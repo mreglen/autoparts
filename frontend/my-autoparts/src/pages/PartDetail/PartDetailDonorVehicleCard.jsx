@@ -1,4 +1,5 @@
 import React from 'react';
+import { Card } from '../../components/UI';
 import {
   buildDonorLabel,
   buildVehicleSubtitle,
@@ -13,12 +14,12 @@ export default function PartDetailDonorVehicleCard({ vehicle }) {
   const subtitle = buildVehicleSubtitle(vehicle);
 
   return (
-    <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 sm:p-5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Снята с автомобиля</p>
-      <p className="mt-1 text-lg font-semibold leading-snug text-gray-900">{title}</p>
+    <Card padding="sm" className="border-accent-100 sm:p-5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-accent-700">Снята с автомобиля</p>
+      <p className="mt-1 text-lg font-semibold leading-snug text-ink">{title}</p>
       {subtitle && subtitle !== title ? (
-        <p className="mt-1 text-sm text-gray-600">{subtitle}</p>
+        <p className="mt-1 text-sm text-ink-muted">{subtitle}</p>
       ) : null}
-    </div>
+    </Card>
   );
 }

@@ -31,7 +31,7 @@ const ORDER_STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS);
 const BOOKING_STATUS_OPTIONS = Object.entries(BOOKING_STATUS_LABELS);
 
 const inputClass =
-  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+  'mt-1 block w-full rounded-sg border border-line bg-surface px-3 py-2 text-sm shadow-sg-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
 
 function toIsoDate(date) {
   const y = date.getFullYear();
@@ -311,7 +311,7 @@ export default function AutoservicePlannerPage() {
           <button
             type="button"
             onClick={() => shiftMonth(-1)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            className="rounded-sg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
           >
             ←
           </button>
@@ -321,7 +321,7 @@ export default function AutoservicePlannerPage() {
           <button
             type="button"
             onClick={() => shiftMonth(1)}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            className="rounded-sg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
           >
             →
           </button>
@@ -334,7 +334,7 @@ export default function AutoservicePlannerPage() {
         </p>
       )}
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div className="mt-4 overflow-hidden rounded-sg border border-gray-200 bg-white">
         <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
           {WEEKDAYS.map((label) => (
             <div key={label} className="px-2 py-2">
@@ -357,13 +357,13 @@ export default function AutoservicePlannerPage() {
                 key={iso}
                 type="button"
                 onClick={() => openDay(iso)}
-                className={`min-h-[4.5rem] border-b border-r border-gray-100 p-2 text-left align-top transition-colors hover:bg-indigo-50/60 ${
+                className={`min-h-[4.5rem] border-b border-r border-gray-100 p-2 text-left align-top transition-colors hover:bg-brand-50/60 ${
                   isCurrentMonth ? 'bg-white' : 'bg-gray-50/60 text-gray-400'
-                } ${isSelected ? 'ring-2 ring-inset ring-indigo-500' : ''}`}
+                } ${isSelected ? 'ring-2 ring-inset ring-brand-500' : ''}`}
               >
                 <span
                   className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
-                    isToday ? 'bg-indigo-600 text-white' : 'text-gray-700'
+                    isToday ? 'bg-brand-600 text-white' : 'text-gray-700'
                   }`}
                 >
                   {day.getDate()}
@@ -399,7 +399,7 @@ export default function AutoservicePlannerPage() {
             aria-label="Закрыть"
             onClick={closeModal}
           />
-          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
+          <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-sg-lg border border-gray-200 bg-white p-5 shadow-xl">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-gray-900">
@@ -412,7 +412,7 @@ export default function AutoservicePlannerPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                className="rounded-sg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
                 aria-label="Закрыть"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -422,7 +422,7 @@ export default function AutoservicePlannerPage() {
             </div>
 
             {error && selectedDate && (
-              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+              <p className="mt-3 rounded-sg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
                 {error}
               </p>
             )}
@@ -436,21 +436,21 @@ export default function AutoservicePlannerPage() {
                   setEditingOrderId(null);
                   setError('');
                 }}
-                className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+                className="rounded-sg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700"
               >
                 Новая запись
               </button>
               <button
                 type="button"
                 onClick={() => navigateToNewOrder()}
-                className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                className="rounded-sg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
               >
                 Создать заказ-наряд
               </button>
             </div>
 
             {showCreateBooking && (
-              <form onSubmit={handleCreateBooking} className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+              <form onSubmit={handleCreateBooking} className="mt-4 rounded-sg border border-amber-200 bg-amber-50/50 p-4">
                 <h3 className="text-sm font-semibold text-gray-900">Новая запись</h3>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label className="block text-sm text-gray-700">
@@ -493,14 +493,14 @@ export default function AutoservicePlannerPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+                    className="rounded-sg bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
                   >
                     {saving ? 'Сохранение…' : 'Сохранить запись'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowCreateBooking(false)}
-                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="rounded-sg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >
                     Отмена
                   </button>
@@ -516,7 +516,7 @@ export default function AutoservicePlannerPage() {
                 {orders.map((order) => (
                   <div
                     key={order.id}
-                    className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
+                    className="rounded-sg border border-gray-200 px-3 py-2.5 text-sm"
                   >
                     {editingOrderId === order.id && orderEditForm ? (
                       <form onSubmit={handleSaveOrder} className="space-y-3">
@@ -556,7 +556,7 @@ export default function AutoservicePlannerPage() {
                           <button
                             type="submit"
                             disabled={saving}
-                            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                            className="rounded-sg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
                           >
                             {saving ? '…' : 'Сохранить'}
                           </button>
@@ -566,7 +566,7 @@ export default function AutoservicePlannerPage() {
                               setEditingOrderId(null);
                               setOrderEditForm(null);
                             }}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                            className="rounded-sg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                           >
                             Отмена
                           </button>
@@ -590,14 +590,14 @@ export default function AutoservicePlannerPage() {
                           <button
                             type="button"
                             onClick={() => startEditOrder(order)}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                            className="rounded-sg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                           >
                             Изменить
                           </button>
                           <button
                             type="button"
                             onClick={() => navigate(`/autoservice/orders/${order.id}/edit`)}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                            className="rounded-sg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                           >
                             Открыть
                           </button>
@@ -617,7 +617,7 @@ export default function AutoservicePlannerPage() {
                 {bookings.map((booking) => (
                   <div
                     key={booking.id}
-                    className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-sm"
+                    className="rounded-sg border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-sm"
                   >
                     {editingBookingId === booking.id && bookingEditForm ? (
                       <form onSubmit={handleSaveBooking} className="space-y-3">
@@ -693,7 +693,7 @@ export default function AutoservicePlannerPage() {
                           <button
                             type="submit"
                             disabled={saving}
-                            className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+                            className="rounded-sg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
                           >
                             {saving ? '…' : 'Сохранить'}
                           </button>
@@ -703,7 +703,7 @@ export default function AutoservicePlannerPage() {
                               setEditingBookingId(null);
                               setBookingEditForm(null);
                             }}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                            className="rounded-sg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                           >
                             Отмена
                           </button>
@@ -726,14 +726,14 @@ export default function AutoservicePlannerPage() {
                           <button
                             type="button"
                             onClick={() => navigateToNewOrder(booking)}
-                            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                            className="rounded-sg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700"
                           >
                             Заказ-наряд
                           </button>
                           <button
                             type="button"
                             onClick={() => startEditBooking(booking)}
-                            className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                            className="rounded-sg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                           >
                             Изменить
                           </button>

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Card } from '../../components/UI';
 import { hasDonorDetails } from '../../utils/fitmentDisplay';
 import { splitFitmentForDisplay } from '../../utils/mergeProductFitment';
 import PartDetailDonorVehicleCard from './PartDetailDonorVehicleCard';
@@ -7,11 +8,11 @@ import PartDetailCompatibilityList from './PartDetailCompatibilityList';
 function FitmentSkeleton() {
   return (
     <div className="mt-4 space-y-3">
-      <div className="h-24 animate-pulse rounded-xl bg-gray-100" />
+      <div className="h-24 animate-pulse rounded-sg-lg bg-surface-subtle" />
       <div className="flex gap-2">
-        <div className="h-16 w-40 animate-pulse rounded-xl bg-gray-100" />
-        <div className="h-16 w-40 animate-pulse rounded-xl bg-gray-100" />
-        <div className="hidden h-16 w-40 animate-pulse rounded-xl bg-gray-100 sm:block" />
+        <div className="h-16 w-40 animate-pulse rounded-sg-lg bg-surface-subtle" />
+        <div className="h-16 w-40 animate-pulse rounded-sg-lg bg-surface-subtle" />
+        <div className="hidden h-16 w-40 animate-pulse rounded-sg-lg bg-surface-subtle sm:block" />
       </div>
     </div>
   );
@@ -32,18 +33,18 @@ export default function PartDetailFitmentBlock({
 
   if (loading && !hasContent) {
     return (
-      <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-        <h2 className="text-lg font-semibold text-gray-900">Подходит для автомобилей</h2>
+      <Card as="section" padding="sm" className="sm:p-5">
+        <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
         <FitmentSkeleton />
-      </section>
+      </Card>
     );
   }
 
   if (!hasContent) return null;
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-      <h2 className="text-lg font-semibold text-gray-900">Подходит для автомобилей</h2>
+    <Card as="section" padding="sm" className="sm:p-5">
+      <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
 
       {visibleDonors.length > 0 ? (
         <div className="mt-4 space-y-3">
@@ -59,6 +60,6 @@ export default function PartDetailFitmentBlock({
       {compatibility.length > 0 ? (
         <PartDetailCompatibilityList vehicles={compatibility} />
       ) : null}
-    </section>
+    </Card>
   );
 }

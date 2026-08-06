@@ -164,7 +164,7 @@ export default function ProfileWithMenuLayout() {
 
     if (!isReady) {
         return (
-            <div className="min-h-screen max-w-full overflow-x-hidden bg-gray-50">
+            <div className="min-h-screen max-w-full overflow-x-hidden bg-surface">
                 <div className="hidden lg:block">
                     <Navigation />
                 </div>
@@ -179,7 +179,7 @@ export default function ProfileWithMenuLayout() {
     }
 
     return (
-        <div className="min-h-screen max-w-full overflow-x-hidden bg-gray-50 pb-[4.5rem] lg:pb-0">
+        <div className="min-h-screen max-w-full overflow-x-hidden bg-surface pb-[4.5rem] lg:pb-0">
             <HeaderBadgeHeightSync />
             <div className="hidden lg:block">
                 <Navigation />

@@ -12,7 +12,7 @@ export default function StarRatingInput({ value = 5, onChange, disabled = false,
           type="button"
           disabled={disabled}
           onClick={() => onChange?.(star)}
-          className={`rounded-md p-0.5 transition hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`rounded-md p-0.5 transition hover:scale-110 focus:outline-none focus:ring-2 focus:ring-brand-500/40 disabled:cursor-not-allowed disabled:opacity-50 ${
             star <= value ? 'text-amber-400' : 'text-gray-300 hover:text-amber-300'
           }`}
           aria-label={`${star} из 5`}

@@ -1,62 +1,119 @@
-import React, { useState } from 'react';
-import ButtonPrimary from './ButtonPrimary';
+import { useEffect } from 'react';
+import Button from './Button';
 
-function Modal({ onClose }) {
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        console.log('Submitted:', { name, phone });
-        onClose();
-    };
-
-    return (
-        <div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-        >
-            <div className="bg-white p-6 rounded-lg w-80 relative z-50">
-                {/* Кнопка закрытия */}
-                <button
-                    className="float-right text-gray-600 hover:text-gray-800"
-                    onClick={onClose}
-                >
-                    &times;
-                </button>
-
-                {/* Заголовок */}
-                <h2 className="text-xl font-bold mb-4">Введите данные</h2>
-
-                {/* Форма */}
-                <form onSubmit={handleSubmit}>
-                    <div className="mb-4">
-                        <label className="block text-gray-700 mb-2">Имя</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg"
-                            required
-                        />
-                    </div>
-
-                    <div className="mb-4">
-                        <label className="block text-gray-700 mb-2">Телефон</label>
-                        <input
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg"
-                            required
-                        />
-                    </div>
-
-                    {/* Кнопка отправки */}
-                    <ButtonPrimary text="Отправить" />
-                </form>
-            </div>
-        </div>
-    );
+function cx(...parts) {
+  return parts.filter(Boolean).join(' ');
 }
 
-export default Modal;
+export default function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  size = 'md',
+  className = '',
+}) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const width =
+    size === 'sm' ? 'max-w-md' : size === 'lg' ? 'max-w-3xl' : size === 'xl' ? 'max-w-5xl' : 'max-w-xl';
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-end justify-center p-0 sm:items-center sm:p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/40"
+        aria-label="Закрыть"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === 'string' ? title : undefined}
+        className={cx(
+          'relative w-full overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:rounded-sg-lg',
+          width,
+          className,
+        )}
+      >
+        {(title || onClose) && (
+          <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
+            <div className="min-w-0">
+              {typeof title === 'string' ? (
+                <h2 className="text-base font-semibold text-ink">{title}</h2>
+              ) : (
+                title
+              )}
+            </div>
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-sg p-1.5 text-ink-faint hover:bg-surface-subtle hover:text-ink"
+                aria-label="Закрыть"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            ) : null}
+          </div>
+        )}
+        <div className="max-h-[75vh] overflow-y-auto px-5 py-4">{children}</div>
+        {footer ? <div className="border-t border-line px-5 py-4">{footer}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+export function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title = 'Подтвердите действие',
+  message,
+  confirmLabel = 'Подтвердить',
+  cancelLabel = 'Отмена',
+  danger = false,
+  loading = false,
+}) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="sm"
+      footer={(
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
+            {cancelLabel}
+          </Button>
+          <Button
+            variant={danger ? 'danger' : 'primary'}
+            loading={loading}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </Button>
+        </div>
+      )}
+    >
+      {message ? <p className="text-sm text-ink-soft">{message}</p> : null}
+    </Modal>
+  );
+}

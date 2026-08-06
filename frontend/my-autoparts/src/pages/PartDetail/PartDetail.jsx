@@ -44,6 +44,7 @@ import {
 import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
 import { getUsedPurchaseActions } from '../../utils/usedPurchaseMode';
 import { mapLaximoApplicableVehicles } from '../../utils/fitmentDisplay';
+import { Badge } from '../../components/UI';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -828,10 +829,10 @@ const PartDetail = () => {
 
     if (!soldOutLabel && soldOutResolveState === 'loading') {
       return (
-        <div className="min-h-screen bg-gray-50 max-md:pb-28">
+        <div className="min-h-screen bg-surface max-md:pb-28">
           <div className="max-w-6xl mx-auto px-4 py-16">
-            <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center shadow-sm">
-              <p className="text-lg text-gray-600">Загрузка информации о запчасти...</p>
+            <div className="rounded-sg-lg border border-line bg-surface px-6 py-12 text-center shadow-sg-sm">
+              <p className="text-lg text-ink-muted">Загрузка информации о запчасти...</p>
             </div>
           </div>
         </div>
@@ -840,7 +841,7 @@ const PartDetail = () => {
 
     if (soldOutLabel) {
       return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-surface">
           <Helmet>
             <title>{soldOutLabel} — продано | Свой Гараж</title>
             <meta name="robots" content="noindex, follow" />
@@ -854,16 +855,16 @@ const PartDetail = () => {
               ]}
               includeJsonLd={false}
             />
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center shadow-sm">
-              <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Продано</p>
-              <h1 className="mt-2 text-2xl font-bold text-gray-900">{soldOutLabel}</h1>
-              <p className="mt-3 text-gray-600">
+            <div className="rounded-sg-lg border border-warning-100 bg-warning-50 px-6 py-8 text-center shadow-sg-sm">
+              <p className="text-sm font-semibold uppercase tracking-wide text-warning-700">Продано</p>
+              <h1 className="mt-2 text-2xl font-bold text-ink">{soldOutLabel}</h1>
+              <p className="mt-3 text-ink-muted">
                 Это предложение уже недоступно. Посмотрите другие варианты с тем же артикулом.
               </p>
               <button
                 type="button"
                 onClick={() => navigate(catalogPath)}
-                className="mt-5 inline-flex rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                className="mt-5 inline-flex rounded-md bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
               >
                 Каталог по артикулу
               </button>
@@ -889,11 +890,11 @@ const PartDetail = () => {
         </Helmet>
         <div className="text-center">
           <p className="text-lg text-red-600">Ошибка загрузки информации о запчасти</p>
-          <p className="text-sm text-gray-500 mt-2">{formatErrorText(error)}</p>
+          <p className="text-sm text-ink-muted mt-2">{formatErrorText(error)}</p>
           <button 
             type="button"
             onClick={handleBackToList}
-            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+            className="mt-4 px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700"
           >
             Назад
           </button>
@@ -904,11 +905,11 @@ const PartDetail = () => {
 
   if (!showProduct) {
     return (
-      <div className="min-h-screen bg-gray-50 max-md:pb-28">
+      <div className="min-h-screen bg-surface max-md:pb-28">
         {apiSeo ? <PartProductSeoHelmet seo={apiSeo} structuredDataBlocks={null} product={null} /> : null}
         <div className="max-w-6xl mx-auto px-4 py-16">
-          <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center shadow-sm">
-            <p className="text-lg text-gray-600">Загрузка информации о запчасти...</p>
+          <div className="rounded-sg-lg border border-line bg-surface px-6 py-12 text-center shadow-sg-sm">
+            <p className="text-lg text-ink-muted">Загрузка информации о запчасти...</p>
           </div>
         </div>
       </div>
@@ -988,10 +989,10 @@ const PartDetail = () => {
           return (
             <div
               key={index}
-              className={`relative aspect-square cursor-pointer overflow-hidden rounded-md border bg-gray-50 ${
+              className={`relative aspect-square cursor-pointer overflow-hidden rounded-md border bg-surface-muted ${
                 currentMainMediaIndex === index
-                  ? 'border-indigo-500'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-brand-500'
+                  : 'border-line hover:border-line-strong'
               }`}
               onClick={() => setCurrentMainMediaIndex(index)}
             >
@@ -1033,34 +1034,24 @@ const PartDetail = () => {
     );
   };
 
+  const renderProductBadges = () => (
+    <div className="flex flex-wrap items-center gap-2">
+      <Badge>{currentProduct.brand || '—'}</Badge>
+      <Badge>Арт. {currentProduct.article || '—'}</Badge>
+      <Badge tone={currentProduct.is_new ? 'success' : 'accent'}>
+        {currentProduct.is_new ? 'Новая' : 'Б/у'}
+      </Badge>
+      {inStock ? <Badge tone="success">В наличии</Badge> : null}
+    </div>
+  );
+
   const renderMobileTitleBlock = () => (
     <>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
-          {currentProduct.brand || '—'}
-        </span>
-        <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
-          Арт. {currentProduct.article || '—'}
-        </span>
-        {currentProduct.is_new ? (
-          <span className="rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-            Новая
-          </span>
-        ) : (
-          <span className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
-            Б/у
-          </span>
-        )}
-        {inStock ? (
-          <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-            В наличии
-          </span>
-        ) : null}
-      </div>
-      <h1 className="text-xl font-bold leading-snug text-gray-900">
+      <div className="mb-2">{renderProductBadges()}</div>
+      <h1 className="text-xl font-bold leading-snug text-ink">
         <span className="block">{h1Primary}</span>
         {h1Subtitle ? (
-          <span className="mt-1 block text-base font-medium text-gray-600">{h1Subtitle}</span>
+          <span className="mt-1 block text-base font-medium text-ink-muted">{h1Subtitle}</span>
         ) : null}
       </h1>
       <PartDetailSeoCrossLinks
@@ -1076,11 +1067,11 @@ const PartDetail = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-gray-50 to-gray-100 max-md:pb-28 md:bg-white md:from-white md:via-white md:to-white">
+    <div className="min-h-screen bg-surface max-md:pb-28">
       <PartProductSeoHelmet seo={seo} structuredDataBlocks={structuredDataBlocks} product={currentProduct} />
 
       <div className="md:hidden">
-        <div className="relative min-h-[52dvh] max-h-[62dvh] bg-gray-100">
+        <div className="relative min-h-[52dvh] max-h-[62dvh] bg-surface-subtle">
           {allMediaItems.length > 0 ? (
             <div
               className="relative h-full min-h-[52dvh] max-h-[62dvh] cursor-pointer"
@@ -1101,8 +1092,8 @@ const PartDetail = () => {
                         preload="metadata"
                       />
                       <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
-                        <div className="rounded-full bg-white/90 p-3">
-                          <svg className="ml-0.5 h-8 w-8 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                        <div className="rounded-full bg-surface/90 p-3">
+                          <svg className="ml-0.5 h-8 w-8 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                           </svg>
                         </div>
@@ -1127,7 +1118,7 @@ const PartDetail = () => {
                 <>
                   <button
                     type="button"
-                    className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur"
+                    className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink-soft shadow-sg-sm backdrop-blur"
                     onClick={(e) => {
                       e.stopPropagation();
                       setCurrentMainMediaIndex((prev) => (prev > 0 ? prev - 1 : allMediaItems.length - 1));
@@ -1140,7 +1131,7 @@ const PartDetail = () => {
                   </button>
                   <button
                     type="button"
-                    className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur"
+                    className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink-soft shadow-sg-sm backdrop-blur"
                     onClick={(e) => {
                       e.stopPropagation();
                       setCurrentMainMediaIndex((prev) => (prev < allMediaItems.length - 1 ? prev + 1 : 0));
@@ -1158,8 +1149,8 @@ const PartDetail = () => {
               )}
             </div>
           ) : (
-            <div className="flex min-h-[52dvh] items-center justify-center bg-gray-100">
-              <p className="text-sm text-gray-400">Нет фотографий</p>
+            <div className="flex min-h-[52dvh] items-center justify-center bg-surface-subtle">
+              <p className="text-sm text-ink-faint">Нет фотографий</p>
             </div>
           )}
 
@@ -1169,7 +1160,7 @@ const PartDetail = () => {
             <button
               type="button"
               onClick={handleBackToList}
-              className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-gray-800 shadow-sm backdrop-blur"
+              className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface/80 text-ink-soft shadow-sg-sm backdrop-blur"
               aria-label="Назад"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1181,7 +1172,7 @@ const PartDetail = () => {
                 productId={currentProduct.id}
                 size="sm"
                 showLabel={false}
-                className="h-10 w-10 min-h-0 rounded-full border-0 bg-white/80 p-0 shadow-sm backdrop-blur"
+                className="h-10 w-10 min-h-0 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
               />
               <ShareButton
                 url={seo.canonicalUrl}
@@ -1189,26 +1180,26 @@ const PartDetail = () => {
                 text={shareText}
                 showLabel={false}
                 size="sm"
-                className="h-10 w-10 min-h-0 rounded-full border-0 bg-white/80 p-0 shadow-sm backdrop-blur"
+                className="h-10 w-10 min-h-0 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
               />
             </div>
           </div>
         </div>
 
-        <div className="border-b border-gray-100 bg-white px-4 py-3">
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="border-b border-line bg-surface px-4 py-3">
+          <div className="text-2xl font-bold text-ink">
             {currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : '—'}
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1380px] px-2 pb-8 pt-3 md:px-3 max-md:px-0 max-md:pb-32 max-md:pt-0">
+      <div className="mx-auto max-w-7xl px-3 pb-8 pt-3 md:px-4 max-md:px-0 max-md:pb-32 max-md:pt-0">
         <div className="mb-3 hidden md:block">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleBackToList}
-              className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:border-indigo-200 hover:text-indigo-600"
+              className="inline-flex items-center rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink-muted shadow-sg-sm transition-colors hover:border-brand-200 hover:text-brand-600"
             >
               <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -1219,7 +1210,7 @@ const PartDetail = () => {
               productId={currentProduct.id}
               size="sm"
               showLabel={false}
-              className="h-9 w-9 min-h-0 gap-0 rounded-lg border border-gray-200 p-0 shadow-sm"
+              className="h-9 w-9 min-h-0 gap-0 rounded-lg border border-line p-0 shadow-sg-sm"
             />
             <ShareButton
               url={seo.canonicalUrl}
@@ -1227,7 +1218,7 @@ const PartDetail = () => {
               text={shareText}
               showLabel={false}
               size="sm"
-              className="h-9 w-9 min-h-0 gap-0 rounded-lg border border-gray-200 p-0 shadow-sm"
+              className="h-9 w-9 min-h-0 gap-0 rounded-lg border border-line p-0 shadow-sg-sm"
             />
           </div>
           <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
@@ -1237,7 +1228,7 @@ const PartDetail = () => {
           <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm max-md:rounded-none max-md:border-x-0 max-md:shadow-none md:border-0 md:shadow-none md:rounded-none">
+        <div className="overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg max-md:rounded-none max-md:border-x-0 max-md:shadow-none md:border-0 md:shadow-none md:rounded-none">
           <div className="md:hidden">
             <div className="grid grid-cols-1">
               <div className="space-y-4 p-4 max-md:px-4 max-md:pt-4">
@@ -1246,18 +1237,18 @@ const PartDetail = () => {
                 <PartDetailSpecsBlock product={currentProduct} />
               </div>
 
-              <div className="flex flex-col gap-4 bg-slate-50/70 p-4 max-md:px-4">
-                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-4 bg-surface-muted p-4 max-md:px-4">
+                <div className="rounded-sg border border-line bg-surface p-4 shadow-sg">
                   <dl className="space-y-2.5 text-sm">
                     <div className="flex items-center justify-between gap-3">
-                      <dt className="text-gray-500">В наличии</dt>
-                      <dd className={`font-semibold ${inStock ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      <dt className="text-ink-muted">В наличии</dt>
+                      <dd className={`font-semibold ${inStock ? 'text-success-700' : 'text-warning-700'}`}>
                         {currentProduct.quantity || 0} шт.
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-gray-500">Адрес</dt>
-                      <dd className="mt-1 font-medium leading-snug text-gray-900 break-words">
+                      <dt className="text-ink-muted">Адрес</dt>
+                      <dd className="mt-1 font-medium leading-snug text-ink break-words">
                         {currentProduct.storage_location?.address
                           || currentProduct.storage_location?.name
                           || '—'}
@@ -1267,21 +1258,21 @@ const PartDetail = () => {
                 </div>
 
                 {currentProduct.description ? (
-                  <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <h2 className="mb-2 text-sm font-semibold text-gray-900">Описание от продавца</h2>
-                    <div className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">
+                  <div className="rounded-sg border border-line bg-surface p-4 shadow-sg">
+                    <h2 className="mb-2 text-sm font-semibold text-ink">Описание от продавца</h2>
+                    <div className="text-sm leading-relaxed text-ink-soft whitespace-pre-line">
                       {stripHtmlTags(currentProduct.description)}
                     </div>
                   </div>
                 ) : null}
 
                 {showSellerContact && (sellerOrg?.phone || sellerOrg?.contact_person) ? (
-                  <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <h2 className="mb-3 text-sm font-semibold text-gray-900">Продавец</h2>
+                  <div className="rounded-sg border border-line bg-surface p-4 shadow-sg">
+                    <h2 className="mb-3 text-sm font-semibold text-ink">Продавец</h2>
                     <div className="mb-3 flex items-center gap-2.5">
                       <div
                         className={`flex h-9 w-9 shrink-0 overflow-hidden rounded-full ${
-                          sellerLogoUrl ? 'border border-gray-200 bg-white' : 'bg-indigo-600'
+                          sellerLogoUrl ? 'border border-line bg-surface' : 'bg-brand-600'
                         }`}
                       >
                         {sellerLogoUrl ? (
@@ -1298,10 +1289,10 @@ const PartDetail = () => {
                       </div>
                       <div className="min-w-0">
                         {sellerOrg?.name ? (
-                          <p className="truncate text-sm font-medium text-gray-900">{sellerOrg.name}</p>
+                          <p className="truncate text-sm font-medium text-ink">{sellerOrg.name}</p>
                         ) : null}
                         {sellerOrg?.contact_person ? (
-                          <p className="truncate text-xs text-gray-500">{sellerOrg.contact_person}</p>
+                          <p className="truncate text-xs text-ink-muted">{sellerOrg.contact_person}</p>
                         ) : null}
                       </div>
                     </div>
@@ -1310,7 +1301,7 @@ const PartDetail = () => {
                         <button
                           type="button"
                           onClick={handleOpenPhoneModal}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 py-2.5 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 py-2.5 text-sm font-semibold text-brand-800 hover:bg-brand-100"
                         >
                           Позвонить
                         </button>
@@ -1319,7 +1310,7 @@ const PartDetail = () => {
                         type="button"
                         onClick={handleWriteToSeller}
                         disabled={creatingChat}
-                        className="flex flex-1 items-center justify-center rounded-md bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-indigo-400"
+                        className="flex flex-1 items-center justify-center rounded-md bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:bg-brand-400"
                       >
                         {creatingChat ? 'Создание чата…' : 'Написать'}
                       </button>
@@ -1335,8 +1326,8 @@ const PartDetail = () => {
           </div>
 
           <div className="hidden md:block py-2 lg:py-4">
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10 xl:gap-12">
-              <div className="lg:col-span-5">
+            <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-8 xl:gap-10">
+              <div className="min-w-0 overflow-hidden lg:col-span-5">
                 <PartDetailDesktopGallery
                   items={allMediaItems}
                   currentIndex={currentMainMediaIndex}
@@ -1350,33 +1341,12 @@ const PartDetail = () => {
               </div>
 
               <div className="min-w-0 lg:col-span-4">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
-                    {currentProduct.brand || '—'}
-                  </span>
-                  <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
-                    Арт. {currentProduct.article || '—'}
-                  </span>
-                  {currentProduct.is_new ? (
-                    <span className="rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-                      Новая
-                    </span>
-                  ) : (
-                    <span className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
-                      Б/у
-                    </span>
-                  )}
-                  {inStock ? (
-                    <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                      В наличии
-                    </span>
-                  ) : null}
-                </div>
+                <div className="mb-3">{renderProductBadges()}</div>
 
-                <h1 className="text-xl font-bold leading-snug text-gray-900 lg:text-[1.65rem]">
+                <h1 className="text-xl font-bold leading-snug text-ink lg:text-[1.65rem]">
                   <span className="block">{h1Primary}</span>
                   {h1Subtitle ? (
-                    <span className="mt-1 block text-base font-medium text-gray-600">{h1Subtitle}</span>
+                    <span className="mt-1 block text-base font-medium text-ink-muted">{h1Subtitle}</span>
                   ) : null}
                 </h1>
 
@@ -1396,15 +1366,15 @@ const PartDetail = () => {
 
                 {currentProduct.description ? (
                   <section className="mt-4">
-                    <h2 className="text-base font-semibold text-gray-900">Описание от продавца</h2>
-                    <div className="mt-2 text-sm leading-relaxed text-gray-700 whitespace-pre-line">
+                    <h2 className="text-base font-semibold text-ink">Описание от продавца</h2>
+                    <div className="mt-2 text-sm leading-relaxed text-ink-soft whitespace-pre-line">
                       {stripHtmlTags(currentProduct.description)}
                     </div>
                   </section>
                 ) : null}
               </div>
 
-              <div className="lg:col-span-3">
+              <div className="min-w-0 lg:col-span-3">
                 <div className="space-y-5 lg:sticky lg:top-4">
                   <PartDetailPurchaseSidebar
                     product={currentProduct}
@@ -1432,7 +1402,7 @@ const PartDetail = () => {
               </div>
             </div>
 
-            <div className="mt-8 space-y-5 border-t border-gray-100 pt-8 lg:mt-10 lg:pt-10">
+            <div className="mt-8 space-y-5 border-t border-line-soft pt-8 lg:mt-10 lg:pt-10">
               <PartDetailTrustRow />
             </div>
           </div>
@@ -1477,23 +1447,23 @@ const PartDetail = () => {
           aria-labelledby="part-phone-modal-title"
         >
           <div
-            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="w-full max-w-sm overflow-hidden rounded-sg-lg bg-surface shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-b border-indigo-100 bg-indigo-50/70 px-5 py-4">
+            <div className="border-b border-brand-100 bg-brand-50/70 px-5 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 id="part-phone-modal-title" className="text-base font-semibold text-gray-900">
+                  <h3 id="part-phone-modal-title" className="text-base font-semibold text-ink">
                     Позвонить продавцу
                   </h3>
                   {sellerOrg?.name ? (
-                    <p className="mt-0.5 truncate text-sm text-gray-600">{sellerOrg.name}</p>
+                    <p className="mt-0.5 truncate text-sm text-ink-muted">{sellerOrg.name}</p>
                   ) : null}
                 </div>
                 <button
                   type="button"
                   onClick={handleClosePhoneModal}
-                  className="shrink-0 rounded-md p-1 text-gray-400 hover:bg-white/80 hover:text-gray-600"
+                  className="shrink-0 rounded-md p-1 text-ink-faint hover:bg-surface/80 hover:text-ink-muted"
                   aria-label="Закрыть"
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1504,15 +1474,15 @@ const PartDetail = () => {
             </div>
 
             <div className="px-5 py-5">
-              <p className="text-sm text-gray-500">Номер телефона</p>
-              <p className="mt-1 text-2xl font-bold tracking-wide text-gray-900">
+              <p className="text-sm text-ink-muted">Номер телефона</p>
+              <p className="mt-1 text-2xl font-bold tracking-wide text-ink">
                 {formatPhoneNumber(sellerOrg.phone)}
               </p>
 
               <div className="mt-5 flex flex-col gap-2">
                 <a
                   href={`tel:${sellerOrg.phone.replace(/\D/g, '')}`}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
                 >
                   <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -1522,7 +1492,7 @@ const PartDetail = () => {
                 <button
                   type="button"
                   onClick={handleClosePhoneModal}
-                  className="rounded-lg py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                  className="rounded-lg py-2.5 text-sm font-medium text-ink-muted hover:bg-surface-muted"
                 >
                   Отмена
                 </button>
@@ -1534,7 +1504,7 @@ const PartDetail = () => {
 
       {showMobileStickyCta ? (
         <div
-          className="md:hidden fixed inset-x-0 z-[44] border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/90 shadow-[0_-6px_24px_rgba(0,0,0,0.08)]"
+          className="md:hidden fixed inset-x-0 z-[44] border-t border-line bg-surface/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface/90 shadow-[0_-6px_24px_rgba(0,0,0,0.08)]"
           style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
         >
           <div className="mx-auto flex max-w-6xl gap-2">
@@ -1543,7 +1513,7 @@ const PartDetail = () => {
                 type="button"
                 onClick={handleBuyNow}
                 disabled={buyingNow}
-                className={`min-h-11 flex-1 rounded-xl bg-indigo-50 px-3 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`min-h-11 flex-1 rounded-sg bg-brand-50 px-3 text-sm font-semibold text-brand-800 transition-colors hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 ${
                   !canShowWrite ? 'w-full' : ''
                 }`}
               >
@@ -1555,7 +1525,7 @@ const PartDetail = () => {
                 type="button"
                 onClick={handleWriteToSeller}
                 disabled={creatingChat}
-                className={`min-h-11 flex-1 rounded-xl bg-indigo-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`min-h-11 flex-1 rounded-sg bg-brand-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 ${
                   !canShowBuyNow ? 'w-full' : ''
                 }`}
               >

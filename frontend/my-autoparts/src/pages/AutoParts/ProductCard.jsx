@@ -1,8 +1,8 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { buildListImageUrlFallbackChain } from '../../utils/apiClient';
-import { formatProductDisplayTitle } from '../../utils/productDisplayName';
+import { extractProductDescription, formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildNewPartOpenPath, buildPartDetailPath } from '../../utils/partRoutes';
 import { prefetchUsedPartDetail } from '../../utils/prefetchPartDetail';
 import { isRosskoFavoriteItem } from '../../utils/favoriteKeys';
@@ -64,6 +64,7 @@ const ProductCard = ({
   eagerImage = false,
   showFavorite = true,
   showNewBadge,
+  compactMarketplace = false,
 }) => {
   const dispatch = useDispatch();
   const product = part;
@@ -74,6 +75,11 @@ const ProductCard = ({
     part.title || part.name,
   );
   const shouldShowNewBadge = showNewBadge ?? isRossko;
+  const compactTitle = extractProductDescription(
+    part.title || part.name,
+    part.brand,
+    part.article,
+  ) || displayTitle;
 
   const detailPath = useMemo(() => {
     if (isRossko) {
@@ -92,32 +98,87 @@ const ProductCard = ({
     }
   }, [dispatch, isRossko, product.id]);
 
-  const listPreview = useMemo(() => {
+  const listPreviews = useMemo(() => {
     if (isRossko) return null;
     const photos = part.photos || [];
+    const previews = [];
     for (let i = 0; i < photos.length; i += 1) {
       const photo = photos[i];
       if (!isVideoItem(photo)) {
         const chain = buildListImageUrlFallbackChain(photo);
         if (chain.length > 0) {
-          return { type: 'photo', url: chain[0], photo, urlChain: chain };
+          previews.push({ type: 'photo', url: chain[0], photo, urlChain: chain });
         }
       }
     }
+    if (previews.length > 0) return previews;
     const videos = part.videos || [];
     if (videos.length > 0) {
-      return { type: 'video', url: null };
+      return [{ type: 'video', url: null }];
     }
-    return null;
+    return [];
   }, [isRossko, part.photos, part.videos]);
 
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
+  const listPreview = listPreviews?.[currentPreviewIndex] || listPreviews?.[0] || null;
   const [photoSrc, setPhotoSrc] = useState(listPreview?.url || '');
   const [photoFallbackIndex, setPhotoFallbackIndex] = useState(0);
+  const touchStartXRef = useRef(null);
+  const didSwipeRef = useRef(false);
+  const swipeResetTimerRef = useRef(null);
 
   useEffect(() => {
     setPhotoSrc(listPreview?.url || '');
     setPhotoFallbackIndex(0);
   }, [listPreview?.url]);
+
+  useEffect(() => {
+    setCurrentPreviewIndex(0);
+  }, [product.id]);
+
+  useEffect(() => () => {
+    if (swipeResetTimerRef.current) {
+      window.clearTimeout(swipeResetTimerRef.current);
+    }
+  }, []);
+
+  const previewCount = listPreviews?.length || 0;
+
+  const handlePreviewMouseMove = useCallback((event) => {
+    if (!compactMarketplace || previewCount <= 1) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width) return;
+    const relativeX = Math.max(0, Math.min(rect.width - 1, event.clientX - rect.left));
+    const nextIndex = Math.min(previewCount - 1, Math.floor((relativeX / rect.width) * previewCount));
+    setCurrentPreviewIndex(nextIndex);
+  }, [compactMarketplace, previewCount]);
+
+  const handlePreviewTouchStart = useCallback((event) => {
+    if (!compactMarketplace || previewCount <= 1) return;
+    touchStartXRef.current = event.touches[0]?.clientX ?? null;
+    didSwipeRef.current = false;
+  }, [compactMarketplace, previewCount]);
+
+  const handlePreviewTouchEnd = useCallback((event) => {
+    const startX = touchStartXRef.current;
+    const endX = event.changedTouches[0]?.clientX;
+    touchStartXRef.current = null;
+    if (startX == null || endX == null || previewCount <= 1) return;
+    const deltaX = endX - startX;
+    if (Math.abs(deltaX) < 35) return;
+    didSwipeRef.current = true;
+    if (swipeResetTimerRef.current) {
+      window.clearTimeout(swipeResetTimerRef.current);
+    }
+    swipeResetTimerRef.current = window.setTimeout(() => {
+      didSwipeRef.current = false;
+    }, 400);
+    setCurrentPreviewIndex((current) => (
+      deltaX < 0
+        ? Math.min(previewCount - 1, current + 1)
+        : Math.max(0, current - 1)
+    ));
+  }, [previewCount]);
 
   const priceLabel = useMemo(() => {
     const raw = product.price;
@@ -140,15 +201,36 @@ const ProductCard = ({
 
   return (
     <div className="w-full">
-      <div className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className={compactMarketplace
+        ? 'flex h-full flex-col bg-surface'
+        : 'flex h-full flex-col overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg'}
+      >
         <Link
           to={detailPath}
           className="group flex flex-1 flex-col text-inherit no-underline"
           onMouseEnter={prefetchDetail}
           onFocus={prefetchDetail}
           onTouchStart={prefetchDetail}
+          onClick={(event) => {
+            if (didSwipeRef.current) {
+              event.preventDefault();
+              didSwipeRef.current = false;
+              if (swipeResetTimerRef.current) {
+                window.clearTimeout(swipeResetTimerRef.current);
+              }
+            }
+          }}
         >
-          <div className="relative flex aspect-[4/3] w-full cursor-pointer items-center justify-center overflow-hidden bg-gray-100">
+          <div className={`relative flex w-full cursor-pointer items-center justify-center overflow-hidden bg-surface-muted ${
+            compactMarketplace ? 'aspect-square touch-pan-y rounded-sg-lg' : 'aspect-[4/3]'
+          }`}
+            onMouseMove={handlePreviewMouseMove}
+            onMouseLeave={() => {
+              if (compactMarketplace && previewCount > 1) setCurrentPreviewIndex(0);
+            }}
+            onTouchStart={handlePreviewTouchStart}
+            onTouchEnd={handlePreviewTouchEnd}
+          >
             {shouldShowNewBadge ? <CatalogNewBadge /> : null}
             {showFavorite ? (
               isRossko ? (
@@ -161,7 +243,7 @@ const ProductCard = ({
               <img
                 src={photoSrc}
                 alt={displayTitle}
-                className="h-full w-full object-contain"
+                className={`h-full w-full ${compactMarketplace ? 'object-cover' : 'object-contain'}`}
                 width={400}
                 height={300}
                 sizes="(max-width:640px) 50vw, (max-width:1280px) 33vw, 25vw"
@@ -198,30 +280,61 @@ const ProductCard = ({
             ) : (
               <PhotoPlaceholder />
             )}
+            {compactMarketplace && previewCount > 1 ? (
+              <div className="pointer-events-none absolute inset-x-2 bottom-2 flex gap-1">
+                {listPreviews.map((_, index) => (
+                  <span
+                    key={index}
+                    className={`h-1 flex-1 rounded-full shadow-sm ${
+                      index === currentPreviewIndex ? 'bg-white' : 'bg-white/45'
+                    }`}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-1 flex-col">
-            <div className="flex-[2] space-y-0.5 p-2">
-              <div className="flex items-center gap-1">
-                <span className="text-[17px] font-bold text-gray-900">{priceLabel}</span>
-                {product.originalPrice ? (
-                  <span className="text-[16px] text-gray-400 line-through">{product.originalPrice}</span>
-                ) : null}
-              </div>
+            <div className={compactMarketplace ? 'flex-[2] space-y-0 px-0.5 pt-1.5' : 'flex-[2] space-y-0.5 p-2'}>
+              {compactMarketplace ? (
+                <>
+                  <p className="line-clamp-2 cursor-pointer text-sm font-medium leading-[1.25rem] text-ink group-hover:text-brand-600 sm:text-[15px]">
+                    {compactTitle}
+                  </p>
+                  <p className="truncate text-xs leading-[1.15rem] text-ink-muted sm:text-sm">
+                    {[product.brand, product.article].filter(Boolean).join(' · ') || 'Без бренда и артикула'}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <span className="text-base font-bold leading-5 text-ink sm:text-[17px]">{priceLabel}</span>
+                    {product.originalPrice ? (
+                      <span className="text-sm text-ink-faint line-through">{product.originalPrice}</span>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[17px] font-bold text-ink">{priceLabel}</span>
+                    {product.originalPrice ? (
+                      <span className="text-[16px] text-ink-faint line-through">{product.originalPrice}</span>
+                    ) : null}
+                  </div>
 
-              <div className="flex-1 space-y-0.5">
-                <p className="line-clamp-2 cursor-pointer text-[15px] font-medium text-gray-900 group-hover:text-indigo-600">
-                  {displayTitle}
-                </p>
-              </div>
+                  <div className="flex-1 space-y-0.5">
+                    <p className="line-clamp-2 cursor-pointer text-[15px] font-medium text-ink group-hover:text-brand-600">
+                      {displayTitle}
+                    </p>
+                  </div>
+                </>
+              )}
 
-              {!hideWarehouse && !isRossko ? (
-                <div className="flex items-center gap-0.5 text-[14px] text-gray-600">
+              {!compactMarketplace && !hideWarehouse && !isRossko ? (
+                <div className="flex items-center gap-0.5 text-[14px] text-ink-muted">
                   <span>{product.location || 'Скл'}</span>
                   {product.stock ? (
                     <span
-                      className={`rounded-full px-0.5 py-0.5 text-[14px] ${
-                        product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      className={`rounded-sg px-0.5 py-0.5 text-[14px] ${
+                        product.stock > 0 ? 'bg-success-100 text-success-700' : 'bg-danger-100 text-danger-700'
                       }`}
                     >
                       {product.stock > 0 ? `В н: ${product.stock}` : 'Нет'}
@@ -230,24 +343,24 @@ const ProductCard = ({
                 </div>
               ) : null}
 
-              {!hideConditionAndQuantity && !isRossko ? (
+              {!compactMarketplace && !hideConditionAndQuantity && !isRossko ? (
                 <div className="flex flex-wrap gap-0.5 pt-0.5">
                   {product.isNew || product.is_new ? (
-                    <span className="rounded-full bg-green-500 px-1 py-0.5 text-[14px] font-medium text-white">
+                    <span className="rounded-sg bg-brand-600 px-1 py-0.5 text-[14px] font-medium text-white">
                       Новое
                     </span>
                   ) : (
-                    <span className="rounded-full bg-yellow-500 px-1 py-0.5 text-[14px] font-medium text-white">
+                    <span className="rounded-sg bg-accent-600 px-1 py-0.5 text-[14px] font-medium text-white">
                       Б/у
                     </span>
                   )}
                   {product.quantity !== undefined ? (
-                    <span className="rounded-full bg-blue-500 px-1 py-0.5 text-[14px] font-medium text-white">
+                    <span className="rounded-sg bg-brand-100 px-1 py-0.5 text-[14px] font-medium text-brand-700">
                       {product.quantity} шт.
                     </span>
                   ) : null}
                   {product.isDiscount ? (
-                    <span className="rounded-full bg-red-500 px-1 py-0.5 text-[14px] font-medium text-white">
+                    <span className="rounded-sg bg-danger-600 px-1 py-0.5 text-[14px] font-medium text-white">
                       Скидка
                     </span>
                   ) : null}

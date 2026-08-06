@@ -11,6 +11,7 @@ import {
 } from '../../utils/newPartsCheckoutDelivery';
 import { buildDeliverySeo, PageSeoHelmet } from '../../utils/pageSeo';
 import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
+import { Card, PageHeader } from '../../components/UI';
 
 function formatMoney(value) {
   const num = Number(value);
@@ -20,24 +21,24 @@ function formatMoney(value) {
 
 function ModeCard({ icon, title, description, children }) {
   return (
-    <section className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm sm:p-6">
+    <Card as="section" padding="md">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sg bg-brand-50 text-brand-600">
           {icon}
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
+          {description && <p className="mt-1 text-sm text-ink-muted">{description}</p>}
         </div>
       </div>
-      {children ? <div className="mt-4 border-t border-gray-100 pt-4">{children}</div> : null}
-    </section>
+      {children ? <div className="mt-4 border-t border-line pt-4">{children}</div> : null}
+    </Card>
   );
 }
 
 function InfoChip({ children }) {
   return (
-    <span className="inline-flex rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800">
+    <span className="inline-flex rounded-sg border border-line bg-surface-muted px-3 py-2 text-sm font-medium text-ink">
       {children}
     </span>
   );
@@ -63,9 +64,9 @@ function YandexDeliveryMatrixTable({ rows }) {
   }, [rows]);
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200">
+    <div className="overflow-x-auto rounded-sg border border-line">
       <table className="min-w-full text-sm">
-        <thead className="bg-gray-50 text-left text-gray-600">
+        <thead className="bg-surface-muted text-left text-ink-muted">
           <tr>
             <th className="px-4 py-3 font-medium">Регион</th>
             <th className="px-4 py-3 font-medium">Тип доставки</th>
@@ -75,11 +76,11 @@ function YandexDeliveryMatrixTable({ rows }) {
         </thead>
         <tbody>
           {matrixRows.map((row) => (
-            <tr key={row.id} className="border-t border-gray-100">
-              <td className="px-4 py-3 font-medium text-gray-900">{row.region}</td>
-              <td className="px-4 py-3 text-gray-800">{row.deliveryType}</td>
-              <td className="px-4 py-3 text-gray-800">{row.carrier}</td>
-              <td className="px-4 py-3 text-gray-700">{row.minAmount || '—'}</td>
+            <tr key={row.id} className="border-t border-line">
+              <td className="px-4 py-3 font-medium text-ink">{row.region}</td>
+              <td className="px-4 py-3 text-ink-soft">{row.deliveryType}</td>
+              <td className="px-4 py-3 text-ink-soft">{row.carrier}</td>
+              <td className="px-4 py-3 text-ink-muted">{row.minAmount || '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -121,17 +122,14 @@ export default function DeliveryPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 pb-12">
       <PageSeoHelmet seo={seo} />
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Доставка</h1>
-        <p className="mt-3 text-gray-600 leading-relaxed">
-          Условия доставки интернет-магазина «Свой Гараж». Информация совпадает с оформлением заказа
-          и настройками в Яндекс Товарах.
-        </p>
-      </header>
+      <PageHeader
+        title="Доставка"
+        subtitle="Условия доставки интернет-магазина «Свой Гараж». Информация совпадает с оформлением заказа и настройками в Яндекс Товарах."
+      />
 
-      {loading && <p className="text-sm text-gray-500">Загрузка…</p>}
+      {loading && <p className="text-sm text-ink-muted">Загрузка…</p>}
       {error && (
-        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="mb-4 rounded-sg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700">
           {error}
         </div>
       )}
@@ -143,12 +141,12 @@ export default function DeliveryPage() {
             title="Самовывоз"
             description="Самовывоз из магазина — забор заказа в пункте выдачи магазина"
           >
-            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-success-700">
               Адрес самовывоза
             </p>
-            <p className="mt-2 text-sm leading-relaxed text-gray-900">{pickupAddress}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink">{pickupAddress}</p>
             {pickupMin && (
-              <p className="mt-2 text-sm text-gray-600">Минимальная сумма заказа: {pickupMin}</p>
+              <p className="mt-2 text-sm text-ink-muted">Минимальная сумма заказа: {pickupMin}</p>
             )}
           </ModeCard>
 
@@ -159,7 +157,7 @@ export default function DeliveryPage() {
           >
             <div className="space-y-5">
               <div>
-                <p className="mb-2 text-sm font-medium text-gray-800">Регионы</p>
+                <p className="mb-2 text-sm font-medium text-ink-soft">Регионы</p>
                 <div className="flex flex-wrap gap-2">
                   {CHECKOUT_DELIVERY_REGIONS.map((name) => (
                     <InfoChip key={name}>{name}</InfoChip>
@@ -168,7 +166,7 @@ export default function DeliveryPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium text-gray-800">
+                <p className="mb-2 text-sm font-medium text-ink-soft">
                   Способы доставки ({YANDEX_PVZ_DELIVERY_TYPE_LABEL})
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -176,26 +174,26 @@ export default function DeliveryPage() {
                     <InfoChip key={method.key}>{method.carrierName}</InfoChip>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-ink-muted">
                   В оформлении заказа: {CHECKOUT_PVZ_METHODS.map((m) => m.label).join(', ')}
                 </p>
               </div>
 
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-ink-muted">
                 При оформлении укажите адрес (город, улица, дом) — можно выбрать из подсказок или
                 ввести вручную.
               </p>
             </div>
           </ModeCard>
 
-          <section className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-semibold text-gray-900">Доставка по регионам</h2>
-            <p className="mt-1 text-sm text-gray-500 mb-4">
+          <Card as="section" padding="md">
+            <h2 className="text-lg font-semibold text-ink">Доставка по регионам</h2>
+            <p className="mb-4 mt-1 text-sm text-ink-muted">
               Полный перечень для проверки в Яндекс Товарах: тип «{YANDEX_PVZ_DELIVERY_TYPE_LABEL}»,
               службы «СДЭК», «Почта России», «Яндекс Доставка».
             </p>
             <YandexDeliveryMatrixTable rows={rows} />
-          </section>
+          </Card>
         </div>
       )}
       <YandexWebmasterCounter />

@@ -4,13 +4,14 @@ import {
   formatSalesCount,
   pluralSales,
 } from '../../utils/organizationTrustUtils';
+import { Badge, Card } from '../../components/UI';
 
 export default function OrganizationTrustStatsPanel({ trustStats, loading = false }) {
   if (loading) {
     return (
       <div className="grid gap-4 sm:grid-cols-3">
         {[1, 2, 3].map((key) => (
-          <div key={key} className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+          <div key={key} className="h-28 animate-pulse rounded-sg bg-surface-muted" />
         ))}
       </div>
     );
@@ -23,40 +24,38 @@ export default function OrganizationTrustStatsPanel({ trustStats, loading = fals
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-lg font-semibold text-gray-900">Надёжность продавца</h2>
+        <h2 className="text-lg font-semibold text-ink">Надёжность продавца</h2>
         {trustStats.is_verified_seller ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200">
-            Проверенный продавец
-          </span>
+          <Badge tone="success">Проверенный продавец</Badge>
         ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Успешные продажи</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-gray-900">
+        <Card padding="md" className="border-brand-100 bg-brand-50 shadow-none">
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Успешные продажи</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-ink">
             {formatSalesCount(trustStats.completed_sales_count)}
           </p>
-          <p className="text-sm text-gray-600">{pluralSales(trustStats.completed_sales_count)} на платформе</p>
-        </div>
+          <p className="text-sm text-ink-muted">{pluralSales(trustStats.completed_sales_count)} на платформе</p>
+        </Card>
 
-        <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">В каталоге</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-gray-900">
+        <Card padding="md" className="bg-surface-muted shadow-none">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">В каталоге</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-ink">
             {formatSalesCount(trustStats.catalog_products_count)}
           </p>
-          <p className="text-sm text-gray-600">позиций в наличии</p>
-        </div>
+          <p className="text-sm text-ink-muted">позиций в наличии</p>
+        </Card>
 
-        <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Среднее время ответа</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-gray-900">
+        <Card padding="md" className="bg-surface-muted shadow-none">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Среднее время ответа</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums text-ink">
             {responseLabel || '—'}
           </p>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-ink-muted">
             {responseLabel ? 'по чатам за 90 дней' : 'пока недостаточно данных'}
           </p>
-        </div>
+        </Card>
       </div>
     </section>
   );

@@ -78,7 +78,7 @@ export default function PartDetailSeoCrossLinks({
         {catalogHref ? (
           <Link
             to={catalogHref}
-            className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
+            className="rounded-full border border-line bg-surface-muted px-3 py-1.5 text-xs font-medium text-ink-soft hover:bg-surface-subtle sm:text-sm"
           >
             Б/у по артикулу
           </Link>
@@ -86,7 +86,7 @@ export default function PartDetailSeoCrossLinks({
         {brandSlug ? (
           <Link
             to={`/autoparts/used/brand/${encodeURIComponent(brandSlug)}`}
-            className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 sm:text-sm"
+            className="rounded-full border border-accent-200 bg-accent-50 px-3 py-1.5 text-xs font-medium text-accent-700 hover:bg-accent-100 sm:text-sm"
           >
             Все б/у {brandText}
           </Link>
@@ -94,7 +94,7 @@ export default function PartDetailSeoCrossLinks({
         {brandSlug ? (
           <Link
             to={`/autoparts/new/brand/${encodeURIComponent(brandSlug)}`}
-            className="rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100 sm:text-sm"
+            className="rounded-full border border-success-100 bg-success-50 px-3 py-1.5 text-xs font-medium text-success-700 hover:bg-success-100 sm:text-sm"
           >
             Все новые {brandText}
           </Link>
@@ -108,7 +108,7 @@ export default function PartDetailSeoCrossLinks({
       {catalogHref ? (
         <Link
           to={catalogHref}
-          className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
+          className="rounded-full border border-line bg-surface-muted px-3 py-1.5 text-xs font-medium text-ink-soft hover:bg-surface-subtle sm:text-sm"
         >
           Каталог по артикулу
         </Link>
@@ -116,7 +116,7 @@ export default function PartDetailSeoCrossLinks({
       {brandSlug ? (
         <Link
           to={`/autoparts/used/brand/${encodeURIComponent(brandSlug)}`}
-          className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 sm:text-sm"
+          className="rounded-full border border-accent-200 bg-accent-50 px-3 py-1.5 text-xs font-medium text-accent-700 hover:bg-accent-100 sm:text-sm"
         >
           Все б/у {brandText}
         </Link>
@@ -124,7 +124,7 @@ export default function PartDetailSeoCrossLinks({
       {newPartHref ? (
         <Link
           to={newPartHref}
-          className="rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100 sm:text-sm"
+          className="rounded-full border border-success-100 bg-success-50 px-3 py-1.5 text-xs font-medium text-success-700 hover:bg-success-100 sm:text-sm"
         >
           Новая аналогичная
         </Link>
@@ -132,7 +132,7 @@ export default function PartDetailSeoCrossLinks({
       {organizationId ? (
         <Link
           to={`/organizations/${organizationId}`}
-          className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
+          className="rounded-full border border-line bg-surface-muted px-3 py-1.5 text-xs font-medium text-ink-soft hover:bg-surface-subtle sm:text-sm"
         >
           {organizationName ? `Продавец: ${organizationName}` : 'Страница продавца'}
         </Link>

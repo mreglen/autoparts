@@ -11,7 +11,7 @@ import { useSelectedCity } from '../../hooks/useSelectedCity';
 function HeaderIconButton({ onClick, to, label, children, accent, badge = 0 }) {
     const className = `relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-[0.97] ${
         accent
-            ? 'border-indigo-200 bg-indigo-50 text-indigo-700 active:bg-indigo-100'
+            ? 'border-brand-200 bg-brand-50 text-brand-700 active:bg-brand-100'
             : 'border-gray-200/80 bg-white text-gray-600 active:bg-gray-50'
     }`;
 
@@ -150,7 +150,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
                             aria-expanded={isCityModalOpen}
                             aria-label={`Город: ${selectedCity}`}
                         >
-                            <LocationPinIcon className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                            <LocationPinIcon className="h-3.5 w-3.5 shrink-0 text-brand-600" />
                             <span className="truncate">г. {selectedCity}</span>
                             <svg className="h-3 w-3 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -170,7 +170,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
                         <Link
                             to={profilePath}
                             aria-label="Профиль"
-                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-200/80 bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-semibold text-white shadow-sm active:scale-[0.97]"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sg border border-brand-200 bg-brand-600 text-sm font-semibold text-white shadow-sg-sm active:scale-[0.97]"
                         >
                             {firstName.charAt(0).toUpperCase()}
                         </Link>
@@ -178,7 +178,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
                         <button
                             type="button"
                             onClick={() => navigate('/auth')}
-                            className="shrink-0 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 active:bg-indigo-100"
+                            className="shrink-0 rounded-sg border border-brand-200 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-700 active:bg-brand-100"
                         >
                             Войти
                         </button>

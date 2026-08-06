@@ -3,21 +3,21 @@ import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlace
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
 export const settingsInputClass =
-    'w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 shadow-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+    'w-full rounded-sg border border-line px-3 py-2.5 text-sm text-ink shadow-sg-sm transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
 
 export const settingsBtnPrimary =
-    'inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50';
+    'inline-flex items-center justify-center rounded-sg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50';
 
 export const settingsBtnSecondary =
-    'inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50';
+    'inline-flex items-center justify-center rounded-sg border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-muted disabled:opacity-50';
 
 export const settingsBtnSmPrimary =
-    'rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50';
+    'rounded-sg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50';
 
 export const settingsBtnSmSecondary =
-    'rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50';
+    'rounded-sg border border-line bg-white px-3 py-2 text-sm text-ink-soft hover:bg-surface-muted';
 
-export const settingsCardClass = 'rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6';
+export const settingsCardClass = 'rounded-sg-lg border border-line bg-surface p-5 shadow-sg sm:p-6';
 
 export const settingsActionsBtnClass =
     'inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed';

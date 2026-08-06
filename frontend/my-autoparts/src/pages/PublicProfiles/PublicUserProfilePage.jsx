@@ -14,13 +14,13 @@ import BuyerProfileBlock from '../../components/PublicProfile/BuyerProfileBlock'
 function ProfileSkeleton() {
   return (
     <div className="mx-auto max-w-4xl animate-pulse px-4 py-10 sm:px-6">
-      <div className="h-56 rounded-3xl bg-slate-200" />
+      <div className="h-56 rounded-sg-lg bg-surface-subtle" />
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <div className="h-28 rounded-2xl bg-slate-100" />
-        <div className="h-28 rounded-2xl bg-slate-100" />
-        <div className="h-28 rounded-2xl bg-slate-100" />
+        <div className="h-28 rounded-sg bg-surface-muted" />
+        <div className="h-28 rounded-sg bg-surface-muted" />
+        <div className="h-28 rounded-sg bg-surface-muted" />
       </div>
-      <div className="mt-4 h-48 rounded-2xl bg-slate-100" />
+      <div className="mt-4 h-48 rounded-sg bg-surface-muted" />
     </div>
   );
 }
@@ -194,24 +194,20 @@ export default function PublicUserProfilePage() {
           <title>Профиль не найден — Свой Гараж</title>
           <meta name="robots" content="noindex, nofollow" />
         </Helmet>
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 text-2xl text-gray-400">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-sg bg-surface-muted text-2xl text-ink-faint">
           ?
         </div>
-        <h1 className="text-xl font-semibold text-gray-900">Профиль не найден</h1>
-        <p className="mt-2 text-sm text-gray-500">{error || 'Проверьте ссылку или ID пользователя.'}</p>
+        <h1 className="text-xl font-semibold text-ink">Профиль не найден</h1>
+        <p className="mt-2 text-sm text-ink-muted">{error || 'Проверьте ссылку или ID пользователя.'}</p>
         <Link
           to="/"
-          className="mt-8 inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+          className="mt-8 inline-flex rounded-sg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
         >
           На главную
         </Link>
       </div>
     );
   }
-
-  const accent = profile.is_seller
-    ? 'from-indigo-600 via-indigo-700 to-violet-800'
-    : 'from-teal-600 via-emerald-600 to-cyan-700';
 
   return (
     <div className="relative min-h-[70vh] pb-16">
@@ -223,11 +219,10 @@ export default function PublicUserProfilePage() {
           <link rel="canonical" href={`${window.location.origin}/users/${profile.public_code}`} />
         </Helmet>
 
-        <div className="overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-xl shadow-gray-200/50">
+        <div className="overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg">
           <ProfileHeader
             profile={profile}
             orgDetail={orgDetail}
-            accent={accent}
             showMessageButton={showMessageButton}
             isOwnProfile={isOwnProfile}
             token={token}

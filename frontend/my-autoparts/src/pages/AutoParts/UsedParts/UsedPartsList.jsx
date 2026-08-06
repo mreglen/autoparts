@@ -60,15 +60,15 @@ function getVirtualizeThreshold(width) {
   return width < 1024 ? VIRTUALIZE_THRESHOLD_MOBILE : VIRTUALIZE_THRESHOLD_DESKTOP;
 }
 
-/** Реалистичная высота ряда сетки (aspect 4/3 + текст) — иначе getTotalSize() раздувает скролл. */
+/** Реалистичная высота компактной карточки (квадратное фото + три строки текста). */
 function estimateGridRowHeight(viewportWidth, columns) {
   const hasFiltersAside = viewportWidth >= 1024;
   const horizontalChrome = hasFiltersAside ? 280 : 24;
   const gap = 12;
   const usable = Math.max(280, Math.min(viewportWidth, 1536) - horizontalChrome);
   const cardWidth = Math.max(120, (usable - gap * (columns - 1)) / columns);
-  const imageHeight = cardWidth * 0.75;
-  const metaHeight = viewportWidth < 640 ? 92 : 108;
+  const imageHeight = cardWidth;
+  const metaHeight = viewportWidth < 640 ? 92 : 100;
   return Math.round(imageHeight + metaHeight + gap);
 }
 
@@ -866,7 +866,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
           {/* Grid view - карточки */}
           {viewMode === 'grid' && !shouldVirtualize && (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {sortedAvailableParts.map((part, index) => (
                 <ProductCard
                   key={part.id}
@@ -876,6 +876,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
                   hideWarehouse={true}
+                  compactMarketplace
                 />
               ))}
             </div>
@@ -893,7 +894,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                     key={virtualRow.key}
                     data-index={virtualRow.index}
                     ref={gridRowVirtualizer.measureElement}
-                    className="absolute left-0 top-0 w-full grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-3"
+                    className="absolute left-0 top-0 grid w-full grid-cols-2 gap-3 pb-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                     style={{
                       transform: `translateY(${virtualRow.start - gridScrollMargin}px)`,
                     }}
@@ -909,6 +910,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                           isTestOrganization={true}
                           hideConditionAndQuantity={true}
                           hideWarehouse={true}
+                          compactMarketplace
                         />
                       );
                     })}
@@ -988,7 +990,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
           {/* Grid view - карточки */}
           {viewMode === 'grid' && (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {sortedAnalogParts.map((part, index) => (
                 <ProductCard
                   key={`analog-${part.id}`}
@@ -998,6 +1000,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
                   hideWarehouse={true}
+                  compactMarketplace
                 />
               ))}
             </div>

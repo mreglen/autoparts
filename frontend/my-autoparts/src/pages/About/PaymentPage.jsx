@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import { buildPaymentSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
+import { Card, PageHeader } from '../../components/UI';
 
 export default function PaymentPage() {
   const seo = buildPaymentSeo();
@@ -28,38 +29,40 @@ export default function PaymentPage() {
   }, []);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-8">
       <PageSeoHelmet seo={seo} />
-      <header className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Оплата</h1>
-        <p className="mt-3 text-gray-600 leading-relaxed">
-          Способы оплаты заказов в интернет-магазине «Свой Гараж»: перевод, наличные при получении или онлайн.
-        </p>
-        <p className="mt-2 text-sm text-gray-600">
-          Условия покупки — в{' '}
-          <Link to="/offer" className="text-indigo-600 hover:underline">
-            публичной оферте
-          </Link>
-          .
-        </p>
-      </header>
+      <PageHeader
+        title="Оплата"
+        subtitle={
+          <>
+            Способы оплаты заказов в интернет-магазине «Свой Гараж»: перевод, наличные при получении или онлайн.
+            <span className="mt-2 block text-sm text-ink-muted">
+              Условия покупки — в{' '}
+              <Link to="/offer" className="text-brand-600 hover:underline">
+                публичной оферте
+              </Link>
+              .
+            </span>
+          </>
+        }
+      />
 
-      {loading && <p className="text-sm text-gray-500">Загрузка…</p>}
+      {loading && <p className="text-sm text-ink-muted">Загрузка…</p>}
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 text-red-800 text-sm px-4 py-3 border border-red-100">
+        <div className="mb-4 rounded-sg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700">
           {error}
         </div>
       )}
 
       {info && (
-        <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-          <ul className="list-disc pl-5 space-y-2 text-gray-800">
+        <Card as="section" padding="md">
+          <ul className="list-disc space-y-2 pl-5 text-ink-soft">
             {(info.methods || []).map((method) => (
               <li key={method}>{method}</li>
             ))}
           </ul>
-          {info.notes && <p className="mt-4 text-sm text-gray-600">{info.notes}</p>}
-        </section>
+          {info.notes && <p className="mt-4 text-sm text-ink-muted">{info.notes}</p>}
+        </Card>
       )}
       <YandexWebmasterCounter />
     </div>

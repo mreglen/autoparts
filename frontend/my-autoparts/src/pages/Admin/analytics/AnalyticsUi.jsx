@@ -23,18 +23,19 @@ export function LoadingState({ label = 'Загрузка…' }) {
   );
 }
 
-export function StatCard({ label, value, accent = 'indigo' }) {
+export function StatCard({ label, value, accent = 'brand' }) {
   const accents = {
-    indigo: 'border-indigo-100 bg-indigo-50/40',
-    emerald: 'border-emerald-100 bg-emerald-50/40',
-    amber: 'border-amber-100 bg-amber-50/40',
+    brand: 'border-brand-100 bg-brand-50/40',
+    indigo: 'border-brand-100 bg-brand-50/40',
+    emerald: 'border-success-100 bg-success-50/40',
+    amber: 'border-warning-100 bg-warning-50/40',
   };
   return (
     <div
-      className={`rounded-xl border px-4 py-4 shadow-sm ${accents[accent] || accents.indigo}`}
+      className={`rounded-sg-lg border px-4 py-4 shadow-sg ${accents[accent] || accents.brand}`}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{value}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">{label}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{value}</p>
     </div>
   );
 }
@@ -42,13 +43,13 @@ export function StatCard({ label, value, accent = 'indigo' }) {
 export function Section({ title, subtitle, action, children, className = '' }) {
   return (
     <section
-      className={`overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ${className}`.trim()}
+      className={`overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg ${className}`.trim()}
     >
       {(title || action) && (
-        <div className="flex flex-wrap items-start justify-between gap-2 border-b border-gray-100 px-4 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-2 border-b border-line px-4 py-3">
           <div>
-            {title && <h2 className="text-sm font-semibold text-gray-900">{title}</h2>}
-            {subtitle && <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>}
+            {title && <h2 className="text-sm font-semibold text-ink">{title}</h2>}
+            {subtitle && <p className="mt-0.5 text-xs text-ink-muted">{subtitle}</p>}
           </div>
           {action}
         </div>

@@ -5,9 +5,9 @@ const SOURCE_LABELS = {
 };
 
 const SOURCE_STYLES = {
-  platform: 'bg-indigo-50 text-indigo-700 ring-indigo-100',
-  yandex: 'bg-yellow-50 text-yellow-800 ring-yellow-100',
-  avito: 'bg-orange-50 text-orange-800 ring-orange-100',
+  platform: 'bg-brand-50 text-brand-700 ring-brand-100',
+  yandex: 'bg-warning-50 text-warning-700 ring-warning-100',
+  avito: 'bg-accent-50 text-accent-700 ring-accent-100',
 };
 
 export function reviewSourceLabel(source) {
@@ -15,7 +15,7 @@ export function reviewSourceLabel(source) {
 }
 
 export function reviewSourceClass(source) {
-  return SOURCE_STYLES[source] || 'bg-gray-50 text-gray-700 ring-gray-100';
+  return SOURCE_STYLES[source] || 'bg-surface-subtle text-ink-soft ring-line';
 }
 
 export function formatReviewDate(value) {

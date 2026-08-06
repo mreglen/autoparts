@@ -118,7 +118,7 @@ function SourceBadge({ source, className = '' }) {
       ? 'bg-amber-50 text-amber-800'
       : isOrganization
         ? 'bg-emerald-50 text-emerald-700'
-        : 'bg-indigo-50 text-indigo-700';
+        : 'bg-brand-50 text-brand-700';
 
   return (
     <span
@@ -180,7 +180,7 @@ function ChatPanelHeader({ onBack, avatar, title, subtitle, subtitleAction, badg
               <button
                 type="button"
                 onClick={subtitleAction}
-                className="truncate text-left text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
+                className="truncate text-left text-xs text-brand-600 hover:text-brand-800 hover:underline"
               >
                 {subtitle}
               </button>
@@ -477,7 +477,7 @@ const ChatsHubPage = () => {
       />
 
       {incomingChatAlert ? (
-        <div className="mx-3 mt-2 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900 shadow-sm">
+        <div className="mx-3 mt-2 flex items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900 shadow-sm">
           <button
             type="button"
             onClick={handleOpenIncomingChat}
@@ -488,7 +488,7 @@ const ChatsHubPage = () => {
           <button
             type="button"
             onClick={() => dispatch(clearIncomingChatAlert())}
-            className="flex-shrink-0 rounded p-1 text-indigo-600 hover:bg-indigo-100"
+            className="flex-shrink-0 rounded p-1 text-brand-600 hover:bg-brand-100"
             aria-label="Закрыть"
           >
             ×
@@ -509,7 +509,7 @@ const ChatsHubPage = () => {
                 <button
                   type="button"
                   onClick={() => setCreateChatOpen(true)}
-                  className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 py-2.5 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50"
+                  className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand-200 bg-brand-50/50 py-2.5 text-sm font-semibold text-brand-700 transition hover:border-brand-300 hover:bg-brand-50"
                 >
                   <span className="text-lg leading-none">+</span>
                   Создать чат
@@ -534,7 +534,7 @@ const ChatsHubPage = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Поиск по имени или товару"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-brand-300 focus:bg-white focus:ring-2 focus:ring-brand-500/20"
                 />
               </div>
               <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -547,7 +547,7 @@ const ChatsHubPage = () => {
                       onClick={() => setSourceFilter(item.id)}
                       className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                         active
-                          ? 'bg-indigo-600 text-white shadow-sm'
+                          ? 'bg-brand-600 text-white shadow-sm'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
@@ -565,7 +565,7 @@ const ChatsHubPage = () => {
               {(garageLoading || avitoLoading) && filteredChats.length === 0 ? (
                 <div className="flex h-64 items-center justify-center">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
                     <p className="text-sm text-gray-500">Загрузка чатов…</p>
                   </div>
                 </div>
@@ -582,7 +582,7 @@ const ChatsHubPage = () => {
                     <button
                       type="button"
                       onClick={() => dispatch(fetchUserChats({}))}
-                      className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                      className="mt-4 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700"
                     >
                       Повторить
                     </button>
@@ -606,7 +606,7 @@ const ChatsHubPage = () => {
                       <button
                         type="button"
                         onClick={() => setSearchQuery('')}
-                        className="mt-4 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                        className="mt-4 text-sm font-medium text-brand-600 hover:text-brand-700"
                       >
                         Очистить поиск
                       </button>
@@ -666,7 +666,7 @@ const ChatsHubPage = () => {
               <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-gradient-to-b from-[#eef2f6] to-[#e8edf3] p-6">
                 <div className="max-w-sm text-center">
                   <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-3xl bg-white shadow-md ring-1 ring-gray-200/60">
-                    <svg className="h-12 w-12 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-12 w-12 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                   </div>
@@ -790,7 +790,7 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
       onClick={onSelect}
       className={`group relative w-full px-3 py-3.5 text-left transition-colors sm:px-4 ${
         isSelected
-          ? 'bg-indigo-50/90 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-indigo-600'
+          ? 'bg-brand-50/90 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-brand-600'
           : 'hover:bg-gray-50/90'
       }`}
     >
@@ -804,10 +804,10 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
             <img
               src={img}
               alt=""
-              className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white shadow-sm transition-all group-hover:ring-indigo-200"
+              className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white shadow-sm transition-all group-hover:ring-brand-200"
             />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-lg font-semibold text-white shadow-sm ring-2 ring-white">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 text-lg font-semibold text-white shadow-sm ring-2 ring-white">
               {placeholderLetter}
             </div>
           )}
@@ -856,7 +856,7 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
           {lastMessageText && (
             <div className="flex items-center gap-1.5">
               {lastMessageIsMine && (
-                <svg className="h-3.5 w-3.5 flex-shrink-0 text-indigo-500" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="h-3.5 w-3.5 flex-shrink-0 text-brand-500" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                 </svg>
               )}
@@ -868,7 +868,7 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
         </div>
 
         {Number(chat.unread_count) > 0 && (
-          <span className="mt-1 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[11px] font-bold text-white">
+          <span className="mt-1 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[11px] font-bold text-white">
             {chat.unread_count > 99 ? '99+' : chat.unread_count}
           </span>
         )}
@@ -1173,7 +1173,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
                 className="h-11 w-11 rounded-2xl object-cover ring-2 ring-white shadow-sm flex-shrink-0"
               />
             ) : (
-              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
+              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
                 {(title && title.charAt(0).toUpperCase()) || 'Ч'}
               </div>
             )
@@ -1231,7 +1231,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
           <div className="flex h-full min-h-[200px] items-center justify-center">
             <ChatEmptyState
               icon={(
-                <svg className="h-10 w-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-10 w-10 text-brand-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               )}
@@ -1300,7 +1300,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
                                 ? 'bg-blue-600 text-white rounded-t-none rounded-bl-xl rounded-br-2xl' 
                                 : 'bg-white text-gray-900 shadow-sm rounded-t-none rounded-br-xl rounded-bl-2xl border border-gray-100')
                             : (isOwn 
-                                ? 'bg-indigo-600 text-white rounded-2xl rounded-br-md' 
+                                ? 'bg-brand-600 text-white rounded-2xl rounded-br-md' 
                                 : 'bg-white text-gray-900 shadow-sm rounded-2xl rounded-bl-md border border-gray-100/80')
                         }`}
                         data-message-bubble="true"
@@ -1410,12 +1410,12 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
             ))}
           </div>
         )}
-        <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-1.5 focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/15">
+        <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-1.5 focus-within:border-brand-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500/15">
           <button 
             type="button" 
             onClick={() => fileInputRef.current?.click()} 
             disabled={uploading || selectedFiles.length >= 5}
-            className="flex-shrink-0 rounded-xl p-2.5 text-gray-500 transition-colors hover:bg-white hover:text-indigo-600 disabled:opacity-50"
+            className="flex-shrink-0 rounded-xl p-2.5 text-gray-500 transition-colors hover:bg-white hover:text-brand-600 disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -1441,7 +1441,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
           <button 
             type="submit" 
             disabled={(!newMessage.trim() && selectedFiles.length === 0) || uploading}
-            className="flex-shrink-0 rounded-xl bg-indigo-600 p-2.5 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="flex-shrink-0 rounded-xl bg-brand-600 p-2.5 text-white transition-colors hover:bg-brand-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             {uploading ? (
               <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1567,7 +1567,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
           )}
           <div className={`px-4 py-2.5 rounded-2xl ${
             isOwn
-              ? 'bg-indigo-600 text-white rounded-br-md'
+              ? 'bg-brand-600 text-white rounded-br-md'
               : 'bg-white text-gray-900 shadow-sm rounded-bl-md border border-gray-100/80'
           }`}>
             {urls.length > 0 && (
@@ -1619,7 +1619,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
               className="h-11 w-11 flex-shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-sm"
             />
           ) : (
-            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
               {(title && title.charAt(0).toUpperCase()) || 'Ч'}
             </div>
           )
@@ -1651,7 +1651,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
           <div className="flex h-full min-h-[200px] items-center justify-center">
             <ChatEmptyState
               icon={(
-                <svg className="h-10 w-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-10 w-10 text-brand-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               )}
@@ -1669,7 +1669,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
         onSubmit={handleSendMessage}
         className="flex-shrink-0 border-t border-gray-200/80 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur-sm sm:p-4"
       >
-        <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-1.5 focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/15">
+        <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-1.5 focus-within:border-brand-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500/15">
           <input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
@@ -1679,7 +1679,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
           <button
             type="submit"
             disabled={sending || !newMessage.trim()}
-            className="flex-shrink-0 rounded-xl bg-indigo-600 p-2.5 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+            className="flex-shrink-0 rounded-xl bg-brand-600 p-2.5 text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-gray-300"
           >
             {sending ? (
               <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">

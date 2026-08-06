@@ -1,21 +1,22 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Card } from '../../components/UI';
 import { resolveProductCity } from '../../utils/productSearchSeo';
 
 function SpecRowCard({ label, children }) {
   return (
-    <div className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1 border-b border-gray-100 py-3 last:border-b-0 sm:grid-cols-[8.5rem_1fr]">
-      <dt className="text-sm text-gray-500">{label}</dt>
-      <dd className="text-sm font-medium text-gray-900">{children}</dd>
+    <div className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1 border-b border-line-soft py-3 last:border-b-0 sm:grid-cols-[8.5rem_1fr]">
+      <dt className="text-sm text-ink-muted">{label}</dt>
+      <dd className="text-sm font-medium text-ink">{children}</dd>
     </div>
   );
 }
 
 function SpecRowInline({ label, children }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-dotted border-gray-200 py-2.5 last:border-b-0">
-      <dt className="shrink-0 text-sm text-gray-500">{label}</dt>
-      <dd className="min-w-0 text-right text-sm font-medium text-gray-900">{children}</dd>
+    <div className="flex items-start justify-between gap-4 border-b border-dotted border-line py-2.5 last:border-b-0">
+      <dt className="shrink-0 text-sm text-ink-muted">{label}</dt>
+      <dd className="min-w-0 text-right text-sm font-medium text-ink">{children}</dd>
     </div>
   );
 }
@@ -39,17 +40,17 @@ function PartDetailSpecsContent({ product, SpecRow }) {
       {article ? <SpecRow label="Артикул">{article}</SpecRow> : null}
       {(product.internal_code || '').trim() ? (
         <SpecRow label="Код товара">
-          <span className="font-mono text-gray-800">{String(product.internal_code).trim()}</span>
+          <span className="font-mono text-ink-soft">{String(product.internal_code).trim()}</span>
         </SpecRow>
       ) : null}
       <SpecRow label="Наличие">
-        <span className={inStock ? 'text-emerald-700' : 'text-amber-700'}>{stockLabel}</span>
+        <span className={inStock ? 'text-success-700' : 'text-warning-700'}>{stockLabel}</span>
       </SpecRow>
       <SpecRow label="Город">{city}</SpecRow>
       <SpecRow label="Доставка">
         <span>
           Доставка по России, самовывоз — у продавца.{' '}
-          <Link to="/delivery" className="font-medium text-indigo-600 hover:text-indigo-800">
+          <Link to="/delivery" className="font-medium text-brand-600 hover:text-brand-800">
             Подробнее
           </Link>
         </span>
@@ -63,7 +64,7 @@ function PartDetailSpecsContent({ product, SpecRow }) {
         <SpecRow label="Продавец">
           <Link
             to={`/organizations/${seller.id}`}
-            className="font-medium text-indigo-600 hover:text-indigo-800"
+            className="font-medium text-brand-600 hover:text-brand-800"
           >
             {sellerName}
           </Link>
@@ -81,7 +82,7 @@ export default function PartDetailSpecsBlock({ product, variant = 'card' }) {
   if (variant === 'inline') {
     return (
       <section className="mt-5">
-        <h2 className="text-base font-semibold text-gray-900">Характеристики</h2>
+        <h2 className="text-base font-semibold text-ink">Характеристики</h2>
         <dl className="mt-2">
           <PartDetailSpecsContent product={product} SpecRow={SpecRow} />
         </dl>
@@ -90,11 +91,11 @@ export default function PartDetailSpecsBlock({ product, variant = 'card' }) {
   }
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
-      <h2 className="text-base font-semibold text-gray-900">Характеристики</h2>
+    <Card as="section" padding="sm" className="sm:p-5">
+      <h2 className="text-base font-semibold text-ink">Характеристики</h2>
       <dl className="mt-2">
         <PartDetailSpecsContent product={product} SpecRow={SpecRow} />
       </dl>
-    </section>
+    </Card>
   );
 }

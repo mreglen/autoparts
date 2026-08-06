@@ -39,8 +39,8 @@ export default function PartDetailDesktopGallery({
 }) {
   if (!items.length) {
     return (
-      <div className="flex h-80 items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50">
-        <p className="text-sm text-gray-400">Нет фотографий или видео</p>
+      <div className="flex h-80 items-center justify-center rounded-sg-lg border border-dashed border-line bg-surface-muted">
+        <p className="text-sm text-ink-faint">Нет фотографий или видео</p>
       </div>
     );
   }
@@ -51,9 +51,9 @@ export default function PartDetailDesktopGallery({
   const alt = mainAlt || buildProductPhotoAlt({ brand, article, name, isMain: true });
 
   return (
-    <div className="flex gap-3 lg:gap-4">
+    <div className="flex w-full min-w-0 gap-3 lg:gap-4">
       {items.length > 1 ? (
-        <div className="flex max-h-[min(680px,72vh)] w-[4.75rem] shrink-0 flex-col gap-2.5 overflow-y-auto pr-0.5 lg:w-20">
+        <div className="flex max-h-[min(560px,70vh)] w-16 shrink-0 flex-col gap-2 overflow-y-auto pr-0.5 lg:w-[4.5rem]">
           {items.map((item, index) => {
             const thumbIsVideo = isVideoItem(item);
             const isActive = index === currentIndex;
@@ -62,8 +62,8 @@ export default function PartDetailDesktopGallery({
                 key={index}
                 type="button"
                 onClick={() => onIndexChange(index)}
-                className={`relative aspect-square w-full shrink-0 overflow-hidden rounded-lg border bg-gray-50 ${
-                  isActive ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-200 hover:border-gray-300'
+                className={`relative aspect-square w-full shrink-0 overflow-hidden rounded-sg border bg-surface-muted ${
+                  isActive ? 'border-brand-500 ring-1 ring-brand-500' : 'border-line hover:border-line-strong'
                 }`}
                 aria-label={`Фото ${index + 1}`}
               >
@@ -99,9 +99,9 @@ export default function PartDetailDesktopGallery({
         </div>
       ) : null}
 
-      <div className="relative min-w-0 flex-1">
+      <div className="relative min-w-0 flex-1 overflow-hidden">
         <div
-          className="group relative min-h-[420px] aspect-[4/5] cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-gray-50 lg:min-h-[520px] lg:aspect-[3/4]"
+          className="group relative aspect-square max-h-[min(560px,70vh)] w-full cursor-pointer overflow-hidden rounded-sg-lg border border-line bg-surface-muted shadow-sg"
           onClick={() => onOpenModal(currentIndex)}
           role="button"
           tabIndex={0}
@@ -120,7 +120,7 @@ export default function PartDetailDesktopGallery({
               />
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/30">
                 <div className="rounded-full bg-white/90 p-4">
-                  <svg className="ml-0.5 h-10 w-10 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="ml-0.5 h-10 w-10 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                   </svg>
                 </div>
@@ -146,7 +146,7 @@ export default function PartDetailDesktopGallery({
           <>
             <button
               type="button"
-              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 shadow-sm hover:text-indigo-600"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-line bg-surface p-2 text-ink-muted shadow-sg-sm hover:text-brand-600"
               onClick={(e) => {
                 e.stopPropagation();
                 onIndexChange(currentIndex > 0 ? currentIndex - 1 : items.length - 1);
@@ -159,7 +159,7 @@ export default function PartDetailDesktopGallery({
             </button>
             <button
               type="button"
-              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 shadow-sm hover:text-indigo-600"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-line bg-surface p-2 text-ink-muted shadow-sg-sm hover:text-brand-600"
               onClick={(e) => {
                 e.stopPropagation();
                 onIndexChange(currentIndex < items.length - 1 ? currentIndex + 1 : 0);

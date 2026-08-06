@@ -31,10 +31,10 @@ function DesktopNavLink({ to, children, end }) {
       to={to}
       end={end}
       className={({ isActive }) =>
-        `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+        `rounded-sg px-3 py-1.5 text-sm font-medium transition-colors ${
           isActive
-            ? 'bg-indigo-50 text-indigo-700'
-            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            ? 'bg-brand-50 text-brand-700'
+            : 'text-ink-muted hover:bg-surface-subtle hover:text-ink'
         }`
       }
     >
@@ -57,7 +57,7 @@ function HeaderIconLink({ to, label, badge, children }) {
     <Link
       to={to}
       aria-label={label}
-      className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-gray-600 transition hover:border-indigo-200 hover:bg-indigo-50/50 hover:text-indigo-600"
+      className="relative flex h-10 w-10 items-center justify-center rounded-sg border border-line bg-surface-muted text-ink-muted transition hover:border-brand-200 hover:bg-brand-50/50 hover:text-brand-600"
     >
       {children}
       <HeaderBadge count={badge} />

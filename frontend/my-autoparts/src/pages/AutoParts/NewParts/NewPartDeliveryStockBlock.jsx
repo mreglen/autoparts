@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
+import { Card } from '../../../components/UI';
 import {
   formatDeliveryTimeText,
   formatPriceRub,
@@ -10,24 +11,24 @@ import NewPartHorizontalScroll from './NewPartHorizontalScroll';
 
 function StockMobileCard({ stock, markupPercent }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+    <Card padding="none" className="bg-surface-muted p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-gray-500">Склад</p>
-          <p className="text-sm font-semibold text-gray-900">{stock.stock_id}</p>
+          <p className="text-xs text-ink-muted">Склад</p>
+          <p className="text-sm font-semibold text-ink">{stock.stock_id}</p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-gray-500">Цена</p>
-          <p className="text-base font-bold text-gray-900">
+          <p className="text-xs text-ink-muted">Цена</p>
+          <p className="text-base font-bold text-ink">
             {formatPriceRub(applyMarkup(stock.price, markupPercent))} ₽
           </p>
         </div>
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
-        <span>В наличии: <strong className="text-gray-900">{stock.available_count} шт.</strong></span>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
+        <span>В наличии: <strong className="text-success-700">{stock.available_count} шт.</strong></span>
         <span>{formatDeliveryTimeText(stock.delivery_start, stock.delivery_end)}</span>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -37,19 +38,19 @@ export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
 
   if (!summary.active.length) {
     return (
-      <section className="mb-4 rounded-2xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm sm:mb-6 sm:p-5">
-        <h2 className="text-base font-semibold text-gray-900 sm:text-lg">Наличие и поставка</h2>
-        <p className="mt-2 text-sm text-gray-600">
+      <Card as="section" padding="sm" className="mb-4 border-warning-100 sm:mb-6 sm:p-5">
+        <h2 className="text-base font-semibold text-ink sm:text-lg">Наличие и поставка</h2>
+        <p className="mt-2 text-sm text-ink-muted">
           {inStock ? 'Уточняем наличие на складах поставщика.' : 'Сейчас нет доступных складов для заказа.'}
         </p>
-      </section>
+      </Card>
     );
   }
 
   return (
-    <section className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:mb-6 sm:p-5">
-      <h2 className="text-base font-semibold text-gray-900 sm:text-lg">Наличие и поставка</h2>
-      <p className="mt-2 text-sm text-gray-600">
+    <Card as="section" padding="sm" className="mb-4 sm:mb-6 sm:p-5">
+      <h2 className="text-base font-semibold text-ink sm:text-lg">Наличие и поставка</h2>
+      <p className="mt-2 text-sm text-ink-muted">
         В наличии на {summary.warehouseCount} {summary.warehouseCount === 1 ? 'складе' : 'складах'}
         {summary.minPrice ? `, от ${formatPriceRub(summary.minPrice)} ₽` : ''}
         {summary.totalQty ? `, всего ${summary.totalQty} шт.` : ''}.
@@ -66,7 +67,7 @@ export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
         <NewPartHorizontalScroll hint="Листайте таблицу складов →" showHint={summary.active.length > 3}>
           <table className="min-w-[40rem] w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+              <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
                 <th className="px-3 py-2 font-medium">Склад</th>
                 <th className="px-3 py-2 font-medium">Наличие</th>
                 <th className="px-3 py-2 font-medium">Цена</th>
@@ -75,13 +76,13 @@ export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
             </thead>
             <tbody>
               {summary.active.map((stock) => (
-                <tr key={stock.stock_id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-3 py-2 text-gray-800">{stock.stock_id}</td>
-                  <td className="px-3 py-2 text-gray-800">{stock.available_count} шт.</td>
-                  <td className="px-3 py-2 font-medium text-gray-900">
+                <tr key={stock.stock_id} className="border-b border-line-soft last:border-0">
+                  <td className="px-3 py-2 text-ink-soft">{stock.stock_id}</td>
+                  <td className="px-3 py-2 text-success-700">{stock.available_count} шт.</td>
+                  <td className="px-3 py-2 font-medium text-ink">
                     {formatPriceRub(applyMarkup(stock.price, markupPercent))} ₽
                   </td>
-                  <td className="px-3 py-2 text-gray-600">
+                  <td className="px-3 py-2 text-ink-muted">
                     {formatDeliveryTimeText(stock.delivery_start, stock.delivery_end)}
                   </td>
                 </tr>
@@ -90,6 +91,6 @@ export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
           </table>
         </NewPartHorizontalScroll>
       </div>
-    </section>
+    </Card>
   );
 }

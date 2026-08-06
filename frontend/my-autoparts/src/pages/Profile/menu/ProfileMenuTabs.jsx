@@ -325,12 +325,12 @@ export default function ProfileMenuTabs({
         : 'w-full px-4 py-3 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3';
 
     const itemActive = isDrawer
-        ? 'bg-indigo-50 text-indigo-700'
-        : 'border-indigo-500 text-indigo-600 bg-indigo-50';
+        ? 'bg-brand-50 text-brand-700'
+        : 'border-brand-500 text-brand-600 bg-brand-50';
 
     const itemInactive = isDrawer
-        ? 'text-gray-700 active:bg-gray-50'
-        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50';
+        ? 'text-ink-soft active:bg-surface-subtle'
+        : 'border-transparent text-ink-muted hover:text-ink hover:bg-surface-subtle';
 
     const submenuItemBase = isDrawer
         ? 'min-h-[40px] w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors flex items-center gap-3 ml-2'

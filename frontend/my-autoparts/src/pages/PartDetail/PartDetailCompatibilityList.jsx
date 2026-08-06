@@ -1,4 +1,5 @@
 import React from 'react';
+import { Card } from '../../components/UI';
 import NewPartHorizontalScroll from '../AutoParts/NewParts/NewPartHorizontalScroll';
 import { buildVehicleSubtitle, buildVehicleTitle } from '../../utils/fitmentDisplay';
 
@@ -15,15 +16,16 @@ export default function PartDetailCompatibilityList({ vehicles = [] }) {
             const title = buildVehicleTitle(vehicle);
             const meta = buildVehicleSubtitle(vehicle);
             return (
-              <div
+              <Card
                 key={key}
-                className="w-[11.5rem] shrink-0 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:w-[13rem]"
+                padding="none"
+                className="w-[11.5rem] shrink-0 p-3 sm:w-[13rem]"
               >
-                <p className="text-sm font-semibold leading-snug text-gray-900">{title}</p>
+                <p className="text-sm font-semibold leading-snug text-ink">{title}</p>
                 {meta ? (
-                  <p className="mt-1 line-clamp-2 text-xs text-gray-500">{meta}</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-ink-muted">{meta}</p>
                 ) : null}
-              </div>
+              </Card>
             );
           })}
         </div>

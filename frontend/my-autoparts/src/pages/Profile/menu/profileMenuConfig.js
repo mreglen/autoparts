@@ -8,6 +8,7 @@ import { resolveMenuUser } from '../../../utils/adminMenuMode';
 export const TAB_PATH_MAP = {
     dashboard: '/dashboard',
     'admin-panel': '/admin-settings',
+    'design-system': '/design-system',
     profile: '/profile',
     'settings-notifications': '/profile/notifications',
     'purchases-orders': '/purchases/orders',
@@ -155,6 +156,7 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/vehicles/edit')) return 'vehicles';
     if (path.startsWith('/sellers')) return 'sellers';
     if (path.startsWith('/moderation/products')) return 'product-moderation';
+    if (path.startsWith('/design-system')) return 'design-system';
     if (path.startsWith('/admin/analytics')) return 'analytics';
     if (path.startsWith('/admin/users')) return 'admin-users';
     if (path.startsWith('/admin/rossko')) return 'admin-rossko';
@@ -340,6 +342,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
                 { id: 'product-moderation', label: 'Проверка запчастей' },
                 { id: 'analytics', label: 'Аналитика' },
                 { id: 'admin-panel', label: 'Настройки' },
+                { id: 'design-system', label: 'Дизайн-система' },
                 { id: 'admin-users', label: 'Пользователи' },
                 { id: 'admin-rossko', label: 'Rossko' },
                 { id: 'site-payments', label: 'Оплата сайта' },

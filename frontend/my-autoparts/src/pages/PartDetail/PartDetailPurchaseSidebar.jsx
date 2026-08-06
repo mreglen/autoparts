@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button, Card } from '../../components/UI';
 
 export default function PartDetailPurchaseSidebar({
   product,
@@ -21,18 +22,18 @@ export default function PartDetailPurchaseSidebar({
     || '—';
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <Card as="section" padding="sm">
       {inStock ? (
-        <span className="mb-3 inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+        <span className="mb-3 inline-flex items-center rounded-sg-sm bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700 ring-1 ring-success-100">
           В наличии · {product.quantity || 0} шт.
         </span>
       ) : (
-        <span className="mb-3 inline-flex items-center rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+        <span className="mb-3 inline-flex items-center rounded-sg-sm bg-warning-50 px-2.5 py-1 text-xs font-semibold text-warning-700 ring-1 ring-warning-100">
           Нет в наличии
         </span>
       )}
 
-      <div className="text-2xl font-bold text-indigo-700 sm:text-3xl">
+      <div className="text-2xl font-bold text-brand-700 sm:text-3xl">
         {product.price ? formatPrice(product.price) : '—'}
       </div>
 
@@ -45,30 +46,31 @@ export default function PartDetailPurchaseSidebar({
                   type="button"
                   onClick={onRemoveFromCart}
                   disabled={isAdding}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-xl font-bold hover:bg-gray-50 disabled:opacity-50"
+                  className="flex h-10 w-10 items-center justify-center rounded-sg border border-line-strong bg-surface text-xl font-bold text-ink hover:bg-surface-muted disabled:opacity-50"
                 >
                   −
                 </button>
-                <span className="w-10 text-center text-lg font-bold text-gray-900">{cartQuantity}</span>
+                <span className="w-10 text-center text-lg font-bold text-ink">{cartQuantity}</span>
                 <button
                   type="button"
                   onClick={onAddToCart}
                   disabled={isAdding || stockNoStock}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-xl font-bold hover:bg-gray-50 disabled:opacity-50"
+                  className="flex h-10 w-10 items-center justify-center rounded-sg border border-line-strong bg-surface text-xl font-bold text-ink hover:bg-surface-muted disabled:opacity-50"
                 >
                   +
                 </button>
               </div>
               {stockNoStock ? (
-                <span className="text-xs font-medium text-orange-600">Нет в наличии</span>
+                <span className="text-xs font-medium text-accent-600">Нет в наличии</span>
               ) : null}
             </div>
           ) : (
-            <button
+            <Button
               type="button"
               onClick={onAddToCart}
               disabled={isAdding || stockNoStock}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 py-3 text-base font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              size="lg"
+              className="w-full"
             >
               {isAdding ? (
                 <svg className="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -83,26 +85,28 @@ export default function PartDetailPurchaseSidebar({
                   В корзину
                 </>
               )}
-            </button>
+            </Button>
           )}
 
           {canShowBuyNow ? (
-            <button
+            <Button
               type="button"
               onClick={onBuyNow}
               disabled={buyingNow || stockNoStock}
-              className="w-full rounded-lg border-2 border-indigo-600 bg-white py-3 text-base font-semibold text-indigo-700 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+              variant="secondary"
+              size="lg"
+              className="w-full border-brand-600 text-brand-700 hover:bg-brand-50"
             >
               {buyingNow ? 'Оформление…' : 'Купить сейчас'}
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
 
-      <div className="mt-4 border-t border-gray-100 pt-3">
-        <p className="text-xs font-medium text-gray-500">Адрес</p>
-        <p className="mt-1 text-sm font-medium leading-snug text-gray-900 break-words">{address}</p>
+      <div className="mt-4 border-t border-line-soft pt-3">
+        <p className="text-xs font-medium text-ink-muted">Адрес</p>
+        <p className="mt-1 break-words text-sm font-medium leading-snug text-ink">{address}</p>
       </div>
-    </section>
+    </Card>
   );
 }

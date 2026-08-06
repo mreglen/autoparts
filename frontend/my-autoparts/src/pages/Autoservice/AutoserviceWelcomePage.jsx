@@ -10,6 +10,7 @@ import {
   fetchAutoserviceClientMe,
   selectIsAutoserviceClient,
 } from '../../redux/slices/AutoserviceClientSlice';
+import { Button, Card, PageHeader } from '../../components/UI';
 
 export default function AutoserviceWelcomePage() {
   const dispatch = useDispatch();
@@ -62,38 +63,39 @@ export default function AutoserviceWelcomePage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
-      <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{serviceName}</h1>
+      <PageHeader title={serviceName} />
 
-      <div className="mt-4 rounded-lg border border-gray-200 bg-white p-5">
+      <Card className="mt-2" padding="md">
         {info?.description ? (
-          <p className="text-sm text-gray-700">{info.description}</p>
+          <p className="text-sm text-ink-soft">{info.description}</p>
         ) : (
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-ink-soft">
             Станьте клиентом, чтобы хранить свои автомобили, записываться на ремонт и видеть историю работ.
           </p>
         )}
 
         {(info?.address || info?.phone) && (
-          <p className="mt-3 text-sm text-gray-500">
+          <p className="mt-3 text-sm text-ink-muted">
             {[info.address, info.phone].filter(Boolean).join(' · ')}
           </p>
         )}
 
         {error && (
-          <p className="mt-4 text-sm text-red-600" role="alert">
+          <p className="mt-4 text-sm text-danger-600" role="alert">
             {error}
           </p>
         )}
 
-        <button
+        <Button
           type="button"
+          className="mt-5"
           onClick={handleBecomeClient}
           disabled={saving || clientStatus === 'loading' || !isAuthenticated}
-          className="mt-5 inline-flex rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+          loading={saving}
         >
           {saving ? 'Сохранение…' : 'Стать клиентом'}
-        </button>
-      </div>
+        </Button>
+      </Card>
     </div>
   );
 }

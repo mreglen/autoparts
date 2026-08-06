@@ -28,20 +28,21 @@ function getFirstName(user) {
   return raw.split(/\s+/)[0];
 }
 
-function MetricCard({ label, value, hint, href, accent = 'indigo' }) {
+function MetricCard({ label, value, hint, href, accent = 'brand' }) {
   const accents = {
-    indigo: 'from-indigo-500/10 to-indigo-600/5 ring-indigo-500/10',
-    emerald: 'from-emerald-500/10 to-emerald-600/5 ring-emerald-500/10',
-    amber: 'from-amber-500/10 to-amber-600/5 ring-amber-500/10',
+    brand: 'border-brand-100 bg-brand-50/40',
+    emerald: 'border-success-100 bg-success-50/50',
+    amber: 'border-warning-100 bg-warning-50/50',
+    indigo: 'border-brand-100 bg-brand-50/40',
   };
 
-  const className = `group block rounded-2xl bg-gradient-to-br ${accents[accent]} p-5 ring-1 transition-all hover:shadow-md hover:-translate-y-0.5`;
+  const className = `group block rounded-sg-lg border p-5 shadow-sg transition-shadow hover:shadow-sg-md ${accents[accent] || accents.brand}`;
 
   const content = (
     <>
-      <p className="text-sm font-medium text-gray-600">{label}</p>
-      <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 tabular-nums">{value}</p>
-      {hint ? <p className="mt-2 text-sm text-gray-500">{hint}</p> : null}
+      <p className="text-sm font-medium text-ink-muted">{label}</p>
+      <p className="mt-2 text-3xl font-bold tracking-tight text-ink tabular-nums">{value}</p>
+      {hint ? <p className="mt-2 text-sm text-ink-faint">{hint}</p> : null}
     </>
   );
 
@@ -103,14 +104,14 @@ function QuickAction({ label, description, href, icon }) {
   return (
     <Link
       to={href}
-      className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 transition-all hover:border-indigo-200 hover:bg-indigo-50/40 hover:shadow-sm"
+      className="flex items-center gap-3 rounded-sg-lg border border-line bg-surface p-4 shadow-sg transition-shadow hover:border-brand-200 hover:shadow-sg-md"
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sg bg-brand-50 text-brand-600">
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-gray-900">{label}</span>
-        <span className="mt-0.5 block text-xs text-gray-500">{description}</span>
+        <span className="block text-sm font-semibold text-ink">{label}</span>
+        <span className="mt-0.5 block text-xs text-ink-muted">{description}</span>
       </span>
     </Link>
   );

@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchPublicSiteConfig } from '../../redux/slices/PublicInfoSlice';
 import { buildAboutSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
+import { Card, PageHeader } from '../../components/UI';
 
 const LEGAL = {
     fullName: 'Общество с ограниченной ответственностью «Кроан»',
@@ -30,9 +31,9 @@ function formatPhone(phone) {
 
 function InfoRow({ label, value, mono }) {
     return (
-        <div className="py-3 border-b border-gray-100 last:border-0">
-            <dt className="text-sm text-gray-500 mb-0.5">{label}</dt>
-            <dd className={`text-gray-900 ${mono ? 'font-mono text-sm' : ''}`}>{value}</dd>
+        <div className="border-b border-line py-3 last:border-0">
+            <dt className="mb-0.5 text-sm text-ink-muted">{label}</dt>
+            <dd className={`text-ink ${mono ? 'font-mono text-sm' : ''}`}>{value}</dd>
         </div>
     );
 }
@@ -51,32 +52,32 @@ export default function AboutCompany() {
     const seo = buildAboutSeo();
 
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="mx-auto max-w-4xl">
             <PageSeoHelmet seo={seo} />
-            <header className="mb-8">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">О компании</h1>
-                <p className="mt-3 text-gray-600 leading-relaxed">
-                    Интернет-магазин <strong className="text-gray-900">«Свой Гараж»</strong> работает под управлением{' '}
-                    {LEGAL.shortName}. Мы помогаем подобрать и заказать автозапчасти — новые и б/у.
-                </p>
-            </header>
+            <PageHeader
+                title="О компании"
+                subtitle={
+                    <>
+                        Интернет-магазин <strong className="text-ink">«Свой Гараж»</strong> работает под управлением{' '}
+                        {LEGAL.shortName}. Мы помогаем подобрать и заказать автозапчасти — новые и б/у.
+                    </>
+                }
+            />
 
-            
-
-            <section className="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Контакты</h2>
+            <Card className="mb-6" padding="md">
+                <h2 className="mb-4 text-lg font-semibold text-ink">Контакты</h2>
                 <dl>
                     <InfoRow label="Город" value="г. Екатеринбург" />
                     <InfoRow label="Адрес" value={LEGAL.legalAddress} />
-                    <div className="py-3 border-b border-gray-100">
-                        <dt className="text-sm text-gray-500 mb-0.5">Телефон</dt>
-                        <dd className="text-gray-900">
+                    <div className="border-b border-line py-3">
+                        <dt className="mb-0.5 text-sm text-ink-muted">Телефон</dt>
+                        <dd className="text-ink">
                             {phoneFormatted && telHref ? (
-                                <a href={telHref} className="text-indigo-600 hover:underline font-medium">
+                                <a href={telHref} className="font-medium text-brand-600 hover:underline">
                                     {phoneFormatted}
                                 </a>
                             ) : (
-                                <span className="text-gray-500">Уточняйте в личном кабинете или у администратора сайта</span>
+                                <span className="text-ink-muted">Уточняйте в личном кабинете или у администратора сайта</span>
                             )}
                         </dd>
                     </div>
@@ -84,39 +85,39 @@ export default function AboutCompany() {
                         label="Режим работы"
                         value="Пн–Пт: 10:00–18:00 (местное время). В праздничные дни — по объявлению на сайте."
                     />
-                    <div className="py-3 border-b border-gray-100">
-                        <dt className="text-sm text-gray-500 mb-0.5">Доставка и оплата</dt>
-                        <dd className="text-gray-900">
-                            <Link to="/delivery" className="text-indigo-600 hover:underline">Условия доставки</Link>
+                    <div className="border-b border-line py-3">
+                        <dt className="mb-0.5 text-sm text-ink-muted">Доставка и оплата</dt>
+                        <dd className="text-ink">
+                            <Link to="/delivery" className="text-brand-600 hover:underline">Условия доставки</Link>
                             {' · '}
-                            <Link to="/payment" className="text-indigo-600 hover:underline">Способы оплаты</Link>
+                            <Link to="/payment" className="text-brand-600 hover:underline">Способы оплаты</Link>
                         </dd>
                     </div>
-                    <div className="py-3 border-b border-gray-100 last:border-0">
-                        <dt className="text-sm text-gray-500 mb-0.5">Документы</dt>
-                        <dd className="text-gray-900">
-                            <Link to="/privacy" className="text-indigo-600 hover:underline">
+                    <div className="border-b border-line py-3 last:border-0">
+                        <dt className="mb-0.5 text-sm text-ink-muted">Документы</dt>
+                        <dd className="text-ink">
+                            <Link to="/privacy" className="text-brand-600 hover:underline">
                                 Политика конфиденциальности
                             </Link>
                             {' · '}
-                            <Link to="/personal-data-consent" className="text-indigo-600 hover:underline">
+                            <Link to="/personal-data-consent" className="text-brand-600 hover:underline">
                                 Согласие на обработку персональных данных
                             </Link>
                             {' · '}
-                            <Link to="/offer" className="text-indigo-600 hover:underline">
+                            <Link to="/offer" className="text-brand-600 hover:underline">
                                 Публичная оферта
                             </Link>
                             {' · '}
-                            <Link to="/cookie-policy" className="text-indigo-600 hover:underline">
+                            <Link to="/cookie-policy" className="text-brand-600 hover:underline">
                                 Политика обработки cookie
                             </Link>
                         </dd>
                     </div>
                 </dl>
-            </section>
+            </Card>
 
-            <section className="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Реквизиты</h2>
+            <Card className="mb-6" padding="md">
+                <h2 className="mb-4 text-lg font-semibold text-ink">Реквизиты</h2>
                 <dl>
                     <InfoRow label="Полное наименование" value={LEGAL.fullName} />
                     <InfoRow label="ОГРН" value={LEGAL.ogrn} mono />
@@ -124,10 +125,8 @@ export default function AboutCompany() {
                     <InfoRow label="Дата регистрации" value={LEGAL.registeredAt} />
                     <InfoRow label="Юридический адрес" value={LEGAL.legalAddress} />
                     <InfoRow label="Генеральный директор" value={LEGAL.director} />
-                 
                 </dl>
-               
-            </section>
+            </Card>
 
             <YandexWebmasterCounter />
         </div>

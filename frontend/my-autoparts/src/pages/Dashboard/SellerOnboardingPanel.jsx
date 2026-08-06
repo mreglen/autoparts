@@ -5,22 +5,22 @@ function StepRow({ step, onNavigate }) {
   const isDone = step.status === 'done';
 
   return (
-    <div className="flex items-center justify-between gap-4 py-3 border-b border-indigo-100/80 last:border-0">
+    <div className="flex items-center justify-between gap-4 border-b border-brand-50 py-3 last:border-0">
       <div className="min-w-0 flex-1">
-        <p className={`text-sm font-medium ${isDone ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+        <p className={`text-sm font-medium ${isDone ? 'text-ink-faint line-through' : 'text-ink'}`}>
           {step.title}
         </p>
         {!isDone && step.hint ? (
-          <p className="mt-0.5 text-xs text-gray-600">{step.hint}</p>
+          <p className="mt-0.5 text-xs text-ink-muted">{step.hint}</p>
         ) : null}
       </div>
       {isDone ? (
-        <span className="shrink-0 text-xs font-medium text-emerald-600">Готово</span>
+        <span className="shrink-0 text-xs font-medium text-success-600">Готово</span>
       ) : (
         <button
           type="button"
           onClick={() => onNavigate(step.url)}
-          className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm ring-1 ring-indigo-200 hover:bg-indigo-50"
+          className="shrink-0 rounded-sg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
         >
           Перейти
         </button>
@@ -50,11 +50,11 @@ export default function SellerOnboardingPanel({ onboarding, loading }) {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50 to-white p-5">
-        <div className="h-5 w-40 animate-pulse rounded bg-indigo-100/80" />
+      <div className="rounded-sg-lg border border-brand-50 bg-surface p-5 shadow-sg">
+        <div className="h-5 w-40 animate-pulse rounded-sg bg-brand-50" />
         <div className="mt-4 space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-10 animate-pulse rounded-lg bg-indigo-100/50" />
+            <div key={i} className="h-10 animate-pulse rounded-sg bg-brand-50" />
           ))}
         </div>
       </div>
@@ -64,20 +64,20 @@ export default function SellerOnboardingPanel({ onboarding, loading }) {
   if (!onboarding?.steps?.length || allRequiredDone) return null;
 
   return (
-    <div className="rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50 to-white shadow-sm">
-      <div className="px-5 pt-5 pb-3">
+    <div className="rounded-sg-lg border border-brand-50 bg-surface shadow-sg">
+      <div className="px-5 pb-3 pt-5">
         <div className="flex items-baseline justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Первые шаги</h2>
-            <p className="mt-0.5 text-sm text-gray-600">Настройте магазин, чтобы начать продажи</p>
+            <h2 className="text-base font-semibold text-ink">Первые шаги</h2>
+            <p className="mt-0.5 text-sm text-ink-muted">Настройте магазин, чтобы начать продажи</p>
           </div>
-          <span className="text-xs font-semibold tabular-nums text-indigo-700">
+          <span className="text-xs font-semibold tabular-nums text-brand-700">
             {onboarding.core_progress?.done || 0}/{onboarding.core_progress?.total || 0}
           </span>
         </div>
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-indigo-100">
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-brand-50">
           <div
-            className="h-full rounded-full bg-indigo-600 transition-all duration-500"
+            className="h-full rounded-full bg-brand-600 transition-all duration-500"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -90,8 +90,8 @@ export default function SellerOnboardingPanel({ onboarding, loading }) {
       </div>
 
       {optionalSteps.length > 0 && (
-        <div className="rounded-b-2xl border-t border-indigo-100/80 bg-white/60 px-5 py-3">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">По желанию</p>
+        <div className="rounded-b-sg-lg border-t border-brand-50 bg-surface-muted px-5 py-3">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">По желанию</p>
           {optionalSteps.map((step) => (
             <StepRow key={step.id} step={step} onNavigate={navigate} />
           ))}

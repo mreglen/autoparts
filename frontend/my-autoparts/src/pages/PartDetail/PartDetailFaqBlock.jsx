@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Card } from '../../components/UI';
 import { buildProductFaqItems } from '../../utils/partDetailFaq';
 
 export default function PartDetailFaqBlock({
@@ -27,23 +28,23 @@ export default function PartDetailFaqBlock({
   if (!items.length) return null;
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-      <h2 className="text-lg font-semibold text-gray-900">Частые вопросы</h2>
-      <div className="mt-4 divide-y divide-gray-100 rounded-xl border border-gray-100">
+    <Card as="section" padding="sm" className="sm:p-5">
+      <h2 className="text-lg font-semibold text-ink">Частые вопросы</h2>
+      <div className="mt-4 divide-y divide-line-soft rounded-sg-lg border border-line-soft">
         {items.map((item, index) => {
           const isOpen = openIndex === index;
           return (
             <div key={item.question}>
               <button
                 type="button"
-                className="flex w-full items-start justify-between gap-3 px-4 py-3.5 text-left text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
+                className="flex w-full items-start justify-between gap-3 px-4 py-3.5 text-left text-sm font-medium text-ink transition-colors hover:bg-surface-muted"
                 onClick={() => setOpenIndex(isOpen ? -1 : index)}
                 aria-expanded={isOpen}
               >
                 <span>{item.question}</span>
                 <span
                   className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                    isOpen ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'
+                    isOpen ? 'bg-brand-100 text-brand-700' : 'bg-surface-subtle text-ink-muted'
                   }`}
                   aria-hidden="true"
                 >
@@ -51,7 +52,7 @@ export default function PartDetailFaqBlock({
                 </span>
               </button>
               {isOpen ? (
-                <div className="px-4 pb-4 text-sm leading-relaxed text-gray-600">
+                <div className="px-4 pb-4 text-sm leading-relaxed text-ink-muted">
                   {item.answer}
                 </div>
               ) : null}
@@ -59,6 +60,6 @@ export default function PartDetailFaqBlock({
           );
         })}
       </div>
-    </section>
+    </Card>
   );
 }

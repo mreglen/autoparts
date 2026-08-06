@@ -17,7 +17,7 @@ import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
 const formatPrice = (price) =>
   new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price);
 
-function CartOutlineIcon({ className = 'h-10 w-10 text-indigo-600' }) {
+function CartOutlineIcon({ className = 'h-10 w-10 text-brand-600' }) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
       <path
@@ -107,13 +107,13 @@ function getMaxAllowedQuantity(item) {
 function PartTypeBadge({ type }) {
   if (type === 'used') {
     return (
-      <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20">
+      <span className="inline-flex items-center rounded-sg bg-accent-50 px-2 py-0.5 text-xs font-medium text-accent-700 ring-1 ring-inset ring-accent-600/20">
         Б/У
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
+    <span className="inline-flex items-center rounded-sg bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-600/20">
       Новая
     </span>
   );
@@ -166,7 +166,7 @@ function CartItemRow({
         type="checkbox"
         checked={selected}
         onChange={onSelect}
-        className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+        className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
         aria-label={`Выбрать ${item.name}`}
       />
       <div className="min-w-0 flex-1">
@@ -182,7 +182,7 @@ function CartItemRow({
         {showDelivery && (
           <p className="mt-1.5 flex items-start gap-1.5 text-xs text-gray-600 sm:text-sm">
             <svg
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500"
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-500"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -264,8 +264,8 @@ function SellerCartBlock({
     ));
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <header className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-4 py-4 sm:px-6">
+    <section className="overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg">
+      <header className="border-b border-gray-100 bg-surface-muted px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
             <input
@@ -275,7 +275,7 @@ function SellerCartBlock({
                 if (el) el.indeterminate = someSelected && !allSelected;
               }}
               onChange={onSelectAll}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
               aria-label={`Выбрать все у ${seller}`}
             />
             <div>
@@ -325,7 +325,7 @@ function SellerCartBlock({
                 <button
                   type="button"
                   onClick={onCheckoutSelected}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-sg border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100"
                 >
                   {isAuthorized ? 'Оформить выбранное' : 'Оформить выбранное'}
                 </button>
@@ -349,7 +349,7 @@ function SellerCartBlock({
               <button
                 type="button"
                 onClick={onCheckout}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:flex-none"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-sg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 sm:flex-none"
               >
                 <img src="/img/cart.svg" alt="" className="h-4 w-4 brightness-0 invert" />
                 {checkoutLabel}
@@ -364,7 +364,7 @@ function SellerCartBlock({
 
 function PageState({ icon, title, description, action, iconWrapClassName = 'bg-gray-100' }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+    <div className="flex flex-col items-center justify-center rounded-sg-lg border border-line bg-surface px-6 py-16 text-center shadow-sg">
       <div className={`mb-6 flex h-20 w-20 items-center justify-center rounded-full ${iconWrapClassName}`}>{icon}</div>
       <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">{title}</h2>
       {description ? <p className="mt-2 max-w-sm text-sm text-gray-500">{description}</p> : null}
@@ -610,7 +610,7 @@ export default function CartPage() {
     <div className="max-md:mt-0 mt-5 pb-8">
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-indigo-600">Покупки</p>
+          <p className="text-sm font-medium text-brand-600">Покупки</p>
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Корзина</h1>
           {!isInitialLoad && cartItems.length > 0 && (
             <p className="mt-1 text-sm text-gray-500">
@@ -625,7 +625,7 @@ export default function CartPage() {
           )}
         </div>
         {!isInitialLoad && cartItems.length > 0 && (
-          <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm sm:text-right">
+          <div className="rounded-sg-lg border border-line bg-surface px-4 py-3 shadow-sg sm:text-right">
             <p className="text-xs text-gray-500">Общая сумма</p>
             <p className="text-xl font-bold text-gray-900">{formatPrice(grandTotal)}</p>
           </div>
@@ -635,7 +635,7 @@ export default function CartPage() {
       {isInitialLoad ? (
         <PageState
           icon={
-            <svg className="h-10 w-10 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+            <svg className="h-10 w-10 animate-spin text-brand-600" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path
                 className="opacity-75"
@@ -664,7 +664,7 @@ export default function CartPage() {
             <button
               type="button"
               onClick={() => dispatch(fetchCart())}
-              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="rounded-sg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
             >
               Попробовать снова
             </button>
@@ -673,13 +673,13 @@ export default function CartPage() {
       ) : cartItems.length === 0 ? (
         <PageState
           icon={<CartOutlineIcon />}
-          iconWrapClassName="bg-indigo-50"
+          iconWrapClassName="bg-brand-50"
           title="Корзина пуста"
           description="Добавьте новые или б/у запчасти — они сгруппируются по организациям продавцов"
           action={
             <Link
               to="/autoparts"
-              className="inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="inline-flex rounded-sg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
             >
               Перейти к каталогу
             </Link>

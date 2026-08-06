@@ -44,6 +44,7 @@ import {
   readPartDetailCache,
   writePartDetailCache,
 } from '../../../utils/partDetailCache';
+import { Badge, Button, Card, EmptyState, SectionHeader, SkeletonCard } from '../../../components/UI';
 
 const safeText = (value, fallback = '') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -455,11 +456,9 @@ export default function NewPartDetailPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-10">
+      <div className="mx-auto max-w-6xl px-3 py-6 sm:px-4">
         {seo ? <PageSeoHelmet seo={seo} /> : null}
-        <div className="rounded-2xl border border-gray-200 bg-white px-6 py-8 text-center shadow-sm">
-          <p className="text-gray-600">Загрузка карточки…</p>
-        </div>
+        <SkeletonCard lines={5} className="min-h-56" />
       </div>
     );
   }
@@ -471,14 +470,13 @@ export default function NewPartDetailPage() {
           <title>Карточка не найдена | Свой Гараж</title>
           <meta name="robots" content="noindex, nofollow" />
         </Helmet>
-        <p className="text-red-600">{error}</p>
-        <button
-          type="button"
-          onClick={handleBackToList}
-          className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
-        >
-          К новым запчастям
-        </button>
+        <EmptyState
+          illustration="error"
+          title="Карточка не найдена"
+          description={error}
+          actionLabel="К новым запчастям"
+          onAction={handleBackToList}
+        />
       </div>
     );
   }
@@ -530,23 +528,22 @@ export default function NewPartDetailPage() {
   const hasLiveStocks = Boolean(livePart) && liveStocks.length > 0;
 
   const mainProductBlock = hasLiveStocks ? (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-      <NewPartProductCard
-        part={livePart}
-        stocksData={liveStocks}
-        sectionType="available"
-        uniqueId={`detail-${numericCardId}`}
-        isDetailView
-      />
-    </section>
+    <NewPartProductCard
+      part={livePart}
+      stocksData={liveStocks}
+      sectionType="available"
+      uniqueId={`detail-${numericCardId}`}
+      isDetailView
+    />
   ) : (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <p className="text-gray-600">Нет доступных складов для заказа.</p>
-    </section>
+    <EmptyState
+      title="Нет доступных складов"
+      description="Сейчас эту деталь нельзя добавить в корзину. Проверьте аналоги ниже."
+    />
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6 md:py-8">
+    <div className="mx-auto max-w-6xl px-3 py-4 max-md:pb-28 sm:px-4 sm:py-6 md:py-8">
       <PageSeoHelmet seo={seo} />
       <Helmet>
         {structuredDataBlocks.map((block) => (
@@ -558,23 +555,29 @@ export default function NewPartDetailPage() {
 
       <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
 
-      <section className="mb-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm sm:mb-6 sm:p-6">
-        <button
-          type="button"
+      <Card as="section" className="mb-4 border-brand-100 bg-brand-50/30 sm:mb-6" padding="md">
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={handleBackToList}
-          className="mb-3 min-h-[44px] text-sm font-medium text-indigo-600 hover:text-indigo-800"
+          className="-ml-2 mb-3"
         >
           ← К поиску новых запчастей
-        </button>
-        <h1 className="text-lg font-bold leading-snug text-gray-900 sm:text-2xl">{pageH1}</h1>
+        </Button>
+        <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-center">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold leading-snug text-ink sm:text-2xl">{pageH1}</h1>
         <NewPartHorizontalScroll className="mt-3" hint="Листайте теги →" showHint={false}>
           <div className="flex flex-nowrap gap-2 pb-0.5 text-xs sm:flex-wrap sm:text-sm">
-            <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-gray-700 shadow-sm">Бренд: {brand}</span>
-            <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-gray-700 shadow-sm">Артикул: {article}</span>
+            <Badge className="shrink-0">Бренд: {brand}</Badge>
+            <Badge className="shrink-0">Артикул: {article}</Badge>
+            <Badge tone={inStock ? 'success' : 'warning'} className="shrink-0">
+              {inStock ? 'В наличии' : 'Под заказ'}
+            </Badge>
             {slugifyBrand(brand) ? (
               <Link
                 to={`/autoparts/new/brand/${encodeURIComponent(slugifyBrand(brand))}`}
-                className="shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 font-medium text-indigo-700 shadow-sm hover:bg-indigo-100"
+                className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 font-semibold text-brand-700 hover:bg-brand-100"
               >
                 Все новые {brand}
               </Link>
@@ -587,14 +590,33 @@ export default function NewPartDetailPage() {
           isNew
           usedCatalogPath={usedCatalogPath}
         />
-      </section>
-
-      <NewPartDeliveryStockBlock
-        stocks={liveStocks}
-        inStock={inStock}
-      />
+          </div>
+          {card?.image_url ? (
+            <div className="hidden h-32 overflow-hidden rounded-sg border border-line bg-surface sm:block">
+              <img
+                src={card.image_url.startsWith('http') ? card.image_url : resolveOgImageUrl(card.image_url)}
+                alt={`${brand} ${article}`}
+                className="h-full w-full object-contain p-2"
+              />
+            </div>
+          ) : (
+            <div className="hidden h-32 items-center justify-center rounded-sg border border-line bg-surface text-ink-faint sm:flex">
+              <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {mainProductBlock}
+
+      <div className="mt-4">
+        <NewPartDeliveryStockBlock
+          stocks={liveStocks}
+          inStock={inStock}
+        />
+      </div>
 
       <div className="mt-6 space-y-4">
         <PartDetailAboutBlock bodyDescription={bodyDescription} isNew />
@@ -629,12 +651,13 @@ export default function NewPartDetailPage() {
       ) : null}
 
       <section className="mt-8" ref={analogsSentinelRef}>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Аналоги</h2>
-          {analogsVisible && !analogsLoading && analogParts.length > 0 && (
-            <span className="text-sm text-gray-500">{analogParts.length} шт.</span>
-          )}
-        </div>
+        <SectionHeader
+          title="Аналоги"
+          action={analogsVisible && !analogsLoading && analogParts.length > 0
+            ? <Badge>{analogParts.length} шт.</Badge>
+            : null}
+          className="mb-4"
+        />
         {analogsVisible ? (
           <NewPartAnalogsTable
             analogParts={analogParts}
@@ -642,7 +665,7 @@ export default function NewPartDetailPage() {
             onNavigateCreate={handleAnalogNavigateCreate}
           />
         ) : (
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-500">
+          <div className="rounded-sg-lg border border-line bg-surface p-5 text-sm text-ink-muted shadow-sg">
             Загрузка аналогов…
           </div>
         )}

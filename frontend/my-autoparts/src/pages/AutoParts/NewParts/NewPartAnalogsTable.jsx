@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { Card } from '../../../components/UI';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { buildNewPartDetailPath } from '../../../utils/partRoutes';
 import { mapPartToStocksData } from './rosskoHelpers';
 import {
-  applyMarkup,
   formatDeliveryTimeText,
   formatPriceRub,
   getMinStockPrice,
@@ -69,23 +69,23 @@ function AnalogMobileCard({ part, markupPercent, onNavigateCreate }) {
     onNavigateCreate(part);
   };
 
-  const linkClass = 'inline-flex min-h-[44px] items-center font-medium text-indigo-600 hover:text-indigo-800';
+  const linkClass = 'inline-flex min-h-[44px] items-center font-medium text-brand-600 hover:text-brand-800';
 
   return (
-    <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <Card as="article" padding="sm">
       <div className="flex flex-wrap gap-2 text-xs">
-        <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{brand}</span>
-        <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{article}</span>
+        <span className="rounded bg-surface-subtle px-2 py-0.5 font-medium text-ink-soft">{brand}</span>
+        <span className="rounded bg-surface-subtle px-2 py-0.5 font-medium text-ink-soft">{article}</span>
       </div>
-      <p className="mt-2 text-sm font-semibold leading-snug text-gray-900">{name}</p>
+      <p className="mt-2 text-sm font-semibold leading-snug text-ink">{name}</p>
       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs text-gray-500">Цена от</p>
-          <p className="text-lg font-bold text-gray-900">{minPrice ? `${formatPriceRub(minPrice)} ₽` : '—'}</p>
-          <p className="mt-1 text-xs text-gray-600">{delivery}</p>
+          <p className="text-xs text-ink-muted">Цена от</p>
+          <p className="text-lg font-bold text-ink">{minPrice ? `${formatPriceRub(minPrice)} ₽` : '—'}</p>
+          <p className="mt-1 text-xs text-ink-muted">{delivery}</p>
         </div>
         {resolving ? (
-          <span className="text-xs text-gray-400">…</span>
+          <span className="text-xs text-ink-faint">…</span>
         ) : href ? (
           <Link to={href} className={linkClass}>
             Открыть
@@ -96,7 +96,7 @@ function AnalogMobileCard({ part, markupPercent, onNavigateCreate }) {
           </button>
         )}
       </div>
-    </article>
+    </Card>
   );
 }
 
@@ -132,20 +132,20 @@ function AnalogRow({ part, markupPercent, onNavigateCreate }) {
     onNavigateCreate(part);
   };
 
-  const linkClass = 'font-medium text-indigo-600 hover:text-indigo-800';
+  const linkClass = 'font-medium text-brand-600 hover:text-brand-800';
 
   return (
-    <tr className="border-b border-gray-100 last:border-0">
-      <td className="px-3 py-2 text-gray-800">{brand}</td>
-      <td className="px-3 py-2 text-gray-800">{article}</td>
-      <td className="px-3 py-2 text-gray-700">{name}</td>
-      <td className="px-3 py-2 font-medium text-gray-900">
+    <tr className="border-b border-line-soft last:border-0">
+      <td className="px-3 py-2 text-ink-soft">{brand}</td>
+      <td className="px-3 py-2 text-ink-soft">{article}</td>
+      <td className="px-3 py-2 text-ink-soft">{name}</td>
+      <td className="px-3 py-2 font-medium text-ink">
         {minPrice ? `${formatPriceRub(minPrice)} ₽` : '—'}
       </td>
-      <td className="px-3 py-2 text-gray-600">{delivery}</td>
+      <td className="px-3 py-2 text-ink-muted">{delivery}</td>
       <td className="px-3 py-2">
         {resolving ? (
-          <span className="text-xs text-gray-400">…</span>
+          <span className="text-xs text-ink-faint">…</span>
         ) : href ? (
           <Link to={href} className={linkClass}>
             Открыть
@@ -164,10 +164,10 @@ export default function NewPartAnalogsTable({ analogParts, loading, onNavigateCr
   const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 15);
 
   if (loading) {
-    return <p className="text-sm text-gray-500">Загрузка аналогов…</p>;
+    return <p className="text-sm text-ink-muted">Загрузка аналогов…</p>;
   }
   if (!analogParts.length) {
-    return <p className="text-sm text-gray-500">Аналоги не найдены.</p>;
+    return <p className="text-sm text-ink-muted">Аналоги не найдены.</p>;
   }
 
   return (
@@ -186,11 +186,11 @@ export default function NewPartAnalogsTable({ analogParts, loading, onNavigateCr
         })}
       </div>
 
-      <div className="hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:block">
+      <Card padding="none" className="hidden md:block">
         <NewPartHorizontalScroll className="p-0" hint="Листайте таблицу аналогов →" showHint={analogParts.length > 2}>
           <table className="min-w-[52rem] w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+              <tr className="border-b border-line bg-surface-muted text-xs uppercase tracking-wide text-ink-muted">
                 <th className="px-3 py-2 font-medium">Бренд</th>
                 <th className="px-3 py-2 font-medium">Артикул</th>
                 <th className="px-3 py-2 font-medium">Название</th>
@@ -214,7 +214,7 @@ export default function NewPartAnalogsTable({ analogParts, loading, onNavigateCr
             </tbody>
           </table>
         </NewPartHorizontalScroll>
-      </div>
+      </Card>
     </>
   );
 }

@@ -83,12 +83,12 @@ function NavItemButton({ item, isActive, onClick, badge }) {
             aria-label={item.label}
             aria-current={isActive ? 'page' : undefined}
             className={`flex min-h-[48px] flex-1 items-center justify-center rounded-lg px-1 transition-colors ${
-                isActive ? 'text-indigo-600' : 'text-gray-500 active:text-indigo-600'
+                isActive ? 'text-brand-600' : 'text-ink-faint active:text-brand-600'
             }`}
         >
             <span
                 className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
-                    isActive ? 'bg-indigo-50' : ''
+                    isActive ? 'bg-brand-50' : ''
                 }`}
             >
                 <svg
@@ -117,7 +117,7 @@ function NavItemLink({ item, isActive, badge }) {
             to={item.to}
             aria-label={item.label}
             className={`flex min-h-[48px] flex-1 items-center justify-center rounded-lg px-1 transition-colors ${
-                isActive ? 'text-indigo-600' : 'text-gray-500 active:text-indigo-600'
+                isActive ? 'text-brand-600' : 'text-ink-faint active:text-brand-600'
             }`}
         >
             {({ isActive: linkActive }) => {
@@ -125,7 +125,7 @@ function NavItemLink({ item, isActive, badge }) {
                 return (
                     <span
                         className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
-                            active ? 'bg-indigo-50' : ''
+                            active ? 'bg-brand-50' : ''
                         }`}
                     >
                         <svg

@@ -96,16 +96,16 @@ function QuantityControl({
           type="button"
           onClick={onRemove}
           disabled={disabled}
-          className={`${compact ? 'h-9 w-9' : 'h-7 w-7'} rounded border border-gray-300 bg-white text-lg hover:bg-gray-50 disabled:opacity-50`}
+          className={`${compact ? 'h-9 w-9' : 'h-7 w-7'} rounded-sg border border-line bg-surface text-lg text-ink hover:bg-surface-muted disabled:opacity-50`}
         >
           −
         </button>
-        <span className={`${compact ? 'w-8 text-base' : 'w-6 text-sm'} text-center font-semibold text-gray-900`}>{safeQuantity}</span>
+        <span className={`${compact ? 'w-8 text-base' : 'w-6 text-sm'} text-center font-semibold text-ink`}>{safeQuantity}</span>
         <button
           type="button"
           onClick={onAdd}
           disabled={disabled || noStock}
-          className={`${compact ? 'h-9 w-9' : 'h-7 w-7'} rounded border border-gray-300 bg-white text-lg hover:bg-gray-50 disabled:opacity-50`}
+          className={`${compact ? 'h-9 w-9' : 'h-7 w-7'} rounded-sg border border-line bg-surface text-lg text-ink hover:bg-surface-muted disabled:opacity-50`}
         >
           +
         </button>
@@ -118,7 +118,7 @@ function QuantityControl({
       type="button"
       onClick={onAdd}
       disabled={disabled}
-      className={`${compact ? 'min-h-[44px] px-5 py-2.5 text-sm' : 'px-3 py-1.5 text-xs'} rounded-lg bg-indigo-600 font-medium text-white hover:bg-indigo-700 disabled:opacity-50`}
+      className={`${compact ? 'min-h-[44px] px-5 py-2.5 text-sm' : 'px-3 py-1.5 text-xs'} rounded-sg bg-brand-600 font-medium text-white hover:bg-brand-700 disabled:opacity-50`}
     >
       В корзину
     </button>
@@ -282,7 +282,7 @@ function NewPartProductCard({
   const mainAvailableCount = toSafeInt(mainStock?.available_count, 0);
 
   return (
-    <article className="relative rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5" data-card-id={uniqueId}>
+    <article className="relative rounded-sg-lg border border-line bg-surface p-3 shadow-sg sm:p-5" data-card-id={uniqueId}>
       <FavoriteHeartOverlay
         rossko={{
           brand,
@@ -295,10 +295,19 @@ function NewPartProductCard({
       />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
-          <div className="relative hidden h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-100 sm:flex sm:h-28 sm:w-28">
-            <svg className="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+          <div className="relative hidden h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-sg border border-line bg-surface-muted sm:flex sm:h-28 sm:w-28">
+            {part?.image_url ? (
+              <img
+                src={part.image_url}
+                alt={`${brand} ${number}`}
+                className="h-full w-full object-contain p-2"
+                loading="lazy"
+              />
+            ) : (
+              <svg className="h-10 w-10 text-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            )}
           </div>
           <div className="min-w-0 flex-1">
           {!isDetailView ? (
@@ -311,45 +320,44 @@ function NewPartProductCard({
               onTouchStart={prefetchDetail}
             >
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{brand}</span>
-                <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{number}</span>
-                {showAnalog && <span className="rounded bg-orange-100 px-2 py-0.5 font-medium text-orange-800">Аналог</span>}
-                {fastDelivery && <span className="rounded bg-green-100 px-2 py-0.5 font-medium text-green-800">Быстрая поставка</span>}
+                <span className="rounded-sg bg-surface-muted px-2 py-0.5 font-medium text-ink-soft">{brand}</span>
+                <span className="rounded-sg bg-surface-muted px-2 py-0.5 font-medium text-ink-soft">{number}</span>
+                {showAnalog && <span className="rounded-sg bg-accent-100 px-2 py-0.5 font-medium text-accent-700">Аналог</span>}
+                {fastDelivery && <span className="rounded-sg bg-success-100 px-2 py-0.5 font-medium text-success-700">Быстрая поставка</span>}
               </div>
-              <h3 className="text-base font-semibold leading-snug text-gray-900 hover:text-indigo-700 sm:text-lg">
+              <h3 className="text-base font-semibold leading-snug text-ink hover:text-brand-700 sm:text-lg">
                 {displayTitle}
               </h3>
-              <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-gray-600 sm:line-clamp-2">{title}</p>
+              <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-ink-muted sm:line-clamp-2">{title}</p>
             </Link>
           ) : (
             <>
-              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{brand}</span>
-                <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{number}</span>
-                {showAnalog && <span className="rounded bg-orange-100 px-2 py-0.5 font-medium text-orange-800">Аналог</span>}
-                {fastDelivery && <span className="rounded bg-green-100 px-2 py-0.5 font-medium text-green-800">Быстрая поставка</span>}
-              </div>
-              <h3 className="text-base font-semibold leading-snug text-gray-900 sm:text-lg">
-                {displayTitle}
-              </h3>
-              <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-gray-600 sm:line-clamp-2">{title}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+                Основное предложение
+              </p>
+              {fastDelivery ? (
+                <span className="mt-2 inline-flex rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700 ring-1 ring-inset ring-success-100">
+                  Быстрая поставка
+                </span>
+              ) : null}
+              <p className="mt-2 text-sm leading-relaxed text-ink-muted">{title || displayTitle}</p>
             </>
           )}
           </div>
         </div>
 
-        <div className="w-full rounded-lg bg-gray-50 p-3 sm:p-4 lg:w-[280px] lg:flex-shrink-0">
+        <div className="w-full rounded-sg bg-surface-muted p-3 sm:p-4 lg:w-[280px] lg:flex-shrink-0">
           <div className="mb-2 flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs text-gray-500">Цена</p>
-              <p className="text-2xl font-bold text-gray-900 sm:text-xl">{price} ₽</p>
+              <p className="text-xs text-ink-muted">Цена</p>
+              <p className="text-2xl font-bold text-ink sm:text-xl">{price} ₽</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-500">Остаток</p>
-              <p className="text-sm font-semibold text-gray-900">{mainAvailableCount} шт.</p>
+              <p className="text-xs text-ink-muted">Остаток</p>
+              <p className="text-sm font-semibold text-ink">{mainAvailableCount} шт.</p>
             </div>
           </div>
-          <p className="mb-3 text-xs leading-relaxed text-gray-600">{formatDeliveryTimeText(mainStock.delivery_start, mainStock.delivery_end)}</p>
+          <p className="mb-3 text-xs leading-relaxed text-ink-muted">{formatDeliveryTimeText(mainStock.delivery_start, mainStock.delivery_end)}</p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <QuantityControl
               quantity={mainQuantity}
@@ -360,7 +368,7 @@ function NewPartProductCard({
               compact
             />
             {(mainStockInfo.noStock || mainStockInfo.limitedStock) && (
-              <span className="text-xs text-orange-600 sm:ml-2">
+              <span className="text-xs text-accent-600 sm:ml-2">
                 {mainStockInfo.noStock ? 'Нет на складах' : 'Есть на др. складах'}
               </span>
             )}
@@ -369,11 +377,11 @@ function NewPartProductCard({
       </div>
 
       {otherStocks.length > 0 && (
-        <div className="mt-4 border-t border-dashed border-gray-200 pt-3">
+        <div className="mt-4 border-t border-dashed border-line pt-3">
           <button
             type="button"
             onClick={() => setShowDetails((prev) => !prev)}
-            className="min-h-[44px] text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            className="min-h-[44px] text-sm font-medium text-brand-600 hover:text-brand-800"
           >
             {showDetails ? 'Скрыть другие склады' : `Другие склады (${otherStocks.length})`}
           </button>
@@ -385,11 +393,11 @@ function NewPartProductCard({
                 const stockInfo = getStockAvailability(stock);
                 const availableCount = toSafeInt(stock?.available_count, 0);
                 return (
-                  <div key={`${uniqueId}-stock-${idx}`} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                  <div key={`${uniqueId}-stock-${idx}`} className="rounded-sg border border-line bg-surface-muted p-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="text-sm text-gray-700">
-                        <p className="font-medium text-gray-900">{priceWithMarkup(stock.price)} ₽ · {availableCount} шт.</p>
-                        <p className="text-xs text-gray-600">{formatDeliveryTimeText(stock.delivery_start, stock.delivery_end)}</p>
+                      <div className="text-sm text-ink-soft">
+                        <p className="font-medium text-ink">{priceWithMarkup(stock.price)} ₽ · {availableCount} шт.</p>
+                        <p className="text-xs text-ink-muted">{formatDeliveryTimeText(stock.delivery_start, stock.delivery_end)}</p>
                       </div>
                       <QuantityControl
                         quantity={quantity}

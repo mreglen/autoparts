@@ -15,9 +15,9 @@ export function ProfileBlock({ title, children, className = '' }) {
   return (
     <div className={className}>
       {title ? (
-        <p className="mb-1.5 px-1 text-xs font-medium uppercase tracking-wide text-gray-500 lg:px-0">{title}</p>
+        <p className="mb-1.5 px-1 text-xs font-medium uppercase tracking-wide text-ink-faint lg:px-0">{title}</p>
       ) : null}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">{children}</div>
+      <div className="overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg">{children}</div>
     </div>
   );
 }
@@ -30,15 +30,15 @@ export function ProfileSectionHeader({
   showChevron = true,
 }) {
   const actionClass =
-    'text-sm font-medium text-indigo-600 hover:text-indigo-700';
+    'text-sm font-semibold text-brand-700 hover:text-brand-800';
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
-      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+    <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+      <h3 className="text-sm font-semibold text-ink">{title}</h3>
       {to ? (
         <Link to={to} className={actionClass}>
           {actionLabel || 'Все'}
-          {showChevron ? <ChevronRight className="h-4 w-4 text-indigo-400" /> : null}
+          {showChevron ? <ChevronRight className="h-4 w-4 text-brand-400" /> : null}
         </Link>
       ) : null}
       {!to && onAction && actionLabel ? (
@@ -52,11 +52,11 @@ export function ProfileSectionHeader({
 
 export function ProfileEmptyLine({ children, catalogTo = '/autoparts/used' }) {
   return (
-    <p className="px-4 py-8 text-center text-sm text-gray-500">
+    <p className="px-4 py-8 text-center text-sm text-ink-muted">
       {children || (
         <>
           Пока пусто.{' '}
-          <Link to={catalogTo} className="font-medium text-indigo-600 hover:text-indigo-700">
+          <Link to={catalogTo} className="font-medium text-brand-600 hover:text-brand-700">
             Каталог
           </Link>
         </>
@@ -162,10 +162,10 @@ export const profilePageShell = 'w-full space-y-3 pb-6';
 export const profileFullPageShell = 'w-full pb-6';
 
 export const profileInputClass =
-  'w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+  'w-full rounded-sg border border-line bg-surface px-3 py-2.5 text-sm text-ink shadow-sg-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
 
 export const profilePrimaryBtn =
-  'inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50';
+  'inline-flex items-center justify-center rounded-sg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50';
 
 export const profileSecondaryBtn =
-  'inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50';
+  'inline-flex items-center justify-center rounded-sg border border-line bg-surface px-5 py-2.5 text-sm font-medium text-ink-soft hover:bg-surface-muted disabled:opacity-50';

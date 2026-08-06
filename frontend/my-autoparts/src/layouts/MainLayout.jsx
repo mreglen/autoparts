@@ -14,6 +14,8 @@ import { useAvitoAccountStatus } from '../hooks/useAvitoAccountStatus';
 import useCartSync from '../hooks/useCartSync';
 import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
 import NotificationsBanner from '../components/NotificationsBanner/NotificationsBanner';
+import SiteFooter from '../components/SiteFooter/SiteFooter';
+import { getPublicLayoutProfile } from '../utils/layoutProfiles';
 
 export default function MainLayout() {
     const location = useLocation();
@@ -21,7 +23,8 @@ export default function MainLayout() {
     const { user } = useSelector((state) => state.auth);
     useCartSync();
     const breadcrumbItems = usePageBreadcrumbs();
-    const isPartPage = location.pathname.startsWith('/part/');
+    const layoutProfile = getPublicLayoutProfile(location.pathname);
+    const isPartPage = layoutProfile.isPartPage;
     const isNewPartDetailPage = /^\/autoparts\/new\/part\/[^/]+$/.test(location.pathname);
     const isSeoLandingPage = /^\/autoparts\/(new|used)\/(brand|category|geo)\/[^/]+$/.test(
         location.pathname,
@@ -31,15 +34,11 @@ export default function MainLayout() {
     });
 
     const isAutopartsPage = location.pathname.startsWith('/autoparts');
-    const isVinCatalogPage = location.pathname.startsWith('/autoparts/vin');
-    const isChatsPage = location.pathname.startsWith('/chats');
+    const isVinCatalogPage = layoutProfile.isVinCatalog;
+    const isChatsPage = layoutProfile.isChatsPage;
     const isMobileActiveChat = isChatsPage && Boolean(searchParams.get('chatId'));
-    const isFullBleedAmbientPage =
-        location.pathname === '/reviews' ||
-        location.pathname === '/' ||
-        location.pathname === '/autoservice' ||
-        location.pathname === '/organizations' ||
-        location.pathname.startsWith('/organizations/');
+    const isFullBleedAmbientPage = layoutProfile.isFullBleedAmbient;
+    const showFooter = !isChatsPage && !isPartPage && !isVinCatalogPage;
 
     const {
         token,
@@ -60,7 +59,7 @@ export default function MainLayout() {
     }, [location.pathname]);
 
     return (
-        <div className="min-h-screen max-w-full overflow-x-hidden bg-gray-50 pb-[4.5rem] lg:pb-0">
+        <div className="min-h-screen max-w-full overflow-x-hidden bg-surface pb-[4.5rem] lg:pb-0">
             <HeaderBadgeHeightSync />
             <div className="hidden lg:block">
                 <Navigation />
@@ -91,7 +90,7 @@ export default function MainLayout() {
             <main
                 className={`mx-auto ${
                     isFullBleedAmbientPage
-                        ? 'max-w-none bg-[#f4f6fb] px-0 py-0 min-h-[calc(100dvh-var(--sg-mobile-header-h)-4.5rem)] lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]'
+                        ? 'max-w-none bg-surface px-0 py-0 min-h-[calc(100dvh-var(--sg-mobile-header-h)-4.5rem)] lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]'
                         : isChatsPage
                         ? `max-w-7xl max-lg:px-0 max-lg:py-0 max-lg:overflow-hidden px-3 sm:px-1 lg:px-2 py-6 sm:py-8 ${
                             isMobileActiveChat
@@ -115,6 +114,8 @@ export default function MainLayout() {
                 <AvitoProExpiredBanner status={avitoAccountStatus} />
                 <Outlet />
             </main>
+
+            {showFooter ? <SiteFooter /> : null}
 
             <InstallPwaPrompt />
             <MobileBottomNav />

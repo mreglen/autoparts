@@ -24,19 +24,19 @@ import {
 function ProfilePageSkeleton() {
   return (
     <div className={`${profilePageShell} animate-pulse`}>
-      <div className="bg-white px-4 py-5 sm:rounded-xl">
+      <div className="bg-surface px-4 py-5 sm:rounded-sg-lg sm:border sm:border-line sm:shadow-sg">
         <div className="flex items-center gap-3">
-          <div className="h-14 w-14 rounded-full bg-gray-200" />
+          <div className="h-14 w-14 rounded-full bg-surface-muted" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-40 rounded bg-gray-200" />
-            <div className="h-3 w-28 rounded bg-gray-100" />
+            <div className="h-4 w-40 rounded-sg bg-surface-muted" />
+            <div className="h-3 w-28 rounded-sg bg-line" />
           </div>
         </div>
       </div>
-      <div className="bg-white sm:rounded-xl">
+      <div className="bg-surface sm:rounded-sg-lg sm:border sm:border-line sm:shadow-sg">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="border-b border-gray-100 px-4 py-4 last:border-0">
-            <div className="h-4 w-32 rounded bg-gray-100" />
+          <div key={i} className="border-b border-line px-4 py-4 last:border-0">
+            <div className="h-4 w-32 rounded-sg bg-surface-muted" />
           </div>
         ))}
       </div>
@@ -240,7 +240,7 @@ export default function ProfilePage() {
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={avatarLoading}
-                className="relative shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                className="relative shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
               >
                 <UserAvatar
                   avatarUrl={user.avatar_url}
@@ -259,7 +259,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
-                  className="font-medium text-indigo-600 hover:text-indigo-700"
+                  className="font-medium text-brand-600 hover:text-brand-700"
                 >
                   Изменить фото
                 </button>
