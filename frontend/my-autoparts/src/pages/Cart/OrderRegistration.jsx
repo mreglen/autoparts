@@ -122,6 +122,11 @@ export default function OrderRegistration() {
   const deliverInParts = orderData.deliverInParts || false;
 
   useEffect(() => {
+    if (!isReady || user) return;
+    navigate('/auth', { replace: true, state: { from: '/order-reg' } });
+  }, [isReady, user, navigate]);
+
+  useEffect(() => {
     if (rawItems.some((item) => item.type === 'new')) {
       navigate('/cart/new/checkout', { replace: true });
       return;

@@ -14,6 +14,7 @@ import {
   setDashboardTasksSectionHidden,
 } from './dashboardUtils';
 import SellerOnboardingPanel from './SellerOnboardingPanel';
+import { warehousePageClass } from '../../utils/warehouseListUi';
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -313,7 +314,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-0 space-y-6">
+      <div className={`${warehousePageClass} mx-auto max-w-4xl space-y-6 py-2`}>
         <div className="h-10 w-56 rounded-lg bg-gray-100 animate-pulse" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {[1, 2, 3].map((i) => (
@@ -327,7 +328,7 @@ export default function DashboardPage() {
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
+      <div className={`${warehousePageClass} mx-auto max-w-md py-16 text-center`}>
         <p className="text-gray-600">{error || 'Нет данных'}</p>
         <button
           type="button"
@@ -344,7 +345,7 @@ export default function DashboardPage() {
   const recentSales = sales?.recentSales?.slice(0, 4) || [];
 
   return (
-    <div className="mx-auto max-w-4xl px-4 pb-12 pt-2 sm:px-0 sm:pt-4 space-y-8">
+    <div className={`${warehousePageClass} mx-auto max-w-4xl space-y-8 pb-12 pt-2 sm:pt-4`}>
       {showOnboarding && (
         <SellerOnboardingPanel onboarding={onboarding} loading={onboardingLoading} />
       )}

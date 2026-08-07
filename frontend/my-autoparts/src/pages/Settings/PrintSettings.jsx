@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { warehousePageClass } from '../../utils/warehouseListUi';
 
 export default function PrintSettings() {
   const { isReady, user } = useAuthReady();
@@ -26,21 +27,10 @@ export default function PrintSettings() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-800">Печать</h2>
-      </div>
-
-      {/* Printers Section */}
-      <div>
-        <PrinterTokenSection />
-      </div>
-
-      {/* Label Print Settings Section */}
-      <div>
-        <LabelPrintSection />
-      </div>
+    <div className={`${warehousePageClass} min-w-0 space-y-4`}>
+      <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Печать</h1>
+      <PrinterTokenSection />
+      <LabelPrintSection />
     </div>
   );
 }

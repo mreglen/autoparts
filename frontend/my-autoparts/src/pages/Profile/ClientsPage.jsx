@@ -17,6 +17,12 @@ import ClientOrdersModal from './ClientOrdersModal';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { apiAxios, normalizeImageUrl } from '../../utils/apiClient';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
+import {
+    warehouseEmptyShellClass,
+    warehouseListShellClass,
+    warehousePageClass,
+    warehousePillControlClass,
+} from '../../utils/warehouseListUi';
 
 function clientFullName(client) {
     return `${client.last_name || ''} ${client.first_name || ''}${client.patronymic ? ` ${client.patronymic}` : ''}`.trim();
@@ -151,8 +157,10 @@ export default function ClientsPage() {
 
     if (!user?.organization_id) {
         return (
-            <div className="mt-4 px-4 sm:px-0">
-                <p className="text-gray-600">Раздел доступен только для организации продавца.</p>
+            <div className={warehousePageClass}>
+                <p className={`${warehouseEmptyShellClass} text-sm text-gray-600`}>
+                    Раздел доступен только для организации продавца.
+                </p>
             </div>
         );
     }
@@ -166,30 +174,22 @@ export default function ClientsPage() {
     }
 
     return (
-        <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
-                <h1 className="text-2xl font-bold text-gray-800">Клиенты</h1>
+        <div className={`${warehousePageClass} min-w-0 space-y-4`}>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Клиенты</h1>
                 <p className="text-sm text-gray-500">
-                    Покупатели с заказами: <span className="font-semibold text-gray-900">{clients.length}</span>
+                    Покупателей: <span className="font-semibold tabular-nums text-gray-900">{clients.length}</span>
                 </p>
             </div>
 
-            <div className="mb-6 flex-1 max-w-md">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Поиск</label>
-                <div className="relative">
-                    <input
-                        type="text"
-                        placeholder="ФИО, email, телефон..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                    </div>
-                </div>
+            <div className="max-w-md">
+                <input
+                    type="search"
+                    placeholder="ФИО, email, телефон"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={warehousePillControlClass}
+                />
             </div>
 
             {error && (
@@ -215,7 +215,7 @@ export default function ClientsPage() {
             ) : (
                 <>
                     <div
-                        className={`hidden md:block w-full rounded-xl border border-gray-200 bg-white ${
+                        className={`hidden md:block w-full ${warehouseListShellClass} ${
                             openActionsId ? 'overflow-visible' : 'overflow-x-auto overflow-hidden'
                         }`}
                     >

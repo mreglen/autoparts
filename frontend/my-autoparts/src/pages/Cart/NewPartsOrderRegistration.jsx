@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   selectCart,
@@ -120,6 +120,7 @@ function SelectChip({ selected, onClick, children }) {
 
 export default function NewPartsOrderRegistration() {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const { user, isReady } = useAuthReady();
   const cart = useSelector(selectCart);
@@ -146,11 +147,14 @@ export default function NewPartsOrderRegistration() {
   useEffect(() => {
     if (!isReady) return;
     if (!user) {
-      navigate('/auth', { replace: true });
+      navigate('/auth', {
+        replace: true,
+        state: { from: `${location.pathname}${location.search}` },
+      });
       return;
     }
     dispatch(fetchCart());
-  }, [isReady, user, navigate, dispatch]);
+  }, [isReady, user, navigate, dispatch, location.pathname, location.search]);
 
   const selectedItems = useMemo(() => {
     if (!cart?.new_parts_items?.length) return [];

@@ -10,7 +10,7 @@ if "fcntl" not in sys.modules:
 from fastapi import HTTPException
 
 from app.schemas.garage_vehicle import GarageVehicleCreate
-from app.services.laximo.vehicle_lookup import ByVinResult
+from app.services.laximo.vehicle_lookup import ByFrameResult, ByVinResult
 from app.services.laximo.vehicle_normalize import NormalizedVehicleCandidate
 from app.services.laximo.vin import normalize_vin_or_raise
 
@@ -118,6 +118,35 @@ class GarageDecodeVinTests(unittest.TestCase):
                 )
             self.assertEqual(ctx.exception.status_code, 400)
 
+    def test_decode_frame_maps_lookup_ok(self):
+        from app.routers.autoservice_garage import decode_garage_frame
+        from app.schemas.garage_vehicle import GarageVehicleDecodeFrameRequest
+
+        candidate = NormalizedVehicleCandidate(make="Toyota", model="Hiace", year=2015)
+        lookup = ByFrameResult(
+            ok=True,
+            reason="ok",
+            message=None,
+            frame="SGL5-400683",
+            candidates=[candidate],
+        )
+
+        with patch(
+            "app.routers.autoservice_garage.require_my_active_autoservice_client"
+        ), patch(
+            "app.routers.autoservice_garage.lookup_by_frame",
+            return_value=lookup,
+        ):
+            response = decode_garage_frame(
+                GarageVehicleDecodeFrameRequest(frame="SGL5-400683"),
+                db=MagicMock(),
+                current_user=MagicMock(),
+            )
+
+        self.assertTrue(response.ok)
+        self.assertEqual(response.frame, "SGL5-400683")
+        self.assertEqual(response.candidates[0].model, "Hiace")
+
 
 class GarageCreateLaximoTests(unittest.TestCase):
     def test_create_with_laximo_fields_sets_source(self):
@@ -152,6 +181,23 @@ class GarageCreateLaximoTests(unittest.TestCase):
         self.assertIsNone(catalog2)
         self.assertIsNone(vid2)
         self.assertIsNone(attrs2)
+
+    def test_create_with_frame_source_keeps_frame_metadata(self):
+        from app.routers import autoservice_garage as garage
+
+        payload = GarageVehicleCreate(
+            make="Toyota",
+            model="Hiace",
+            source="frame",
+            laximo_attributes=[{"key": "frame_query", "value": "SGL5-400683"}],
+        )
+
+        source, catalog, vehicle_id, attrs = garage._resolve_source_and_laximo(payload)
+
+        self.assertEqual(source, "frame")
+        self.assertIsNone(catalog)
+        self.assertIsNone(vehicle_id)
+        self.assertEqual(attrs, [{"key": "frame_query", "value": "SGL5-400683"}])
 
     def test_create_vehicle_persists_laximo(self):
         from app.routers.autoservice_garage import _create_vehicle_for_client

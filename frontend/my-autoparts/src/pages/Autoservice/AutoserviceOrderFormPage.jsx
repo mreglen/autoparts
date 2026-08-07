@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
+import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
 import { apiAxios, apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { parseServerDate } from '../../utils/serverDate';
@@ -1558,7 +1559,7 @@ export default function AutoserviceOrderFormPage() {
       ) : null}
 
       {addVehicleOpen && clientId ? (
-        <AddVehicleModal
+        <GarageQuickAddModal
           clientId={clientId}
           onClose={() => setAddVehicleOpen(false)}
           onCreated={handleVehicleCreated}

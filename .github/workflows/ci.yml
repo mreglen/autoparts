@@ -20,11 +20,52 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
       - run: cp .env.example .env
       - run: python -m compileall -q app
-      - run: python -m unittest tests.test_backup_service
+      - run: >-
+          python -m unittest
+          tests.test_backup_service
+          tests.test_internal_code
+          tests.test_slug_utils
+          tests.test_product_price
+          tests.test_new_part_price_utils
+          tests.test_organization_city
+          tests.test_rate_limit
+          tests.test_products_public_cache
+          tests.test_websocket_limits
+          tests.test_internal_prerender
+          tests.test_openrouter_integration
+          tests.test_laximo_cat_gate
+          tests.test_search_query
+          tests.test_search_resolve_service
+          tests.test_stock_out_sales
+          tests.test_avito_order_pricing
+          tests.test_avito_closed_order_processor
+          tests.test_avito_warehouse_fulfillment
+          tests.test_avito_integration_permissions
+          tests.test_marketplace_used_order
+          tests.test_marketplace_used_fulfillment
+          tests.test_stock_sale_fulfillment
+          tests.test_inventory_service
+          tests.test_order_return_service
+          tests.test_order_pickup_chat_service
+          tests.test_pickup_verification_service
+          tests.test_finance_reports
+          tests.test_finance_xlsx_export
+          tests.test_qr_part_card_access
+          tests.test_audit_permissions
+          tests.test_audit_logging
+          tests.test_audit_api
+          tests.test_new_parts_orders_list
+          tests.test_sales_menu_counts
+          tests.test_search_subscription_service
+          tests.test_search_subscriptions_http
+          tests.test_drom_autoload_xlsx
+          tests.test_notification_service
 
   frontend:
     name: Frontend build and tests
@@ -40,5 +81,6 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/my-autoparts/package-lock.json
       - run: npm ci
+      - run: cp .env.example .env
       - run: npm run build
       - run: CI=true npm test -- --watchAll=false

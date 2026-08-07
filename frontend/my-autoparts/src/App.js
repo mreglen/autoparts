@@ -99,7 +99,7 @@ const OrganizationsPage = lazy(() => import('./pages/Organizations/Organizations
 const OrganizationPublicPage = lazy(() => import('./pages/Organizations/OrganizationPublicPage'));
 const PublicUserProfilePage = lazy(() => import('./pages/PublicProfiles/PublicUserProfilePage'));
 const ReviewsPage = lazy(() => import('./pages/About/ReviewsPage'));
-const AutoserviceStaffStubPage = lazy(() => import('./pages/Autoservice/AutoserviceStaffStubPage'));
+const AutoservicePublicPage = lazy(() => import('./pages/Autoservice/AutoservicePublicPage'));
 const AutoserviceClientsPage = lazy(() => import('./pages/Autoservice/AutoserviceClientsPage'));
 const AutoserviceSettingsPage = lazy(() => import('./pages/Autoservice/AutoserviceSettingsPage'));
 const AutoserviceOrdersPage = lazy(() => import('./pages/Autoservice/AutoserviceOrdersPage'));
@@ -107,6 +107,7 @@ const AutoserviceOrderFormPage = lazy(() => import('./pages/Autoservice/Autoserv
 const AutoserviceWelcomePage = lazy(() => import('./pages/Autoservice/AutoserviceWelcomePage'));
 const AutoserviceRepairBookingPage = lazy(() => import('./pages/Autoservice/AutoserviceRepairBookingPage'));
 const AutoservicePlannerPage = lazy(() => import('./pages/Autoservice/AutoservicePlannerPage'));
+const AutoserviceInspectionsPage = lazy(() => import('./pages/Autoservice/AutoserviceInspectionsPage'));
 const GaragePage = lazy(() => import('./pages/Garage/GaragePage'));
 const GarageRepairHistoryPage = lazy(() => import('./pages/Garage/GarageRepairHistoryPage'));
 const LaximoCatalogSandboxPage = lazy(() => import('./pages/Laximo/LaximoCatalogSandboxPage'));
@@ -221,13 +222,16 @@ function WarehouseInventoryRoute() {
   );
 }
 
-function AutoserviceEntryRedirect() {
+function AutoservicePublicRoute() {
   const showAutoservice = useShowAutoservice();
-  const token = useSelector((state) => state.auth.token);
-  if (!showAutoservice || !token) {
+  if (!showAutoservice) {
     return <Navigate to="/" replace />;
   }
-  return <Navigate to="/autoservice/welcome" replace />;
+  return (
+    <LazyRoute>
+      <AutoservicePublicPage />
+    </LazyRoute>
+  );
 }
 
 function AutoserviceClientRoute({ children }) {
@@ -296,11 +300,14 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
       </LazyRoute>
     );
   }
-  return (
-    <LazyRoute>
-      <AutoserviceStaffStubPage section={section} />
-    </LazyRoute>
-  );
+  if (section === 'inspections') {
+    return (
+      <LazyRoute>
+        <AutoserviceInspectionsPage />
+      </LazyRoute>
+    );
+  }
+  return <Navigate to="/autoservice/orders" replace />;
 }
 
 function RedirectLegacyProfileRoute() {
@@ -385,7 +392,7 @@ function App() {
           <Route path="/delivery" element={<LazyRoute><DeliveryPage /></LazyRoute>} />
           <Route path="/payment" element={<LazyRoute><PaymentPage /></LazyRoute>} />
           <Route path="/reviews" element={<ReviewsRoute />} />
-          <Route path="/autoservice" element={<AutoserviceEntryRedirect />} />
+          <Route path="/autoservice" element={<AutoservicePublicRoute />} />
           <Route
             path="/organizations"
             element={(
@@ -922,7 +929,7 @@ function App() {
           />
           <Route
             path="/autoservice/inspections"
-            element={<Navigate to="/autoservice/planner" replace />}
+            element={<AutoserviceStaffRoute section="inspections" />}
           />
           <Route
             path="/autoservice/planner"

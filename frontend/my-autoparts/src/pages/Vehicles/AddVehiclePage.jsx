@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Navigate, useNavigate } from 'react-router-dom';
-import VehicleModal from '../MyParts/AddPart/VehicleModal';
+import DismantlingVehicleAddForm from './DismantlingVehicleAddForm';
 
 function AddVehiclePage() {
   const navigate = useNavigate();
@@ -39,17 +39,7 @@ function AddVehiclePage() {
   if (!user) return <Navigate to="/auth" replace />;
   if (!hasPermission) return <Navigate to="/" replace />;
 
-  return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Добавить автомобиль</h1>
-      <VehicleModal
-        isOpen
-        variant="page"
-        onClose={() => navigate('/vehicles')}
-        onSelectVehicle={() => {}}
-      />
-    </div>
-  );
+  return <DismantlingVehicleAddForm />;
 }
 
 export default AddVehiclePage;

@@ -26,7 +26,6 @@ export const TAB_PATH_MAP = {
     'settings-organization': '/settings/organization',
     'settings-printers': '/settings/printers',
     'settings-integration': '/settings/integration',
-    'settings-label': '/settings/label',
     clients: '/clients',
     sellers: '/sellers',
     'settings-employees': '/settings/employees',
@@ -45,6 +44,7 @@ export const TAB_PATH_MAP = {
     'autoservice-planner': '/autoservice/planner',
     'autoservice-clients': '/autoservice/clients',
     'autoservice-orders': '/autoservice/orders',
+    'autoservice-inspections': '/autoservice/inspections',
     'autoservice-settings': '/autoservice/settings',
 };
 
@@ -132,6 +132,7 @@ const buildAutoserviceStaffTab = (user, options) => {
         { id: 'autoservice-planner', label: 'Планировщик' },
         { id: 'autoservice-orders', label: 'Заказ-наряд' },
         { id: 'autoservice-clients', label: 'Клиенты' },
+        { id: 'autoservice-inspections', label: 'Техосмотр' },
     ];
     if (canAccessAutoserviceSettings(user, options)) {
         submenu.push({ id: 'autoservice-settings', label: 'Настройки' });
@@ -170,6 +171,7 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/autoservice/planner')) return 'autoservice-planner';
     if (path.startsWith('/autoservice/clients')) return 'autoservice-clients';
     if (path.startsWith('/autoservice/orders')) return 'autoservice-orders';
+    if (path.startsWith('/autoservice/inspections')) return 'autoservice-inspections';
     if (path.startsWith('/autoservice/settings')) return 'autoservice-settings';
     return PATH_TAB_MAP[path] || (user?.is_seller ? 'dashboard' : 'profile');
 };

@@ -72,6 +72,8 @@ def _resolve_source_and_laximo(
     source_raw = (payload.source or "").strip().lower()
     if source_raw == "plate":
         return "plate", catalog, vehicle_id, attrs
+    if source_raw == "frame":
+        return "frame", catalog, vehicle_id, attrs
     if source_raw == "laximo" or catalog or vehicle_id:
         return "laximo", catalog, vehicle_id, attrs
     return "manual", None, None, None

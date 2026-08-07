@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { QRCodeSVG } from 'qrcode.react';
 import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
@@ -11,6 +11,7 @@ import {
     selectPaymentSessionError,
     selectPaymentSessionLoading,
 } from '../../redux/slices/CartSlice';
+import { useAuthReady } from '../../hooks/useAuthReady';
 
 const formatPrice = (price) =>
     new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price || 0);
@@ -18,7 +19,10 @@ const formatPrice = (price) =>
 export default function NewPartsPaymentPage() {
     const { sessionId } = useParams();
     const [searchParams] = useSearchParams();
+    const location = useLocation();
+    const navigate = useNavigate();
     const dispatch = useDispatch();
+    const { user, isReady } = useAuthReady();
     const session = useSelector(selectPaymentSession);
     const loading = useSelector(selectPaymentSessionLoading);
     const error = useSelector(selectPaymentSessionError);
@@ -33,8 +37,17 @@ export default function NewPartsPaymentPage() {
     }, [dispatch, sessionId]);
 
     useEffect(() => {
+        if (!isReady || user) return;
+        navigate('/auth', {
+            replace: true,
+            state: { from: `${location.pathname}${location.search}` },
+        });
+    }, [isReady, user, navigate, location.pathname, location.search]);
+
+    useEffect(() => {
+        if (!isReady || !user) return;
         loadSession();
-    }, [loadSession]);
+    }, [isReady, user, loadSession]);
 
     useEffect(() => {
         const terminal = ['fulfilled', 'expired', 'fulfillment_failed', 'refunded'];
@@ -167,12 +180,26 @@ export default function NewPartsPaymentPage() {
                     Оплата прошла, но заказ создать не удалось. Автоматический возврат не
                     выполнен — свяжитесь с поддержкой, мы вернём средства вручную.
                 </p>
-                <Link
-                    to="/about"
-                    className="mt-4 inline-block text-sm font-medium text-indigo-600 hover:underline"
-                >
-                    Контакты
-                </Link>
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                    <Link
+                        to="/purchases/orders"
+                        className="rounded-xl bg-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-indigo-700"
+                    >
+                        Мои заказы
+                    </Link>
+                    <Link
+                        to="/cart"
+                        className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                        В корзину
+                    </Link>
+                    <Link
+                        to="/about"
+                        className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                        Контакты
+                    </Link>
+                </div>
             </div>
         );
     }

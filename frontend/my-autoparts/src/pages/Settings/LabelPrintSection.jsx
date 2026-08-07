@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import LabelStorageCellsPreview from '../../components/LabelPrint/LabelStorageCellsPreview';
+import {
+  warehousePillControlClass,
+  warehousePrimaryButtonClass,
+  warehouseSecondaryButtonClass,
+} from '../../utils/warehouseListUi';
 
 const MM_TO_PX = 96 / 25.4;
 
@@ -44,7 +49,7 @@ function LabelPreview({ widthMm, heightMm }) {
   const frameRef = useRef(null);
   const frameSize = useElementSize(frameRef);
 
-  const framePadding = 12; // px (p-3)
+  const framePadding = 12;
   const designMm = useMemo(() => ({ w: 58, h: 38 }), []);
 
   const basePx = useMemo(() => {
@@ -61,8 +66,6 @@ function LabelPreview({ widthMm, heightMm }) {
 
   const scale = useMemo(() => {
     if (!frameSize.width || !frameSize.height) return 1;
-    // Предпросмотр должен вмещаться целиком и по возможности занимать максимум места:
-    // допускаем увеличение, но всё равно держим в рамках контейнера.
     const availableW = Math.max(1, frameSize.width - framePadding * 2);
     const availableH = Math.max(1, frameSize.height - framePadding * 2);
     const k = Math.min(availableW / basePx.w, availableH / basePx.h);
@@ -72,11 +75,11 @@ function LabelPreview({ widthMm, heightMm }) {
   return (
     <div
       ref={frameRef}
-      className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-auto"
+      className="w-full overflow-auto rounded-xl bg-gray-50 p-3 ring-1 ring-gray-200/80"
       style={{ height: 260 }}
     >
       <div
-        className="bg-white border border-black box-border"
+        className="box-border border border-black bg-white"
         style={{
           width: basePx.w,
           height: basePx.h,
@@ -85,7 +88,6 @@ function LabelPreview({ widthMm, heightMm }) {
           overflow: 'hidden',
         }}
       >
-        {/* Масштабируем контент под указанные размеры */}
         <div
           style={{
             width: `${designMm.w * MM_TO_PX}px`,
@@ -96,40 +98,40 @@ function LabelPreview({ widthMm, heightMm }) {
             boxSizing: 'border-box',
           }}
         >
-          <div className="flex flex-col justify-between h-full gap-1">
+          <div className="flex h-full flex-col justify-between gap-1">
             <div className="flex items-start gap-2">
-              <div className="flex-1 min-w-0 text-black">
+              <div className="min-w-0 flex-1 text-black">
                 <div className="mb-1">
                   <div className="text-[8px] font-bold leading-tight">Бренд</div>
-                  <div className="text-[11px] font-semibold leading-tight break-words">BOSCH</div>
+                  <div className="break-words text-[11px] font-semibold leading-tight">BOSCH</div>
                 </div>
                 <div className="mb-1">
                   <div className="text-[8px] font-bold leading-tight">Артикул</div>
-                  <div className="text-[11px] font-semibold leading-tight break-words">0 986 479 123</div>
+                  <div className="break-words text-[11px] font-semibold leading-tight">0 986 479 123</div>
                 </div>
                 <div>
                   <div className="text-[8px] font-bold leading-tight">Наименование</div>
-                  <div className="text-[9px] font-semibold leading-tight break-words">Тормозные колодки передние</div>
+                  <div className="break-words text-[9px] font-semibold leading-tight">
+                    Тормозные колодки передние
+                  </div>
                 </div>
               </div>
 
-              <div className="shrink-0 w-[56px] flex flex-col items-center">
-                <div className="w-[48px] h-[48px] bg-black" aria-label="QR placeholder" />
-                <div className="mt-1 text-[8px] leading-tight text-black text-center whitespace-nowrap">Цена: 1 250 ₽</div>
+              <div className="flex w-[56px] shrink-0 flex-col items-center">
+                <div className="h-[48px] w-[48px] bg-black" aria-label="QR placeholder" />
+                <div className="mt-1 whitespace-nowrap text-center text-[8px] leading-tight text-black">
+                  Цена: 1 250 ₽
+                </div>
                 <div className="mt-0.5 w-full text-center text-black">
                   <div className="text-[7px] font-bold leading-tight">Код</div>
-                  <div className="font-mono text-[8px] font-bold leading-tight break-all">TVGP-AABBP</div>
+                  <div className="break-all font-mono text-[8px] font-bold leading-tight">TVGP-AABBP</div>
                 </div>
               </div>
             </div>
 
             <div className="w-full">
-              <div className="text-[8px] font-bold leading-tight text-black mb-0.5">Адресное хранение</div>
-              <LabelStorageCellsPreview
-                cells={TEST_LABEL_STORAGE_CELLS}
-                widthMm={widthMm}
-                fullWidth
-              />
+              <div className="mb-0.5 text-[8px] font-bold leading-tight text-black">Адресное хранение</div>
+              <LabelStorageCellsPreview cells={TEST_LABEL_STORAGE_CELLS} widthMm={widthMm} fullWidth />
             </div>
           </div>
         </div>
@@ -218,7 +220,6 @@ export default function LabelPrintSection() {
     setLoading(true);
     setSaveError(null);
     try {
-      // Делает выбранный принтер текущим (is_current=true) для пользователя
       await apiAxios.post(`/printers/id/${printerId}/grant`);
       await reloadFromPermissions();
     } catch (e) {
@@ -233,7 +234,6 @@ export default function LabelPrintSection() {
     setPrintingTest(true);
     setSaveError(null);
     try {
-      // Сервер сгенерирует PDF по label_print.html и отправит агенту
       await apiAxios.post(`/printers/id/${selectedPrinterId}/print-test-label`);
     } catch (e) {
       setSaveError(e?.response?.data?.detail || 'Ошибка печати пробной этикетки');
@@ -243,104 +243,81 @@ export default function LabelPrintSection() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-50 text-indigo-600 rounded-full p-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17h10M7 13h10M7 9h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-gray-800">Этикетка</h3>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+    <section className="space-y-4 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-base font-bold text-gray-900">Этикетка</h2>
+        <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={handlePrintTestLabel}
             disabled={!selectedPrinterId || printingTest}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg font-medium transition-colors ${
-              selectedPrinterId && !printingTest
-                ? 'bg-white border border-gray-300 text-gray-800 hover:bg-gray-50'
-                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            }`}
+            className={warehouseSecondaryButtonClass}
           >
             {printingTest ? 'Печатаю…' : 'Пробная печать'}
           </button>
-
           <button
+            type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg font-medium transition-colors ${
-              canSave ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            }`}
+            className={warehousePrimaryButtonClass}
           >
             {saving ? 'Сохраняю…' : 'Сохранить'}
           </button>
         </div>
       </div>
 
-      {saveError && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {typeof saveError === 'string' ? saveError : (saveError?.detail || 'Ошибка сохранения')}
+      {saveError ? (
+        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200/80">
+          {typeof saveError === 'string' ? saveError : saveError?.detail || 'Ошибка сохранения'}
         </div>
-      )}
+      ) : null}
 
-      <div className="grid grid-cols-1 gap-6">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Принтер</label>
-            <select
-              value={selectedPrinterId}
-              onChange={(e) => handleSelectPrinter(e.target.value)}
-              disabled={loading}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
-            >
-              <option value="">Выберите принтер</option>
-              {connectedPrinters.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} {p.is_default ? '(По умолчанию)' : ''}
-                </option>
-              ))}
-            </select>
-            {!selectedPrinterId && (
-              <div className="text-xs text-gray-500 mt-1">Сначала выберите подключенный принтер для настройки этикетки.</div>
-            )}
-          </div>
-      
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ширина (мм)</label>
-              <input
-                type="number"
-                min={10}
-                step={1}
-                value={widthMm}
-                onChange={(e) => setWidthMm(e.target.value)}
-                disabled={!isDirector || !selectedPrinterId}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Высота (мм)</label>
-              <input
-                type="number"
-                min={10}
-                step={1}
-                value={heightMm}
-                onChange={(e) => setHeightMm(e.target.value)}
-                disabled={!isDirector || !selectedPrinterId}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100"
-              />
-            </div>
-          </div>
-        </div>
-      
-        <div>
-          <div className="text-sm font-medium text-gray-700 mb-2">Предпросмотр ({widthMm}×{heightMm}mm)</div>
-          <LabelPreview widthMm={widthMm} heightMm={heightMm} />
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <label className="block min-w-0 sm:col-span-3">
+          <span className="mb-1.5 block text-xs font-medium text-gray-500">Принтер</span>
+          <select
+            value={selectedPrinterId}
+            onChange={(e) => handleSelectPrinter(e.target.value)}
+            disabled={loading}
+            className={warehousePillControlClass}
+          >
+            <option value="">Выберите принтер</option>
+            {connectedPrinters.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} {p.is_default ? '(По умолчанию)' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block min-w-0">
+          <span className="mb-1.5 block text-xs font-medium text-gray-500">Ширина, мм</span>
+          <input
+            type="number"
+            min={10}
+            step={1}
+            value={widthMm}
+            onChange={(e) => setWidthMm(e.target.value)}
+            disabled={!isDirector || !selectedPrinterId}
+            className={warehousePillControlClass}
+          />
+        </label>
+
+        <label className="block min-w-0">
+          <span className="mb-1.5 block text-xs font-medium text-gray-500">Высота, мм</span>
+          <input
+            type="number"
+            min={10}
+            step={1}
+            value={heightMm}
+            onChange={(e) => setHeightMm(e.target.value)}
+            disabled={!isDirector || !selectedPrinterId}
+            className={warehousePillControlClass}
+          />
+        </label>
       </div>
-    </div>
+
+      <LabelPreview widthMm={widthMm} heightMm={heightMm} />
+    </section>
   );
 }
-

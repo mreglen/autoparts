@@ -4,6 +4,11 @@ import { fetchEmployees, addEmployee as createEmployee, updateEmployee, deleteEm
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import PageIntro from '../../components/PageIntro/PageIntro';
+import {
+  warehouseListShellClass,
+  warehousePageClass,
+  warehousePrimaryButtonClass,
+} from '../../utils/warehouseListUi';
 
 const EmployeesPage = () => {
   const dispatch = useDispatch();
@@ -213,7 +218,7 @@ const EmployeesPage = () => {
   const employeeCount = employees?.length ?? 0;
 
   return (
-    <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+    <div className={`${warehousePageClass} min-w-0`}>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <PageIntro
           title="Сотрудники"
@@ -238,7 +243,7 @@ const EmployeesPage = () => {
             setErrors({});
             setShowAddForm(true);
           }}
-          className="w-full rounded-lg bg-indigo-600 px-6 py-3 text-base font-medium text-white transition-colors hover:bg-indigo-700 sm:w-auto sm:px-4 sm:py-2 sm:text-sm"
+          className={`${warehousePrimaryButtonClass} w-full sm:w-auto`}
         >
           Добавить сотрудника
         </button>
@@ -294,7 +299,7 @@ const EmployeesPage = () => {
       ) : (
         <>
           <div
-            className={`hidden md:block rounded-xl border border-gray-200 bg-white shadow-sm ${
+            className={`hidden md:block ${warehouseListShellClass} ${
               openDropdownId ? 'overflow-visible' : 'overflow-hidden'
             }`}
           >
@@ -363,7 +368,7 @@ const EmployeesPage = () => {
               return (
                 <div
                   key={emp.id}
-                  className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-200"
+                  className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80 transition-all duration-200"
                 >
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-1 items-start gap-3">

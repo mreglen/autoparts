@@ -33,9 +33,9 @@ export default function Authorization() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/80">
         {/* Return to Home Button */}
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
+        <div className="border-b border-gray-100 bg-gray-50 p-4">
           <button
             onClick={() => navigate('/')}
             className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
