@@ -8,7 +8,9 @@ import {
   mapCandidateToGarageForm,
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
-import { normalizeVinOrNull, sanitizeVinInput, looksLikeVin, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import { normalizePlate } from '../../utils/laximoPlate';
+import { detectVehicleLookupKind, formatVehicleLookupInput } from '../../utils/vehicleLookupKind';
 import {
   warehousePillControlClass,
   warehousePrimaryButtonClass,
@@ -28,24 +30,6 @@ const emptyForm = {
   plate: '',
   notes: '',
 };
-
-function detectLookupKind(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-  if (looksLikeVin(raw)) return 'vin';
-  const compact = raw.toUpperCase().replace(/\s+/g, '');
-  if (compact.includes('-') && compact.length >= 6) return 'frame';
-  if (/[А-ЯЁ]/.test(raw) && compact.length >= 6) return 'plate';
-  if (compact.length >= 6 && compact.length <= 12 && /[A-Z]/.test(compact) && /\d/.test(compact)) return 'plate';
-  if (compact.length >= 6) return 'frame';
-  return null;
-}
-
-function formatLookupInput(value) {
-  const raw = String(value || '');
-  if (looksLikeVin(raw)) return sanitizeVinInput(raw);
-  return raw.toUpperCase().replace(/\s+/g, ' ').trimStart();
-}
 
 function ModalShell({ title, children, onClose }) {
   return (
@@ -296,12 +280,12 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
 
   const handleDecodePlate = async (rawValue) => {
     setLookupError('');
-    const plate = String(rawValue ?? lookupInput).trim();
-    if (plate.length < 6) {
-      setLookupError('Укажите госномер');
+    const plate = normalizePlate(rawValue ?? lookupInput);
+    if (!plate || plate.length < 6) {
+      setLookupError('Укажите корректный госномер');
       return;
     }
-    setLookupInput(formatLookupInput(plate));
+    setLookupInput(formatVehicleLookupInput(rawValue ?? lookupInput));
     setLookupDecoding(true);
     setLookupFromPlate(true);
     setLookupFromFrame(false);
@@ -390,7 +374,7 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
       setLookupError('Введите VIN, госномер или Frame');
       return;
     }
-    const kind = detectLookupKind(raw);
+    const kind = detectVehicleLookupKind(raw);
     if (kind === 'vin') {
       await handleDecodeVin(raw);
       return;
@@ -510,7 +494,7 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
             className={formInputClass}
             value={lookupInput}
             onChange={(event) => {
-              setLookupInput(formatLookupInput(event.target.value));
+              setLookupInput(formatVehicleLookupInput(event.target.value));
               setLookupError('');
             }}
             onKeyDown={(event) => {
@@ -521,7 +505,7 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
             }}
             maxLength={LOOKUP_INPUT_MAX_LENGTH}
             disabled={lookupDecoding}
-            placeholder="А123БВ77, WVWZZZ1JZYW123456 или SGL5-400683"
+            placeholder="М460УН154, WVWZZZ1JZYW123456 или SGL5-400683"
             autoComplete="off"
             autoFocus
           />

@@ -315,7 +315,9 @@ def lookup_by_plate(
             country_code=cc,
             count_toward_quota=True,
         )
-    except LaximoCatError:
+    except LaximoCatError as exc:
+        if getattr(exc, "status_code", None) == 404:
+            return _plate_not_found(normalized_plate)
         logger.exception("Laximo identifyByPlateNumberFull failed")
         return _plate_soft_unavailable(normalized_plate)
     except Exception:

@@ -12,30 +12,14 @@ import {
   mapCandidateToGarageForm,
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
-import { normalizeVinOrNull, sanitizeVinInput, looksLikeVin, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import { normalizePlate } from '../../utils/laximoPlate';
+import { detectVehicleLookupKind, formatVehicleLookupInput } from '../../utils/vehicleLookupKind';
 
 const LOOKUP_INPUT_MAX_LENGTH = 32;
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
-
-function detectLookupKind(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-  if (looksLikeVin(raw)) return 'vin';
-  const compact = raw.toUpperCase().replace(/\s+/g, '');
-  if (compact.includes('-') && compact.length >= 6) return 'frame';
-  if (/[А-ЯЁ]/.test(raw) && compact.length >= 6) return 'plate';
-  if (compact.length >= 6 && compact.length <= 12 && /[A-Z]/.test(compact) && /\d/.test(compact)) return 'plate';
-  if (compact.length >= 6) return 'frame';
-  return null;
-}
-
-function formatLookupInput(value) {
-  const raw = String(value || '');
-  if (looksLikeVin(raw)) return sanitizeVinInput(raw);
-  return raw.toUpperCase().replace(/\s+/g, ' ').trimStart();
-}
 
 const emptyForm = {
   vin: '',
@@ -345,12 +329,12 @@ export default function GaragePage() {
 
   const handleDecodePlate = async (rawValue) => {
     setLookupError(null);
-    const plate = String(rawValue ?? lookupInput).trim();
-    if (plate.length < 6) {
-      setLookupError('Укажите госномер');
+    const plate = normalizePlate(rawValue ?? lookupInput);
+    if (!plate || plate.length < 6) {
+      setLookupError('Укажите корректный госномер');
       return;
     }
-    setLookupInput(formatLookupInput(plate));
+    setLookupInput(formatVehicleLookupInput(rawValue ?? lookupInput));
     setLookupDecoding(true);
     setLookupFromPlate(true);
     setLookupFromFrame(false);
@@ -439,7 +423,7 @@ export default function GaragePage() {
       setLookupError('Введите VIN, госномер или Frame');
       return;
     }
-    const kind = detectLookupKind(raw);
+    const kind = detectVehicleLookupKind(raw);
     if (kind === 'vin') {
       await handleDecodeVin(raw);
       return;
@@ -621,7 +605,7 @@ export default function GaragePage() {
                 className={inputClass}
                 value={lookupInput}
                 onChange={(e) => {
-                  setLookupInput(formatLookupInput(e.target.value));
+                  setLookupInput(formatVehicleLookupInput(e.target.value));
                   setLookupError(null);
                 }}
                 onKeyDown={(e) => {
@@ -632,7 +616,7 @@ export default function GaragePage() {
                 }}
                 maxLength={LOOKUP_INPUT_MAX_LENGTH}
                 disabled={lookupDecoding}
-                placeholder="А123БВ77, WVWZZZ1JZYW123456 или SGL5-400683"
+                placeholder="М460УН154, WVWZZZ1JZYW123456 или SGL5-400683"
                 autoComplete="off"
                 autoFocus
               />

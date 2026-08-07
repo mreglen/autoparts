@@ -163,6 +163,18 @@ class LookupByPlateTests(unittest.TestCase):
         self.assertNotIn("laximo", lowered)
         self.assertNotIn("квота", lowered)
 
+    def test_upstream_404_not_found(self):
+        with patch(
+            "app.services.laximo.vehicle_lookup.laximo_cat_ready",
+            return_value=True,
+        ), patch(
+            "app.services.laximo.vehicle_lookup.identify_by_plate_number_full",
+            side_effect=LaximoCatError("HTTP 404", status_code=404),
+        ):
+            result = lookup_by_plate(MagicMock(), "М460УН154")
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "not_found")
+
 
 class GarageDecodePlateTests(unittest.TestCase):
     def test_decode_plate_maps_lookup(self):

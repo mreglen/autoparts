@@ -13,7 +13,9 @@ import {
   mapCandidateToDismantlingPrefill,
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
-import { looksLikeVin, sanitizeVinInput } from '../../utils/laximoVin';
+import { sanitizeVinInput } from '../../utils/laximoVin';
+import { normalizePlate } from '../../utils/laximoPlate';
+import { detectVehicleLookupKind, formatVehicleLookupInput } from '../../utils/vehicleLookupKind';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import {
   warehousePageClass,
@@ -37,25 +39,6 @@ const emptyForm = {
   description: '',
 };
 
-function detectLookupKind(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-  if (looksLikeVin(raw)) return 'vin';
-  const compact = raw.toUpperCase().replace(/\s+/g, '');
-  if (compact.includes('-') && compact.length >= 6) return 'frame';
-  if (/[А-ЯЁ]/.test(raw) && compact.length >= 6) return 'plate';
-  if (compact.length >= 6 && compact.length <= 12 && /[A-Z]/.test(compact) && /\d/.test(compact)) {
-    return 'plate';
-  }
-  return compact.length >= 6 ? 'frame' : null;
-}
-
-function formatLookupInput(value) {
-  const raw = String(value || '');
-  if (looksLikeVin(raw)) return sanitizeVinInput(raw);
-  return raw.toUpperCase().replace(/\s+/g, ' ').trimStart();
-}
-
 function LookupStep({ onResolved, onManual }) {
   const [lookupInput, setLookupInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -71,7 +54,7 @@ function LookupStep({ onResolved, onManual }) {
     setNotice(null);
     setCandidates([]);
 
-    const kind = detectLookupKind(lookupInput);
+    const kind = detectVehicleLookupKind(lookupInput);
     if (!kind) {
       setError('Введите VIN, госномер или Frame');
       return;
@@ -82,7 +65,7 @@ function LookupStep({ onResolved, onManual }) {
       ? raw.toUpperCase().replace(/\s+/g, '')
       : kind === 'vin'
         ? sanitizeVinInput(raw)
-        : raw;
+        : normalizePlate(raw);
     const path = `/laximo/vehicles/by-${kind}`;
     const body = kind === 'plate'
       ? { plate: value, country_code: 'ru' }
@@ -125,7 +108,7 @@ function LookupStep({ onResolved, onManual }) {
           className={warehousePillControlClass}
           value={lookupInput}
           onChange={(event) => {
-            setLookupInput(formatLookupInput(event.target.value));
+            setLookupInput(formatVehicleLookupInput(event.target.value));
             setError('');
           }}
           onKeyDown={(event) => {
@@ -136,7 +119,7 @@ function LookupStep({ onResolved, onManual }) {
           }}
           maxLength={LOOKUP_MAX_LENGTH}
           disabled={loading}
-          placeholder="А123БВ77, WVWZZZ1JZYW123456 или SGL5-400683"
+          placeholder="М460УН154, WVWZZZ1JZYW123456 или SGL5-400683"
           autoComplete="off"
           autoFocus
         />
