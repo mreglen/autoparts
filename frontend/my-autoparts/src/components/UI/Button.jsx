@@ -13,6 +13,10 @@ const VARIANT_CLASS = {
     'bg-accent-600 text-white hover:bg-accent-700 focus-visible:ring-accent-500 shadow-sg-sm',
   soft:
     'bg-brand-50 text-brand-700 hover:bg-brand-100 focus-visible:ring-brand-500',
+  softAccent:
+    'bg-accent-50 text-accent-700 hover:bg-accent-100 focus-visible:ring-accent-500',
+  softAccent:
+    'bg-accent-50 text-accent-700 hover:bg-accent-100 focus-visible:ring-accent-500',
 };
 
 const SIZE_CLASS = {

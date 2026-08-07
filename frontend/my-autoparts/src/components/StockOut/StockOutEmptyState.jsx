@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { warehouseEmptyShellClass, warehousePrimaryButtonClass } from '../../utils/warehouseListUi';
 
 export default function StockOutEmptyState({ hasSearch }) {
   return (
-    <div className="rounded-2xl border border-dashed border-rose-200 bg-white px-6 py-14 text-center shadow-sm">
-      <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
+    <div className={warehouseEmptyShellClass}>
+      <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-gray-400">
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path
             strokeLinecap="round"
@@ -23,10 +24,7 @@ export default function StockOutEmptyState({ hasSearch }) {
           : 'Здесь появятся списания и продажи запчастей со склада.'}
       </p>
       {!hasSearch && (
-        <Link
-          to="/my-parts"
-          className="mt-6 inline-flex rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-rose-700"
-        >
+        <Link to="/my-parts" className={`mt-6 ${warehousePrimaryButtonClass}`}>
           Перейти к запчастям
         </Link>
       )}

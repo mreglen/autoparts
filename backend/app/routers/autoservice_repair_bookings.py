@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
+from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_booking import RepairBooking
 from app.models.user import User
 from app.schemas.repair_booking import (
@@ -14,6 +15,7 @@ from app.schemas.repair_booking import (
     RepairBookingCreate,
     RepairBookingPatch,
     RepairBookingStaffCreate,
+    RepairBookingVehicleBrief,
     RepairBookingView,
 )
 from app.utils.autoservice_access import (
@@ -23,6 +25,53 @@ from app.utils.autoservice_access import (
 )
 
 router = APIRouter(tags=["Autoservice repair bookings"])
+
+
+def _resolve_garage_vehicle(
+    db: Session,
+    *,
+    client_id: int,
+    organization_id: str,
+    garage_vehicle_id: int | None,
+) -> GarageVehicle | None:
+    if garage_vehicle_id is None:
+        return None
+    vehicle = (
+        db.query(GarageVehicle)
+        .filter(
+            GarageVehicle.id == garage_vehicle_id,
+            GarageVehicle.client_id == client_id,
+            GarageVehicle.organization_id == organization_id,
+        )
+        .first()
+    )
+    if not vehicle:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Автомобиль не найден",
+        )
+    return vehicle
+
+
+def _booking_to_view(row: RepairBooking) -> RepairBookingView:
+    vehicle_brief = None
+    if row.vehicle is not None:
+        vehicle_brief = RepairBookingVehicleBrief.model_validate(row.vehicle)
+    return RepairBookingView(
+        id=row.id,
+        organization_id=row.organization_id,
+        client_id=row.client_id,
+        garage_vehicle_id=row.garage_vehicle_id,
+        vehicle=vehicle_brief,
+        name=row.name,
+        phone=row.phone,
+        preferred_date=row.preferred_date,
+        comment=row.comment,
+        status=row.status,
+        source=row.source,
+        staff_notes=row.staff_notes,
+        created_at=row.created_at,
+    )
 
 
 @router.post(
@@ -40,10 +89,17 @@ def create_repair_booking(
     name = (payload.name or "").strip() or client.name
     raw_phone = (payload.phone or "").strip() or client.phone
     phone = normalize_phone_or_400(raw_phone)
+    vehicle = _resolve_garage_vehicle(
+        db,
+        client_id=client.id,
+        organization_id=client.organization_id,
+        garage_vehicle_id=payload.garage_vehicle_id,
+    )
 
     row = RepairBooking(
         organization_id=client.organization_id,
         client_id=client.id,
+        garage_vehicle_id=vehicle.id if vehicle else None,
         name=name[:120],
         phone=phone,
         preferred_date=payload.preferred_date,
@@ -55,7 +111,9 @@ def create_repair_booking(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return RepairBookingView.model_validate(row)
+    if vehicle:
+        row.vehicle = vehicle
+    return _booking_to_view(row)
 
 
 @router.post(
@@ -71,9 +129,28 @@ def create_repair_booking_staff(
     org_id = require_autoservice_staff(db, current_user)
     name = payload.name.strip()
     phone = normalize_phone_or_400(payload.phone)
+    garage_vehicle_id = payload.garage_vehicle_id
+    if garage_vehicle_id is not None:
+        vehicle = (
+            db.query(GarageVehicle)
+            .filter(
+                GarageVehicle.id == garage_vehicle_id,
+                GarageVehicle.organization_id == org_id,
+            )
+            .first()
+        )
+        if not vehicle:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Автомобиль не найден",
+            )
+    else:
+        vehicle = None
+
     row = RepairBooking(
         organization_id=org_id,
-        client_id=None,
+        client_id=vehicle.client_id if vehicle else None,
+        garage_vehicle_id=vehicle.id if vehicle else None,
         name=name[:120],
         phone=phone,
         preferred_date=payload.preferred_date,
@@ -85,7 +162,9 @@ def create_repair_booking_staff(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return RepairBookingView.model_validate(row)
+    if vehicle:
+        row.vehicle = vehicle
+    return _booking_to_view(row)
 
 
 @router.get(
@@ -99,11 +178,12 @@ def list_my_repair_bookings(
     client = require_my_active_autoservice_client(db, current_user)
     rows = (
         db.query(RepairBooking)
+        .options(joinedload(RepairBooking.vehicle))
         .filter(RepairBooking.client_id == client.id)
         .order_by(RepairBooking.preferred_date.desc(), RepairBooking.id.desc())
         .all()
     )
-    return [RepairBookingView.model_validate(row) for row in rows]
+    return [_booking_to_view(row) for row in rows]
 
 
 @router.get(
@@ -118,7 +198,11 @@ def list_repair_bookings(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_staff(db, current_user)
-    query = db.query(RepairBooking).filter(RepairBooking.organization_id == org_id)
+    query = (
+        db.query(RepairBooking)
+        .options(joinedload(RepairBooking.vehicle))
+        .filter(RepairBooking.organization_id == org_id)
+    )
     if status_filter:
         if status_filter not in REPAIR_BOOKING_STATUSES:
             raise HTTPException(
@@ -133,7 +217,7 @@ def list_repair_bookings(
     rows = (
         query.order_by(RepairBooking.preferred_date.asc(), RepairBooking.id.asc()).all()
     )
-    return [RepairBookingView.model_validate(row) for row in rows]
+    return [_booking_to_view(row) for row in rows]
 
 
 @router.patch(
@@ -155,6 +239,7 @@ def patch_repair_booking(
         )
     row = (
         db.query(RepairBooking)
+        .options(joinedload(RepairBooking.vehicle))
         .filter(
             RepairBooking.id == booking_id,
             RepairBooking.organization_id == org_id,
@@ -186,4 +271,4 @@ def patch_repair_booking(
         row.staff_notes = (data["staff_notes"] or "").strip() or None
     db.commit()
     db.refresh(row)
-    return RepairBookingView.model_validate(row)
+    return _booking_to_view(row)

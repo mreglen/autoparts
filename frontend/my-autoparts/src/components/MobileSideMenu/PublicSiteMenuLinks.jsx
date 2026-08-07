@@ -24,26 +24,26 @@ export default function PublicSiteMenuLinks({ variant = 'drawer', onNavigate }) 
   const itemClass = ({ isActive }) => {
     if (isDrawer) {
       return `flex min-h-[44px] w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-        isActive ? 'bg-indigo-50 text-indigo-700' : 'text-gray-800 active:bg-gray-50'
+        isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-900 active:bg-gray-50'
       }`;
     }
-    return `flex w-full items-center border-l-4 px-4 py-2.5 text-sm font-medium transition-colors ${
+    return `mx-2 flex w-[calc(100%-1rem)] items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
       isActive
-        ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
-        : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+        ? 'bg-gray-100 text-gray-900'
+        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
     }`;
   };
 
   return (
-    <div className={isDrawer ? 'mt-4 border-t border-gray-100 pt-3' : 'mt-4 border-t border-gray-200 pt-4'}>
+    <div className={isDrawer ? 'mt-4 border-t border-gray-100 pt-3' : 'mt-2 border-t border-gray-100 px-1 pt-4 pb-4'}>
       <p
-        className={`font-semibold uppercase tracking-wider text-gray-400 ${
-          isDrawer ? 'px-3 pb-2 text-xs' : 'mb-2 px-4 text-[11px]'
+        className={`font-medium text-gray-500 ${
+          isDrawer ? 'px-3 pb-2 text-xs' : 'mb-2 px-3 text-xs'
         }`}
       >
         Информация
       </p>
-      <nav className={`flex flex-col ${isDrawer ? 'gap-0.5' : 'gap-0'}`}>
+      <nav className={`flex flex-col ${isDrawer ? 'gap-0.5' : 'gap-0.5'}`}>
         {links.map((link) => (
           <NavLink
             key={link.path}

@@ -17,6 +17,12 @@ class RepairBooking(Base):
         nullable=True,
         index=True,
     )
+    garage_vehicle_id = Column(
+        Integer,
+        ForeignKey("garage_vehicles.id"),
+        nullable=True,
+        index=True,
+    )
     name = Column(String(120), nullable=False)
     phone = Column(String(32), nullable=False)
     preferred_date = Column(Date, nullable=False, index=True)
@@ -35,4 +41,5 @@ class RepairBooking(Base):
 
     organization = relationship("Organization", foreign_keys=[organization_id])
     client = relationship("AutoserviceClient", foreign_keys=[client_id])
+    vehicle = relationship("GarageVehicle", foreign_keys=[garage_vehicle_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])

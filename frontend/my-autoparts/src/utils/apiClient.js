@@ -15,8 +15,27 @@ const normalizeBaseUrl = (url) => {
     return String(url).trim().replace(/\/+$/, '');
 };
 
-const API_BASE = normalizeBaseUrl(process.env.REACT_APP_API_BASE_URL);
-const BACKEND_BASE = normalizeBaseUrl(process.env.REACT_APP_BACKEND_BASE_URL);
+/** Fallback when CRA build missed REACT_APP_* (avoids `/undefined/...` → nginx 405). */
+const resolveApiBase = () => {
+    const fromEnv = normalizeBaseUrl(process.env.REACT_APP_API_BASE_URL);
+    if (fromEnv) return fromEnv;
+    if (typeof window !== 'undefined' && window.location?.origin) {
+        return `${window.location.origin}/server/api`;
+    }
+    return '/server/api';
+};
+
+const resolveBackendBase = () => {
+    const fromEnv = normalizeBaseUrl(process.env.REACT_APP_BACKEND_BASE_URL);
+    if (fromEnv) return fromEnv;
+    if (typeof window !== 'undefined' && window.location?.origin) {
+        return `${window.location.origin}/server`;
+    }
+    return '/server';
+};
+
+const API_BASE = resolveApiBase();
+const BACKEND_BASE = resolveBackendBase();
 
 
 export { API_BASE, BACKEND_BASE };

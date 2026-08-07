@@ -3458,6 +3458,35 @@ def ensure_repair_bookings_table() -> None:
     logger.info("Applied repair_bookings table patch")
 
 
+def ensure_repair_bookings_garage_vehicle_column() -> None:
+    """Add optional garage_vehicle_id to repair_bookings."""
+    inspector = inspect(engine)
+    if "repair_bookings" not in inspector.get_table_names():
+        return
+    if "garage_vehicles" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("repair_bookings")}
+    if "garage_vehicle_id" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE repair_bookings "
+                "ADD COLUMN garage_vehicle_id INTEGER REFERENCES garage_vehicles(id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX ix_repair_bookings_garage_vehicle_id "
+                "ON repair_bookings (garage_vehicle_id)"
+            )
+        )
+
+    logger.info("Applied repair_bookings garage_vehicle_id column patch")
+
+
 def ensure_repair_orders_tables() -> None:
     """Create repair_orders and repair_order_assignees for autoservice repair journal."""
     inspector = inspect(engine)

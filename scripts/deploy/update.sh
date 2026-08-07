@@ -177,13 +177,17 @@ ensure_brotli_snippet() {
 }
 
 git_pull() {
-  log "git fetch + sync с origin (локальные правки сбрасываются, backend/.env сохраняется)..."
-  local branch env_backup="" previous_sha
+  log "git fetch + sync с origin (локальные правки сбрасываются, backend/.env и frontend/.env сохраняются)..."
+  local branch env_backup="" fe_env_backup="" previous_sha
   branch=$(sudo -u fast git -C "$ROOT" rev-parse --abbrev-ref HEAD)
   previous_sha=$(sudo -u fast git -C "$ROOT" rev-parse HEAD)
   if [[ -f "$BACKEND/.env" ]]; then
     env_backup=$(mktemp)
     cp "$BACKEND/.env" "$env_backup"
+  fi
+  if [[ -f "$FRONTEND/.env" ]]; then
+    fe_env_backup=$(mktemp)
+    cp "$FRONTEND/.env" "$fe_env_backup"
   fi
   chown -R fast:fast "$ROOT"
   sudo -u fast git -C "$ROOT" fetch origin "$branch"
@@ -194,6 +198,12 @@ git_pull() {
     chown fast:fast "$BACKEND/.env"
     chmod 600 "$BACKEND/.env"
     rm -f "$env_backup"
+  fi
+  if [[ -n "$fe_env_backup" && -f "$fe_env_backup" ]]; then
+    cp "$fe_env_backup" "$FRONTEND/.env"
+    chown fast:fast "$FRONTEND/.env"
+    chmod 600 "$FRONTEND/.env"
+    rm -f "$fe_env_backup"
   fi
   rm -f "$BACKEND/.requirements.sha256"
   mkdir -p "$DEPLOY_STATE_DIR"
@@ -251,7 +261,27 @@ install_backend_deps() {
   chown fast:fast "$hash_file"
 }
 
+ensure_frontend_env() {
+  local env="$FRONTEND/.env"
+  if [[ ! -f "$env" ]]; then
+    log "Создание frontend/.env для production (отсутствовал — из-за этого были 405 /undefined/...)"
+    cat > "$env" <<'EOF'
+REACT_APP_API_BASE_URL=https://svoygarage.ru/server/api
+REACT_APP_BACKEND_BASE_URL=https://svoygarage.ru/server
+EOF
+    chown fast:fast "$env"
+    chmod 600 "$env"
+  fi
+  if ! grep -qE '^REACT_APP_API_BASE_URL=https?://[^[:space:]]+/api' "$env"; then
+    die "frontend/.env: нужен REACT_APP_API_BASE_URL=https://svoygarage.ru/server/api"
+  fi
+  if grep -qE '^REACT_APP_API_BASE_URL=.*127\.0\.0\.1|^REACT_APP_API_BASE_URL=.*localhost' "$env"; then
+    die "frontend/.env указывает на localhost — для production нужен https://svoygarage.ru/server/api"
+  fi
+}
+
 build_frontend() {
+  ensure_frontend_env
   log "npm install + build (2–5 мин, backend пока работает)..."
   chown -R fast:fast "$FRONTEND"
   rm -rf "$FRONTEND/build"
@@ -266,6 +296,9 @@ build_frontend() {
     npm run build
   "
   [[ -f "$FRONTEND/build/index.html" ]] || die "Сборка frontend не создала build/index.html"
+  if ! grep -q 'svoygarage.ru/server/api' "$FRONTEND"/build/static/js/main*.js 2>/dev/null; then
+    die "В сборке нет https://svoygarage.ru/server/api — проверьте frontend/.env и пересоберите"
+  fi
 }
 
 deploy_frontend() {

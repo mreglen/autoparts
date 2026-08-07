@@ -5,6 +5,15 @@ import { fetchVehicles } from '../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import VehicleCard, { VehiclesEmptyState } from '../../components/Vehicles/VehicleCard';
+import PillDropdown from '../../components/PillDropdown/PillDropdown';
+import {
+  mapIdOptionsForPillDropdown,
+  warehousePageClass,
+  warehousePillControlClass,
+  warehousePrimaryButtonClass,
+  warehouseSecondaryButtonClass,
+  warehouseToolbarClass,
+} from '../../utils/warehouseListUi';
 
 const SORT_OPTIONS = [
   { id: 'brand_asc', label: 'Марка А–Я' },
@@ -27,6 +36,7 @@ function VehiclesList() {
     () => searchParams.get('storage') || ''
   );
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
+  const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
 
   const hasPermission =
     user?.is_admin ||
@@ -133,6 +143,26 @@ function VehiclesList() {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
+  const storageFilterOptions = useMemo(
+    () => [
+      { value: '', label: 'Склад' },
+      ...storageLocations.map((location) => ({
+        value: String(location.id),
+        label: location.address || `Склад #${location.id}`,
+      })),
+    ],
+    [storageLocations],
+  );
+
+  const sortFilterOptions = useMemo(() => mapIdOptionsForPillDropdown(SORT_OPTIONS), []);
+
+  const setFilterDropdownOpen = (key) => (open) => {
+    setOpenFilterDropdown(open ? key : null);
+  };
+
+  const totalInList = sortedVehicles.length;
+  const hasActiveFilters = Boolean(searchQuery.trim()) || Boolean(selectedStorageLocation);
+
   if (!authChecked) {
     return <AuthLoadingScreen />;
   }
@@ -140,73 +170,36 @@ function VehiclesList() {
   if (!user) return <Navigate to="/auth" replace />;
   if (!hasPermission) return <Navigate to="/" replace />;
 
-  const totalInList = sortedVehicles.length;
-  const hasActiveFilters = Boolean(searchQuery.trim()) || Boolean(selectedStorageLocation);
-
   return (
-    <div className="min-w-0 space-y-6">
-      <header className="relative overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-white via-white to-slate-100/90 p-5 shadow-sm ring-1 ring-gray-200/60 sm:p-6">
-        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-slate-400/10 blur-2xl" />
-        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Склад</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Автомобили</h1>
-            <p className="mt-2 max-w-xl text-sm text-gray-600">
-              Учёт автомобилей на складах: привязка к запчастям, VIN, пробег и описание для разборки.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => loadVehicles(true)}
-              disabled={vehiclesLoading || refreshing}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
-            >
-              <svg
-                className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              {refreshing ? 'Обновление…' : 'Обновить'}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/vehicles/add')}
-              className="inline-flex items-center justify-center rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-900"
-            >
-              Добавить автомобиль
-            </button>
-          </div>
+    <div className={warehousePageClass}>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Автомобили</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Учёт автомобилей на складах для разборки и привязки запчастей
+          </p>
         </div>
-
-        {!vehiclesLoading && !error && totalInList > 0 && (
-          <dl className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
-              <dt className="text-xs font-medium text-gray-500">Автомобилей</dt>
-              <dd className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{stats.count}</dd>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {!vehiclesLoading && !error && totalInList > 0 && (
+            <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
+              <div>
+                <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.count}</div>
+                <div className="text-[11px] text-gray-500">Автомобилей</div>
+              </div>
+              <div>
+                <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.brands}</div>
+                <div className="text-[11px] text-gray-500">Марок</div>
+              </div>
             </div>
-            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
-              <dt className="text-xs font-medium text-gray-500">Марок</dt>
-              <dd className="mt-1 text-2xl font-bold tabular-nums text-slate-700">{stats.brands}</dd>
-            </div>
-          </dl>
-        )}
-      </header>
-
-      <div className="rounded-2xl border border-gray-200/80 bg-white p-1 shadow-sm">
-        <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-end">
-          <div className="relative min-w-0 flex-1">
+          )}
+          <button
+            type="button"
+            onClick={() => loadVehicles(true)}
+            disabled={vehiclesLoading || refreshing}
+            className={warehouseSecondaryButtonClass}
+          >
             <svg
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -216,84 +209,101 @@ function VehiclesList() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
+            {refreshing ? 'Обновление…' : 'Обновить'}
+          </button>
+          <button type="button" onClick={() => navigate('/vehicles/add')} className={warehousePrimaryButtonClass}>
+            Добавить автомобиль
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
             <input
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Марка, модель, поколение, VIN…"
               autoComplete="off"
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-slate-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
+              className={`${warehousePillControlClass} pr-10`}
             />
-            {searchQuery && (
+            {searchQuery ? (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
                 aria-label="Очистить поиск"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-            )}
+            ) : null}
           </div>
-
-          <div className="w-full lg:w-56">
-            <label htmlFor="vehicles-storage-filter" className="sr-only">
-              Склад
-            </label>
-            <select
-              id="vehicles-storage-filter"
-              value={selectedStorageLocation}
-              onChange={(e) => setSelectedStorageLocation(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 px-3 text-sm text-gray-900 focus:border-slate-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
-            >
-              <option value="">Все склады</option>
-              {storageLocations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.address}
-                </option>
-              ))}
-            </select>
+          <div className="w-full sm:w-64">
+            <PillDropdown
+              ariaLabel="Склад"
+              placeholder="Склад"
+              value={selectedStorageLocation ? String(selectedStorageLocation) : ''}
+              options={storageFilterOptions}
+              isOpen={openFilterDropdown === 'storage'}
+              onOpenChange={setFilterDropdownOpen('storage')}
+              onChange={(nextValue) => setSelectedStorageLocation(nextValue)}
+            />
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 border-t border-gray-100 px-3 py-3">
-          {SORT_OPTIONS.map((opt) => (
+        <div className={warehouseToolbarClass}>
+          <PillDropdown
+            ariaLabel="Сортировка"
+            placeholder="Марка А–Я"
+            value={sortOrder}
+            options={sortFilterOptions}
+            isOpen={openFilterDropdown === 'sort'}
+            onOpenChange={setFilterDropdownOpen('sort')}
+            onChange={setSortOrder}
+            fullWidth={false}
+            triggerClassName="h-9 rounded-xl bg-white px-3 ring-1 ring-gray-200 hover:bg-gray-50"
+            menuClassName="min-w-[12rem]"
+          />
+          {hasActiveFilters && (
             <button
-              key={opt.id}
               type="button"
-              onClick={() => setSortOrder(opt.id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                sortOrder === opt.id
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedStorageLocation('');
+              }}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:underline"
             >
-              {opt.label}
+              <span aria-hidden>×</span>
+              Сбросить фильтры
             </button>
-          ))}
+          )}
         </div>
+
+        {!vehiclesLoading && !error && totalInList > 0 && (
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm sm:hidden">
+            <span className="font-semibold tabular-nums text-gray-900">{stats.count} авто</span>
+            <span className="tabular-nums text-gray-500">{stats.brands} марок</span>
+          </div>
+        )}
       </div>
 
       {vehiclesLoading && (
-        <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
+        <div className="rounded-xl border border-gray-200 bg-white py-16 text-center">
           <AuthLoadingScreen className="h-24" />
-          <p className="mt-4 text-sm text-gray-600">Загружаем автомобили…</p>
+          <p className="mt-4 text-sm text-gray-500">Загружаем автомобили…</p>
         </div>
       )}
 
       {error && !vehiclesLoading && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-8 text-center">
           <p className="text-sm font-medium text-red-800">{error}</p>
-          <button
-            type="button"
-            onClick={() => loadVehicles()}
-            className="mt-4 inline-flex rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-          >
+          <button type="button" onClick={() => loadVehicles()} className={`mt-4 ${warehousePrimaryButtonClass}`}>
             Попробовать снова
           </button>
         </div>
@@ -302,25 +312,25 @@ function VehiclesList() {
       {!vehiclesLoading && !error && (
         <>
           {totalInList > 0 && displayVehicles.length !== totalInList && (
-            <p className="text-sm text-gray-500">
+            <p className="mb-3 text-sm text-gray-500">
               Показано {displayVehicles.length} из {totalInList} автомобилей
               {hasActiveFilters ? ' (с учётом фильтров)' : ''}
             </p>
           )}
 
-          <div className="space-y-4">
-            {displayVehicles.map((v) => (
-              <VehicleCard
-                key={v.id}
-                vehicle={v}
-                storageLabel={getStorageLabel(v.storage_location_id)}
-                isExpanded={expandedId === v.id}
-                onToggle={toggleExpand}
-              />
-            ))}
-          </div>
-
-          {displayVehicles.length === 0 && (
+          {displayVehicles.length > 0 ? (
+            <div className="space-y-4">
+              {displayVehicles.map((v) => (
+                <VehicleCard
+                  key={v.id}
+                  vehicle={v}
+                  storageLabel={getStorageLabel(v.storage_location_id)}
+                  isExpanded={expandedId === v.id}
+                  onToggle={toggleExpand}
+                />
+              ))}
+            </div>
+          ) : (
             <VehiclesEmptyState
               searchQuery={searchQuery}
               hasStorageFilter={Boolean(selectedStorageLocation)}

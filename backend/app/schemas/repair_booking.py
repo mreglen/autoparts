@@ -9,6 +9,17 @@ REPAIR_BOOKING_STATUSES = ("new", "processed", "cancelled")
 RepairBookingStatus = Literal["new", "processed", "cancelled"]
 
 
+class RepairBookingVehicleBrief(BaseModel):
+    id: int
+    make: str
+    model: str
+    year: Optional[int] = None
+    plate: Optional[str] = None
+    vin: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class RepairBookingCreate(BaseModel):
     """Client-side booking form: name/phone prefilled from profile, date required."""
 
@@ -16,6 +27,7 @@ class RepairBookingCreate(BaseModel):
     phone: Optional[str] = Field(None, min_length=5, max_length=40)
     preferred_date: date
     comment: Optional[str] = Field(None, max_length=2000)
+    garage_vehicle_id: Optional[int] = Field(None, ge=1)
 
 
 class RepairBookingStaffCreate(BaseModel):
@@ -23,6 +35,7 @@ class RepairBookingStaffCreate(BaseModel):
     phone: str = Field(min_length=5, max_length=40)
     preferred_date: date
     comment: Optional[str] = Field(None, max_length=2000)
+    garage_vehicle_id: Optional[int] = Field(None, ge=1)
 
 
 class RepairBookingPatch(BaseModel):
@@ -38,6 +51,8 @@ class RepairBookingView(BaseModel):
     id: int
     organization_id: str
     client_id: Optional[int] = None
+    garage_vehicle_id: Optional[int] = None
+    vehicle: Optional[RepairBookingVehicleBrief] = None
     name: str
     phone: str
     preferred_date: date

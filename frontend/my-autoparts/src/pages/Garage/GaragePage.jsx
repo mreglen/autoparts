@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -12,10 +12,30 @@ import {
   mapCandidateToGarageForm,
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
-import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import { normalizeVinOrNull, sanitizeVinInput, looksLikeVin, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+
+const LOOKUP_INPUT_MAX_LENGTH = 32;
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+
+function detectLookupKind(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (looksLikeVin(raw)) return 'vin';
+  const compact = raw.toUpperCase().replace(/\s+/g, '');
+  if (compact.includes('-') && compact.length >= 6) return 'frame';
+  if (/[А-ЯЁ]/.test(raw) && compact.length >= 6) return 'plate';
+  if (compact.length >= 6 && compact.length <= 12 && /[A-Z]/.test(compact) && /\d/.test(compact)) return 'plate';
+  if (compact.length >= 6) return 'frame';
+  return null;
+}
+
+function formatLookupInput(value) {
+  const raw = String(value || '');
+  if (looksLikeVin(raw)) return sanitizeVinInput(raw);
+  return raw.toUpperCase().replace(/\s+/g, ' ').trimStart();
+}
 
 const emptyForm = {
   vin: '',
@@ -195,6 +215,8 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
 
 export default function GaragePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.returnTo || null;
   const { isReady, isAuthenticated } = useAuthReady();
   const isClient = useSelector(selectIsAutoserviceClient);
   const clientStatus = useSelector((state) => state.autoserviceClient.status);
@@ -205,15 +227,11 @@ export default function GaragePage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [addStep, setAddStep] = useState('vin');
-  const [vinInput, setVinInput] = useState('');
-  const [vinDecoding, setVinDecoding] = useState(false);
-  const [vinError, setVinError] = useState(null);
-  const [plateInput, setPlateInput] = useState('');
-  const [plateDecoding, setPlateDecoding] = useState(false);
-  const [plateError, setPlateError] = useState(null);
+  const [lookupInput, setLookupInput] = useState('');
+  const [lookupDecoding, setLookupDecoding] = useState(false);
+  const [lookupError, setLookupError] = useState(null);
+  const [resolvedPlate, setResolvedPlate] = useState('');
   const [frameInput, setFrameInput] = useState('');
-  const [frameDecoding, setFrameDecoding] = useState(false);
-  const [frameError, setFrameError] = useState(null);
   const [lookupFromPlate, setLookupFromPlate] = useState(false);
   const [lookupFromFrame, setLookupFromFrame] = useState(false);
   const [addForm, setAddForm] = useState(emptyForm);
@@ -254,12 +272,10 @@ export default function GaragePage() {
 
   const openAdd = () => {
     setAddStep('vin');
-    setVinInput('');
-    setVinError(null);
-    setPlateInput('');
-    setPlateError(null);
+    setLookupInput('');
+    setLookupError(null);
+    setResolvedPlate('');
     setFrameInput('');
-    setFrameError(null);
     setLookupFromPlate(false);
     setLookupFromFrame(false);
     setAddForm(emptyForm);
@@ -269,6 +285,15 @@ export default function GaragePage() {
     setAddOpen(true);
   };
 
+  useEffect(() => {
+    if (!location.state?.openAdd) return;
+    openAdd();
+    navigate(location.pathname, {
+      replace: true,
+      state: location.state?.returnTo ? { returnTo: location.state.returnTo } : {},
+    });
+  }, [location.pathname, location.state?.openAdd, location.state?.returnTo, navigate]);
+
   const applyCandidate = (candidate, vin, plate = '') => {
     setSelectedCandidate(candidate);
     setAddForm(mapCandidateToGarageForm(candidate, vin, plate));
@@ -276,19 +301,19 @@ export default function GaragePage() {
     setAddStep('form');
   };
 
-  const handleDecodeVin = async () => {
-    setVinError(null);
-    setPlateError(null);
-    setFrameError(null);
-    const vin = normalizeVinOrNull(vinInput);
+  const handleDecodeVin = async (rawValue) => {
+    setLookupError(null);
+    const vin = normalizeVinOrNull(rawValue ?? lookupInput);
     if (!vin) {
-      setVinError('VIN должен содержать от 11 до 17 символов');
+      setLookupError('VIN должен содержать от 11 до 17 символов');
       return;
     }
-    setVinInput(vin);
-    setVinDecoding(true);
+    setLookupInput(vin);
+    setLookupDecoding(true);
     setLookupFromPlate(false);
     setLookupFromFrame(false);
+    setResolvedPlate('');
+    setFrameInput('');
     try {
       const result = await apiRequest('/autoservice/garage/decode-vin', {
         method: 'POST',
@@ -296,40 +321,40 @@ export default function GaragePage() {
       });
       const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
       if (result?.ok && candidates.length === 1) {
-        applyCandidate(candidates[0], vin, plateInput.trim());
+        applyCandidate(candidates[0], vin, resolvedPlate);
         return;
       }
       if (result?.ok && candidates.length > 1) {
         setAddCandidates(candidates);
         setSelectedCandidate(null);
-        setAddForm({ ...emptyForm, vin, plate: plateInput.trim() });
+        setAddForm({ ...emptyForm, vin, plate: resolvedPlate });
         setAddNotice(null);
         setAddStep('pick');
         return;
       }
       setSelectedCandidate(null);
-      setAddForm({ ...emptyForm, vin, plate: plateInput.trim() });
+      setAddForm({ ...emptyForm, vin, plate: resolvedPlate });
       setAddNotice(softNoticeVariantFromReason(result?.reason));
       setAddStep('form');
     } catch (err) {
-      setVinError(err?.message || 'Не удалось распознать VIN');
+      setLookupError(err?.message || 'Не удалось распознать VIN');
     } finally {
-      setVinDecoding(false);
+      setLookupDecoding(false);
     }
   };
 
-  const handleDecodePlate = async () => {
-    setPlateError(null);
-    setVinError(null);
-    setFrameError(null);
-    const plate = plateInput.trim();
+  const handleDecodePlate = async (rawValue) => {
+    setLookupError(null);
+    const plate = String(rawValue ?? lookupInput).trim();
     if (plate.length < 6) {
-      setPlateError('Укажите госномер');
+      setLookupError('Укажите госномер');
       return;
     }
-    setPlateDecoding(true);
+    setLookupInput(formatLookupInput(plate));
+    setLookupDecoding(true);
     setLookupFromPlate(true);
     setLookupFromFrame(false);
+    setFrameInput('');
     try {
       const result = await apiRequest('/autoservice/garage/decode-plate', {
         method: 'POST',
@@ -338,6 +363,8 @@ export default function GaragePage() {
       const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
       const vin = (result?.vin || '').trim().toUpperCase();
       const normalizedPlate = (result?.plate || plate).trim();
+      setResolvedPlate(normalizedPlate);
+      setLookupInput(normalizedPlate);
       if (result?.ok && candidates.length === 1) {
         applyCandidate(candidates[0], vin, normalizedPlate);
         return;
@@ -355,24 +382,24 @@ export default function GaragePage() {
       setAddNotice(softNoticeVariantFromReason(result?.reason));
       setAddStep('form');
     } catch (err) {
-      setPlateError(err?.message || 'Не удалось распознать госномер');
+      setLookupError(err?.message || 'Не удалось распознать госномер');
     } finally {
-      setPlateDecoding(false);
+      setLookupDecoding(false);
     }
   };
 
-  const handleDecodeFrame = async () => {
-    setFrameError(null);
-    setVinError(null);
-    setPlateError(null);
-    const frame = frameInput.trim().toUpperCase().replace(/\s+/g, '');
+  const handleDecodeFrame = async (rawValue) => {
+    setLookupError(null);
+    const frame = String(rawValue ?? lookupInput).trim().toUpperCase().replace(/\s+/g, '');
     if (frame.length < 6) {
-      setFrameError('Укажите Frame (номер кузова)');
+      setLookupError('Укажите Frame (номер кузова)');
       return;
     }
-    setFrameDecoding(true);
+    setLookupInput(frame);
+    setLookupDecoding(true);
     setLookupFromPlate(false);
     setLookupFromFrame(true);
+    setResolvedPlate('');
     try {
       const result = await apiRequest('/autoservice/garage/decode-frame', {
         method: 'POST',
@@ -381,27 +408,51 @@ export default function GaragePage() {
       const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
       const normalizedFrame = (result?.frame || frame).trim();
       setFrameInput(normalizedFrame);
+      setLookupInput(normalizedFrame);
       if (result?.ok && candidates.length === 1) {
-        applyCandidate(candidates[0], '', plateInput.trim());
+        applyCandidate(candidates[0], '', resolvedPlate);
         return;
       }
       if (result?.ok && candidates.length > 1) {
         setAddCandidates(candidates);
         setSelectedCandidate(null);
-        setAddForm({ ...emptyForm, plate: plateInput.trim() });
+        setAddForm({ ...emptyForm, plate: resolvedPlate });
         setAddNotice(null);
         setAddStep('pick');
         return;
       }
       setSelectedCandidate(null);
-      setAddForm({ ...emptyForm, plate: plateInput.trim() });
+      setAddForm({ ...emptyForm, plate: resolvedPlate });
       setAddNotice(softNoticeVariantFromReason(result?.reason));
       setAddStep('form');
     } catch (err) {
-      setFrameError(err?.message || 'Не удалось распознать Frame');
+      setLookupError(err?.message || 'Не удалось распознать Frame');
     } finally {
-      setFrameDecoding(false);
+      setLookupDecoding(false);
     }
+  };
+
+  const handleDecodeLookup = async () => {
+    setLookupError(null);
+    const raw = lookupInput.trim();
+    if (!raw) {
+      setLookupError('Введите VIN, госномер или Frame');
+      return;
+    }
+    const kind = detectLookupKind(raw);
+    if (kind === 'vin') {
+      await handleDecodeVin(raw);
+      return;
+    }
+    if (kind === 'plate') {
+      await handleDecodePlate(raw);
+      return;
+    }
+    if (kind === 'frame') {
+      await handleDecodeFrame(raw);
+      return;
+    }
+    setLookupError('Не удалось определить тип. Проверьте VIN, госномер или Frame.');
   };
 
   const handleCreateVehicle = async (body) => {
@@ -431,6 +482,9 @@ export default function GaragePage() {
       });
       setVehicles((prev) => [row, ...prev]);
       setAddOpen(false);
+      if (returnTo) {
+        navigate(returnTo, { replace: true, state: { selectedVehicleId: row.id } });
+      }
     } finally {
       setAddSaving(false);
     }
@@ -510,7 +564,7 @@ export default function GaragePage() {
           <p className="text-sm text-gray-500">Загрузка автомобилей…</p>
         ) : vehicles.length === 0 ? (
           <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
-            Пока нет автомобилей. Добавьте первый по VIN или вручную.
+            Пока нет автомобилей. Добавьте первый по VIN, госномеру или Frame.
           </p>
         ) : (
           vehicles.map((v) => (
@@ -553,52 +607,38 @@ export default function GaragePage() {
       </div>
 
       {addOpen && addStep === 'vin' && (
-        <Modal title="Добавить автомобиль" onClose={() => setAddOpen(false)}>
+        <Modal title="Добавление авто в гараж" onClose={() => setAddOpen(false)}>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Введите VIN, госномер или Frame — попробуем подставить данные автоматически.
+              Введите VIN, госномер или Frame — подставим данные автоматически.
             </p>
             <div>
-              <label className="block text-sm font-medium text-gray-700">VIN</label>
+              <label htmlFor="garage-add-lookup" className="block text-sm font-medium text-gray-700">
+                Госномер, VIN или Frame
+              </label>
               <input
+                id="garage-add-lookup"
                 className={inputClass}
-                value={vinInput}
+                value={lookupInput}
                 onChange={(e) => {
-                  setVinInput(sanitizeVinInput(e.target.value));
-                  setVinError(null);
+                  setLookupInput(formatLookupInput(e.target.value));
+                  setLookupError(null);
                 }}
-                maxLength={VIN_INPUT_MAX_LENGTH}
-                disabled={vinDecoding || plateDecoding || frameDecoding}
-              />
-              {vinError && <p className="mt-1 text-sm text-red-600">{vinError}</p>}
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleDecodeVin}
-                disabled={vinDecoding || plateDecoding || frameDecoding}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {vinDecoding ? 'Проверка…' : 'Распознать VIN'}
-              </button>
-            </div>
-            <div className="border-t border-gray-100 pt-4">
-              <label className="block text-sm font-medium text-gray-700">Госномер</label>
-              <input
-                className={inputClass}
-                value={plateInput}
-                onChange={(e) => {
-                  setPlateInput(e.target.value.toUpperCase());
-                  setPlateError(null);
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleDecodeLookup();
+                  }
                 }}
-                maxLength={12}
-                disabled={vinDecoding || plateDecoding || frameDecoding}
-                placeholder="А123БВ77"
+                maxLength={LOOKUP_INPUT_MAX_LENGTH}
+                disabled={lookupDecoding}
+                placeholder="А123БВ77, WVWZZZ1JZYW123456 или SGL5-400683"
                 autoComplete="off"
+                autoFocus
               />
-              {plateError && <p className="mt-1 text-sm text-red-600">{plateError}</p>}
+              {lookupError && <p className="mt-1 text-sm text-red-600">{lookupError}</p>}
             </div>
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -609,46 +649,18 @@ export default function GaragePage() {
                   setAddForm(emptyForm);
                   setAddStep('form');
                 }}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                disabled={lookupDecoding}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-60"
               >
-                Ввести вручную
+                Искать по марке
               </button>
               <button
                 type="button"
-                onClick={handleDecodePlate}
-                disabled={vinDecoding || plateDecoding || frameDecoding}
+                onClick={handleDecodeLookup}
+                disabled={lookupDecoding}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
               >
-                {plateDecoding ? 'Проверка…' : 'Распознать госномер'}
-              </button>
-            </div>
-            <div className="border-t border-gray-100 pt-4">
-              <label className="block text-sm font-medium text-gray-700">Frame (кузов)</label>
-              <p className="mt-0.5 text-xs text-gray-500">
-                Для японских авто, например SGL5-400683.
-              </p>
-              <input
-                className={inputClass}
-                value={frameInput}
-                onChange={(e) => {
-                  setFrameInput(e.target.value.toUpperCase());
-                  setFrameError(null);
-                }}
-                maxLength={32}
-                disabled={vinDecoding || plateDecoding || frameDecoding}
-                placeholder="SGL5-400683"
-                autoComplete="off"
-              />
-              {frameError && <p className="mt-1 text-sm text-red-600">{frameError}</p>}
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleDecodeFrame}
-                disabled={vinDecoding || plateDecoding || frameDecoding}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {frameDecoding ? 'Проверка…' : 'Распознать Frame'}
+                {lookupDecoding ? 'Проверка…' : 'Продолжить'}
               </button>
             </div>
           </div>
@@ -667,8 +679,8 @@ export default function GaragePage() {
                     onClick={() =>
                       applyCandidate(
                         c,
-                        addForm.vin || vinInput.trim().toUpperCase(),
-                        addForm.plate || plateInput.trim(),
+                        addForm.vin || lookupInput.trim().toUpperCase(),
+                        addForm.plate || resolvedPlate,
                       )
                     }
                     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/40"
@@ -685,9 +697,9 @@ export default function GaragePage() {
                 setAddNotice(null);
                 setAddStep('form');
               }}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900"
+              className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
-              Ввести вручную
+              Искать по марке
             </button>
           </div>
         </Modal>
@@ -704,8 +716,8 @@ export default function GaragePage() {
               addNotice
                 ? () => {
                     setAddStep('vin');
-                    setVinInput(addForm.vin || vinInput);
-                    setPlateInput(addForm.plate || plateInput);
+                    setLookupInput(addForm.vin || addForm.plate || frameInput || lookupInput);
+                    setLookupError(null);
                     setAddNotice(null);
                   }
                 : undefined

@@ -22,6 +22,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { formatDromExportMessage } from '../../utils/dromExport';
 import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopButton';
+import PillDropdown from '../../components/PillDropdown/PillDropdown';
 
 const CardPart = ({
   part,
@@ -52,7 +53,7 @@ const CardPart = ({
   const [showActions, setShowActions] = useState(false);
   const isModeration = variant === 'moderation';
   const isRejectedModeration = isModeration && moderationKind === 'rejected';
-  const expandedColSpan = isModeration ? 7 : 8;
+  const expandedColSpan = isModeration ? 3 : 4;
   const actionsMenuHeight = isRejectedModeration ? 120 : isModeration ? 160 : showExport && showDromExport ? 360 : showExport || showDromExport ? 300 : 260;
   const desktopActionsPlacement = useActionsDropdownPlacement(showActions, actionsMenuHeight);
   const mobileActionsPlacement = useActionsDropdownPlacement(showActions, actionsMenuHeight);
@@ -219,13 +220,89 @@ const CardPart = ({
     onImageError?.(part.id);
   };
 
+  const priceLabel = part.price != null && !isNaN(parseFloat(part.price))
+    ? `${parseFloat(part.price).toLocaleString('ru-RU')} ₽`
+    : '—';
+
+  const renderStatusBadges = () => (
+    <div className="flex items-center gap-2 flex-wrap">
+      {isModeration ? (
+        isRejectedModeration ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+            Отклонена
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            На модерации
+          </span>
+        )
+      ) : (
+        <>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+            part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+          }`}>
+            {part.is_new ? 'Новый' : 'Б/у'}
+          </span>
+          <div className="flex items-center gap-1">
+            <img
+              src="/logos/svoygarage.png"
+              alt="Свой Гараж"
+              className="w-4 h-4 object-contain"
+              title="Свой Гараж"
+            />
+            {part.is_on_avito && (
+              <img
+                src="/logos/avito.png"
+                alt="Avito"
+                className="w-4 h-4 object-contain"
+                title="Avito"
+              />
+            )}
+            {part.is_on_drom && (
+              <img
+                src="/logos/drom.png"
+                alt="Drom"
+                className="w-4 h-4 object-contain"
+                title="Drom"
+              />
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  const renderProductPreview = (imageClassName = 'w-16 h-16') => (
+    <div
+      className={`${imageClassName} flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer`}
+      onClick={onToggleExpand}
+    >
+      {previewSrc && !hasImageError ? (
+        <img
+          src={previewSrc}
+          alt={part.name}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+          onError={handlePreviewError}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+
   return (
   <React.Fragment>
     {/* Desktop table row */}
     {renderMode === 'table' && (
-    <tr className="group hover:bg-gray-50/50 transition-all duration-200 border-b border-gray-100">
+    <tr className="group hover:bg-gray-50/50 transition-colors border-b border-gray-100">
       {!isModeration && (
-        <td className="px-4 py-4 whitespace-nowrap">
+        <td className="w-12 px-3 py-3 align-middle">
           <input
             type="checkbox"
             checked={isSelected}
@@ -237,121 +314,45 @@ const CardPart = ({
           />
         </td>
       )}
-      
-      {/* Product info cell with image */}
-      <td className="px-4 py-4" colSpan={4}>
-        <div className="flex items-start gap-4">
-          {/* Product image */}
-          <div 
-            className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer" 
-            onClick={onToggleExpand}
-          >
-            {previewSrc && !hasImageError ? (
-              <img 
-                src={previewSrc} 
-                alt={part.name}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                decoding="async"
-                onError={handlePreviewError}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-            )}
-          </div>
 
-          {/* Product details */}
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={onToggleExpand}>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-base font-semibold text-gray-900">{part.brand || '—'}</span>
-              <span className="text-sm text-gray-400">•</span>
-              <span className="text-sm text-gray-500 font-mono">{part.article || '—'}</span>
+      <td className="px-3 py-3 align-middle min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
+          {renderProductPreview()}
+          <div className="min-w-0 flex-1 cursor-pointer" onClick={onToggleExpand}>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-sm font-semibold text-gray-900">{part.brand || '—'}</span>
+              <span className="text-sm text-gray-400 hidden sm:inline">•</span>
+              <span className="text-sm text-gray-500 font-mono truncate">{part.article || '—'}</span>
             </div>
             {part.internal_code && (
-              <div className="text-xs text-gray-500 mb-1">
+              <div className="mt-0.5 text-xs text-gray-500 truncate">
                 {INTERNAL_CODE_LABEL}: <span className="font-mono">{formatInternalCodeDisplay(part.internal_code)}</span>
               </div>
             )}
-            <h3 className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">{part.name || '—'}</h3>
-            
-            {/* Status badges */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {isModeration ? (
-                isRejectedModeration ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    Отклонена
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                    На модерации
-                  </span>
-                )
-              ) : (
-                <>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {part.is_new ? 'Новый' : 'Б/у'}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <img
-                      src="/logos/svoygarage.png"
-                      alt="Свой Гараж"
-                      className="w-4 h-4 object-contain"
-                      title="Свой Гараж"
-                    />
-                    {part.is_on_avito && (
-                      <img
-                        src="/logos/avito.png"
-                        alt="Avito"
-                        className="w-4 h-4 object-contain"
-                        title="Avito"
-                      />
-                    )}
-                    {part.is_on_drom && (
-                      <img
-                        src="/logos/drom.png"
-                        alt="Drom"
-                        className="w-4 h-4 object-contain"
-                        title="Drom"
-                      />
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+            <h3 className="mt-1 text-sm text-gray-800 line-clamp-2 leading-snug">{part.name || '—'}</h3>
+            <div className="mt-2">{renderStatusBadges()}</div>
           </div>
         </div>
       </td>
-      
-      {/* Quantity and Price */}
-      <td className="px-4 py-4 whitespace-nowrap">
-        <div className="text-center">
-          <div className="text-sm font-medium text-gray-900">{part.quantity || 0}</div>
-          <div className="text-xs text-gray-500">шт.</div>
+
+      <td className="w-32 px-3 py-3 align-middle whitespace-nowrap">
+        <div className="text-right">
+          <div className="text-base font-bold tabular-nums text-gray-900">{priceLabel}</div>
+          <div className="mt-0.5 text-xs tabular-nums text-gray-500">{part.quantity || 0} шт.</div>
         </div>
       </td>
-      <td className="px-4 py-4 whitespace-nowrap">
-        <div className="text-base font-bold text-gray-900">
-          {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toLocaleString('ru-RU')} ₽` : '—'}
-        </div>
-      </td>
-      
-      {/* Actions */}
-      <td className="px-4 py-4 whitespace-nowrap">
-        <div ref={desktopActionsPlacement.anchorRef} className="relative actions-dropdown">
+
+      <td className="w-28 px-3 py-3 align-middle whitespace-nowrap text-right">
+        <div ref={desktopActionsPlacement.anchorRef} className="relative actions-dropdown inline-block">
           <button
             onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+            aria-label="Действия"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
             </svg>
-            <span className="hidden sm:inline">Действия</span>
+            <span className="hidden xl:inline">Действия</span>
           </button>
 
           {showActions && renderActionsMenu(buildActionsDropdownMenuClassName(desktopActionsPlacement.openUp, 'w-48 z-50'))}
@@ -432,54 +433,12 @@ const CardPart = ({
             </div>
             
             {/* Price and quantity */}
-            <div className="flex items-center justify-between mt-3">
-              <div className="text-base font-bold text-gray-900">
-                {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toLocaleString('ru-RU')} ₽` : '—'}
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <div>
+                <div className="text-base font-bold tabular-nums text-gray-900">{priceLabel}</div>
+                <div className="mt-0.5 text-xs tabular-nums text-gray-500">{part.quantity || 0} шт.</div>
               </div>
-              <div className="text-center">
-                <div className="text-sm font-medium text-gray-900">{part.quantity || 0}</div>
-                <div className="text-xs text-gray-500">шт.</div>
-              </div>
-            </div>
-
-            {/* Status / platforms */}
-            <div className="flex items-center gap-2 mt-2">
-              {isModeration ? (
-                isRejectedModeration ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    Отклонена
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                    На модерации
-                  </span>
-                )
-              ) : (
-                <>
-                  <img
-                    src="/logos/svoygarage.png"
-                    alt="Свой Гараж"
-                    className="w-4 h-4 object-contain"
-                    title="Свой Гараж"
-                  />
-                  {part.is_on_avito && (
-                    <img
-                      src="/logos/avito.png"
-                      alt="Avito"
-                      className="w-4 h-4 object-contain"
-                      title="Avito"
-                    />
-                  )}
-                  {part.is_on_drom && (
-                    <img
-                      src="/logos/drom.png"
-                      alt="Drom"
-                      className="w-4 h-4 object-contain"
-                      title="Drom"
-                    />
-                  )}
-                </>
-              )}
+              <div>{renderStatusBadges()}</div>
             </div>
           </div>
         </div>
@@ -861,11 +820,36 @@ const MY_PARTS_SORT_OPTIONS = [
   { value: 'price_asc', label: 'Цена: по возрастанию' },
   { value: 'price_desc', label: 'Цена: по убыванию' },
 ];
-const MY_PARTS_SORT_LABELS = Object.fromEntries(
-  MY_PARTS_SORT_OPTIONS.map(({ value, label }) => [value, label]),
-);
 const URL_SEARCH_DEBOUNCE_MS = 400;
 const MY_PRODUCTS_PAGE_SIZE = 30;
+
+function MyPartsStockTableColGroup() {
+  return (
+    <colgroup>
+      <col className="w-12" />
+      <col />
+      <col className="w-32" />
+      <col className="w-28" />
+    </colgroup>
+  );
+}
+
+function MyPartsModerationTableColGroup() {
+  return (
+    <colgroup>
+      <col />
+      <col className="w-32" />
+      <col className="w-28" />
+    </colgroup>
+  );
+}
+
+const myPartsTableClass = 'min-w-full table-fixed divide-y divide-gray-200';
+
+const pillControlClass =
+  'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+const pillButtonClass =
+  'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
 
 const buildMyProductsRequest = ({ page = 1, storage, cell, cellValue, responsible, q, sort, stock, noPhoto, append = false } = {}) => ({
   page,
@@ -1028,7 +1012,8 @@ function MyParts() {
   });
 
   // Сортировка: по умолчанию сначала новые
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const displayParts = products;
   const sortedDisplayParts = products;
@@ -1093,6 +1078,59 @@ function MyParts() {
   }, [moderationFilters.cell, pendingItems, rejectedItems, pendingStorageCellsByProduct]);
 
   const activeCellValueOptions = isModerationTab ? moderationCellValueOptions : cellValueOptions;
+
+  const storageFilterOptions = useMemo(
+    () => [
+      { value: '', label: 'Склад' },
+      ...storageLocations.map((location) => ({
+        value: String(location.id),
+        label: location.address || `Склад #${location.id}`,
+      })),
+    ],
+    [storageLocations],
+  );
+
+  const cellFilterOptions = useMemo(
+    () => [
+      { value: '', label: activeFilters.storage ? 'Ячейка' : 'Сначала склад' },
+      ...availableStorageCells.map((cell) => ({
+        value: String(cell.id),
+        label: cell.name,
+      })),
+    ],
+    [activeFilters.storage, availableStorageCells],
+  );
+
+  const cellValuePlaceholder = !activeFilters.cell
+    ? 'Позиция'
+    : (!isModerationTab && cellValueOptionsLoading)
+      ? 'Загрузка…'
+      : activeCellValueOptions.length > 0
+        ? (selectedCellName ? `Позиция · ${selectedCellName}` : 'Позиция')
+        : 'Нет позиций';
+
+  const cellValueFilterOptions = useMemo(
+    () => [
+      { value: '', label: cellValuePlaceholder },
+      ...activeCellValueOptions.map((value) => ({ value, label: value })),
+    ],
+    [activeCellValueOptions, cellValuePlaceholder],
+  );
+
+  const responsibleFilterOptions = useMemo(
+    () => [
+      { value: '', label: 'Ответственный' },
+      ...responsibleOptions.map((employee) => ({
+        value: String(employee.id),
+        label: formatResponsibleLabel(employee),
+      })),
+    ],
+    [responsibleOptions],
+  );
+
+  const setFilterDropdownOpen = (key) => (open) => {
+    setOpenFilterDropdown(open ? key : null);
+  };
 
   const loadMoreMyProducts = useCallback(() => {
     if (
@@ -1246,6 +1284,38 @@ function MyParts() {
   }, [displayModerationParts, moderationFilters.sort]);
 
   const moderationItemsCount = (pendingItems?.length || 0) + (rejectedItems?.length || 0);
+
+  const hasActiveFilters = Boolean(
+    activeFilters.storage
+    || activeFilters.cell
+    || activeFilters.cellValue
+    || activeFilters.responsible
+    || (isModerationTab && moderationFilters.hideRejected)
+    || stockFilter
+    || noPhotoFilter,
+  );
+
+  const resetActiveFilters = () => {
+    if (isModerationTab) {
+      setModerationFilters({ ...DEFAULT_MODERATION_FILTERS });
+      setModerationSearchDraft('');
+    } else {
+      setInStockFilters({ ...DEFAULT_IN_STOCK_FILTERS });
+      setInStockSearchDraft('');
+    }
+    if (stockFilter || noPhotoFilter) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('stock');
+      next.delete('no_photo');
+      setSearchParams(next, { replace: true });
+    }
+  };
+
+  const statusTabs = [
+    { id: 'in-stock', label: 'В наличии', count: myProductsTotal, shortLabel: 'В наличии' },
+    { id: 'pending', label: 'На модерации', count: moderationItemsCount, shortLabel: 'Модерация' },
+    { id: 'drafts', label: 'Черновики', count: draftItems.length, shortLabel: 'Черновики' },
+  ];
 
   const statsParts = isModerationTab ? sortedModerationParts : sortedDisplayParts;
   const clientStatsValue = statsParts.reduce(
@@ -1462,23 +1532,6 @@ function MyParts() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [mobileActionsOpen]);
-
-  // Закрытие dropdown сортировки при клике вне
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.sort-dropdown')) {
-        setShowSortDropdown(false);
-      }
-    };
-
-    if (showSortDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showSortDropdown]);
 
   // Закрытие dropdown массовых действий при клике вне
   useEffect(() => {
@@ -2034,325 +2087,297 @@ function MyParts() {
 
   return (
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-5">
-        <div className="flex items-center gap-3 shrink-0">
-          <h1 className="text-2xl font-bold text-gray-800">Мои запчасти</h1>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Мои запчасти</h1>
           {userHasWarehouseQrAccess(user, permissionCodes) && (
             <Link
               to="/warehouse/scan"
               className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               title="Сканировать QR"
             >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m14 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
               </svg>
               <span className="hidden sm:inline">QR</span>
             </Link>
           )}
         </div>
-        {!isDraftsTab && (
-          <div className="flex flex-wrap gap-x-6 gap-y-3 sm:justify-end">
-            <div className="min-w-[7rem]">
-              <div className="text-lg sm:text-xl font-bold text-gray-800 tabular-nums leading-tight">
-                {totalValue.toLocaleString('ru-RU')} ₽
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                {activeFilters.storage
-                  ? (isModerationTab ? 'Стоимость по складу' : 'Стоимость склада')
-                  : (isModerationTab ? 'Стоимость на модерации' : 'Стоимость всех складов')}
-              </div>
-            </div>
-            <div className="min-w-[5rem]">
-              <div className="text-lg sm:text-xl font-bold text-gray-800 tabular-nums leading-tight">
-                {totalQuantity.toLocaleString('ru-RU')} шт.
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                {activeFilters.storage
-                  ? (isModerationTab ? 'Количество по складу' : 'Штук на складе')
-                  : (isModerationTab ? 'На модерации' : 'Штук на всех складах')}
-              </div>
-            </div>
-            {!isModerationTab && myProductsTotal > 0 && (
-              <div className="min-w-[5rem]">
-                <div className="text-lg sm:text-xl font-bold text-gray-800 tabular-nums leading-tight">
-                  {myProductsTotal.toLocaleString('ru-RU')} поз.
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {!isDraftsTab && (
+            <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
+              <div>
+                <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
+                  {totalValue.toLocaleString('ru-RU')} ₽
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  {activeFilters.storage ? 'Позиций на складе' : 'Позиций всего'}
+                <div className="text-[11px] text-gray-500">
+                  {activeFilters.storage
+                    ? (isModerationTab ? 'По складу' : 'Склад')
+                    : (isModerationTab ? 'На модерации' : 'Все склады')}
                 </div>
               </div>
-            )}
-          </div>
-        )}
+              <div>
+                <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
+                  {totalQuantity.toLocaleString('ru-RU')} шт.
+                </div>
+                <div className="text-[11px] text-gray-500">Количество</div>
+              </div>
+              {!isModerationTab && myProductsTotal > 0 && (
+                <div>
+                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
+                    {myProductsTotal.toLocaleString('ru-RU')}
+                  </div>
+                  <div className="text-[11px] text-gray-500">Позиций</div>
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => navigate('/my-parts/add')}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            Добавить запчасть
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4 border-b border-gray-200">
+        <div className="-mb-px flex gap-1 overflow-x-auto sm:gap-6" role="tablist" aria-label="Статусы запчастей">
+          {statusTabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative shrink-0 whitespace-nowrap px-2 pb-3 pt-1 text-sm font-medium transition-colors sm:px-0 sm:text-[15px] ${
+                  isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <span className="sm:hidden">{tab.shortLabel}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
+                <sup className="ml-0.5 text-[10px] font-semibold text-gray-400 tabular-nums">
+                  {tab.count > 0 ? tab.count : '0'}
+                </sup>
+                <span
+                  className={`absolute inset-x-0 bottom-0 h-0.5 rounded-full transition-colors ${
+                    isActive ? 'bg-gray-900' : 'bg-transparent'
+                  }`}
+                  aria-hidden
+                />
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {!isDraftsTab && (
-      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
-        <div>
-          <label htmlFor="my-parts-search" className="block text-xs font-medium text-gray-600 mb-1.5">
-            Поиск{activeFilters.storage ? ' в выбранном складе' : ''}
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+        <div className="mb-4 space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
+              <input
+                id="my-parts-search"
+                ref={searchInputRef}
+                type="text"
+                inputMode="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                placeholder={
+                  activeFilters.storage
+                    ? 'Поиск по названию, артикулу и коду на складе'
+                    : 'Поиск по названию, артикулу и коду'
+                }
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value)}
+                className={`${pillControlClass} pr-10`}
+              />
+              {searchDraft ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchDraft('')}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
+                  aria-label="Очистить поиск"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              ) : null}
             </div>
-            <input
-              id="my-parts-search"
-              ref={searchInputRef}
-              type="text"
-              inputMode="search"
-              enterKeyHint="search"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              placeholder="По номеру, внутр. коду или названию..."
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              className="block w-full h-10 pl-9 pr-9 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-            />
-            <div className={`absolute inset-y-0 right-0 pr-3 flex items-center ${searchDraft ? '' : 'invisible pointer-events-none'}`}>
-              <button
-                type="button"
-                onClick={() => setSearchDraft('')}
-                className="text-gray-400 hover:text-gray-600 focus:outline-none"
-                tabIndex={searchDraft ? 0 : -1}
-                aria-hidden={!searchDraft}
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${isModerationTab ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
-          <div className="min-w-0">
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Склад</label>
-            <select
-              value={activeFilters.storage}
-              onChange={(e) => updateActiveFilters({ storage: e.target.value })}
-              className="block w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-            >
-            <option value="">Все склады</option>
-            {storageLocations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.address}
-              </option>
-            ))}
-            </select>
-          </div>
-
-          <div className="min-w-0">
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Ячейка</label>
-            <select
-              value={activeFilters.cell}
-              onChange={(e) => updateActiveFilters({ cell: e.target.value })}
-              disabled={!activeFilters.storage}
-              className="block w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
-            >
-            <option value="">{activeFilters.storage ? 'Все ячейки' : 'Сначала выберите склад'}</option>
-            {availableStorageCells.map((cell) => (
-              <option key={cell.id} value={cell.id}>
-                {cell.name}
-              </option>
-            ))}
-            </select>
-          </div>
-
-          <div className="min-w-0">
-            <label className="block text-xs font-medium text-gray-600 mb-1.5 truncate" title={selectedCellName || undefined}>
-              {selectedCellName ? `Позиция · ${selectedCellName}` : 'Позиция'}
-            </label>
-            <select
-              value={activeFilters.cellValue}
-              onChange={(e) => updateActiveFilters({ cellValue: e.target.value })}
-              disabled={!activeFilters.cell || (!isModerationTab && cellValueOptionsLoading)}
-              className="block w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
-            >
-            <option value="">
-              {!activeFilters.cell
-                ? 'Сначала выберите ячейку'
-                : (!isModerationTab && cellValueOptionsLoading)
-                  ? 'Загрузка…'
-                  : activeCellValueOptions.length > 0
-                    ? 'Все позиции'
-                    : 'Нет заполненных позиций'}
-            </option>
-            {activeCellValueOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-            </select>
-          </div>
-
-          <div className="min-w-0">
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Ответственный</label>
-            <select
-              value={activeFilters.responsible}
-              onChange={(e) => updateActiveFilters({ responsible: e.target.value })}
-              className="block w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-            >
-              <option value="">Все ответственные</option>
-              {responsibleOptions.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {formatResponsibleLabel(employee)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="min-w-0 relative sort-dropdown">
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Сортировка</label>
             <button
               type="button"
-              onClick={() => setShowSortDropdown(!showSortDropdown)}
-              className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm flex items-center justify-between gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              title="Сортировка"
-              aria-expanded={showSortDropdown}
+              onClick={() => {
+                setFiltersOpen((v) => {
+                  if (v) setOpenFilterDropdown(null);
+                  return !v;
+                });
+              }}
+              className={`${pillButtonClass} ${filtersOpen ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
+              aria-expanded={filtersOpen}
             >
-              <span className="flex items-center gap-2 min-w-0 text-gray-700">
-                <svg className="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                </svg>
-                <span className="truncate">
-                  {MY_PARTS_SORT_LABELS[activeFilters.sort] || 'Сначала новые'}
-                </span>
-              </span>
-              <svg className={`w-4 h-4 shrink-0 text-gray-400 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              Фильтры
+              <svg
+                className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
+          </div>
 
-            {showSortDropdown && (
-              <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-30">
-                {MY_PARTS_SORT_OPTIONS.map(({ value, label }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => { updateActiveFilters({ sort: value }); setShowSortDropdown(false); }}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${activeFilters.sort === value ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span>{label}</span>
-                      {activeFilters.sort === value && (
-                        <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                ))}
+          {filtersOpen && (
+            <div className="space-y-3">
+              <div className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${isModerationTab ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
+                <PillDropdown
+                  ariaLabel="Склад"
+                  placeholder="Склад"
+                  value={activeFilters.storage ? String(activeFilters.storage) : ''}
+                  options={storageFilterOptions}
+                  isOpen={openFilterDropdown === 'storage'}
+                  onOpenChange={setFilterDropdownOpen('storage')}
+                  onChange={(nextValue) => updateActiveFilters({ storage: nextValue })}
+                />
+
+                <PillDropdown
+                  ariaLabel="Ячейка"
+                  placeholder={activeFilters.storage ? 'Ячейка' : 'Сначала склад'}
+                  value={activeFilters.cell ? String(activeFilters.cell) : ''}
+                  options={cellFilterOptions}
+                  disabled={!activeFilters.storage}
+                  isOpen={openFilterDropdown === 'cell'}
+                  onOpenChange={setFilterDropdownOpen('cell')}
+                  onChange={(nextValue) => updateActiveFilters({ cell: nextValue })}
+                />
+
+                <PillDropdown
+                  ariaLabel="Позиция"
+                  placeholder={cellValuePlaceholder}
+                  value={activeFilters.cellValue || ''}
+                  options={cellValueFilterOptions}
+                  disabled={!activeFilters.cell || (!isModerationTab && cellValueOptionsLoading)}
+                  isOpen={openFilterDropdown === 'cellValue'}
+                  onOpenChange={setFilterDropdownOpen('cellValue')}
+                  onChange={(nextValue) => updateActiveFilters({ cellValue: nextValue })}
+                />
+
+                <PillDropdown
+                  ariaLabel="Ответственный"
+                  placeholder="Ответственный"
+                  value={activeFilters.responsible ? String(activeFilters.responsible) : ''}
+                  options={responsibleFilterOptions}
+                  isOpen={openFilterDropdown === 'responsible'}
+                  onOpenChange={setFilterDropdownOpen('responsible')}
+                  onChange={(nextValue) => updateActiveFilters({ responsible: nextValue })}
+                />
+
+                {isModerationTab && (
+                  <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full bg-gray-100 px-4 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={moderationFilters.hideRejected}
+                      onChange={(e) => updateActiveFilters({ hideRejected: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Скрыть отклонённые
+                  </label>
+                )}
+              </div>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetActiveFilters}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:underline"
+                >
+                  <span aria-hidden>×</span>
+                  Сбросить фильтры
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 sm:gap-3">
+            {activeTab === 'in-stock' && (
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-gray-700 ring-1 ring-gray-200">
+                <input
+                  ref={selectAllCheckboxRef}
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  disabled={selectAllLoading || myProductsTotal === 0}
+                  onChange={handleToggleSelectAll}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                />
+                <span>{selectAllLoading ? 'Выбор…' : 'Выбрать все'}</span>
+                {selectedParts.size > 0 && (
+                  <span className="text-gray-400 tabular-nums">({selectedParts.size})</span>
+                )}
+              </label>
+            )}
+
+            <PillDropdown
+              ariaLabel="Сортировка"
+              placeholder="Сначала новые"
+              value={activeFilters.sort}
+              options={MY_PARTS_SORT_OPTIONS}
+              isOpen={openFilterDropdown === 'sort'}
+              onOpenChange={setFilterDropdownOpen('sort')}
+              onChange={(nextValue) => updateActiveFilters({ sort: nextValue })}
+              fullWidth={false}
+              triggerClassName="h-9 rounded-xl bg-white px-3 ring-1 ring-gray-200 hover:bg-gray-50"
+              menuClassName="min-w-[14rem]"
+            />
+
+            {avitoJob && (
+              <div className="ml-auto text-xs text-gray-500 sm:text-sm">
+                Avito: {avitoJob.status} ({avitoJob.processed_count || 0}/{avitoJob.total_count || 0})
+              </div>
+            )}
+
+            {activeTab === 'in-stock' && avitoIntegrationReady && selectedParts.size > 0 && (
+              <div ref={bulkActionsPlacement.anchorRef} className="relative ml-auto actions-dropdown sm:ml-0">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+                >
+                  Действия
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showBulkActions && renderBulkActionsMenu(
+                  buildActionsDropdownMenuClassName(bulkActionsPlacement.openUp, 'w-40 z-50'),
+                )}
               </div>
             )}
           </div>
 
-          {isModerationTab && (
-            <div className="min-w-0 flex flex-col justify-end">
-              <label className="inline-flex items-center gap-2 h-10 px-3 border border-gray-300 rounded-lg bg-white cursor-pointer shadow-sm">
-                <input
-                  type="checkbox"
-                  checked={moderationFilters.hideRejected}
-                  onChange={(e) => updateActiveFilters({ hideRejected: e.target.checked })}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-                <span className="text-sm text-gray-700">Скрыть отклонённые</span>
-              </label>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm sm:hidden">
+            <span className="font-semibold tabular-nums text-gray-900">{totalValue.toLocaleString('ru-RU')} ₽</span>
+            <span className="tabular-nums text-gray-500">{totalQuantity.toLocaleString('ru-RU')} шт.</span>
+            {!isModerationTab && myProductsTotal > 0 && (
+              <span className="tabular-nums text-gray-500">{myProductsTotal.toLocaleString('ru-RU')} поз.</span>
+            )}
+          </div>
         </div>
-      </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start mb-6 gap-4">
-        <button
-          onClick={() => navigate('/my-parts/add')}
-          className="px-6 py-3 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base font-medium min-h-[48px] sm:min-h-0"
-        >
-          Добавить запчасть
-        </button>
-        {avitoJob && (
-          <div className="text-sm text-gray-600">
-            Avito export: {avitoJob.status} ({avitoJob.processed_count || 0}/{avitoJob.total_count || 0})
-          </div>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <div className="mb-6">
-        <div className="grid grid-cols-3 gap-1 sm:flex sm:gap-8">
-          <button
-            type="button"
-            onClick={() => setActiveTab('in-stock')}
-            className={`min-w-0 font-medium text-xs sm:text-base ${
-              activeTab === 'in-stock' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <div
-              className={`flex items-center justify-center gap-1 whitespace-nowrap pb-2 border-b-2 sm:border-b-4 border-blue-500 sm:justify-start ${
-                activeTab === 'in-stock' ? 'opacity-100' : 'opacity-70'
-              }`}
-            >
-              <span>В наличии</span>
-              {myProductsTotal > 0 && (
-                <span
-                  className="inline-flex shrink-0 items-center rounded-full bg-indigo-100 px-1.5 py-0 text-[10px] font-medium text-indigo-800 sm:px-2.5 sm:py-0.5 sm:text-xs"
-                  title={`${myProductsTotal} позиций`}
-                >
-                  {myProductsTotal}
-                </span>
-              )}
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('pending')}
-            className={`min-w-0 font-medium text-xs sm:text-base ${
-              activeTab === 'pending' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <div
-              className={`flex items-center justify-center gap-1 whitespace-nowrap pb-2 border-b-2 sm:border-b-4 border-yellow-500 sm:justify-start ${
-                activeTab === 'pending' ? 'opacity-100' : 'opacity-70'
-              }`}
-            >
-              <span className="sm:hidden">Модерация</span>
-              <span className="hidden sm:inline">На модерации</span>
-              {moderationItemsCount > 0 && (
-                <span className="inline-flex shrink-0 items-center rounded-full bg-yellow-100 px-1.5 py-0 text-[10px] font-medium text-yellow-800 sm:px-2.5 sm:py-0.5 sm:text-xs">
-                  {moderationItemsCount}
-                </span>
-              )}
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('drafts')}
-            className={`min-w-0 font-medium text-xs sm:text-base ${
-              activeTab === 'drafts' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <div
-              className={`flex items-center justify-center gap-1 whitespace-nowrap pb-2 border-b-2 sm:border-b-4 border-slate-500 sm:justify-start ${
-                activeTab === 'drafts' ? 'opacity-100' : 'opacity-70'
-              }`}
-            >
-              <span>Черновики</span>
-              {draftItems.length > 0 && (
-                <span className="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-1.5 py-0 text-[10px] font-medium text-slate-800 sm:px-2.5 sm:py-0.5 sm:text-xs">
-                  {draftItems.length}
-                </span>
-              )}
-            </div>
-          </button>
+      {isDraftsTab && avitoJob && (
+        <div className="mb-4 text-sm text-gray-500">
+          Avito export: {avitoJob.status} ({avitoJob.processed_count || 0}/{avitoJob.total_count || 0})
         </div>
-      </div>
+      )}
 
-      {activeTab === 'in-stock' && (stockFilter || noPhotoFilter) && (
+{activeTab === 'in-stock' && (stockFilter || noPhotoFilter) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <span>
             {stockFilter === 'zero' && 'Показаны товары с нулевым остатком'}
@@ -2379,16 +2404,8 @@ function MyParts() {
         isInitialMyProductsLoad ? (
         <div className="mt-4">
           <div className="hidden md:block w-full">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left" />
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" colSpan={4}>Запчасть</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Остаток</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Цена</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Действия</th>
-                </tr>
-              </thead>
+            <table className={myPartsTableClass}>
+              <MyPartsStockTableColGroup />
               <tbody className="bg-white divide-y divide-gray-200">
                 {Array.from({ length: 8 }, (_, index) => (
                   <MyPartsRowSkeleton key={index} renderMode="table" />
@@ -2461,53 +2478,8 @@ function MyParts() {
         <>
           {/* Desktop version - table */}
           <div className="hidden md:block w-full">
-            {avitoIntegrationReady && (
-              <div className="mb-3 flex items-center justify-between py-2 border-b border-gray-200">
-                <span className="text-sm text-gray-500">
-                  <span className="ml-2">Выбрано: {selectedParts.size}</span>
-                  {allFilteredSelected && myProductsTotal > 0 && (
-                    <span className="ml-2 text-indigo-600">
-                      (все {myProductsTotal.toLocaleString('ru-RU')} по фильтру)
-                    </span>
-                  )}
-                </span>
-                <div ref={bulkActionsPlacement.anchorRef} className="relative actions-dropdown">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
-                    disabled={selectedParts.size === 0}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
-                    <span className="hidden sm:inline">Действия</span>
-                  </button>
-
-                  {showBulkActions && renderBulkActionsMenu(
-                    buildActionsDropdownMenuClassName(bulkActionsPlacement.openUp, 'w-40 z-50')
-                  )}
-                </div>
-              </div>
-            )}
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left">
-                    <input
-                      ref={selectAllCheckboxRef}
-                      type="checkbox"
-                      checked={allFilteredSelected}
-                      disabled={selectAllLoading || myProductsTotal === 0}
-                      onChange={handleToggleSelectAll}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded disabled:opacity-50"
-                    />
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" colSpan={4}>Запчасть</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Остаток</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Цена</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Действия</th>
-                </tr>
-              </thead>
+            <table className={myPartsTableClass}>
+              <MyPartsStockTableColGroup />
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedDisplayParts.map((part) => (
                   <CardPart
@@ -2610,10 +2582,11 @@ function MyParts() {
               {myProductsLoadingMore && (
                 <div className="space-y-3">
                   <div className="hidden md:block">
-                    <table className="min-w-full divide-y divide-gray-200">
+                    <table className={myPartsTableClass}>
+                      <MyPartsModerationTableColGroup />
                       <tbody className="bg-white divide-y divide-gray-200">
                         {Array.from({ length: 3 }, (_, index) => (
-                          <MyPartsRowSkeleton key={index} renderMode="table" />
+                          <MyPartsRowSkeleton key={index} renderMode="table" withCheckbox={false} />
                         ))}
                       </tbody>
                     </table>
@@ -2689,15 +2662,8 @@ function MyParts() {
         ) : (
           <>
             <div className="hidden md:block w-full">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" colSpan={4}>Запчасть</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Остаток</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Цена</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Действия</th>
-                  </tr>
-                </thead>
+              <table className={myPartsTableClass}>
+                <MyPartsModerationTableColGroup />
                 <tbody className="bg-white divide-y divide-gray-200">
                   {sortedModerationParts.map((part) => (
                     <CardPart

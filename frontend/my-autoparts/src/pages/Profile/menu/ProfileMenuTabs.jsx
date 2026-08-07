@@ -235,8 +235,7 @@ const getMenuIcon = (menuId) => {
     return icons[menuId] || null;
 };
 
-const getInitialExpandedMenus = (tabs, activeTab, isDrawer) => {
-    if (!isDrawer) return {};
+const getInitialExpandedMenus = (tabs, activeTab) => {
     const expanded = {};
     tabs.forEach((tab) => {
         if (tab.submenu?.some((sub) => sub.id === activeTab)) {
@@ -245,6 +244,31 @@ const getInitialExpandedMenus = (tabs, activeTab, isDrawer) => {
     });
     return expanded;
 };
+
+function MenuBadge({ count, className = '' }) {
+    if (count === undefined || count <= 0) return null;
+    return (
+        <span
+            className={`inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold leading-none text-white ${className}`}
+        >
+            {count > 99 ? '99+' : count}
+        </span>
+    );
+}
+
+function MenuChevron({ expanded, className = '' }) {
+    return (
+        <svg
+            className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''} ${className}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden
+        >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+    );
+}
 
 export default function ProfileMenuTabs({
     tabs,
@@ -258,11 +282,10 @@ export default function ProfileMenuTabs({
 }) {
     const isDrawer = variant === 'drawer';
     const [expandedMenus, setExpandedMenus] = useState(() =>
-        getInitialExpandedMenus(tabs, activeTab, isDrawer)
+        getInitialExpandedMenus(tabs, activeTab)
     );
 
     useEffect(() => {
-        if (!isDrawer) return;
         setExpandedMenus((prev) => {
             const next = { ...prev };
             tabs.forEach((tab) => {
@@ -272,7 +295,7 @@ export default function ProfileMenuTabs({
             });
             return next;
         });
-    }, [activeTab, tabs, isDrawer]);
+    }, [activeTab, tabs]);
 
     const toggleSubmenu = (menuId) => {
         setExpandedMenus((prev) => ({
@@ -322,19 +345,19 @@ export default function ProfileMenuTabs({
 
     const itemBase = isDrawer
         ? 'min-h-[44px] w-full rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors flex items-center gap-3 active:scale-[0.99]'
-        : 'w-full px-4 py-3 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3';
+        : 'mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors';
 
     const itemActive = isDrawer
-        ? 'bg-brand-50 text-brand-700'
-        : 'border-brand-500 text-brand-600 bg-brand-50';
+        ? 'bg-gray-100 text-gray-900'
+        : 'bg-gray-100 text-gray-900';
 
     const itemInactive = isDrawer
-        ? 'text-ink-soft active:bg-surface-subtle'
-        : 'border-transparent text-ink-muted hover:text-ink hover:bg-surface-subtle';
+        ? 'text-gray-900 active:bg-gray-50'
+        : 'text-gray-900 hover:bg-gray-50';
 
     const submenuItemBase = isDrawer
         ? 'min-h-[40px] w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors flex items-center gap-3 ml-2'
-        : 'w-full px-4 py-2 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3';
+        : 'mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl py-2 pl-11 pr-3 text-left text-sm transition-colors';
 
     const renderMenuItem = (tab) => {
         if (tab.submenu) {
@@ -346,32 +369,23 @@ export default function ProfileMenuTabs({
                     <button
                         type="button"
                         onClick={() => toggleSubmenu(tab.id)}
-                        className={`${itemBase} ${hasActiveSubmenu ? itemActive : itemInactive} ${
-                            isDrawer ? 'justify-between' : 'justify-between'
-                        }`}
+                        className={`${itemBase} ${hasActiveSubmenu ? itemActive : itemInactive}`}
                     >
                         <div className="flex min-w-0 flex-1 items-center gap-3">
-                            <div className="flex-shrink-0">{getMenuIcon(tab.id)}</div>
-                            <span className={`flex flex-grow items-center gap-2 ${isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'}`}>
+                            <div className="shrink-0 text-gray-900">{getMenuIcon(tab.id)}</div>
+                            <span
+                                className={`min-w-0 flex-1 ${
+                                    isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
+                                }`}
+                            >
                                 {tab.label}
-                                {badgeCounts[tab.id] !== undefined && badgeCounts[tab.id] > 0 && (
-                                    <span className="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
-                                        {badgeCounts[tab.id] > 99 ? '99+' : badgeCounts[tab.id]}
-                                    </span>
-                                )}
                             </span>
                         </div>
-                        <svg
-                            className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
+                        <MenuBadge count={badgeCounts[tab.id]} className="mr-1" />
+                        <MenuChevron expanded={isExpanded} />
                     </button>
                     {isExpanded && (
-                        <div className={isDrawer ? 'mt-1 space-y-0.5 pl-2' : 'ml-4 border-l border-gray-200'}>
+                        <div className={isDrawer ? 'mt-1 space-y-0.5 pl-2' : 'mt-0.5 space-y-0.5'}>
                             {tab.submenu.map((subTab) => (
                                 <a
                                     key={subTab.id}
@@ -379,21 +393,19 @@ export default function ProfileMenuTabs({
                                     onClick={(event) => handleSidebarItemClick(event, subTab.id)}
                                     className={`${submenuItemBase} ${
                                         activeTab === subTab.id ? itemActive : itemInactive
-                                    }`}
+                                    } ${activeTab === subTab.id ? 'font-medium' : 'font-normal text-gray-700'}`}
                                 >
-                                    <div className="flex-shrink-0">{getMenuIcon(subTab.id)}</div>
+                                    {!isDrawer ? null : (
+                                        <div className="shrink-0 text-gray-700">{getMenuIcon(subTab.id)}</div>
+                                    )}
                                     <span
-                                        className={`flex flex-grow items-center gap-2 ${
+                                        className={`min-w-0 flex-1 ${
                                             isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
                                         }`}
                                     >
                                         {subTab.label}
-                                        {badgeCounts[subTab.id] !== undefined && badgeCounts[subTab.id] > 0 && (
-                                            <span className="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
-                                                {badgeCounts[subTab.id] > 99 ? '99+' : badgeCounts[subTab.id]}
-                                            </span>
-                                        )}
                                     </span>
+                                    <MenuBadge count={badgeCounts[subTab.id]} />
                                 </a>
                             ))}
                         </div>
@@ -411,19 +423,15 @@ export default function ProfileMenuTabs({
                     isDrawer ? 'mb-1' : ''
                 }`}
             >
-                <div className="flex-shrink-0">{getMenuIcon(tab.id)}</div>
+                <div className="shrink-0 text-gray-900">{getMenuIcon(tab.id)}</div>
                 <span
-                    className={`flex flex-grow items-center gap-2 ${
+                    className={`min-w-0 flex-1 ${
                         isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
                     }`}
                 >
                     {tab.label}
-                    {badgeCounts[tab.id] !== undefined && badgeCounts[tab.id] > 0 && (
-                        <span className="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
-                            {badgeCounts[tab.id] > 99 ? '99+' : badgeCounts[tab.id]}
-                        </span>
-                    )}
                 </span>
+                <MenuBadge count={badgeCounts[tab.id]} className="ml-auto" />
             </a>
         );
     };
@@ -445,7 +453,7 @@ export default function ProfileMenuTabs({
 
     return (
         <div
-            className="w-full min-w-[15.5rem] rounded-xl border border-gray-200 bg-white shadow-md sticky top-[calc(var(--sg-desktop-header-h)+1rem)] h-[calc(100vh-var(--sg-desktop-header-h)-2rem)] overflow-y-auto overscroll-contain scroll-pb-32 [&::-webkit-scrollbar]:hidden"
+            className="sticky top-[calc(var(--sg-desktop-header-h)+1rem)] h-[calc(100vh-var(--sg-desktop-header-h)-2rem)] w-full min-w-[15.5rem] overflow-y-auto overscroll-contain scroll-pb-32 bg-white [&::-webkit-scrollbar]:hidden"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
             {showAdminMenuSwitch ? (
@@ -455,7 +463,7 @@ export default function ProfileMenuTabs({
                     onChange={onAdminMenuModeChange}
                 />
             ) : null}
-            <div className="flex flex-col pb-4 pt-1">{tabs.map(renderMenuItem)}</div>
+            <nav className="flex flex-col gap-0.5 py-2">{tabs.map(renderMenuItem)}</nav>
             <PublicSiteMenuLinks variant="sidebar" />
         </div>
     );
