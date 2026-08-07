@@ -34,6 +34,7 @@ import {
   hasPartFormErrors,
   partFieldClass,
   partFieldLabelClass,
+  partTextareaClass,
   scrollToFirstPartFormError,
   validatePartForm,
 } from '../../../utils/partFormValidation';
@@ -57,11 +58,17 @@ import VehicleModal from './VehicleModal';
 import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
 import MobileStickyFooter from '../../../components/MobileStickyFooter/MobileStickyFooter';
 import ArticleMatchesModal from '../../../components/ArticleMatchesModal/ArticleMatchesModal';
+import {
+  warehousePageClass,
+  warehousePillButtonClass,
+  warehousePrimaryButtonClass,
+  warehouseSecondaryButtonClass,
+} from '../../../utils/warehouseListUi';
 
 const SUGGEST_LIST =
-  'mt-1 max-h-44 overflow-y-auto rounded-md border border-gray-300 bg-white text-sm text-gray-900 shadow-sm';
+  'mt-1 max-h-44 overflow-y-auto rounded-2xl border border-gray-200 bg-white py-1 text-sm shadow-lg ring-1 ring-gray-200/80';
 const SUGGEST_ITEM =
-  'w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none';
+  'w-full px-4 py-2.5 text-left text-sm text-gray-900 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none';
 
 const DRAFT_AUTOSAVE_MS = 1000;
 
@@ -903,7 +910,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
       }));
 
       setRosskoLookupNotice(
-        `Данные заполнены из Rossko: ${filledBrand || '—'} ${filledArticle}`.trim()
+        `Данные заполнены: ${filledBrand || '—'} ${filledArticle}`.trim()
       );
     } catch (err) {
       setRosskoLookupError(
@@ -1328,7 +1335,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
 
   if (!isReady) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className={`${warehousePageClass} mx-auto max-w-3xl`}>
         <AuthLoadingScreen />
       </div>
     );
@@ -1336,7 +1343,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
 
   if (loadingFormData && !draftMode) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className={`${warehousePageClass} mx-auto max-w-3xl`}>
         <AuthLoadingScreen />
       </div>
     );
@@ -1344,8 +1351,8 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
 
   if (!canAccess) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="text-center py-8 text-gray-500">Перенаправление...</div>
+      <div className={`${warehousePageClass} mx-auto max-w-3xl`}>
+        <div className="py-8 text-center text-gray-500">Перенаправление...</div>
       </div>
     );
   }
@@ -1379,31 +1386,33 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
           : '';
 
   return (
-    <div className="relative max-w-4xl mx-auto p-6 max-md:pb-32">
+    <div className={`${warehousePageClass} relative mx-auto max-w-3xl max-md:pb-32`}>
       {draftMode && loadingFormData && (
         <div
           className="absolute inset-0 z-20 flex items-start justify-center bg-white/75 pt-24"
           aria-busy="true"
           aria-live="polite"
         >
-          <p className="rounded-full bg-white px-4 py-2 text-sm text-gray-600 shadow-sm">
+          <p className="rounded-full bg-white px-4 py-2 text-sm text-gray-600 shadow-sm ring-1 ring-gray-200/80">
             Обновление черновика…
           </p>
         </div>
       )}
-      <h1 className="mb-6 text-2xl font-bold max-md:hidden">{pageTitle}</h1>
-      {isDraftFlow && draftStatusLabel && (
-        <p className={`mb-4 text-sm ${draftSaveStatus === 'error' ? 'text-red-600' : 'text-gray-500'}`}>
-          {draftStatusLabel}
-        </p>
-      )}
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">{pageTitle}</h1>
+        {isDraftFlow && draftStatusLabel ? (
+          <p className={`text-sm ${draftSaveStatus === 'error' ? 'text-red-600' : 'text-gray-500'}`}>
+            {draftStatusLabel}
+          </p>
+        ) : null}
+      </div>
       {resubmitMode && rejectionReason && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-lg">
+        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
           <p className="text-sm font-medium text-red-800">Причина отклонения</p>
           <p className="mt-1 text-sm text-red-700">{rejectionReason}</p>
         </div>
       )}
-      <form id="add-part-form" onSubmit={handleSubmit} noValidate className="space-y-6 md:space-y-6">
+      <form id="add-part-form" onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
         <MobilePageSection title="Основное">
         {/* Артикул */}
         <div data-part-field="article">
@@ -1462,19 +1471,19 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
           )}
         </div>
 
-        <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-4">
+        <div className="rounded-xl bg-gray-100 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">Заполнение из Rossko</p>
-              <p className="text-xs text-gray-600 mt-1">
-                Введите артикул и при необходимости бренд, затем подгрузите название и цену.
+              <p className="text-sm font-semibold text-gray-900">Заполнить автоматически</p>
+              <p className="mt-1 text-xs text-gray-600">
+                Введите артикул и при необходимости бренд, затем заполните название и цену автоматически.
               </p>
             </div>
             <button
               type="button"
               onClick={handleFillFromRossko}
               disabled={rosskoLookupLoading || !(formData.article || '').trim()}
-              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+              className={`${warehousePrimaryButtonClass} shrink-0 disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {rosskoLookupLoading ? 'Ищем в Rossko...' : 'Заполнить из Rossko'}
             </button>
@@ -1569,7 +1578,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
             value={formData.description}
             onChange={handleInputChange}
             rows="4"
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partTextareaClass()}
             placeholder="Введите описание запчасти..."
           />
           {!aiDescriptionLoading && aiDescriptionAccess?.show_ui && (
@@ -1578,7 +1587,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
                 type="button"
                 onClick={handleGenerateDescription}
                 disabled={!canGenerateAiDescription}
-                className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`${warehousePillButtonClass} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {aiDescriptionGenerating ? 'Генерация…' : 'Сгенерировать описание'}
               </button>
@@ -1593,27 +1602,24 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         <MobilePageSection title="Фото и видео">
         {/* Медиафайлы (фото и видео) */}
         <div>
-          <label className="block text-sm font-medium">Фотографии и видео *</label>
-          <div className="mt-1 space-y-2">
-            {/* Combined file upload button */}
-            <div>
-              <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-                Добавить файл
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2,video/*,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
-                  onChange={handleFileAdd}
-                  className="hidden"
-                  disabled={isUploadingMedia}
-                />
-              </label>
-            </div>
+          <label className="block text-sm font-medium text-gray-800">Фотографии и видео *</label>
+          <div className="mt-2">
+            <label className={`${warehousePillButtonClass} cursor-pointer`}>
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Добавить файл
+              <input
+                type="file"
+                multiple
+                accept="image/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2,video/*,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
+                onChange={handleFileAdd}
+                className="hidden"
+                disabled={isUploadingMedia}
+              />
+            </label>
           </div>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2.5">
             {photos.map((file, idx) => {
               // Handle both File objects (before upload) and URL strings (after upload)
               let photoSrc;
@@ -1640,7 +1646,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
                   <img
                     src={photoSrc}
                     alt={`photo-preview-${idx}`}
-                    className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                    className="h-20 w-20 rounded-xl object-cover ring-1 ring-gray-200/80 cursor-pointer transition hover:opacity-90"
                     onLoad={() => {
                       // Cleanup for blob URLs
                      if (file instanceof File || file instanceof Blob) {
@@ -1683,7 +1689,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
                   )}
                   <video
                     src={file instanceof File || file instanceof Blob ? URL.createObjectURL(file) : (file.finalPath || '')}
-                    className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                    className="h-20 w-20 rounded-xl object-cover ring-1 ring-gray-200/80 cursor-pointer transition hover:opacity-90"
                     controls={false}
                   />
                   {isUploading && file.cancelUpload ? (
@@ -1721,12 +1727,12 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         <MobilePageSection title="Состояние">
         {/* Состояние */}
         <div>
-          <label className="block text-sm font-medium">Состояние</label>
+          <label className="block text-sm font-medium text-gray-800">Состояние</label>
           <select
             name="condition"
             value={formData.condition}
             onChange={handleInputChange}
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass()}
           >
             <option value="новый">Новый</option>
             <option value="б/у">Б/у</option>
@@ -1737,37 +1743,37 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         <MobilePageSection title="Автомобиль">
         {/* Автомобиль */}
         {selectedVehicle && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+          <div className="grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-4 sm:grid-cols-3">
             <div>
               <span className="text-xs text-gray-500">Марка</span>
-              <div className="font-medium">{selectedVehicle.brand}</div>
+              <div className="mt-0.5 text-sm font-semibold text-gray-900">{selectedVehicle.brand}</div>
             </div>
             <div>
               <span className="text-xs text-gray-500">Модель</span>
-              <div className="font-medium">{selectedVehicle.model}</div>
+              <div className="mt-0.5 text-sm font-semibold text-gray-900">{selectedVehicle.model}</div>
             </div>
             <div>
               <span className="text-xs text-gray-500">Поколение</span>
-              <div className="font-medium">{selectedVehicle.generation || '—'}</div>
+              <div className="mt-0.5 text-sm font-semibold text-gray-900">{selectedVehicle.generation || '—'}</div>
             </div>
             <div>
               <span className="text-xs text-gray-500">Двигатель</span>
-              <div className="font-medium">{selectedVehicle.engine || '—'}</div>
+              <div className="mt-0.5 text-sm font-semibold text-gray-900">{selectedVehicle.engine || '—'}</div>
             </div>
             <div>
               <span className="text-xs text-gray-500">КПП</span>
-              <div className="font-medium">{selectedVehicle.transmission || '—'}</div>
+              <div className="mt-0.5 text-sm font-semibold text-gray-900">{selectedVehicle.transmission || '—'}</div>
             </div>
             {selectedVehicle.vin && (
               <div>
                 <span className="text-xs text-gray-500">VIN</span>
-                <div className="font-medium">{selectedVehicle.vin}</div>
+                <div className="mt-0.5 text-sm font-semibold text-gray-900">{selectedVehicle.vin}</div>
               </div>
             )}
             {selectedVehicle.mileage && (
               <div>
                 <span className="text-xs text-gray-500">Пробег</span>
-                <div className="font-medium">{selectedVehicle.mileage.toLocaleString()} км</div>
+                <div className="mt-0.5 text-sm font-semibold text-gray-900">{selectedVehicle.mileage.toLocaleString()} км</div>
               </div>
             )}
           </div>
@@ -1776,7 +1782,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         <button
           type="button"
           onClick={() => setIsVehicleModalOpen(true)}
-          className="min-h-11 text-left text-base font-medium text-indigo-600 underline"
+          className={`${warehousePillButtonClass} w-full sm:w-auto`}
         >
           {selectedVehicle ? 'Изменить автомобиль' : 'Выбрать или добавить автомобиль'}
         </button>
@@ -1832,45 +1838,44 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         {/* Адресное хранение - выбор ячеек */}
         {formData.storage_location_id && (
           <MobilePageSection title="Адресное хранение">
-          <div className="rounded-lg bg-gray-50 p-4 max-md:bg-white max-md:p-0 md:bg-gray-50 md:p-4">
-            <div className="mb-3 flex flex-col gap-2 max-md:gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="hidden text-lg font-medium text-gray-900 md:block">Адресное хранение</h3>
+          <div>
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-gray-600">Укажите значение для каждой ячейки (не обязательно заполнять все поля)</p>
               <button
                 type="button"
                 onClick={() => setShowNewCellForm(!showNewCellForm)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                className={warehousePillButtonClass}
               >
                 {showNewCellForm ? 'Отмена' : 'Добавить адрес'}
               </button>
             </div>
-            <p className="text-sm text-gray-600 mb-4">Укажите значение для каждой ячейки (не обязательно заполнять все поля)</p>
             
             {showNewCellForm && (
-              <div className="mb-4 p-3 bg-white rounded-md border border-gray-300">
-                <div className="mb-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Название ячейки</label>
+              <div className="mb-4 rounded-xl bg-gray-50 p-4 ring-1 ring-gray-200/80">
+                <div className="mb-3">
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">Название ячейки</label>
                   <input
                     type="text"
                     value={newCellName}
                     onChange={(e) => setNewCellName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={partFieldClass()}
                     placeholder="Введите название ячейки"
                   />
                 </div>
                 <div className="mb-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Значение в ячейке</label>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">Значение в ячейке</label>
                   <input
                     type="text"
                     value={newCellValue}
                     onChange={(e) => setNewCellValue(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={partFieldClass()}
                     placeholder="Введите значение"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={handleAddNewCell}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                  className={warehousePrimaryButtonClass}
                 >
                   Добавить ячейку
                 </button>
@@ -1880,25 +1885,25 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
             {locationCells.length > 0 && (
               <>
                 <div className="hidden overflow-x-auto md:block">
-                  <table className="min-w-full border border-gray-300 border-collapse rounded-lg">
-                    <thead className="bg-gray-100">
+                  <table className="min-w-full overflow-hidden rounded-xl ring-1 ring-gray-200/80">
+                    <thead className="bg-gray-50">
                       <tr>
                         {locationCells.map((cell) => (
-                          <th key={cell.id} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 last:border-r-0">
+                          <th key={cell.id} className="border-b border-gray-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 last:border-r-0">
                             {cell.name}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="bg-white">
                       <tr>
                         {locationCells.map((cell) => (
-                          <td key={cell.id} className="px-4 py-3 border-r border-gray-300 last:border-r-0">
+                          <td key={cell.id} className="border-r border-gray-100 px-4 py-3 last:border-r-0">
                             <input
                               type="text"
                               value={cellQuantities[cell.id] || ''}
                               onChange={(e) => handleCellQuantityChange(cell.id, e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              className={partFieldClass()}
                               placeholder="Введите значение"
                             />
                           </td>
@@ -1909,13 +1914,13 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
                 </div>
                 <ul className="space-y-3 md:hidden">
                   {locationCells.map((cell) => (
-                    <li key={cell.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-                      <label className="mb-1 block text-sm font-semibold text-gray-800">{cell.name}</label>
+                    <li key={cell.id} className="rounded-xl bg-gray-50 p-3 ring-1 ring-gray-200/80">
+                      <label className="mb-1.5 block text-sm font-semibold text-gray-800">{cell.name}</label>
                       <input
                         type="text"
                         value={cellQuantities[cell.id] || ''}
                         onChange={(e) => handleCellQuantityChange(cell.id, e.target.value)}
-                        className="min-h-11 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                        className={partFieldClass()}
                         placeholder="Введите значение"
                       />
                     </li>
@@ -1927,16 +1932,13 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
           </MobilePageSection>
         )}
 
-        <div className="hidden gap-3 md:flex">
+        <div className="hidden gap-3 pt-2 md:flex">
           <button
             type="submit"
             disabled={productStatus || isUploadingMedia}
-            className={`px-4 py-2 rounded-md ${(productStatus || isUploadingMedia)
-              ? 'bg-indigo-400 cursor-not-allowed'
-              : 'bg-indigo-600 hover:bg-indigo-700'
-              } text-white`}
+            className={`${warehousePrimaryButtonClass} disabled:cursor-not-allowed disabled:opacity-60`}
           >
-            {productStatus || isUploadingMedia ? (resubmitMode ? 'Отправка...' : 'Создание...') : submitLabel}
+            {submitLabel}
           </button>
           <button
             type="button"
@@ -1948,7 +1950,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
               }
               navigate(cancelPath);
             }}
-            className="px-4 py-2 border border-gray-300 rounded-md"
+            className={warehouseSecondaryButtonClass}
           >
             Отмена
           </button>

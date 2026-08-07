@@ -235,7 +235,8 @@ export default function ClientsPage() {
                                     return (
                                         <tr
                                             key={rowKey}
-                                            className={`hover:bg-gray-50/50 ${isMenuOpen ? 'relative z-30' : ''}`}
+                                            onDoubleClick={() => handleOpenOrders(client)}
+                                            className={`cursor-pointer hover:bg-gray-50/50 ${isMenuOpen ? 'relative z-30' : ''}`}
                                         >
                                             <td className="px-4 py-4">
                                                 <div className="text-sm font-semibold text-gray-900">
@@ -249,7 +250,10 @@ export default function ClientsPage() {
                                             <td className="px-4 py-4 text-center text-sm font-medium text-gray-900">
                                                 {client.orders_count ?? 0}
                                             </td>
-                                            <td className={`px-4 py-4 text-right ${isMenuOpen ? 'relative z-30' : ''}`}>
+                                            <td
+                                                className={`px-4 py-4 text-right ${isMenuOpen ? 'relative z-30' : ''}`}
+                                                onDoubleClick={(e) => e.stopPropagation()}
+                                            >
                                                 <ActionsDropdown
                                                     isOpen={isMenuOpen}
                                                     onOpenChange={(next) => setOpenActionsId(next ? rowKey : null)}
@@ -280,7 +284,11 @@ export default function ClientsPage() {
 
                     <div className="md:hidden space-y-3">
                         {filteredClients.map((client) => (
-                            <div key={clientRowKey(client)} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                            <div
+                                key={clientRowKey(client)}
+                                onDoubleClick={() => handleOpenOrders(client)}
+                                className="cursor-pointer bg-white rounded-lg border border-gray-200 p-4 shadow-sm active:bg-gray-50"
+                            >
                                 <div className="flex justify-between gap-3">
                                     <div className="min-w-0 flex-1">
                                         <h3 className="font-semibold text-gray-900">{clientFullName(client) || '—'}</h3>

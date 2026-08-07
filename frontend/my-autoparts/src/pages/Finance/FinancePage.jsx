@@ -12,6 +12,13 @@ import {
   getMonthRangeDefaults,
 } from './financeDisplay';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
+import {
+  warehouseEmptyShellClass,
+  warehousePageClass,
+  warehousePillControlClass,
+  warehousePrimaryButtonClass,
+  warehouseToolbarClass,
+} from '../../utils/warehouseListUi';
 
 const TABS = [
   { id: 'summary', label: 'Сводка' },
@@ -21,12 +28,75 @@ const TABS = [
   { id: 'inventory', label: 'Остатки' },
 ];
 
-function KpiCard({ label, value, sub }) {
+const tabFilterButtonClass = (active) =>
+  `inline-flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
+    active
+      ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200'
+      : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
+  }`;
+
+const channelFilterButtonClass = tabFilterButtonClass;
+
+function FinanceHeaderStats({ activeTab, summary, sales, writeoffs, stockIns, inventory }) {
+  const blocks = useMemo(() => {
+    if (activeTab === 'summary' && summary) {
+      return [
+        { value: formatFinanceCurrency(summary.sales_total), label: 'Продажи', accent: false },
+        { value: formatFinanceCurrency(summary.stock_in_value), label: 'Поступления', accent: true },
+        { value: formatFinanceCurrency(summary.inventory_value), label: 'Остатки', accent: false },
+      ];
+    }
+    if (activeTab === 'sales') {
+      return [
+        { value: formatFinanceCurrency(sales.totals?.total), label: 'Итого', accent: false },
+        { value: String(sales.totals?.count ?? 0), label: 'Строк', accent: true },
+      ];
+    }
+    if (activeTab === 'writeoffs') {
+      return [
+        { value: String(writeoffs.count ?? 0), label: 'Списаний', accent: false },
+        { value: String(writeoffs.total_qty ?? 0), label: 'Шт.', accent: true },
+      ];
+    }
+    if (activeTab === 'stock_ins') {
+      return [
+        { value: formatFinanceCurrency(stockIns.total_value), label: 'Сумма', accent: false },
+        { value: String(stockIns.count ?? 0), label: 'Записей', accent: true },
+      ];
+    }
+    if (activeTab === 'inventory') {
+      return [
+        { value: formatFinanceCurrency(inventory.total_value), label: 'Оценка', accent: false },
+        {
+          value: String(inventory.products_count ?? 0),
+          label: `${inventory.total_qty ?? 0} шт.`,
+          accent: true,
+        },
+      ];
+    }
+    return [];
+  }, [activeTab, summary, sales, writeoffs, stockIns, inventory]);
+
+  if (!blocks.length) return null;
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-gray-900">{value}</p>
-      {sub ? <p className="mt-1 text-xs text-gray-500">{sub}</p> : null}
+    <div
+      className={`grid gap-4 sm:flex sm:shrink-0 sm:gap-8 ${
+        blocks.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
+      }`}
+    >
+      {blocks.map((block) => (
+        <div key={block.label} className="text-center">
+          <div
+            className={`text-2xl font-bold tabular-nums leading-none sm:text-[1.75rem] ${
+              block.accent ? 'text-indigo-600' : 'text-gray-900'
+            }`}
+          >
+            {block.value}
+          </div>
+          <div className="mt-1.5 text-xs text-gray-500 sm:text-sm">{block.label}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -42,10 +112,20 @@ function FinanceField({ label, children }) {
 
 function FinanceMobileCard({ children }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2">
+    <div className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">{children}</div>
+  );
+}
+
+function FinanceTableShell({ children }) {
+  return (
+    <div className="hidden overflow-x-auto rounded-2xl bg-white ring-1 ring-gray-200/80 md:block">
       {children}
     </div>
   );
+}
+
+function FinanceEmptyState({ children }) {
+  return <p className={`${warehouseEmptyShellClass} text-sm text-gray-500`}>{children}</p>;
 }
 
 export default function FinancePage() {
@@ -71,7 +151,12 @@ export default function FinancePage() {
   const [sales, setSales] = useState({ rows: [], totals: {} });
   const [writeoffs, setWriteoffs] = useState({ rows: [], count: 0, total_qty: 0 });
   const [stockIns, setStockIns] = useState({ rows: [], count: 0, total_qty: 0, total_value: 0 });
-  const [inventory, setInventory] = useState({ rows: [], products_count: 0, total_qty: 0, total_value: 0 });
+  const [inventory, setInventory] = useState({
+    rows: [],
+    products_count: 0,
+    total_qty: 0,
+    total_value: 0,
+  });
 
   const queryParams = useMemo(
     () => buildFinanceQueryParams({ dateFrom, dateTo, asOfDate, channel }),
@@ -151,36 +236,44 @@ export default function FinancePage() {
 
   if (!user.organization_id) {
     return (
-      <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-900">
+      <div className={`${warehousePageClass} rounded-2xl bg-amber-50 p-6 text-amber-900 ring-1 ring-amber-200/80`}>
         Финансовые отчёты доступны только для учётной записи, привязанной к организации продавца.
       </div>
     );
   }
 
+  const showHeaderStats = !loading || summary;
+
   return (
-    <div className="mt-4 sm:mt-5 space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div>
-          <h1 className="max-md:hidden text-2xl sm:text-3xl font-bold text-gray-900">Финансы</h1>
-          <p className="mt-2 text-gray-600 text-sm sm:text-base max-w-2xl">
-            Отчёты по данным платформы.
-          </p>
+    <div className={`${warehousePageClass} min-w-0 space-y-4`}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6 lg:flex-1">
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Финансы</h1>
+          {showHeaderStats ? (
+            <FinanceHeaderStats
+              activeTab={activeTab}
+              summary={summary}
+              sales={sales}
+              writeoffs={writeoffs}
+              stockIns={stockIns}
+              inventory={inventory}
+            />
+          ) : null}
         </div>
         <button
           type="button"
           onClick={handleExport}
           disabled={exporting || loading}
-          className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 shrink-0"
+          className={`${warehousePrimaryButtonClass} w-full shrink-0 lg:w-auto`}
         >
-          {exporting ? 'Формируем файл...' : 'Экспорт в таблицу'}
+          {exporting ? 'Формируем файл…' : 'Экспорт в таблицу'}
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <MobileCollapsibleFilters title="Период и параметры">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <label className="block text-sm">
-            <span className="text-gray-600">Период с</span>
+      <MobileCollapsibleFilters title="Период и параметры">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="block min-w-0">
+            <span className="mb-1.5 block text-xs font-medium text-gray-500">Период с</span>
             <input
               type="date"
               value={dateFrom}
@@ -190,11 +283,11 @@ export default function FinancePage() {
                 setDateFrom(next);
                 if (next > dateTo) setDateTo(next);
               }}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={warehousePillControlClass}
             />
           </label>
-          <label className="block text-sm">
-            <span className="text-gray-600">Период по</span>
+          <label className="block min-w-0">
+            <span className="mb-1.5 block text-xs font-medium text-gray-500">Период по</span>
             <input
               type="date"
               value={dateTo}
@@ -205,71 +298,55 @@ export default function FinancePage() {
                 setDateTo(next);
                 if (next < dateFrom) setDateFrom(next);
               }}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={warehousePillControlClass}
             />
           </label>
-          <label className="block text-sm">
-            <span className="text-gray-600">Остатки на дату</span>
+          <label className="block min-w-0">
+            <span className="mb-1.5 block text-xs font-medium text-gray-500">Остатки на дату</span>
             <input
               type="date"
               value={asOfDate}
               max={todayDate}
               onChange={(e) => setAsOfDate(clampFinanceDate(e.target.value, todayDate))}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              className={warehousePillControlClass}
             />
           </label>
-          {activeTab === 'sales' && (
-            <label className="block text-sm">
-              <span className="text-gray-600">Канал продаж</span>
-              <select
-                value={channel}
-                onChange={(e) => setChannel(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-              >
-                {CHANNEL_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
         </div>
-        <div className="mt-4 flex flex-col max-md:gap-2 sm:flex-row sm:flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={loadData}
-            disabled={loading}
-            className="max-md:w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            {loading ? 'Загрузка...' : 'Обновить'}
-          </button>
-        </div>
-        </MobileCollapsibleFilters>
-      </div>
+      </MobileCollapsibleFilters>
 
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+      {error ? (
+        <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200/80">
           {error}
         </div>
-      )}
+      ) : null}
 
-      <div className="flex flex-wrap gap-2 border-b border-gray-200">
+      <div className={warehouseToolbarClass}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-              activeTab === tab.id
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={tabFilterButtonClass(activeTab === tab.id)}
           >
             {tab.label}
           </button>
         ))}
       </div>
+
+      {activeTab === 'sales' ? (
+        <div className={warehouseToolbarClass}>
+          {CHANNEL_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setChannel(opt.value)}
+              className={channelFilterButtonClass(channel === opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {loading && !summary ? (
         <div className="flex justify-center py-16">
@@ -277,58 +354,67 @@ export default function FinancePage() {
         </div>
       ) : (
         <>
-          {activeTab === 'summary' && summary && (
+          {activeTab === 'summary' && summary ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <KpiCard
-                  label="Продажи за период"
-                  value={formatFinanceCurrency(summary.sales_total)}
-                  sub={`${summary.sales_count} строк`}
-                />
-                <KpiCard
-                  label="Поступления"
-                  value={formatFinanceCurrency(summary.stock_in_value)}
-                  sub={`${summary.stock_in_qty} шт.`}
-                />
-                <KpiCard
-                  label="Остатки на дату"
-                  value={formatFinanceCurrency(summary.inventory_value)}
-                  sub={`${summary.inventory_products} позиций, ${summary.inventory_qty} шт.`}
-                />
-                <KpiCard
-                  label="Списания"
-                  value={String(summary.writeoffs_count)}
-                  sub={`${summary.writeoffs_qty} шт.`}
-                />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">
+                  <p className="text-xs font-medium text-gray-500">Продажи</p>
+                  <p className="mt-2 text-lg font-bold tabular-nums text-gray-900 sm:text-xl">
+                    {formatFinanceCurrency(summary.sales_total)}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">{summary.sales_count} строк</p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">
+                  <p className="text-xs font-medium text-gray-500">Поступления</p>
+                  <p className="mt-2 text-lg font-bold tabular-nums text-gray-900 sm:text-xl">
+                    {formatFinanceCurrency(summary.stock_in_value)}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">{summary.stock_in_qty} шт.</p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">
+                  <p className="text-xs font-medium text-gray-500">Остатки</p>
+                  <p className="mt-2 text-lg font-bold tabular-nums text-gray-900 sm:text-xl">
+                    {formatFinanceCurrency(summary.inventory_value)}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {summary.inventory_products} поз., {summary.inventory_qty} шт.
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">
+                  <p className="text-xs font-medium text-gray-500">Списания</p>
+                  <p className="mt-2 text-lg font-bold tabular-nums text-gray-900 sm:text-xl">
+                    {summary.writeoffs_count}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">{summary.writeoffs_qty} шт.</p>
+                </div>
               </div>
-              {summary.sales_by_channel && (
-                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Продажи по каналам</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+              {summary.sales_by_channel ? (
+                <div className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80 sm:p-5">
+                  <h3 className="text-sm font-semibold text-gray-900">Продажи по каналам</h3>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                     {Object.entries(summary.sales_by_channel).map(([key, ch]) => (
-                      <div key={key} className="rounded-lg bg-gray-50 p-3 text-sm">
+                      <div
+                        key={key}
+                        className="rounded-xl bg-gray-50 px-3 py-2.5 text-sm ring-1 ring-gray-100"
+                      >
                         <div className="font-medium text-gray-800">{ch.label || key}</div>
-                        <div className="mt-1 text-gray-600">
+                        <div className="mt-1 tabular-nums text-gray-600">
                           {formatFinanceCurrency(ch.total)} · {ch.count} строк
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
-          )}
+          ) : null}
 
-          {activeTab === 'sales' && (
+          {activeTab === 'sales' ? (
             <div className="space-y-3">
-              <div className="text-sm text-gray-600">
-                Итого: {formatFinanceCurrency(sales.totals?.total)} · {sales.totals?.count ?? 0} строк
-              </div>
               <div className="md:hidden space-y-3">
                 {!sales.rows?.length ? (
-                  <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                    Нет продаж за период
-                  </p>
+                  <FinanceEmptyState>Нет продаж за период</FinanceEmptyState>
                 ) : (
                   sales.rows.map((row) => (
                     <FinanceMobileCard key={row.id}>
@@ -347,41 +433,41 @@ export default function FinancePage() {
                   ))
                 )}
               </div>
-              <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
+              <FinanceTableShell>
                 <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                     <tr>
-                      <th className="px-3 py-2">Дата</th>
-                      <th className="px-3 py-2">Товар</th>
-                      <th className="px-3 py-2">Канал</th>
-                      <th className="px-3 py-2">Оплата</th>
-                      <th className="px-3 py-2 text-right">Кол-во</th>
-                      <th className="px-3 py-2 text-right">Сумма</th>
+                      <th className="px-4 py-3 font-medium">Дата</th>
+                      <th className="px-4 py-3 font-medium">Товар</th>
+                      <th className="px-4 py-3 font-medium">Канал</th>
+                      <th className="px-4 py-3 font-medium">Оплата</th>
+                      <th className="px-4 py-3 text-right font-medium">Кол-во</th>
+                      <th className="px-4 py-3 text-right font-medium">Сумма</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-100">
                     {sales.rows?.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                           Нет продаж за период
                         </td>
                       </tr>
                     ) : (
                       sales.rows.map((row) => (
-                        <tr key={row.id} className="border-t border-gray-100">
-                          <td className="px-3 py-2 whitespace-nowrap">
+                        <tr key={row.id} className="hover:bg-gray-50/80">
+                          <td className="whitespace-nowrap px-4 py-3">
                             {formatFinanceDate(row.movement_date)}
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="px-4 py-3">
                             <div className="font-medium text-gray-900">{row.name || '—'}</div>
                             <div className="text-xs text-gray-500">
                               {[row.article, row.internal_code].filter(Boolean).join(' · ')}
                             </div>
                           </td>
-                          <td className="px-3 py-2">{row.channel_label}</td>
-                          <td className="px-3 py-2">{row.payment_method || '—'}</td>
-                          <td className="px-3 py-2 text-right">{row.quantity}</td>
-                          <td className="px-3 py-2 text-right font-medium">
+                          <td className="px-4 py-3">{row.channel_label}</td>
+                          <td className="px-4 py-3">{row.payment_method || '—'}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{row.quantity}</td>
+                          <td className="px-4 py-3 text-right font-medium tabular-nums">
                             {formatFinanceCurrency(row.line_total)}
                           </td>
                         </tr>
@@ -389,105 +475,115 @@ export default function FinancePage() {
                     )}
                   </tbody>
                 </table>
+              </FinanceTableShell>
+            </div>
+          ) : null}
+
+          {activeTab === 'writeoffs' ? (
+            <>
+              <div className="mb-3 space-y-3 md:hidden">
+                {!writeoffs.rows?.length ? (
+                  <FinanceEmptyState>Нет списаний за период</FinanceEmptyState>
+                ) : (
+                  writeoffs.rows.map((row) => (
+                    <FinanceMobileCard key={row.id}>
+                      <FinanceField label="Дата">{formatFinanceDate(row.movement_date)}</FinanceField>
+                      <FinanceField label="Товар">{row.name || row.article || '—'}</FinanceField>
+                      <FinanceField label="Кол-во">{row.quantity}</FinanceField>
+                      <FinanceField label="Причина">{row.reason || '—'}</FinanceField>
+                    </FinanceMobileCard>
+                  ))
+                )}
               </div>
-            </div>
-          )}
-
-          {activeTab === 'writeoffs' && (
-            <>
-            <div className="md:hidden space-y-3 mb-3">
-              {!writeoffs.rows?.length ? (
-                <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                  Нет списаний за период
-                </p>
-              ) : (
-                writeoffs.rows.map((row) => (
-                  <FinanceMobileCard key={row.id}>
-                    <FinanceField label="Дата">{formatFinanceDate(row.movement_date)}</FinanceField>
-                    <FinanceField label="Товар">{row.name || row.article || '—'}</FinanceField>
-                    <FinanceField label="Кол-во">{row.quantity}</FinanceField>
-                    <FinanceField label="Причина">{row.reason || '—'}</FinanceField>
-                  </FinanceMobileCard>
-                ))
-              )}
-            </div>
-            <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                  <tr>
-                    <th className="px-3 py-2">Дата</th>
-                    <th className="px-3 py-2">Товар</th>
-                    <th className="px-3 py-2 text-right">Кол-во</th>
-                    <th className="px-3 py-2">Причина</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {writeoffs.rows?.map((row) => (
-                    <tr key={row.id} className="border-t border-gray-100">
-                      <td className="px-3 py-2">{formatFinanceDate(row.movement_date)}</td>
-                      <td className="px-3 py-2">{row.name || row.article || '—'}</td>
-                      <td className="px-3 py-2 text-right">{row.quantity}</td>
-                      <td className="px-3 py-2 text-gray-600">{row.reason || '—'}</td>
+              <FinanceTableShell>
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Дата</th>
+                      <th className="px-4 py-3 font-medium">Товар</th>
+                      <th className="px-4 py-3 text-right font-medium">Кол-во</th>
+                      <th className="px-4 py-3 font-medium">Причина</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {!writeoffs.rows?.length ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                          Нет списаний за период
+                        </td>
+                      </tr>
+                    ) : (
+                      writeoffs.rows.map((row) => (
+                        <tr key={row.id} className="hover:bg-gray-50/80">
+                          <td className="px-4 py-3">{formatFinanceDate(row.movement_date)}</td>
+                          <td className="px-4 py-3">{row.name || row.article || '—'}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{row.quantity}</td>
+                          <td className="px-4 py-3 text-gray-600">{row.reason || '—'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </FinanceTableShell>
             </>
-          )}
+          ) : null}
 
-          {activeTab === 'stock_ins' && (
+          {activeTab === 'stock_ins' ? (
             <>
-            <div className="md:hidden space-y-3 mb-3">
-              {!stockIns.rows?.length ? (
-                <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                  Нет поступлений за период
-                </p>
-              ) : (
-                stockIns.rows.map((row) => (
-                  <FinanceMobileCard key={row.id}>
-                    <FinanceField label="Дата">{formatFinanceDate(row.created_at)}</FinanceField>
-                    <FinanceField label="Товар">{row.name || row.article || '—'}</FinanceField>
-                    <FinanceField label="Кол-во">{row.quantity}</FinanceField>
-                    <FinanceField label="Сумма">{formatFinanceCurrency(row.line_total)}</FinanceField>
-                  </FinanceMobileCard>
-                ))
-              )}
-            </div>
-            <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                  <tr>
-                    <th className="px-3 py-2">Дата</th>
-                    <th className="px-3 py-2">Товар</th>
-                    <th className="px-3 py-2 text-right">Кол-во</th>
-                    <th className="px-3 py-2 text-right">Сумма</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stockIns.rows?.map((row) => (
-                    <tr key={row.id} className="border-t border-gray-100">
-                      <td className="px-3 py-2">{formatFinanceDate(row.created_at)}</td>
-                      <td className="px-3 py-2">{row.name || row.article || '—'}</td>
-                      <td className="px-3 py-2 text-right">{row.quantity}</td>
-                      <td className="px-3 py-2 text-right">
-                        {formatFinanceCurrency(row.line_total)}
-                      </td>
+              <div className="mb-3 space-y-3 md:hidden">
+                {!stockIns.rows?.length ? (
+                  <FinanceEmptyState>Нет поступлений за период</FinanceEmptyState>
+                ) : (
+                  stockIns.rows.map((row) => (
+                    <FinanceMobileCard key={row.id}>
+                      <FinanceField label="Дата">{formatFinanceDate(row.created_at)}</FinanceField>
+                      <FinanceField label="Товар">{row.name || row.article || '—'}</FinanceField>
+                      <FinanceField label="Кол-во">{row.quantity}</FinanceField>
+                      <FinanceField label="Сумма">{formatFinanceCurrency(row.line_total)}</FinanceField>
+                    </FinanceMobileCard>
+                  ))
+                )}
+              </div>
+              <FinanceTableShell>
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Дата</th>
+                      <th className="px-4 py-3 font-medium">Товар</th>
+                      <th className="px-4 py-3 text-right font-medium">Кол-во</th>
+                      <th className="px-4 py-3 text-right font-medium">Сумма</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {!stockIns.rows?.length ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                          Нет поступлений за период
+                        </td>
+                      </tr>
+                    ) : (
+                      stockIns.rows.map((row) => (
+                        <tr key={row.id} className="hover:bg-gray-50/80">
+                          <td className="px-4 py-3">{formatFinanceDate(row.created_at)}</td>
+                          <td className="px-4 py-3">{row.name || row.article || '—'}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{row.quantity}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {formatFinanceCurrency(row.line_total)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </FinanceTableShell>
             </>
-          )}
+          ) : null}
 
-          {activeTab === 'inventory' && (
+          {activeTab === 'inventory' ? (
             <div className="space-y-3">
-              <div className="md:hidden space-y-3">
+              <div className="space-y-3 md:hidden">
                 {!inventory.rows?.length ? (
-                  <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                    Нет остатков на выбранную дату
-                  </p>
+                  <FinanceEmptyState>Нет остатков на выбранную дату</FinanceEmptyState>
                 ) : (
                   inventory.rows.map((row, idx) => (
                     <FinanceMobileCard key={`${row.product_id}-${idx}`}>
@@ -499,34 +595,42 @@ export default function FinancePage() {
                   ))
                 )}
               </div>
-              <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
+              <FinanceTableShell>
                 <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                     <tr>
-                      <th className="px-3 py-2">Товар</th>
-                      <th className="px-3 py-2 text-right">Остаток</th>
-                      <th className="px-3 py-2 text-right">Цена</th>
-                      <th className="px-3 py-2 text-right">Оценка</th>
+                      <th className="px-4 py-3 font-medium">Товар</th>
+                      <th className="px-4 py-3 text-right font-medium">Остаток</th>
+                      <th className="px-4 py-3 text-right font-medium">Цена</th>
+                      <th className="px-4 py-3 text-right font-medium">Оценка</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {inventory.rows?.map((row, idx) => (
-                      <tr key={`${row.product_id}-${idx}`} className="border-t border-gray-100">
-                        <td className="px-3 py-2">{row.name || row.article || '—'}</td>
-                        <td className="px-3 py-2 text-right">{row.quantity}</td>
-                        <td className="px-3 py-2 text-right">
-                          {formatFinanceCurrency(row.unit_price)}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          {formatFinanceCurrency(row.line_total)}
+                  <tbody className="divide-y divide-gray-100">
+                    {!inventory.rows?.length ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                          Нет остатков на выбранную дату
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      inventory.rows.map((row, idx) => (
+                        <tr key={`${row.product_id}-${idx}`} className="hover:bg-gray-50/80">
+                          <td className="px-4 py-3">{row.name || row.article || '—'}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{row.quantity}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {formatFinanceCurrency(row.unit_price)}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {formatFinanceCurrency(row.line_total)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
-              </div>
+              </FinanceTableShell>
             </div>
-          )}
+          ) : null}
         </>
       )}
     </div>

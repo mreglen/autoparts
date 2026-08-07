@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import ProductCard from '../AutoParts/ProductCard';
-import { ProductCardSkeletonGrid } from '../../components/skeletons/ProductCardSkeleton';
 import CatalogViewModeToggle from '../../components/CatalogViewModeToggle/CatalogViewModeToggle';
 import FavoriteHeartOverlay from '../../components/FavoriteButton/FavoriteHeartOverlay';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildNewPartOpenPath, buildPartDetailPath } from '../../utils/partRoutes';
 import { engagementItemKey, isRosskoFavoriteItem } from '../../utils/favoriteKeys';
 import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
-import { ProfileEmptyLine, profileFullPageShell, profileProductCardProps } from './profileUi';
+import { ProfileEmptyLine, ProfileProductGrid, profileFullPageShell } from './profileUi';
 
 function EngagementListRow({ part, formatPrice }) {
   const isRossko = isRosskoFavoriteItem(part);
@@ -62,13 +60,19 @@ export default function ProfileEngagementProductsPage({
   const { formatPrice } = useProductPriceFormat();
 
   const content = useMemo(() => {
-    if (loading) {
-      return <ProductCardSkeletonGrid count={8} />;
-    }
-    if (!items?.length) {
-      return <ProfileEmptyLine />;
-    }
     if (viewMode === 'list') {
+      if (loading) {
+        return (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div key={index} className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+            ))}
+          </div>
+        );
+      }
+      if (!items?.length) {
+        return <ProfileEmptyLine />;
+      }
       return (
         <div className="space-y-3">
           {items.map((part) => (
@@ -77,13 +81,8 @@ export default function ProfileEngagementProductsPage({
         </div>
       );
     }
-    return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {items.map((part) => (
-          <ProductCard key={engagementItemKey(part)} part={part} {...profileProductCardProps} />
-        ))}
-      </div>
-    );
+
+    return <ProfileProductGrid items={items} loading={loading} />;
   }, [items, loading, viewMode, formatPrice]);
 
   return (

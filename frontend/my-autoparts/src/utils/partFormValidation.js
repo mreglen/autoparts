@@ -44,10 +44,15 @@ export function hasPartFormErrors(errors) {
 
 export function partFieldClass(hasError) {
   return [
-    'mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm',
-    hasError
-      ? 'border-red-500 ring-1 ring-red-500 focus:border-red-500 focus:ring-red-500'
-      : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500',
+    'mt-1 block w-full h-10 rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60',
+    hasError ? '!border-red-400 !bg-red-50/50 focus:!border-red-500' : '',
+  ].join(' ');
+}
+
+export function partTextareaClass(hasError = false) {
+  return [
+    'mt-1 block w-full min-h-[96px] resize-y rounded-xl border border-transparent bg-gray-100 px-4 py-3 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60',
+    hasError ? '!border-red-400 !bg-red-50/50 focus:!border-red-500' : '',
   ].join(' ');
 }
 

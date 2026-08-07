@@ -17,7 +17,6 @@ import {
   warehousePillButtonClass,
   warehousePillControlClass,
   warehousePrimaryButtonClass,
-  warehouseSecondaryButtonClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
 import { normalizeImageUrl } from '../../utils/apiClient';
@@ -47,7 +46,6 @@ export const StockOutList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('date_desc');
-  const [refreshing, setRefreshing] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
 
@@ -69,19 +67,13 @@ export const StockOutList = () => {
     if (!hasPermission) navigate('/', { replace: true });
   }, [user, permissionCodes, hasPermission, navigate]);
 
-  const loadStockOuts = useCallback(
-    async (isRefresh = false) => {
-      if (isRefresh) setRefreshing(true);
-      try {
-        await dispatch(fetchStockOuts()).unwrap();
-      } catch {
-        /* error in redux */
-      } finally {
-        if (isRefresh) setRefreshing(false);
-      }
-    },
-    [dispatch]
-  );
+  const loadStockOuts = useCallback(async () => {
+    try {
+      await dispatch(fetchStockOuts()).unwrap();
+    } catch {
+      /* error in redux */
+    }
+  }, [dispatch]);
 
   useEffect(() => {
     if (authChecked && hasPermission && (user?.is_seller || user?.is_employee) && user.organization_id) {
@@ -244,28 +236,6 @@ export const StockOutList = () => {
               </div>
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => loadStockOuts(true)}
-            disabled={loading || refreshing}
-            className={warehouseSecondaryButtonClass}
-          >
-            <svg
-              className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            {refreshing ? 'Обновление…' : 'Обновить'}
-          </button>
           <button type="button" onClick={() => navigate('/my-parts')} className={warehousePrimaryButtonClass}>
             Мои запчасти
           </button>

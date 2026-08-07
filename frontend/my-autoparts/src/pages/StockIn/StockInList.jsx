@@ -11,7 +11,6 @@ import {
   warehousePageClass,
   warehousePillControlClass,
   warehousePrimaryButtonClass,
-  warehouseSecondaryButtonClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
 import { normalizeImageUrl } from '../../utils/apiClient';
@@ -34,7 +33,6 @@ const StockInList = () => {
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('date_desc');
-  const [refreshing, setRefreshing] = useState(false);
   const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
 
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -61,19 +59,13 @@ const StockInList = () => {
     if (!hasPermission) navigate('/', { replace: true });
   }, [user, permissionCodes, hasPermission, navigate]);
 
-  const loadStockIns = useCallback(
-    async (isRefresh = false) => {
-      if (isRefresh) setRefreshing(true);
-      try {
-        await dispatch(fetchStockIns()).unwrap();
-      } catch {
-        /* error in redux */
-      } finally {
-        if (isRefresh) setRefreshing(false);
-      }
-    },
-    [dispatch]
-  );
+  const loadStockIns = useCallback(async () => {
+    try {
+      await dispatch(fetchStockIns()).unwrap();
+    } catch {
+      /* error in redux */
+    }
+  }, [dispatch]);
 
   const sortedStockIns = useMemo(
     () => sortStockInDocs(stockIns, sortOrder),
@@ -160,28 +152,6 @@ const StockInList = () => {
               </div>
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => loadStockIns(true)}
-            disabled={loading || refreshing}
-            className={warehouseSecondaryButtonClass}
-          >
-            <svg
-              className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            {refreshing ? 'Обновление…' : 'Обновить'}
-          </button>
           <Link to="/my-parts" className={warehousePrimaryButtonClass}>
             Мои запчасти
           </Link>

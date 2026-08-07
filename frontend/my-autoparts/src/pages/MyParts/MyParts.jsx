@@ -23,6 +23,7 @@ import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { formatDromExportMessage } from '../../utils/dromExport';
 import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopButton';
 import PillDropdown from '../../components/PillDropdown/PillDropdown';
+import { getIsNarrowViewport } from '../../constants/breakpoints';
 
 const CardPart = ({
   part,
@@ -1013,7 +1014,7 @@ function MyParts() {
 
   // Сортировка: по умолчанию сначала новые
   const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(() => !getIsNarrowViewport());
 
   const displayParts = products;
   const sortedDisplayParts = products;
@@ -1468,6 +1469,49 @@ function MyParts() {
 
   const allFilteredSelected = myProductsTotal > 0 && selectedParts.size === myProductsTotal;
   const someSelected = selectedParts.size > 0 && selectedParts.size < myProductsTotal;
+
+  const hasSelection = activeTab === 'in-stock' && selectedParts.size > 0;
+
+  const selectedStats = useMemo(() => {
+    if (!hasSelection) return null;
+
+    if (allFilteredSelected) {
+      return {
+        value: inStockListFullyLoaded ? clientStatsValue : myProductsTotalValue,
+        quantity: inStockListFullyLoaded ? clientStatsQuantity : myProductsTotalQuantity,
+        count: myProductsTotal,
+      };
+    }
+
+    let value = 0;
+    let quantity = 0;
+    products.forEach((part) => {
+      if (!selectedParts.has(part.id)) return;
+      value += (Number(part.price) || 0) * (Number(part.quantity) || 0);
+      quantity += Number(part.quantity) || 0;
+    });
+
+    return {
+      value,
+      quantity,
+      count: selectedParts.size,
+    };
+  }, [
+    hasSelection,
+    allFilteredSelected,
+    inStockListFullyLoaded,
+    clientStatsValue,
+    myProductsTotalValue,
+    clientStatsQuantity,
+    myProductsTotalQuantity,
+    myProductsTotal,
+    products,
+    selectedParts,
+  ]);
+
+  const displayValue = selectedStats ? selectedStats.value : totalValue;
+  const displayQuantity = selectedStats ? selectedStats.quantity : totalQuantity;
+  const displayPositionsCount = selectedStats ? selectedStats.count : myProductsTotal;
 
   useEffect(() => {
     [selectAllCheckboxRef, selectAllCheckboxMobileRef].forEach((ref) => {
@@ -2108,7 +2152,7 @@ function MyParts() {
             <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
               <div>
                 <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
-                  {totalValue.toLocaleString('ru-RU')} ₽
+                  {displayValue.toLocaleString('ru-RU')} ₽
                 </div>
                 <div className="text-[11px] text-gray-500">
                   {activeFilters.storage
@@ -2118,14 +2162,14 @@ function MyParts() {
               </div>
               <div>
                 <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
-                  {totalQuantity.toLocaleString('ru-RU')} шт.
+                  {displayQuantity.toLocaleString('ru-RU')} шт.
                 </div>
                 <div className="text-[11px] text-gray-500">Количество</div>
               </div>
               {!isModerationTab && myProductsTotal > 0 && (
                 <div>
                   <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
-                    {myProductsTotal.toLocaleString('ru-RU')}
+                    {displayPositionsCount.toLocaleString('ru-RU')}
                   </div>
                   <div className="text-[11px] text-gray-500">Позиций</div>
                 </div>
@@ -2317,9 +2361,6 @@ function MyParts() {
                   className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
                 />
                 <span>{selectAllLoading ? 'Выбор…' : 'Выбрать все'}</span>
-                {selectedParts.size > 0 && (
-                  <span className="text-gray-400 tabular-nums">({selectedParts.size})</span>
-                )}
               </label>
             )}
 
@@ -2362,10 +2403,10 @@ function MyParts() {
           </div>
 
           <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm sm:hidden">
-            <span className="font-semibold tabular-nums text-gray-900">{totalValue.toLocaleString('ru-RU')} ₽</span>
-            <span className="tabular-nums text-gray-500">{totalQuantity.toLocaleString('ru-RU')} шт.</span>
+            <span className="font-semibold tabular-nums text-gray-900">{displayValue.toLocaleString('ru-RU')} ₽</span>
+            <span className="tabular-nums text-gray-500">{displayQuantity.toLocaleString('ru-RU')} шт.</span>
             {!isModerationTab && myProductsTotal > 0 && (
-              <span className="tabular-nums text-gray-500">{myProductsTotal.toLocaleString('ru-RU')} поз.</span>
+              <span className="tabular-nums text-gray-500">{displayPositionsCount.toLocaleString('ru-RU')} поз.</span>
             )}
           </div>
         </div>
@@ -2511,7 +2552,7 @@ function MyParts() {
 
           {/* Mobile version - card layout */}
           <div className="md:hidden">
-            <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 space-y-2">
+            <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
                   <input
@@ -2524,31 +2565,25 @@ function MyParts() {
                   />
                   <span>{selectAllLoading ? 'Выбор…' : 'Выбрать всё'}</span>
                 </label>
-                <span className="text-sm text-gray-500 whitespace-nowrap">
-                  Выбрано: {selectedParts.size}
-                  {allFilteredSelected && myProductsTotal > 0 && (
-                    <span className="text-indigo-600"> / {myProductsTotal.toLocaleString('ru-RU')}</span>
-                  )}
-                </span>
-              </div>
-              {avitoIntegrationReady && (
-                <div ref={mobileBulkActionsPlacement.anchorRef} className="relative actions-dropdown flex justify-end">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
-                    disabled={selectedParts.size === 0}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px]"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
-                    <span>Действия</span>
-                  </button>
+                {avitoIntegrationReady && (
+                  <div ref={mobileBulkActionsPlacement.anchorRef} className="relative actions-dropdown shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
+                      disabled={selectedParts.size === 0}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px]"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                      <span>Действия</span>
+                    </button>
 
-                  {showBulkActions && renderBulkActionsMenu(
-                    buildActionsDropdownMenuClassName(mobileBulkActionsPlacement.openUp, 'w-44 z-50')
-                  )}
-                </div>
-              )}
+                    {showBulkActions && renderBulkActionsMenu(
+                      buildActionsDropdownMenuClassName(mobileBulkActionsPlacement.openUp, 'w-44 z-50')
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             {sortedDisplayParts.map((part) => (
               <CardPart

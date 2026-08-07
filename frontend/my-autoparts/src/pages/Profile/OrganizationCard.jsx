@@ -58,21 +58,21 @@ export default function OrganizationCard({ orgId }) {
   const phone = org.phone ? formatPhoneNumber(org.phone) : null;
 
   return (
-    <ProfileBlock>
+    <ProfileBlock title="Организация">
       <Link
         to={`/organizations/${org.id}`}
-        className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50"
+        className="flex items-center gap-3 px-4 py-4 transition hover:bg-gray-50 sm:px-5"
       >
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-100">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-100 ring-1 ring-gray-200/80">
           {logoUrl ? (
             <img src={logoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="text-sm font-medium text-gray-500">{orgInitials}</span>
+            <span className="text-sm font-semibold text-gray-500">{orgInitials}</span>
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-medium text-gray-900">{org.name || 'Организация'}</p>
-          {phone ? <p className="truncate text-sm text-gray-400">{phone}</p> : null}
+          <p className="truncate text-base font-semibold text-gray-900">{org.name || 'Организация'}</p>
+          {phone ? <p className="truncate text-sm text-gray-500">{phone}</p> : null}
         </div>
         <ChevronRight />
       </Link>

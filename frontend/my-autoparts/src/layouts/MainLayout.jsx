@@ -14,7 +14,6 @@ import { useAvitoAccountStatus } from '../hooks/useAvitoAccountStatus';
 import useCartSync from '../hooks/useCartSync';
 import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
 import NotificationsBanner from '../components/NotificationsBanner/NotificationsBanner';
-import SiteFooter from '../components/SiteFooter/SiteFooter';
 import { getPublicLayoutProfile } from '../utils/layoutProfiles';
 
 export default function MainLayout() {
@@ -38,7 +37,6 @@ export default function MainLayout() {
     const isChatsPage = layoutProfile.isChatsPage;
     const isMobileActiveChat = isChatsPage && Boolean(searchParams.get('chatId'));
     const isFullBleedAmbientPage = layoutProfile.isFullBleedAmbient;
-    const showFooter = !isChatsPage && !isPartPage && !isVinCatalogPage;
 
     const {
         token,
@@ -114,8 +112,6 @@ export default function MainLayout() {
                 <AvitoProExpiredBanner status={avitoAccountStatus} />
                 <Outlet />
             </main>
-
-            {showFooter ? <SiteFooter /> : null}
 
             <InstallPwaPrompt />
             <MobileBottomNav />

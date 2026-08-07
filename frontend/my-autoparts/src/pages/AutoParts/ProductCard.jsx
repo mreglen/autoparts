@@ -65,7 +65,10 @@ const ProductCard = ({
   showFavorite = true,
   showNewBadge,
   compactMarketplace = false,
+  variant,
 }) => {
+  const isProfileVariant = variant === 'profile';
+  const isCompactLayout = compactMarketplace || isProfileVariant;
   const dispatch = useDispatch();
   const product = part;
   const isRossko = isRosskoFavoriteItem(part);
@@ -201,10 +204,13 @@ const ProductCard = ({
 
   return (
     <div className="w-full">
-      <div className={compactMarketplace
-        ? 'flex h-full flex-col bg-surface'
-        : 'flex h-full flex-col overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg'}
-      >
+      <div className={
+        isProfileVariant
+          ? 'flex h-full flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/80 transition hover:ring-gray-300'
+          : compactMarketplace
+            ? 'flex h-full flex-col bg-surface'
+            : 'flex h-full flex-col overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg'
+      }>
         <Link
           to={detailPath}
           className="group flex flex-1 flex-col text-inherit no-underline"
@@ -221,8 +227,12 @@ const ProductCard = ({
             }
           }}
         >
-          <div className={`relative flex w-full cursor-pointer items-center justify-center overflow-hidden bg-surface-muted ${
-            compactMarketplace ? 'aspect-square touch-pan-y rounded-sg-lg' : 'aspect-[4/3]'
+          <div className={`relative flex w-full cursor-pointer items-center justify-center overflow-hidden ${
+            isProfileVariant
+              ? 'aspect-square bg-gray-50'
+              : compactMarketplace
+                ? 'aspect-square touch-pan-y rounded-sg-lg bg-surface-muted'
+                : 'aspect-[4/3] bg-surface-muted'
           }`}
             onMouseMove={handlePreviewMouseMove}
             onMouseLeave={() => {
@@ -243,7 +253,7 @@ const ProductCard = ({
               <img
                 src={photoSrc}
                 alt={displayTitle}
-                className={`h-full w-full ${compactMarketplace ? 'object-cover' : 'object-contain'}`}
+                className={`h-full w-full ${isCompactLayout ? 'object-cover' : 'object-contain'}`}
                 width={400}
                 height={300}
                 sizes="(max-width:640px) 50vw, (max-width:1280px) 33vw, 25vw"
@@ -295,8 +305,27 @@ const ProductCard = ({
           </div>
 
           <div className="flex flex-1 flex-col">
-            <div className={compactMarketplace ? 'flex-[2] space-y-0 px-0.5 pt-1.5' : 'flex-[2] space-y-0.5 p-2'}>
-              {compactMarketplace ? (
+            <div className={
+              isProfileVariant
+                ? 'flex flex-1 flex-col px-2.5 pb-2.5 pt-2'
+                : compactMarketplace
+                  ? 'flex-[2] space-y-0 px-0.5 pt-1.5'
+                  : 'flex-[2] space-y-0.5 p-2'
+            }>
+              {isProfileVariant ? (
+                <>
+                  <p className="text-[15px] font-bold tabular-nums leading-tight text-gray-900">{priceLabel}</p>
+                  {product.brand ? (
+                    <p className="mt-1 truncate text-[11px] font-medium text-gray-500 sm:text-xs">{product.brand}</p>
+                  ) : null}
+                  {product.article ? (
+                    <p className="mt-0.5 truncate text-[11px] text-gray-400 sm:text-xs">{product.article}</p>
+                  ) : null}
+                  {!product.article && compactTitle ? (
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-gray-600 sm:text-xs">{compactTitle}</p>
+                  ) : null}
+                </>
+              ) : compactMarketplace ? (
                 <>
                   <p className="line-clamp-2 cursor-pointer text-sm font-medium leading-[1.25rem] text-ink group-hover:text-brand-600 sm:text-[15px]">
                     {compactTitle}
@@ -328,7 +357,7 @@ const ProductCard = ({
                 </>
               )}
 
-              {!compactMarketplace && !hideWarehouse && !isRossko ? (
+              {!isCompactLayout && !hideWarehouse && !isRossko ? (
                 <div className="flex items-center gap-0.5 text-[14px] text-ink-muted">
                   <span>{product.location || 'Скл'}</span>
                   {product.stock ? (
@@ -343,7 +372,7 @@ const ProductCard = ({
                 </div>
               ) : null}
 
-              {!compactMarketplace && !hideConditionAndQuantity && !isRossko ? (
+              {!isCompactLayout && !hideConditionAndQuantity && !isRossko ? (
                 <div className="flex flex-wrap gap-0.5 pt-0.5">
                   {product.isNew || product.is_new ? (
                     <span className="rounded-sg bg-brand-600 px-1 py-0.5 text-[14px] font-medium text-white">

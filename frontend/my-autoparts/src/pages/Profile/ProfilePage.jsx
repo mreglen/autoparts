@@ -14,6 +14,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import {
   ChevronRight,
   ProfileBlock,
+  ProfileQuickAction,
   ProfileRow,
   profileInputClass,
   profilePageShell,
@@ -24,19 +25,26 @@ import {
 function ProfilePageSkeleton() {
   return (
     <div className={`${profilePageShell} animate-pulse`}>
-      <div className="bg-surface px-4 py-5 sm:rounded-sg-lg sm:border sm:border-line sm:shadow-sg">
-        <div className="flex items-center gap-3">
-          <div className="h-14 w-14 rounded-full bg-surface-muted" />
+      <div className="h-8 w-32 rounded-lg bg-gray-100" />
+      <div className="rounded-2xl bg-white p-5 ring-1 ring-gray-200/80">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-full bg-gray-100" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-40 rounded-sg bg-surface-muted" />
-            <div className="h-3 w-28 rounded-sg bg-line" />
+            <div className="h-5 w-44 rounded-lg bg-gray-100" />
+            <div className="h-4 w-28 rounded-lg bg-gray-100" />
+            <div className="h-6 w-20 rounded-full bg-gray-100" />
           </div>
         </div>
       </div>
-      <div className="bg-surface sm:rounded-sg-lg sm:border sm:border-line sm:shadow-sg">
+      <div className="grid grid-cols-3 gap-2">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="border-b border-line px-4 py-4 last:border-0">
-            <div className="h-4 w-32 rounded-sg bg-surface-muted" />
+          <div key={i} className="h-24 rounded-2xl bg-gray-100" />
+        ))}
+      </div>
+      <div className="rounded-2xl bg-white ring-1 ring-gray-200/80">
+        {[1, 2].map((i) => (
+          <div key={i} className="border-b border-gray-100 px-4 py-4 last:border-0">
+            <div className="h-4 w-36 rounded-lg bg-gray-100" />
           </div>
         ))}
       </div>
@@ -52,20 +60,32 @@ function getRoleLabel(user) {
 }
 
 const IconBag = () => (
-  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
   </svg>
 );
 
 const IconBell = () => (
-  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
   </svg>
 );
 
 const IconParts = () => (
-  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+  </svg>
+);
+
+const IconLock = () => (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+  </svg>
+);
+
+const IconLogout = () => (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
   </svg>
 );
 
@@ -116,13 +136,11 @@ export default function ProfilePage() {
   if (isReady && !user) {
     return (
       <div className={profilePageShell}>
-        <ProfileBlock>
-          <div className="px-4 py-10 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Профиль</h1>
+        <ProfileBlock padded>
+          <div className="py-6 text-center">
             <p className="text-[15px] text-gray-900">Войдите в аккаунт</p>
-            <Link
-              to="/auth"
-              className={`${profilePrimaryBtn} mt-5`}
-            >
+            <Link to="/auth" className={`${profilePrimaryBtn} mt-5`}>
               Войти
             </Link>
           </div>
@@ -202,149 +220,159 @@ export default function ProfilePage() {
     || (user?.is_employee && permissionCodes && permissionCodes.includes('my-parts')),
   );
 
+  const quickActions = [
+    showMyParts ? { to: '/my-parts', label: 'Мои запчасти', icon: <IconParts /> } : null,
+    { to: '/purchases/orders', label: 'Заказы', icon: <IconBag /> },
+    { to: '/profile/notifications', label: 'Уведомления', icon: <IconBell /> },
+  ].filter(Boolean);
+
   return (
     <div className={profilePageShell}>
+      <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Профиль</h1>
+
       {!isEditing ? (
         <ProfileBlock>
           <button
             type="button"
             onClick={handleEdit}
-            className="flex w-full items-center gap-3 px-4 py-4 text-left hover:bg-gray-50 active:bg-gray-100"
+            className="flex w-full items-center gap-4 px-4 py-5 text-left transition hover:bg-gray-50 active:bg-gray-100 sm:px-5"
           >
-            <div className="relative shrink-0">
-              <UserAvatar
-                avatarUrl={user.avatar_url}
-                firstName={user.first_name}
-                lastName={user.last_name}
-                size="lg"
-                className="!rounded-full"
-              />
-            </div>
+            <UserAvatar
+              avatarUrl={user.avatar_url}
+              firstName={user.first_name}
+              lastName={user.last_name}
+              size="lg"
+              className="!h-16 !w-16 !rounded-full !text-xl"
+            />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-lg font-medium text-gray-900">{displayName}</p>
-              <p className="truncate text-sm text-gray-500">{profileSubtitle}</p>
-              <p className="mt-1 text-xs text-gray-400">{getRoleLabel(user)}</p>
+              <p className="truncate text-xl font-bold text-gray-900">{displayName}</p>
+              <p className="mt-0.5 truncate text-sm text-gray-500">{profileSubtitle}</p>
+              <span className="mt-2 inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+                {getRoleLabel(user)}
+              </span>
             </div>
             <ChevronRight />
           </button>
         </ProfileBlock>
       ) : (
-        <ProfileBlock title="Личные данные">
-          <div className="px-4 py-4">
-            {saveError ? (
-              <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
-            ) : null}
+        <ProfileBlock title="Личные данные" padded>
+          {saveError ? (
+            <div className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
+          ) : null}
 
-            <div className="mb-5 flex items-center gap-4">
+          <div className="mb-5 flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarLoading}
+              className="relative shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+            >
+              <UserAvatar
+                avatarUrl={user.avatar_url}
+                firstName={user.first_name}
+                lastName={user.last_name}
+                size="lg"
+                className="!h-16 !w-16 !rounded-full !text-xl"
+              />
+              {avatarLoading ? (
+                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 text-xs text-white">
+                  …
+                </span>
+              ) : null}
+            </button>
+            <div className="text-sm">
               <button
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
-                disabled={avatarLoading}
-                className="relative shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
+                className="font-medium text-indigo-600 hover:text-indigo-700"
               >
-                <UserAvatar
-                  avatarUrl={user.avatar_url}
-                  firstName={user.first_name}
-                  lastName={user.last_name}
-                  size="lg"
-                  className="!rounded-full"
-                />
-                {avatarLoading ? (
-                  <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 text-xs text-white">
-                    …
-                  </span>
-                ) : null}
+                Изменить фото
               </button>
-              <div className="text-sm">
+              {user.avatar_url ? (
                 <button
                   type="button"
-                  onClick={() => avatarInputRef.current?.click()}
-                  className="font-medium text-brand-600 hover:text-brand-700"
+                  onClick={handleDeleteAvatar}
+                  disabled={avatarLoading}
+                  className="mt-1 block text-gray-400 hover:text-red-600 disabled:opacity-50"
                 >
-                  Изменить фото
+                  Удалить
                 </button>
-                {user.avatar_url ? (
-                  <button
-                    type="button"
-                    onClick={handleDeleteAvatar}
-                    disabled={avatarLoading}
-                    className="mt-1 block text-gray-400 hover:text-red-600 disabled:opacity-50"
-                  >
-                    Удалить
-                  </button>
-                ) : null}
-              </div>
+              ) : null}
+            </div>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={handleAvatarFileChange}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Фамилия</label>
               <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                onChange={handleAvatarFileChange}
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleChange}
+                className={profileInputClass}
+                autoComplete="family-name"
               />
             </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-sm text-gray-500">Фамилия</label>
-                <input
-                  name="last_name"
-                  value={formData.last_name}
-                  onChange={handleChange}
-                  className={profileInputClass}
-                  autoComplete="family-name"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-gray-500">Имя</label>
-                <input
-                  name="first_name"
-                  value={formData.first_name}
-                  onChange={handleChange}
-                  className={profileInputClass}
-                  autoComplete="given-name"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm text-gray-500">Отчество</label>
-                <input
-                  name="patronymic"
-                  value={formData.patronymic}
-                  onChange={handleChange}
-                  className={profileInputClass}
-                />
-              </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Имя</label>
+              <input
+                name="first_name"
+                value={formData.first_name}
+                onChange={handleChange}
+                className={profileInputClass}
+                autoComplete="given-name"
+              />
             </div>
-
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" onClick={handleCancel} disabled={saving} className={profileSecondaryBtn}>
-                Отмена
-              </button>
-              <button type="button" onClick={handleSave} disabled={saving} className={profilePrimaryBtn}>
-                {saving ? 'Сохранение…' : 'Сохранить'}
-              </button>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">Отчество</label>
+              <input
+                name="patronymic"
+                value={formData.patronymic}
+                onChange={handleChange}
+                className={profileInputClass}
+              />
             </div>
+          </div>
+
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={handleCancel} disabled={saving} className={profileSecondaryBtn}>
+              Отмена
+            </button>
+            <button type="button" onClick={handleSave} disabled={saving} className={profilePrimaryBtn}>
+              {saving ? 'Сохранение…' : 'Сохранить'}
+            </button>
           </div>
         </ProfileBlock>
       )}
 
-      <ProfileBlock>
-        {showMyParts ? (
-          <ProfileRow to="/my-parts" label="Мои запчасти" icon={<IconParts />} />
-        ) : null}
-        <ProfileRow to="/purchases/orders" label="Заказы" icon={<IconBag />} />
-        <ProfileRow to="/profile/notifications" label="Уведомления" icon={<IconBell />} />
-      </ProfileBlock>
+      <div className={`grid gap-2 sm:gap-3 ${quickActions.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {quickActions.map((action) => (
+          <ProfileQuickAction
+            key={action.to}
+            to={action.to}
+            label={action.label}
+            icon={action.icon}
+          />
+        ))}
+      </div>
 
       {showOrganization ? <OrganizationCard orgId={user.organization_id} /> : null}
 
       <ProfileEngagementPreview />
 
-      <ProfileBlock>
-        <ProfileRow label="Сменить пароль" onClick={() => setShowPasswordModal(true)} />
+      <ProfileBlock title="Аккаунт">
+        <ProfileRow label="Сменить пароль" onClick={() => setShowPasswordModal(true)} icon={<IconLock />} />
         <ProfileRow
           label="Выйти"
           destructive
           onClick={() => setShowLogoutModal(true)}
+          icon={<IconLogout />}
           trailing={null}
         />
       </ProfileBlock>
