@@ -3,10 +3,34 @@
  * Do not invent TecDoc ids.
  */
 
+import { normalizeVinOrNull } from './laximoVin';
+
+function isUnknownLabel(value) {
+  const text = String(value || '').trim();
+  if (!text) return true;
+  return /^\[?unknown\]?$/i.test(text);
+}
+
+function resolveCandidateModel(candidate) {
+  const model = String(candidate?.model || '').trim();
+  if (model && !isUnknownLabel(model)) return model;
+  const display = String(candidate?.display_name || '').trim();
+  if (!display) return '';
+  const make = String(candidate?.make || '').trim();
+  if (make && display.toUpperCase().startsWith(make.toUpperCase())) {
+    return display.slice(make.length).trim();
+  }
+  return display;
+}
+
+export function sanitizeResolvedVin(value) {
+  return normalizeVinOrNull(value) || '';
+}
+
 export function mapCandidateToGarageForm(candidate, vin, plate = '') {
   if (!candidate) {
     return {
-      vin: vin || '',
+      vin: sanitizeResolvedVin(vin),
       make: '',
       model: '',
       year: '',
@@ -16,9 +40,9 @@ export function mapCandidateToGarageForm(candidate, vin, plate = '') {
     };
   }
   return {
-    vin: vin || '',
+    vin: sanitizeResolvedVin(vin),
     make: candidate.make || '',
-    model: candidate.model || '',
+    model: resolveCandidateModel(candidate),
     year: candidate.year != null ? String(candidate.year) : '',
     color: candidate.color || '',
     plate: plate || '',
@@ -80,7 +104,7 @@ export function mapCandidateToDismantlingPrefill(candidate, vin) {
   const yearStr = candidate.year != null ? String(candidate.year) : '';
   return {
     brandInput: candidate.make || '',
-    modelInput: candidate.model || '',
+    modelInput: resolveCandidateModel(candidate),
     engineText: candidate.engine || '',
     transmissionText: candidate.transmission || '',
     // Free-text generation so manual TecDoc-less path can proceed; user can refine.

@@ -24,6 +24,7 @@ from app.services.laximo.gate import (
 from app.services.laximo.plate import normalize_plate_or_raise
 from app.services.laximo.vehicle_normalize import (
     NormalizedVehicleCandidate,
+    dedupe_vehicle_candidates,
     enrich_candidate_from_plate_full,
     normalize_find_vehicle_row,
     normalize_plate_full_card,
@@ -311,7 +312,9 @@ def _lookup_by_plate_via_find_vehicle(
     if not rows:
         return None
 
-    candidates = [normalize_find_vehicle_row(row) for row in rows]
+    candidates = dedupe_vehicle_candidates(
+        [normalize_find_vehicle_row(row) for row in rows]
+    )
     vin = None
     for row in rows:
         vin = _vin_from_find_vehicle_row(row)
@@ -367,6 +370,8 @@ def _lookup_by_plate_via_identify_full(
     if not candidates:
         return _plate_not_found(normalized_plate)
 
+    candidates = dedupe_vehicle_candidates(candidates)
+
     return ByPlateResult(
         ok=True,
         reason=PUBLIC_OK,
@@ -400,6 +405,7 @@ def lookup_by_plate(
         for item in cached.get("candidates") or []:
             if isinstance(item, dict):
                 rebuilt.append(NormalizedVehicleCandidate(**item))
+        rebuilt = dedupe_vehicle_candidates(rebuilt)
         return ByPlateResult(
             ok=True,
             reason=PUBLIC_OK,
@@ -412,17 +418,11 @@ def lookup_by_plate(
     try:
         result = _lookup_by_plate_via_find_vehicle(db, normalized_plate, cc)
         if result is None:
-            try:
-                result = _lookup_by_plate_via_identify_full(db, normalized_plate, cc)
-            except LaximoCatError as exc:
-                if getattr(exc, "status_code", None) == 404:
-                    return _plate_not_found(normalized_plate)
-                logger.exception("Laximo plate identify fallback failed")
-                return _plate_soft_unavailable(normalized_plate)
+            result = _lookup_by_plate_via_identify_full(db, normalized_plate, cc)
     except LaximoCatError as exc:
         if getattr(exc, "status_code", None) == 404:
             return _plate_not_found(normalized_plate)
-        logger.exception("Laximo findVehicleByPlateNumber failed")
+        logger.exception("Laximo plate lookup failed")
         return _plate_soft_unavailable(normalized_plate)
     except Exception:
         logger.exception("Unexpected error during plate lookup")

@@ -11,6 +11,7 @@ import {
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import { normalizePlate } from '../../utils/laximoPlate';
 import { detectVehicleLookupKind, formatVehicleLookupInput } from '../../utils/vehicleLookupKind';
+import { sanitizeResolvedVin } from '../../utils/laximoVinCandidate';
 import {
   warehousePillControlClass,
   warehousePrimaryButtonClass,
@@ -197,6 +198,7 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
   const [lookupDecoding, setLookupDecoding] = useState(false);
   const [lookupError, setLookupError] = useState('');
   const [resolvedPlate, setResolvedPlate] = useState('');
+  const [resolvedVin, setResolvedVin] = useState('');
   const [frameInput, setFrameInput] = useState('');
   const [lookupFromPlate, setLookupFromPlate] = useState(false);
   const [lookupFromFrame, setLookupFromFrame] = useState(false);
@@ -211,6 +213,7 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
     setLookupInput('');
     setLookupError('');
     setResolvedPlate('');
+    setResolvedVin('');
     setFrameInput('');
     setLookupFromPlate(false);
     setLookupFromFrame(false);
@@ -244,6 +247,7 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
       return;
     }
     setLookupInput(vin);
+    setResolvedVin(vin);
     setLookupDecoding(true);
     setLookupFromPlate(false);
     setLookupFromFrame(false);
@@ -296,9 +300,10 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
         body: JSON.stringify({ plate, country_code: 'ru' }),
       });
       const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
-      const vin = (result?.vin || '').trim().toUpperCase();
+      const vin = sanitizeResolvedVin(result?.vin || '');
       const normalizedPlate = (result?.plate || plate).trim();
       setResolvedPlate(normalizedPlate);
+      setResolvedVin(vin);
       setLookupInput(normalizedPlate);
       if (result?.ok && candidates.length === 1) {
         applyCandidate(candidates[0], vin, normalizedPlate);
@@ -335,6 +340,7 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
     setLookupFromPlate(false);
     setLookupFromFrame(true);
     setResolvedPlate('');
+    setResolvedVin('');
     try {
       const result = await apiRequest('/autoservice/garage/decode-frame', {
         method: 'POST',
@@ -437,7 +443,7 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
                 onClick={() =>
                   applyCandidate(
                     candidate,
-                    addForm.vin || lookupInput.trim().toUpperCase(),
+                    resolvedVin,
                     addForm.plate || resolvedPlate,
                   )
                 }

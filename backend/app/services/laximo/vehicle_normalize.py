@@ -86,6 +86,43 @@ def _raw_attributes(attributes: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _clean_label(raw: Optional[str]) -> Optional[str]:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    lowered = text.lower().strip("[]")
+    if lowered in ("unknown", "неизвестно", "n/a", "na"):
+        return None
+    return text
+
+
+def dedupe_vehicle_candidates(
+    candidates: list[NormalizedVehicleCandidate],
+) -> list[NormalizedVehicleCandidate]:
+    """Drop exact duplicates returned by Laximo plate/VIN search."""
+    seen: set[str] = set()
+    out: list[NormalizedVehicleCandidate] = []
+    for cand in candidates:
+        key = "|".join(
+            [
+                cand.catalog or "",
+                cand.vehicle_id or "",
+                cand.make or "",
+                cand.model or "",
+                str(cand.year or ""),
+                cand.engine or "",
+                cand.transmission or "",
+            ]
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(cand)
+    return out
+
+
 def normalize_find_vehicle_row(row: dict[str, Any]) -> NormalizedVehicleCandidate:
     brand = (row.get("brand") or "").strip() or None
     name = (row.get("name") or "").strip() or None
@@ -105,7 +142,10 @@ def normalize_find_vehicle_row(row: dict[str, Any]) -> NormalizedVehicleCandidat
             filter_level = str(fl)
 
     attrs = _attr_map(row.get("attributes"))
-    model = _first(attrs, "model", "modification", "description") or name
+    model = (
+        _clean_label(_first(attrs, "model", "modification", "description"))
+        or _clean_label(name)
+    )
     year = _parse_year(
         _first(attrs, "manufactured", "date", "modelyearfrom", "modelyear", "prodrange")
     )

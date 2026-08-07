@@ -22,6 +22,8 @@ from app.services.laximo.vehicle_lookup import (
 )
 from app.services.laximo.vehicle_normalize import (
     NormalizedVehicleCandidate,
+    dedupe_vehicle_candidates,
+    normalize_find_vehicle_row,
     normalize_plate_full_card,
 )
 
@@ -81,6 +83,27 @@ SAMPLE_FIND_VEHICLE_ROW = {
 }
 
 
+class FindVehicleNormalizeTests(unittest.TestCase):
+    def test_unknown_model_falls_back_to_name(self):
+        row = {
+            **SAMPLE_FIND_VEHICLE_ROW,
+            "attributes": [
+                {"key": "model", "value": "[Unknown]"},
+                {"key": "manufactured", "value": "2007"},
+            ],
+        }
+        cand = normalize_find_vehicle_row(row)
+        self.assertEqual(cand.model, "XC90")
+
+    def test_dedupe_identical_rows(self):
+        row = {**SAMPLE_FIND_VEHICLE_ROW, "attributes": [{"key": "engine_info", "value": "B5254T2"}]}
+        candidates = dedupe_vehicle_candidates(
+            [normalize_find_vehicle_row(row) for _ in range(3)]
+        )
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].engine, "B5254T2")
+
+
 class LookupByPlateTests(unittest.TestCase):
     def setUp(self):
         clear_plate_lookup_cache()
@@ -121,6 +144,19 @@ class LookupByPlateTests(unittest.TestCase):
         self.assertEqual(result.candidates[0].model, "XC90")
         self.assertEqual(result.candidates[0].year, 2007)
         self.assertEqual(result.candidates[0].catalog, "VOLVO201410")
+
+    def test_find_vehicle_dedupes_duplicate_rows(self):
+        duplicate_rows = [SAMPLE_FIND_VEHICLE_ROW] * 5
+        with patch(
+            "app.services.laximo.vehicle_lookup.laximo_cat_ready",
+            return_value=True,
+        ), patch(
+            "app.services.laximo.vehicle_lookup.find_vehicle_by_plate_number",
+            return_value=duplicate_rows,
+        ):
+            result = lookup_by_plate(MagicMock(), "E702XT196")
+        self.assertTrue(result.ok)
+        self.assertEqual(len(result.candidates), 1)
 
     def test_full_plus_find_vehicle(self):
         cand = NormalizedVehicleCandidate(

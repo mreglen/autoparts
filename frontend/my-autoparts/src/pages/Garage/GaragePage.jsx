@@ -15,6 +15,7 @@ import {
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import { normalizePlate } from '../../utils/laximoPlate';
 import { detectVehicleLookupKind, formatVehicleLookupInput } from '../../utils/vehicleLookupKind';
+import { sanitizeResolvedVin } from '../../utils/laximoVinCandidate';
 
 const LOOKUP_INPUT_MAX_LENGTH = 32;
 
@@ -215,6 +216,7 @@ export default function GaragePage() {
   const [lookupDecoding, setLookupDecoding] = useState(false);
   const [lookupError, setLookupError] = useState(null);
   const [resolvedPlate, setResolvedPlate] = useState('');
+  const [resolvedVin, setResolvedVin] = useState('');
   const [frameInput, setFrameInput] = useState('');
   const [lookupFromPlate, setLookupFromPlate] = useState(false);
   const [lookupFromFrame, setLookupFromFrame] = useState(false);
@@ -259,6 +261,7 @@ export default function GaragePage() {
     setLookupInput('');
     setLookupError(null);
     setResolvedPlate('');
+    setResolvedVin('');
     setFrameInput('');
     setLookupFromPlate(false);
     setLookupFromFrame(false);
@@ -293,6 +296,7 @@ export default function GaragePage() {
       return;
     }
     setLookupInput(vin);
+    setResolvedVin(vin);
     setLookupDecoding(true);
     setLookupFromPlate(false);
     setLookupFromFrame(false);
@@ -345,9 +349,10 @@ export default function GaragePage() {
         body: JSON.stringify({ plate, country_code: 'ru' }),
       });
       const candidates = Array.isArray(result?.candidates) ? result.candidates : [];
-      const vin = (result?.vin || '').trim().toUpperCase();
+      const vin = sanitizeResolvedVin(result?.vin || '');
       const normalizedPlate = (result?.plate || plate).trim();
       setResolvedPlate(normalizedPlate);
+      setResolvedVin(vin);
       setLookupInput(normalizedPlate);
       if (result?.ok && candidates.length === 1) {
         applyCandidate(candidates[0], vin, normalizedPlate);
@@ -384,6 +389,7 @@ export default function GaragePage() {
     setLookupFromPlate(false);
     setLookupFromFrame(true);
     setResolvedPlate('');
+    setResolvedVin('');
     try {
       const result = await apiRequest('/autoservice/garage/decode-frame', {
         method: 'POST',
@@ -663,7 +669,7 @@ export default function GaragePage() {
                     onClick={() =>
                       applyCandidate(
                         c,
-                        addForm.vin || lookupInput.trim().toUpperCase(),
+                        resolvedVin,
                         addForm.plate || resolvedPlate,
                       )
                     }

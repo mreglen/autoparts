@@ -11,6 +11,7 @@ import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import {
   candidateLabel,
   mapCandidateToDismantlingPrefill,
+  sanitizeResolvedVin,
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
 import { sanitizeVinInput } from '../../utils/laximoVin';
@@ -75,11 +76,13 @@ function LookupStep({ onResolved, onManual }) {
     try {
       const result = await apiRequest(path, { method: 'POST', body: JSON.stringify(body) });
       const list = Array.isArray(result?.candidates) ? result.candidates : [];
-      const vin = (kind === 'plate' ? result?.vin : kind === 'vin' ? value : '') || '';
-      setResolvedVin(String(vin).trim().toUpperCase());
+      const vin = kind === 'vin'
+        ? value
+        : sanitizeResolvedVin(result?.vin || '');
+      setResolvedVin(vin);
 
       if (result?.ok && list.length === 1) {
-        onResolved(list[0], String(vin).trim().toUpperCase());
+        onResolved(list[0], vin);
         return;
       }
       if (result?.ok && list.length > 1) {
@@ -88,7 +91,7 @@ function LookupStep({ onResolved, onManual }) {
       }
       setNotice(softNoticeVariantFromReason(result?.reason));
       onManual({
-        vin: kind === 'vin' ? value : String(vin).trim().toUpperCase(),
+        vin: kind === 'vin' ? value : vin,
       });
     } catch (requestError) {
       setError(requestError?.message || 'Не удалось найти автомобиль');
