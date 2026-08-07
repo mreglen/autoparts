@@ -33,6 +33,11 @@ import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHea
 import { fetchFavoriteStatusesBatch } from '../../../redux/slices/UserEngagementSlice';
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import { productFavoriteKey } from '../../../utils/favoriteKeys';
+import {
+  autopartsFilterMobileButtonClass,
+  autopartsFilterPanelClass,
+  autopartsFilterTitleClass,
+} from '../../../utils/autopartsFilterUi';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
@@ -119,8 +124,8 @@ const formatPhoneNumber = (phone) => {
 const UsedPartsFiltersAside = React.memo(function UsedPartsFiltersAside({ updateCatalogUrl }) {
   return (
     <aside className="hidden w-full shrink-0 lg:block lg:w-64">
-      <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-[calc(var(--sg-desktop-header-h)+1rem)]">
-        <h3 className="mb-3 font-semibold text-gray-900">Фильтры</h3>
+      <div className={`${autopartsFilterPanelClass} lg:sticky lg:top-[calc(var(--sg-desktop-header-h)+1rem)]`}>
+        <h3 className={autopartsFilterTitleClass}>Фильтры</h3>
         <UsedPartsFiltersForm updateCatalogUrl={updateCatalogUrl} deferApply showClearInPanel={false} />
       </div>
     </aside>
@@ -786,7 +791,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           ) : null}
           <Link
             to={{ pathname: '/autoparts/used/filters', search: location.search }}
-            className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden"
+            className={autopartsFilterMobileButtonClass}
           >
             Фильтры
           </Link>

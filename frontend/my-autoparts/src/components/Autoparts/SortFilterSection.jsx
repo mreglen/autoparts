@@ -1,4 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import {
+  autopartsFilterOptionClass,
+  autopartsFilterCheckboxClass,
+} from '../../utils/autopartsFilterUi';
 
 /**
  * Раскрывающийся блок выбора сортировки в панели фильтров.
@@ -19,16 +23,16 @@ export default function SortFilterSection({
   }, [value, defaultValue]);
 
   return (
-    <div className="relative z-10 border-t border-gray-100 pt-4 first:border-t-0 first:pt-0">
+    <div className="space-y-2">
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
-        className="mb-2 flex min-h-11 w-full touch-manipulation items-center justify-between rounded-lg px-1 text-sm font-medium text-gray-700 active:bg-gray-50"
+        className="flex min-h-10 w-full touch-manipulation items-center justify-between rounded-full bg-gray-100 px-3 text-sm font-medium text-gray-800 transition hover:bg-gray-50"
         aria-expanded={expanded}
       >
-        <span>{title}</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-500">{title}</span>
         <svg
-          className={`h-5 w-5 shrink-0 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -38,20 +42,17 @@ export default function SortFilterSection({
         </svg>
       </button>
       {expanded && (
-        <div className="space-y-1 pb-1">
+        <div className="space-y-1.5">
           {options.map((option) => (
-            <label
-              key={option.value}
-              className="flex min-h-11 touch-manipulation cursor-pointer items-center gap-3 rounded-lg px-1 text-sm text-gray-700 active:bg-gray-50"
-            >
+            <label key={option.value} className={autopartsFilterOptionClass}>
               <input
                 type="radio"
                 name={`sort-filter-${title}`}
                 checked={value === option.value}
                 onChange={() => onChange(option.value)}
-                className="h-4 w-4 shrink-0 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className={autopartsFilterCheckboxClass}
               />
-              <span>{option.label}</span>
+              <span className="min-w-0 flex-1">{option.label}</span>
             </label>
           ))}
         </div>

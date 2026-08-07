@@ -21,6 +21,15 @@ import {
   uiSortToApi,
 } from '../../../utils/autopartsPublic';
 import SortFilterSection from '../../../components/Autoparts/SortFilterSection';
+import {
+  autopartsFilterCheckboxClass,
+  autopartsFilterOptionClass,
+  autopartsFilterPriceInputClass,
+  autopartsFilterPrimaryButtonClass,
+  autopartsFilterSecondaryButtonClass,
+  autopartsFilterSectionTitleClass,
+  autopartsFilterToggleClass,
+} from '../../../utils/autopartsFilterUi';
 
 const COLLAPSED_FILTER_LIMIT = 3;
 
@@ -242,19 +251,19 @@ function UsedPartsFiltersForm({
     const showToggle = allOptions.length > COLLAPSED_FILTER_LIMIT;
 
     return (
-      <div>
-        <p className="block text-xs font-medium text-gray-600 mb-2">{title}</p>
-        <div className="space-y-2">
+      <div className="space-y-2">
+        <p className={autopartsFilterSectionTitleClass}>{title}</p>
+        <div className="space-y-1.5">
           {visibleOptions.length > 0 ? (
             visibleOptions.map((option) => {
               const value = String(option.value);
               return (
-                <label key={value} className="flex items-center gap-2 text-sm text-gray-700">
+                <label key={value} className={autopartsFilterOptionClass}>
                   <input
                     type="checkbox"
                     checked={selectedValues.includes(value)}
                     onChange={() => toggleMultiFilter(urlKey, value)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className={autopartsFilterCheckboxClass}
                   />
                   <span className="min-w-0 flex-1 truncate">{option.label || option.value}</span>
                   {typeof option.count === 'number' && (
@@ -264,14 +273,14 @@ function UsedPartsFiltersForm({
               );
             })
           ) : (
-            <p className="text-xs text-gray-400">Нет вариантов</p>
+            <p className="px-1 text-xs text-gray-400">Нет вариантов</p>
           )}
         </div>
         {showToggle && (
           <button
             type="button"
             onClick={() => toggleFilterGroup(groupKey)}
-            className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+            className={autopartsFilterToggleClass}
           >
             {isExpanded ? 'Скрыть' : 'Показать больше'}
           </button>
@@ -286,7 +295,7 @@ function UsedPartsFiltersForm({
   }));
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <SortFilterSection
         options={USED_SORT_OPTIONS}
         value={currentSort}
@@ -307,9 +316,24 @@ function UsedPartsFiltersForm({
         selectedValues: activeFilters.brands,
         urlKey: 'brand',
       })}
-      <div className="grid grid-cols-2 gap-2">
-        <input type="number" placeholder="Цена от" value={activeFilters.priceMin} onChange={(e) => setFilter('vmin', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-        <input type="number" placeholder="Цена до" value={activeFilters.priceMax} onChange={(e) => setFilter('vmax', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+      <div className="space-y-2">
+        <p className={autopartsFilterSectionTitleClass}>Цена, ₽</p>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="number"
+            placeholder="От"
+            value={activeFilters.priceMin}
+            onChange={(e) => setFilter('vmin', e.target.value || null)}
+            className={autopartsFilterPriceInputClass}
+          />
+          <input
+            type="number"
+            placeholder="До"
+            value={activeFilters.priceMax}
+            onChange={(e) => setFilter('vmax', e.target.value || null)}
+            className={autopartsFilterPriceInputClass}
+          />
+        </div>
       </div>
       {renderCheckboxGroup({
         title: 'Марки авто',
@@ -325,17 +349,22 @@ function UsedPartsFiltersForm({
         selectedValues: activeFilters.vehicleModels,
         urlKey: 'vm',
       })}
-      <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" checked={activeFilters.hasPhotos} onChange={(e) => setFilter('has_photos', e.target.checked ? '1' : null)} />
-        Только с фото
+      <label className={autopartsFilterOptionClass}>
+        <input
+          type="checkbox"
+          checked={activeFilters.hasPhotos}
+          onChange={(e) => setFilter('has_photos', e.target.checked ? '1' : null)}
+          className={autopartsFilterCheckboxClass}
+        />
+        <span>Только с фото</span>
       </label>
       {deferApply ? (
-        <div className="space-y-2 border-t border-gray-100 pt-3">
+        <div className="space-y-2 border-t border-gray-100 pt-4">
           {hasPendingChanges ? (
             <button
               type="button"
               onClick={applyFilters}
-              className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+              className={`${autopartsFilterPrimaryButtonClass} w-full`}
             >
               Применить фильтры
             </button>
@@ -344,7 +373,7 @@ function UsedPartsFiltersForm({
             <button
               type="button"
               onClick={clearFilters}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50"
+              className={`${autopartsFilterSecondaryButtonClass} w-full`}
             >
               Сбросить фильтры
             </button>
@@ -352,7 +381,13 @@ function UsedPartsFiltersForm({
         </div>
       ) : null}
       {!deferApply && showClearInPanel && (
-        <button type="button" onClick={clearFilters} className="w-full text-sm text-indigo-600 hover:text-indigo-800 font-medium">Сбросить фильтры</button>
+        <button
+          type="button"
+          onClick={clearFilters}
+          className={`${autopartsFilterSecondaryButtonClass} w-full`}
+        >
+          Сбросить фильтры
+        </button>
       )}
     </div>
   );

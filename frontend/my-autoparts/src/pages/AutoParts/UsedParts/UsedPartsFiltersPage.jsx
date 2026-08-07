@@ -13,6 +13,12 @@ import UsedPartsFiltersForm from './UsedPartsFiltersForm';
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
 import { buildUsedCatalogParams } from '../../../utils/autopartsPublic';
 import { Z_MOBILE_STICKY_FOOTER } from '../../../constants/mobileTokens';
+import {
+  autopartsFilterPanelClass,
+  autopartsFilterPrimaryButtonClass,
+  autopartsFilterSecondaryButtonClass,
+  autopartsFilterTitleClass,
+} from '../../../utils/autopartsFilterUi';
 
 export default function UsedPartsFiltersPage() {
   const dispatch = useDispatch();
@@ -81,9 +87,9 @@ export default function UsedPartsFiltersPage() {
         <link rel="canonical" href="https://svoygarage.ru/autoparts/used" />
       </Helmet>
       <div className="px-3 sm:px-0">
-        <h1 className="text-lg font-semibold text-gray-900 mb-3 md:hidden">Фильтры</h1>
-        <div className="relative z-10 rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="font-semibold text-gray-900 mb-3 hidden md:block">Фильтры</h2>
+        <h1 className="mb-3 text-lg font-semibold text-gray-900 md:hidden">Фильтры</h1>
+        <div className={`relative z-10 ${autopartsFilterPanelClass}`}>
+          <h2 className={`${autopartsFilterTitleClass} hidden md:block`}>Фильтры</h2>
           <UsedPartsFiltersForm updateCatalogUrl={updateCatalogUrl} showClearInPanel={false} />
         </div>
       </div>
@@ -101,7 +107,7 @@ export default function UsedPartsFiltersPage() {
             <button
               type="button"
               onClick={clearFilters}
-              className="min-h-11 w-full rounded-lg border border-gray-300 px-3 text-base font-medium text-gray-800 active:bg-gray-50"
+              className={`${autopartsFilterSecondaryButtonClass} min-h-11 w-full text-base`}
             >
               Сбросить фильтры
             </button>
@@ -109,7 +115,7 @@ export default function UsedPartsFiltersPage() {
           <button
             type="button"
             onClick={goToResults}
-            className="min-h-11 w-full rounded-lg bg-indigo-600 px-4 text-base font-semibold text-white active:bg-indigo-700"
+            className={`${autopartsFilterPrimaryButtonClass} min-h-11 w-full text-base`}
           >
             Показать товары
           </button>

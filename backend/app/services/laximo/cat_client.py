@@ -138,6 +138,35 @@ def find_vehicle(
     return _as_dict_list(data)
 
 
+def find_vehicle_by_plate_number(
+    db: Session,
+    plate_number: str,
+    *,
+    country_code: str = "ru",
+    catalog: Optional[str] = None,
+    count_toward_quota: bool = True,
+) -> list[dict[str, Any]]:
+    """POST /findVehicleByPlateNumber — catalog vehicle candidates by RU plate."""
+    plate = (plate_number or "").strip()
+    if not plate:
+        raise LaximoCatError("plateNumber is required")
+    cc = (country_code or "ru").strip().lower() or "ru"
+    params: dict[str, Any] = {
+        "countryCode": cc,
+        "plateNumber": plate,
+        "localized": "true",
+    }
+    if catalog:
+        params["catalog"] = catalog.strip()
+    data = request_cat(
+        db,
+        "/findVehicleByPlateNumber",
+        params=params,
+        count_toward_quota=count_toward_quota,
+    )
+    return _as_dict_list(data)
+
+
 def identify_by_plate_number_full(
     db: Session,
     plate_number: str,

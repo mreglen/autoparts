@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.services.laximo.cat_client import (
     LaximoCatError,
     find_vehicle,
+    find_vehicle_by_plate_number,
     identify_by_plate_number_full,
 )
 from app.services.laximo.frame import normalize_frame_or_raise
@@ -276,53 +277,68 @@ def _plate_card_usable(card: dict[str, Any]) -> bool:
     return bool(mark or model)
 
 
-def lookup_by_plate(
+def _vin_from_find_vehicle_row(row: dict[str, Any]) -> Optional[str]:
+    attrs = row.get("attributes") if isinstance(row.get("attributes"), list) else []
+    for item in attrs:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key") or "").strip().lower()
+        if key not in ("vin", "vin_number", "vincode"):
+            continue
+        vin = normalize_vin_or_none(str(item.get("value") or ""))
+        if vin:
+            return vin
+    return None
+
+
+def _lookup_by_plate_via_find_vehicle(
     db: Session,
-    plate: str,
-    *,
-    country_code: str = "ru",
-) -> ByPlateResult:
-    """
-    Gate → cache → identifyByPlateNumberFull → optional FindVehicle(vin).
-    Soft-fails never expose quota / Laximo / upstream details.
-    """
-    normalized_plate = normalize_plate_or_raise(plate)
-    cc = (country_code or "ru").strip().lower() or "ru"
-    cache_key = _plate_cache_key(normalized_plate, cc)
-
-    if not laximo_cat_ready(db):
-        return _plate_soft_unavailable(normalized_plate)
-
-    cached = _plate_cache_get(cache_key)
-    if cached is not None:
-        rebuilt: list[NormalizedVehicleCandidate] = []
-        for item in cached.get("candidates") or []:
-            if isinstance(item, dict):
-                rebuilt.append(NormalizedVehicleCandidate(**item))
-        return ByPlateResult(
-            ok=True,
-            reason=PUBLIC_OK,
-            message=None,
-            plate=cached.get("plate") or normalized_plate,
-            vin=cached.get("vin"),
-            candidates=rebuilt,
-        )
-
+    normalized_plate: str,
+    cc: str,
+) -> Optional[ByPlateResult]:
     try:
-        card = identify_by_plate_number_full(
+        rows = find_vehicle_by_plate_number(
             db,
             normalized_plate,
             country_code=cc,
             count_toward_quota=True,
         )
     except LaximoCatError as exc:
-        if getattr(exc, "status_code", None) == 404:
-            return _plate_not_found(normalized_plate)
-        logger.exception("Laximo identifyByPlateNumberFull failed")
-        return _plate_soft_unavailable(normalized_plate)
-    except Exception:
-        logger.exception("Unexpected error during identifyByPlateNumberFull")
-        return _plate_soft_unavailable(normalized_plate)
+        if getattr(exc, "status_code", None) in (403, 404):
+            return None
+        raise
+
+    if not rows:
+        return None
+
+    candidates = [normalize_find_vehicle_row(row) for row in rows]
+    vin = None
+    for row in rows:
+        vin = _vin_from_find_vehicle_row(row)
+        if vin:
+            break
+
+    return ByPlateResult(
+        ok=True,
+        reason=PUBLIC_OK,
+        message=None,
+        plate=normalized_plate,
+        vin=vin,
+        candidates=candidates,
+    )
+
+
+def _lookup_by_plate_via_identify_full(
+    db: Session,
+    normalized_plate: str,
+    cc: str,
+) -> ByPlateResult:
+    card = identify_by_plate_number_full(
+        db,
+        normalized_plate,
+        country_code=cc,
+        count_toward_quota=True,
+    )
 
     if not _plate_card_usable(card):
         return _plate_not_found(normalized_plate)
@@ -351,7 +367,7 @@ def lookup_by_plate(
     if not candidates:
         return _plate_not_found(normalized_plate)
 
-    result = ByPlateResult(
+    return ByPlateResult(
         ok=True,
         reason=PUBLIC_OK,
         message=None,
@@ -359,12 +375,68 @@ def lookup_by_plate(
         vin=vin,
         candidates=candidates,
     )
+
+
+def lookup_by_plate(
+    db: Session,
+    plate: str,
+    *,
+    country_code: str = "ru",
+) -> ByPlateResult:
+    """
+    Gate → cache → findVehicleByPlateNumber → fallback identifyByPlateNumberFull.
+    Soft-fails never expose quota / Laximo / upstream details.
+    """
+    normalized_plate = normalize_plate_or_raise(plate)
+    cc = (country_code or "ru").strip().lower() or "ru"
+    cache_key = _plate_cache_key(normalized_plate, cc)
+
+    if not laximo_cat_ready(db):
+        return _plate_soft_unavailable(normalized_plate)
+
+    cached = _plate_cache_get(cache_key)
+    if cached is not None:
+        rebuilt: list[NormalizedVehicleCandidate] = []
+        for item in cached.get("candidates") or []:
+            if isinstance(item, dict):
+                rebuilt.append(NormalizedVehicleCandidate(**item))
+        return ByPlateResult(
+            ok=True,
+            reason=PUBLIC_OK,
+            message=None,
+            plate=cached.get("plate") or normalized_plate,
+            vin=cached.get("vin"),
+            candidates=rebuilt,
+        )
+
+    try:
+        result = _lookup_by_plate_via_find_vehicle(db, normalized_plate, cc)
+        if result is None:
+            try:
+                result = _lookup_by_plate_via_identify_full(db, normalized_plate, cc)
+            except LaximoCatError as exc:
+                if getattr(exc, "status_code", None) == 404:
+                    return _plate_not_found(normalized_plate)
+                logger.exception("Laximo plate identify fallback failed")
+                return _plate_soft_unavailable(normalized_plate)
+    except LaximoCatError as exc:
+        if getattr(exc, "status_code", None) == 404:
+            return _plate_not_found(normalized_plate)
+        logger.exception("Laximo findVehicleByPlateNumber failed")
+        return _plate_soft_unavailable(normalized_plate)
+    except Exception:
+        logger.exception("Unexpected error during plate lookup")
+        return _plate_soft_unavailable(normalized_plate)
+
+    if not result.ok:
+        return result
+
     _plate_cache_set(
         cache_key,
         {
             "plate": normalized_plate,
-            "vin": vin,
-            "candidates": [c.to_dict() for c in candidates],
+            "vin": result.vin,
+            "candidates": [c.to_dict() for c in result.candidates],
         },
     )
     return result

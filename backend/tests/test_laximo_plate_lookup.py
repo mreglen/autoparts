@@ -69,6 +69,18 @@ class PlateFullNormalizeTests(unittest.TestCase):
         self.assertIsNone(normalize_plate_full_card({}))
 
 
+SAMPLE_FIND_VEHICLE_ROW = {
+    "catalog": "VOLVO201410",
+    "brand": "VOLVO",
+    "name": "XC90",
+    "vehicleId": "1004",
+    "ssd": "test-ssd",
+    "attributes": [
+        {"key": "manufactured", "value": "2007", "name": "Выпущено"},
+    ],
+}
+
+
 class LookupByPlateTests(unittest.TestCase):
     def setUp(self):
         clear_plate_lookup_cache()
@@ -78,13 +90,37 @@ class LookupByPlateTests(unittest.TestCase):
             "app.services.laximo.vehicle_lookup.laximo_cat_ready",
             return_value=False,
         ), patch(
+            "app.services.laximo.vehicle_lookup.find_vehicle_by_plate_number"
+        ) as find_mock, patch(
             "app.services.laximo.vehicle_lookup.identify_by_plate_number_full"
         ) as full_mock:
             result = lookup_by_plate(MagicMock(), "М460УН154")
+        find_mock.assert_not_called()
         full_mock.assert_not_called()
         self.assertFalse(result.ok)
         self.assertEqual(result.reason, "temporarily_unavailable")
         self.assertTrue(assert_public_message_safe(result.message or ""))
+
+    def test_find_vehicle_by_plate_primary(self):
+        with patch(
+            "app.services.laximo.vehicle_lookup.laximo_cat_ready",
+            return_value=True,
+        ), patch(
+            "app.services.laximo.vehicle_lookup.find_vehicle_by_plate_number",
+            return_value=[SAMPLE_FIND_VEHICLE_ROW],
+        ) as find_mock, patch(
+            "app.services.laximo.vehicle_lookup.identify_by_plate_number_full"
+        ) as full_mock:
+            result = lookup_by_plate(MagicMock(), "E702XT196")
+
+        find_mock.assert_called_once()
+        full_mock.assert_not_called()
+        self.assertTrue(result.ok)
+        self.assertEqual(result.plate, "Е702ХТ196")
+        self.assertEqual(result.candidates[0].make, "VOLVO")
+        self.assertEqual(result.candidates[0].model, "XC90")
+        self.assertEqual(result.candidates[0].year, 2007)
+        self.assertEqual(result.candidates[0].catalog, "VOLVO201410")
 
     def test_full_plus_find_vehicle(self):
         cand = NormalizedVehicleCandidate(
@@ -97,6 +133,9 @@ class LookupByPlateTests(unittest.TestCase):
         with patch(
             "app.services.laximo.vehicle_lookup.laximo_cat_ready",
             return_value=True,
+        ), patch(
+            "app.services.laximo.vehicle_lookup.find_vehicle_by_plate_number",
+            return_value=[],
         ), patch(
             "app.services.laximo.vehicle_lookup.identify_by_plate_number_full",
             return_value=SAMPLE_PLATE_CARD,
@@ -120,6 +159,9 @@ class LookupByPlateTests(unittest.TestCase):
             "app.services.laximo.vehicle_lookup.laximo_cat_ready",
             return_value=True,
         ), patch(
+            "app.services.laximo.vehicle_lookup.find_vehicle_by_plate_number",
+            return_value=[],
+        ), patch(
             "app.services.laximo.vehicle_lookup.identify_by_plate_number_full",
             return_value={},
         ):
@@ -131,6 +173,9 @@ class LookupByPlateTests(unittest.TestCase):
         with patch(
             "app.services.laximo.vehicle_lookup.laximo_cat_ready",
             return_value=True,
+        ), patch(
+            "app.services.laximo.vehicle_lookup.find_vehicle_by_plate_number",
+            return_value=[],
         ), patch(
             "app.services.laximo.vehicle_lookup.identify_by_plate_number_full",
             return_value=SAMPLE_PLATE_CARD,
@@ -153,20 +198,41 @@ class LookupByPlateTests(unittest.TestCase):
             "app.services.laximo.vehicle_lookup.laximo_cat_ready",
             return_value=True,
         ), patch(
-            "app.services.laximo.vehicle_lookup.identify_by_plate_number_full",
+            "app.services.laximo.vehicle_lookup.find_vehicle_by_plate_number",
             side_effect=LaximoCatError("HTTP 500"),
-        ):
+        ), patch(
+            "app.services.laximo.vehicle_lookup.identify_by_plate_number_full",
+        ) as full_mock:
             result = lookup_by_plate(MagicMock(), "М460УН154")
+        full_mock.assert_not_called()
         self.assertFalse(result.ok)
         self.assertEqual(result.reason, "temporarily_unavailable")
         lowered = (result.message or "").lower()
         self.assertNotIn("laximo", lowered)
         self.assertNotIn("квота", lowered)
 
+    def test_identify_403_falls_back_after_empty_find(self):
+        with patch(
+            "app.services.laximo.vehicle_lookup.laximo_cat_ready",
+            return_value=True,
+        ), patch(
+            "app.services.laximo.vehicle_lookup.find_vehicle_by_plate_number",
+            return_value=[],
+        ), patch(
+            "app.services.laximo.vehicle_lookup.identify_by_plate_number_full",
+            side_effect=LaximoCatError("HTTP 403", status_code=403),
+        ):
+            result = lookup_by_plate(MagicMock(), "М460УН154")
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "temporarily_unavailable")
+
     def test_upstream_404_not_found(self):
         with patch(
             "app.services.laximo.vehicle_lookup.laximo_cat_ready",
             return_value=True,
+        ), patch(
+            "app.services.laximo.vehicle_lookup.find_vehicle_by_plate_number",
+            return_value=[],
         ), patch(
             "app.services.laximo.vehicle_lookup.identify_by_plate_number_full",
             side_effect=LaximoCatError("HTTP 404", status_code=404),
