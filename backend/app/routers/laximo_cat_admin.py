@@ -25,7 +25,6 @@ from app.services.laximo.gate import (
     doc_requests_remaining,
     get_doc_internal_status,
     get_internal_status,
-    product_card_daily_request_limit,
     product_card_quota_exhausted,
     product_card_requests_remaining,
     quota_exhausted,
