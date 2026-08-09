@@ -4,7 +4,10 @@ import {
   buildVehicleTitle,
   dedupeCompatibilityAgainstDonors,
   getDonorCaption,
+  groupFitmentForDisplay,
   hasDonorDetails,
+  mapLaximoApplicableVehicle,
+  mergeReferenceFitmentRows,
 } from './fitmentDisplay';
 import { splitFitmentForDisplay } from './mergeProductFitment';
 
@@ -63,5 +66,40 @@ describe('splitFitmentForDisplay', () => {
     ]);
     expect(compatibility).toHaveLength(1);
     expect(compatibility[0].model).toBe('ES');
+  });
+
+  test('mergeReferenceFitmentRows dedupes tecdoc and laximo by brand/model/years', () => {
+    const merged = mergeReferenceFitmentRows([
+      { brand: 'HYUNDAI', model: 'MATRIX', generation: '2001–2007', source: 'tecdoc' },
+      {
+        brand: 'HYUNDAI',
+        model: 'MATRIX',
+        generation: '2001–2007',
+        source: 'laximo',
+      },
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].sources.sort()).toEqual(['laximo', 'tecdoc']);
+  });
+
+  test('mapLaximoApplicableVehicle strips duplicate year range from name', () => {
+    const mapped = mapLaximoApplicableVehicle({
+      brand: 'HYUNDAI',
+      name: 'MATRIX 01 (2001-2007)',
+      year_from: '2001',
+      year_to: '2007',
+    });
+    expect(mapped.model).toBe('MATRIX 01');
+    expect(mapped.generation).toBe('2001–2007');
+  });
+
+  test('groupFitmentForDisplay groups by brand and model', () => {
+    const groups = groupFitmentForDisplay([
+      { brand: 'Ford', model: 'Fiesta', generation: '1995–1999', source: 'laximo' },
+      { brand: 'Ford', model: 'Escort', generation: '1990–1995', source: 'tecdoc' },
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].brand).toBe('Ford');
+    expect(groups[0].models).toHaveLength(2);
   });
 });

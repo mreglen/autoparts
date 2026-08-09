@@ -1,6 +1,21 @@
+import sys
+import types
 import unittest
 from unittest.mock import MagicMock, patch
 
+if "fcntl" not in sys.modules:
+    sys.modules["fcntl"] = types.ModuleType("fcntl")
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from app.db.database import Base
+from app.models.laximo_oem_fitment import (
+    LaximoApplicableVehicle,
+    LaximoOemArticle,
+    LaximoOemCatalogScan,
+    LaximoOemVehicleLink,
+)
 from app.services.laximo.cat_client import LaximoCatError
 from app.services.laximo.gate import assert_public_message_safe
 from app.services.laximo.oem_applicability import (
@@ -13,6 +28,21 @@ from app.services.laximo.oem_applicability import (
 class ApplicableVehiclesTests(unittest.TestCase):
     def setUp(self):
         clear_oem_applicability_cache()
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(
+            bind=self.engine,
+            tables=[
+                LaximoOemArticle.__table__,
+                LaximoApplicableVehicle.__table__,
+                LaximoOemVehicleLink.__table__,
+                LaximoOemCatalogScan.__table__,
+            ],
+        )
+        self.Session = sessionmaker(bind=self.engine)
+        self.db = self.Session()
+
+    def tearDown(self):
+        self.db.close()
 
     def test_not_ready_skips_http(self):
         with patch(
@@ -21,7 +51,7 @@ class ApplicableVehiclesTests(unittest.TestCase):
         ), patch(
             "app.services.laximo.oem_applicability.cat_client.find_part_references"
         ) as refs:
-            result = lookup_applicable_vehicles(MagicMock(), oem="0913128000")
+            result = lookup_applicable_vehicles(self.db, oem="0913128000")
         refs.assert_not_called()
         self.assertFalse(result.ok)
         self.assertEqual(result.reason, "temporarily_unavailable")
@@ -55,12 +85,12 @@ class ApplicableVehiclesTests(unittest.TestCase):
             ],
         ) as fav:
             result = lookup_applicable_vehicles(
-                MagicMock(), oem="0913128000", brand="HYUNDAI"
+                self.db, oem="0913128000", brand="HYUNDAI"
             )
         refs.assert_called_once()
-        self.assertTrue(refs.call_args.kwargs.get("count_toward_quota"))
+        self.assertTrue(refs.call_args.kwargs.get("quota_kind") == "product_card")
         fav.assert_called_once()
-        self.assertTrue(fav.call_args.kwargs.get("count_toward_quota"))
+        self.assertTrue(fav.call_args.kwargs.get("quota_kind") == "product_card")
         self.assertTrue(result.ok)
         self.assertEqual(len(result.payload["vehicles"]), 1)
         self.assertEqual(result.payload["vehicles"][0]["brand"], "HYUNDAI")
@@ -81,10 +111,10 @@ class ApplicableVehiclesTests(unittest.TestCase):
         ), patch(
             "app.services.laximo.oem_applicability.cat_client.find_applicable_vehicles"
         ) as fav:
-            result = lookup_applicable_vehicles(MagicMock(), oem="0913128000")
+            result = lookup_applicable_vehicles(self.db, oem="0913128000")
         fav.assert_not_called()
-        self.assertTrue(result.ok)
-        self.assertEqual(result.payload["vehicles"], [])
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "not_found")
 
     def test_upstream_fail_soft(self):
         with patch(
@@ -94,7 +124,7 @@ class ApplicableVehiclesTests(unittest.TestCase):
             "app.services.laximo.oem_applicability.cat_client.find_part_references",
             side_effect=LaximoCatError("HTTP 403"),
         ):
-            result = lookup_applicable_vehicles(MagicMock(), oem="0913128000")
+            result = lookup_applicable_vehicles(self.db, oem="0913128000")
         self.assertFalse(result.ok)
         self.assertEqual(result.reason, "temporarily_unavailable")
         self.assertTrue(assert_public_message_safe(result.message or ""))
@@ -109,10 +139,10 @@ class ApplicableVehiclesTests(unittest.TestCase):
         ), patch(
             "app.services.laximo.oem_applicability.cat_client.find_applicable_vehicles"
         ) as fav:
-            result = lookup_applicable_vehicles(MagicMock(), oem="0913128000")
+            result = lookup_applicable_vehicles(self.db, oem="0913128000")
         fav.assert_not_called()
-        self.assertTrue(result.ok)
-        self.assertEqual(result.payload["vehicles"], [])
+        self.assertFalse(result.ok)
+        self.assertEqual(result.reason, "not_found")
 
 
 class OemOnVehicleTests(unittest.TestCase):

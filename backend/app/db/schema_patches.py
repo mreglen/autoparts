@@ -2042,6 +2042,173 @@ def ensure_laximo_cat_tables() -> None:
         logger.info("Applied site_laximo_cat_integration table patch")
 
     ensure_laximo_doc_columns()
+    ensure_laximo_product_card_quota_columns()
+    ensure_laximo_oem_fitment_tables()
+
+
+def ensure_laximo_product_card_quota_columns() -> None:
+    """Add per-day product-card HTTP budget columns to site_laximo_cat_integration."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "site_laximo_cat_integration" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_laximo_cat_integration")}
+    is_pg = engine.dialect.name == "postgresql"
+    ts = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    statements = []
+    patches = [
+        ("product_card_daily_request_limit", "INTEGER NOT NULL DEFAULT 10"),
+        ("product_card_requests_today", "INTEGER NOT NULL DEFAULT 0"),
+        ("product_card_requests_day", "DATE"),
+        ("product_card_quota_exhausted_at", ts),
+    ]
+    for name, col_type in patches:
+        if name not in columns:
+            statements.append(
+                f"ALTER TABLE site_laximo_cat_integration ADD COLUMN {name} {col_type}"
+            )
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied Laximo product-card quota columns patch")
+
+
+def ensure_laximo_oem_fitment_tables() -> None:
+    """Persist OEM ↔ vehicle applicability from Laximo.CAT."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    is_pg = engine.dialect.name == "postgresql"
+    ts = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    json_type = "TEXT"
+
+    if "laximo_oem_articles" not in table_names:
+        ddl = f"""
+        CREATE TABLE laximo_oem_articles (
+            id INTEGER PRIMARY KEY{' AUTOINCREMENT' if not is_pg else ''},
+            oem_norm VARCHAR(64) NOT NULL UNIQUE,
+            oem_raw VARCHAR(64) NOT NULL,
+            brand_hint VARCHAR(64) NOT NULL DEFAULT '',
+            status VARCHAR(32) NOT NULL DEFAULT 'pending',
+            vehicle_count INTEGER NOT NULL DEFAULT 0,
+            fetched_at {ts},
+            expires_at {ts},
+            next_retry_at {ts},
+            last_error TEXT,
+            created_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'},
+            updated_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'}
+        )
+        """
+        with engine.begin() as conn:
+            if is_pg:
+                conn.execute(
+                    text(
+                        ddl.replace("INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY")
+                    )
+                )
+            else:
+                conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_laximo_oem_articles_status "
+                    "ON laximo_oem_articles (status)"
+                )
+            )
+        logger.info("Applied laximo_oem_articles table patch")
+        table_names.add("laximo_oem_articles")
+
+    if "laximo_applicable_vehicles" not in table_names:
+        ddl = f"""
+        CREATE TABLE laximo_applicable_vehicles (
+            id INTEGER PRIMARY KEY{' AUTOINCREMENT' if not is_pg else ''},
+            catalog VARCHAR(64) NOT NULL,
+            vehicle_id VARCHAR(64),
+            vehicle_key VARCHAR(128) NOT NULL,
+            brand VARCHAR(80),
+            name VARCHAR(255),
+            year_from VARCHAR(8),
+            year_to VARCHAR(8),
+            attributes_json {json_type},
+            created_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'},
+            UNIQUE (catalog, vehicle_key)
+        )
+        """
+        with engine.begin() as conn:
+            if is_pg:
+                conn.execute(
+                    text(
+                        ddl.replace("INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY")
+                    )
+                )
+            else:
+                conn.execute(text(ddl))
+        logger.info("Applied laximo_applicable_vehicles table patch")
+        table_names.add("laximo_applicable_vehicles")
+
+    if "laximo_oem_vehicle_links" not in table_names:
+        ddl = f"""
+        CREATE TABLE laximo_oem_vehicle_links (
+            id INTEGER PRIMARY KEY{' AUTOINCREMENT' if not is_pg else ''},
+            article_id INTEGER NOT NULL,
+            vehicle_id INTEGER NOT NULL,
+            created_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'},
+            UNIQUE (article_id, vehicle_id),
+            FOREIGN KEY (article_id) REFERENCES laximo_oem_articles(id) ON DELETE CASCADE,
+            FOREIGN KEY (vehicle_id) REFERENCES laximo_applicable_vehicles(id) ON DELETE CASCADE
+        )
+        """
+        with engine.begin() as conn:
+            if is_pg:
+                conn.execute(
+                    text(
+                        ddl.replace("INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY")
+                    )
+                )
+            else:
+                conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_laximo_oem_vehicle_links_article "
+                    "ON laximo_oem_vehicle_links (article_id)"
+                )
+            )
+        logger.info("Applied laximo_oem_vehicle_links table patch")
+        table_names.add("laximo_oem_vehicle_links")
+
+    if "laximo_oem_catalog_scans" not in table_names:
+        ddl = f"""
+        CREATE TABLE laximo_oem_catalog_scans (
+            id INTEGER PRIMARY KEY{' AUTOINCREMENT' if not is_pg else ''},
+            article_id INTEGER NOT NULL,
+            catalog_code VARCHAR(64) NOT NULL,
+            catalog_brand VARCHAR(80),
+            has_detailapplicability BOOLEAN NOT NULL DEFAULT {'FALSE' if is_pg else '0'},
+            fav_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+            vehicles_found INTEGER NOT NULL DEFAULT 0,
+            scanned_at {ts},
+            created_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'},
+            UNIQUE (article_id, catalog_code),
+            FOREIGN KEY (article_id) REFERENCES laximo_oem_articles(id) ON DELETE CASCADE
+        )
+        """
+        with engine.begin() as conn:
+            if is_pg:
+                conn.execute(
+                    text(
+                        ddl.replace("INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY")
+                    )
+                )
+            else:
+                conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_laximo_oem_catalog_scans_article "
+                    "ON laximo_oem_catalog_scans (article_id)"
+                )
+            )
+        logger.info("Applied laximo_oem_catalog_scans table patch")
 
 
 def ensure_laximo_doc_columns() -> None:

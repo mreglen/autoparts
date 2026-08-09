@@ -67,6 +67,7 @@ export default function LaximoCatSection() {
   const [password, setPassword] = useState('');
   const [baseUrl, setBaseUrl] = useState('https://ws.laximo.ru/restApi/v1');
   const [dailyLimit, setDailyLimit] = useState('500');
+  const [productCardDailyLimit, setProductCardDailyLimit] = useState('10');
   const [isEnabled, setIsEnabled] = useState(false);
   const [docLogin, setDocLogin] = useState('');
   const [docPassword, setDocPassword] = useState('');
@@ -78,6 +79,7 @@ export default function LaximoCatSection() {
     setIntegration(data);
     setBaseUrl(data?.base_url || 'https://ws.laximo.ru/restApi/v1');
     setDailyLimit(String(data?.daily_request_limit ?? 500));
+    setProductCardDailyLimit(String(data?.product_card_daily_request_limit ?? 10));
     setIsEnabled(Boolean(data?.is_enabled));
     setDocBaseUrl(data?.doc_base_url || 'https://ws.laximo.ru/restApi/v1');
     setDocIsEnabled(Boolean(data?.doc_is_enabled));
@@ -151,6 +153,7 @@ export default function LaximoCatSection() {
         body: JSON.stringify({
           base_url: baseUrl.trim(),
           daily_request_limit: parseInt(dailyLimit, 10) || 0,
+          product_card_daily_request_limit: parseInt(productCardDailyLimit, 10) || 0,
           is_enabled: isEnabled,
           doc_base_url: docBaseUrl.trim(),
           doc_is_enabled: docIsEnabled,
@@ -271,6 +274,22 @@ export default function LaximoCatSection() {
     }
   };
 
+  const resetProductCardQuota = async () => {
+    if (!window.confirm('Сбросить дневной счётчик HTTP-запросов для карточек товаров?')) return;
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await apiRequest('/admin/laximo-cat/product-card/quota/reset', { method: 'POST' });
+      setIntegration(data);
+      setNotice('Счётчик запросов для карточек сброшен');
+    } catch (e) {
+      setError(e?.message || 'Не удалось сбросить счётчик карточек');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
@@ -282,6 +301,9 @@ export default function LaximoCatSection() {
   const used = Number(integration?.requests_today) || 0;
   const docUsed = Number(integration?.doc_requests_today) || 0;
   const limit = Number(integration?.daily_request_limit) || 0;
+  const productCardUsed = Number(integration?.product_card_requests_today) || 0;
+  const productCardLimit = Number(integration?.product_card_daily_request_limit) || 0;
+  const productCardRemaining = integration?.product_card_requests_remaining;
   const remaining = integration?.requests_remaining;
   const docRemaining = integration?.doc_requests_remaining;
 
@@ -378,25 +400,41 @@ export default function LaximoCatSection() {
                 value={dailyLimit}
                 onChange={(e) => setDailyLimit(e.target.value)}
               />
-              <p className="mt-1 text-xs text-gray-500">0 — без лимита</p>
+              <p className="mt-1 text-xs text-gray-500">0 — без лимита (общий CAT)</p>
             </div>
-            <div className="flex items-end">
-              <label className="flex cursor-pointer select-none items-center gap-3">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  checked={isEnabled}
-                  disabled={!canEnable && !isEnabled}
-                  onChange={(e) => setIsEnabled(e.target.checked)}
-                />
-                <span className="font-medium text-gray-900">Включить</span>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                HTTP-запросы для карточек / сутки
               </label>
+              <input
+                type="number"
+                min="0"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                value={productCardDailyLimit}
+                onChange={(e) => setProductCardDailyLimit(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Каждый FindPartReferences / FindApplicableVehicles = 1 запрос. По умолчанию 10.
+              </p>
             </div>
+          </div>
+
+          <div className="flex items-end">
+            <label className="flex cursor-pointer select-none items-center gap-3">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                checked={isEnabled}
+                disabled={!canEnable && !isEnabled}
+                onChange={(e) => setIsEnabled(e.target.checked)}
+              />
+              <span className="font-medium text-gray-900">Включить</span>
+            </label>
           </div>
 
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-gray-900">Квота</span>
+              <span className="text-sm font-medium text-gray-900">Квота CAT</span>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${qPill.className}`}>
                 {qPill.label}
               </span>
@@ -421,6 +459,42 @@ export default function LaximoCatSection() {
               className="mt-2 text-xs text-indigo-600 hover:underline disabled:opacity-50"
             >
               Сбросить счётчик сегодня
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-3">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-gray-900">Квота карточек товаров</span>
+              {integration?.product_card_quota_exhausted ? (
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+                  Лимит исчерпан
+                </span>
+              ) : (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                  OK
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-700">
+              HTTP к Laximo для применимости:{' '}
+              <strong>
+                {productCardUsed}
+                {productCardLimit > 0 ? ` из ${productCardLimit}` : ''}
+              </strong>
+              {productCardRemaining != null ? (
+                <>
+                  {' '}
+                  · осталось <strong>{productCardRemaining}</strong>
+                </>
+              ) : null}
+            </p>
+            <button
+              type="button"
+              onClick={resetProductCardQuota}
+              disabled={saving}
+              className="mt-2 text-xs text-indigo-600 hover:underline disabled:opacity-50"
+            >
+              Сбросить счётчик карточек
             </button>
           </div>
 

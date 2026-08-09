@@ -135,6 +135,11 @@ class ApplicableVehicleOut(BaseModel):
 class ApplicableVehiclesResponse(CatalogSoftBase):
     oem: Optional[str] = None
     vehicles: list[ApplicableVehicleOut] = Field(default_factory=list)
+    fitment_status: Optional[str] = None
+    data_source: Optional[str] = None
+    coverage: Optional[str] = None
+    total: Optional[int] = None
+    updated_at: Optional[str] = None
 
 
 class OemApplicabilityRequest(BaseModel):

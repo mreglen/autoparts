@@ -4,6 +4,7 @@ from ..db.database import Base
 
 DEFAULT_LAXIMO_CAT_BASE_URL = "https://ws.laximo.ru/restApi/v1"
 DEFAULT_DAILY_REQUEST_LIMIT = 500
+DEFAULT_PRODUCT_CARD_DAILY_REQUEST_LIMIT = 10
 
 
 class SiteLaximoCatIntegration(Base):
@@ -22,6 +23,12 @@ class SiteLaximoCatIntegration(Base):
     requests_today = Column(Integer, nullable=False, default=0)
     requests_day = Column(Date, nullable=True)
     quota_exhausted_at = Column(DateTime, nullable=True)
+    product_card_daily_request_limit = Column(
+        Integer, nullable=False, default=DEFAULT_PRODUCT_CARD_DAILY_REQUEST_LIMIT
+    )
+    product_card_requests_today = Column(Integer, nullable=False, default=0)
+    product_card_requests_day = Column(Date, nullable=True)
+    product_card_quota_exhausted_at = Column(DateTime, nullable=True)
     last_upstream_error_at = Column(DateTime, nullable=True)
     last_upstream_error = Column(Text, nullable=True)
     # Laximo.DOC (FindOEM / analogs) — separate credentials & gate

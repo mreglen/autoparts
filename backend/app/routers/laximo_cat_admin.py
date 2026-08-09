@@ -11,6 +11,7 @@ from app.core.auth import get_current_admin_user
 from app.db.database import get_db
 from app.models.site_laximo_cat_integration import (
     DEFAULT_LAXIMO_CAT_BASE_URL,
+    DEFAULT_PRODUCT_CARD_DAILY_REQUEST_LIMIT,
     SiteLaximoCatIntegration,
 )
 from app.models.user import User
@@ -24,11 +25,15 @@ from app.services.laximo.gate import (
     doc_requests_remaining,
     get_doc_internal_status,
     get_internal_status,
+    product_card_daily_request_limit,
+    product_card_quota_exhausted,
+    product_card_requests_remaining,
     quota_exhausted,
     requests_remaining,
     reset_daily_counter_if_needed,
     reset_doc_quota_counter,
     reset_doc_verification_on_credential_change,
+    reset_product_card_quota_counter,
     reset_quota_counter,
     reset_verification_on_credential_change,
 )
@@ -47,6 +52,7 @@ class LaximoSettingsPatch(BaseModel):
     is_enabled: Optional[bool] = None
     base_url: Optional[str] = Field(None, min_length=8, max_length=512)
     daily_request_limit: Optional[int] = Field(None, ge=0, le=1_000_000)
+    product_card_daily_request_limit: Optional[int] = Field(None, ge=0, le=1_000_000)
     doc_is_enabled: Optional[bool] = None
     doc_base_url: Optional[str] = Field(None, min_length=8, max_length=512)
 
@@ -80,6 +86,10 @@ class LaximoIntegrationView(BaseModel):
     doc_status: str = "not_configured"
     doc_last_upstream_error: Optional[str] = None
     doc_last_upstream_error_at: Optional[datetime] = None
+    product_card_daily_request_limit: int = DEFAULT_PRODUCT_CARD_DAILY_REQUEST_LIMIT
+    product_card_requests_today: int = 0
+    product_card_requests_remaining: Optional[int] = None
+    product_card_quota_exhausted: bool = False
 
 
 class LaximoTestResult(BaseModel):
@@ -127,6 +137,13 @@ def _integration_view(db: Session, row: SiteLaximoCatIntegration) -> LaximoInteg
         doc_status=get_doc_internal_status(db, row),
         doc_last_upstream_error=getattr(row, "doc_last_upstream_error", None),
         doc_last_upstream_error_at=getattr(row, "doc_last_upstream_error_at", None),
+        product_card_daily_request_limit=int(
+            getattr(row, "product_card_daily_request_limit", DEFAULT_PRODUCT_CARD_DAILY_REQUEST_LIMIT)
+            or DEFAULT_PRODUCT_CARD_DAILY_REQUEST_LIMIT
+        ),
+        product_card_requests_today=int(getattr(row, "product_card_requests_today", 0) or 0),
+        product_card_requests_remaining=product_card_requests_remaining(row),
+        product_card_quota_exhausted=product_card_quota_exhausted(row),
     )
 
 
@@ -193,6 +210,9 @@ def patch_laximo_settings(
 
     if "daily_request_limit" in data and data["daily_request_limit"] is not None:
         row.daily_request_limit = int(data["daily_request_limit"])
+
+    if "product_card_daily_request_limit" in data and data["product_card_daily_request_limit"] is not None:
+        row.product_card_daily_request_limit = int(data["product_card_daily_request_limit"])
 
     if "is_enabled" in data:
         want_enabled = bool(data["is_enabled"])
@@ -408,6 +428,22 @@ def reset_laximo_quota(
         event_type="laximo_cat_quota_reset",
         category="settings",
         summary="Сброшен дневной счётчик запросов Laximo.CAT",
+        user=current_user,
+    )
+    return _integration_view(db, row)
+
+
+@router.post("/product-card/quota/reset", response_model=LaximoIntegrationView)
+def reset_laximo_product_card_quota(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = reset_product_card_quota_counter(db)
+    log_audit(
+        db,
+        event_type="laximo_product_card_quota_reset",
+        category="settings",
+        summary="Сброшен дневной счётчик HTTP-запросов Laximo для карточек товаров",
         user=current_user,
     )
     return _integration_view(db, row)

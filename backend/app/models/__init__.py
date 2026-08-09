@@ -53,6 +53,12 @@ from app.models.user_engagement import (
     SearchSubscription,
     SearchSubscriptionNotification,
 )
+from app.models.laximo_oem_fitment import (
+    LaximoApplicableVehicle,
+    LaximoOemArticle,
+    LaximoOemCatalogScan,
+    LaximoOemVehicleLink,
+)
 
 
 from sqlalchemy.orm import relationship

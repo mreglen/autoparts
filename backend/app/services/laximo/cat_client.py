@@ -13,6 +13,7 @@ from app.services.laximo.gate import (
     get_plain_credentials,
     increment_laximo_request_counter,
     record_upstream_error,
+    try_reserve_product_card_request,
 )
 from app.utils.laximo_cat_integration_db import get_or_create_laximo_cat_integration
 
@@ -27,6 +28,10 @@ class LaximoCatError(Exception):
         super().__init__(message)
         self.status_code = status_code
         self.message = message
+
+
+class LaximoProductCardQuotaExhausted(LaximoCatError):
+    """Product-card daily HTTP budget exhausted."""
 
 
 def _resolve_credentials(db: Session) -> tuple[str, str, str]:
@@ -55,13 +60,18 @@ def request_cat(
     *,
     params: Optional[dict[str, Any]] = None,
     count_toward_quota: bool = True,
+    quota_kind: Optional[str] = None,
     timeout_sec: float = DEFAULT_TIMEOUT_SEC,
 ) -> Any:
     """
     POST to Laximo.CAT REST endpoint.
     Does not log password. Product calls should pass count_toward_quota=True;
-    admin test must pass False.
+    admin test must pass False. quota_kind='product_card' reserves card budget.
     """
+    if count_toward_quota and quota_kind == "product_card":
+        if not try_reserve_product_card_request(db):
+            raise LaximoProductCardQuotaExhausted("product card quota exhausted")
+
     login, password, base_url = _resolve_credentials(db)
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
@@ -262,6 +272,7 @@ def find_part_references(
     *,
     oem: str,
     count_toward_quota: bool = True,
+    quota_kind: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """
     POST /findPartReferences — catalogs where OEM appears.
@@ -275,6 +286,7 @@ def find_part_references(
         "/findPartReferences",
         params={"oem": oem_text},
         count_toward_quota=count_toward_quota,
+        quota_kind=quota_kind,
     )
     catalogs: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -325,6 +337,7 @@ def find_applicable_vehicles(
     catalog: str,
     oem: str,
     count_toward_quota: bool = True,
+    quota_kind: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """
     POST /findApplicableVehicles — vehicles in catalog that use OEM.
@@ -339,6 +352,7 @@ def find_applicable_vehicles(
         "/findApplicableVehicles",
         params={"catalog": cat, "oem": oem_text, "localized": "true"},
         count_toward_quota=count_toward_quota,
+        quota_kind=quota_kind,
     )
     out: list[dict[str, Any]] = []
     for row in _as_dict_list(

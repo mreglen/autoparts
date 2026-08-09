@@ -58,6 +58,10 @@ def reset_daily_counter_if_needed(row: SiteLaximoCatIntegration) -> None:
         row.doc_requests_today = 0
         row.doc_requests_day = today
         row.doc_quota_exhausted_at = None
+    if getattr(row, "product_card_requests_day", None) != today:
+        row.product_card_requests_today = 0
+        row.product_card_requests_day = today
+        row.product_card_quota_exhausted_at = None
 
 
 def credentials_configured(row: SiteLaximoCatIntegration) -> bool:
@@ -135,6 +139,48 @@ def doc_requests_remaining(row: SiteLaximoCatIntegration) -> Optional[int]:
         return None
     used = int(getattr(row, "doc_requests_today", 0) or 0)
     return max(0, limit - used)
+
+
+def product_card_quota_exhausted(row: SiteLaximoCatIntegration) -> bool:
+    reset_daily_counter_if_needed(row)
+    limit = int(getattr(row, "product_card_daily_request_limit", 0) or 0)
+    if limit <= 0:
+        return False
+    return int(getattr(row, "product_card_requests_today", 0) or 0) >= limit
+
+
+def product_card_requests_remaining(row: SiteLaximoCatIntegration) -> Optional[int]:
+    reset_daily_counter_if_needed(row)
+    limit = int(getattr(row, "product_card_daily_request_limit", 0) or 0)
+    if limit <= 0:
+        return None
+    used = int(getattr(row, "product_card_requests_today", 0) or 0)
+    return max(0, limit - used)
+
+
+def try_reserve_product_card_request(
+    db: Session, row: Optional[SiteLaximoCatIntegration] = None
+) -> bool:
+    """Reserve one product-card HTTP slot. Returns False when daily budget exhausted."""
+    integration = row or get_or_create_laximo_cat_integration(db)
+    reset_daily_counter_if_needed(integration)
+    limit = int(getattr(integration, "product_card_daily_request_limit", 0) or 0)
+    if limit <= 0:
+        return True
+    used = int(getattr(integration, "product_card_requests_today", 0) or 0)
+    if used >= limit:
+        integration.product_card_quota_exhausted_at = datetime.now(timezone.utc)
+        db.add(integration)
+        db.commit()
+        return False
+    integration.product_card_requests_today = used + 1
+    integration.product_card_requests_day = _utc_today()
+    if integration.product_card_requests_today >= limit:
+        integration.product_card_quota_exhausted_at = datetime.now(timezone.utc)
+    db.add(integration)
+    db.commit()
+    db.refresh(integration)
+    return True
 
 
 def get_internal_status(db: Session, row: Optional[SiteLaximoCatIntegration] = None) -> str:
@@ -253,6 +299,19 @@ def reset_doc_quota_counter(
     integration.doc_requests_today = 0
     integration.doc_requests_day = _utc_today()
     integration.doc_quota_exhausted_at = None
+    db.add(integration)
+    db.commit()
+    db.refresh(integration)
+    return integration
+
+
+def reset_product_card_quota_counter(
+    db: Session, row: Optional[SiteLaximoCatIntegration] = None
+) -> SiteLaximoCatIntegration:
+    integration = row or get_or_create_laximo_cat_integration(db)
+    integration.product_card_requests_today = 0
+    integration.product_card_requests_day = _utc_today()
+    integration.product_card_quota_exhausted_at = None
     db.add(integration)
     db.commit()
     db.refresh(integration)

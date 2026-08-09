@@ -119,13 +119,28 @@ export function mapReferenceVehicle(vehicle) {
 
 /**
  * Map Laximo FindApplicableVehicles row to fitment chip shape.
- * name is treated as model (e.g. "EXCEL 94 (1995-1999)").
  */
+function stripEmbeddedYearRange(name) {
+  const text = normalizeToken(name);
+  if (!text) return '';
+  return text.replace(/\s*\((19|20)\d{2}\s*[-–—]\s*(19|20)\d{2}\)\s*$/i, '').trim();
+}
+
+function extractModelFromLaximoName(name, brand) {
+  const cleaned = stripEmbeddedYearRange(name);
+  const make = normalizeToken(brand);
+  if (make && cleaned.toUpperCase().startsWith(make.toUpperCase())) {
+    return cleaned.slice(make.length).trim() || cleaned;
+  }
+  return cleaned;
+}
+
 export function mapLaximoApplicableVehicle(vehicle) {
   if (!vehicle) return null;
   const brand = normalizeToken(vehicle.brand);
-  const name = normalizeToken(vehicle.name);
-  if (!brand && !name) return null;
+  const rawName = normalizeToken(vehicle.name);
+  if (!brand && !rawName) return null;
+  const model = extractModelFromLaximoName(rawName, brand) || rawName || brand;
   const yearFrom = normalizeToken(vehicle.year_from);
   const yearTo = normalizeToken(vehicle.year_to);
   let generation = '';
@@ -134,7 +149,7 @@ export function mapLaximoApplicableVehicle(vehicle) {
   else if (yearTo) generation = yearTo;
   return {
     brand: brand || '—',
-    model: name || brand,
+    model,
     generation,
     engine: '',
     transmission: '',
@@ -145,4 +160,95 @@ export function mapLaximoApplicableVehicle(vehicle) {
 export function mapLaximoApplicableVehicles(vehicles = []) {
   const list = Array.isArray(vehicles) ? vehicles : [];
   return list.map(mapLaximoApplicableVehicle).filter(Boolean);
+}
+
+function compatibilityDedupeKey(vehicle) {
+  return [
+    normalizeToken(vehicle?.brand).toLowerCase(),
+    normalizeToken(vehicle?.model).toLowerCase(),
+    normalizeToken(vehicle?.generation).toLowerCase(),
+  ].join('|');
+}
+
+function mergeSources(existingSources, source) {
+  const set = new Set(Array.isArray(existingSources) ? existingSources : []);
+  if (source) set.add(source);
+  return Array.from(set);
+}
+
+export function mergeReferenceFitmentRows(referenceVehicles = []) {
+  const merged = [];
+  const index = new Map();
+  (Array.isArray(referenceVehicles) ? referenceVehicles : []).forEach((raw) => {
+    const vehicle = mapReferenceVehicle(raw);
+    if (!vehicle.brand || !vehicle.model) return;
+    const key = compatibilityDedupeKey(vehicle);
+    const prev = index.get(key);
+    if (!prev) {
+      const entry = { ...vehicle, sources: [vehicle.source || 'reference'] };
+      index.set(key, entry);
+      merged.push(entry);
+      return;
+    }
+    prev.sources = mergeSources(prev.sources, vehicle.source);
+    if (!prev.generation && vehicle.generation) prev.generation = vehicle.generation;
+    if (!prev.engine && vehicle.engine) prev.engine = vehicle.engine;
+    if (!prev.transmission && vehicle.transmission) prev.transmission = vehicle.transmission;
+  });
+  return merged;
+}
+
+export function groupFitmentForDisplay(vehicles = []) {
+  const groups = new Map();
+  (Array.isArray(vehicles) ? vehicles : []).forEach((vehicle) => {
+    const brand = normalizeToken(vehicle?.brand);
+    const model = normalizeToken(vehicle?.model);
+    if (!brand || !model) return;
+    const brandKey = brand.toLowerCase();
+    if (!groups.has(brandKey)) {
+      groups.set(brandKey, { brand, models: new Map() });
+    }
+    const brandGroup = groups.get(brandKey);
+    const modelKey = model.toLowerCase();
+    if (!brandGroup.models.has(modelKey)) {
+      brandGroup.models.set(modelKey, { model, rows: [] });
+    }
+    brandGroup.models.get(modelKey).rows.push({
+      generation: normalizeToken(vehicle.generation),
+      engine: normalizeToken(vehicle.engine),
+      transmission: normalizeToken(vehicle.transmission),
+      sources: Array.isArray(vehicle.sources) ? vehicle.sources : [vehicle.source || 'reference'],
+    });
+  });
+
+  return Array.from(groups.values())
+    .sort((a, b) => a.brand.localeCompare(b.brand, 'ru'))
+    .map((brandGroup) => ({
+      brand: brandGroup.brand,
+      models: Array.from(brandGroup.models.values())
+        .sort((a, b) => a.model.localeCompare(b.model, 'ru'))
+        .map((modelGroup) => ({
+          model: modelGroup.model,
+          rows: modelGroup.rows.sort((a, b) => (
+            String(a.generation).localeCompare(String(b.generation), 'ru')
+          )),
+        })),
+    }));
+}
+
+export function countGroupedFitmentRows(groups = []) {
+  return (groups || []).reduce(
+    (sum, brandGroup) => sum + brandGroup.models.reduce(
+      (modelSum, modelGroup) => modelSum + modelGroup.rows.length,
+      0,
+    ),
+    0,
+  );
+}
+
+export function sourceLabel(source) {
+  if (source === 'laximo') return 'Laximo';
+  if (source === 'tecdoc') return 'TecDoc';
+  if (source === 'seller') return 'Продавец';
+  return 'Справочник';
 }

@@ -2,6 +2,7 @@ import {
   dedupeCompatibilityAgainstDonors,
   mapReferenceVehicle,
   mapSellerVehicle,
+  mergeReferenceFitmentRows,
 } from './fitmentDisplay';
 
 function normalizeToken(value) {
@@ -58,9 +59,10 @@ export function splitFitmentForDisplay(sellerVehicles = [], referenceVehicles = 
   const donors = (Array.isArray(sellerVehicles) ? sellerVehicles : [])
     .map(mapSellerVehicle)
     .filter((vehicle) => vehicle.brand);
+  const mergedReference = mergeReferenceFitmentRows(referenceVehicles);
   const compatibility = dedupeCompatibilityAgainstDonors(
     donors,
-    (Array.isArray(referenceVehicles) ? referenceVehicles : []).map(mapReferenceVehicle),
+    mergedReference,
   ).filter((vehicle) => vehicle.brand && vehicle.model);
 
   return { donors, compatibility };

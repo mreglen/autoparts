@@ -139,6 +139,7 @@ const PartDetail = () => {
   const [alternateOffersError, setAlternateOffersError] = useState('');
   const [referenceFitment, setReferenceFitment] = useState([]);
   const [referenceFitmentLoading, setReferenceFitmentLoading] = useState(false);
+  const [fitmentMeta, setFitmentMeta] = useState(null);
   const [soldOutAlternates, setSoldOutAlternates] = useState([]);
   const [soldOutAlternatesLoading, setSoldOutAlternatesLoading] = useState(false);
   const [soldOutResolved, setSoldOutResolved] = useState(null);
@@ -297,7 +298,10 @@ const PartDetail = () => {
 
   useEffect(() => {
     if (!showProduct || !secondaryEnabled || !displayProduct?.brand || !displayProduct?.article) {
-      if (!showProduct) setReferenceFitment([]);
+      if (!showProduct) {
+        setReferenceFitment([]);
+        setFitmentMeta(null);
+      }
       return undefined;
     }
 
@@ -306,6 +310,7 @@ const PartDetail = () => {
     const cachedFitment = readPartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey);
     if (cachedFitment) {
       setReferenceFitment(cachedFitment);
+      setFitmentMeta({ checked: true });
       setReferenceFitmentLoading(false);
       return undefined;
     }
@@ -331,17 +336,28 @@ const PartDetail = () => {
         const vehicles = Array.isArray(refResponse?.data?.vehicles)
           ? refResponse.data.vehicles
           : [];
-        const laximoOk = laximoResponse?.data?.ok !== false;
+        const laximoData = laximoResponse?.data;
+        const laximoOk = laximoData?.ok !== false;
         const laximoRows = laximoOk
-          ? mapLaximoApplicableVehicles(laximoResponse?.data?.vehicles)
+          ? mapLaximoApplicableVehicles(laximoData?.vehicles)
           : [];
         const merged = [...vehicles, ...laximoRows];
         if (!cancelled) {
           writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, merged);
           setReferenceFitment(merged);
+          setFitmentMeta({
+            checked: true,
+            laximoOk,
+            coverage: laximoData?.coverage || (laximoRows.length ? 'full' : 'none'),
+            dataSource: laximoData?.data_source || (laximoRows.length ? 'laximo' : 'none'),
+            fitmentStatus: laximoData?.fitment_status || null,
+          });
         }
       } catch (_error) {
-        if (!cancelled) setReferenceFitment([]);
+        if (!cancelled) {
+          setReferenceFitment([]);
+          setFitmentMeta({ checked: true, laximoOk: false, coverage: 'none' });
+        }
       } finally {
         if (!cancelled) setReferenceFitmentLoading(false);
       }
@@ -1413,6 +1429,7 @@ const PartDetail = () => {
         sellerVehicles={currentProduct.compatible_vehicles}
         referenceVehicles={referenceFitment}
         loading={secondaryEnabled ? referenceFitmentLoading : true}
+        fitmentMeta={fitmentMeta}
       />
 
       <PartArticleMatchesBlock

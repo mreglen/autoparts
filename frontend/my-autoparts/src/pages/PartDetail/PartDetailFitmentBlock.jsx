@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Card } from '../../components/UI';
-import { hasDonorDetails } from '../../utils/fitmentDisplay';
+import { countGroupedFitmentRows, groupFitmentForDisplay, hasDonorDetails } from '../../utils/fitmentDisplay';
 import { splitFitmentForDisplay } from '../../utils/mergeProductFitment';
 import PartDetailDonorVehicleCard from './PartDetailDonorVehicleCard';
 import PartDetailCompatibilityList from './PartDetailCompatibilityList';
@@ -9,12 +9,30 @@ function FitmentSkeleton() {
   return (
     <div className="mt-4 space-y-3">
       <div className="h-24 animate-pulse rounded-sg-lg bg-surface-subtle" />
-      <div className="flex gap-2">
-        <div className="h-16 w-40 animate-pulse rounded-sg-lg bg-surface-subtle" />
-        <div className="h-16 w-40 animate-pulse rounded-sg-lg bg-surface-subtle" />
-        <div className="hidden h-16 w-40 animate-pulse rounded-sg-lg bg-surface-subtle sm:block" />
+      <div className="space-y-2">
+        <div className="h-14 animate-pulse rounded-sg-lg bg-surface-subtle" />
+        <div className="h-14 animate-pulse rounded-sg-lg bg-surface-subtle" />
       </div>
     </div>
+  );
+}
+
+function FitmentMetaNotice({ meta }) {
+  if (!meta) return null;
+  const { coverage, dataSource, fitmentStatus, laximoOk } = meta;
+  const parts = [];
+  if (dataSource === 'db') parts.push('данные из базы');
+  else if (dataSource === 'mixed') parts.push('данные из базы и Laximo');
+  else if (dataSource === 'laximo') parts.push('данные Laximo');
+  if (coverage === 'partial') parts.push('список может быть неполным');
+  if (fitmentStatus === 'not_found') parts.push('применимость не найдена');
+  if (laximoOk === false) parts.push('Laximo временно недоступен');
+  if (!parts.length) return null;
+  return (
+    <p className="mt-2 text-xs text-ink-muted">
+      {parts.join(' · ')}
+      . Справочные данные — уточняйте у продавца.
+    </p>
   );
 }
 
@@ -22,6 +40,7 @@ export default function PartDetailFitmentBlock({
   sellerVehicles = [],
   referenceVehicles = [],
   loading = false,
+  fitmentMeta = null,
 }) {
   const { donors, compatibility } = useMemo(
     () => splitFitmentForDisplay(sellerVehicles, referenceVehicles),
@@ -29,13 +48,31 @@ export default function PartDetailFitmentBlock({
   );
 
   const visibleDonors = donors.filter(hasDonorDetails);
-  const hasContent = visibleDonors.length > 0 || compatibility.length > 0;
+  const groupedCount = useMemo(
+    () => countGroupedFitmentRows(groupFitmentForDisplay(compatibility)),
+    [compatibility],
+  );
+  const hasContent = visibleDonors.length > 0 || groupedCount > 0;
+  const showEmptyState = !loading && !hasContent && fitmentMeta?.checked;
 
   if (loading && !hasContent) {
     return (
       <Card as="section" padding="sm" className="sm:p-5">
         <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
+        <p className="mt-1 text-sm text-ink-muted">Загружаем применимость…</p>
         <FitmentSkeleton />
+      </Card>
+    );
+  }
+
+  if (showEmptyState) {
+    return (
+      <Card as="section" padding="sm" className="sm:p-5">
+        <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
+        <p className="mt-2 text-sm text-ink-muted">
+          По артикулу не найдено справочной применимости. Проверьте OEM-номер или уточните у продавца.
+        </p>
+        <FitmentMetaNotice meta={fitmentMeta} />
       </Card>
     );
   }
@@ -44,7 +81,13 @@ export default function PartDetailFitmentBlock({
 
   return (
     <Card as="section" padding="sm" className="sm:p-5">
-      <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
+        {groupedCount > 0 ? (
+          <span className="text-sm text-ink-muted">{groupedCount} модификаций</span>
+        ) : null}
+      </div>
+      <FitmentMetaNotice meta={fitmentMeta} />
 
       {visibleDonors.length > 0 ? (
         <div className="mt-4 space-y-3">
@@ -57,8 +100,12 @@ export default function PartDetailFitmentBlock({
         </div>
       ) : null}
 
-      {compatibility.length > 0 ? (
+      {groupedCount > 0 ? (
         <PartDetailCompatibilityList vehicles={compatibility} />
+      ) : null}
+
+      {loading && hasContent ? (
+        <p className="mt-3 text-xs text-ink-muted">Обновляем справочную применимость…</p>
       ) : null}
     </Card>
   );
