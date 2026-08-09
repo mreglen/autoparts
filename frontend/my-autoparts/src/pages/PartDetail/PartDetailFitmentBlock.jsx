@@ -19,14 +19,12 @@ function FitmentSkeleton() {
 
 function FitmentMetaNotice({ meta }) {
   if (!meta) return null;
-  const { coverage, dataSource, fitmentStatus, laximoOk } = meta;
+  const { coverage, dataSource } = meta;
   const parts = [];
   if (dataSource === 'db') parts.push('данные из базы');
   else if (dataSource === 'mixed') parts.push('данные из базы и Laximo');
   else if (dataSource === 'laximo') parts.push('данные Laximo');
   if (coverage === 'partial') parts.push('список может быть неполным');
-  if (fitmentStatus === 'not_found') parts.push('применимость не найдена');
-  if (laximoOk === false) parts.push('Laximo временно недоступен');
   if (!parts.length) return null;
   return (
     <p className="mt-2 text-xs text-ink-muted">
@@ -53,7 +51,6 @@ export default function PartDetailFitmentBlock({
     [compatibility],
   );
   const hasContent = visibleDonors.length > 0 || groupedCount > 0;
-  const showEmptyState = !loading && !hasContent && fitmentMeta?.checked;
 
   if (loading && !hasContent) {
     return (
@@ -61,18 +58,6 @@ export default function PartDetailFitmentBlock({
         <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
         <p className="mt-1 text-sm text-ink-muted">Загружаем применимость…</p>
         <FitmentSkeleton />
-      </Card>
-    );
-  }
-
-  if (showEmptyState) {
-    return (
-      <Card as="section" padding="sm" className="sm:p-5">
-        <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
-        <p className="mt-2 text-sm text-ink-muted">
-          По артикулу не найдено справочной применимости. Проверьте OEM-номер или уточните у продавца.
-        </p>
-        <FitmentMetaNotice meta={fitmentMeta} />
       </Card>
     );
   }
