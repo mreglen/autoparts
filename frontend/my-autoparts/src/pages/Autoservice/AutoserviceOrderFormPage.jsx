@@ -14,6 +14,7 @@ import {
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import { getRosskoMinPrice, getRosskoParts } from '../AutoParts/NewParts/rosskoHelpers';
 
 const inputClass =
@@ -68,7 +69,15 @@ function fromLocalInputValue(local) {
 }
 
 function emptyWork() {
-  return { title: '', qty: 1, unit_price: '0', executor_user_id: '' };
+  return { title: '', catalog_work_id: '', qty: 1, unit_price: '0', executors: [] };
+}
+
+function emptyExecutor(employeeId = '', percent = '') {
+  return { employee_id: employeeId, percent };
+}
+
+function workPayAmount(qty, unitPrice, percent) {
+  return lineSum(qty, unitPrice) * (Number(percent) || 0) / 100;
 }
 
 function emptyClientPart() {
@@ -577,9 +586,13 @@ function mapOrderToFormState(order) {
     works: (order?.works || []).length
       ? order.works.map((w) => ({
           title: w.title || '',
+          catalog_work_id: w.catalog_work_id ? String(w.catalog_work_id) : '',
           qty: w.qty || 1,
           unit_price: String(w.unit_price ?? '0'),
-          executor_user_id: w.executor_user_id ? String(w.executor_user_id) : '',
+          executors: (w.executors || []).map((ex) => ({
+            employee_id: String(ex.employee_id),
+            percent: String(ex.percent ?? '0'),
+          })),
         }))
       : [],
     clientParts: (order?.client_parts || []).length
@@ -617,7 +630,8 @@ export default function AutoserviceOrderFormPage() {
   const isEdit = !isCreate && Boolean(orderId);
 
   const [clients, setClients] = useState([]);
-  const [staffOptions, setStaffOptions] = useState([]);
+  const [workCatalog, setWorkCatalog] = useState([]);
+  const [serviceEmployees, setServiceEmployees] = useState([]);
   const [lifts, setLifts] = useState([]);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState('');
@@ -676,13 +690,15 @@ export default function AutoserviceOrderFormPage() {
     setMetaLoading(true);
     setMetaError('');
     try {
-      const [clientsData, staffData, liftsData] = await Promise.all([
+      const [clientsData, worksData, employeesData, liftsData] = await Promise.all([
         apiRequest('/autoservice/clients'),
-        apiRequest('/autoservice/repair-orders/staff-options'),
+        apiRequest('/autoservice/works'),
+        apiRequest('/autoservice/repair-orders/service-employees-options'),
         apiRequest('/autoservice/repair-orders/lifts-meta'),
       ]);
       setClients(Array.isArray(clientsData) ? clientsData : []);
-      setStaffOptions(Array.isArray(staffData) ? staffData : []);
+      setWorkCatalog(Array.isArray(worksData) ? worksData : []);
+      setServiceEmployees(Array.isArray(employeesData) ? employeesData : []);
       setLifts(Array.isArray(liftsData?.lifts) ? liftsData.lifts : []);
     } catch (err) {
       setMetaError(err?.message || 'Не удалось загрузить справочники');
@@ -833,6 +849,55 @@ export default function AutoserviceOrderFormPage() {
     setWorks((prev) => prev.map((w, i) => (i === index ? { ...w, ...patch } : w)));
   };
 
+  const createCatalogWork = async (name, workIndex) => {
+    try {
+      const row = await apiRequest('/autoservice/works', {
+        method: 'POST',
+        body: JSON.stringify({ name, default_unit_price: 0 }),
+      });
+      setWorkCatalog((prev) => [...prev, row]);
+      updateWork(workIndex, {
+        title: row.name,
+        catalog_work_id: String(row.id),
+        unit_price: String(row.default_unit_price ?? 0),
+      });
+    } catch (err) {
+      setError(err?.message || 'Не удалось добавить работу');
+    }
+  };
+
+  const addWorkExecutor = (workIndex, employeeId = '') => {
+    const emp = serviceEmployees.find((e) => String(e.id) === String(employeeId));
+    const percent = emp ? String(emp.work_percent ?? 0) : '';
+    setWorks((prev) => prev.map((w, i) => (
+      i === workIndex
+        ? { ...w, executors: [...(w.executors || []), emptyExecutor(employeeId, percent)] }
+        : w
+    )));
+  };
+
+  const updateWorkExecutor = (workIndex, execIndex, patch) => {
+    setWorks((prev) => prev.map((w, i) => {
+      if (i !== workIndex) return w;
+      const next = (w.executors || []).map((ex, j) => (j === execIndex ? { ...ex, ...patch } : ex));
+      if (patch.employee_id) {
+        const emp = serviceEmployees.find((e) => String(e.id) === String(patch.employee_id));
+        if (emp && !patch.percent) {
+          next[execIndex] = { ...next[execIndex], percent: String(emp.work_percent ?? 0) };
+        }
+      }
+      return { ...w, executors: next };
+    }));
+  };
+
+  const removeWorkExecutor = (workIndex, execIndex) => {
+    setWorks((prev) => prev.map((w, i) => (
+      i === workIndex
+        ? { ...w, executors: (w.executors || []).filter((_, j) => j !== execIndex) }
+        : w
+    )));
+  };
+
   const updatePart = (index, patch) => {
     setClientParts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
@@ -944,9 +1009,15 @@ export default function AutoserviceOrderFormPage() {
     assignee_user_ids: [],
     works: works.map((w) => ({
       title: w.title.trim(),
+      catalog_work_id: w.catalog_work_id ? Number(w.catalog_work_id) : null,
       qty: Number(w.qty),
       unit_price: Number(w.unit_price),
-      executor_user_id: w.executor_user_id ? Number(w.executor_user_id) : null,
+      executors: (w.executors || [])
+        .filter((ex) => ex.employee_id)
+        .map((ex) => ({
+          employee_id: Number(ex.employee_id),
+          percent: Number(ex.percent) || 0,
+        })),
     })),
     client_parts: clientParts.map((p) => ({
       title: p.title.trim(),
@@ -1217,76 +1288,100 @@ export default function AutoserviceOrderFormPage() {
           ) : (
             <div className="space-y-3">
               {works.map((w, index) => (
-                <div key={index} className="rounded-lg border border-gray-200 p-3">
+                <div key={index} className="rounded-xl border border-gray-200 bg-[#fafafa] p-3">
                   <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
-                    <span>№ {index + 1}</span>
+                    <span>{index + 1}</span>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setWorks((p) => moveItem(p, index, -1))}>
-                        ↑
-                      </button>
-                      <button type="button" onClick={() => setWorks((p) => moveItem(p, index, 1))}>
-                        ↓
-                      </button>
+                      <button type="button" onClick={() => setWorks((p) => moveItem(p, index, -1))}>↑</button>
+                      <button type="button" onClick={() => setWorks((p) => moveItem(p, index, 1))}>↓</button>
                       <button
                         type="button"
                         className="text-red-600"
                         onClick={() => setWorks((p) => p.filter((_, i) => i !== index))}
                       >
-                        Удалить
+                        ×
                       </button>
                     </div>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-4">
                     <div className="sm:col-span-2">
-                      <input
-                        className={inputSmClass}
-                        placeholder="Название"
+                      <WorkCatalogInput
                         value={w.title}
-                        onChange={(e) => updateWork(index, { title: e.target.value })}
+                        catalogWorkId={w.catalog_work_id}
+                        options={workCatalog}
+                        onChange={(patch) => updateWork(index, patch)}
+                        onCreate={(name) => createCatalogWork(name, index)}
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500">Кол-во</label>
                       <input
                         type="number"
                         min={1}
-                        step={1}
                         className={inputSmClass}
+                        placeholder="Кол-во"
                         value={w.qty}
                         onChange={(e) => updateWork(index, { qty: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500">Цена</label>
                       <input
                         type="number"
                         min={0}
                         step="0.01"
                         className={inputSmClass}
+                        placeholder="Цена"
                         value={w.unit_price}
                         onChange={(e) => updateWork(index, { unit_price: e.target.value })}
                       />
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Сумма</label>
-                      <p className="mt-1 text-sm text-gray-800">{formatMoney(lineSum(w.qty, w.unit_price))} ₽</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Исполнитель работы</label>
-                      <select
-                        className={inputSmClass}
-                        value={w.executor_user_id}
-                        onChange={(e) => updateWork(index, { executor_user_id: e.target.value })}
-                      >
-                        <option value="">Не указан</option>
-                        {staffOptions.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                   </div>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-gray-600">{formatMoney(lineSum(w.qty, w.unit_price))} ₽</span>
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-[#00a046]"
+                      onClick={() => addWorkExecutor(index)}
+                    >
+                      + сотрудник
+                    </button>
+                  </div>
+                  {(w.executors || []).length > 0 ? (
+                    <div className="mt-2 space-y-1.5">
+                      {(w.executors || []).map((ex, execIndex) => (
+                        <div key={execIndex} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-2 py-1.5">
+                          <select
+                            className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-1 text-sm"
+                            value={ex.employee_id}
+                            onChange={(e) => updateWorkExecutor(index, execIndex, { employee_id: e.target.value })}
+                          >
+                            <option value="">—</option>
+                            {serviceEmployees.map((emp) => (
+                              <option key={emp.id} value={emp.id}>{emp.name}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            className="w-14 rounded border border-gray-200 px-2 py-1 text-sm"
+                            value={ex.percent}
+                            onChange={(e) => updateWorkExecutor(index, execIndex, { percent: e.target.value })}
+                          />
+                          <span className="text-xs text-gray-500">%</span>
+                          <span className="text-xs font-medium text-gray-900">
+                            {formatMoney(workPayAmount(w.qty, w.unit_price, ex.percent))} ₽
+                          </span>
+                          <button
+                            type="button"
+                            className="text-xs text-red-600"
+                            onClick={() => removeWorkExecutor(index, execIndex)}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

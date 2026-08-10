@@ -9,24 +9,25 @@ const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
 
 const STATUS_LABELS = {
-  accepted: 'Принят',
+  pending: 'Ожидание',
   in_progress: 'В работе',
-  ready: 'Готов',
-  issued: 'Выдан',
+  completed: 'Завершён',
   cancelled: 'Отменён',
-  // legacy (на случай непатченных данных)
-  open: 'Принят',
-  completed: 'Выдан',
+  accepted: 'Ожидание',
+  ready: 'Завершён',
+  issued: 'Завершён',
+  open: 'Ожидание',
 };
 
 const STATUS_STYLES = {
-  accepted: 'bg-amber-50 text-amber-800 ring-amber-200',
+  pending: 'bg-amber-50 text-amber-800 ring-amber-200',
   in_progress: 'bg-sky-50 text-sky-800 ring-sky-200',
-  ready: 'bg-violet-50 text-violet-800 ring-violet-200',
-  issued: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  cancelled: 'bg-gray-100 text-gray-600 ring-gray-200',
-  open: 'bg-amber-50 text-amber-800 ring-amber-200',
   completed: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  cancelled: 'bg-gray-100 text-gray-600 ring-gray-200',
+  accepted: 'bg-amber-50 text-amber-800 ring-amber-200',
+  ready: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  issued: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  open: 'bg-amber-50 text-amber-800 ring-amber-200',
 };
 
 function formatDateTime(value) {
@@ -130,7 +131,19 @@ function OrderLinesExpand({ row, showExecutors }) {
                   <td className="py-1 pr-3">{w.qty}</td>
                   <td className="py-1 pr-3">{formatMoney(w.unit_price)}</td>
                   <td className="py-1 pr-3">{formatMoney(w.line_sum ?? lineSum(w.qty, w.unit_price))}</td>
-                  {showExecutors && <td className="py-1">{w.executor?.name || '—'}</td>}
+                  {showExecutors && (
+                    <td className="py-1">
+                      {(w.executors || []).length
+                        ? (w.executors || []).map((ex) => (
+                          <span key={ex.employee_id} className="mr-2 inline-block">
+                            {ex.employee?.name}
+                            {' '}
+                            {formatMoney(ex.pay_amount)} ₽
+                          </span>
+                        ))
+                        : w.executor?.name || '—'}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -274,15 +287,13 @@ export default function AutoserviceOrdersPage() {
     () =>
       viewHistory
         ? [
-            { value: 'accepted', label: 'Вернуть: принят' },
+            { value: 'pending', label: 'Ожидание' },
             { value: 'in_progress', label: 'В работу' },
-            { value: 'ready', label: 'Готов' },
           ]
         : [
-            { value: 'accepted', label: 'Принят' },
+            { value: 'pending', label: 'Ожидание' },
             { value: 'in_progress', label: 'В работу' },
-            { value: 'ready', label: 'Готов' },
-            { value: 'issued', label: 'Выдан' },
+            { value: 'completed', label: 'Завершить' },
             { value: 'cancelled', label: 'Отменить' },
           ],
     [viewHistory],
@@ -354,7 +365,7 @@ export default function AutoserviceOrdersPage() {
               onChange={(e) => setHistoryStatus(e.target.value)}
             >
               <option value="">Все</option>
-              <option value="issued">Выдан</option>
+              <option value="completed">Завершён</option>
               <option value="cancelled">Отменён</option>
             </select>
           </div>

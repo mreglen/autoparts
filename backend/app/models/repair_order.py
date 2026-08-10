@@ -128,13 +128,48 @@ class RepairOrderWork(Base):
         index=True,
     )
     position = Column(Integer, nullable=False, default=1)
+    catalog_work_id = Column(
+        Integer,
+        ForeignKey("autoservice_works.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title = Column(String(255), nullable=False)
     qty = Column(Integer, nullable=False, default=1)
     unit_price = Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     executor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     order = relationship("RepairOrder", back_populates="works")
+    catalog_work = relationship("AutoserviceWork", foreign_keys=[catalog_work_id])
     executor = relationship("User", foreign_keys=[executor_user_id])
+    executors = relationship(
+        "RepairOrderWorkExecutor",
+        back_populates="work",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class RepairOrderWorkExecutor(Base):
+    __tablename__ = "repair_order_work_executors"
+
+    id = Column(Integer, primary_key=True)
+    work_id = Column(
+        Integer,
+        ForeignKey("repair_order_works.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    employee_id = Column(
+        Integer,
+        ForeignKey("autoservice_service_employees.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    percent = Column(Numeric(5, 2), nullable=False, default=Decimal("0.00"))
+
+    work = relationship("RepairOrderWork", back_populates="executors")
+    employee = relationship("AutoserviceServiceEmployee", foreign_keys=[employee_id])
 
 
 class RepairOrderClientPart(Base):

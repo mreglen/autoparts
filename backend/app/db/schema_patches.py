@@ -4033,3 +4033,122 @@ def ensure_autoservice_lifts_tables() -> None:
 
     logger.info("Applied autoservice_lifts data migration patch")
 
+
+def ensure_autoservice_works_and_employees_tables() -> None:
+    """Work catalog, service employees, work executors, payroll accruals, status migration."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    is_pg = engine.dialect.name == "postgresql"
+    ts_type = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    bool_true = "TRUE" if is_pg else "1"
+    numeric = "NUMERIC(12, 2)" if is_pg else "REAL"
+
+    if "organizations" not in tables:
+        return
+
+    if "autoservice_works" not in tables:
+        ddl = f"""
+        CREATE TABLE autoservice_works (
+            id {"SERIAL" if is_pg else "INTEGER"} PRIMARY KEY{" AUTOINCREMENT" if not is_pg else ""},
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            name VARCHAR(255) NOT NULL,
+            default_unit_price {numeric} NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 1,
+            is_active BOOLEAN NOT NULL DEFAULT {bool_true},
+            created_at {ts_type} NOT NULL DEFAULT {"NOW()" if is_pg else "CURRENT_TIMESTAMP"},
+            updated_at {ts_type} NOT NULL DEFAULT {"NOW()" if is_pg else "CURRENT_TIMESTAMP"},
+            {"CONSTRAINT uq_autoservice_work_org_name UNIQUE (organization_id, name)" if is_pg else "UNIQUE (organization_id, name)"}
+        )
+        """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+        logger.info("Applied autoservice_works table patch")
+        tables.add("autoservice_works")
+
+    if "autoservice_service_employees" not in tables:
+        ddl = f"""
+        CREATE TABLE autoservice_service_employees (
+            id {"SERIAL" if is_pg else "INTEGER"} PRIMARY KEY{" AUTOINCREMENT" if not is_pg else ""},
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            name VARCHAR(120) NOT NULL,
+            phone VARCHAR(32),
+            position VARCHAR(80),
+            salary_type VARCHAR(32) NOT NULL DEFAULT 'percent_work',
+            salary_amount {numeric} NOT NULL DEFAULT 0,
+            work_percent {numeric} NOT NULL DEFAULT 0,
+            is_active BOOLEAN NOT NULL DEFAULT {bool_true},
+            created_at {ts_type} NOT NULL DEFAULT {"NOW()" if is_pg else "CURRENT_TIMESTAMP"},
+            updated_at {ts_type} NOT NULL DEFAULT {"NOW()" if is_pg else "CURRENT_TIMESTAMP"}
+        )
+        """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+        logger.info("Applied autoservice_service_employees table patch")
+        tables.add("autoservice_service_employees")
+
+    if "repair_order_works" in tables:
+        columns = {col["name"] for col in inspector.get_columns("repair_order_works")}
+        if "catalog_work_id" not in columns and "autoservice_works" in tables:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE repair_order_works "
+                        "ADD COLUMN catalog_work_id INTEGER REFERENCES autoservice_works(id)"
+                    )
+                )
+            logger.info("Applied repair_order_works catalog_work_id patch")
+
+    if "repair_order_work_executors" not in tables and "repair_order_works" in tables:
+        ddl = f"""
+        CREATE TABLE repair_order_work_executors (
+            id {"SERIAL" if is_pg else "INTEGER"} PRIMARY KEY{" AUTOINCREMENT" if not is_pg else ""},
+            work_id INTEGER NOT NULL REFERENCES repair_order_works(id) ON DELETE CASCADE,
+            employee_id INTEGER NOT NULL REFERENCES autoservice_service_employees(id) ON DELETE CASCADE,
+            percent {numeric} NOT NULL DEFAULT 0
+        )
+        """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            if is_pg:
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_repair_order_work_executors_work_id "
+                        "ON repair_order_work_executors (work_id)"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_repair_order_work_executors_employee_id "
+                        "ON repair_order_work_executors (employee_id)"
+                    )
+                )
+        logger.info("Applied repair_order_work_executors table patch")
+        tables.add("repair_order_work_executors")
+
+    if "autoservice_payroll_accruals" not in tables:
+        ddl = f"""
+        CREATE TABLE autoservice_payroll_accruals (
+            id {"SERIAL" if is_pg else "INTEGER"} PRIMARY KEY{" AUTOINCREMENT" if not is_pg else ""},
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            employee_id INTEGER NOT NULL REFERENCES autoservice_service_employees(id) ON DELETE CASCADE,
+            order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+            work_id INTEGER REFERENCES repair_order_works(id) ON DELETE SET NULL,
+            accrual_type VARCHAR(32) NOT NULL,
+            amount {numeric} NOT NULL DEFAULT 0,
+            accrued_at {ts_type} NOT NULL DEFAULT {"NOW()" if is_pg else "CURRENT_TIMESTAMP"}
+        )
+        """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+        logger.info("Applied autoservice_payroll_accruals table patch")
+
+    if "repair_orders" in tables:
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE repair_orders SET status = 'pending' WHERE status IN ('accepted', 'open')")
+            )
+            conn.execute(
+                text("UPDATE repair_orders SET status = 'completed' WHERE status IN ('ready', 'issued', 'completed')")
+            )
+        logger.info("Applied repair order status migration patch")
+

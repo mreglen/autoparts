@@ -15,20 +15,27 @@ const MONTHS = [
 ];
 
 const ORDER_STATUS_LABELS = {
-  accepted: 'Принят',
+  pending: 'Ожидание',
   in_progress: 'В работе',
-  ready: 'Готов',
-  issued: 'Выдан',
+  completed: 'Завершён',
   cancelled: 'Отменён',
+  accepted: 'Ожидание',
+  ready: 'Завершён',
+  issued: 'Завершён',
 };
 
+const ORDER_STATUS_OPTIONS = [
+  ['pending', 'Ожидание'],
+  ['in_progress', 'В работе'],
+  ['completed', 'Завершён'],
+  ['cancelled', 'Отменён'],
+];
 const BOOKING_STATUS_LABELS = {
   new: 'Новая',
   processed: 'Обработана',
   cancelled: 'Отменена',
 };
 
-const ORDER_STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS);
 const BOOKING_STATUS_OPTIONS = Object.entries(BOOKING_STATUS_LABELS);
 
 const inputClass =
@@ -286,7 +293,7 @@ export default function AutoservicePlannerPage() {
     setEditingBookingId(null);
     setOrderEditForm({
       scheduled_at: toLocalInputValue(order.scheduled_at),
-      status: order.status || 'accepted',
+      status: order.status || 'pending',
     });
   };
 

@@ -5,9 +5,16 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-ACTIVE_STATUSES = ("accepted", "in_progress", "ready")
-HISTORY_STATUSES = ("issued", "cancelled")
+ACTIVE_STATUSES = ("pending", "in_progress")
+HISTORY_STATUSES = ("completed", "cancelled")
 ALL_STATUSES = ACTIVE_STATUSES + HISTORY_STATUSES
+# Legacy aliases kept for migration/display
+LEGACY_STATUS_MAP = {
+    "accepted": "pending",
+    "ready": "completed",
+    "issued": "completed",
+    "open": "pending",
+}
 SHOP_PART_SOURCES = ("manual", "warehouse", "rossko")
 
 
@@ -39,10 +46,29 @@ class RepairOrderLiftBrief(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class RepairOrderEmployeeBrief(BaseModel):
+    id: int
+    name: str
+
+
+class RepairOrderWorkExecutorIn(BaseModel):
+    employee_id: int
+    percent: Decimal = Field(ge=0, le=100)
+
+
+class RepairOrderWorkExecutorView(BaseModel):
+    employee_id: int
+    employee: RepairOrderEmployeeBrief
+    percent: Decimal
+    pay_amount: Decimal
+
+
 class RepairOrderWorkIn(BaseModel):
     title: str = Field(min_length=1, max_length=255)
+    catalog_work_id: Optional[int] = None
     qty: int = Field(ge=1)
     unit_price: Decimal = Field(ge=0)
+    executors: list[RepairOrderWorkExecutorIn] = Field(default_factory=list)
     executor_user_id: Optional[int] = None
 
 
@@ -65,10 +91,12 @@ class RepairOrderShopPartIn(BaseModel):
 class RepairOrderWorkView(BaseModel):
     id: int
     position: int
+    catalog_work_id: Optional[int] = None
     title: str
     qty: int
     unit_price: Decimal
     line_sum: Decimal
+    executors: list[RepairOrderWorkExecutorView] = Field(default_factory=list)
     executor_user_id: Optional[int] = None
     executor: Optional[RepairOrderUserBrief] = None
 
@@ -146,7 +174,7 @@ class RepairOrderUpdate(BaseModel):
 
 
 class RepairOrderStatusPatch(BaseModel):
-    status: Literal["accepted", "in_progress", "ready", "issued", "cancelled"]
+    status: Literal["pending", "in_progress", "completed", "cancelled"]
 
 
 class RepairOrderStaffView(BaseModel):
@@ -200,6 +228,12 @@ class RepairOrderClientView(BaseModel):
 class RepairOrderStaffOption(BaseModel):
     id: int
     name: str
+
+
+class RepairOrderServiceEmployeeOption(BaseModel):
+    id: int
+    name: str
+    work_percent: Decimal
 
 
 class RepairOrderLiftsMeta(BaseModel):

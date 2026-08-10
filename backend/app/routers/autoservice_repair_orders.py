@@ -11,12 +11,15 @@ from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
 from app.models.autoservice_lift import AutoserviceLift
+from app.models.autoservice_service_employee import AutoserviceServiceEmployee
+from app.models.autoservice_work import AutoserviceWork
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import (
     RepairOrder,
     RepairOrderClientPart,
     RepairOrderShopPart,
     RepairOrderWork,
+    RepairOrderWorkExecutor,
 )
 from app.models.product import Product
 from app.models.user import User
@@ -35,12 +38,16 @@ from app.schemas.repair_order import (
     RepairOrderLiftsMeta,
     RepairOrderShopPartIn,
     RepairOrderShopPartView,
+    RepairOrderEmployeeBrief,
+    RepairOrderServiceEmployeeOption,
     RepairOrderStaffOption,
     RepairOrderStaffView,
     RepairOrderStatusPatch,
     RepairOrderUpdate,
     RepairOrderUserBrief,
     RepairOrderVehicleBrief,
+    RepairOrderWorkExecutorIn,
+    RepairOrderWorkExecutorView,
     RepairOrderWorkIn,
     RepairOrderWorkView,
     WarehouseProductOption,
@@ -51,6 +58,7 @@ from app.utils.autoservice_access import (
     user_display_name,
 )
 from app.utils.repair_order_number import allocate_repair_order_number
+from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
 from app.services.autoservice_lift_helpers import (
     normalize_dt as _normalize_dt,
     validate_lift_id as _validate_lift_id,
@@ -118,14 +126,32 @@ def _sorted_shop_parts(row: RepairOrder) -> list[RepairOrderShopPart]:
     return sorted(row.shop_parts or [], key=lambda p: (p.position, p.id))
 
 
+def _employee_brief(employee: AutoserviceServiceEmployee) -> RepairOrderEmployeeBrief:
+    return RepairOrderEmployeeBrief(id=employee.id, name=employee.name)
+
+
 def _work_view(work: RepairOrderWork) -> RepairOrderWorkView:
+    line_total = _line_sum(work.qty, work.unit_price)
+    executors = []
+    for row in sorted(work.executors or [], key=lambda e: e.id):
+        pay = _money(line_total * _money(row.percent) / Decimal("100"))
+        executors.append(
+            RepairOrderWorkExecutorView(
+                employee_id=row.employee_id,
+                employee=_employee_brief(row.employee),
+                percent=_money(row.percent),
+                pay_amount=pay,
+            )
+        )
     return RepairOrderWorkView(
         id=work.id,
         position=work.position,
+        catalog_work_id=work.catalog_work_id,
         title=work.title,
         qty=work.qty,
         unit_price=_money(work.unit_price),
-        line_sum=_line_sum(work.qty, work.unit_price),
+        line_sum=line_total,
+        executors=executors,
         executor_user_id=work.executor_user_id,
         executor=_user_brief(work.executor) if work.executor else None,
     )
@@ -261,6 +287,9 @@ def _order_query(db: Session):
         joinedload(RepairOrder.lift),
         joinedload(RepairOrder.assignees),
         selectinload(RepairOrder.works).joinedload(RepairOrderWork.executor),
+        selectinload(RepairOrder.works)
+        .selectinload(RepairOrderWork.executors)
+        .joinedload(RepairOrderWorkExecutor.employee),
         selectinload(RepairOrder.client_parts),
         selectinload(RepairOrder.shop_parts),
     )
@@ -350,6 +379,60 @@ def _resolve_executor(db: Session, org_id: str, user_id: int | None) -> User | N
     return users[0]
 
 
+def _resolve_catalog_work(
+    db: Session,
+    org_id: str,
+    catalog_work_id: int | None,
+    title: str,
+    unit_price: Decimal,
+) -> tuple[int | None, str, Decimal]:
+    if catalog_work_id is None:
+        return None, title, unit_price
+    row = (
+        db.query(AutoserviceWork)
+        .filter(
+            AutoserviceWork.id == catalog_work_id,
+            AutoserviceWork.organization_id == org_id,
+            AutoserviceWork.is_active.is_(True),
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Работа из каталога не найдена",
+        )
+    resolved_title = title.strip() or row.name
+    resolved_price = unit_price if unit_price > 0 else _money(row.default_unit_price)
+    return row.id, resolved_title[:255], resolved_price
+
+
+def _resolve_work_executors(
+    db: Session,
+    org_id: str,
+    executors: list[RepairOrderWorkExecutorIn],
+) -> list[tuple[AutoserviceServiceEmployee, Decimal]]:
+    if not executors:
+        return []
+    ids = list(dict.fromkeys(e.employee_id for e in executors))
+    employees = (
+        db.query(AutoserviceServiceEmployee)
+        .filter(
+            AutoserviceServiceEmployee.id.in_(ids),
+            AutoserviceServiceEmployee.organization_id == org_id,
+            AutoserviceServiceEmployee.is_active.is_(True),
+        )
+        .all()
+    )
+    by_id = {e.id: e for e in employees}
+    if len(by_id) != len(ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некоторые сотрудники сервиса не найдены",
+        )
+    return [(by_id[item.employee_id], _money(item.percent)) for item in executors]
+
+
 def _replace_works(
     db: Session,
     order: RepairOrder,
@@ -360,21 +443,41 @@ def _replace_works(
     db.flush()
     for idx, item in enumerate(items, start=1):
         title = item.title.strip()
-        if not title:
+        if not title and not item.catalog_work_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Название работы не может быть пустым",
+            )
+        catalog_id, resolved_title, resolved_price = _resolve_catalog_work(
+            db,
+            org_id,
+            item.catalog_work_id,
+            title,
+            _money(item.unit_price),
+        )
+        if not resolved_title:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Название работы не может быть пустым",
             )
         _resolve_executor(db, org_id, item.executor_user_id)
-        order.works.append(
-            RepairOrderWork(
-                position=idx,
-                title=title[:255],
-                qty=item.qty,
-                unit_price=_money(item.unit_price),
-                executor_user_id=item.executor_user_id,
-            )
+        executor_rows = _resolve_work_executors(db, org_id, item.executors)
+        work = RepairOrderWork(
+            position=idx,
+            catalog_work_id=catalog_id,
+            title=resolved_title[:255],
+            qty=item.qty,
+            unit_price=resolved_price,
+            executor_user_id=item.executor_user_id,
         )
+        for employee, percent in executor_rows:
+            work.executors.append(
+                RepairOrderWorkExecutor(
+                    employee_id=employee.id,
+                    percent=percent,
+                )
+            )
+        order.works.append(work)
 
 
 def _replace_client_parts(
@@ -543,6 +646,34 @@ def search_warehouse_products(
 
 
 @router.get(
+    "/autoservice/repair-orders/service-employees-options",
+    response_model=list[RepairOrderServiceEmployeeOption],
+)
+def list_repair_order_service_employee_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    rows = (
+        db.query(AutoserviceServiceEmployee)
+        .filter(
+            AutoserviceServiceEmployee.organization_id == org_id,
+            AutoserviceServiceEmployee.is_active.is_(True),
+        )
+        .order_by(AutoserviceServiceEmployee.name.asc())
+        .all()
+    )
+    return [
+        RepairOrderServiceEmployeeOption(
+            id=row.id,
+            name=row.name,
+            work_percent=_money(row.work_percent),
+        )
+        for row in rows
+    ]
+
+
+@router.get(
     "/autoservice/repair-orders/staff-options",
     response_model=list[RepairOrderStaffOption],
 )
@@ -634,7 +765,7 @@ def list_repair_orders(
             if status_filter not in HISTORY_STATUSES:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Для истории status: issued или cancelled",
+                    detail="Для истории status: completed или cancelled",
                 )
             query = query.filter(RepairOrder.status == status_filter)
         else:
@@ -685,7 +816,7 @@ def create_repair_order(
         scheduled_at=scheduled_at,
         scheduled_end_at=scheduled_end_at,
         accepted_by_user_id=current_user.id,
-        status="accepted",
+        status="pending",
     )
     row.assignees = assignees
     db.add(row)
@@ -770,7 +901,13 @@ def patch_repair_order_status(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Недопустимый статус",
         )
+    prev_status = row.status
     row.status = payload.status
+    if prev_status == "completed" and payload.status != "completed":
+        clear_order_accruals(db, row.id)
+    if payload.status == "completed" and prev_status != "completed":
+        db.flush()
+        accrue_order_payroll(db, row)
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
     return _to_staff_view(row)
