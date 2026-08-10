@@ -34,6 +34,7 @@ from app.db.schema_patches import (
     ensure_repair_order_lines_tables,
     ensure_repair_order_shop_parts_table,
     ensure_repair_order_stage10,
+    ensure_autoservice_lifts_tables,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
@@ -212,6 +213,7 @@ try:
     ensure_repair_order_lines_tables()
     ensure_repair_order_shop_parts_table()
     ensure_repair_order_stage10()
+    ensure_autoservice_lifts_tables()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
     ensure_group_chat_columns()

@@ -174,7 +174,7 @@ export function getPageTitle(pathname) {
         '/autoservice/planner': 'Планировщик',
         '/autoservice/clients': 'Клиенты автосервиса',
         '/autoservice/orders': 'Заказ-наряды',
-        '/autoservice/inspections': 'Техосмотр',
+        '/autoservice/inspections': 'Записи',
         '/autoservice/settings': 'Настройки автосервиса',
         '/garage': 'Мои авто',
         '/garage/repairs': 'История ремонтов',

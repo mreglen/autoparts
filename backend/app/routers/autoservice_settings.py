@@ -28,7 +28,7 @@ def _get_or_create_settings(db: Session, org_id: str) -> AutoserviceSettings:
     )
     if row:
         return row
-    row = AutoserviceSettings(organization_id=org_id, lifts_count=0)
+    row = AutoserviceSettings(organization_id=org_id)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -75,7 +75,6 @@ def update_autoservice_settings(
 ):
     org_id = require_autoservice_director(db, current_user)
     row = _get_or_create_settings(db, org_id)
-    row.lifts_count = payload.lifts_count
     if "public_name" in payload.model_fields_set:
         row.public_name = (payload.public_name or "").strip() or None
     if "public_description" in payload.model_fields_set:

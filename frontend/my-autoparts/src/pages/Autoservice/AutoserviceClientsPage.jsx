@@ -8,11 +8,6 @@ import { formatServerDateTime } from '../../utils/serverDate';
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
 
-const SOURCE_LABELS = {
-  self: 'Сам',
-  staff: 'Сотрудник',
-};
-
 function Modal({ title, children, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -218,7 +213,6 @@ export default function AutoserviceClientsPage() {
             <tr>
               <th className="px-4 py-3">Имя</th>
               <th className="px-4 py-3">Телефон</th>
-              <th className="px-4 py-3">Источник</th>
               <th className="px-4 py-3">Согласие</th>
               <th className="px-4 py-3">Аккаунт</th>
               <th className="px-4 py-3">Авто</th>
@@ -227,13 +221,13 @@ export default function AutoserviceClientsPage() {
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                   Загрузка…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                   Клиентов пока нет
                 </td>
               </tr>
@@ -243,9 +237,6 @@ export default function AutoserviceClientsPage() {
                   <tr className="hover:bg-gray-50/80">
                     <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-700">{row.phone}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                      {SOURCE_LABELS[row.source] || row.source}
-                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-600">
                       {formatServerDateTime(row.consented_at)}
                     </td>
@@ -272,7 +263,7 @@ export default function AutoserviceClientsPage() {
                   </tr>
                   {expandedClientId === row.id && (
                     <tr className="bg-gray-50/50">
-                      <td colSpan={6} className="px-4 py-3">
+                      <td colSpan={5} className="px-4 py-3">
                         {vehiclesLoadingId === row.id ? (
                           <p className="text-sm text-gray-500">Загрузка автомобилей…</p>
                         ) : (clientVehicles[row.id] || []).length === 0 ? (

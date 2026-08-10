@@ -570,7 +570,10 @@ function mapOrderToFormState(order) {
       : toLocalInputValue(new Date().toISOString()),
     comment: order?.client_comment || '',
     staffComment: order?.staff_comment || '',
-    liftNumber: order?.lift_number != null ? String(order.lift_number) : '',
+    liftId: order?.lift_id != null ? String(order.lift_id) : '',
+    scheduledEndAt: order?.scheduled_end_at
+      ? toLocalInputValue(order.scheduled_end_at)
+      : '',
     works: (order?.works || []).length
       ? order.works.map((w) => ({
           title: w.title || '',
@@ -615,7 +618,7 @@ export default function AutoserviceOrderFormPage() {
 
   const [clients, setClients] = useState([]);
   const [staffOptions, setStaffOptions] = useState([]);
-  const [liftsCount, setLiftsCount] = useState(0);
+  const [lifts, setLifts] = useState([]);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState('');
 
@@ -629,7 +632,8 @@ export default function AutoserviceOrderFormPage() {
   const [scheduledAt, setScheduledAt] = useState(() => toLocalInputValue(new Date().toISOString()));
   const [comment, setComment] = useState('');
   const [staffComment, setStaffComment] = useState('');
-  const [liftNumber, setLiftNumber] = useState('');
+  const [scheduledEndAt, setScheduledEndAt] = useState('');
+  const [liftId, setLiftId] = useState('');
   const [works, setWorks] = useState([]);
   const [clientParts, setClientParts] = useState([]);
   const [shopParts, setShopParts] = useState([]);
@@ -656,7 +660,8 @@ export default function AutoserviceOrderFormPage() {
     setScheduledAt(state.scheduledAt);
     setComment(state.comment);
     setStaffComment(state.staffComment);
-    setLiftNumber(state.liftNumber);
+    setLiftId(state.liftId);
+    setScheduledEndAt(state.scheduledEndAt);
     setWorks(state.works);
     setClientParts(state.clientParts);
     setShopParts(state.shopParts);
@@ -678,7 +683,7 @@ export default function AutoserviceOrderFormPage() {
       ]);
       setClients(Array.isArray(clientsData) ? clientsData : []);
       setStaffOptions(Array.isArray(staffData) ? staffData : []);
-      setLiftsCount(typeof liftsData?.lifts_count === 'number' ? liftsData.lifts_count : 0);
+      setLifts(Array.isArray(liftsData?.lifts) ? liftsData.lifts : []);
     } catch (err) {
       setMetaError(err?.message || 'Не удалось загрузить справочники');
     } finally {
@@ -932,9 +937,10 @@ export default function AutoserviceOrderFormPage() {
     client_id: Number(clientId),
     vehicle_id: Number(vehicleId),
     scheduled_at: fromLocalInputValue(scheduledAt),
+    scheduled_end_at: scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null,
     client_comment: comment.trim() || null,
     staff_comment: staffComment.trim() || null,
-    lift_number: liftNumber ? Number(liftNumber) : null,
+    lift_id: liftId ? Number(liftId) : null,
     assignee_user_ids: [],
     works: works.map((w) => ({
       title: w.title.trim(),
@@ -964,6 +970,10 @@ export default function AutoserviceOrderFormPage() {
     }
     const iso = fromLocalInputValue(scheduledAt);
     if (!iso) return 'Некорректная дата записи';
+    const endIso = scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null;
+    if (endIso && iso && new Date(endIso) <= new Date(iso)) {
+      return 'Время окончания должно быть позже времени начала';
+    }
     for (const w of works) {
       if (!String(w.title || '').trim()) return 'У каждой работы должно быть название';
       if (!Number.isInteger(Number(w.qty)) || Number(w.qty) < 1) {
@@ -1143,17 +1153,26 @@ export default function AutoserviceOrderFormPage() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700">Окончание (необязательно)</label>
+              <input
+                type="datetime-local"
+                className={inputClass}
+                value={scheduledEndAt}
+                onChange={(e) => setScheduledEndAt(e.target.value)}
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700">Подъёмник</label>
               <select
                 className={inputClass}
-                value={liftNumber}
-                onChange={(e) => setLiftNumber(e.target.value)}
-                disabled={liftsCount <= 0}
+                value={liftId}
+                onChange={(e) => setLiftId(e.target.value)}
+                disabled={lifts.length <= 0}
               >
-                <option value="">{liftsCount > 0 ? 'Не назначен' : 'Нет подъёмников'}</option>
-                {Array.from({ length: liftsCount }, (_, i) => i + 1).map((n) => (
-                  <option key={n} value={n}>
-                    №{n}
+                <option value="">{lifts.length > 0 ? 'Не назначен' : 'Нет подъёмников'}</option>
+                {lifts.map((lift) => (
+                  <option key={lift.id} value={lift.id}>
+                    {lift.name}
                   </option>
                 ))}
               </select>

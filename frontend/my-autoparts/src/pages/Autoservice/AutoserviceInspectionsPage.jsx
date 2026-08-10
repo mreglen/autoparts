@@ -236,8 +236,7 @@ export default function AutoserviceInspectionsPage() {
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Записи на тех осмотр</h1>
-          <p className="mt-1 text-sm text-gray-500">Заявки с сайта и добавленные вручную</p>
+          <h1 className="text-2xl font-bold text-gray-900">Записи</h1>
         </div>
         <button
           type="button"

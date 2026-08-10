@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 
 
 class AutoserviceSettingsUpdate(BaseModel):
-    lifts_count: int = Field(ge=0)
     public_name: Optional[str] = Field(None, max_length=160)
     public_description: Optional[str] = Field(None, max_length=2000)
 
@@ -13,7 +12,6 @@ class AutoserviceSettingsUpdate(BaseModel):
 class AutoserviceSettingsView(BaseModel):
     id: int
     organization_id: str
-    lifts_count: int
     public_name: Optional[str] = None
     public_description: Optional[str] = None
     created_at: datetime

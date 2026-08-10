@@ -7,12 +7,15 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
+from app.models.autoservice_lift import AutoserviceLift
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_booking import RepairBooking
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_planner import (
     PlannerDay,
+    PlannerLiftColumn,
+    PlannerLiftsDayResponse,
     PlannerRepairBooking,
     PlannerRepairOrder,
     PlannerResponse,
@@ -32,6 +35,22 @@ def _vehicle_label(vehicle: GarageVehicle | None) -> str:
     if vehicle.plate:
         label = f"{label} ({vehicle.plate})" if label else vehicle.plate
     return label or "—"
+
+
+def _planner_order(row: RepairOrder) -> PlannerRepairOrder:
+    return PlannerRepairOrder(
+        id=row.id,
+        order_number=row.order_number,
+        client_id=row.client_id,
+        client_name=row.client.name if row.client else "—",
+        client_phone=row.client.phone if row.client else "",
+        vehicle=_vehicle_label(row.vehicle),
+        status=row.status,
+        scheduled_at=row.scheduled_at,
+        scheduled_end_at=row.scheduled_end_at,
+        lift_id=row.lift_id,
+        lift_name=row.lift.name if row.lift else None,
+    )
 
 
 @router.get("/autoservice/planner", response_model=PlannerResponse)
@@ -61,6 +80,7 @@ def get_planner(
         .options(
             joinedload(RepairOrder.client),
             joinedload(RepairOrder.vehicle),
+            joinedload(RepairOrder.lift),
         )
         .filter(
             RepairOrder.organization_id == org_id,
@@ -93,19 +113,7 @@ def get_planner(
         day = days.get(row.scheduled_at.date())
         if day is None:
             continue
-        day.repair_orders.append(
-            PlannerRepairOrder(
-                id=row.id,
-                order_number=row.order_number,
-                client_id=row.client_id,
-                client_name=row.client.name if row.client else "—",
-                client_phone=row.client.phone if row.client else "",
-                vehicle=_vehicle_label(row.vehicle),
-                status=row.status,
-                scheduled_at=row.scheduled_at,
-                lift_number=row.lift_number,
-            )
-        )
+        day.repair_orders.append(_planner_order(row))
 
     for row in bookings:
         day = days.get(row.preferred_date)
@@ -127,4 +135,68 @@ def get_planner(
         date_from=date_from,
         date_to=date_to,
         days=[days[key] for key in sorted(days)],
+    )
+
+
+@router.get("/autoservice/planner/lifts", response_model=PlannerLiftsDayResponse)
+def get_planner_lifts_day(
+    day: date = Query(..., alias="date"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    range_start = datetime.combine(day, time.min)
+    range_end = datetime.combine(day + timedelta(days=1), time.min)
+
+    lifts = (
+        db.query(AutoserviceLift)
+        .filter(
+            AutoserviceLift.organization_id == org_id,
+            AutoserviceLift.is_active.is_(True),
+        )
+        .order_by(AutoserviceLift.sort_order.asc(), AutoserviceLift.id.asc())
+        .all()
+    )
+
+    orders = (
+        db.query(RepairOrder)
+        .options(
+            joinedload(RepairOrder.client),
+            joinedload(RepairOrder.vehicle),
+            joinedload(RepairOrder.lift),
+        )
+        .filter(
+            RepairOrder.organization_id == org_id,
+            RepairOrder.scheduled_at >= range_start,
+            RepairOrder.scheduled_at < range_end,
+            RepairOrder.status != "cancelled",
+        )
+        .order_by(RepairOrder.scheduled_at.asc(), RepairOrder.id.asc())
+        .all()
+    )
+
+    by_lift: dict[int, list[PlannerRepairOrder]] = {lift.id: [] for lift in lifts}
+    unassigned: list[PlannerRepairOrder] = []
+
+    for row in orders:
+        item = _planner_order(row)
+        if row.lift_id and row.lift_id in by_lift:
+            by_lift[row.lift_id].append(item)
+        else:
+            unassigned.append(item)
+
+    columns = [
+        PlannerLiftColumn(
+            id=lift.id,
+            name=lift.name,
+            sort_order=lift.sort_order,
+            orders=by_lift.get(lift.id, []),
+        )
+        for lift in lifts
+    ]
+
+    return PlannerLiftsDayResponse(
+        date=day,
+        lifts=columns,
+        unassigned_orders=unassigned,
     )

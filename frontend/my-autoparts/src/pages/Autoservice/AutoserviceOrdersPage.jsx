@@ -96,9 +96,9 @@ function OrderLinesExpand({ row, showExecutors }) {
           </p>
         </div>
       )}
-      {row.lift_number ? (
+      {row.lift?.name ? (
         <p>
-          <span className="font-medium text-gray-900">Подъёмник:</span> №{row.lift_number}
+          <span className="font-medium text-gray-900">Подъёмник:</span> {row.lift.name}
         </p>
       ) : null}
       {row.staff_comment && showExecutors && (
@@ -433,7 +433,7 @@ export default function AutoserviceOrdersPage() {
                       {formatDateTime(row.scheduled_at)}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      {row.lift_number != null ? `№${row.lift_number}` : '—'}
+                      {row.lift?.name || '—'}
                     </td>
                     <td className="hidden px-4 py-3 text-gray-700 sm:table-cell">{row.accepted_by?.name || '—'}</td>
                     <td className="px-4 py-3">

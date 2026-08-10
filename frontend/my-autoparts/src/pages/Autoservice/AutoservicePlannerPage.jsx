@@ -5,6 +5,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { formatServerDateTime, parseServerDate } from '../../utils/serverDate';
+import { formatOrderTimeRange } from '../../utils/autoserviceLiftDisplay';
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
@@ -101,6 +102,10 @@ export default function AutoservicePlannerPage() {
   const [bookingEditForm, setBookingEditForm] = useState(null);
   const [orderEditForm, setOrderEditForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [viewMode, setViewMode] = useState('calendar');
+  const [liftDayDate, setLiftDayDate] = useState(() => toIsoDate(today));
+  const [liftDayData, setLiftDayData] = useState(null);
+  const [liftDayLoading, setLiftDayLoading] = useState(false);
 
   const cells = useMemo(() => buildMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
   const rangeFrom = cells.length ? toIsoDate(cells[0]) : null;
@@ -127,9 +132,28 @@ export default function AutoservicePlannerPage() {
     }
   }, [rangeFrom, rangeTo]);
 
+  const loadLiftDay = useCallback(async () => {
+    if (!liftDayDate) return;
+    setLiftDayLoading(true);
+    setError('');
+    try {
+      const data = await apiRequest(`/autoservice/planner/lifts?date=${liftDayDate}`);
+      setLiftDayData(data);
+    } catch (e) {
+      setError(e?.message || 'Не удалось загрузить загрузку подъёмников');
+      setLiftDayData(null);
+    } finally {
+      setLiftDayLoading(false);
+    }
+  }, [liftDayDate]);
+
   useEffect(() => {
     if (isReady && isAuthenticated) load();
   }, [isReady, isAuthenticated, load]);
+
+  useEffect(() => {
+    if (isReady && isAuthenticated && viewMode === 'lifts') loadLiftDay();
+  }, [isReady, isAuthenticated, viewMode, loadLiftDay]);
 
   const resetModalState = () => {
     setShowCreateBooking(false);
@@ -306,7 +330,30 @@ export default function AutoservicePlannerPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Планировщик</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Планировщик</h1>
+          <div className="inline-flex rounded-sg border border-gray-200 bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('calendar')}
+              className={`rounded-sg px-3 py-1.5 text-sm font-medium ${
+                viewMode === 'calendar' ? 'bg-brand-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Календарь
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('lifts')}
+              className={`rounded-sg px-3 py-1.5 text-sm font-medium ${
+                viewMode === 'lifts' ? 'bg-brand-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Подъёмники
+            </button>
+          </div>
+        </div>
+        {viewMode === 'calendar' ? (
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -326,14 +373,79 @@ export default function AutoservicePlannerPage() {
             →
           </button>
         </div>
+        ) : (
+          <input
+            type="date"
+            value={liftDayDate}
+            onChange={(e) => setLiftDayDate(e.target.value)}
+            className="rounded-sg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+          />
+        )}
       </div>
 
-      {error && !selectedDate && (
+      {error && !selectedDate && viewMode === 'calendar' && (
         <p className="mt-4 text-sm text-red-600" role="alert">
           {error}
         </p>
       )}
 
+      {error && viewMode === 'lifts' && (
+        <p className="mt-4 text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      )}
+
+      {viewMode === 'lifts' ? (
+        <div className="mt-4">
+          {liftDayLoading ? (
+            <p className="text-sm text-gray-500">Загрузка…</p>
+          ) : (
+            <div className="space-y-4">
+              {(liftDayData?.lifts || []).length === 0 ? (
+                <p className="rounded-sg border border-gray-200 bg-white p-4 text-sm text-gray-500">
+                  Нет активных подъёмников. Добавьте их в настройках автосервиса.
+                </p>
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                  {(liftDayData?.lifts || []).map((lift) => (
+                    <section key={lift.id} className="rounded-sg border border-gray-200 bg-white p-4">
+                      <h2 className="text-sm font-semibold text-gray-900">{lift.name}</h2>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {lift.orders.length ? `${lift.orders.length} заказ(ов)` : 'Свободен'}
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        {lift.orders.map((order) => (
+                          <div key={order.id} className="rounded-sg border border-gray-200 px-3 py-2 text-sm">
+                            <p className="font-medium text-gray-900">{order.order_number} · {order.client_name}</p>
+                            <p className="mt-0.5 text-gray-600">{order.vehicle}</p>
+                            <p className="mt-0.5 text-xs text-gray-500">{formatOrderTimeRange(order)}</p>
+                            <p className="mt-1 text-xs text-gray-500">{ORDER_STATUS_LABELS[order.status] || order.status}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              )}
+              {(liftDayData?.unassigned_orders || []).length > 0 ? (
+                <section className="rounded-sg border border-dashed border-gray-300 bg-gray-50 p-4">
+                  <h2 className="text-sm font-semibold text-gray-900">Без подъёмника</h2>
+                  <div className="mt-3 space-y-2">
+                    {liftDayData.unassigned_orders.map((order) => (
+                      <div key={order.id} className="rounded-sg border border-gray-200 bg-white px-3 py-2 text-sm">
+                        <p className="font-medium text-gray-900">{order.order_number} · {order.client_name}</p>
+                        <p className="mt-0.5 text-gray-600">{order.vehicle}</p>
+                        <p className="mt-0.5 text-xs text-gray-500">{formatOrderTimeRange(order)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          )}
+        </div>
+      ) : (
+      <>
       <div className="mt-4 overflow-hidden rounded-sg border border-gray-200 bg-white">
         <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
           {WEEKDAYS.map((label) => (
@@ -579,8 +691,8 @@ export default function AutoservicePlannerPage() {
                             {order.order_number} · {order.client_name}
                           </p>
                           <p className="mt-0.5 text-gray-600">
-                            {order.vehicle} · {formatServerDateTime(order.scheduled_at)}
-                            {order.lift_number != null ? ` · подъёмник №${order.lift_number}` : ''}
+                            {order.vehicle} · {formatOrderTimeRange(order)}
+                            {order.lift_name ? ` · ${order.lift_name}` : ''}
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -746,6 +858,8 @@ export default function AutoservicePlannerPage() {
             )}
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

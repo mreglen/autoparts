@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
-from app.models.autoservice_settings import AutoserviceSettings
+from app.models.autoservice_lift import AutoserviceLift
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import (
     RepairOrder,
@@ -31,6 +31,7 @@ from app.schemas.repair_order import (
     RepairOrderClientView,
     RepairOrderClientWorkView,
     RepairOrderCreate,
+    RepairOrderLiftBrief,
     RepairOrderLiftsMeta,
     RepairOrderShopPartIn,
     RepairOrderShopPartView,
@@ -50,6 +51,11 @@ from app.utils.autoservice_access import (
     user_display_name,
 )
 from app.utils.repair_order_number import allocate_repair_order_number
+from app.services.autoservice_lift_helpers import (
+    normalize_dt as _normalize_dt,
+    validate_lift_id as _validate_lift_id,
+    validate_schedule_end as _validate_schedule_end,
+)
 
 router = APIRouter(tags=["Autoservice repair orders"])
 
@@ -179,6 +185,12 @@ def _client_shop_part_view(part: RepairOrderShopPart) -> RepairOrderClientShopPa
     )
 
 
+def _lift_brief(lift: AutoserviceLift | None) -> RepairOrderLiftBrief | None:
+    if not lift:
+        return None
+    return RepairOrderLiftBrief(id=lift.id, name=lift.name, sort_order=lift.sort_order)
+
+
 def _to_staff_view(row: RepairOrder) -> RepairOrderStaffView:
     works = [_work_view(w) for w in _sorted_works(row)]
     parts = [_client_part_view(p) for p in _sorted_client_parts(row)]
@@ -193,8 +205,10 @@ def _to_staff_view(row: RepairOrder) -> RepairOrderStaffView:
         vehicle_id=row.vehicle_id,
         client_comment=row.client_comment,
         staff_comment=row.staff_comment,
-        lift_number=row.lift_number,
+        lift_id=row.lift_id,
+        lift=_lift_brief(row.lift),
         scheduled_at=row.scheduled_at,
+        scheduled_end_at=row.scheduled_end_at,
         accepted_by_user_id=row.accepted_by_user_id,
         status=row.status,
         created_at=row.created_at,
@@ -223,8 +237,10 @@ def _to_client_view(row: RepairOrder) -> RepairOrderClientView:
         order_number=row.order_number,
         vehicle_id=row.vehicle_id,
         client_comment=row.client_comment,
-        lift_number=row.lift_number,
+        lift_id=row.lift_id,
+        lift=_lift_brief(row.lift),
         scheduled_at=row.scheduled_at,
+        scheduled_end_at=row.scheduled_end_at,
         status=row.status,
         created_at=row.created_at,
         vehicle=_vehicle_brief(row.vehicle),
@@ -242,6 +258,7 @@ def _order_query(db: Session):
         joinedload(RepairOrder.client),
         joinedload(RepairOrder.vehicle),
         joinedload(RepairOrder.accepted_by),
+        joinedload(RepairOrder.lift),
         joinedload(RepairOrder.assignees),
         selectinload(RepairOrder.works).joinedload(RepairOrderWork.executor),
         selectinload(RepairOrder.client_parts),
@@ -463,32 +480,16 @@ def _apply_search_filter(query, q: str | None):
     )
 
 
-def _get_lifts_count(db: Session, org_id: str) -> int:
-    row = (
-        db.query(AutoserviceSettings)
-        .filter(AutoserviceSettings.organization_id == org_id)
-        .first()
+def _list_active_lifts(db: Session, org_id: str) -> list[AutoserviceLift]:
+    return (
+        db.query(AutoserviceLift)
+        .filter(
+            AutoserviceLift.organization_id == org_id,
+            AutoserviceLift.is_active.is_(True),
+        )
+        .order_by(AutoserviceLift.sort_order.asc(), AutoserviceLift.id.asc())
+        .all()
     )
-    if not row:
-        return 0
-    return max(int(row.lifts_count or 0), 0)
-
-
-def _validate_lift_number(db: Session, org_id: str, lift_number: int | None) -> int | None:
-    if lift_number is None:
-        return None
-    lifts_count = _get_lifts_count(db, org_id)
-    if lifts_count <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Подъёмники не настроены (количество = 0)",
-        )
-    if not isinstance(lift_number, int) or lift_number < 1 or lift_number > lifts_count:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Номер подъёмника должен быть от 1 до {lifts_count}",
-        )
-    return lift_number
 
 
 @router.get(
@@ -500,7 +501,10 @@ def get_repair_order_lifts_meta(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_staff(db, current_user)
-    return RepairOrderLiftsMeta(lifts_count=_get_lifts_count(db, org_id))
+    lifts = _list_active_lifts(db, org_id)
+    return RepairOrderLiftsMeta(
+        lifts=[RepairOrderLiftBrief.model_validate(l) for l in lifts],
+    )
 
 
 @router.get(
@@ -667,11 +671,9 @@ def create_repair_order(
     org_id = require_autoservice_staff(db, current_user)
     _get_client_and_vehicle(db, org_id, payload.client_id, payload.vehicle_id)
     assignees = _resolve_assignees(db, org_id, payload.assignee_user_ids)
-    scheduled_at = payload.scheduled_at
-    if isinstance(scheduled_at, datetime) and scheduled_at.tzinfo is not None:
-        scheduled_at = scheduled_at.replace(tzinfo=None)
-
-    lift_number = _validate_lift_number(db, org_id, payload.lift_number)
+    scheduled_at = _normalize_dt(payload.scheduled_at)
+    scheduled_end_at = _validate_schedule_end(scheduled_at, payload.scheduled_end_at)
+    lift_id = _validate_lift_id(db, org_id, payload.lift_id)
     row = RepairOrder(
         organization_id=org_id,
         order_number=allocate_repair_order_number(db),
@@ -679,8 +681,9 @@ def create_repair_order(
         vehicle_id=payload.vehicle_id,
         client_comment=(payload.client_comment or "").strip() or None,
         staff_comment=(payload.staff_comment or "").strip() or None,
-        lift_number=lift_number,
+        lift_id=lift_id,
         scheduled_at=scheduled_at,
+        scheduled_end_at=scheduled_end_at,
         accepted_by_user_id=current_user.id,
         status="accepted",
     )
@@ -716,10 +719,11 @@ def update_repair_order(
         row.vehicle_id = vehicle_id
 
     if payload.scheduled_at is not None:
-        scheduled_at = payload.scheduled_at
-        if scheduled_at.tzinfo is not None:
-            scheduled_at = scheduled_at.replace(tzinfo=None)
-        row.scheduled_at = scheduled_at
+        row.scheduled_at = _normalize_dt(payload.scheduled_at)
+
+    if "scheduled_end_at" in payload.model_fields_set:
+        end_at = payload.scheduled_end_at
+        row.scheduled_end_at = _validate_schedule_end(row.scheduled_at, end_at)
 
     if "client_comment" in payload.model_fields_set:
         comment = payload.client_comment
@@ -729,8 +733,8 @@ def update_repair_order(
         staff_comment = payload.staff_comment
         row.staff_comment = (staff_comment or "").strip() or None
 
-    if "lift_number" in payload.model_fields_set:
-        row.lift_number = _validate_lift_number(db, org_id, payload.lift_number)
+    if "lift_id" in payload.model_fields_set:
+        row.lift_id = _validate_lift_id(db, org_id, payload.lift_id)
 
     if payload.assignee_user_ids is not None:
         row.assignees = _resolve_assignees(db, org_id, payload.assignee_user_ids)

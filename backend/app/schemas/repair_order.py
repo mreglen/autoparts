@@ -31,6 +31,14 @@ class RepairOrderClientBrief(BaseModel):
     phone: str
 
 
+class RepairOrderLiftBrief(BaseModel):
+    id: int
+    name: str
+    sort_order: int
+
+    model_config = {"from_attributes": True}
+
+
 class RepairOrderWorkIn(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     qty: int = Field(ge=1)
@@ -113,9 +121,10 @@ class RepairOrderCreate(BaseModel):
     client_id: int
     vehicle_id: int
     scheduled_at: datetime
+    scheduled_end_at: Optional[datetime] = None
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
-    lift_number: Optional[int] = Field(None, ge=1)
+    lift_id: Optional[int] = None
     assignee_user_ids: list[int] = Field(default_factory=list)
     works: list[RepairOrderWorkIn] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartIn] = Field(default_factory=list)
@@ -126,9 +135,10 @@ class RepairOrderUpdate(BaseModel):
     client_id: Optional[int] = None
     vehicle_id: Optional[int] = None
     scheduled_at: Optional[datetime] = None
+    scheduled_end_at: Optional[datetime] = None
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
-    lift_number: Optional[int] = None
+    lift_id: Optional[int] = None
     assignee_user_ids: Optional[list[int]] = None
     works: Optional[list[RepairOrderWorkIn]] = None
     client_parts: Optional[list[RepairOrderClientPartIn]] = None
@@ -147,8 +157,10 @@ class RepairOrderStaffView(BaseModel):
     vehicle_id: int
     client_comment: Optional[str] = None
     staff_comment: Optional[str] = None
-    lift_number: Optional[int] = None
+    lift_id: Optional[int] = None
+    lift: Optional[RepairOrderLiftBrief] = None
     scheduled_at: datetime
+    scheduled_end_at: Optional[datetime] = None
     accepted_by_user_id: int
     status: str
     created_at: datetime
@@ -170,8 +182,10 @@ class RepairOrderClientView(BaseModel):
     order_number: str
     vehicle_id: int
     client_comment: Optional[str] = None
-    lift_number: Optional[int] = None
+    lift_id: Optional[int] = None
+    lift: Optional[RepairOrderLiftBrief] = None
     scheduled_at: datetime
+    scheduled_end_at: Optional[datetime] = None
     status: str
     created_at: datetime
     vehicle: RepairOrderVehicleBrief
@@ -189,7 +203,7 @@ class RepairOrderStaffOption(BaseModel):
 
 
 class RepairOrderLiftsMeta(BaseModel):
-    lifts_count: int
+    lifts: list[RepairOrderLiftBrief] = Field(default_factory=list)
 
 
 class WarehouseProductOption(BaseModel):

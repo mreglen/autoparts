@@ -3905,3 +3905,127 @@ def ensure_repair_order_stage10() -> None:
 
     logger.info("Applied repair_order stage10 patch")
 
+
+def ensure_autoservice_lifts_tables() -> None:
+    """Create autoservice_lifts, add lift_id/scheduled_end_at, migrate lifts_count data."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+
+    if "autoservice_lifts" not in tables:
+        if "organizations" not in tables:
+            return
+        if engine.dialect.name == "postgresql":
+            ddl = """
+            CREATE TABLE autoservice_lifts (
+                id SERIAL PRIMARY KEY,
+                organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                name VARCHAR(120) NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 1,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                archived_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_autoservice_lift_org_name UNIQUE (organization_id, name)
+            )
+            """
+        else:
+            ddl = """
+            CREATE TABLE autoservice_lifts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                name VARCHAR(120) NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 1,
+                is_active BOOLEAN NOT NULL DEFAULT 1,
+                archived_at DATETIME,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (organization_id, name)
+            )
+            """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+        logger.info("Applied autoservice_lifts table patch")
+        tables.add("autoservice_lifts")
+
+    if "repair_orders" in tables:
+        columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+        alter_stmts = []
+        if "lift_id" not in columns:
+            alter_stmts.append(
+                "ALTER TABLE repair_orders ADD COLUMN lift_id INTEGER REFERENCES autoservice_lifts(id)"
+            )
+        if "scheduled_end_at" not in columns:
+            alter_stmts.append(
+                "ALTER TABLE repair_orders ADD COLUMN scheduled_end_at DATETIME"
+            )
+        if alter_stmts:
+            with engine.begin() as conn:
+                for stmt in alter_stmts:
+                    conn.execute(text(stmt))
+            logger.info("Applied repair_orders lift columns patch: %s", alter_stmts)
+
+    if "autoservice_lifts" not in tables or "autoservice_settings" not in tables:
+        return
+
+    with engine.begin() as conn:
+        settings_rows = conn.execute(
+            text(
+                "SELECT organization_id, lifts_count FROM autoservice_settings WHERE lifts_count > 0"
+            )
+        ).fetchall()
+        for org_id, lifts_count in settings_rows:
+            org_id = str(org_id)
+            count = int(lifts_count or 0)
+            if count <= 0:
+                continue
+            existing = conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM autoservice_lifts WHERE organization_id = :org_id"
+                ),
+                {"org_id": org_id},
+            ).scalar()
+            if int(existing or 0) > 0:
+                continue
+            for n in range(1, count + 1):
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO autoservice_lifts (organization_id, name, sort_order, is_active)
+                        VALUES (:org_id, :name, :sort_order, 1)
+                        """
+                    ),
+                    {
+                        "org_id": org_id,
+                        "name": f"Подъёмник №{n}",
+                        "sort_order": n,
+                    },
+                )
+
+        order_rows = conn.execute(
+            text(
+                """
+                SELECT ro.id, ro.organization_id, ro.lift_number
+                FROM repair_orders ro
+                WHERE ro.lift_number IS NOT NULL AND ro.lift_id IS NULL
+                """
+            )
+        ).fetchall()
+        for order_id, org_id, lift_number in order_rows:
+            lift_row = conn.execute(
+                text(
+                    """
+                    SELECT id FROM autoservice_lifts
+                    WHERE organization_id = :org_id AND sort_order = :sort_order
+                    LIMIT 1
+                    """
+                ),
+                {"org_id": str(org_id), "sort_order": int(lift_number)},
+            ).fetchone()
+            if lift_row:
+                conn.execute(
+                    text("UPDATE repair_orders SET lift_id = :lift_id WHERE id = :order_id"),
+                    {"lift_id": lift_row[0], "order_id": order_id},
+                )
+
+    logger.info("Applied autoservice_lifts data migration patch")
+

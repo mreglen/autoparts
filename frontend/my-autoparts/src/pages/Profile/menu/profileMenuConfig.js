@@ -132,7 +132,7 @@ const buildAutoserviceStaffTab = (user, options) => {
         { id: 'autoservice-planner', label: 'Планировщик' },
         { id: 'autoservice-orders', label: 'Заказ-наряд' },
         { id: 'autoservice-clients', label: 'Клиенты' },
-        { id: 'autoservice-inspections', label: 'Техосмотр' },
+        { id: 'autoservice-inspections', label: 'Записи' },
     ];
     if (canAccessAutoserviceSettings(user, options)) {
         submenu.push({ id: 'autoservice-settings', label: 'Настройки' });
