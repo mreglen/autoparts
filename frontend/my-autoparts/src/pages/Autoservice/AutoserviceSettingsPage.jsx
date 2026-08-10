@@ -20,7 +20,7 @@ const SALARY_LABELS = {
 
 function WorksModal({ works, loading, onClose, onAdd, onRefresh }) {
   const [name, setName] = useState('');
-  const [price, setPrice] = useState('0');
+  const [price, setPrice] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleAdd = async (e) => {
@@ -29,9 +29,10 @@ function WorksModal({ works, loading, onClose, onAdd, onRefresh }) {
     if (!trimmed) return;
     setSaving(true);
     try {
-      await onAdd({ name: trimmed, default_unit_price: Number(price) || 0 });
+      const parsedPrice = Number(String(price).replace(',', '.').trim());
+      await onAdd({ name: trimmed, default_unit_price: Number.isFinite(parsedPrice) ? parsedPrice : 0 });
       setName('');
-      setPrice('0');
+      setPrice('');
       await onRefresh();
     } finally {
       setSaving(false);
@@ -46,25 +47,38 @@ function WorksModal({ works, loading, onClose, onAdd, onRefresh }) {
           <h3 className="text-lg font-semibold text-gray-900">Работы</h3>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">×</button>
         </div>
-        <form onSubmit={handleAdd} className="flex gap-2 border-b border-gray-100 p-4">
-          <input
-            className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="Название"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="₽"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-          />
-          <button type="submit" disabled={saving} className={btnPrimary}>
-            +
-          </button>
+        <form onSubmit={handleAdd} className="border-b border-gray-100 p-4">
+          <div className="flex items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="work-name" className="mb-1 block text-xs font-medium text-gray-500">
+                Название
+              </label>
+              <input
+                id="work-name"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                placeholder="Например, замена масла"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <div className="w-36 shrink-0 sm:w-40">
+              <label htmlFor="work-price" className="mb-1 block text-xs font-medium text-gray-500">
+                Цена, ₽
+              </label>
+              <input
+                id="work-price"
+                type="text"
+                inputMode="decimal"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                placeholder=""
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+              />
+            </div>
+            <button type="submit" disabled={saving} className={`${btnPrimary} mb-0.5 shrink-0 px-3`}>
+              +
+            </button>
+          </div>
         </form>
         <div className="p-4">
           {loading ? (
@@ -82,6 +96,134 @@ function WorksModal({ works, loading, onClose, onAdd, onRefresh }) {
             </ul>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function employeeFormFromRow(emp) {
+  return {
+    name: emp?.name || '',
+    phone: emp?.phone || '',
+    position: emp?.position || '',
+    salary_type: emp?.salary_type || 'percent_work',
+    salary_amount: emp?.salary_amount != null ? String(emp.salary_amount) : '0',
+    work_percent: emp?.work_percent != null ? String(emp.work_percent) : '0',
+  };
+}
+
+function EmployeeEditModal({ employee, onClose, onSaved }) {
+  const [form, setForm] = useState(() => employeeFormFromRow(employee));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setForm(employeeFormFromRow(employee));
+    setError('');
+  }, [employee]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const name = form.name.trim();
+    if (name.length < 2) {
+      setError('Укажите имя');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/service-employees/${employee.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name,
+          phone: form.phone.trim() || null,
+          position: form.position.trim() || null,
+          salary_type: form.salary_type,
+          salary_amount: Number(form.salary_amount) || 0,
+          work_percent: Number(form.work_percent) || 0,
+        }),
+      });
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-lg font-semibold text-gray-900">Сотрудник</h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-700">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <input
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            placeholder="Имя"
+            value={form.name}
+            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+          />
+          <input
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            placeholder="Телефон"
+            value={form.phone}
+            onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+          />
+          <input
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            placeholder="Должность"
+            value={form.position}
+            onChange={(e) => setForm((p) => ({ ...p, position: e.target.value }))}
+          />
+          <select
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            value={form.salary_type}
+            onChange={(e) => setForm((p) => ({ ...p, salary_type: e.target.value }))}
+          >
+            <option value="percent_work">% от работ</option>
+            <option value="fixed">Фикс</option>
+            <option value="daily_rate">Ставка/день</option>
+          </select>
+          {form.salary_type === 'percent_work' ? (
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              placeholder="% от работы"
+              value={form.work_percent}
+              onChange={(e) => setForm((p) => ({ ...p, work_percent: e.target.value }))}
+            />
+          ) : (
+            <input
+              type="number"
+              min={0}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              placeholder="₽"
+              value={form.salary_amount}
+              onChange={(e) => setForm((p) => ({ ...p, salary_amount: e.target.value }))}
+            />
+          )}
+          {form.salary_type !== 'percent_work' ? (
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              placeholder="% от работы"
+              value={form.work_percent}
+              onChange={(e) => setForm((p) => ({ ...p, work_percent: e.target.value }))}
+            />
+          ) : null}
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <button type="submit" disabled={saving} className={`w-full ${btnPrimary} py-2.5 disabled:opacity-60`}>
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -257,6 +399,8 @@ export default function AutoserviceSettingsPage() {
   const [employeeStats, setEmployeeStats] = useState(null);
   const [employeeStatsLoading, setEmployeeStatsLoading] = useState(false);
   const [employeeStatsPeriod, setEmployeeStatsPeriod] = useState('month');
+  const [employeeActionMenuId, setEmployeeActionMenuId] = useState(null);
+  const [editingEmployee, setEditingEmployee] = useState(null);
 
   const loadSettings = useCallback(async () => {
     const data = await apiRequest('/autoservice/settings');
@@ -438,6 +582,7 @@ export default function AutoserviceSettingsPage() {
   };
 
   const openEmployeeStats = async (employee, period = 'month') => {
+    setEmployeeActionMenuId(null);
     setStatsEmployee(employee);
     setEmployeeStatsPeriod(period);
     setEmployeeStats(null);
@@ -451,6 +596,26 @@ export default function AutoserviceSettingsPage() {
       setError(err?.message || 'Не удалось загрузить ЗП');
     } finally {
       setEmployeeStatsLoading(false);
+    }
+  };
+
+  const startEditEmployee = (employee) => {
+    setEmployeeActionMenuId(null);
+    setEditingEmployee(employee);
+  };
+
+  const archiveEmployee = async (employeeId) => {
+    setEmployeeActionMenuId(null);
+    if (!window.confirm('Удалить сотрудника из списка?')) return;
+    setError('');
+    try {
+      await apiRequest(`/autoservice/service-employees/${employeeId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: false }),
+      });
+      await loadEmployees();
+    } catch (err) {
+      setError(err?.message || 'Не удалось удалить');
     }
   };
 
@@ -685,23 +850,51 @@ export default function AutoserviceSettingsPage() {
                 <li className="py-4 text-sm text-gray-500">Пока нет</li>
               ) : (
                 employees.filter((e) => e.is_active).map((emp) => (
-                  <li key={emp.id}>
+                  <li key={emp.id} className="relative flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900">{emp.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {SALARY_LABELS[emp.salary_type]}
+                        {emp.salary_type === 'percent_work'
+                          ? ` · ${emp.work_percent}%`
+                          : ` · ${Number(emp.salary_amount).toLocaleString('ru-RU')} ₽`}
+                        {emp.salary_type !== 'percent_work' && Number(emp.work_percent) > 0
+                          ? ` · ${emp.work_percent}%`
+                          : ''}
+                      </p>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => openEmployeeStats(emp)}
-                      className="flex w-full items-center justify-between py-3 text-left hover:bg-gray-50"
+                      onClick={() => setEmployeeActionMenuId(employeeActionMenuId === emp.id ? null : emp.id)}
+                      className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-[#00a046] hover:bg-green-50"
                     >
-                      <div>
-                        <p className="font-medium text-gray-900">{emp.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {SALARY_LABELS[emp.salary_type]}
-                          {emp.salary_type === 'percent_work'
-                            ? ` · ${emp.work_percent}%`
-                            : ` · ${Number(emp.salary_amount).toLocaleString('ru-RU')} ₽`}
-                        </p>
-                      </div>
-                      <span className="text-gray-400">→</span>
+                      Действия
                     </button>
+                    {employeeActionMenuId === emp.id ? (
+                      <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                        <button
+                          type="button"
+                          className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                          onClick={() => startEditEmployee(emp)}
+                        >
+                          Изменить
+                        </button>
+                        <button
+                          type="button"
+                          className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                          onClick={() => openEmployeeStats(emp)}
+                        >
+                          ЗП
+                        </button>
+                        <button
+                          type="button"
+                          className="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+                          onClick={() => archiveEmployee(emp.id)}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    ) : null}
                   </li>
                 ))
               )}
@@ -717,6 +910,14 @@ export default function AutoserviceSettingsPage() {
           onClose={() => setWorksOpen(false)}
           onAdd={addWork}
           onRefresh={loadWorks}
+        />
+      ) : null}
+
+      {editingEmployee ? (
+        <EmployeeEditModal
+          employee={editingEmployee}
+          onClose={() => setEditingEmployee(null)}
+          onSaved={loadEmployees}
         />
       ) : null}
 

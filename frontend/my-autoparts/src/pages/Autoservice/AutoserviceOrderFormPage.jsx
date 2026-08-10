@@ -17,11 +17,39 @@ import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../.
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import { getRosskoMinPrice, getRosskoParts } from '../AutoParts/NewParts/rosskoHelpers';
 
-const inputClass =
-  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+const pillInputClass =
+  'mt-1 block h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
 
-const inputSmClass =
-  'block w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+const pillInputSmClass =
+  'block h-9 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+
+const pillTextareaClass =
+  'mt-1 block w-full rounded-sg border border-transparent bg-gray-100 px-4 py-2.5 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0';
+
+const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700';
+
+const btnPrimaryClass =
+  'inline-flex h-10 items-center justify-center rounded-full bg-brand-600 px-5 text-sm font-semibold text-white shadow-sg-sm transition hover:bg-brand-700 disabled:opacity-60';
+
+const btnSecondaryClass =
+  'inline-flex h-10 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
+
+const lineItemClass = 'rounded-sg border border-line bg-surface-muted p-3';
+
+const pillSelectSmClass =
+  'min-w-0 flex-1 rounded-full border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0';
+
+const rowActionBtnClass =
+  'inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-xs text-ink-muted transition hover:bg-gray-200 hover:text-ink-soft';
+
+function FieldLabel({ children, action }) {
+  return (
+    <div className="mb-1 flex items-center justify-between gap-2">
+      <span className="text-sg-caption font-medium text-ink-muted">{children}</span>
+      {action}
+    </div>
+  );
+}
 
 function formatMoney(value) {
   const n = Number(value);
@@ -114,10 +142,10 @@ function vehicleSearchText(v) {
 
 function SectionCard({ title, children, action }) {
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+    <section className="rounded-sg-lg border border-line bg-surface p-4 sm:p-5">
       {title ? (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-line-soft pb-3">
+          <h2 className="text-sg-subtitle text-ink">{title}</h2>
           {action}
         </div>
       ) : null}
@@ -130,13 +158,13 @@ function Modal({ title, children, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-gray-200">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-sg-lg bg-surface shadow-sg-lg ring-1 ring-line">
+        <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
+          <h3 className="text-sg-subtitle text-ink">{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+            className="rounded-full p-1.5 text-ink-faint hover:bg-surface-subtle hover:text-ink-soft"
             aria-label="Закрыть"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,7 +216,7 @@ function SearchableSelect({
     <div ref={rootRef} className="relative">
       <input
         type="text"
-        className={inputClass}
+        className={pillInputClass}
         disabled={disabled || loading}
         placeholder={loading ? 'Загрузка…' : placeholder}
         value={displayValue}
@@ -203,16 +231,16 @@ function SearchableSelect({
         autoComplete="off"
       />
       {open && !disabled && !loading ? (
-        <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-sg-lg border border-line bg-surface py-1 shadow-sg-md">
           {filtered.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-gray-500">{emptyMessage}</li>
+            <li className="px-4 py-2.5 text-sm text-ink-muted">{emptyMessage}</li>
           ) : (
             filtered.map((o) => (
               <li key={o.value}>
                 <button
                   type="button"
-                  className={`block w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 ${
-                    String(o.value) === String(value) ? 'bg-indigo-50 font-medium text-indigo-700' : 'text-gray-800'
+                  className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-brand-50 ${
+                    String(o.value) === String(value) ? 'bg-brand-50 font-medium text-brand-700' : 'text-ink-soft'
                   }`}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
@@ -272,9 +300,9 @@ function AddClientModal({ onClose, onCreated }) {
     <Modal title="Добавить клиента" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Имя</label>
+          <label className="block text-sg-caption font-medium text-ink-muted">Имя</label>
           <input
-            className={inputClass}
+            className={pillInputClass}
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={saving}
@@ -283,10 +311,10 @@ function AddClientModal({ onClose, onCreated }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Телефон</label>
+          <label className="block text-sg-caption font-medium text-ink-muted">Телефон</label>
           <input
             type="tel"
-            className={`${inputClass} ${phoneError ? 'border-red-500' : ''}`}
+            className={`${pillInputClass} ${phoneError ? '!border-danger-600 !bg-danger-50 focus:!border-danger-600' : ''}`}
             value={phone}
             onChange={(e) => {
               setPhone(formatPhoneInput(e.target.value));
@@ -300,19 +328,10 @@ function AddClientModal({ onClose, onCreated }) {
         </div>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            disabled={saving}
-          >
+          <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
             Отмена
           </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-          >
+          <button type="submit" disabled={saving} className={btnPrimaryClass}>
             {saving ? 'Сохранение…' : 'Добавить'}
           </button>
         </div>
@@ -440,11 +459,11 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
             }}
           />
         ) : null}
-        <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3">
-          <label className="block text-sm font-medium text-gray-700">Найти по VIN</label>
+        <div className="rounded-sg border border-line bg-surface-muted p-4">
+          <FieldLabel>Найти по VIN</FieldLabel>
           <div className="mt-1 flex flex-col gap-2 sm:flex-row">
             <input
-              className={inputClass}
+              className={`${pillInputClass} mt-0`}
               value={form.vin}
               onChange={(e) => {
                 setForm((p) => ({ ...p, vin: sanitizeVinInput(e.target.value) }));
@@ -459,7 +478,7 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
               type="button"
               onClick={handleDecodeVin}
               disabled={saving || vinDecoding}
-              className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+              className={`${btnPrimaryClass} shrink-0`}
             >
               {vinDecoding ? 'Проверка…' : 'Распознать'}
             </button>
@@ -471,7 +490,7 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
                   <button
                     type="button"
                     onClick={() => applyCandidate(c, form.vin.trim().toUpperCase())}
-                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/40"
+                    className="w-full rounded-full border border-line bg-surface px-4 py-2.5 text-left text-sm text-ink-soft transition hover:border-brand-300 hover:bg-brand-50"
                   >
                     {candidateLabel(c)}
                   </button>
@@ -482,9 +501,9 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Марка</label>
+            <label className="block text-sg-caption font-medium text-ink-muted">Марка</label>
             <input
-              className={inputClass}
+              className={pillInputClass}
               value={form.make}
               onChange={(e) => setForm((p) => ({ ...p, make: e.target.value }))}
               disabled={saving}
@@ -493,9 +512,9 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Модель</label>
+            <label className="block text-sg-caption font-medium text-ink-muted">Модель</label>
             <input
-              className={inputClass}
+              className={pillInputClass}
               value={form.model}
               onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
               disabled={saving}
@@ -504,21 +523,21 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Год</label>
+            <label className="block text-sg-caption font-medium text-ink-muted">Год</label>
             <input
               type="number"
               min={1900}
               max={2100}
-              className={inputClass}
+              className={pillInputClass}
               value={form.year}
               onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
               disabled={saving}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Госномер</label>
+            <label className="block text-sg-caption font-medium text-ink-muted">Госномер</label>
             <input
-              className={inputClass}
+              className={pillInputClass}
               value={form.plate}
               onChange={(e) => setForm((p) => ({ ...p, plate: e.target.value }))}
               disabled={saving}
@@ -526,9 +545,9 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Цвет</label>
+            <label className="block text-sg-caption font-medium text-ink-muted">Цвет</label>
             <input
-              className={inputClass}
+              className={pillInputClass}
               value={form.color}
               onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
               disabled={saving}
@@ -536,9 +555,9 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Заметки</label>
+            <label className="block text-sg-caption font-medium text-ink-muted">Заметки</label>
             <textarea
-              className={inputClass}
+              className={pillTextareaClass}
               rows={2}
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
@@ -549,19 +568,10 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
         </div>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            disabled={saving}
-          >
+          <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
             Отмена
           </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-          >
+          <button type="submit" disabled={saving} className={btnPrimaryClass}>
             {saving ? 'Сохранение…' : 'Добавить'}
           </button>
         </div>
@@ -1115,10 +1125,10 @@ export default function AutoserviceOrderFormPage() {
   if (orderLoading || metaLoading || !formInitialized) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <Link to="/autoservice/orders" className="text-sm text-indigo-600 hover:underline">
+        <Link to="/autoservice/orders" className={linkActionClass}>
           ← К записям
         </Link>
-        <p className="mt-6 text-sm text-gray-500">Загрузка…</p>
+        <p className="mt-6 text-sm text-ink-muted">Загрузка…</p>
       </div>
     );
   }
@@ -1126,17 +1136,13 @@ export default function AutoserviceOrderFormPage() {
   if (orderError) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <Link to="/autoservice/orders" className="text-sm text-indigo-600 hover:underline">
+        <Link to="/autoservice/orders" className={linkActionClass}>
           ← К записям
         </Link>
         <p className="mt-6 text-sm text-red-600" role="alert">
           {orderError}
         </p>
-        <button
-          type="button"
-          onClick={goBack}
-          className="mt-4 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-        >
+        <button type="button" onClick={goBack} className={`${btnSecondaryClass} mt-4`}>
           Вернуться к списку
         </button>
       </div>
@@ -1144,23 +1150,24 @@ export default function AutoserviceOrderFormPage() {
   }
 
   return (
+    <div className="min-h-screen bg-surface-muted">
     <div className="mx-auto max-w-4xl px-4 py-6 pb-28">
       <header className="mb-6">
-        <Link to="/autoservice/orders" className="text-sm text-indigo-600 hover:underline">
+        <Link to="/autoservice/orders" className={linkActionClass}>
           ← К записям
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-gray-900">{pageTitle}</h1>
+        <h1 className="mt-2 text-sg-title text-ink">{pageTitle}</h1>
       </header>
 
       {metaError ? (
-        <p className="mb-4 text-sm text-amber-700" role="status">
+        <p className="mb-4 text-sm text-warning-700" role="status">
           {metaError}
         </p>
       ) : null}
 
       <form id="repair-order-form" onSubmit={handleSubmit} className="space-y-4">
         {error ? (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          <p className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
             {error}
           </p>
         ) : null}
@@ -1169,11 +1176,11 @@ export default function AutoserviceOrderFormPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <div className="flex items-end justify-between gap-2">
-                <label className="block text-sm font-medium text-gray-700">Клиент</label>
+                <label className="block text-sg-caption font-medium text-ink-muted">Клиент</label>
                 <button
                   type="button"
                   onClick={() => setAddClientOpen(true)}
-                  className="text-sm text-indigo-600 hover:underline"
+                  className={linkActionClass}
                 >
                   Добавить
                 </button>
@@ -1188,12 +1195,12 @@ export default function AutoserviceOrderFormPage() {
             </div>
             <div>
               <div className="flex items-end justify-between gap-2">
-                <label className="block text-sm font-medium text-gray-700">Автомобиль</label>
+                <label className="block text-sg-caption font-medium text-ink-muted">Автомобиль</label>
                 <button
                   type="button"
                   onClick={() => setAddVehicleOpen(true)}
                   disabled={!clientId}
-                  className="text-sm text-indigo-600 hover:underline disabled:cursor-not-allowed disabled:text-gray-400"
+                  className={`${linkActionClass} disabled:cursor-not-allowed disabled:text-ink-faint`}
                 >
                   Добавить
                 </button>
@@ -1214,28 +1221,28 @@ export default function AutoserviceOrderFormPage() {
         <SectionCard title="Запись">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Дата записи</label>
+              <label className="block text-sg-caption font-medium text-ink-muted">Дата записи</label>
               <input
                 type="datetime-local"
-                className={inputClass}
+                className={pillInputClass}
                 value={scheduledAt}
                 onChange={(e) => setScheduledAt(e.target.value)}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Окончание (необязательно)</label>
+              <label className="block text-sg-caption font-medium text-ink-muted">Окончание (необязательно)</label>
               <input
                 type="datetime-local"
-                className={inputClass}
+                className={pillInputClass}
                 value={scheduledEndAt}
                 onChange={(e) => setScheduledEndAt(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Подъёмник</label>
+              <label className="block text-sg-caption font-medium text-ink-muted">Подъёмник</label>
               <select
-                className={inputClass}
+                className={pillInputClass}
                 value={liftId}
                 onChange={(e) => setLiftId(e.target.value)}
                 disabled={lifts.length <= 0}
@@ -1251,18 +1258,18 @@ export default function AutoserviceOrderFormPage() {
           </div>
           <div className="mt-4 grid gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Комментарий клиента</label>
+              <label className="block text-sg-caption font-medium text-ink-muted">Комментарий клиента</label>
               <textarea
-                className={inputClass}
+                className={pillTextareaClass}
                 rows={2}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Комментарий сотрудника</label>
+              <label className="block text-sg-caption font-medium text-ink-muted">Комментарий сотрудника</label>
               <textarea
-                className={inputClass}
+                className={pillTextareaClass}
                 rows={2}
                 value={staffComment}
                 onChange={(e) => setStaffComment(e.target.value)}
@@ -1277,26 +1284,26 @@ export default function AutoserviceOrderFormPage() {
             <button
               type="button"
               onClick={() => setWorks((prev) => [...prev, emptyWork()])}
-              className="text-sm text-indigo-600 hover:underline"
+              className={linkActionClass}
             >
               + Добавить
             </button>
           )}
         >
           {works.length === 0 ? (
-            <p className="text-sm text-gray-500">Пока нет работ</p>
+            <p className="text-sm text-ink-muted">Пока нет работ</p>
           ) : (
             <div className="space-y-3">
               {works.map((w, index) => (
-                <div key={index} className="rounded-xl border border-gray-200 bg-[#fafafa] p-3">
-                  <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
+                <div key={index} className={lineItemClass}>
+                  <div className="mb-2 flex items-center justify-between text-xs text-ink-muted">
                     <span>{index + 1}</span>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => setWorks((p) => moveItem(p, index, -1))}>↑</button>
-                      <button type="button" onClick={() => setWorks((p) => moveItem(p, index, 1))}>↓</button>
+                    <div className="flex gap-1">
+                      <button type="button" className={rowActionBtnClass} onClick={() => setWorks((p) => moveItem(p, index, -1))}>↑</button>
+                      <button type="button" className={rowActionBtnClass} onClick={() => setWorks((p) => moveItem(p, index, 1))}>↓</button>
                       <button
                         type="button"
-                        className="text-red-600"
+                        className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700`}
                         onClick={() => setWorks((p) => p.filter((_, i) => i !== index))}
                       >
                         ×
@@ -1317,7 +1324,7 @@ export default function AutoserviceOrderFormPage() {
                       <input
                         type="number"
                         min={1}
-                        className={inputSmClass}
+                        className={pillInputSmClass}
                         placeholder="Кол-во"
                         value={w.qty}
                         onChange={(e) => updateWork(index, { qty: e.target.value })}
@@ -1328,7 +1335,7 @@ export default function AutoserviceOrderFormPage() {
                         type="number"
                         min={0}
                         step="0.01"
-                        className={inputSmClass}
+                        className={pillInputSmClass}
                         placeholder="Цена"
                         value={w.unit_price}
                         onChange={(e) => updateWork(index, { unit_price: e.target.value })}
@@ -1336,10 +1343,10 @@ export default function AutoserviceOrderFormPage() {
                     </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-gray-600">{formatMoney(lineSum(w.qty, w.unit_price))} ₽</span>
+                    <span className="text-ink-muted">{formatMoney(lineSum(w.qty, w.unit_price))} ₽</span>
                     <button
                       type="button"
-                      className="text-xs font-medium text-[#00a046]"
+                      className="text-xs font-medium text-brand-600 hover:text-brand-700"
                       onClick={() => addWorkExecutor(index)}
                     >
                       + сотрудник
@@ -1348,9 +1355,9 @@ export default function AutoserviceOrderFormPage() {
                   {(w.executors || []).length > 0 ? (
                     <div className="mt-2 space-y-1.5">
                       {(w.executors || []).map((ex, execIndex) => (
-                        <div key={execIndex} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-2 py-1.5">
+                        <div key={execIndex} className="flex flex-wrap items-center gap-2 rounded-full bg-surface px-3 py-1.5 ring-1 ring-line">
                           <select
-                            className="min-w-0 flex-1 rounded border border-gray-200 px-2 py-1 text-sm"
+                            className={pillSelectSmClass}
                             value={ex.employee_id}
                             onChange={(e) => updateWorkExecutor(index, execIndex, { employee_id: e.target.value })}
                           >
@@ -1363,17 +1370,17 @@ export default function AutoserviceOrderFormPage() {
                             type="number"
                             min={0}
                             max={100}
-                            className="w-14 rounded border border-gray-200 px-2 py-1 text-sm"
+                            className="w-14 rounded-full border border-transparent bg-gray-100 px-2 py-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
                             value={ex.percent}
                             onChange={(e) => updateWorkExecutor(index, execIndex, { percent: e.target.value })}
                           />
-                          <span className="text-xs text-gray-500">%</span>
-                          <span className="text-xs font-medium text-gray-900">
+                          <span className="text-xs text-ink-muted">%</span>
+                          <span className="text-xs font-medium text-ink">
                             {formatMoney(workPayAmount(w.qty, w.unit_price, ex.percent))} ₽
                           </span>
                           <button
                             type="button"
-                            className="text-xs text-red-600"
+                            className="text-xs text-danger-600 hover:text-danger-700"
                             onClick={() => removeWorkExecutor(index, execIndex)}
                           >
                             ×
@@ -1386,7 +1393,7 @@ export default function AutoserviceOrderFormPage() {
               ))}
             </div>
           )}
-          <p className="mt-3 text-sm font-medium text-gray-900">Итого работ: {formatMoney(worksTotal)} ₽</p>
+          <p className="mt-3 text-sm font-medium text-ink">Итого работ: {formatMoney(worksTotal)} ₽</p>
         </SectionCard>
 
         <SectionCard
@@ -1395,30 +1402,30 @@ export default function AutoserviceOrderFormPage() {
             <button
               type="button"
               onClick={() => setClientParts((prev) => [...prev, emptyClientPart()])}
-              className="text-sm text-indigo-600 hover:underline"
+              className={linkActionClass}
             >
               + Добавить
             </button>
           )}
         >
           {clientParts.length === 0 ? (
-            <p className="text-sm text-gray-500">Пока нет запчастей клиента</p>
+            <p className="text-sm text-ink-muted">Пока нет запчастей клиента</p>
           ) : (
             <div className="space-y-3">
               {clientParts.map((p, index) => (
-                <div key={index} className="rounded-lg border border-gray-200 p-3">
-                  <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
+                <div key={index} className={lineItemClass}>
+                  <div className="mb-2 flex items-center justify-between text-xs text-ink-muted">
                     <span>№ {index + 1}</span>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => setClientParts((prev) => moveItem(prev, index, -1))}>
+                    <div className="flex gap-1">
+                      <button type="button" className={rowActionBtnClass} onClick={() => setClientParts((prev) => moveItem(prev, index, -1))}>
                         ↑
                       </button>
-                      <button type="button" onClick={() => setClientParts((prev) => moveItem(prev, index, 1))}>
+                      <button type="button" className={rowActionBtnClass} onClick={() => setClientParts((prev) => moveItem(prev, index, 1))}>
                         ↓
                       </button>
                       <button
                         type="button"
-                        className="text-red-600"
+                        className="text-xs font-medium text-danger-600 hover:text-danger-700"
                         onClick={() => setClientParts((prev) => prev.filter((_, i) => i !== index))}
                       >
                         Удалить
@@ -1428,19 +1435,19 @@ export default function AutoserviceOrderFormPage() {
                   <div className="grid gap-2 sm:grid-cols-3">
                     <div className="sm:col-span-2">
                       <input
-                        className={inputSmClass}
+                        className={pillInputSmClass}
                         placeholder="Название"
                         value={p.title}
                         onChange={(e) => updatePart(index, { title: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500">Кол-во</label>
+                      <label className="text-xs text-ink-muted">Кол-во</label>
                       <input
                         type="number"
                         min={1}
                         step={1}
-                        className={inputSmClass}
+                        className={pillInputSmClass}
                         value={p.qty}
                         onChange={(e) => updatePart(index, { qty: e.target.value })}
                       />
@@ -1453,29 +1460,37 @@ export default function AutoserviceOrderFormPage() {
         </SectionCard>
 
         <SectionCard title="Запчасти исполнителя">
-          <div className="mb-4 flex flex-wrap gap-2 text-sm">
+          <div className="mb-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setShopParts((prev) => [...prev, emptyShopPart()])}
-              className="text-indigo-600 hover:underline"
+              className="inline-flex h-9 items-center rounded-full bg-gray-100 px-4 text-sm font-medium text-ink-soft transition hover:bg-gray-200"
             >
               Вручную
             </button>
-            <button type="button" onClick={() => openPicker('warehouse')} className="text-indigo-600 hover:underline">
+            <button
+              type="button"
+              onClick={() => openPicker('warehouse')}
+              className="inline-flex h-9 items-center rounded-full bg-gray-100 px-4 text-sm font-medium text-ink-soft transition hover:bg-gray-200"
+            >
               Со склада
             </button>
-            <button type="button" onClick={() => openPicker('rossko')} className="text-indigo-600 hover:underline">
+            <button
+              type="button"
+              onClick={() => openPicker('rossko')}
+              className="inline-flex h-9 items-center rounded-full bg-gray-100 px-4 text-sm font-medium text-ink-soft transition hover:bg-gray-200"
+            >
               Из Rossko
             </button>
           </div>
           <div className="mb-4 flex items-end gap-2">
             <div>
-              <label className="text-xs text-gray-500">Наценка для всех %</label>
+              <label className="text-xs text-ink-muted">Наценка для всех %</label>
               <input
                 type="number"
                 min={0}
                 step="0.01"
-                className={inputSmClass}
+                className={pillInputSmClass}
                 placeholder={shopParts.length && bulkMarkupDisplay === '' ? '—' : ''}
                 value={bulkMarkup !== '' ? bulkMarkup : bulkMarkupDisplay}
                 onChange={(e) => applyBulkMarkup(e.target.value)}
@@ -1483,18 +1498,18 @@ export default function AutoserviceOrderFormPage() {
             </div>
           </div>
           {picker ? (
-            <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
+            <div className="mb-4 rounded-sg border border-brand-100 bg-brand-50/50 p-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-ink">
                   {picker === 'warehouse' ? 'Поиск по складу' : 'Поиск Rossko'}
                 </p>
-                <button type="button" className="text-xs text-gray-500" onClick={() => setPicker(null)}>
+                <button type="button" className="text-xs text-ink-muted hover:text-ink-soft" onClick={() => setPicker(null)}>
                   Закрыть
                 </button>
               </div>
               <div className="mt-2 flex gap-2">
                 <input
-                  className={inputSmClass}
+                  className={`${pillInputSmClass} flex-1`}
                   value={pickerQuery}
                   onChange={(e) => setPickerQuery(e.target.value)}
                   placeholder={picker === 'warehouse' ? 'Название / артикул' : 'Артикул'}
@@ -1510,21 +1525,21 @@ export default function AutoserviceOrderFormPage() {
                   type="button"
                   disabled={pickerLoading}
                   onClick={() => (picker === 'warehouse' ? runWarehouseSearch() : runRosskoSearch())}
-                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white disabled:opacity-60"
+                  className={`${btnPrimaryClass} h-9 px-4`}
                 >
                   {pickerLoading ? '…' : 'Найти'}
                 </button>
               </div>
-              {pickerError ? <p className="mt-2 text-xs text-red-600">{pickerError}</p> : null}
+              {pickerError ? <p className="mt-2 text-xs text-danger-600">{pickerError}</p> : null}
               <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
                 {pickerResults.length === 0 && !pickerLoading ? (
-                  <p className="text-xs text-gray-500">Нет результатов</p>
+                  <p className="text-xs text-ink-muted">Нет результатов</p>
                 ) : (
                   pickerResults.map((item, idx) => (
                     <button
                       key={item.id || `${item.brand}-${item.partnumber}-${idx}`}
                       type="button"
-                      className="block w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-left text-xs hover:bg-gray-50"
+                      className="block w-full rounded-full border border-line bg-surface px-3 py-2 text-left text-xs text-ink-soft transition hover:border-brand-300 hover:bg-brand-50"
                       onClick={() => (picker === 'warehouse' ? pickWarehouse(item) : pickRossko(item))}
                     >
                       {picker === 'warehouse' ? (
@@ -1551,26 +1566,26 @@ export default function AutoserviceOrderFormPage() {
             </div>
           ) : null}
           {shopParts.length === 0 ? (
-            <p className="text-sm text-gray-500">Пока нет запчастей исполнителя</p>
+            <p className="text-sm text-ink-muted">Пока нет запчастей исполнителя</p>
           ) : (
             <div className="space-y-3">
               {shopParts.map((p, index) => (
-                <div key={index} className="rounded-lg border border-gray-200 p-3">
-                  <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
+                <div key={index} className={lineItemClass}>
+                  <div className="mb-2 flex items-center justify-between text-xs text-ink-muted">
                     <span>
                       № {index + 1}
                       {p.source && p.source !== 'manual' ? ` · ${p.source}` : ''}
                     </span>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => setShopParts((prev) => moveItem(prev, index, -1))}>
+                    <div className="flex gap-1">
+                      <button type="button" className={rowActionBtnClass} onClick={() => setShopParts((prev) => moveItem(prev, index, -1))}>
                         ↑
                       </button>
-                      <button type="button" onClick={() => setShopParts((prev) => moveItem(prev, index, 1))}>
+                      <button type="button" className={rowActionBtnClass} onClick={() => setShopParts((prev) => moveItem(prev, index, 1))}>
                         ↓
                       </button>
                       <button
                         type="button"
-                        className="text-red-600"
+                        className="text-xs font-medium text-danger-600 hover:text-danger-700"
                         onClick={() => setShopParts((prev) => prev.filter((_, i) => i !== index))}
                       >
                         Удалить
@@ -1580,48 +1595,48 @@ export default function AutoserviceOrderFormPage() {
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="sm:col-span-2">
                       <input
-                        className={inputSmClass}
+                        className={pillInputSmClass}
                         placeholder="Название"
                         value={p.title}
                         onChange={(e) => updateShopPart(index, { title: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500">Кол-во</label>
+                      <label className="text-xs text-ink-muted">Кол-во</label>
                       <input
                         type="number"
                         min={1}
                         step={1}
-                        className={inputSmClass}
+                        className={pillInputSmClass}
                         value={p.qty}
                         onChange={(e) => updateShopPart(index, { qty: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500">Цена</label>
+                      <label className="text-xs text-ink-muted">Цена</label>
                       <input
                         type="number"
                         min={0}
                         step="0.01"
-                        className={inputSmClass}
+                        className={pillInputSmClass}
                         value={p.unit_price}
                         onChange={(e) => updateShopPart(index, { unit_price: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500">Наценка %</label>
+                      <label className="text-xs text-ink-muted">Наценка %</label>
                       <input
                         type="number"
                         min={0}
                         step="0.01"
-                        className={inputSmClass}
+                        className={pillInputSmClass}
                         value={p.markup_percent}
                         onChange={(e) => updateShopPart(index, { markup_percent: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500">Цена с наценкой / сумма</label>
-                      <p className="mt-1 text-sm text-gray-800">
+                      <label className="text-xs text-ink-muted">Цена с наценкой / сумма</label>
+                      <p className="mt-1 text-sm text-ink-soft">
                         {formatMoney(priceWithMarkup(p.unit_price, p.markup_percent))} ₽ ·{' '}
                         {formatMoney(shopLineSum(p.qty, p.unit_price, p.markup_percent))} ₽
                       </p>
@@ -1631,36 +1646,32 @@ export default function AutoserviceOrderFormPage() {
               ))}
             </div>
           )}
-          <p className="mt-3 text-sm font-medium text-gray-900">
+          <p className="mt-3 text-sm font-medium text-ink">
             Итого ЗЧ исполнителя: {formatMoney(shopPartsTotal)} ₽
           </p>
         </SectionCard>
 
       </form>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/90">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900">
+            <p className="text-sm font-semibold text-ink">
               Итого {formatMoney(grandTotal)} ₽
             </p>
-            <p className="truncate text-xs text-gray-500">
+            <p className="truncate text-xs text-ink-muted">
               работы {formatMoney(worksTotal)} · ЗЧ {formatMoney(shopPartsTotal)}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
-            <button
-              type="button"
-              onClick={goBack}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
+            <button type="button" onClick={goBack} className={btnSecondaryClass}>
               Отмена
             </button>
             <button
               type="submit"
               form="repair-order-form"
               disabled={saving}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+              className={btnPrimaryClass}
             >
               {saving ? 'Сохранение…' : 'Сохранить'}
             </button>
@@ -1679,6 +1690,7 @@ export default function AutoserviceOrderFormPage() {
           onCreated={handleVehicleCreated}
         />
       ) : null}
+    </div>
     </div>
   );
 }

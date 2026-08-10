@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 
-const inputSm =
-  'block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#00a046] focus:outline-none focus:ring-1 focus:ring-[#00a046]';
+const pillInputSmClass =
+  'block h-9 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
 
 function formatMoney(value) {
   const n = Number(value);
@@ -52,7 +52,7 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
     <div ref={rootRef} className="relative">
       <input
         type="text"
-        className={inputSm}
+        className={pillInputSmClass}
         disabled={disabled}
         placeholder="Работа"
         value={display}
@@ -69,25 +69,25 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
         autoComplete="off"
       />
       {open && !disabled ? (
-        <ul className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+        <ul className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-sg-lg border border-line bg-surface py-1 shadow-sg-md">
           {filtered.map((item) => (
             <li key={item.id}>
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm hover:bg-brand-50"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(item)}
               >
-                <span className="truncate text-gray-900">{item.name}</span>
-                <span className="shrink-0 text-gray-500">{formatMoney(item.default_unit_price)} ₽</span>
+                <span className="truncate text-ink">{item.name}</span>
+                <span className="shrink-0 text-ink-muted">{formatMoney(item.default_unit_price)} ₽</span>
               </button>
             </li>
           ))}
           {!exactMatch && (query || value || '').trim().length >= 2 ? (
-            <li className="border-t border-gray-100">
+            <li className="border-t border-line-soft">
               <button
                 type="button"
-                className="w-full px-3 py-2 text-left text-sm font-medium text-[#00a046] hover:bg-green-50"
+                className="w-full px-4 py-2.5 text-left text-sm font-medium text-brand-600 hover:bg-brand-50"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   const name = (query || value || '').trim();
@@ -101,7 +101,7 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
             </li>
           ) : null}
           {filtered.length === 0 && !(query || value || '').trim() ? (
-            <li className="px-3 py-2 text-sm text-gray-500">Начните ввод</li>
+            <li className="px-4 py-2.5 text-sm text-ink-muted">Начните ввод</li>
           ) : null}
         </ul>
       ) : null}
