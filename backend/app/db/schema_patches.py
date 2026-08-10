@@ -3955,8 +3955,9 @@ def ensure_autoservice_lifts_tables() -> None:
                 "ALTER TABLE repair_orders ADD COLUMN lift_id INTEGER REFERENCES autoservice_lifts(id)"
             )
         if "scheduled_end_at" not in columns:
+            end_type = "TIMESTAMPTZ" if engine.dialect.name == "postgresql" else "DATETIME"
             alter_stmts.append(
-                "ALTER TABLE repair_orders ADD COLUMN scheduled_end_at DATETIME"
+                f"ALTER TABLE repair_orders ADD COLUMN scheduled_end_at {end_type}"
             )
         if alter_stmts:
             with engine.begin() as conn:
