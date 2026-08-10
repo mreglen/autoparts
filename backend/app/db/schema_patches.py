@@ -3969,6 +3969,7 @@ def ensure_autoservice_lifts_tables() -> None:
         return
 
     with engine.begin() as conn:
+        active_literal = "TRUE" if engine.dialect.name == "postgresql" else "1"
         settings_rows = conn.execute(
             text(
                 "SELECT organization_id, lifts_count FROM autoservice_settings WHERE lifts_count > 0"
@@ -3992,7 +3993,9 @@ def ensure_autoservice_lifts_tables() -> None:
                     text(
                         """
                         INSERT INTO autoservice_lifts (organization_id, name, sort_order, is_active)
-                        VALUES (:org_id, :name, :sort_order, 1)
+                        VALUES (:org_id, :name, :sort_order, """
+                        + active_literal
+                        + """)
                         """
                     ),
                     {
