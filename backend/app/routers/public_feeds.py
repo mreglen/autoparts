@@ -12,6 +12,7 @@ from app.services.sitemap_service import (
     build_sitemap_index_xml,
     get_new_brands_sitemap_snapshot,
     get_new_categories_sitemap_snapshot,
+    get_new_parts_sitemap_page_snapshot,
     get_new_parts_sitemap_snapshot,
     get_products_sitemap_snapshot,
     get_used_brands_sitemap_snapshot,
@@ -77,6 +78,33 @@ def public_new_parts_sitemap(db: Session = Depends(get_db)):
         return _xml_response(snapshot.xml_content, last_modified=snapshot.generated_at)
     except Exception as exc:
         logger.exception("Failed to serve new parts sitemap: %s", exc)
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            "</urlset>\n"
+        )
+        return _xml_response(xml)
+
+
+@router.get("/sitemap-new-parts-{page}.xml")
+def public_new_parts_sitemap_page(page: int, db: Session = Depends(get_db)):
+    try:
+        row = get_or_create_yandex_integration(db)
+        snapshot = get_new_parts_sitemap_page_snapshot(
+            db,
+            page,
+            preferred_host_url=row.host_url,
+        )
+        return _xml_response(snapshot.xml_content, last_modified=snapshot.generated_at)
+    except ValueError:
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            "</urlset>\n"
+        )
+        return _xml_response(xml)
+    except Exception as exc:
+        logger.exception("Failed to serve new parts sitemap page %s: %s", page, exc)
         xml = (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

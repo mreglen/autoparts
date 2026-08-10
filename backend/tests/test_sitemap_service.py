@@ -7,10 +7,12 @@ from app.services.sitemap_service import (
     NEW_PARTS_SITEMAP_CACHE_KEY,
     PRODUCTS_SITEMAP_CACHE_KEY,
     PRODUCT_URL_DOWNLOAD_LIMIT,
+    _build_new_parts_sitemap_index_xml,
     _product_lastmod_date,
     _split_seo_url_limit,
     append_new_part_card_to_sitemap_cache,
     build_fallback_sitemap_index_xml,
+    build_new_parts_sitemap_pages,
     build_new_parts_sitemap_xml,
     build_products_sitemap_xml,
     build_sitemap_index_xml,
@@ -448,10 +450,11 @@ class SitemapCacheTests(unittest.TestCase):
         mock_rebuild.assert_called_once_with(db, preferred_host_url=None)
         self.assertEqual(snapshot.url_count, 1)
 
+    @patch("app.services.sitemap_service._delete_new_parts_page_caches")
     @patch("app.services.sitemap_service.SeoSitemapCache")
-    @patch("app.services.sitemap_service.build_new_parts_sitemap_xml")
-    def test_rebuild_new_parts_sitemap_cache_persists_row(self, mock_build, mock_cache_cls):
-        mock_build.return_value = ("<urlset></urlset>", 2)
+    @patch("app.services.sitemap_service.build_new_parts_sitemap_pages")
+    def test_rebuild_new_parts_sitemap_cache_persists_row(self, mock_build, mock_cache_cls, _delete_pages):
+        mock_build.return_value = ([("<urlset></urlset>", 2)], 2)
         db = MagicMock()
         db.query.return_value.filter.return_value.first.return_value = None
         row = MagicMock(cache_key=NEW_PARTS_SITEMAP_CACHE_KEY, xml_content="<urlset></urlset>", url_count=2)
@@ -462,6 +465,31 @@ class SitemapCacheTests(unittest.TestCase):
 
         self.assertEqual(snapshot.url_count, 2)
         self.assertEqual(mock_cache_cls.call_args.kwargs["cache_key"], NEW_PARTS_SITEMAP_CACHE_KEY)
+
+
+class NewPartsSitemapPaginationTests(unittest.TestCase):
+    def test_build_new_parts_sitemap_pages_splits_at_limit(self):
+        entries = ["  <url><loc>https://svoygarage.ru/p</loc></url>"] * 50001
+        with patch(
+            "app.services.sitemap_service._collect_new_parts_sitemap_entries",
+            return_value=entries,
+        ):
+            pages, total = build_new_parts_sitemap_pages(MagicMock())
+        self.assertEqual(total, 50001)
+        self.assertEqual(len(pages), 2)
+        self.assertEqual(pages[0][1], 50000)
+        self.assertEqual(pages[1][1], 1)
+
+    @patch("app.services.sitemap_service._sitemap_index_lastmod_line", return_value="    <lastmod>2026-08-10</lastmod>\n")
+    def test_build_new_parts_sitemap_index_xml(self, _lastmod):
+        xml = _build_new_parts_sitemap_index_xml(
+            "https://svoygarage.ru",
+            page_count=2,
+            generated_at=datetime(2026, 8, 10, tzinfo=timezone.utc),
+        )
+        self.assertIn("<sitemapindex", xml)
+        self.assertIn("sitemap-new-parts-1.xml", xml)
+        self.assertIn("sitemap-new-parts-2.xml", xml)
 
 
 class SummarizeSitePageCountsTests(unittest.TestCase):
