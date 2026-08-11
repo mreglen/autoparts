@@ -36,8 +36,6 @@ const BOOKING_STATUS_LABELS = {
   cancelled: 'Отменена',
 };
 
-const BOOKING_STATUS_OPTIONS = Object.entries(BOOKING_STATUS_LABELS);
-
 const inputClass =
   'mt-1 block w-full rounded-sg border border-line bg-surface px-3 py-2 text-sm shadow-sg-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
 
@@ -108,10 +106,8 @@ export default function AutoservicePlannerPage() {
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState(null);
   const [showCreateBooking, setShowCreateBooking] = useState(false);
-  const [editingBookingId, setEditingBookingId] = useState(null);
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [createForm, setCreateForm] = useState({ name: '', phone: '', comment: '' });
-  const [bookingEditForm, setBookingEditForm] = useState(null);
   const [orderEditForm, setOrderEditForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState('calendar');
@@ -169,10 +165,8 @@ export default function AutoservicePlannerPage() {
 
   const resetModalState = () => {
     setShowCreateBooking(false);
-    setEditingBookingId(null);
     setEditingOrderId(null);
     setCreateForm({ name: '', phone: '', comment: '' });
-    setBookingEditForm(null);
     setOrderEditForm(null);
   };
 
@@ -224,13 +218,13 @@ export default function AutoservicePlannerPage() {
     setSaving(true);
     setError('');
     try {
-      await apiRequest('/autoservice/repair-bookings/staff', {
+      await apiRequest('/autoservice/inspection-bookings', {
         method: 'POST',
         body: JSON.stringify({
           name,
           phone: createForm.phone.trim(),
           preferred_date: selectedDate,
-          comment: createForm.comment.trim() || null,
+          notes: createForm.comment.trim() || null,
         }),
       });
       await load();
@@ -243,59 +237,9 @@ export default function AutoservicePlannerPage() {
     }
   };
 
-  const startEditBooking = (booking) => {
-    setEditingBookingId(booking.id);
-    setShowCreateBooking(false);
-    setEditingOrderId(null);
-    setBookingEditForm({
-      name: booking.name || '',
-      phone: booking.phone || '',
-      preferred_date: booking.preferred_date,
-      comment: booking.comment || '',
-      status: booking.status || 'new',
-    });
-  };
-
-  const handleSaveBooking = async (event) => {
-    event.preventDefault();
-    if (!editingBookingId || !bookingEditForm) return;
-    const name = bookingEditForm.name.trim();
-    const phoneErr = validatePhone(bookingEditForm.phone);
-    if (!name) {
-      setError('Укажите имя клиента');
-      return;
-    }
-    if (phoneErr) {
-      setError(phoneErr);
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      await apiRequest(`/autoservice/repair-bookings/${editingBookingId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          name,
-          phone: bookingEditForm.phone.trim(),
-          preferred_date: bookingEditForm.preferred_date,
-          comment: bookingEditForm.comment.trim() || null,
-          status: bookingEditForm.status,
-        }),
-      });
-      await load();
-      setEditingBookingId(null);
-      setBookingEditForm(null);
-    } catch (e) {
-      setError(e?.message || 'Не удалось сохранить запись');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const startEditOrder = (order) => {
     setEditingOrderId(order.id);
     setShowCreateBooking(false);
-    setEditingBookingId(null);
     setOrderEditForm({
       scheduled_at: toLocalInputValue(order.scheduled_at),
       status: order.status || 'pending',
@@ -336,9 +280,8 @@ export default function AutoservicePlannerPage() {
   if (!isReady) return <AuthLoadingScreen />;
 
   const orders = selectedDay?.repair_orders || [];
-  const bookings = selectedDay?.repair_bookings || [];
   const inspectionBookings = selectedDay?.inspection_bookings || [];
-  const hasItems = orders.length > 0 || bookings.length > 0 || inspectionBookings.length > 0;
+  const hasItems = orders.length > 0 || inspectionBookings.length > 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
@@ -472,12 +415,10 @@ export default function AutoservicePlannerPage() {
             const iso = toIsoDate(day);
             const entry = daysMap[iso];
             const dayOrders = entry?.repair_orders || [];
-            const dayBookings = entry?.repair_bookings || [];
             const dayInspections = entry?.inspection_bookings || [];
             const isCurrentMonth = day.getMonth() === viewMonth;
             const isToday = iso === toIsoDate(today);
-            const totalItems = dayOrders.length + dayBookings.length + dayInspections.length;
-            const dayHasItems = totalItems > 0;
+            const dayHasItems = dayOrders.length > 0 || dayInspections.length > 0;
             const isSelected = selectedDate === iso;
             return (
               <button
@@ -488,20 +429,13 @@ export default function AutoservicePlannerPage() {
                   isCurrentMonth ? 'bg-white' : 'bg-gray-50/60 text-gray-400'
                 } ${dayHasItems ? 'bg-brand-50/40' : ''} ${isSelected ? 'ring-2 ring-inset ring-brand-500' : ''}`}
               >
-                <div className="flex items-start justify-between gap-1">
-                  <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
-                      isToday ? 'bg-brand-600 text-white' : 'text-gray-700'
-                    }`}
-                  >
-                    {day.getDate()}
-                  </span>
-                  {dayHasItems && (
-                    <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                      {totalItems}
-                    </span>
-                  )}
-                </div>
+                <span
+                  className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+                    isToday ? 'bg-brand-600 text-white' : 'text-gray-700'
+                  }`}
+                >
+                  {day.getDate()}
+                </span>
                 <span className="mt-1.5 block space-y-1">
                   {dayOrders.length > 0 && (
                     <span className="flex items-center gap-1.5 text-[11px] font-medium text-brand-800">
@@ -509,16 +443,10 @@ export default function AutoservicePlannerPage() {
                       Заказ-наряды: {dayOrders.length}
                     </span>
                   )}
-                  {dayBookings.length > 0 && (
+                  {dayInspections.length > 0 && (
                     <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-800">
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                      Записи: {dayBookings.length}
-                    </span>
-                  )}
-                  {dayInspections.length > 0 && (
-                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-800">
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                      Заявки: {dayInspections.length}
+                      Записи: {dayInspections.length}
                     </span>
                   )}
                   {!dayHasItems && isCurrentMonth && (
@@ -538,15 +466,7 @@ export default function AutoservicePlannerPage() {
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-amber-500" />
-          Записи на ремонт
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          Заявки (раздел «Записи»)
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">N</span>
-          Всего событий в день
+          Записи
         </span>
       </div>
 
@@ -593,7 +513,6 @@ export default function AutoservicePlannerPage() {
                 type="button"
                 onClick={() => {
                   setShowCreateBooking(true);
-                  setEditingBookingId(null);
                   setEditingOrderId(null);
                   setError('');
                 }}
@@ -770,151 +689,15 @@ export default function AutoservicePlannerPage() {
               </div>
             )}
 
-            <h3 className="mt-5 text-sm font-semibold text-gray-900">Записи на ремонт</h3>
-            {bookings.length === 0 ? (
-              <p className="mt-1 text-sm text-gray-500">Нет записей на ремонт</p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {bookings.map((booking) => (
-                  <div
-                    key={booking.id}
-                    className="rounded-sg border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-sm"
-                  >
-                    {editingBookingId === booking.id && bookingEditForm ? (
-                      <form onSubmit={handleSaveBooking} className="space-y-3">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <label className="block text-sm text-gray-700">
-                            Имя
-                            <input
-                              type="text"
-                              required
-                              value={bookingEditForm.name}
-                              onChange={(e) => setBookingEditForm((prev) => ({
-                                ...prev,
-                                name: e.target.value,
-                              }))}
-                              className={inputClass}
-                            />
-                          </label>
-                          <label className="block text-sm text-gray-700">
-                            Телефон
-                            <input
-                              type="tel"
-                              required
-                              value={bookingEditForm.phone}
-                              onChange={(e) => setBookingEditForm((prev) => ({
-                                ...prev,
-                                phone: formatPhoneInput(e.target.value),
-                              }))}
-                              className={inputClass}
-                            />
-                          </label>
-                        </div>
-                        <label className="block text-sm text-gray-700">
-                          Дата записи
-                          <input
-                            type="date"
-                            required
-                            value={bookingEditForm.preferred_date}
-                            onChange={(e) => setBookingEditForm((prev) => ({
-                              ...prev,
-                              preferred_date: e.target.value,
-                            }))}
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className="block text-sm text-gray-700">
-                          Комментарий
-                          <textarea
-                            rows={2}
-                            value={bookingEditForm.comment}
-                            onChange={(e) => setBookingEditForm((prev) => ({
-                              ...prev,
-                              comment: e.target.value,
-                            }))}
-                            className={inputClass}
-                          />
-                        </label>
-                        <label className="block text-sm text-gray-700">
-                          Статус
-                          <select
-                            value={bookingEditForm.status}
-                            onChange={(e) => setBookingEditForm((prev) => ({
-                              ...prev,
-                              status: e.target.value,
-                            }))}
-                            className={inputClass}
-                          >
-                            {BOOKING_STATUS_OPTIONS.map(([value, label]) => (
-                              <option key={value} value={value}>{label}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="submit"
-                            disabled={saving}
-                            className="rounded-sg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
-                          >
-                            {saving ? '…' : 'Сохранить'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingBookingId(null);
-                              setBookingEditForm(null);
-                            }}
-                            className="rounded-sg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            Отмена
-                          </button>
-                        </div>
-                      </form>
-                    ) : (
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-medium text-gray-900">
-                            {booking.name} · {booking.phone}
-                          </p>
-                          {booking.comment && (
-                            <p className="mt-0.5 text-gray-600">{booking.comment}</p>
-                          )}
-                          <p className="mt-0.5 text-xs text-gray-500">
-                            {BOOKING_STATUS_LABELS[booking.status] || booking.status}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => navigateToNewOrder(booking)}
-                            className="rounded-sg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700"
-                          >
-                            Заказ-наряд
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => startEditBooking(booking)}
-                            className="rounded-sg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            Изменить
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <h3 className="mt-5 text-sm font-semibold text-gray-900">Заявки (раздел «Записи»)</h3>
+            <h3 className="mt-5 text-sm font-semibold text-gray-900">Записи</h3>
             {inspectionBookings.length === 0 ? (
-              <p className="mt-1 text-sm text-gray-500">Нет заявок на этот день</p>
+              <p className="mt-1 text-sm text-gray-500">Нет записей на этот день</p>
             ) : (
               <div className="mt-2 space-y-2">
                 {inspectionBookings.map((item) => (
                   <div
                     key={`inspection-${item.id}`}
-                    className="rounded-sg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5 text-sm"
+                    className="rounded-sg border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-sm"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">

@@ -23,7 +23,6 @@ import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { formatDromExportMessage } from '../../utils/dromExport';
 import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopButton';
 import PillDropdown from '../../components/PillDropdown/PillDropdown';
-import { getIsNarrowViewport } from '../../constants/breakpoints';
 
 const CardPart = ({
   part,
@@ -1014,7 +1013,7 @@ function MyParts() {
 
   // Сортировка: по умолчанию сначала новые
   const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
-  const [filtersOpen, setFiltersOpen] = useState(() => !getIsNarrowViewport());
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const displayParts = products;
   const sortedDisplayParts = products;
@@ -2130,21 +2129,38 @@ function MyParts() {
 
 
   return (
-    <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Мои запчасти</h1>
-          {userHasWarehouseQrAccess(user, permissionCodes) && (
-            <Link
-              to="/warehouse/scan"
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              title="Сканировать QR"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m14 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
-              <span className="hidden sm:inline">QR</span>
-            </Link>
+    <div className="mt-3 sm:mt-5 px-4 sm:px-0">
+      <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2.5 sm:gap-3">
+            <h1 className="text-xl font-bold text-gray-900 sm:text-[1.75rem]">Мои запчасти</h1>
+            {userHasWarehouseQrAccess(user, permissionCodes) && (
+              <Link
+                to="/warehouse/scan"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:min-h-10 sm:px-3 sm:py-2"
+                title="Сканировать QR"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m14 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+                <span className="hidden sm:inline">QR</span>
+              </Link>
+            )}
+          </div>
+          {!isDraftsTab && (
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm sm:hidden">
+              <span className="font-semibold tabular-nums text-gray-900">
+                {displayValue.toLocaleString('ru-RU')} ₽
+              </span>
+              <span className="tabular-nums text-gray-500">
+                {displayQuantity.toLocaleString('ru-RU')} шт.
+              </span>
+              {!isModerationTab && myProductsTotal > 0 && (
+                <span className="tabular-nums text-gray-500">
+                  {displayPositionsCount.toLocaleString('ru-RU')} поз.
+                </span>
+              )}
+            </div>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -2179,7 +2195,7 @@ function MyParts() {
           <button
             type="button"
             onClick={() => navigate('/my-parts/add')}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+            className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:w-auto"
           >
             Добавить запчасть
           </button>
@@ -2399,14 +2415,6 @@ function MyParts() {
                   buildActionsDropdownMenuClassName(bulkActionsPlacement.openUp, 'w-40 z-50'),
                 )}
               </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm sm:hidden">
-            <span className="font-semibold tabular-nums text-gray-900">{displayValue.toLocaleString('ru-RU')} ₽</span>
-            <span className="tabular-nums text-gray-500">{displayQuantity.toLocaleString('ru-RU')} шт.</span>
-            {!isModerationTab && myProductsTotal > 0 && (
-              <span className="tabular-nums text-gray-500">{displayPositionsCount.toLocaleString('ru-RU')} поз.</span>
             )}
           </div>
         </div>

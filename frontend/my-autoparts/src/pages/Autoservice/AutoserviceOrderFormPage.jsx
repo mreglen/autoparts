@@ -34,7 +34,7 @@ const btnPrimaryClass =
 const btnSecondaryClass =
   'inline-flex h-10 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
 
-const lineItemClass = 'rounded-sg border border-line bg-surface-muted p-3';
+const lineItemClass = 'rounded-sg border border-line bg-white p-3';
 
 const pillSelectSmClass =
   'min-w-0 flex-1 rounded-full border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0';
@@ -1150,7 +1150,7 @@ export default function AutoserviceOrderFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-muted">
+    <div className="min-h-screen bg-white">
     <div className="mx-auto max-w-4xl px-4 py-6 pb-28">
       <header className="mb-6">
         <Link to="/autoservice/orders" className={linkActionClass}>
@@ -1370,7 +1370,7 @@ export default function AutoserviceOrderFormPage() {
                             type="number"
                             min={0}
                             max={100}
-                            className="w-14 rounded-full border border-transparent bg-gray-100 px-2 py-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
+                            className="w-24 shrink-0 rounded-full border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
                             value={ex.percent}
                             onChange={(e) => updateWorkExecutor(index, execIndex, { percent: e.target.value })}
                           />
