@@ -101,8 +101,10 @@ function BookingCard({ row }) {
               ) : null}
             </div>
 
-            {row.comment ? (
-              <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{row.comment}</p>
+            {row.notes || row.comment ? (
+              <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">
+                {row.notes || row.comment}
+              </p>
             ) : (
               <p className="text-sm text-gray-400">Комментарий не указан</p>
             )}
@@ -216,7 +218,7 @@ export default function AutoserviceRepairBookingPage() {
     setRowsLoading(true);
     setRowsError('');
     try {
-      const data = await apiRequest('/autoservice/repair-bookings/me');
+      const data = await apiRequest('/autoservice/inspection-bookings/me');
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
       setRows([]);
@@ -258,13 +260,13 @@ export default function AutoserviceRepairBookingPage() {
     }
     setSaving(true);
     try {
-      const row = await apiRequest('/autoservice/repair-bookings', {
+      const row = await apiRequest('/autoservice/inspection-bookings/me', {
         method: 'POST',
         body: JSON.stringify({
           name: name.trim() || null,
           phone: phone.trim() || null,
           preferred_date: preferredDate,
-          comment: comment.trim() || null,
+          notes: comment.trim() || null,
           garage_vehicle_id: vehicleId ? Number(vehicleId) : null,
         }),
       });

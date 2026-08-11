@@ -4242,3 +4242,108 @@ def ensure_repair_order_numbers_per_org() -> None:
 
     logger.info("Applied repair order per-organization numbering patch")
 
+
+def ensure_inspection_bookings_unified() -> None:
+    """Extend inspection_bookings and migrate legacy repair_bookings into one queue."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "inspection_bookings" not in tables:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("inspection_bookings")}
+    alter_stmts: list[str] = []
+    if "client_id" not in columns:
+        alter_stmts.append(
+            "ALTER TABLE inspection_bookings ADD COLUMN client_id INTEGER REFERENCES autoservice_clients(id)"
+        )
+    if "garage_vehicle_id" not in columns:
+        alter_stmts.append(
+            "ALTER TABLE inspection_bookings ADD COLUMN garage_vehicle_id INTEGER REFERENCES garage_vehicles(id)"
+        )
+    if "legacy_repair_booking_id" not in columns:
+        alter_stmts.append(
+            "ALTER TABLE inspection_bookings ADD COLUMN legacy_repair_booking_id INTEGER"
+        )
+
+    if alter_stmts:
+        with engine.begin() as conn:
+            for stmt in alter_stmts:
+                conn.execute(text(stmt))
+        logger.info("Applied inspection_bookings unified columns patch: %s", alter_stmts)
+
+    if "repair_bookings" not in tables:
+        return
+
+    from app.models.inspection_booking import InspectionBooking
+    from app.models.repair_booking import RepairBooking
+    from sqlalchemy.orm import sessionmaker
+
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+    try:
+        migrated_ids = {
+            row[0]
+            for row in db.query(InspectionBooking.legacy_repair_booking_id)
+            .filter(InspectionBooking.legacy_repair_booking_id.isnot(None))
+            .all()
+        }
+        legacy_rows = (
+            db.query(RepairBooking)
+            .order_by(RepairBooking.id.asc())
+            .all()
+        )
+        added = 0
+        for rb in legacy_rows:
+            if rb.id in migrated_ids:
+                continue
+            notes = (rb.comment or "").strip() or None
+            staff_notes = (rb.staff_notes or "").strip() or None
+            if staff_notes:
+                notes = f"{notes}\n\n{staff_notes}".strip() if notes else staff_notes
+            source = rb.source if rb.source in {"site", "staff", "client"} else "client"
+            status = rb.status if rb.status in {"new", "processed", "cancelled"} else "new"
+            db.add(
+                InspectionBooking(
+                    organization_id=rb.organization_id,
+                    client_id=rb.client_id,
+                    garage_vehicle_id=rb.garage_vehicle_id,
+                    legacy_repair_booking_id=rb.id,
+                    name=rb.name,
+                    phone=rb.phone,
+                    preferred_date=rb.preferred_date,
+                    status=status,
+                    source=source,
+                    created_by_user_id=rb.created_by_user_id,
+                    notes=notes,
+                    created_at=rb.created_at,
+                )
+            )
+            added += 1
+        if added:
+            db.commit()
+            logger.info("Migrated %s repair_bookings rows into inspection_bookings", added)
+    finally:
+        db.close()
+
+    inspector = inspect(engine)
+    index_stmts: list[str] = []
+    if not _index_exists(inspector, "inspection_bookings", "ix_inspection_bookings_client_id"):
+        index_stmts.append(
+            "CREATE INDEX IF NOT EXISTS ix_inspection_bookings_client_id ON inspection_bookings (client_id)"
+        )
+    if not _index_exists(inspector, "inspection_bookings", "ix_inspection_bookings_garage_vehicle_id"):
+        index_stmts.append(
+            "CREATE INDEX IF NOT EXISTS ix_inspection_bookings_garage_vehicle_id "
+            "ON inspection_bookings (garage_vehicle_id)"
+        )
+    if not _index_exists(inspector, "inspection_bookings", "uq_inspection_bookings_legacy_repair_booking_id"):
+        index_stmts.append(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_inspection_bookings_legacy_repair_booking_id "
+            "ON inspection_bookings (legacy_repair_booking_id)"
+        )
+    if index_stmts:
+        with engine.begin() as conn:
+            for stmt in index_stmts:
+                conn.execute(text(stmt))
+        logger.info("Applied inspection_bookings unified indexes patch")
+

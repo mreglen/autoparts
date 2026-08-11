@@ -23,7 +23,18 @@ const STATUS_STYLES = {
 const SOURCE_LABELS = {
   site: 'Сайт',
   staff: 'Сотрудник',
+  client: 'Клиент',
 };
+
+function formatVehicleBrief(vehicle) {
+  if (!vehicle) return '—';
+  const parts = [vehicle.make, vehicle.model].filter(Boolean);
+  let label = parts.join(' ').trim();
+  if (vehicle.plate) {
+    label = label ? `${label} (${vehicle.plate})` : vehicle.plate;
+  }
+  return label || '—';
+}
 
 function StatusBadge({ status }) {
   return (
@@ -284,6 +295,8 @@ export default function AutoserviceInspectionsPage() {
               <th className="px-4 py-3">Имя</th>
               <th className="px-4 py-3">Телефон</th>
               <th className="px-4 py-3">Желаемая дата</th>
+              <th className="px-4 py-3">Автомобиль</th>
+              <th className="px-4 py-3">Комментарий</th>
               <th className="px-4 py-3">Источник</th>
               <th className="px-4 py-3">Статус</th>
               <th className="px-4 py-3">Действие</th>
@@ -292,13 +305,13 @@ export default function AutoserviceInspectionsPage() {
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                   Загрузка…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                   Заявок пока нет
                 </td>
               </tr>
@@ -309,6 +322,12 @@ export default function AutoserviceInspectionsPage() {
                   <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-gray-700">{row.phone}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatServerDate(row.preferred_date)}</td>
+                  <td className="max-w-[12rem] truncate px-4 py-3 text-gray-700" title={formatVehicleBrief(row.vehicle)}>
+                    {formatVehicleBrief(row.vehicle)}
+                  </td>
+                  <td className="max-w-xs truncate px-4 py-3 text-gray-600" title={row.notes || ''}>
+                    {row.notes || '—'}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-gray-600">
                     {SOURCE_LABELS[row.source] || row.source}
                   </td>

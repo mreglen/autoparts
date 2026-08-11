@@ -10,7 +10,7 @@ from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
 from app.models.garage_vehicle import GarageVehicle
-from app.models.repair_booking import RepairBooking
+from app.models.inspection_booking import InspectionBooking
 from app.models.user import User
 from app.schemas.repair_booking import (
     REPAIR_BOOKING_STATUSES,
@@ -27,7 +27,7 @@ from app.utils.autoservice_access import (
     require_my_active_autoservice_client,
 )
 
-router = APIRouter(tags=["Autoservice repair bookings"])
+router = APIRouter(tags=["Autoservice repair bookings (legacy compat)"])
 
 
 def _resolve_garage_vehicle(
@@ -56,7 +56,7 @@ def _resolve_garage_vehicle(
     return vehicle
 
 
-def _booking_to_view(row: RepairBooking) -> RepairBookingView:
+def _inspection_to_repair_view(row: InspectionBooking) -> RepairBookingView:
     vehicle_brief = None
     if row.vehicle is not None:
         vehicle_brief = RepairBookingVehicleBrief.model_validate(row.vehicle)
@@ -69,11 +69,31 @@ def _booking_to_view(row: RepairBooking) -> RepairBookingView:
         name=row.name,
         phone=row.phone,
         preferred_date=row.preferred_date,
-        comment=row.comment,
+        comment=row.notes,
         status=row.status,
         source=row.source,
-        staff_notes=row.staff_notes,
+        staff_notes=None,
         created_at=row.created_at,
+    )
+
+
+def _find_staff_inspection_booking(
+    db: Session,
+    *,
+    org_id: str,
+    booking_id: int,
+) -> InspectionBooking | None:
+    return (
+        db.query(InspectionBooking)
+        .options(joinedload(InspectionBooking.vehicle))
+        .filter(
+            InspectionBooking.organization_id == org_id,
+            or_(
+                InspectionBooking.id == booking_id,
+                InspectionBooking.legacy_repair_booking_id == booking_id,
+            ),
+        )
+        .first()
     )
 
 
@@ -81,12 +101,14 @@ def _booking_to_view(row: RepairBooking) -> RepairBookingView:
     "/autoservice/repair-bookings",
     response_model=RepairBookingView,
     status_code=status.HTTP_201_CREATED,
+    deprecated=True,
 )
 def create_repair_booking(
     payload: RepairBookingCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Legacy alias — creates a unified inspection booking."""
     client = require_my_active_autoservice_client(db, current_user)
 
     name = (payload.name or "").strip() or client.name
@@ -98,40 +120,44 @@ def create_repair_booking(
         garage_vehicle_id=payload.garage_vehicle_id,
     )
 
-    row = RepairBooking(
+    row = InspectionBooking(
         organization_id=client.organization_id,
         client_id=client.id,
         garage_vehicle_id=vehicle.id if vehicle else None,
         name=name[:120],
         phone=phone,
         preferred_date=payload.preferred_date,
-        comment=(payload.comment or "").strip() or None,
         status="new",
         source="client",
         created_by_user_id=current_user.id,
+        notes=(payload.comment or "").strip() or None,
     )
     db.add(row)
     db.commit()
     db.refresh(row)
     if vehicle:
         row.vehicle = vehicle
-    return _booking_to_view(row)
+    return _inspection_to_repair_view(row)
 
 
 @router.post(
     "/autoservice/repair-bookings/staff",
     response_model=RepairBookingView,
     status_code=status.HTTP_201_CREATED,
+    deprecated=True,
 )
 def create_repair_booking_staff(
     payload: RepairBookingStaffCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Legacy alias — creates a unified inspection booking."""
     org_id = require_autoservice_staff(db, current_user)
     name = payload.name.strip()
     phone = normalize_phone_or_400(payload.phone)
     garage_vehicle_id = payload.garage_vehicle_id
+    client_id = None
+    vehicle = None
     if garage_vehicle_id is not None:
         vehicle = (
             db.query(GarageVehicle)
@@ -146,58 +172,60 @@ def create_repair_booking_staff(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Автомобиль не найден",
             )
-    else:
-        vehicle = None
+        client_id = vehicle.client_id
 
-    row = RepairBooking(
+    row = InspectionBooking(
         organization_id=org_id,
-        client_id=vehicle.client_id if vehicle else None,
+        client_id=client_id,
         garage_vehicle_id=vehicle.id if vehicle else None,
         name=name[:120],
         phone=phone,
         preferred_date=payload.preferred_date,
-        comment=(payload.comment or "").strip() or None,
         status="new",
         source="staff",
         created_by_user_id=current_user.id,
+        notes=(payload.comment or "").strip() or None,
     )
     db.add(row)
     db.commit()
     db.refresh(row)
     if vehicle:
         row.vehicle = vehicle
-    return _booking_to_view(row)
+    return _inspection_to_repair_view(row)
 
 
 @router.get(
     "/autoservice/repair-bookings/me",
     response_model=list[RepairBookingView],
+    deprecated=True,
 )
 def list_my_repair_bookings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Legacy alias — lists unified inspection bookings for the current client."""
     client = require_my_active_autoservice_client(db, current_user)
     related_ids = related_autoservice_client_ids(db, client)
     rows = (
-        db.query(RepairBooking)
-        .options(joinedload(RepairBooking.vehicle))
+        db.query(InspectionBooking)
+        .options(joinedload(InspectionBooking.vehicle))
         .filter(
-            RepairBooking.organization_id == client.organization_id,
+            InspectionBooking.organization_id == client.organization_id,
             or_(
-                RepairBooking.client_id.in_(related_ids),
-                RepairBooking.created_by_user_id == current_user.id,
+                InspectionBooking.client_id.in_(related_ids),
+                InspectionBooking.created_by_user_id == current_user.id,
             ),
         )
-        .order_by(RepairBooking.preferred_date.desc(), RepairBooking.id.desc())
+        .order_by(InspectionBooking.preferred_date.desc(), InspectionBooking.id.desc())
         .all()
     )
-    return [_booking_to_view(row) for row in rows]
+    return [_inspection_to_repair_view(row) for row in rows]
 
 
 @router.get(
     "/autoservice/repair-bookings",
     response_model=list[RepairBookingView],
+    deprecated=True,
 )
 def list_repair_bookings(
     status_filter: str | None = Query(None, alias="status"),
@@ -206,11 +234,12 @@ def list_repair_bookings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Legacy alias — lists unified inspection bookings for staff."""
     org_id = require_autoservice_staff(db, current_user)
     query = (
-        db.query(RepairBooking)
-        .options(joinedload(RepairBooking.vehicle))
-        .filter(RepairBooking.organization_id == org_id)
+        db.query(InspectionBooking)
+        .options(joinedload(InspectionBooking.vehicle))
+        .filter(InspectionBooking.organization_id == org_id)
     )
     if status_filter:
         if status_filter not in REPAIR_BOOKING_STATUSES:
@@ -218,20 +247,21 @@ def list_repair_bookings(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Недопустимый статус",
             )
-        query = query.filter(RepairBooking.status == status_filter)
+        query = query.filter(InspectionBooking.status == status_filter)
     if date_from:
-        query = query.filter(RepairBooking.preferred_date >= date_from)
+        query = query.filter(InspectionBooking.preferred_date >= date_from)
     if date_to:
-        query = query.filter(RepairBooking.preferred_date <= date_to)
+        query = query.filter(InspectionBooking.preferred_date <= date_to)
     rows = (
-        query.order_by(RepairBooking.preferred_date.asc(), RepairBooking.id.asc()).all()
+        query.order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc()).all()
     )
-    return [_booking_to_view(row) for row in rows]
+    return [_inspection_to_repair_view(row) for row in rows]
 
 
 @router.patch(
     "/autoservice/repair-bookings/{booking_id}",
     response_model=RepairBookingView,
+    deprecated=True,
 )
 def patch_repair_booking(
     booking_id: int,
@@ -239,6 +269,7 @@ def patch_repair_booking(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Legacy alias — updates a unified inspection booking."""
     org_id = require_autoservice_staff(db, current_user)
     data = payload.model_dump(exclude_unset=True)
     if not data:
@@ -246,15 +277,7 @@ def patch_repair_booking(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Нет полей для обновления",
         )
-    row = (
-        db.query(RepairBooking)
-        .options(joinedload(RepairBooking.vehicle))
-        .filter(
-            RepairBooking.id == booking_id,
-            RepairBooking.organization_id == org_id,
-        )
-        .first()
-    )
+    row = _find_staff_inspection_booking(db, org_id=org_id, booking_id=booking_id)
     if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -273,11 +296,14 @@ def patch_repair_booking(
     if "preferred_date" in data and data["preferred_date"]:
         row.preferred_date = data["preferred_date"]
     if "comment" in data:
-        row.comment = (data["comment"] or "").strip() or None
+        row.notes = (data["comment"] or "").strip() or None
     if data.get("status"):
         row.status = data["status"]
     if "staff_notes" in data:
-        row.staff_notes = (data["staff_notes"] or "").strip() or None
+        staff_notes = (data["staff_notes"] or "").strip() or None
+        if staff_notes:
+            base = (row.notes or "").strip()
+            row.notes = f"{base}\n\n{staff_notes}".strip() if base else staff_notes
     db.commit()
     db.refresh(row)
-    return _booking_to_view(row)
+    return _inspection_to_repair_view(row)

@@ -23,6 +23,7 @@ from app.db.schema_patches import (
     ensure_site_settings_show_warehouse_inventory_column,
     ensure_site_settings_show_autoservice_column,
     ensure_inspection_bookings_table,
+    ensure_inspection_bookings_unified,
     ensure_autoservice_clients_table,
     ensure_garage_vehicles_table,
     ensure_garage_vehicle_laximo_columns,
@@ -204,6 +205,7 @@ try:
     ensure_site_settings_show_warehouse_inventory_column()
     ensure_site_settings_show_autoservice_column()
     ensure_inspection_bookings_table()
+    ensure_inspection_bookings_unified()
     ensure_autoservice_clients_table()
     ensure_garage_vehicles_table()
     ensure_garage_vehicle_laximo_columns()

@@ -10,7 +10,6 @@ from app.db.database import get_db
 from app.models.autoservice_lift import AutoserviceLift
 from app.models.garage_vehicle import GarageVehicle
 from app.models.inspection_booking import InspectionBooking
-from app.models.repair_booking import RepairBooking
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_planner import (
@@ -94,19 +93,8 @@ def get_planner(
     )
 
     bookings = (
-        db.query(RepairBooking)
-        .filter(
-            RepairBooking.organization_id == org_id,
-            RepairBooking.preferred_date >= date_from,
-            RepairBooking.preferred_date <= date_to,
-            RepairBooking.status != "cancelled",
-        )
-        .order_by(RepairBooking.preferred_date.asc(), RepairBooking.id.asc())
-        .all()
-    )
-
-    inspection_bookings = (
         db.query(InspectionBooking)
+        .options(joinedload(InspectionBooking.vehicle))
         .filter(
             InspectionBooking.organization_id == org_id,
             InspectionBooking.preferred_date >= date_from,
@@ -138,28 +126,14 @@ def get_planner(
         day = days.get(row.preferred_date)
         if day is None:
             continue
-        day.repair_bookings.append(
-            PlannerRepairBooking(
+        day.inspection_bookings.append(
+            PlannerInspectionBooking(
                 id=row.id,
                 client_id=row.client_id,
                 name=row.name,
                 phone=row.phone,
                 preferred_date=row.preferred_date,
-                comment=row.comment,
-                status=row.status,
-            )
-        )
-
-    for row in inspection_bookings:
-        day = days.get(row.preferred_date)
-        if day is None:
-            continue
-        day.inspection_bookings.append(
-            PlannerInspectionBooking(
-                id=row.id,
-                name=row.name,
-                phone=row.phone,
-                preferred_date=row.preferred_date,
+                vehicle=_vehicle_label(row.vehicle),
                 notes=row.notes,
                 status=row.status,
                 source=row.source,

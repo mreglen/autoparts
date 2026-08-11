@@ -30,9 +30,11 @@ class PlannerRepairBooking(BaseModel):
 
 class PlannerInspectionBooking(BaseModel):
     id: int
+    client_id: Optional[int] = None
     name: str
     phone: str
     preferred_date: date
+    vehicle: Optional[str] = None
     notes: Optional[str] = None
     status: str
     source: str

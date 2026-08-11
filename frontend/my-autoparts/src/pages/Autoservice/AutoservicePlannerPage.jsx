@@ -720,6 +720,9 @@ export default function AutoservicePlannerPage() {
                         <p className="font-medium text-gray-900">
                           {item.name} · {item.phone}
                         </p>
+                        {item.vehicle && item.vehicle !== '—' ? (
+                          <p className="mt-0.5 text-gray-700">{item.vehicle}</p>
+                        ) : null}
                         {item.notes && (
                           <p className="mt-0.5 text-gray-600">{item.notes}</p>
                         )}
