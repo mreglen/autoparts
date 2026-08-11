@@ -254,18 +254,7 @@ def create_garage_vehicle_staff(
     return _vehicle_to_view(row)
 
 
-@router.patch(
-    "/autoservice/garage/vehicles/{vehicle_id}",
-    response_model=GarageVehicleView,
-)
-def update_garage_vehicle(
-    vehicle_id: int,
-    payload: GarageVehicleUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    my_client = require_my_active_autoservice_client(db, current_user)
-    row = _get_client_vehicle_or_404(db, vehicle_id, my_client.id)
+def _apply_vehicle_update(db: Session, row: GarageVehicle, payload: GarageVehicleUpdate) -> GarageVehicle:
     data = payload.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(
@@ -278,7 +267,7 @@ def update_garage_vehicle(
             dup = (
                 db.query(GarageVehicle)
                 .filter(
-                    GarageVehicle.client_id == my_client.id,
+                    GarageVehicle.client_id == row.client_id,
                     GarageVehicle.vin == vin,
                     GarageVehicle.id != row.id,
                 )
@@ -304,6 +293,68 @@ def update_garage_vehicle(
         row.notes = (data["notes"] or "").strip() or None
     db.commit()
     db.refresh(row)
+    return row
+
+
+@router.patch(
+    "/autoservice/garage/vehicles/{vehicle_id}",
+    response_model=GarageVehicleView,
+)
+def update_garage_vehicle(
+    vehicle_id: int,
+    payload: GarageVehicleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    my_client = require_my_active_autoservice_client(db, current_user)
+    row = _get_client_vehicle_or_404(db, vehicle_id, my_client.id)
+    row = _apply_vehicle_update(db, row, payload)
+    return _vehicle_to_view(row)
+
+
+@router.patch(
+    "/autoservice/garage/vehicles/{vehicle_id}/staff",
+    response_model=GarageVehicleView,
+)
+def update_garage_vehicle_staff(
+    vehicle_id: int,
+    payload: GarageVehicleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    row = (
+        db.query(GarageVehicle)
+        .filter(
+            GarageVehicle.id == vehicle_id,
+            GarageVehicle.organization_id == org_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Автомобиль не найден",
+        )
+    client = (
+        db.query(AutoserviceClient)
+        .filter(
+            AutoserviceClient.id == row.client_id,
+            AutoserviceClient.organization_id == org_id,
+        )
+        .first()
+    )
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Клиент не найден",
+        )
+    if client.user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Редактировать можно только автомобили гостевых клиентов",
+        )
+    row = _apply_vehicle_update(db, row, payload)
     return _vehicle_to_view(row)
 
 

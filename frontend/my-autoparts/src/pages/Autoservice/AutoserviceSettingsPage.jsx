@@ -638,7 +638,6 @@ export default function AutoserviceSettingsPage() {
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Настройки</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Параметры автосервиса, зоны, работы и сотрудники</p>
         </div>
         <button
           type="button"
@@ -961,7 +960,14 @@ export default function AutoserviceSettingsPage() {
                       </tr>
                     ) : (
                       activeEmployees.map((emp) => (
-                        <tr key={emp.id} className="transition-colors hover:bg-gray-50/70">
+                        <tr
+                          key={emp.id}
+                          className="cursor-pointer transition-colors hover:bg-gray-50/70"
+                          onDoubleClick={(e) => {
+                            if (e.target.closest('.actions-dropdown')) return;
+                            setEditingEmployee(emp);
+                          }}
+                        >
                           <td className="py-3 pr-3 align-middle">
                             <div className="font-medium text-gray-900">{emp.name}</div>
                             {emp.position ? (
@@ -972,14 +978,13 @@ export default function AutoserviceSettingsPage() {
                           <td className="py-3 text-right align-middle">
                             <ActionsDropdown
                               menuClassName="w-40 z-50"
-                              estimatedMenuHeight={140}
+                              estimatedMenuHeight={100}
                               showLabel
                               buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
                             >
                               <ActionsDropdownItem onClick={() => setEditingEmployee(emp)}>
                                 Изменить
                               </ActionsDropdownItem>
-                              <ActionsDropdownItem onClick={() => openEmployeeStats(emp)}>ЗП</ActionsDropdownItem>
                               <ActionsDropdownItem danger onClick={() => archiveEmployee(emp.id)}>
                                 Удалить
                               </ActionsDropdownItem>
@@ -1001,7 +1006,11 @@ export default function AutoserviceSettingsPage() {
                   activeEmployees.map((emp) => (
                     <div
                       key={emp.id}
-                      className="flex items-start justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0"
+                      className="flex cursor-pointer items-start justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0"
+                      onDoubleClick={(e) => {
+                        if (e.target.closest('.actions-dropdown')) return;
+                        setEditingEmployee(emp);
+                      }}
                     >
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-gray-900">{emp.name}</p>
@@ -1009,12 +1018,11 @@ export default function AutoserviceSettingsPage() {
                       </div>
                       <ActionsDropdown
                         menuClassName="w-40 z-50"
-                        estimatedMenuHeight={140}
+                        estimatedMenuHeight={100}
                         showLabel={false}
                         buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50"
                       >
                         <ActionsDropdownItem onClick={() => setEditingEmployee(emp)}>Изменить</ActionsDropdownItem>
-                        <ActionsDropdownItem onClick={() => openEmployeeStats(emp)}>ЗП</ActionsDropdownItem>
                         <ActionsDropdownItem danger onClick={() => archiveEmployee(emp.id)}>
                           Удалить
                         </ActionsDropdownItem>

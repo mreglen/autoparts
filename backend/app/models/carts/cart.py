@@ -15,5 +15,8 @@ class Cart(Base):
     user = relationship("User", back_populates="carts")
 
     # Новые отношения для разделения типов товаров
+    new_parts_baskets = relationship(
+        "NewPartsBasket", back_populates="cart", cascade="all, delete-orphan"
+    )
     new_parts_items = relationship("NewPartsCart", back_populates="cart", cascade="all, delete-orphan")
     used_parts_items = relationship("UsedPartsCart", back_populates="cart", cascade="all, delete-orphan")

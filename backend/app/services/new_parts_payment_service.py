@@ -24,6 +24,7 @@ from app.services.new_parts_order_fulfillment import (
 from app.services.yookassa_client import get_yookassa_client
 from app.services.yookassa_receipt_builder import build_receipt
 from app.utils.guest_cart import get_or_create_user_cart
+from app.utils.cart_baskets import load_user_basket_items
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +52,13 @@ def _serialize_cart_item(item: NewPartsCart) -> dict[str, Any]:
     }
 
 
-def _load_user_cart_items(db: Session, user_id: int) -> list[NewPartsCart]:
+def _load_user_cart_items(
+    db: Session,
+    user_id: int,
+    basket_id: int | None = None,
+) -> list[NewPartsCart]:
     cart = get_or_create_user_cart(db, user_id)
-    items = (
-        db.query(NewPartsCart)
-        .filter(NewPartsCart.cart_id == cart.id, NewPartsCart.user_id == user_id)
-        .all()
-    )
-    return items
+    return load_user_basket_items(db, cart.id, user_id, basket_id)
 
 
 def _session_or_404(db: Session, session_id: str, user_id: int) -> NewPartsCheckoutSession:
@@ -140,7 +140,7 @@ async def create_checkout_session(
             detail="Онлайн-оплата временно недоступна",
         )
 
-    cart_items = _load_user_cart_items(db, user.id)
+    cart_items = _load_user_cart_items(db, user.id, payload.basket_id)
     if not cart_items:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

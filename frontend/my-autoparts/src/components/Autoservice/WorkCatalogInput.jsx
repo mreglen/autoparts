@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 
 const pillInputSmClass =
-  'block h-9 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+  'block h-8 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
 
 function formatMoney(value) {
   const n = Number(value);

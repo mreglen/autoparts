@@ -1613,6 +1613,243 @@ def ensure_cart_max_quantity_columns() -> None:
     logger.info("Applied cart max_quantity column patches: %s", statements)
 
 
+def ensure_new_parts_basket_tables() -> None:
+    """Create named new-parts basket tables and backfill existing cart items."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    dialect = engine.dialect.name
+
+    with engine.begin() as conn:
+        if "new_parts_baskets" not in table_names:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE new_parts_baskets (
+                            id SERIAL PRIMARY KEY,
+                            cart_id INTEGER NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+                            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            name VARCHAR(100) NOT NULL,
+                            is_default BOOLEAN NOT NULL DEFAULT FALSE,
+                            sort_order INTEGER NOT NULL DEFAULT 0,
+                            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                            updated_at TIMESTAMP WITH TIME ZONE
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE new_parts_baskets (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            cart_id INTEGER NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+                            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            name VARCHAR(100) NOT NULL,
+                            is_default BOOLEAN NOT NULL DEFAULT 0,
+                            sort_order INTEGER NOT NULL DEFAULT 0,
+                            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_new_parts_baskets_cart_id "
+                    "ON new_parts_baskets (cart_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_new_parts_baskets_user_id "
+                    "ON new_parts_baskets (user_id)"
+                )
+            )
+
+        if "guest_new_parts_baskets" not in table_names:
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE guest_new_parts_baskets (
+                            id SERIAL PRIMARY KEY,
+                            guest_cart_id INTEGER NOT NULL REFERENCES guest_carts(id) ON DELETE CASCADE,
+                            name VARCHAR(100) NOT NULL,
+                            is_default BOOLEAN NOT NULL DEFAULT FALSE,
+                            sort_order INTEGER NOT NULL DEFAULT 0,
+                            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                            updated_at TIMESTAMP WITH TIME ZONE
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE guest_new_parts_baskets (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            guest_cart_id INTEGER NOT NULL REFERENCES guest_carts(id) ON DELETE CASCADE,
+                            name VARCHAR(100) NOT NULL,
+                            is_default BOOLEAN NOT NULL DEFAULT 0,
+                            sort_order INTEGER NOT NULL DEFAULT 0,
+                            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP
+                        )
+                        """
+                    )
+                )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_guest_new_parts_baskets_guest_cart_id "
+                    "ON guest_new_parts_baskets (guest_cart_id)"
+                )
+            )
+
+        inspector = inspect(engine)
+        table_names = set(inspector.get_table_names())
+
+        if "new_parts_cart" in table_names:
+            columns = {col["name"] for col in inspector.get_columns("new_parts_cart")}
+            if "basket_id" not in columns:
+                conn.execute(text("ALTER TABLE new_parts_cart ADD COLUMN basket_id INTEGER"))
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_new_parts_cart_basket_id "
+                        "ON new_parts_cart (basket_id)"
+                    )
+                )
+
+        if "guest_new_parts_cart" in table_names:
+            columns = {col["name"] for col in inspector.get_columns("guest_new_parts_cart")}
+            if "basket_id" not in columns:
+                conn.execute(text("ALTER TABLE guest_new_parts_cart ADD COLUMN basket_id INTEGER"))
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_guest_new_parts_cart_basket_id "
+                        "ON guest_new_parts_cart (basket_id)"
+                    )
+                )
+
+        if "carts" in table_names and "new_parts_baskets" in table_names:
+            carts = conn.execute(text("SELECT id, user_id FROM carts")).fetchall()
+            for cart_id, user_id in carts:
+                default_row = conn.execute(
+                    text(
+                        """
+                        SELECT id FROM new_parts_baskets
+                        WHERE cart_id = :cart_id AND user_id = :user_id AND is_default = TRUE
+                        LIMIT 1
+                        """
+                    ),
+                    {"cart_id": cart_id, "user_id": user_id},
+                ).first()
+                if not default_row:
+                    default_row = conn.execute(
+                        text(
+                            """
+                            SELECT id FROM new_parts_baskets
+                            WHERE cart_id = :cart_id AND user_id = :user_id
+                            ORDER BY id ASC
+                            LIMIT 1
+                            """
+                        ),
+                        {"cart_id": cart_id, "user_id": user_id},
+                    ).first()
+                if not default_row:
+                    conn.execute(
+                        text(
+                            """
+                            INSERT INTO new_parts_baskets (cart_id, user_id, name, is_default, sort_order)
+                            VALUES (:cart_id, :user_id, 'Новые запчасти', TRUE, 0)
+                            """
+                        ),
+                        {"cart_id": cart_id, "user_id": user_id},
+                    )
+                    default_row = conn.execute(
+                        text(
+                            """
+                            SELECT id FROM new_parts_baskets
+                            WHERE cart_id = :cart_id AND user_id = :user_id AND is_default = TRUE
+                            LIMIT 1
+                            """
+                        ),
+                        {"cart_id": cart_id, "user_id": user_id},
+                    ).first()
+                if default_row:
+                    conn.execute(
+                        text(
+                            """
+                            UPDATE new_parts_cart
+                            SET basket_id = :basket_id
+                            WHERE cart_id = :cart_id AND basket_id IS NULL
+                            """
+                        ),
+                        {"basket_id": default_row[0], "cart_id": cart_id},
+                    )
+
+        if "guest_carts" in table_names and "guest_new_parts_baskets" in table_names:
+            guest_carts = conn.execute(text("SELECT id FROM guest_carts")).fetchall()
+            for (guest_cart_id,) in guest_carts:
+                default_row = conn.execute(
+                    text(
+                        """
+                        SELECT id FROM guest_new_parts_baskets
+                        WHERE guest_cart_id = :guest_cart_id AND is_default = TRUE
+                        LIMIT 1
+                        """
+                    ),
+                    {"guest_cart_id": guest_cart_id},
+                ).first()
+                if not default_row:
+                    default_row = conn.execute(
+                        text(
+                            """
+                            SELECT id FROM guest_new_parts_baskets
+                            WHERE guest_cart_id = :guest_cart_id
+                            ORDER BY id ASC
+                            LIMIT 1
+                            """
+                        ),
+                        {"guest_cart_id": guest_cart_id},
+                    ).first()
+                if not default_row:
+                    conn.execute(
+                        text(
+                            """
+                            INSERT INTO guest_new_parts_baskets (guest_cart_id, name, is_default, sort_order)
+                            VALUES (:guest_cart_id, 'Новые запчасти', TRUE, 0)
+                            """
+                        ),
+                        {"guest_cart_id": guest_cart_id},
+                    )
+                    default_row = conn.execute(
+                        text(
+                            """
+                            SELECT id FROM guest_new_parts_baskets
+                            WHERE guest_cart_id = :guest_cart_id AND is_default = TRUE
+                            LIMIT 1
+                            """
+                        ),
+                        {"guest_cart_id": guest_cart_id},
+                    ).first()
+                if default_row:
+                    conn.execute(
+                        text(
+                            """
+                            UPDATE guest_new_parts_cart
+                            SET basket_id = :basket_id
+                            WHERE guest_cart_id = :guest_cart_id AND basket_id IS NULL
+                            """
+                        ),
+                        {"basket_id": default_row[0], "guest_cart_id": guest_cart_id},
+                    )
+
+    logger.info("Applied new parts basket table patches")
+
+
 def ensure_yookassa_payment_tables() -> None:
     """Create checkout session and YooKassa payment tables if missing."""
     inspector = inspect(engine)

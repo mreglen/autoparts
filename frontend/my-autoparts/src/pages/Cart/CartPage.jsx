@@ -5,14 +5,20 @@ import {
   selectCart,
   selectCartLoading,
   selectCartError,
+  selectNewPartsBaskets,
+  selectActiveNewPartsBasketId,
   fetchCart,
   updateCartItemQuantity,
   updateUsedCartItemQuantity,
   removeFromCart,
   removeUsedFromCart,
+  setActiveNewPartsBasket,
+  renameNewPartsBasket,
 } from '../../redux/slices/CartSlice';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
+import UnderlineTabs from '../../components/UI/UnderlineTabs';
+import Modal from '../../components/UI/Modal';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price);
@@ -379,11 +385,17 @@ export default function CartPage() {
   const cart = useSelector(selectCart);
   const loading = useSelector(selectCartLoading);
   const error = useSelector(selectCartError);
+  const newPartsBaskets = useSelector(selectNewPartsBaskets);
+  const activeBasketId = useSelector(selectActiveNewPartsBasketId);
   const isInitialLoad = loading && !cart;
   const isAuthorized = useSelector((state) => Boolean(state.auth.token));
 
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [renameError, setRenameError] = useState('');
   const pendingCheckoutRef = useRef(null);
 
   useEffect(() => {
@@ -406,10 +418,37 @@ export default function CartPage() {
     image: '/api/placeholder/80/80',
   }), []);
 
-  const newPartsItems = useMemo(() => {
+  const activeBasket = useMemo(() => {
+    if (!newPartsBaskets.length) return null;
+    return (
+      newPartsBaskets.find((b) => b.id === activeBasketId)
+      || newPartsBaskets.find((b) => b.is_default)
+      || newPartsBaskets[0]
+    );
+  }, [newPartsBaskets, activeBasketId]);
+
+  const allNewPartsItems = useMemo(() => {
     if (!cart?.new_parts_items?.length) return [];
     return cart.new_parts_items.map((item) => mapNewItem(item));
   }, [cart, mapNewItem]);
+
+  const newPartsItems = useMemo(() => {
+    const sourceItems = activeBasket?.items?.length
+      ? activeBasket.items
+      : cart?.new_parts_items || [];
+    if (!sourceItems.length) return [];
+    return sourceItems.map((item) => mapNewItem(item));
+  }, [activeBasket, cart, mapNewItem]);
+
+  const basketTabs = useMemo(
+    () =>
+      newPartsBaskets.map((basket) => ({
+        id: String(basket.id),
+        label: basket.name,
+        count: basket.item_count,
+      })),
+    [newPartsBaskets]
+  );
 
   const usedGroupedItems = useMemo(() => {
     if (!cart?.used_parts_items?.length) return {};
@@ -437,8 +476,8 @@ export default function CartPage() {
   }, [cart]);
 
   const cartItems = useMemo(
-    () => [...newPartsItems, ...Object.values(usedGroupedItems).flat()],
-    [newPartsItems, usedGroupedItems]
+    () => [...allNewPartsItems, ...Object.values(usedGroupedItems).flat()],
+    [allNewPartsItems, usedGroupedItems]
   );
 
   const usedSellerGroups = useMemo(
@@ -530,14 +569,20 @@ export default function CartPage() {
   );
 
   const handleNewPartsCheckout = useCallback(() => {
+    if (activeBasket?.id) {
+      dispatch(setActiveNewPartsBasket(activeBasket.id));
+    }
     if (!isAuthorized) {
       openAuthModalForCheckout({ type: 'new' });
       return;
     }
     navigate('/cart/new/checkout');
-  }, [isAuthorized, navigate, openAuthModalForCheckout]);
+  }, [activeBasket?.id, dispatch, isAuthorized, navigate, openAuthModalForCheckout]);
 
   const handleNewPartsCheckoutSelected = useCallback(() => {
+    if (activeBasket?.id) {
+      dispatch(setActiveNewPartsBasket(activeBasket.id));
+    }
     if (!isAuthorized) {
       openAuthModalForCheckout({ type: 'new' });
       return;
@@ -545,7 +590,34 @@ export default function CartPage() {
     const selected = newPartsItems.filter((item) => selectedItems.has(item.id));
     if (selected.length === 0) return;
     navigate('/cart/new/checkout');
-  }, [isAuthorized, navigate, newPartsItems, openAuthModalForCheckout, selectedItems]);
+  }, [activeBasket?.id, dispatch, isAuthorized, navigate, newPartsItems, openAuthModalForCheckout, selectedItems]);
+
+  const openRenameModal = () => {
+    if (!activeBasket || activeBasket.is_default) return;
+    setRenameValue(activeBasket.name);
+    setRenameError('');
+    setRenameOpen(true);
+  };
+
+  const handleRenameBasket = async (e) => {
+    e.preventDefault();
+    if (!activeBasket || activeBasket.is_default) return;
+    const name = renameValue.trim();
+    if (!name) {
+      setRenameError('Укажите название');
+      return;
+    }
+    setRenameSaving(true);
+    setRenameError('');
+    try {
+      await dispatch(renameNewPartsBasket({ basketId: activeBasket.id, name })).unwrap();
+      setRenameOpen(false);
+    } catch (err) {
+      setRenameError(typeof err === 'string' ? err : 'Не удалось переименовать');
+    } finally {
+      setRenameSaving(false);
+    }
+  };
 
   const handleAuthSuccess = useCallback(() => {
     setIsAuthModalOpen(false);
@@ -614,8 +686,8 @@ export default function CartPage() {
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Корзина</h1>
           {!isInitialLoad && cartItems.length > 0 && (
             <p className="mt-1 text-sm text-gray-500">
-              {newPartsItems.length > 0 && 'новые запчасти'}
-              {newPartsItems.length > 0 && usedSellerGroups.length > 0 && ' · '}
+              {allNewPartsItems.length > 0 && 'новые запчасти'}
+              {allNewPartsItems.length > 0 && usedSellerGroups.length > 0 && ' · '}
               {usedSellerGroups.length > 0 &&
                 `${usedSellerGroups.length} ${
                   usedSellerGroups.length === 1 ? 'продавец б/у' : 'продавцов б/у'
@@ -687,7 +759,57 @@ export default function CartPage() {
         />
       ) : (
         <div className="space-y-6">
-          {newPartsItems.length > 0 && (
+          {newPartsBaskets.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <UnderlineTabs
+                  tabs={basketTabs}
+                  value={String(activeBasket?.id || basketTabs[0]?.id || '')}
+                  onChange={(id) => dispatch(setActiveNewPartsBasket(Number(id)))}
+                  ariaLabel="Корзины новых запчастей"
+                />
+                {activeBasket && !activeBasket.is_default ? (
+                  <button
+                    type="button"
+                    onClick={openRenameModal}
+                    className="self-start rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Переименовать
+                  </button>
+                ) : null}
+              </div>
+
+              {newPartsItems.length > 0 ? (
+                <SellerCartBlock
+                  seller={activeBasket?.name || 'Новые запчасти'}
+                  newItems={newPartsItems}
+                  usedItems={[]}
+                  allItems={newPartsItems}
+                  selectedItems={selectedItems}
+                  onSelectAll={handleSelectAllNewItems}
+                  onItemSelect={handleItemSelect}
+                  onQuantityChange={handleQuantityChange}
+                  onRemove={handleRemoveItem}
+                  onRemoveSelected={() => {
+                    newPartsItems
+                      .filter((item) => selectedItems.has(item.id))
+                      .forEach((item) => handleRemoveItem(item.id));
+                  }}
+                  onCheckout={handleNewPartsCheckout}
+                  onCheckoutSelected={handleNewPartsCheckoutSelected}
+                  isAuthorized={isAuthorized}
+                  calculateSellerTotal={calculateSellerTotal}
+                  checkoutLabel="Оформить заказ"
+                />
+              ) : (
+                <div className="rounded-sg-lg border border-line bg-surface px-6 py-10 text-center text-sm text-gray-500 shadow-sg">
+                  В корзине «{activeBasket?.name || 'Новые запчасти'}» пока нет позиций
+                </div>
+              )}
+            </div>
+          )}
+
+          {!newPartsBaskets.length && newPartsItems.length > 0 && (
             <SellerCartBlock
               seller="Новые запчасти"
               newItems={newPartsItems}
@@ -746,6 +868,47 @@ export default function CartPage() {
         }}
         onAuthSuccess={handleAuthSuccess}
       />
+
+      <Modal
+        open={renameOpen}
+        onClose={() => {
+          if (!renameSaving) setRenameOpen(false);
+        }}
+        title="Переименовать корзину"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setRenameOpen(false)}
+              disabled={renameSaving}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              form="rename-basket-form"
+              disabled={renameSaving}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {renameSaving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+          </div>
+        }
+      >
+        <form id="rename-basket-form" onSubmit={handleRenameBasket} className="space-y-3">
+          <input
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            maxLength={100}
+            disabled={renameSaving}
+            autoFocus
+          />
+          {renameError ? <p className="text-sm text-red-600">{renameError}</p> : null}
+        </form>
+      </Modal>
     </div>
   );
 }

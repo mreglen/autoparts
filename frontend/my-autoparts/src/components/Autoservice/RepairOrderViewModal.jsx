@@ -154,7 +154,7 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
                     {(w.executors || []).length
                       ? (w.executors || []).map((ex) => (
                           <span key={ex.employee_id} className="mr-2 inline-block">
-                            {ex.employee?.name} {formatMoney(ex.pay_amount)} ₽
+                            {ex.employee?.name || '—'}
                           </span>
                         ))
                       : w.executor?.name || '—'}

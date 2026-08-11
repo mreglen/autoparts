@@ -6,8 +6,9 @@ from typing import Optional
 from fastapi import Request, Response
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.carts import Cart, NewPartsCart, UsedPartsCart, GuestCart, GuestNewPartsCart, GuestUsedPartsCart
+from app.models.carts import Cart, NewPartsCart, UsedPartsCart, GuestCart, GuestNewPartsCart, GuestUsedPartsCart, GuestNewPartsBasket, NewPartsBasket
 from app.models.product import Product
+from app.utils.cart_baskets import find_or_create_user_basket_by_name, get_or_create_default_user_basket
 
 
 GUEST_CART_HEADER_NAME = "X-Guest-Cart-Token"
@@ -53,6 +54,7 @@ def load_guest_cart_with_items(db: Session, raw_token: str) -> Optional[GuestCar
     guest_cart = (
         db.query(GuestCart)
         .options(
+            selectinload(GuestCart.new_parts_baskets),
             selectinload(GuestCart.new_parts_items),
             selectinload(GuestCart.used_parts_items)
             .selectinload(GuestUsedPartsCart.product)
@@ -104,10 +106,31 @@ def get_or_create_user_cart(db: Session, user_id: int) -> Cart:
 
 def merge_guest_cart_to_user(db: Session, guest_cart: GuestCart, user_id: int) -> None:
     user_cart = get_or_create_user_cart(db, user_id)
+    get_or_create_default_user_basket(db, user_cart.id, user_id)
+
+    guest_baskets = (
+        db.query(GuestNewPartsBasket)
+        .filter(GuestNewPartsBasket.guest_cart_id == guest_cart.id)
+        .all()
+    )
+    guest_basket_map: dict[int, NewPartsBasket] = {}
+    for guest_basket in guest_baskets:
+        if guest_basket.is_default:
+            user_basket = get_or_create_default_user_basket(db, user_cart.id, user_id)
+        else:
+            user_basket = find_or_create_user_basket_by_name(
+                db, user_cart.id, user_id, guest_basket.name
+            )
+        guest_basket_map[guest_basket.id] = user_basket
 
     for guest_item in guest_cart.new_parts_items:
+        target_basket = guest_basket_map.get(guest_item.basket_id)
+        if not target_basket:
+            target_basket = get_or_create_default_user_basket(db, user_cart.id, user_id)
+
         existing = db.query(NewPartsCart).filter(
             NewPartsCart.cart_id == user_cart.id,
+            NewPartsCart.basket_id == target_basket.id,
             NewPartsCart.stock_id == guest_item.stock_id,
             NewPartsCart.brand == guest_item.brand,
             NewPartsCart.partnumber == guest_item.partnumber,
@@ -120,6 +143,7 @@ def merge_guest_cart_to_user(db: Session, guest_cart: GuestCart, user_id: int) -
                 NewPartsCart(
                     cart_id=user_cart.id,
                     user_id=user_id,
+                    basket_id=target_basket.id,
                     brand=guest_item.brand,
                     partnumber=guest_item.partnumber,
                     name=guest_item.name,
@@ -127,6 +151,7 @@ def merge_guest_cart_to_user(db: Session, guest_cart: GuestCart, user_id: int) -
                     quantity=guest_item.quantity,
                     price=guest_item.price,
                     stock_id=guest_item.stock_id,
+                    max_quantity=guest_item.max_quantity,
                     guid=guest_item.guid,
                     delivery_start=guest_item.delivery_start,
                     delivery_end=guest_item.delivery_end,

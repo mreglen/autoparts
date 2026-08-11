@@ -16,6 +16,48 @@ import {
     clearCartSummaryCache,
 } from '../../utils/cartSummary';
 
+const ACTIVE_BASKET_STORAGE_KEY = 'active_new_parts_basket_id';
+
+function loadActiveBasketId() {
+    try {
+        const raw = localStorage.getItem(ACTIVE_BASKET_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveActiveBasketId(basketId) {
+    try {
+        if (!basketId) {
+            localStorage.removeItem(ACTIVE_BASKET_STORAGE_KEY);
+            return;
+        }
+        localStorage.setItem(ACTIVE_BASKET_STORAGE_KEY, String(basketId));
+    } catch {
+        // ignore
+    }
+}
+
+function syncBasketsFromCart(state) {
+    const baskets = state.cart?.new_parts_baskets;
+    state.newPartsBaskets = Array.isArray(baskets) ? baskets : [];
+    if (!state.newPartsBaskets.length) {
+        state.activeBasketId = null;
+        saveActiveBasketId(null);
+        return;
+    }
+    const hasActive = state.newPartsBaskets.some((b) => b.id === state.activeBasketId);
+    if (!hasActive) {
+        const fallback =
+            state.newPartsBaskets.find((b) => b.is_default)?.id || state.newPartsBaskets[0].id;
+        state.activeBasketId = fallback;
+        saveActiveBasketId(fallback);
+    }
+}
+
 function patchCartItemInState(state, payload, listKey) {
     if (!state.cart?.[listKey]) return;
     const index = state.cart[listKey].findIndex((item) => item.id === payload.id);
@@ -43,6 +85,50 @@ function syncSummaryFromCart(state) {
     state.summary = summary;
     saveCartSummaryCache(summary);
 }
+
+export const fetchNewPartsBaskets = createAsyncThunk(
+    'cart/fetchNewPartsBaskets',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get('/cart/new-parts/baskets');
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки корзин'
+            );
+        }
+    }
+);
+
+export const createNewPartsBasket = createAsyncThunk(
+    'cart/createNewPartsBasket',
+    async ({ name }, { rejectWithValue, dispatch }) => {
+        try {
+            const response = await apiAxios.post('/cart/new-parts/baskets', { name });
+            dispatch(fetchCart());
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка создания корзины'
+            );
+        }
+    }
+);
+
+export const renameNewPartsBasket = createAsyncThunk(
+    'cart/renameNewPartsBasket',
+    async ({ basketId, name }, { rejectWithValue, dispatch }) => {
+        try {
+            const response = await apiAxios.patch(`/cart/new-parts/baskets/${basketId}`, { name });
+            dispatch(fetchCart());
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка переименования корзины'
+            );
+        }
+    }
+);
 
 export const addNewPartsToCart = createAsyncThunk(
     'cart/addNewPartsToCart',
@@ -242,6 +328,8 @@ const cartSlice = createSlice({
     name: 'cart',
     initialState: {
         cart: null,
+        newPartsBaskets: [],
+        activeBasketId: loadActiveBasketId(),
         summary: loadCartSummaryCache(),
         loading: false,
         quantityUpdatingIds: [],
@@ -254,13 +342,20 @@ const cartSlice = createSlice({
         clearCartError: (state) => {
             state.error = null;
         },
+        setActiveNewPartsBasket: (state, action) => {
+            state.activeBasketId = action.payload || null;
+            saveActiveBasketId(state.activeBasketId);
+        },
         clearCart: (state) => {
             state.cart = null;
+            state.newPartsBaskets = [];
+            state.activeBasketId = null;
             state.summary = { itemCount: 0, totalPrice: 0 };
             state.loading = false;
             state.quantityUpdatingIds = [];
             state.error = null;
             clearCartSummaryCache();
+            saveActiveBasketId(null);
         },
     },
     extraReducers: (builder) => {
@@ -283,6 +378,7 @@ const cartSlice = createSlice({
             .addCase(fetchCart.fulfilled, (state, action) => {
                 state.loading = false;
                 state.cart = action.payload;
+                syncBasketsFromCart(state);
                 syncSummaryFromCart(state);
             })
             .addCase(fetchCart.rejected, (state, action) => {
@@ -358,6 +454,15 @@ const cartSlice = createSlice({
                 removeQuantityUpdatingId(state, action.meta.arg.itemId);
                 state.error = action.payload;
             })
+            .addCase(createNewPartsBasket.fulfilled, (state, action) => {
+                const created = action.payload;
+                if (!created?.id) return;
+                state.activeBasketId = created.id;
+                saveActiveBasketId(created.id);
+            })
+            .addCase(renameNewPartsBasket.fulfilled, (state) => {
+                // fetchCart in thunk refreshes baskets
+            })
             .addCase(createNewPartsPaymentSession.pending, (state) => {
                 state.paymentSessionLoading = true;
                 state.paymentSessionError = null;
@@ -385,9 +490,16 @@ const cartSlice = createSlice({
     },
 });
 
-export const { clearCartError, clearCart } = cartSlice.actions;
+export const { clearCartError, clearCart, setActiveNewPartsBasket } = cartSlice.actions;
 
 export const selectCart = (state) => state.cart.cart;
+export const selectNewPartsBaskets = (state) => state.cart.newPartsBaskets;
+export const selectActiveNewPartsBasketId = (state) => state.cart.activeBasketId;
+export const selectActiveNewPartsBasket = (state) => {
+    const baskets = state.cart.newPartsBaskets || [];
+    const activeId = state.cart.activeBasketId;
+    return baskets.find((b) => b.id === activeId) || baskets.find((b) => b.is_default) || baskets[0] || null;
+};
 export const selectCartLoading = (state) => state.cart.loading;
 export const selectCartQuantityUpdatingIds = (state) => state.cart.quantityUpdatingIds;
 export const selectCartError = (state) => state.cart.error;

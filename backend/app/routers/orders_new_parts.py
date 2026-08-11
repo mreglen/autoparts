@@ -20,6 +20,7 @@ from app.services.new_parts_order_fulfillment import fulfill_new_parts_order
 from app.services.push_notifications import notify_sellers_new_order
 from app.services.rossko_order_service import extract_rossko_notice_message
 from app.utils.guest_cart import get_or_create_user_cart
+from app.utils.cart_baskets import load_user_basket_items
 
 router = APIRouter(prefix="/orders", tags=["Orders New Parts"])
 
@@ -75,10 +76,11 @@ async def create_new_parts_order(
         )
 
     cart = get_or_create_user_cart(db, current_user.id)
-    cart_items = (
-        db.query(NewPartsCart)
-        .filter(NewPartsCart.cart_id == cart.id, NewPartsCart.user_id == current_user.id)
-        .all()
+    cart_items = load_user_basket_items(
+        db,
+        cart.id,
+        current_user.id,
+        payload.basket_id,
     )
     if not cart_items:
         raise HTTPException(

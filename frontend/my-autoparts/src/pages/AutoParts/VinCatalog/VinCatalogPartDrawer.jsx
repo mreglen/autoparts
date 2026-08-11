@@ -8,7 +8,7 @@ import {
   mapPartToStocksData,
   normalizeArticle,
 } from '../NewParts/rosskoHelpers';
-import VinCatalogOfferCard from './VinCatalogOfferCard';
+import VinCatalogOffersTable from './VinCatalogOffersTable';
 
 const CLOSE_ANIMATION_MS = 200;
 
@@ -249,16 +249,7 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
             {rosskoLoading ? (
               <OfferSkeleton rows={3} />
             ) : similarParts.length ? (
-              <div className="space-y-2">
-                {similarParts.map((part, idx) => (
-                  <VinCatalogOfferCard
-                    key={`sim-${part?.guid || part?.partnumber || idx}`}
-                    part={part}
-                    sectionType="available"
-                    uniqueId={`sim-${idx}`}
-                  />
-                ))}
-              </div>
+              <VinCatalogOffersTable parts={similarParts} sectionType="available" />
             ) : (
               <p className="text-sm text-gray-500">Нет предложений</p>
             )}
@@ -311,16 +302,7 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
             {rosskoLoading ? (
               <OfferSkeleton rows={4} />
             ) : analogParts.length ? (
-              <div className="space-y-2">
-                {analogParts.map((part, idx) => (
-                  <VinCatalogOfferCard
-                    key={`an-${part?.guid || part?.partnumber || idx}`}
-                    part={part}
-                    sectionType="analog"
-                    uniqueId={`an-${idx}`}
-                  />
-                ))}
-              </div>
+              <VinCatalogOffersTable parts={analogParts} sectionType="analog" />
             ) : (
               <p className="text-sm text-gray-500">Нет аналогов</p>
             )}

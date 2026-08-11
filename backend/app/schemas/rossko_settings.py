@@ -87,6 +87,7 @@ class NewPartsOrderCreateIn(BaseModel):
     delivery_option_id: Optional[int] = None
     comment: Optional[str] = None
     deliver_in_parts: bool = False
+    basket_id: Optional[int] = None
 
 
 class NewPartsOrderCreateOut(BaseModel):

@@ -13,5 +13,8 @@ class GuestCart(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    new_parts_baskets = relationship(
+        "GuestNewPartsBasket", back_populates="guest_cart", cascade="all, delete-orphan"
+    )
     new_parts_items = relationship("GuestNewPartsCart", back_populates="guest_cart", cascade="all, delete-orphan")
     used_parts_items = relationship("GuestUsedPartsCart", back_populates="guest_cart", cascade="all, delete-orphan")

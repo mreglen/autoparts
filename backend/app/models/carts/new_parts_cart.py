@@ -9,6 +9,7 @@ class NewPartsCart(Base):
     id = Column(Integer, primary_key=True, index=True)
     cart_id = Column(Integer, ForeignKey("carts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    basket_id = Column(Integer, ForeignKey("new_parts_baskets.id"), nullable=True, index=True)
 
     # Поля для новых запчастей
     brand = Column(String(100), nullable=False)
@@ -31,6 +32,7 @@ class NewPartsCart(Base):
     # Отношения
     cart = relationship("Cart", back_populates="new_parts_items")
     user = relationship("User")
+    basket = relationship("NewPartsBasket", back_populates="items")
 
     @property
     def seller(self):

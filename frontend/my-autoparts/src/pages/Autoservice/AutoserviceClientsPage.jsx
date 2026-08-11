@@ -5,6 +5,7 @@ import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { formatServerDateTime } from '../../utils/serverDate';
+import { sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 
 const pillControlClass =
   'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0';
@@ -27,7 +28,7 @@ function AccountBadge({ userId }) {
   );
 }
 
-function VehicleList({ vehicles, loading }) {
+function VehicleList({ vehicles, loading, canEdit = false, onEdit }) {
   if (loading) {
     return <p className="text-sm text-gray-500">Загрузка автомобилей…</p>;
   }
@@ -37,13 +38,25 @@ function VehicleList({ vehicles, loading }) {
   return (
     <ul className="space-y-2">
       {vehicles.map((v) => (
-        <li key={v.id} className="text-sm text-gray-700">
-          <span className="font-medium text-gray-900">
-            {v.make} {v.model}
-            {v.year ? `, ${v.year}` : ''}
-          </span>
-          {v.vin ? ` · VIN ${v.vin}` : ''}
-          {v.plate ? ` · ${v.plate}` : ''}
+        <li key={v.id} className="flex items-start justify-between gap-3 text-sm text-gray-700">
+          <div className="min-w-0">
+            <span className="font-medium text-gray-900">
+              {v.make} {v.model}
+              {v.year ? `, ${v.year}` : ''}
+            </span>
+            {v.vin ? ` · VIN ${v.vin}` : ''}
+            {v.plate ? ` · ${v.plate}` : ''}
+            {v.color ? ` · ${v.color}` : ''}
+          </div>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => onEdit?.(v)}
+              className="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
+            >
+              Изменить
+            </button>
+          ) : null}
         </li>
       ))}
     </ul>
@@ -56,7 +69,9 @@ function ClientMobileCard({
   vehicles,
   vehiclesLoading,
   onToggleVehicles,
+  onEditVehicle,
 }) {
+  const isGuest = !row.user_id;
   return (
     <div className="border-b border-gray-100 py-3 last:border-b-0">
       <div className="flex items-start justify-between gap-3">
@@ -80,10 +95,187 @@ function ClientMobileCard({
       </div>
       {expanded ? (
         <div className="mt-3 rounded-xl bg-gray-50 px-3 py-3">
-          <VehicleList vehicles={vehicles} loading={vehiclesLoading} />
+          <VehicleList
+            vehicles={vehicles}
+            loading={vehiclesLoading}
+            canEdit={isGuest}
+            onEdit={onEditVehicle}
+          />
         </div>
       ) : null}
     </div>
+  );
+}
+
+function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    vin: '',
+    make: '',
+    model: '',
+    year: '',
+    color: '',
+    plate: '',
+    notes: '',
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open || !vehicle) return;
+    setForm({
+      vin: vehicle.vin || '',
+      make: vehicle.make || '',
+      model: vehicle.model || '',
+      year: vehicle.year != null ? String(vehicle.year) : '',
+      color: vehicle.color || '',
+      plate: vehicle.plate || '',
+      notes: vehicle.notes || '',
+    });
+    setError('');
+    setSaving(false);
+  }, [open, vehicle]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!vehicle) return;
+    setError('');
+    const make = form.make.trim();
+    const model = form.model.trim();
+    if (!make || !model) {
+      setError('Укажите марку и модель');
+      return;
+    }
+    const year = form.year ? Number(form.year) : null;
+    if (form.year && (!Number.isFinite(year) || year < 1900 || year > 2100)) {
+      setError('Некорректный год');
+      return;
+    }
+    setSaving(true);
+    try {
+      const row = await apiRequest(`/autoservice/garage/vehicles/${vehicle.id}/staff`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          vin: form.vin.trim() || null,
+          make,
+          model,
+          year,
+          color: form.color.trim() || null,
+          plate: form.plate.trim() || null,
+          notes: form.notes.trim() || null,
+        }),
+      });
+      onSaved(row);
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Изменить автомобиль"
+      size="md"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            disabled={saving}
+          >
+            Отмена
+          </button>
+          <button
+            type="submit"
+            form="edit-guest-vehicle"
+            disabled={saving}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </button>
+        </div>
+      }
+    >
+      <form id="edit-guest-vehicle" onSubmit={handleSubmit} className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">VIN</label>
+            <input
+              className={inputClass}
+              value={form.vin}
+              onChange={(e) => setForm((p) => ({ ...p, vin: sanitizeVinInput(e.target.value) }))}
+              maxLength={VIN_INPUT_MAX_LENGTH}
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Марка</label>
+            <input
+              className={inputClass}
+              value={form.make}
+              onChange={(e) => setForm((p) => ({ ...p, make: e.target.value }))}
+              required
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Модель</label>
+            <input
+              className={inputClass}
+              value={form.model}
+              onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
+              required
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Год</label>
+            <input
+              type="number"
+              className={inputClass}
+              value={form.year}
+              onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
+              min={1900}
+              max={2100}
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Цвет</label>
+            <input
+              className={inputClass}
+              value={form.color}
+              onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
+              disabled={saving}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">Госномер</label>
+            <input
+              className={inputClass}
+              value={form.plate}
+              onChange={(e) => setForm((p) => ({ ...p, plate: e.target.value }))}
+              disabled={saving}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">Заметка</label>
+            <textarea
+              className={inputClass}
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+              disabled={saving}
+            />
+          </div>
+        </div>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      </form>
+    </Modal>
   );
 }
 
@@ -207,6 +399,7 @@ export default function AutoserviceClientsPage() {
   const [expandedClientId, setExpandedClientId] = useState(null);
   const [clientVehicles, setClientVehicles] = useState({});
   const [vehiclesLoadingId, setVehiclesLoadingId] = useState(null);
+  const [editVehicle, setEditVehicle] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -394,6 +587,8 @@ export default function AutoserviceClientsPage() {
                         <VehicleList
                           vehicles={clientVehicles[row.id]}
                           loading={vehiclesLoadingId === row.id}
+                          canEdit={!row.user_id}
+                          onEdit={setEditVehicle}
                         />
                       </td>
                     </tr>
@@ -421,6 +616,7 @@ export default function AutoserviceClientsPage() {
               vehicles={clientVehicles[row.id]}
               vehiclesLoading={vehiclesLoadingId === row.id}
               onToggleVehicles={() => toggleClientVehicles(row.id)}
+              onEditVehicle={setEditVehicle}
             />
           ))
         )}
@@ -431,6 +627,22 @@ export default function AutoserviceClientsPage() {
         onClose={() => setAddOpen(false)}
         onCreated={(row) => {
           setRows((prev) => [row, ...prev.filter((r) => r.id !== row.id)]);
+        }}
+      />
+
+      <EditGuestVehicleModal
+        open={Boolean(editVehicle)}
+        vehicle={editVehicle}
+        onClose={() => setEditVehicle(null)}
+        onSaved={(updated) => {
+          setClientVehicles((prev) => {
+            const clientId = updated.client_id;
+            const list = prev[clientId] || [];
+            return {
+              ...prev,
+              [clientId]: list.map((v) => (v.id === updated.id ? updated : v)),
+            };
+          });
         }}
       />
     </div>

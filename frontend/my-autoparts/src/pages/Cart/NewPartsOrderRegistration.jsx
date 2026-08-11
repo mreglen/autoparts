@@ -6,6 +6,7 @@ import {
   selectCartLoading,
   fetchCart,
   createNewPartsPaymentSession,
+  selectActiveNewPartsBasketId,
 } from '../../redux/slices/CartSlice';
 import { apiAxios, apiAxiosUnauth } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
@@ -125,6 +126,7 @@ export default function NewPartsOrderRegistration() {
   const { user, isReady } = useAuthReady();
   const cart = useSelector(selectCart);
   const cartLoading = useSelector(selectCartLoading);
+  const activeBasketId = useSelector(selectActiveNewPartsBasketId);
 
   const [recipient, setRecipient] = useState({ fullName: '', phone: '', email: '' });
   const [touched, setTouched] = useState({});
@@ -157,8 +159,16 @@ export default function NewPartsOrderRegistration() {
   }, [isReady, user, navigate, dispatch, location.pathname, location.search]);
 
   const selectedItems = useMemo(() => {
-    if (!cart?.new_parts_items?.length) return [];
-    return cart.new_parts_items.map((item) => ({
+    const baskets = cart?.new_parts_baskets || [];
+    const activeBasket =
+      baskets.find((b) => b.id === activeBasketId)
+      || baskets.find((b) => b.is_default)
+      || baskets[0];
+    const sourceItems = activeBasket?.items?.length
+      ? activeBasket.items
+      : cart?.new_parts_items || [];
+    if (!sourceItems.length) return [];
+    return sourceItems.map((item) => ({
       id: item.id,
       brand: item.brand,
       partnumber: item.partnumber,
@@ -166,7 +176,7 @@ export default function NewPartsOrderRegistration() {
       price: Number(item.price),
       quantity: item.quantity,
     }));
-  }, [cart]);
+  }, [cart, activeBasketId]);
 
   const orderTotal = useMemo(
     () => selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -313,6 +323,7 @@ export default function NewPartsOrderRegistration() {
       recipient_phone: recipient.phone,
       recipient_email: normalizeEmail(recipient.email),
       deliver_in_parts: false,
+      basket_id: activeBasketId || undefined,
     };
 
     if (fulfillmentMode === 'pickup') {
@@ -350,6 +361,7 @@ export default function NewPartsOrderRegistration() {
     pvzMethod,
     recipient,
     resolvedPickupAddress,
+    activeBasketId,
   ]);
 
   const validateBeforeSubmit = () => {

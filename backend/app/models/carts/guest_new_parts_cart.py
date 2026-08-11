@@ -9,6 +9,7 @@ class GuestNewPartsCart(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     guest_cart_id = Column(Integer, ForeignKey("guest_carts.id"), nullable=False, index=True)
+    basket_id = Column(Integer, ForeignKey("guest_new_parts_baskets.id"), nullable=True, index=True)
     brand = Column(String(100), nullable=False)
     partnumber = Column(String(100), nullable=False)
     name = Column(String(255), nullable=True)
@@ -24,6 +25,7 @@ class GuestNewPartsCart(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     guest_cart = relationship("GuestCart", back_populates="new_parts_items")
+    basket = relationship("GuestNewPartsBasket", back_populates="items")
 
     @property
     def seller(self):

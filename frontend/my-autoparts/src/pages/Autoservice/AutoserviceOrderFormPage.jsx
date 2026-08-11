@@ -21,7 +21,7 @@ const pillInputClass =
   'mt-1 block h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
 
 const pillInputSmClass =
-  'block h-9 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+  'block h-8 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
 
 const pillTextareaClass =
   'mt-1 block w-full rounded-sg border border-transparent bg-gray-100 px-4 py-2.5 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0';
@@ -40,7 +40,7 @@ const pillSelectSmClass =
   'min-w-0 flex-1 rounded-full border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0';
 
 const rowActionBtnClass =
-  'inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-xs text-ink-muted transition hover:bg-gray-200 hover:text-ink-soft';
+  'inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs text-ink-muted transition hover:bg-gray-200 hover:text-ink-soft';
 
 function FieldLabel({ children, action }) {
   return (
@@ -187,6 +187,8 @@ function SearchableSelect({
   loading = false,
   emptyMessage = 'Ничего не найдено',
   noResultsMessage = 'Ничего не найдено',
+  className = '',
+  inputClassName = pillInputClass,
 }) {
   const rootRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -215,10 +217,10 @@ function SearchableSelect({
   const listEmptyMessage = options.length === 0 ? emptyMessage : noResultsMessage;
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={`relative min-w-0 ${className}`}>
       <input
         type="text"
-        className={pillInputClass}
+        className={inputClassName}
         disabled={disabled || loading}
         placeholder={loading ? 'Загрузка…' : placeholder}
         value={displayValue}
@@ -238,7 +240,7 @@ function SearchableSelect({
             <li className="px-4 py-2.5 text-sm text-ink-muted">{listEmptyMessage}</li>
           ) : (
             filtered.map((o) => (
-              <li key={String(o.value)}>
+              <li key={String(o.value) || '__empty__'}>
                 <button
                   type="button"
                   className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-brand-50 ${
@@ -831,6 +833,18 @@ export default function AutoserviceOrderFormPage() {
     [vehicles],
   );
 
+  const employeeOptions = useMemo(
+    () => [
+      { value: '', label: '—', searchText: '' },
+      ...serviceEmployees.map((emp) => ({
+        value: String(emp.id),
+        label: emp.name,
+        searchText: emp.name,
+      })),
+    ],
+    [serviceEmployees],
+  );
+
   const worksTotal = useMemo(
     () => works.reduce((sum, w) => sum + lineSum(w.qty, w.unit_price), 0),
     [works],
@@ -1306,12 +1320,21 @@ export default function AutoserviceOrderFormPage() {
           {works.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет работ</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {works.map((w, index) => (
-                <div key={index} className={lineItemClass}>
-                  <div className="mb-2 flex items-center justify-between text-xs text-ink-muted">
-                    <span>{index + 1}</span>
-                    <div className="flex gap-1">
+                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2.5 py-2">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">{index + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <WorkCatalogInput
+                        value={w.title}
+                        catalogWorkId={w.catalog_work_id}
+                        options={workCatalog}
+                        onChange={(patch) => updateWork(index, patch)}
+                        onCreate={(name) => createCatalogWork(name, index)}
+                      />
+                    </div>
+                    <div className="flex shrink-0 gap-0.5">
                       <button type="button" className={rowActionBtnClass} onClick={() => setWorks((p) => moveItem(p, index, -1))}>↑</button>
                       <button type="button" className={rowActionBtnClass} onClick={() => setWorks((p) => moveItem(p, index, 1))}>↓</button>
                       <button
@@ -1323,72 +1346,59 @@ export default function AutoserviceOrderFormPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-4">
-                    <div className="sm:col-span-2">
-                      <WorkCatalogInput
-                        value={w.title}
-                        catalogWorkId={w.catalog_work_id}
-                        options={workCatalog}
-                        onChange={(patch) => updateWork(index, patch)}
-                        onCreate={(name) => createCatalogWork(name, index)}
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="number"
-                        min={1}
-                        className={pillInputSmClass}
-                        placeholder="Кол-во"
-                        value={w.qty}
-                        onChange={(e) => updateWork(index, { qty: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        className={pillInputSmClass}
-                        placeholder="Цена"
-                        value={w.unit_price}
-                        onChange={(e) => updateWork(index, { unit_price: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-ink-muted">{formatMoney(lineSum(w.qty, w.unit_price))} ₽</span>
+                  <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 pl-5">
+                    <input
+                      type="number"
+                      min={1}
+                      className="h-8 w-16 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
+                      placeholder="Кол-во"
+                      value={w.qty}
+                      onChange={(e) => updateWork(index, { qty: e.target.value })}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      className="h-8 w-24 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
+                      placeholder="Цена"
+                      value={w.unit_price}
+                      onChange={(e) => updateWork(index, { unit_price: e.target.value })}
+                    />
+                    <span className="text-xs tabular-nums text-ink-muted">
+                      {formatMoney(lineSum(w.qty, w.unit_price))} ₽
+                    </span>
                     <button
                       type="button"
-                      className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                      className="ml-auto text-xs font-medium text-brand-600 hover:text-brand-700"
                       onClick={() => addWorkExecutor(index)}
                     >
                       + сотрудник
                     </button>
                   </div>
                   {(w.executors || []).length > 0 ? (
-                    <div className="mt-2 space-y-1.5">
+                    <div className="mt-1.5 min-w-0 space-y-1 pl-5">
                       {(w.executors || []).map((ex, execIndex) => (
-                        <div key={execIndex} className="flex flex-wrap items-center gap-2 rounded-full bg-surface px-3 py-1.5 ring-1 ring-line">
-                          <select
-                            className={pillSelectSmClass}
+                        <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">
+                          <SearchableSelect
+                            className="min-w-0 flex-1"
+                            inputClassName="block h-8 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
                             value={ex.employee_id}
-                            onChange={(e) => updateWorkExecutor(index, execIndex, { employee_id: e.target.value })}
-                          >
-                            <option value="">—</option>
-                            {serviceEmployees.map((emp) => (
-                              <option key={emp.id} value={emp.id}>{emp.name}</option>
-                            ))}
-                          </select>
+                            onChange={(next) => updateWorkExecutor(index, execIndex, { employee_id: next })}
+                            options={employeeOptions}
+                            placeholder="Сотрудник"
+                            emptyMessage="Нет сотрудников"
+                            noResultsMessage="Не найдено"
+                          />
                           <input
                             type="number"
                             min={0}
                             max={100}
-                            className="w-24 shrink-0 rounded-full border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
+                            className="h-7 w-16 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
                             value={ex.percent}
                             onChange={(e) => updateWorkExecutor(index, execIndex, { percent: e.target.value })}
                           />
                           <span className="text-xs text-ink-muted">%</span>
-                          <span className="text-xs font-medium text-ink">
+                          <span className="text-xs font-medium tabular-nums text-ink">
                             {formatMoney(workPayAmount(w.qty, w.unit_price, ex.percent))} ₽
                           </span>
                           <button

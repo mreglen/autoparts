@@ -68,6 +68,7 @@ from app.db.schema_patches import (
     ensure_label_qr_links_backfill,
     ensure_payment_methods_tables,
     ensure_cart_max_quantity_columns,
+    ensure_new_parts_basket_tables,
     ensure_yookassa_payment_tables,
     ensure_yookassa_refund_columns,
     ensure_garage_new_order_yookassa_columns,
@@ -253,6 +254,7 @@ try:
     ensure_label_qr_links_backfill()
     ensure_payment_methods_tables()
     ensure_cart_max_quantity_columns()
+    ensure_new_parts_basket_tables()
     ensure_yookassa_payment_tables()
     ensure_yookassa_refund_columns()
     ensure_garage_new_order_yookassa_columns()

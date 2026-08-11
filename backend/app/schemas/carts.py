@@ -15,11 +15,13 @@ class NewPartsCartItem(BaseModel):
     guid: Optional[str] = None
     delivery_start: Optional[datetime] = None
     delivery_end: Optional[datetime] = None
+    basket_id: Optional[int] = None
 
 
 class UsedPartsCartItem(BaseModel):
     product_id: int
     quantity: int = 1
+
 
 class CartItemResponse(BaseModel):
     id: int
@@ -34,11 +36,30 @@ class CartItemResponse(BaseModel):
     product_id: Optional[int] = None
     seller: str
     created_at: datetime
+    basket_id: Optional[int] = None
+
+
+class NewPartsBasketResponse(BaseModel):
+    id: int
+    name: str
+    is_default: bool
+    items: list[CartItemResponse]
+    item_count: int = 0
+    total_price: float = 0
+
+
+class CreateBasketRequest(BaseModel):
+    name: str
+
+
+class RenameBasketRequest(BaseModel):
+    name: str
 
 
 class CartResponse(BaseModel):
     id: int
     user_id: Optional[int] = None
+    new_parts_baskets: list[NewPartsBasketResponse] = []
     new_parts_items: list[CartItemResponse]
     used_parts_items: list[CartItemResponse]
 
