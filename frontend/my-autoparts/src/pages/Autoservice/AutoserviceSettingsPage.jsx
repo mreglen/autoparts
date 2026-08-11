@@ -293,6 +293,77 @@ function EmployeeStatsModal({ employee, stats, loading, period, onPeriod, onClos
 }
 
 
+function WorkZoneModal({ mode, zone, onClose, onSaved }) {
+  const [name, setName] = useState(zone?.name || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setName(zone?.name || '');
+    setError('');
+  }, [zone, mode]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError('Введите название');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      if (mode === 'create') {
+        await apiRequest('/autoservice/work-zones', {
+          method: 'POST',
+          body: JSON.stringify({ name: trimmed }),
+        });
+      } else {
+        await apiRequest(`/autoservice/work-zones/${zone.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: trimmed }),
+        });
+      }
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
+      <form
+        onSubmit={handleSubmit}
+        className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+      >
+        <h3 className="text-base font-semibold text-gray-900">
+          {mode === 'create' ? 'Новая зона' : 'Переименовать'}
+        </h3>
+        <input
+          autoFocus
+          className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          placeholder="Название"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={120}
+        />
+        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className={btnGhost}>Отмена</button>
+          <button type="submit" disabled={saving} className={btnPrimary}>
+            {saving ? '…' : 'Сохранить'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+
 export default function AutoserviceSettingsPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const [publicName, setPublicName] = useState('');
@@ -303,9 +374,7 @@ export default function AutoserviceSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
-  const [editingZoneId, setEditingZoneId] = useState(null);
-  const [editingName, setEditingName] = useState('');
-  const [actionMenuId, setActionMenuId] = useState(null);
+  const [zoneModal, setZoneModal] = useState(null);
   const [worksOpen, setWorksOpen] = useState(false);
   const [works, setWorks] = useState([]);
   const [worksLoading, setWorksLoading] = useState(false);
@@ -334,7 +403,7 @@ export default function AutoserviceSettingsPage() {
   const loadWorkZones = useCallback(async () => {
     setWorkZonesLoading(true);
     try {
-      const data = await apiRequest('/autoservice/work-zones?include_archived=true');
+      const data = await apiRequest('/autoservice/work-zones');
       setWorkZones(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить рабочие зоны');
@@ -406,40 +475,9 @@ export default function AutoserviceSettingsPage() {
     }
   };
 
-  const handleAddWorkZone = async () => {
-    setError('');
-    try {
-      await apiRequest('/autoservice/work-zones', { method: 'POST', body: JSON.stringify({}) });
-      await loadWorkZones();
-    } catch (err) {
-      setError(err?.message || 'Не удалось добавить рабочую зону');
-    }
-  };
-
-  const startRename = (zone) => {
-    setEditingZoneId(zone.id);
-    setEditingName(zone.name);
-    setActionMenuId(null);
-  };
-
-  const saveRename = async (zoneId) => {
-    const name = editingName.trim();
-    if (!name) return;
-    try {
-      await apiRequest(`/autoservice/work-zones/${zoneId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ name }),
-      });
-      setEditingZoneId(null);
-      await loadWorkZones();
-    } catch (err) {
-      setError(err?.message || 'Не удалось переименовать');
-    }
-  };
-
   const removeWorkZone = async (zoneId) => {
-    setActionMenuId(null);
-    if (!window.confirm('Удалить или архивировать рабочую зону?')) return;
+    if (!window.confirm('Удалить зону?')) return;
+    setError('');
     try {
       await apiRequest(`/autoservice/work-zones/${zoneId}`, { method: 'DELETE' });
       await loadWorkZones();
@@ -602,89 +640,45 @@ export default function AutoserviceSettingsPage() {
           </form>
 
           <section className="mt-10 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Рабочие зоны</h2>
-                <p className="text-sm text-gray-500">Управление рабочими местами организации</p>
-              </div>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-gray-900">Рабочие зоны</h2>
               <button
                 type="button"
-                onClick={handleAddWorkZone}
+                onClick={() => setZoneModal({ mode: 'create' })}
                 className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
               >
-                Добавить рабочую зону
+                Добавить
               </button>
             </div>
 
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-4 py-3">Название</th>
-                    <th className="px-4 py-3">Статус</th>
-                    <th className="px-4 py-3 text-right">Действия</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {workZonesLoading ? (
-                    <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-gray-500">Загрузка…</td>
-                    </tr>
-                  ) : workZones.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-gray-500">Рабочих зон пока нет</td>
-                    </tr>
-                  ) : (
-                    workZones.map((zone) => (
-                      <tr key={zone.id} className="hover:bg-gray-50/80">
-                        <td className="px-4 py-3">
-                          {editingZoneId === zone.id ? (
-                            <input
-                              className="w-full rounded-lg border border-gray-300 px-2 py-1"
-                              value={editingName}
-                              onChange={(e) => setEditingName(e.target.value)}
-                              onBlur={() => saveRename(zone.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') saveRename(zone.id);
-                                if (e.key === 'Escape') setEditingZoneId(null);
-                              }}
-                              autoFocus
-                            />
-                          ) : (
-                            <span className="font-medium text-gray-900">{zone.name}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {zone.is_active ? (
-                            <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
-                              Активна
-                            </span>
-                          ) : (
-                            <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200">
-                              Архив
-                            </span>
-                          )}
-                        </td>
-                        <td className="relative px-4 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setActionMenuId(actionMenuId === zone.id ? null : zone.id)}
-                            className="rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
-                          >
-                            Действия
-                          </button>
-                          {actionMenuId === zone.id ? (
-                            <div className="absolute right-4 z-10 mt-1 w-44 rounded-xl border border-gray-200 bg-white py-1 text-left shadow-lg">
-                              <button type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50" onClick={() => startRename(zone)}>Переименовать</button>
-                              <button type="button" className="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50" onClick={() => removeWorkZone(zone.id)}>Удалить</button>
-                            </div>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="mt-3 divide-y divide-gray-100">
+              {workZonesLoading ? (
+                <p className="py-4 text-sm text-gray-500">…</p>
+              ) : workZones.length === 0 ? (
+                <p className="py-4 text-sm text-gray-400">—</p>
+              ) : (
+                workZones.map((zone) => (
+                  <div key={zone.id} className="flex items-center justify-between gap-3 py-2.5">
+                    <span className="min-w-0 truncate text-sm font-medium text-gray-900">{zone.name}</span>
+                    <div className="flex shrink-0 items-center gap-3 text-sm">
+                      <button
+                        type="button"
+                        className="text-indigo-700 hover:underline"
+                        onClick={() => setZoneModal({ mode: 'edit', zone })}
+                      >
+                        Изменить
+                      </button>
+                      <button
+                        type="button"
+                        className="text-red-600 hover:underline"
+                        onClick={() => removeWorkZone(zone.id)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </section>
 
@@ -835,6 +829,15 @@ export default function AutoserviceSettingsPage() {
             setStatsEmployee(null);
             setEmployeeStats(null);
           }}
+        />
+      ) : null}
+
+      {zoneModal ? (
+        <WorkZoneModal
+          mode={zoneModal.mode}
+          zone={zoneModal.zone}
+          onClose={() => setZoneModal(null)}
+          onSaved={loadWorkZones}
         />
       ) : null}
 

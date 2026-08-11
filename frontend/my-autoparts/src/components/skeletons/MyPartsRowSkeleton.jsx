@@ -3,12 +3,15 @@ import React from 'react';
 export default function MyPartsRowSkeleton({ renderMode = 'table', withCheckbox = true }) {
   if (renderMode === 'card') {
     return (
-      <div className="animate-pulse rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="animate-pulse py-3">
         <div className="flex gap-3">
-          <div className="h-20 w-20 shrink-0 rounded-lg bg-gray-200" />
+          <div className="h-20 w-20 shrink-0 rounded-xl bg-gray-200" />
           <div className="min-w-0 flex-1 space-y-2">
-            <div className="h-4 w-3/4 rounded bg-gray-200" />
-            <div className="h-4 w-1/2 rounded bg-gray-200" />
+            <div className="flex items-center justify-between gap-2">
+              <div className="h-4 flex-1 rounded bg-gray-200" />
+              <div className="h-8 w-8 shrink-0 rounded-lg bg-gray-100" />
+            </div>
+            <div className="h-3 w-2/3 rounded bg-gray-100" />
             <div className="h-4 w-1/3 rounded bg-gray-200" />
           </div>
         </div>
@@ -47,7 +50,7 @@ export default function MyPartsRowSkeleton({ renderMode = 'table', withCheckbox 
 export function MyPartsSkeletonList({ count = 8, renderMode = 'table' }) {
   if (renderMode === 'card') {
     return (
-      <div className="space-y-3 md:hidden" aria-hidden="true">
+      <div className="md:hidden" aria-hidden="true">
         {Array.from({ length: count }, (_, index) => (
           <MyPartsRowSkeleton key={index} renderMode="card" />
         ))}
@@ -62,7 +65,7 @@ export function MyPartsSkeletonList({ count = 8, renderMode = 'table' }) {
           <MyPartsRowSkeleton key={index} renderMode="table" />
         ))}
       </tbody>
-      <div className="space-y-3 md:hidden" aria-hidden="true">
+      <div className="md:hidden" aria-hidden="true">
         {Array.from({ length: Math.min(count, 5) }, (_, index) => (
           <MyPartsRowSkeleton key={index} renderMode="card" />
         ))}

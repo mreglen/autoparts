@@ -15,9 +15,6 @@ export default function AdminMenuModeSwitch({ mode, onChange, variant = 'sidebar
 
   return (
     <div className={isDrawer ? 'mb-3 px-1' : 'px-3 pb-3 pt-2'}>
-      <p className={`mb-2 font-medium text-gray-500 ${isDrawer ? 'text-xs' : 'text-xs'}`}>
-        Режим меню
-      </p>
       <div
         className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1"
         role="tablist"

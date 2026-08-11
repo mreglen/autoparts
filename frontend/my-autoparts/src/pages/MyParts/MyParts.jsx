@@ -23,6 +23,7 @@ import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { formatDromExportMessage } from '../../utils/dromExport';
 import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopButton';
 import PillDropdown from '../../components/PillDropdown/PillDropdown';
+import { UnderlineTabs } from '../../components/UI';
 
 const CardPart = ({
   part,
@@ -58,13 +59,25 @@ const CardPart = ({
   const desktopActionsPlacement = useActionsDropdownPlacement(showActions, actionsMenuHeight);
   const mobileActionsPlacement = useActionsDropdownPlacement(showActions, actionsMenuHeight);
 
-  const renderActionsMenu = (menuClassName) => (
+  const renderActionsMenu = (menuClassName, { compact = false } = {}) => {
+    const itemClass = compact
+      ? 'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50'
+      : 'w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2';
+    const dangerItemClass = compact
+      ? 'flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50'
+      : 'w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2';
+    const linkClass = compact
+      ? 'flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50'
+      : 'w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2';
+    const dividerClass = compact ? 'my-0.5 border-t border-gray-100' : 'border-t border-gray-100 my-1';
+
+    return (
     <div className={menuClassName}>
       {isRejectedModeration ? (
         <>
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(part); setShowActions(false); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className={itemClass}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -73,7 +86,7 @@ const CardPart = ({
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(part); setShowActions(false); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+            className={dangerItemClass}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -85,7 +98,7 @@ const CardPart = ({
         <>
           <button
             onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className={itemClass}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -94,7 +107,7 @@ const CardPart = ({
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(part); setShowActions(false); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className={itemClass}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -103,7 +116,7 @@ const CardPart = ({
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(part); setShowActions(false); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+            className={dangerItemClass}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -115,7 +128,7 @@ const CardPart = ({
         <>
       <button
         onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
-        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+        className={itemClass}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -124,7 +137,7 @@ const CardPart = ({
       </button>
           <button
             onClick={(e) => { e.stopPropagation(); onSale(part); setShowActions(false); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className={itemClass}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -133,7 +146,7 @@ const CardPart = ({
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onWriteoff(part); setShowActions(false); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className={itemClass}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -143,7 +156,7 @@ const CardPart = ({
           {showExport && (
             <button
               onClick={(e) => { e.stopPropagation(); onExport(part); setShowActions(false); }}
-              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              className={itemClass}
             >
               <img src="/logos/avito.png" alt="" className="w-4 h-4" />
               Экспорт Avito
@@ -153,17 +166,17 @@ const CardPart = ({
             <button
               onClick={(e) => { e.stopPropagation(); onExportDrom(part); setShowActions(false); }}
               disabled={dromExporting}
-              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`${itemClass} disabled:cursor-not-allowed disabled:opacity-50`}
             >
               <img src="/logos/drom.png" alt="" className="w-4 h-4" />
               {dromExporting ? 'Экспорт Drom…' : 'Экспорт Drom'}
             </button>
           )}
-          <div className="border-t border-gray-100 my-1"></div>
+          <div className={dividerClass} />
           <Link
             to={`/my-parts/edit/${part.id}`}
             onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
-            className="w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            className={linkClass}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -173,7 +186,8 @@ const CardPart = ({
         </>
       )}
     </div>
-  );
+    );
+  };
 
   
   useEffect(() => {
@@ -237,37 +251,30 @@ const CardPart = ({
           </span>
         )
       ) : (
-        <>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-            part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-          }`}>
-            {part.is_new ? 'Новый' : 'Б/у'}
-          </span>
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1">
+          <img
+            src="/logos/svoygarage.png"
+            alt="Свой Гараж"
+            className="w-4 h-4 object-contain"
+            title="Свой Гараж"
+          />
+          {part.is_on_avito && (
             <img
-              src="/logos/svoygarage.png"
-              alt="Свой Гараж"
+              src="/logos/avito.png"
+              alt="Avito"
               className="w-4 h-4 object-contain"
-              title="Свой Гараж"
+              title="Avito"
             />
-            {part.is_on_avito && (
-              <img
-                src="/logos/avito.png"
-                alt="Avito"
-                className="w-4 h-4 object-contain"
-                title="Avito"
-              />
-            )}
-            {part.is_on_drom && (
-              <img
-                src="/logos/drom.png"
-                alt="Drom"
-                className="w-4 h-4 object-contain"
-                title="Drom"
-              />
-            )}
-          </div>
-        </>
+          )}
+          {part.is_on_drom && (
+            <img
+              src="/logos/drom.png"
+              alt="Drom"
+              className="w-4 h-4 object-contain"
+              title="Drom"
+            />
+          )}
+        </div>
       )}
     </div>
   );
@@ -317,7 +324,7 @@ const CardPart = ({
 
       <td className="px-3 py-3 align-middle min-w-0">
         <div className="flex items-center gap-3 min-w-0">
-          {renderProductPreview()}
+          {renderProductPreview('h-24 w-24')}
           <div className="min-w-0 flex-1 cursor-pointer" onClick={onToggleExpand}>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-sm font-semibold text-gray-900">{part.brand || '—'}</span>
@@ -363,90 +370,107 @@ const CardPart = ({
 
     {/* Mobile card version */}
     {renderMode === 'card' && (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-3">
-      <div className={`flex items-center p-3 border-b border-gray-100 ${isModeration ? 'justify-end' : 'justify-between'}`}>
-        {!isModeration && (
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={(e) => {
-              e.stopPropagation();
-              onSelect();
-            }}
-            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
-          />
-        )}
-        <div ref={mobileActionsPlacement.anchorRef} className="relative actions-dropdown">
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-            </svg>
-            <span>Действия</span>
-          </button>
-
-          {showActions && renderActionsMenu(buildActionsDropdownMenuClassName(mobileActionsPlacement.openUp, 'w-48 z-50'))}
-        </div>
-      </div>
-
-      {/* Main card content */}
-      <div className="p-4 cursor-pointer" onClick={onToggleExpand}>
-        <div className="flex gap-3">
-          {/* Product image */}
-          <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-            {previewSrc && !hasImageError ? (
-              <img 
-                src={previewSrc} 
-                alt={part.name}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                decoding="async"
-                onError={handlePreviewError}
+    <div>
+      <div className="flex gap-3 py-3">
+        <div
+          className="relative h-20 w-20 shrink-0 cursor-pointer overflow-hidden rounded-xl bg-gray-100"
+          onClick={onToggleExpand}
+        >
+          {!isModeration && (
+            <label
+              className="absolute left-1 top-1 z-10 flex cursor-pointer items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onSelect();
+                }}
+                className="my-parts-photo-checkbox"
               />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </label>
+          )}
+          {previewSrc && !hasImageError ? (
+            <img
+              src={previewSrc}
+              alt={part.name}
+              className="h-full w-full object-cover"
+              loading="lazy"
+              decoding="async"
+              onError={handlePreviewError}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <svg className="h-7 w-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-1">
+            <div className="min-w-0 flex-1 cursor-pointer" onClick={onToggleExpand}>
+              <p className="truncate text-sm font-semibold leading-tight text-gray-900">
+                {part.brand || '—'}
+                <span className="font-normal text-gray-400"> · </span>
+                <span className="font-mono font-normal text-gray-500">{part.article || '—'}</span>
+              </p>
+              {part.internal_code && (
+                <p className="mt-0.5 truncate text-xs text-gray-500">
+                  {INTERNAL_CODE_LABEL}:{' '}
+                  <span className="font-mono">{formatInternalCodeDisplay(part.internal_code)}</span>
+                </p>
+              )}
+            </div>
+
+            <div ref={mobileActionsPlacement.anchorRef} className="relative actions-dropdown shrink-0">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+                aria-label="Действия"
+                aria-expanded={showActions}
+              >
+                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <circle cx="12" cy="5" r="1.75" />
+                  <circle cx="12" cy="12" r="1.75" />
+                  <circle cx="12" cy="19" r="1.75" />
                 </svg>
-              </div>
-            )}
+              </button>
+
+              {showActions && renderActionsMenu(
+                buildActionsDropdownMenuClassName(mobileActionsPlacement.openUp, '', { tight: true }),
+                { compact: true },
+              )}
+            </div>
           </div>
 
-          {/* Product info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-base font-semibold text-gray-900">{part.brand || '—'}</span>
-                  <span className="text-sm text-gray-400">•</span>
-                  <span className="text-sm text-gray-500 font-mono">{part.article || '—'}</span>
-                </div>
-                {part.internal_code && (
-                  <div className="text-xs text-gray-500 mb-1">
-                    {INTERNAL_CODE_LABEL}: <span className="font-mono">{formatInternalCodeDisplay(part.internal_code)}</span>
-                  </div>
-                )}
-                <h3 className="text-sm font-medium text-gray-800 line-clamp-2">{part.name || '—'}</h3>
-              </div>
+          <h3
+            className="mt-1 line-clamp-2 cursor-pointer text-sm leading-snug text-gray-700"
+            onClick={onToggleExpand}
+          >
+            {part.name || '—'}
+          </h3>
+
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <div
+              className="flex min-w-0 cursor-pointer items-baseline gap-2"
+              onClick={onToggleExpand}
+            >
+              <span className="text-base font-bold tabular-nums leading-none text-gray-900">{priceLabel}</span>
+              <span className="text-xs tabular-nums text-gray-500">{part.quantity || 0} шт.</span>
             </div>
-            
-            {/* Price and quantity */}
-            <div className="mt-3 flex items-end justify-between gap-3">
-              <div>
-                <div className="text-base font-bold tabular-nums text-gray-900">{priceLabel}</div>
-                <div className="mt-0.5 text-xs tabular-nums text-gray-500">{part.quantity || 0} шт.</div>
-              </div>
-              <div>{renderStatusBadges()}</div>
-            </div>
+            <div className="shrink-0">{renderStatusBadges()}</div>
           </div>
         </div>
       </div>
 
       {/* Expandable details */}
       {isExpanded && (
-        <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+        <div className="pb-3 pt-3">
           <div className="space-y-4">
             {/* Status */}
             <div>
@@ -803,7 +827,7 @@ const DraftCard = ({ draft, onContinue, onSubmit, onDelete }) => {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
             </svg>
-            <span>Действия</span>
+            <span className="hidden sm:inline">Действия</span>
           </button>
           {showActions && renderActionsMenu(buildActionsDropdownMenuClassName(actionsPlacement.openUp, 'w-48 z-50'))}
         </div>
@@ -908,11 +932,9 @@ function MyParts() {
   const [selectedParts, setSelectedParts] = useState(new Set());
   const [selectAllLoading, setSelectAllLoading] = useState(false);
   const selectAllCheckboxRef = useRef(null);
-  const selectAllCheckboxMobileRef = useRef(null);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
   const [showBulkActions, setShowBulkActions] = useState(false);
   const bulkActionsPlacement = useActionsDropdownPlacement(showBulkActions, 130);
-  const mobileBulkActionsPlacement = useActionsDropdownPlacement(showBulkActions, 130);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock');
   const initialUrlSearch = searchParams.get('q') || '';
   const [inStockFilters, setInStockFilters] = useState(() => ({
@@ -1513,11 +1535,9 @@ function MyParts() {
   const displayPositionsCount = selectedStats ? selectedStats.count : myProductsTotal;
 
   useEffect(() => {
-    [selectAllCheckboxRef, selectAllCheckboxMobileRef].forEach((ref) => {
-      if (ref.current) {
-        ref.current.indeterminate = someSelected;
-      }
-    });
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate = someSelected;
+    }
   }, [someSelected]);
 
   useEffect(() => {
@@ -2099,7 +2119,7 @@ function MyParts() {
 
   if (!isReady) {
     return (
-      <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+      <div className="mt-4 sm:mt-5">
         <div className="mb-6 h-8 w-48 animate-pulse rounded bg-gray-200" />
         <div className="hidden md:block">
           <div className="space-y-2">
@@ -2108,7 +2128,7 @@ function MyParts() {
             ))}
           </div>
         </div>
-        <div className="space-y-3 md:hidden">
+        <div className="md:hidden">
           {Array.from({ length: 3 }, (_, index) => (
             <MyPartsRowSkeleton key={index} renderMode="card" />
           ))}
@@ -2129,7 +2149,7 @@ function MyParts() {
 
 
   return (
-    <div className="mt-3 sm:mt-5 px-4 sm:px-0">
+    <div className="mt-3 sm:mt-5">
       <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2.5 sm:gap-3">
@@ -2202,41 +2222,17 @@ function MyParts() {
         </div>
       </div>
 
-      <div className="mb-4 border-b border-gray-200">
-        <div className="-mb-px flex gap-1 overflow-x-auto sm:gap-6" role="tablist" aria-label="Статусы запчастей">
-          {statusTabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setActiveTab(tab.id)}
-                className={`relative shrink-0 whitespace-nowrap px-2 pb-3 pt-1 text-sm font-medium transition-colors sm:px-0 sm:text-[15px] ${
-                  isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <span className="sm:hidden">{tab.shortLabel}</span>
-                <span className="hidden sm:inline">{tab.label}</span>
-                <sup className="ml-0.5 text-[10px] font-semibold text-gray-400 tabular-nums">
-                  {tab.count > 0 ? tab.count : '0'}
-                </sup>
-                <span
-                  className={`absolute inset-x-0 bottom-0 h-0.5 rounded-full transition-colors ${
-                    isActive ? 'bg-gray-900' : 'bg-transparent'
-                  }`}
-                  aria-hidden
-                />
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <UnderlineTabs
+        className="mb-4"
+        ariaLabel="Статусы запчастей"
+        tabs={statusTabs}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
       {!isDraftsTab && (
         <div className="mb-4 space-y-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
             <div className="relative min-w-0 flex-1 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
               <input
                 id="my-parts-search"
@@ -2278,7 +2274,7 @@ function MyParts() {
                   return !v;
                 });
               }}
-              className={`${pillButtonClass} ${filtersOpen ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
+              className={`${pillButtonClass} shrink-0 ${filtersOpen ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
               aria-expanded={filtersOpen}
             >
               Фильтры
@@ -2365,9 +2361,9 @@ function MyParts() {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-gray-100 px-3 py-2.5 sm:gap-3">
             {activeTab === 'in-stock' && (
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-gray-700 ring-1 ring-gray-200">
+              <label className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-white px-3 text-sm text-gray-700">
                 <input
                   ref={selectAllCheckboxRef}
                   type="checkbox"
@@ -2376,7 +2372,7 @@ function MyParts() {
                   onChange={handleToggleSelectAll}
                   className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
                 />
-                <span>{selectAllLoading ? 'Выбор…' : 'Выбрать все'}</span>
+                <span className="whitespace-nowrap">{selectAllLoading ? 'Выбор…' : 'Выбрать всё'}</span>
               </label>
             )}
 
@@ -2389,33 +2385,43 @@ function MyParts() {
               onOpenChange={setFilterDropdownOpen('sort')}
               onChange={(nextValue) => updateActiveFilters({ sort: nextValue })}
               fullWidth={false}
-              triggerClassName="h-9 rounded-xl bg-white px-3 ring-1 ring-gray-200 hover:bg-gray-50"
+              triggerClassName="h-9 rounded-xl border-0 bg-white px-3 shadow-none ring-0 hover:bg-gray-50"
               menuClassName="min-w-[14rem]"
             />
 
-            {avitoJob && (
-              <div className="ml-auto text-xs text-gray-500 sm:text-sm">
-                Avito: {avitoJob.status} ({avitoJob.processed_count || 0}/{avitoJob.total_count || 0})
-              </div>
-            )}
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {avitoJob && (
+                <div className="text-xs text-gray-500 sm:text-sm">
+                  Avito: {avitoJob.status} ({avitoJob.processed_count || 0}/{avitoJob.total_count || 0})
+                </div>
+              )}
 
-            {activeTab === 'in-stock' && avitoIntegrationReady && selectedParts.size > 0 && (
-              <div ref={bulkActionsPlacement.anchorRef} className="relative ml-auto actions-dropdown sm:ml-0">
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50"
+              {activeTab === 'in-stock' && avitoIntegrationReady && (
+                <div
+                  ref={bulkActionsPlacement.anchorRef}
+                  className={`relative actions-dropdown ${selectedParts.size === 0 ? 'md:hidden' : ''}`}
                 >
-                  Действия
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {showBulkActions && renderBulkActionsMenu(
-                  buildActionsDropdownMenuClassName(bulkActionsPlacement.openUp, 'w-40 z-50'),
-                )}
-              </div>
-            )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
+                    disabled={selectedParts.size === 0}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-sm font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Действия"
+                  >
+                    <svg className="h-4 w-4 md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                    <span className="hidden md:inline">Действия</span>
+                    <svg className="hidden h-3.5 w-3.5 md:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showBulkActions && renderBulkActionsMenu(
+                    buildActionsDropdownMenuClassName(bulkActionsPlacement.openUp, 'w-40 z-50'),
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2427,7 +2433,7 @@ function MyParts() {
       )}
 
 {activeTab === 'in-stock' && (stockFilter || noPhotoFilter) && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 py-3 text-sm text-amber-900">
           <span>
             {stockFilter === 'zero' && 'Показаны товары с нулевым остатком'}
             {stockFilter === 'low' && 'Показаны товары с низким остатком (1–2 шт.)'}
@@ -2449,6 +2455,7 @@ function MyParts() {
         </div>
       )}
 
+      <div key={activeTab} className="my-parts-tab-panel">
       {activeTab === 'in-stock' && (
         isInitialMyProductsLoad ? (
         <div className="mt-4">
@@ -2462,7 +2469,7 @@ function MyParts() {
               </tbody>
             </table>
           </div>
-          <div className="space-y-3 md:hidden">
+          <div className="md:hidden">
             {Array.from({ length: 5 }, (_, index) => (
               <MyPartsRowSkeleton key={index} renderMode="card" />
             ))}
@@ -2560,39 +2567,6 @@ function MyParts() {
 
           {/* Mobile version - card layout */}
           <div className="md:hidden">
-            <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                  <input
-                    ref={selectAllCheckboxMobileRef}
-                    type="checkbox"
-                    checked={allFilteredSelected}
-                    disabled={selectAllLoading || myProductsTotal === 0}
-                    onChange={handleToggleSelectAll}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded disabled:opacity-50"
-                  />
-                  <span>{selectAllLoading ? 'Выбор…' : 'Выбрать всё'}</span>
-                </label>
-                {avitoIntegrationReady && (
-                  <div ref={mobileBulkActionsPlacement.anchorRef} className="relative actions-dropdown shrink-0">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
-                      disabled={selectedParts.size === 0}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px]"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
-                      <span>Действия</span>
-                    </button>
-
-                    {showBulkActions && renderBulkActionsMenu(
-                      buildActionsDropdownMenuClassName(mobileBulkActionsPlacement.openUp, 'w-44 z-50')
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
             {sortedDisplayParts.map((part) => (
               <CardPart
                 key={part.id}
@@ -2656,7 +2630,7 @@ function MyParts() {
                 ))}
               </div>
             </div>
-            <div className="space-y-3 md:hidden">
+            <div className="md:hidden">
               {Array.from({ length: 3 }, (_, index) => (
                 <MyPartsRowSkeleton key={index} renderMode="card" />
               ))}
@@ -2811,6 +2785,7 @@ function MyParts() {
           </div>
         )
       )}
+      </div>
 
       <StockOutModal
         isOpen={modalOpen}

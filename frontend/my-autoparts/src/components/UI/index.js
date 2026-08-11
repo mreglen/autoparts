@@ -6,6 +6,7 @@ export { default as EmptyState } from './EmptyState';
 export { default as SectionHeader, PageHeader } from './SectionHeader';
 export { default as Skeleton, SkeletonCard } from './Skeleton';
 export { default as DataTable, ResponsiveList } from './DataTable';
+export { default as UnderlineTabs } from './UnderlineTabs';
 export {
   Input,
   Select,

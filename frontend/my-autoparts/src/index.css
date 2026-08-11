@@ -48,6 +48,45 @@ body {
   }
 }
 
+@keyframes myPartsTabEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.my-parts-tab-panel {
+  animation: myPartsTabEnter 0.28s ease-out;
+}
+
+.my-parts-photo-checkbox {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: none;
+  border-radius: 0.25rem;
+  background-color: #f3f4f6;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.my-parts-photo-checkbox:checked {
+  background-color: #4f46e5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M5 13l4 4L19 7'/%3E%3C/svg%3E");
+  background-size: 12px 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.my-parts-photo-checkbox:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
 #root {
   overflow-x: hidden;
   width: 100%;
