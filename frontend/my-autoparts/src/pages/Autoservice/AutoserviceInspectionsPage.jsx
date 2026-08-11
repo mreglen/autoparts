@@ -9,8 +9,8 @@ const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
 
 const STATUS_LABELS = {
-  new: 'Новая',
-  processed: 'Обработана',
+  new: 'В ожидании',
+  processed: 'Обработано',
   cancelled: 'Отменена',
 };
 
@@ -256,9 +256,9 @@ export default function AutoserviceInspectionsPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">Все</option>
-            <option value="new">Новые</option>
-            <option value="processed">Обработанные</option>
-            <option value="cancelled">Отменённые</option>
+            <option value="new">В ожидании</option>
+            <option value="processed">Обработано</option>
+            <option value="cancelled">Отменена</option>
           </select>
         </label>
         <button
@@ -314,11 +314,6 @@ export default function AutoserviceInspectionsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={row.status} />
-                    {row.notes ? (
-                      <p className="mt-1 max-w-[12rem] truncate text-xs text-gray-400" title={row.notes}>
-                        {row.notes}
-                      </p>
-                    ) : null}
                   </td>
                   <td className="px-4 py-3">
                     <select
@@ -327,8 +322,8 @@ export default function AutoserviceInspectionsPage() {
                       disabled={updatingId === row.id}
                       onChange={(e) => handleStatusChange(row.id, e.target.value)}
                     >
-                      <option value="new">Новая</option>
-                      <option value="processed">Обработана</option>
+                      <option value="new">В ожидании</option>
+                      <option value="processed">Обработано</option>
                       <option value="cancelled">Отменена</option>
                     </select>
                   </td>

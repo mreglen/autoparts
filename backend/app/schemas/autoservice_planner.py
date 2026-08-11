@@ -28,10 +28,21 @@ class PlannerRepairBooking(BaseModel):
     status: str
 
 
+class PlannerInspectionBooking(BaseModel):
+    id: int
+    name: str
+    phone: str
+    preferred_date: date
+    notes: Optional[str] = None
+    status: str
+    source: str
+
+
 class PlannerDay(BaseModel):
     date: date
     repair_orders: list[PlannerRepairOrder] = []
     repair_bookings: list[PlannerRepairBooking] = []
+    inspection_bookings: list[PlannerInspectionBooking] = []
 
 
 class PlannerResponse(BaseModel):

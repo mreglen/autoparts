@@ -31,8 +31,8 @@ const ORDER_STATUS_OPTIONS = [
   ['cancelled', 'Отменён'],
 ];
 const BOOKING_STATUS_LABELS = {
-  new: 'Новая',
-  processed: 'Обработана',
+  new: 'В ожидании',
+  processed: 'Обработано',
   cancelled: 'Отменена',
 };
 
@@ -46,6 +46,11 @@ function toIsoDate(date) {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+function normalizeIsoDate(value) {
+  if (!value) return '';
+  return String(value).slice(0, 10);
 }
 
 function weekdayIndex(date) {
@@ -85,7 +90,7 @@ function fromLocalInputValue(local) {
 }
 
 function emptyDayEntry(isoDate) {
-  return { date: isoDate, repair_orders: [], repair_bookings: [] };
+  return { date: isoDate, repair_orders: [], repair_bookings: [], inspection_bookings: [] };
 }
 
 function defaultScheduledLocal(isoDate) {
@@ -128,7 +133,7 @@ export default function AutoservicePlannerPage() {
       );
       const next = {};
       (data?.days || []).forEach((day) => {
-        next[day.date] = day;
+        next[normalizeIsoDate(day.date)] = day;
       });
       setDaysMap(next);
     } catch (e) {
@@ -332,7 +337,8 @@ export default function AutoservicePlannerPage() {
 
   const orders = selectedDay?.repair_orders || [];
   const bookings = selectedDay?.repair_bookings || [];
-  const hasItems = orders.length > 0 || bookings.length > 0;
+  const inspectionBookings = selectedDay?.inspection_bookings || [];
+  const hasItems = orders.length > 0 || bookings.length > 0 || inspectionBookings.length > 0;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
@@ -467,45 +473,81 @@ export default function AutoservicePlannerPage() {
             const entry = daysMap[iso];
             const dayOrders = entry?.repair_orders || [];
             const dayBookings = entry?.repair_bookings || [];
+            const dayInspections = entry?.inspection_bookings || [];
             const isCurrentMonth = day.getMonth() === viewMonth;
             const isToday = iso === toIsoDate(today);
-            const dayHasItems = dayOrders.length > 0 || dayBookings.length > 0;
+            const totalItems = dayOrders.length + dayBookings.length + dayInspections.length;
+            const dayHasItems = totalItems > 0;
             const isSelected = selectedDate === iso;
             return (
               <button
                 key={iso}
                 type="button"
                 onClick={() => openDay(iso)}
-                className={`min-h-[4.5rem] border-b border-r border-gray-100 p-2 text-left align-top transition-colors hover:bg-brand-50/60 ${
+                className={`relative min-h-[5.5rem] border-b border-r border-gray-100 p-2 text-left align-top transition-colors hover:bg-brand-50/60 ${
                   isCurrentMonth ? 'bg-white' : 'bg-gray-50/60 text-gray-400'
-                } ${isSelected ? 'ring-2 ring-inset ring-brand-500' : ''}`}
+                } ${dayHasItems ? 'bg-brand-50/40' : ''} ${isSelected ? 'ring-2 ring-inset ring-brand-500' : ''}`}
               >
-                <span
-                  className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
-                    isToday ? 'bg-brand-600 text-white' : 'text-gray-700'
-                  }`}
-                >
-                  {day.getDate()}
-                </span>
-                <span className="mt-1 block space-y-0.5">
+                <div className="flex items-start justify-between gap-1">
+                  <span
+                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+                      isToday ? 'bg-brand-600 text-white' : 'text-gray-700'
+                    }`}
+                  >
+                    {day.getDate()}
+                  </span>
+                  {dayHasItems && (
+                    <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                      {totalItems}
+                    </span>
+                  )}
+                </div>
+                <span className="mt-1.5 block space-y-1">
                   {dayOrders.length > 0 && (
-                    <span className="block text-xs text-gray-700">
+                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-brand-800">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600" />
                       Заказ-наряды: {dayOrders.length}
                     </span>
                   )}
                   {dayBookings.length > 0 && (
-                    <span className="block text-xs text-amber-700">
+                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-800">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
                       Записи: {dayBookings.length}
                     </span>
                   )}
+                  {dayInspections.length > 0 && (
+                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-800">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                      Заявки: {dayInspections.length}
+                    </span>
+                  )}
                   {!dayHasItems && isCurrentMonth && (
-                    <span className="block text-xs text-gray-400">+</span>
+                    <span className="block text-xs text-gray-300">+</span>
                   )}
                 </span>
               </button>
             );
           })}
         </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-brand-600" />
+          Заказ-наряды
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-amber-500" />
+          Записи на ремонт
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          Заявки (раздел «Записи»)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">N</span>
+          Всего событий в день
+        </span>
       </div>
 
       {loading && <p className="mt-3 text-sm text-gray-500">Загрузка…</p>}
@@ -728,9 +770,9 @@ export default function AutoservicePlannerPage() {
               </div>
             )}
 
-            <h3 className="mt-5 text-sm font-semibold text-gray-900">Записи</h3>
+            <h3 className="mt-5 text-sm font-semibold text-gray-900">Записи на ремонт</h3>
             {bookings.length === 0 ? (
-              <p className="mt-1 text-sm text-gray-500">Нет записей</p>
+              <p className="mt-1 text-sm text-gray-500">Нет записей на ремонт</p>
             ) : (
               <div className="mt-2 space-y-2">
                 {bookings.map((booking) => (
@@ -859,6 +901,41 @@ export default function AutoservicePlannerPage() {
                         </div>
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <h3 className="mt-5 text-sm font-semibold text-gray-900">Заявки (раздел «Записи»)</h3>
+            {inspectionBookings.length === 0 ? (
+              <p className="mt-1 text-sm text-gray-500">Нет заявок на этот день</p>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {inspectionBookings.map((item) => (
+                  <div
+                    key={`inspection-${item.id}`}
+                    className="rounded-sg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900">
+                          {item.name} · {item.phone}
+                        </p>
+                        {item.notes && (
+                          <p className="mt-0.5 text-gray-600">{item.notes}</p>
+                        )}
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          {BOOKING_STATUS_LABELS[item.status] || item.status}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/autoservice/inspections')}
+                        className="rounded-sg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        Открыть список
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

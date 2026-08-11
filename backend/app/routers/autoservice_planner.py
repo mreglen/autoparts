@@ -9,11 +9,13 @@ from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_lift import AutoserviceLift
 from app.models.garage_vehicle import GarageVehicle
+from app.models.inspection_booking import InspectionBooking
 from app.models.repair_booking import RepairBooking
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_planner import (
     PlannerDay,
+    PlannerInspectionBooking,
     PlannerLiftColumn,
     PlannerLiftsDayResponse,
     PlannerRepairBooking,
@@ -103,10 +105,27 @@ def get_planner(
         .all()
     )
 
+    inspection_bookings = (
+        db.query(InspectionBooking)
+        .filter(
+            InspectionBooking.organization_id == org_id,
+            InspectionBooking.preferred_date >= date_from,
+            InspectionBooking.preferred_date <= date_to,
+            InspectionBooking.status != "cancelled",
+        )
+        .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
+        .all()
+    )
+
     days: dict[date, PlannerDay] = {}
     cursor = date_from
     while cursor <= date_to:
-        days[cursor] = PlannerDay(date=cursor, repair_orders=[], repair_bookings=[])
+        days[cursor] = PlannerDay(
+            date=cursor,
+            repair_orders=[],
+            repair_bookings=[],
+            inspection_bookings=[],
+        )
         cursor += timedelta(days=1)
 
     for row in orders:
@@ -128,6 +147,22 @@ def get_planner(
                 preferred_date=row.preferred_date,
                 comment=row.comment,
                 status=row.status,
+            )
+        )
+
+    for row in inspection_bookings:
+        day = days.get(row.preferred_date)
+        if day is None:
+            continue
+        day.inspection_bookings.append(
+            PlannerInspectionBooking(
+                id=row.id,
+                name=row.name,
+                phone=row.phone,
+                preferred_date=row.preferred_date,
+                notes=row.notes,
+                status=row.status,
+                source=row.source,
             )
         )
 
