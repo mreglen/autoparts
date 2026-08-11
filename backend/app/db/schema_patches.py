@@ -3668,7 +3668,7 @@ def ensure_repair_orders_tables() -> None:
         CREATE TABLE IF NOT EXISTS repair_orders (
             id SERIAL PRIMARY KEY,
             organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
-            order_number VARCHAR(32) NOT NULL UNIQUE,
+            order_number VARCHAR(32) NOT NULL,
             client_id INTEGER NOT NULL REFERENCES autoservice_clients(id),
             vehicle_id INTEGER NOT NULL REFERENCES garage_vehicles(id),
             client_comment TEXT,
@@ -3676,7 +3676,8 @@ def ensure_repair_orders_tables() -> None:
             accepted_by_user_id INTEGER NOT NULL REFERENCES users(id),
             status VARCHAR(32) NOT NULL DEFAULT 'open',
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_repair_orders_org_order_number UNIQUE (organization_id, order_number)
         )
         """
         assignees_ddl = """
@@ -3691,7 +3692,7 @@ def ensure_repair_orders_tables() -> None:
         CREATE TABLE IF NOT EXISTS repair_orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
-            order_number VARCHAR(32) NOT NULL UNIQUE,
+            order_number VARCHAR(32) NOT NULL,
             client_id INTEGER NOT NULL REFERENCES autoservice_clients(id),
             vehicle_id INTEGER NOT NULL REFERENCES garage_vehicles(id),
             client_comment TEXT,
@@ -3699,7 +3700,8 @@ def ensure_repair_orders_tables() -> None:
             accepted_by_user_id INTEGER NOT NULL REFERENCES users(id),
             status VARCHAR(32) NOT NULL DEFAULT 'open',
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_repair_orders_org_order_number UNIQUE (organization_id, order_number)
         )
         """
         assignees_ddl = """
@@ -4151,4 +4153,92 @@ def ensure_autoservice_works_and_employees_tables() -> None:
                 text("UPDATE repair_orders SET status = 'completed' WHERE status IN ('ready', 'issued', 'completed')")
             )
         logger.info("Applied repair order status migration patch")
+
+
+def _has_repair_order_org_number_unique(inspector) -> bool:
+    target = ["organization_id", "order_number"]
+    if _index_exists(inspector, "repair_orders", "uq_repair_orders_org_order_number"):
+        return True
+    for uc in inspector.get_unique_constraints("repair_orders"):
+        if list(uc.get("column_names") or []) == target:
+            return True
+    for idx in inspector.get_indexes("repair_orders"):
+        if idx.get("unique") and list(idx.get("column_names") or []) == target:
+            return True
+    return False
+
+
+def ensure_repair_order_numbers_per_org() -> None:
+    """Switch repair order numbers to plain per-organization sequences (1, 2, 3…)."""
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+    if _has_repair_order_org_number_unique(inspector):
+        return
+
+    dialect = engine.dialect.name
+
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            for uc in inspector.get_unique_constraints("repair_orders"):
+                cols = list(uc.get("column_names") or [])
+                if cols == ["order_number"]:
+                    conn.execute(
+                        text(f'ALTER TABLE repair_orders DROP CONSTRAINT "{uc["name"]}"')
+                    )
+            for idx in inspector.get_indexes("repair_orders"):
+                if idx.get("unique") and list(idx.get("column_names") or []) == ["order_number"]:
+                    conn.execute(text(f'DROP INDEX IF EXISTS "{idx["name"]}"'))
+        else:
+            for row in conn.execute(text("PRAGMA index_list('repair_orders')")).fetchall():
+                # PRAGMA index_list: seq, name, unique, origin, partial
+                name = row[1]
+                is_unique = bool(row[2])
+                if not is_unique:
+                    continue
+                cols = [
+                    info[2]
+                    for info in conn.execute(text(f"PRAGMA index_info('{name}')")).fetchall()
+                ]
+                if cols == ["order_number"]:
+                    conn.execute(text(f'DROP INDEX IF EXISTS "{name}"'))
+
+        orgs = conn.execute(
+            text("SELECT DISTINCT organization_id FROM repair_orders ORDER BY organization_id")
+        ).fetchall()
+        for (org_id,) in orgs:
+            order_ids = [
+                row[0]
+                for row in conn.execute(
+                    text(
+                        "SELECT id FROM repair_orders "
+                        "WHERE organization_id = :org "
+                        "ORDER BY id ASC"
+                    ),
+                    {"org": org_id},
+                ).fetchall()
+            ]
+            for seq, order_id in enumerate(order_ids, start=1):
+                conn.execute(
+                    text(
+                        "UPDATE repair_orders SET order_number = :num WHERE id = :id"
+                    ),
+                    {"num": f"__mig_{org_id}_{seq}", "id": order_id},
+                )
+            for seq, order_id in enumerate(order_ids, start=1):
+                conn.execute(
+                    text(
+                        "UPDATE repair_orders SET order_number = :num WHERE id = :id"
+                    ),
+                    {"num": str(seq), "id": order_id},
+                )
+
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX uq_repair_orders_org_order_number "
+                "ON repair_orders (organization_id, order_number)"
+            )
+        )
+
+    logger.info("Applied repair order per-organization numbering patch")
 

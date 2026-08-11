@@ -186,6 +186,7 @@ function SearchableSelect({
   disabled = false,
   loading = false,
   emptyMessage = 'Ничего не найдено',
+  noResultsMessage = 'Ничего не найдено',
 }) {
   const rootRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -211,6 +212,7 @@ function SearchableSelect({
   }, [options, query]);
 
   const displayValue = open ? query : selected?.label || '';
+  const listEmptyMessage = options.length === 0 ? emptyMessage : noResultsMessage;
 
   return (
     <div ref={rootRef} className="relative">
@@ -233,10 +235,10 @@ function SearchableSelect({
       {open && !disabled && !loading ? (
         <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-sg-lg border border-line bg-surface py-1 shadow-sg-md">
           {filtered.length === 0 ? (
-            <li className="px-4 py-2.5 text-sm text-ink-muted">{emptyMessage}</li>
+            <li className="px-4 py-2.5 text-sm text-ink-muted">{listEmptyMessage}</li>
           ) : (
             filtered.map((o) => (
-              <li key={o.value}>
+              <li key={String(o.value)}>
                 <button
                   type="button"
                   className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-brand-50 ${
@@ -664,6 +666,7 @@ export default function AutoserviceOrderFormPage() {
 
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
+  const [vehiclesError, setVehiclesError] = useState('');
 
   const [bulkMarkup, setBulkMarkup] = useState('');
   const [picker, setPicker] = useState(null);
@@ -771,6 +774,7 @@ export default function AutoserviceOrderFormPage() {
   useEffect(() => {
     if (!clientId) {
       setVehicles([]);
+      setVehiclesError('');
       if (formInitialized) {
         setVehicleId('');
       }
@@ -779,19 +783,21 @@ export default function AutoserviceOrderFormPage() {
     let cancelled = false;
     (async () => {
       setVehiclesLoading(true);
+      setVehiclesError('');
       try {
-        const data = await apiRequest(`/autoservice/garage/vehicles?client_id=${clientId}`);
+        const data = await apiRequest(`/autoservice/garage/vehicles?client_id=${encodeURIComponent(clientId)}`);
         if (cancelled) return;
         const list = Array.isArray(data) ? data : [];
         setVehicles(list);
         setVehicleId((prev) => {
-          if (prev && list.some((v) => String(v.id) === prev)) return prev;
+          if (prev && list.some((v) => String(v.id) === String(prev))) return String(prev);
           return list[0] ? String(list[0].id) : '';
         });
-      } catch {
+      } catch (err) {
         if (!cancelled) {
           setVehicles([]);
           setVehicleId('');
+          setVehiclesError(err?.message || 'Не удалось загрузить автомобили');
         }
       } finally {
         if (!cancelled) setVehiclesLoading(false);
@@ -805,7 +811,7 @@ export default function AutoserviceOrderFormPage() {
   const clientOptions = useMemo(
     () =>
       clients.map((c) => ({
-        value: c.id,
+        value: String(c.id),
         label: `${c.name} · ${c.phone}`,
         searchText: `${c.name} ${c.phone}`.toLowerCase(),
       })),
@@ -815,7 +821,7 @@ export default function AutoserviceOrderFormPage() {
   const vehicleOptions = useMemo(
     () =>
       vehicles.map((v) => ({
-        value: v.id,
+        value: String(v.id),
         label: vehicleLabel(v),
         searchText: vehicleSearchText(v),
       })),
@@ -1212,8 +1218,12 @@ export default function AutoserviceOrderFormPage() {
                 placeholder={clientId ? 'Поиск по марке, модели, VIN…' : 'Сначала выберите клиента'}
                 disabled={!clientId}
                 loading={vehiclesLoading}
-                emptyMessage={clientId ? 'Нет автомобилей' : 'Сначала выберите клиента'}
+                emptyMessage={vehiclesError || (clientId ? 'Нет автомобилей' : 'Сначала выберите клиента')}
+                noResultsMessage="Нет совпадений"
               />
+              {vehiclesError ? (
+                <p className="mt-1 text-xs text-danger-600" role="alert">{vehiclesError}</p>
+              ) : null}
             </div>
           </div>
         </SectionCard>
@@ -1432,26 +1442,22 @@ export default function AutoserviceOrderFormPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div className="sm:col-span-2">
-                      <input
-                        className={pillInputSmClass}
-                        placeholder="Название"
-                        value={p.title}
-                        onChange={(e) => updatePart(index, { title: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-ink-muted">Кол-во</label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        className={pillInputSmClass}
-                        value={p.qty}
-                        onChange={(e) => updatePart(index, { qty: e.target.value })}
-                      />
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      className={`min-w-0 flex-1 ${pillInputSmClass}`}
+                      placeholder="Название"
+                      value={p.title}
+                      onChange={(e) => updatePart(index, { title: e.target.value })}
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      className={`w-24 shrink-0 ${pillInputSmClass}`}
+                      placeholder="Кол-во"
+                      value={p.qty}
+                      onChange={(e) => updatePart(index, { qty: e.target.value })}
+                    />
                   </div>
                 </div>
               ))}

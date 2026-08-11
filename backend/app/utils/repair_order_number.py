@@ -1,28 +1,20 @@
-"""Allocate human-readable repair order numbers: AS-{YYYY}-{NNNNN}."""
+"""Allocate repair order numbers: plain 1, 2, 3… per organization."""
 from __future__ import annotations
-
-from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.models.repair_order import RepairOrder
 
 
-def allocate_repair_order_number(db: Session, when: datetime | None = None) -> str:
-    now = when or datetime.now(timezone.utc)
-    year = now.year
-    prefix = f"AS-{year}-"
-    last = (
+def allocate_repair_order_number(db: Session, organization_id: str) -> str:
+    rows = (
         db.query(RepairOrder.order_number)
-        .filter(RepairOrder.order_number.like(f"{prefix}%"))
-        .order_by(RepairOrder.order_number.desc())
-        .first()
+        .filter(RepairOrder.organization_id == organization_id)
+        .all()
     )
-    next_seq = 1
-    if last and last[0]:
-        tail = str(last[0])[len(prefix) :]
-        try:
-            next_seq = int(tail) + 1
-        except ValueError:
-            next_seq = 1
-    return f"{prefix}{next_seq:05d}"
+    max_seq = 0
+    for (num,) in rows:
+        s = str(num or "").strip()
+        if s.isdigit():
+            max_seq = max(max_seq, int(s))
+    return str(max_seq + 1)

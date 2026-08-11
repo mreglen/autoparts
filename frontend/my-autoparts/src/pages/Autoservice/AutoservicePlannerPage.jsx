@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import RepairOrderViewModal, { REPAIR_ORDER_STATUS_LABELS } from '../../components/Autoservice/RepairOrderViewModal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { formatServerDateTime, parseServerDate } from '../../utils/serverDate';
@@ -14,15 +15,7 @@ const MONTHS = [
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
 ];
 
-const ORDER_STATUS_LABELS = {
-  pending: 'Ожидание',
-  in_progress: 'В работе',
-  completed: 'Завершён',
-  cancelled: 'Отменён',
-  accepted: 'Ожидание',
-  ready: 'Завершён',
-  issued: 'Завершён',
-};
+const ORDER_STATUS_LABELS = REPAIR_ORDER_STATUS_LABELS;
 
 const ORDER_STATUS_OPTIONS = [
   ['pending', 'Ожидание'],
@@ -114,6 +107,8 @@ export default function AutoservicePlannerPage() {
   const [liftDayDate, setLiftDayDate] = useState(() => toIsoDate(today));
   const [liftDayData, setLiftDayData] = useState(null);
   const [liftDayLoading, setLiftDayLoading] = useState(false);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [viewOrderLoading, setViewOrderLoading] = useState(false);
 
   const cells = useMemo(() => buildMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
   const rangeFrom = cells.length ? toIsoDate(cells[0]) : null;
@@ -200,6 +195,20 @@ export default function AutoservicePlannerPage() {
         bookingId: booking?.id || undefined,
       },
     });
+  };
+
+  const openOrderView = async (orderId) => {
+    setViewOrderLoading(true);
+    setViewOrder(null);
+    setError('');
+    try {
+      const data = await apiRequest(`/autoservice/repair-orders/${orderId}`);
+      setViewOrder(data);
+    } catch (e) {
+      setError(e?.message || 'Не удалось загрузить заказ-наряд');
+    } finally {
+      setViewOrderLoading(false);
+    }
   };
 
   const handleCreateBooking = async (event) => {
@@ -371,12 +380,17 @@ export default function AutoservicePlannerPage() {
                       </p>
                       <div className="mt-3 space-y-2">
                         {lift.orders.map((order) => (
-                          <div key={order.id} className="rounded-sg border border-gray-200 px-3 py-2 text-sm">
+                          <button
+                            key={order.id}
+                            type="button"
+                            onClick={() => openOrderView(order.id)}
+                            className="w-full rounded-sg border border-gray-200 px-3 py-2 text-left text-sm transition hover:border-brand-300 hover:bg-brand-50/40"
+                          >
                             <p className="font-medium text-gray-900">{order.order_number} · {order.client_name}</p>
                             <p className="mt-0.5 text-gray-600">{order.vehicle}</p>
                             <p className="mt-0.5 text-xs text-gray-500">{formatOrderTimeRange(order)}</p>
                             <p className="mt-1 text-xs text-gray-500">{ORDER_STATUS_LABELS[order.status] || order.status}</p>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </section>
@@ -388,11 +402,16 @@ export default function AutoservicePlannerPage() {
                   <h2 className="text-sm font-semibold text-gray-900">Без подъёмника</h2>
                   <div className="mt-3 space-y-2">
                     {liftDayData.unassigned_orders.map((order) => (
-                      <div key={order.id} className="rounded-sg border border-gray-200 bg-white px-3 py-2 text-sm">
+                      <button
+                        key={order.id}
+                        type="button"
+                        onClick={() => openOrderView(order.id)}
+                        className="w-full rounded-sg border border-gray-200 bg-white px-3 py-2 text-left text-sm transition hover:border-brand-300 hover:bg-brand-50/40"
+                      >
                         <p className="font-medium text-gray-900">{order.order_number} · {order.client_name}</p>
                         <p className="mt-0.5 text-gray-600">{order.vehicle}</p>
                         <p className="mt-0.5 text-xs text-gray-500">{formatOrderTimeRange(order)}</p>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </section>
@@ -654,7 +673,11 @@ export default function AutoservicePlannerPage() {
                       </form>
                     ) : (
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => openOrderView(order.id)}
+                          className="min-w-0 flex-1 rounded-sg text-left transition hover:bg-gray-50/80"
+                        >
                           <p className="font-medium text-gray-900">
                             {order.order_number} · {order.client_name}
                           </p>
@@ -662,24 +685,17 @@ export default function AutoservicePlannerPage() {
                             {order.vehicle} · {formatOrderTimeRange(order)}
                             {order.lift_name ? ` · ${order.lift_name}` : ''}
                           </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-gray-500">
+                          <p className="mt-0.5 text-xs text-gray-500">
                             {ORDER_STATUS_LABELS[order.status] || order.status}
-                          </span>
+                          </p>
+                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => startEditOrder(order)}
                             className="rounded-sg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                           >
                             Изменить
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/autoservice/orders/${order.id}/edit`)}
-                            className="rounded-sg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            Открыть
                           </button>
                         </div>
                       </div>
@@ -728,6 +744,19 @@ export default function AutoservicePlannerPage() {
       )}
       </>
       )}
+
+      <RepairOrderViewModal
+        order={viewOrder}
+        loading={viewOrderLoading}
+        onClose={() => {
+          setViewOrder(null);
+          setViewOrderLoading(false);
+        }}
+        onEdit={(order) => {
+          setViewOrder(null);
+          navigate(`/autoservice/orders/${order.id}/edit`);
+        }}
+      />
     </div>
   );
 }

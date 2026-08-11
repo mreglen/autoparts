@@ -53,6 +53,7 @@ from app.schemas.repair_order import (
     WarehouseProductOption,
 )
 from app.utils.autoservice_access import (
+    related_autoservice_client_ids,
     require_autoservice_staff,
     require_my_active_autoservice_client,
     user_display_name,
@@ -329,11 +330,12 @@ def _get_client_and_vehicle(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Клиент не найден",
         )
+    related_ids = related_autoservice_client_ids(db, client)
     vehicle = (
         db.query(GarageVehicle)
         .filter(
             GarageVehicle.id == vehicle_id,
-            GarageVehicle.client_id == client_id,
+            GarageVehicle.client_id.in_(related_ids),
             GarageVehicle.organization_id == org_id,
         )
         .first()
@@ -807,7 +809,7 @@ def create_repair_order(
     lift_id = _validate_lift_id(db, org_id, payload.lift_id)
     row = RepairOrder(
         organization_id=org_id,
-        order_number=allocate_repair_order_number(db),
+        order_number=allocate_repair_order_number(db, org_id),
         client_id=payload.client_id,
         vehicle_id=payload.vehicle_id,
         client_comment=(payload.client_comment or "").strip() or None,

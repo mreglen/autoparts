@@ -25,6 +25,7 @@ from app.schemas.garage_vehicle import (
 from app.services.laximo.vehicle_lookup import lookup_by_frame, lookup_by_plate, lookup_by_vin
 from app.services.laximo.vin import normalize_vin_or_raise
 from app.utils.autoservice_access import (
+    related_autoservice_client_ids,
     require_autoservice_staff,
     require_my_active_autoservice_client,
 )
@@ -189,18 +190,20 @@ def list_garage_vehicles(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Клиент не найден",
             )
+        related_ids = related_autoservice_client_ids(db, client)
         rows = (
             db.query(GarageVehicle)
-            .filter(GarageVehicle.client_id == client_id)
+            .filter(GarageVehicle.client_id.in_(related_ids))
             .order_by(GarageVehicle.updated_at.desc(), GarageVehicle.id.desc())
             .all()
         )
         return [_vehicle_to_view(row) for row in rows]
 
     my_client = require_my_active_autoservice_client(db, current_user)
+    related_ids = related_autoservice_client_ids(db, my_client)
     rows = (
         db.query(GarageVehicle)
-        .filter(GarageVehicle.client_id == my_client.id)
+        .filter(GarageVehicle.client_id.in_(related_ids))
         .order_by(GarageVehicle.updated_at.desc(), GarageVehicle.id.desc())
         .all()
     )

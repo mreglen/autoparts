@@ -77,6 +77,45 @@ def user_display_name(user: User) -> str:
     return f"Пользователь {user.id}"
 
 
+def related_autoservice_client_ids(db: Session, client: AutoserviceClient) -> list[int]:
+    """Same person may have several client rows (user_id / phone variants)."""
+    ids = {client.id}
+    org_id = client.organization_id
+    if client.user_id is not None:
+        for (cid,) in (
+            db.query(AutoserviceClient.id)
+            .filter(
+                AutoserviceClient.organization_id == org_id,
+                AutoserviceClient.user_id == client.user_id,
+            )
+            .all()
+        ):
+            ids.add(cid)
+    phone = (client.phone or "").strip()
+    if phone:
+        for (cid,) in (
+            db.query(AutoserviceClient.id)
+            .filter(
+                AutoserviceClient.organization_id == org_id,
+                AutoserviceClient.phone == phone,
+            )
+            .all()
+        ):
+            ids.add(cid)
+        digits = "".join(ch for ch in phone if ch.isdigit())
+        if len(digits) >= 10:
+            tail = digits[-10:]
+            for row_id, row_phone in (
+                db.query(AutoserviceClient.id, AutoserviceClient.phone)
+                .filter(AutoserviceClient.organization_id == org_id)
+                .all()
+            ):
+                row_digits = "".join(ch for ch in str(row_phone or "") if ch.isdigit())
+                if row_digits.endswith(tail):
+                    ids.add(row_id)
+    return sorted(ids)
+
+
 def find_active_autoservice_client_for_user(
     db: Session,
     user: User,

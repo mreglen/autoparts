@@ -37,6 +37,13 @@ repair_order_assignees = Table(
 
 class RepairOrder(Base):
     __tablename__ = "repair_orders"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "order_number",
+            name="uq_repair_orders_org_order_number",
+        ),
+    )
 
     id = Column(Integer, primary_key=True)
     organization_id = Column(
@@ -45,7 +52,7 @@ class RepairOrder(Base):
         nullable=False,
         index=True,
     )
-    order_number = Column(String(32), nullable=False, unique=True, index=True)
+    order_number = Column(String(32), nullable=False, index=True)
     client_id = Column(
         Integer,
         ForeignKey("autoservice_clients.id"),
