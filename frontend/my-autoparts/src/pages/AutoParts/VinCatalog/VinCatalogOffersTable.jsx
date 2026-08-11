@@ -5,7 +5,7 @@ import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import { mapPartToStocksData } from '../NewParts/rosskoHelpers';
 import {
   applyMarkup,
-  formatDeliveryTimeText,
+  formatDeliveryParts,
   formatPriceRub,
 } from '../NewParts/newPartStockUtils';
 import NewPartsCartAddButton from '../../../components/Cart/NewPartsCartAddButton';
@@ -14,6 +14,19 @@ function toSafeInt(value, fallback = 1) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 1) return fallback;
   return Math.trunc(n);
+}
+
+function DeliveryCell({ deliveryStart, deliveryEnd }) {
+  const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
+  if (!parts) {
+    return <span className="text-sm text-gray-500">—</span>;
+  }
+  return (
+    <div className="text-sm leading-snug text-gray-900">
+      <div className="font-semibold">{parts.dateLine}</div>
+      <div className="text-gray-600">{parts.timeLine}</div>
+    </div>
+  );
 }
 
 function flattenPartStocks(part, sectionType) {
@@ -57,7 +70,6 @@ function OfferRow({ row, markupPercent }) {
   const maxQty = Math.max(1, Number(stock.available_count) || 1);
   const safeQty = Math.min(quantity, maxQty);
   const price = applyMarkup(stock.price, markupPercent);
-  const delivery = formatDeliveryTimeText(stock.delivery_start, stock.delivery_end);
   const isAnalog = sectionType === 'analog';
 
   const cartItem = useMemo(
@@ -112,9 +124,10 @@ function OfferRow({ row, markupPercent }) {
         </button>
       </td>
       <td className="whitespace-nowrap px-3 py-2.5">
-        <span className="inline-flex rounded-md bg-amber-50 px-2 py-1 text-sm font-semibold text-gray-900">
-          {delivery !== '—' ? `~${delivery}` : '—'}
-        </span>
+        <DeliveryCell
+          deliveryStart={stock.delivery_start}
+          deliveryEnd={stock.delivery_end}
+        />
       </td>
       <td className="whitespace-nowrap px-3 py-2.5 text-sm text-gray-800">
         {maxQty} шт.

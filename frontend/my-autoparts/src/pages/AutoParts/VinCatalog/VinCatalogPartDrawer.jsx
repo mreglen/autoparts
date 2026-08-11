@@ -222,7 +222,7 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
         onClick={requestClose}
       />
       <div
-        className={`relative flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl sm:max-w-2xl lg:max-w-3xl ${
+        className={`relative flex h-full w-full max-w-5xl flex-col bg-white shadow-2xl sm:max-w-5xl lg:max-w-6xl ${
           isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'
         }`}
       >
@@ -245,7 +245,7 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
 
         <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
           <section>
-            <h4 className="mb-2 text-sm font-semibold text-gray-900">Схожие</h4>
+            <h4 className="mb-2 text-sm font-semibold text-gray-900">Оригинал</h4>
             {rosskoLoading ? (
               <OfferSkeleton rows={3} />
             ) : similarParts.length ? (

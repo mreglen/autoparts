@@ -21,11 +21,18 @@ export function formatPriceRub(price) {
 }
 
 export function formatDeliveryTimeText(deliveryStart, deliveryEnd) {
-  if (!deliveryStart || !deliveryEnd) return '—';
+  const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
+  if (!parts) return '—';
+  return `${parts.dateLine}, ${parts.timeLine}`;
+}
+
+/** Returns { dateLine, timeLine } or null. dateLine = day/month/weekday (or Сегодня/Завтра). */
+export function formatDeliveryParts(deliveryStart, deliveryEnd) {
+  if (!deliveryStart || !deliveryEnd) return null;
   try {
     const startDate = new Date(deliveryStart);
     const endDate = new Date(deliveryEnd);
-    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return '—';
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
 
     const today = new Date();
     const tomorrow = new Date(today);
@@ -38,7 +45,7 @@ export function formatDeliveryTimeText(deliveryStart, deliveryEnd) {
       && startDate.getMonth() === tomorrow.getMonth()
       && startDate.getFullYear() === tomorrow.getFullYear();
 
-    const dateDisplay = isToday
+    const dateLine = isToday
       ? 'Сегодня'
       : isTomorrow
         ? 'Завтра'
@@ -46,9 +53,12 @@ export function formatDeliveryTimeText(deliveryStart, deliveryEnd) {
 
     const startTime = startDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     const endTime = endDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    return `${dateDisplay}, с ${startTime} до ${endTime}`;
+    return {
+      dateLine,
+      timeLine: `с ${startTime} до ${endTime}`,
+    };
   } catch (_e) {
-    return '—';
+    return null;
   }
 }
 
