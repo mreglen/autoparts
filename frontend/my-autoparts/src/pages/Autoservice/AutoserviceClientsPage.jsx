@@ -1,43 +1,107 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { formatServerDateTime } from '../../utils/serverDate';
 
-const inputClass =
-  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+const pillControlClass =
+  'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0';
 
-function Modal({ title, children, onClose }) {
+const inputClass =
+  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+
+function AccountBadge({ userId }) {
+  if (userId) {
+    return (
+      <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
+        Есть
+      </span>
+    );
+  }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-gray-200">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-            aria-label="Закрыть"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200">
+      Гость
+    </span>
+  );
+}
+
+function VehicleList({ vehicles, loading }) {
+  if (loading) {
+    return <p className="text-sm text-gray-500">Загрузка автомобилей…</p>;
+  }
+  if (!vehicles?.length) {
+    return <p className="text-sm text-gray-500">Автомобилей нет</p>;
+  }
+  return (
+    <ul className="space-y-2">
+      {vehicles.map((v) => (
+        <li key={v.id} className="text-sm text-gray-700">
+          <span className="font-medium text-gray-900">
+            {v.make} {v.model}
+            {v.year ? `, ${v.year}` : ''}
+          </span>
+          {v.vin ? ` · VIN ${v.vin}` : ''}
+          {v.plate ? ` · ${v.plate}` : ''}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ClientMobileCard({
+  row,
+  expanded,
+  vehicles,
+  vehiclesLoading,
+  onToggleVehicles,
+}) {
+  return (
+    <div className="border-b border-gray-100 py-3 last:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-gray-900">{row.name}</p>
+            <AccountBadge userId={row.user_id} />
+          </div>
+          <p className="mt-1 text-sm text-gray-600">{row.phone || '—'}</p>
+          <p className="mt-1 text-xs text-gray-500">
+            Согласие: {formatServerDateTime(row.consented_at) || '—'}
+          </p>
         </div>
-        <div className="p-5">{children}</div>
+        <button
+          type="button"
+          onClick={onToggleVehicles}
+          className="shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
+        >
+          {expanded ? 'Скрыть' : 'Авто'}
+        </button>
       </div>
+      {expanded ? (
+        <div className="mt-3 rounded-xl bg-gray-50 px-3 py-3">
+          <VehicleList vehicles={vehicles} loading={vehiclesLoading} />
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function AddClientModal({ onClose, onCreated }) {
+function AddClientModal({ open, onClose, onCreated }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setName('');
+    setPhone('');
+    setPhoneError('');
+    setError(null);
+    setSaving(false);
+  }, [open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -72,8 +136,33 @@ function AddClientModal({ onClose, onCreated }) {
   };
 
   return (
-    <Modal title="Добавить клиента" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Добавить клиента"
+      size="sm"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            disabled={saving}
+          >
+            Отмена
+          </button>
+          <button
+            type="submit"
+            form="add-autoservice-client"
+            disabled={saving}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {saving ? 'Сохранение…' : 'Добавить'}
+          </button>
+        </div>
+      }
+    >
+      <form id="add-autoservice-client" onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Имя</label>
           <input
@@ -99,26 +188,9 @@ function AddClientModal({ onClose, onCreated }) {
             disabled={saving}
             required
           />
-          {phoneError && <p className="mt-1 text-sm text-red-600">{phoneError}</p>}
+          {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            disabled={saving}
-          >
-            Отмена
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-          >
-            {saving ? 'Сохранение…' : 'Добавить'}
-          </button>
-        </div>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
       </form>
     </Modal>
   );
@@ -130,6 +202,8 @@ export default function AutoserviceClientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [qApplied, setQApplied] = useState('');
   const [expandedClientId, setExpandedClientId] = useState(null);
   const [clientVehicles, setClientVehicles] = useState({});
   const [vehiclesLoadingId, setVehiclesLoadingId] = useState(null);
@@ -154,6 +228,18 @@ export default function AutoserviceClientsPage() {
     }
   }, [isReady, isAuthenticated, load]);
 
+  const filteredRows = useMemo(() => {
+    const query = qApplied.trim().toLowerCase();
+    if (!query) return rows;
+    const digits = query.replace(/\D/g, '');
+    return rows.filter((row) => {
+      const name = String(row.name || '').toLowerCase();
+      const phone = String(row.phone || '').toLowerCase();
+      const phoneDigits = phone.replace(/\D/g, '');
+      return name.includes(query) || phone.includes(query) || (digits && phoneDigits.includes(digits));
+    });
+  }, [rows, qApplied]);
+
   const toggleClientVehicles = async (clientId) => {
     if (expandedClientId === clientId) {
       setExpandedClientId(null);
@@ -176,130 +262,177 @@ export default function AutoserviceClientsPage() {
   if (!isAuthenticated || !user) return null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="w-full min-w-0">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Клиенты автосервиса</h1>
-          <p className="mt-1 text-sm text-gray-500">Согласившиеся и добавленные вручную</p>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Клиенты</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {loading
+              ? 'Загрузка…'
+              : qApplied.trim()
+                ? `${filteredRows.length} из ${rows.length}`
+                : `${rows.length} клиентов`}
+          </p>
         </div>
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+          className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
         >
           Добавить
         </button>
       </div>
 
-      <div className="mt-6">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <input
+            className={`${pillControlClass} pr-10`}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Имя или телефон"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setQApplied(q);
+            }}
+            aria-label="Поиск клиентов"
+          />
+          {q ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQ('');
+                setQApplied('');
+              }}
+              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
+              aria-label="Очистить поиск"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => setQApplied(q)}
+          className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-gray-900 px-5 text-sm font-medium text-white transition hover:bg-gray-800"
+        >
+          Найти
+        </button>
         <button
           type="button"
           onClick={load}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+          title="Обновить"
+          aria-label="Обновить"
         >
-          Обновить
+          <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"
+            />
+          </svg>
         </button>
       </div>
 
-      {error && (
-        <p className="mt-4 text-sm text-red-600" role="alert">
+      {error ? (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}
         </p>
-      )}
+      ) : null}
 
-      <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <tr>
-              <th className="px-4 py-3">Имя</th>
-              <th className="px-4 py-3">Телефон</th>
-              <th className="px-4 py-3">Согласие</th>
-              <th className="px-4 py-3">Аккаунт</th>
-              <th className="px-4 py-3">Авто</th>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
+          <thead>
+            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="py-3 pr-3">Имя</th>
+              <th className="w-44 py-3 pr-3">Телефон</th>
+              <th className="hidden w-44 py-3 pr-3 lg:table-cell">Согласие</th>
+              <th className="w-28 py-3 pr-3">Аккаунт</th>
+              <th className="w-28 py-3 text-right">Авто</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={5} className="py-12 text-center text-gray-500">
                   Загрузка…
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                  Клиентов пока нет
+                <td colSpan={5} className="py-12 text-center text-gray-500">
+                  {rows.length === 0 ? 'Клиентов пока нет' : 'Ничего не найдено'}
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <React.Fragment key={row.id}>
-                  <tr className="hover:bg-gray-50/80">
-                    <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-700">{row.phone}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                      {formatServerDateTime(row.consented_at)}
+              filteredRows.map((row) => (
+                <Fragment key={row.id}>
+                  <tr className="transition-colors hover:bg-gray-50/70">
+                    <td className="py-3 pr-3 align-middle font-medium text-gray-900">{row.name}</td>
+                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">{row.phone || '—'}</td>
+                    <td className="hidden whitespace-nowrap py-3 pr-3 align-middle text-gray-600 lg:table-cell">
+                      {formatServerDateTime(row.consented_at) || '—'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {row.user_id ? (
-                        <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
-                          Есть
-                        </span>
-                      ) : (
-                        <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200">
-                          Гость
-                        </span>
-                      )}
+                    <td className="py-3 pr-3 align-middle">
+                      <AccountBadge userId={row.user_id} />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td className="py-3 text-right align-middle">
                       <button
                         type="button"
                         onClick={() => toggleClientVehicles(row.id)}
-                        className="text-sm font-medium text-indigo-700 hover:underline"
+                        className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
                       >
                         {expandedClientId === row.id ? 'Скрыть' : 'Показать'}
                       </button>
                     </td>
                   </tr>
-                  {expandedClientId === row.id && (
-                    <tr className="bg-gray-50/50">
-                      <td colSpan={5} className="px-4 py-3">
-                        {vehiclesLoadingId === row.id ? (
-                          <p className="text-sm text-gray-500">Загрузка автомобилей…</p>
-                        ) : (clientVehicles[row.id] || []).length === 0 ? (
-                          <p className="text-sm text-gray-500">Автомобилей нет</p>
-                        ) : (
-                          <ul className="space-y-2">
-                            {(clientVehicles[row.id] || []).map((v) => (
-                              <li key={v.id} className="text-sm text-gray-700">
-                                <span className="font-medium text-gray-900">
-                                  {v.make} {v.model}
-                                  {v.year ? `, ${v.year}` : ''}
-                                </span>
-                                {v.vin ? ` · VIN ${v.vin}` : ''}
-                                {v.plate ? ` · ${v.plate}` : ''}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
+                  {expandedClientId === row.id ? (
+                    <tr className="bg-gray-50/60">
+                      <td colSpan={5} className="px-1 py-3">
+                        <VehicleList
+                          vehicles={clientVehicles[row.id]}
+                          loading={vehiclesLoadingId === row.id}
+                        />
                       </td>
                     </tr>
-                  )}
-                </React.Fragment>
+                  ) : null}
+                </Fragment>
               ))
             )}
           </tbody>
         </table>
       </div>
 
-      {addOpen && (
-        <AddClientModal
-          onClose={() => setAddOpen(false)}
-          onCreated={(row) => {
-            setRows((prev) => [row, ...prev.filter((r) => r.id !== row.id)]);
-          }}
-        />
-      )}
+      <div className="md:hidden">
+        {loading ? (
+          <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+        ) : filteredRows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-500">
+            {rows.length === 0 ? 'Клиентов пока нет' : 'Ничего не найдено'}
+          </p>
+        ) : (
+          filteredRows.map((row) => (
+            <ClientMobileCard
+              key={row.id}
+              row={row}
+              expanded={expandedClientId === row.id}
+              vehicles={clientVehicles[row.id]}
+              vehiclesLoading={vehiclesLoadingId === row.id}
+              onToggleVehicles={() => toggleClientVehicles(row.id)}
+            />
+          ))
+        )}
+      </div>
+
+      <AddClientModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={(row) => {
+          setRows((prev) => [row, ...prev.filter((r) => r.id !== row.id)]);
+        }}
+      />
     </div>
   );
 }

@@ -1,12 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
+import Modal from '../../components/UI/Modal';
+import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
+import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
+
+const pillControlClass =
+  'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0';
 
 const inputClass =
-  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
 
 const STATUS_LABELS = {
   new: 'В ожидании',
@@ -26,6 +33,12 @@ const SOURCE_LABELS = {
   client: 'Клиент',
 };
 
+const STATUS_OPTIONS = [
+  { value: 'new', label: 'В ожидании' },
+  { value: 'processed', label: 'Обработано' },
+  { value: 'cancelled', label: 'Отменена' },
+];
+
 function formatVehicleBrief(vehicle) {
   if (!vehicle) return '—';
   const parts = [vehicle.make, vehicle.model].filter(Boolean);
@@ -36,43 +49,169 @@ function formatVehicleBrief(vehicle) {
   return label || '—';
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, className = '' }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
         STATUS_STYLES[status] || STATUS_STYLES.new
-      }`}
+      } ${className}`}
     >
       {STATUS_LABELS[status] || status}
     </span>
   );
 }
 
-function Modal({ title, children, onClose }) {
+function StatusPicker({ status, disabled, saving, onChange }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const available = STATUS_OPTIONS.filter((option) => option.value !== status);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocClick = (event) => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  if (available.length === 0) {
+    return <StatusBadge status={status} />;
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-gray-200">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-            aria-label="Закрыть"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <div ref={rootRef} className="status-picker relative inline-block">
+      <button
+        type="button"
+        disabled={disabled || saving}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((value) => !value);
+        }}
+        className="rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:cursor-wait disabled:opacity-60"
+        title="Сменить статус"
+      >
+        <StatusBadge status={status} className={saving ? 'opacity-70' : ''} />
+      </button>
+      {open ? (
+        <div className={buildActionsDropdownMenuClassName(false, 'w-44 z-50')}>
+          {available.map((option) => (
+            <ActionsDropdownItem
+              key={option.value}
+              onClick={() => {
+                setOpen(false);
+                onChange(option.value);
+              }}
+            >
+              {option.label}
+            </ActionsDropdownItem>
+          ))}
         </div>
-        <div className="p-5">{children}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function BookingMobileCard({ row, updatingId, onStatusChange, onView }) {
+  return (
+    <div className="border-b border-gray-100 py-3 last:border-b-0">
+      <div className="flex items-start justify-between gap-2">
+        <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900">{row.name}</span>
+            <StatusPicker
+              status={row.status}
+              saving={updatingId === row.id}
+              disabled={updatingId === row.id}
+              onChange={(nextStatus) => onStatusChange(row.id, nextStatus)}
+            />
+          </div>
+          <p className="mt-1 text-sm text-gray-600">{row.phone || '—'}</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Дата: {formatServerDate(row.preferred_date) || '—'}
+            {row.vehicle ? ` · ${formatVehicleBrief(row.vehicle)}` : ''}
+          </p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {SOURCE_LABELS[row.source] || row.source || '—'} · {formatServerDateTime(row.created_at)}
+          </p>
+        </button>
+        <div className="shrink-0">
+          <ActionsDropdown
+            menuClassName="w-40 z-50"
+            estimatedMenuHeight={80}
+            showLabel={false}
+            buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+          >
+            <ActionsDropdownItem onClick={onView}>Подробнее</ActionsDropdownItem>
+          </ActionsDropdown>
+        </div>
       </div>
     </div>
   );
 }
 
-function AddBookingModal({ onClose, onCreated }) {
+function BookingViewModal({ booking, onClose, updatingId, onStatusChange }) {
+  if (!booking) return null;
+
+  return (
+    <Modal
+      open={Boolean(booking)}
+      onClose={onClose}
+      title={`Заявка · ${booking.name || 'Без имени'}`}
+      size="md"
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <StatusPicker
+            status={booking.status}
+            saving={updatingId === booking.id}
+            disabled={updatingId === booking.id}
+            onChange={(nextStatus) => onStatusChange(booking.id, nextStatus)}
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            Закрыть
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-3 text-sm text-gray-700">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <p>
+            <span className="font-medium text-gray-900">Телефон:</span> {booking.phone || '—'}
+          </p>
+          <p>
+            <span className="font-medium text-gray-900">Желаемая дата:</span>{' '}
+            {formatServerDate(booking.preferred_date) || '—'}
+          </p>
+          <p>
+            <span className="font-medium text-gray-900">Создана:</span>{' '}
+            {formatServerDateTime(booking.created_at) || '—'}
+          </p>
+          <p>
+            <span className="font-medium text-gray-900">Источник:</span>{' '}
+            {SOURCE_LABELS[booking.source] || booking.source || '—'}
+          </p>
+          <p className="sm:col-span-2">
+            <span className="font-medium text-gray-900">Автомобиль:</span> {formatVehicleBrief(booking.vehicle)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
+          <p>
+            <span className="font-medium text-gray-900">Комментарий:</span>{' '}
+            <span className="whitespace-pre-wrap text-gray-700">{booking.notes?.trim() || '—'}</span>
+          </p>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function AddBookingModal({ open, onClose, onCreated }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [preferredDate, setPreferredDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -80,6 +219,17 @@ function AddBookingModal({ onClose, onCreated }) {
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setName('');
+    setPhone('');
+    setPreferredDate(new Date().toISOString().slice(0, 10));
+    setNotes('');
+    setPhoneError('');
+    setError(null);
+    setSaving(false);
+  }, [open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -120,8 +270,33 @@ function AddBookingModal({ onClose, onCreated }) {
   };
 
   return (
-    <Modal title="Добавить заявку" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Добавить заявку"
+      size="sm"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            disabled={saving}
+          >
+            Отмена
+          </button>
+          <button
+            type="submit"
+            form="add-inspection-booking"
+            disabled={saving}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {saving ? 'Сохранение…' : 'Добавить'}
+          </button>
+        </div>
+      }
+    >
+      <form id="add-inspection-booking" onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Имя</label>
           <input
@@ -147,7 +322,7 @@ function AddBookingModal({ onClose, onCreated }) {
             disabled={saving}
             required
           />
-          {phoneError && <p className="mt-1 text-sm text-red-600">{phoneError}</p>}
+          {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Желаемая дата</label>
@@ -171,24 +346,7 @@ function AddBookingModal({ onClose, onCreated }) {
             maxLength={2000}
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            disabled={saving}
-          >
-            Отмена
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-          >
-            {saving ? 'Сохранение…' : 'Добавить'}
-          </button>
-        </div>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
       </form>
     </Modal>
   );
@@ -199,15 +357,18 @@ export default function AutoserviceInspectionsPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [q, setQ] = useState('');
+  const [qApplied, setQApplied] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [viewBooking, setViewBooking] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const qs = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : '';
+      const qs = statusFilter !== 'all' ? `?status=${encodeURIComponent(statusFilter)}` : '';
       const data = await apiRequest(`/autoservice/inspection-bookings${qs}`);
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -224,6 +385,26 @@ export default function AutoserviceInspectionsPage() {
     }
   }, [isReady, isAuthenticated, load]);
 
+  const filteredRows = useMemo(() => {
+    const query = qApplied.trim().toLowerCase();
+    if (!query) return rows;
+    const digits = query.replace(/\D/g, '');
+    return rows.filter((row) => {
+      const name = String(row.name || '').toLowerCase();
+      const phone = String(row.phone || '').toLowerCase();
+      const phoneDigits = phone.replace(/\D/g, '');
+      const notes = String(row.notes || '').toLowerCase();
+      const vehicle = formatVehicleBrief(row.vehicle).toLowerCase();
+      return (
+        name.includes(query) ||
+        phone.includes(query) ||
+        notes.includes(query) ||
+        vehicle.includes(query) ||
+        (digits && phoneDigits.includes(digits))
+      );
+    });
+  }, [rows, qApplied]);
+
   const handleStatusChange = async (id, nextStatus) => {
     setUpdatingId(id);
     setError(null);
@@ -233,6 +414,7 @@ export default function AutoserviceInspectionsPage() {
         body: JSON.stringify({ status: nextStatus }),
       });
       setRows((prev) => prev.map((row) => (row.id === id ? updated : row)));
+      setViewBooking((prev) => (prev?.id === id ? updated : prev));
     } catch (err) {
       setError(err?.message || 'Не удалось обновить статус');
     } finally {
@@ -244,107 +426,177 @@ export default function AutoserviceInspectionsPage() {
   if (!isAuthenticated || !user) return null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="w-full min-w-0">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Записи</h1>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Записи</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {loading
+              ? 'Загрузка…'
+              : qApplied.trim()
+                ? `${filteredRows.length} из ${rows.length}`
+                : `${rows.length} заявок`}
+          </p>
         </div>
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+          className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
         >
           Добавить
         </button>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <label className="text-sm text-gray-600">
-          Статус{' '}
-          <select
-            className="ml-2 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">Все</option>
-            <option value="new">В ожидании</option>
-            <option value="processed">Обработано</option>
-            <option value="cancelled">Отменена</option>
-          </select>
-        </label>
+      <UnderlineTabs
+        className="mb-4"
+        ariaLabel="Фильтр записей по статусу"
+        gapClassName="gap-4"
+        tabs={[
+          { id: 'all', label: 'Все' },
+          { id: 'new', label: 'В ожидании' },
+          { id: 'processed', label: 'Обработано' },
+          { id: 'cancelled', label: 'Отменена' },
+        ]}
+        value={statusFilter}
+        onChange={(id) => {
+          setStatusFilter(id);
+          setViewBooking(null);
+        }}
+      />
+
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <input
+            className={`${pillControlClass} pr-10`}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Имя, телефон, авто или комментарий"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setQApplied(q);
+            }}
+            aria-label="Поиск записей"
+          />
+          {q ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQ('');
+                setQApplied('');
+              }}
+              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
+              aria-label="Очистить поиск"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => setQApplied(q)}
+          className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-gray-900 px-5 text-sm font-medium text-white transition hover:bg-gray-800"
+        >
+          Найти
+        </button>
         <button
           type="button"
           onClick={load}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+          title="Обновить"
+          aria-label="Обновить"
         >
-          Обновить
+          <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"
+            />
+          </svg>
         </button>
       </div>
 
-      {error && (
-        <p className="mt-4 text-sm text-red-600" role="alert">
+      {error ? (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}
         </p>
-      )}
+      ) : null}
 
-      <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <tr>
-              <th className="px-4 py-3">Создана</th>
-              <th className="px-4 py-3">Имя</th>
-              <th className="px-4 py-3">Телефон</th>
-              <th className="px-4 py-3">Желаемая дата</th>
-              <th className="px-4 py-3">Автомобиль</th>
-              <th className="px-4 py-3">Комментарий</th>
-              <th className="px-4 py-3">Источник</th>
-              <th className="px-4 py-3">Статус</th>
-              <th className="px-4 py-3">Действие</th>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
+          <thead>
+            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="w-40 py-3 pr-3">Создана</th>
+              <th className="py-3 pr-3">Клиент</th>
+              <th className="w-36 py-3 pr-3">Дата</th>
+              <th className="hidden py-3 pr-3 lg:table-cell">Автомобиль</th>
+              <th className="hidden w-28 py-3 pr-3 xl:table-cell">Источник</th>
+              <th className="w-36 py-3 pr-3">Статус</th>
+              <th className="w-28 py-3 text-right">Действия</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="py-12 text-center text-gray-500">
                   Загрузка…
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                  Заявок пока нет
+                <td colSpan={7} className="py-12 text-center text-gray-500">
+                  {rows.length === 0 ? 'Заявок пока нет' : 'Ничего не найдено'}
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50/80">
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">{formatServerDateTime(row.created_at)}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-700">{row.phone}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatServerDate(row.preferred_date)}</td>
-                  <td className="max-w-[12rem] truncate px-4 py-3 text-gray-700" title={formatVehicleBrief(row.vehicle)}>
+              filteredRows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="cursor-pointer transition-colors hover:bg-gray-50/70"
+                  onDoubleClick={(e) => {
+                    if (e.target.closest('.status-picker') || e.target.closest('.actions-dropdown')) {
+                      return;
+                    }
+                    setViewBooking(row);
+                  }}
+                >
+                  <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-600">
+                    {formatServerDateTime(row.created_at)}
+                  </td>
+                  <td className="py-3 pr-3 align-middle">
+                    <div className="font-medium text-gray-900">{row.name}</div>
+                    {row.phone ? <div className="mt-0.5 text-xs text-gray-500">{row.phone}</div> : null}
+                  </td>
+                  <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">
+                    {formatServerDate(row.preferred_date) || '—'}
+                  </td>
+                  <td
+                    className="hidden max-w-[12rem] truncate py-3 pr-3 align-middle text-gray-700 lg:table-cell"
+                    title={formatVehicleBrief(row.vehicle)}
+                  >
                     {formatVehicleBrief(row.vehicle)}
                   </td>
-                  <td className="max-w-xs truncate px-4 py-3 text-gray-600" title={row.notes || ''}>
-                    {row.notes || '—'}
+                  <td className="hidden py-3 pr-3 align-middle text-gray-600 xl:table-cell">
+                    {SOURCE_LABELS[row.source] || row.source || '—'}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                    {SOURCE_LABELS[row.source] || row.source}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={row.status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <select
-                      className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-                      value={row.status}
+                  <td className="py-3 pr-3 align-middle">
+                    <StatusPicker
+                      status={row.status}
+                      saving={updatingId === row.id}
                       disabled={updatingId === row.id}
-                      onChange={(e) => handleStatusChange(row.id, e.target.value)}
+                      onChange={(nextStatus) => handleStatusChange(row.id, nextStatus)}
+                    />
+                  </td>
+                  <td className="py-3 text-right align-middle">
+                    <ActionsDropdown
+                      menuClassName="w-40 z-50"
+                      estimatedMenuHeight={80}
+                      showLabel
+                      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
                     >
-                      <option value="new">В ожидании</option>
-                      <option value="processed">Обработано</option>
-                      <option value="cancelled">Отменена</option>
-                    </select>
+                      <ActionsDropdownItem onClick={() => setViewBooking(row)}>Подробнее</ActionsDropdownItem>
+                    </ActionsDropdown>
                   </td>
                 </tr>
               ))
@@ -353,14 +605,40 @@ export default function AutoserviceInspectionsPage() {
         </table>
       </div>
 
-      {addOpen && (
-        <AddBookingModal
-          onClose={() => setAddOpen(false)}
-          onCreated={(row) => {
-            setRows((prev) => [row, ...prev.filter((r) => r.id !== row.id)]);
-          }}
-        />
-      )}
+      <div className="md:hidden">
+        {loading ? (
+          <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+        ) : filteredRows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-500">
+            {rows.length === 0 ? 'Заявок пока нет' : 'Ничего не найдено'}
+          </p>
+        ) : (
+          filteredRows.map((row) => (
+            <BookingMobileCard
+              key={row.id}
+              row={row}
+              updatingId={updatingId}
+              onStatusChange={handleStatusChange}
+              onView={() => setViewBooking(row)}
+            />
+          ))
+        )}
+      </div>
+
+      <AddBookingModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={(row) => {
+          setRows((prev) => [row, ...prev.filter((r) => r.id !== row.id)]);
+        }}
+      />
+
+      <BookingViewModal
+        booking={viewBooking}
+        onClose={() => setViewBooking(null)}
+        updatingId={updatingId}
+        onStatusChange={handleStatusChange}
+      />
     </div>
   );
 }

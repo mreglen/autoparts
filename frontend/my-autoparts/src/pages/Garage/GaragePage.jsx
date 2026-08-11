@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
+import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
+import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
 import {
@@ -19,8 +21,17 @@ import { sanitizeResolvedVin } from '../../utils/laximoVinCandidate';
 
 const LOOKUP_INPUT_MAX_LENGTH = 32;
 
+const pillControlClass =
+  'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0';
+
 const inputClass =
-  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+
+const btnPrimary =
+  'inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60';
+
+const btnGhost =
+  'inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60';
 
 const emptyForm = {
   vin: '',
@@ -32,28 +43,8 @@ const emptyForm = {
   notes: '',
 };
 
-function Modal({ title, children, onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-gray-200">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-            aria-label="Закрыть"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
+function vehicleTitle(v) {
+  return `${v.make || ''} ${v.model || ''}`.trim() + (v.year ? `, ${v.year}` : '');
 }
 
 function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice, onRetryDecode }) {
@@ -94,10 +85,8 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {notice ? (
-        <SoftServiceNotice variant={notice} onRetry={onRetryDecode} />
-      ) : null}
+    <form id="garage-vehicle-form" onSubmit={handleSubmit} className="space-y-4">
+      {notice ? <SoftServiceNotice variant={notice} onRetry={onRetryDecode} /> : null}
       {notice === 'not_found' ? (
         <p className="text-sm text-gray-600">
           <Link to="/autoparts/vin?wizard=1" className="font-medium text-indigo-600 hover:underline">
@@ -116,46 +105,50 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
           disabled={saving}
         />
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Марка</label>
-        <input
-          className={inputClass}
-          value={form.make}
-          onChange={(e) => setForm((p) => ({ ...p, make: e.target.value }))}
-          required
-          disabled={saving}
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Марка</label>
+          <input
+            className={inputClass}
+            value={form.make}
+            onChange={(e) => setForm((p) => ({ ...p, make: e.target.value }))}
+            required
+            disabled={saving}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Модель</label>
+          <input
+            className={inputClass}
+            value={form.model}
+            onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
+            required
+            disabled={saving}
+          />
+        </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Модель</label>
-        <input
-          className={inputClass}
-          value={form.model}
-          onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
-          required
-          disabled={saving}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Год</label>
-        <input
-          type="number"
-          className={inputClass}
-          value={form.year}
-          onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
-          min={1900}
-          max={2100}
-          disabled={saving}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Цвет</label>
-        <input
-          className={inputClass}
-          value={form.color}
-          onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
-          disabled={saving}
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Год</label>
+          <input
+            type="number"
+            className={inputClass}
+            value={form.year}
+            onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
+            min={1900}
+            max={2100}
+            disabled={saving}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Цвет</label>
+          <input
+            className={inputClass}
+            value={form.color}
+            onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
+            disabled={saving}
+          />
+        </div>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">Госномер</label>
@@ -176,25 +169,46 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
           disabled={saving}
         />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="flex justify-end gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-          disabled={saving}
-        >
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" onClick={onCancel} className={btnGhost} disabled={saving}>
           Отмена
         </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-        >
+        <button type="submit" disabled={saving} className={btnPrimary}>
           {saving ? 'Сохранение…' : submitLabel}
         </button>
       </div>
     </form>
+  );
+}
+
+function VehicleMobileCard({ vehicle, deletingId, onEdit, onDelete }) {
+  return (
+    <div className="border-b border-gray-100 py-3 last:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900">{vehicleTitle(vehicle)}</p>
+          <p className="mt-1 text-sm text-gray-600">
+            {vehicle.vin ? `VIN: ${vehicle.vin}` : 'VIN не указан'}
+            {vehicle.plate ? ` · ${vehicle.plate}` : ''}
+          </p>
+          {vehicle.color ? <p className="mt-0.5 text-xs text-gray-500">{vehicle.color}</p> : null}
+          {vehicle.notes ? <p className="mt-1 text-xs text-gray-500 line-clamp-2">{vehicle.notes}</p> : null}
+        </div>
+        <ActionsDropdown
+          menuClassName="w-40 z-50"
+          estimatedMenuHeight={100}
+          showLabel={false}
+          buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50"
+          disabled={deletingId === vehicle.id}
+        >
+          <ActionsDropdownItem onClick={onEdit}>Изменить</ActionsDropdownItem>
+          <ActionsDropdownItem danger onClick={onDelete}>
+            {deletingId === vehicle.id ? 'Удаление…' : 'Удалить'}
+          </ActionsDropdownItem>
+        </ActionsDropdown>
+      </div>
+    </div>
   );
 }
 
@@ -209,6 +223,8 @@ export default function GaragePage() {
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
   const [pageError, setPageError] = useState(null);
+  const [q, setQ] = useState('');
+  const [qApplied, setQApplied] = useState('');
 
   const [addOpen, setAddOpen] = useState(false);
   const [addStep, setAddStep] = useState('vin');
@@ -256,7 +272,7 @@ export default function GaragePage() {
     }
   }, [isReady, isAuthenticated, isClient, loadVehicles]);
 
-  const openAdd = () => {
+  const openAdd = useCallback(() => {
     setAddStep('vin');
     setLookupInput('');
     setLookupError(null);
@@ -270,7 +286,7 @@ export default function GaragePage() {
     setSelectedCandidate(null);
     setAddNotice(null);
     setAddOpen(true);
-  };
+  }, []);
 
   useEffect(() => {
     if (!location.state?.openAdd) return;
@@ -279,7 +295,19 @@ export default function GaragePage() {
       replace: true,
       state: location.state?.returnTo ? { returnTo: location.state.returnTo } : {},
     });
-  }, [location.pathname, location.state?.openAdd, location.state?.returnTo, navigate]);
+  }, [location.pathname, location.state?.openAdd, location.state?.returnTo, navigate, openAdd]);
+
+  const filteredVehicles = useMemo(() => {
+    const query = qApplied.trim().toLowerCase();
+    if (!query) return vehicles;
+    return vehicles.filter((v) => {
+      const hay = [v.make, v.model, v.year, v.vin, v.plate, v.color, v.notes]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return hay.includes(query);
+    });
+  }, [vehicles, qApplied]);
 
   const applyCandidate = (candidate, vin, plate = '') => {
     setSelectedCandidate(candidate);
@@ -512,174 +540,247 @@ export default function GaragePage() {
   if (!isReady) return <AuthLoadingScreen />;
 
   if (clientStatus === 'loading' || clientStatus === 'idle') {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-gray-500">
-        Загрузка…
-      </div>
-    );
+    return <p className="py-12 text-center text-sm text-gray-500">Загрузка…</p>;
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="w-full min-w-0">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Мои авто</h1>
-          <p className="mt-1 text-sm">
-            <Link to="/autoservice/repair-booking" className="text-indigo-600 hover:underline">
-              Запись на ремонт
-            </Link>
-            <span className="text-gray-300"> · </span>
-            <Link to="/garage/repairs" className="text-indigo-600 hover:underline">
-              История ремонтов
-            </Link>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {vehiclesLoading
+              ? 'Загрузка…'
+              : qApplied.trim()
+                ? `${filteredVehicles.length} из ${vehicles.length}`
+                : `${vehicles.length} автомобилей`}
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to="/autoservice/repair-booking" className={btnGhost}>
+            Запись на ремонт
+          </Link>
+          <button type="button" onClick={openAdd} className={btnPrimary}>
+            Добавить авто
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <input
+            className={`${pillControlClass} pr-10`}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Марка, модель, VIN или госномер"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setQApplied(q);
+            }}
+            aria-label="Поиск автомобилей"
+          />
+          {q ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQ('');
+                setQApplied('');
+              }}
+              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
+              aria-label="Очистить поиск"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          ) : null}
         </div>
         <button
           type="button"
-          onClick={openAdd}
-          className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+          onClick={() => setQApplied(q)}
+          className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-gray-900 px-5 text-sm font-medium text-white transition hover:bg-gray-800"
         >
-          Добавить авто
+          Найти
+        </button>
+        <button
+          type="button"
+          onClick={loadVehicles}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+          title="Обновить"
+          aria-label="Обновить"
+        >
+          <svg
+            className={`h-4 w-4 ${vehiclesLoading ? 'animate-spin' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"
+            />
+          </svg>
         </button>
       </div>
 
-      {pageError && (
-        <p className="mt-4 text-sm text-red-600" role="alert">
+      {pageError ? (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {pageError}
         </p>
-      )}
+      ) : null}
 
-      <div className="mt-6 space-y-3">
+      <div className="hidden overflow-x-auto md:block">
+        <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
+          <thead>
+            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <th className="py-3 pr-3">Автомобиль</th>
+              <th className="w-48 py-3 pr-3">VIN</th>
+              <th className="w-36 py-3 pr-3">Госномер</th>
+              <th className="hidden w-28 py-3 pr-3 lg:table-cell">Цвет</th>
+              <th className="w-28 py-3 text-right">Действия</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {vehiclesLoading ? (
+              <tr>
+                <td colSpan={5} className="py-12 text-center text-gray-500">
+                  Загрузка…
+                </td>
+              </tr>
+            ) : filteredVehicles.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-12 text-center text-gray-500">
+                  {vehicles.length === 0
+                    ? 'Пока нет автомобилей. Добавьте первый по VIN, госномеру или Frame.'
+                    : 'Ничего не найдено'}
+                </td>
+              </tr>
+            ) : (
+              filteredVehicles.map((v) => (
+                <tr key={v.id} className="transition-colors hover:bg-gray-50/70">
+                  <td className="py-3 pr-3 align-middle">
+                    <div className="font-medium text-gray-900">{vehicleTitle(v)}</div>
+                    {v.notes ? (
+                      <div className="mt-0.5 truncate text-xs text-gray-500" title={v.notes}>
+                        {v.notes}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="truncate py-3 pr-3 align-middle font-mono text-xs text-gray-700" title={v.vin || ''}>
+                    {v.vin || '—'}
+                  </td>
+                  <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">{v.plate || '—'}</td>
+                  <td className="hidden py-3 pr-3 align-middle text-gray-600 lg:table-cell">{v.color || '—'}</td>
+                  <td className="py-3 text-right align-middle">
+                    <ActionsDropdown
+                      menuClassName="w-40 z-50"
+                      estimatedMenuHeight={100}
+                      showLabel
+                      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                      disabled={deletingId === v.id}
+                    >
+                      <ActionsDropdownItem onClick={() => setEditVehicle(v)}>Изменить</ActionsDropdownItem>
+                      <ActionsDropdownItem danger onClick={() => handleDeleteVehicle(v.id)}>
+                        {deletingId === v.id ? 'Удаление…' : 'Удалить'}
+                      </ActionsDropdownItem>
+                    </ActionsDropdown>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="md:hidden">
         {vehiclesLoading ? (
-          <p className="text-sm text-gray-500">Загрузка автомобилей…</p>
-        ) : vehicles.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
-            Пока нет автомобилей. Добавьте первый по VIN, госномеру или Frame.
+          <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+        ) : filteredVehicles.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-500">
+            {vehicles.length === 0
+              ? 'Пока нет автомобилей. Добавьте первый по VIN, госномеру или Frame.'
+              : 'Ничего не найдено'}
           </p>
         ) : (
-          vehicles.map((v) => (
-            <div
+          filteredVehicles.map((v) => (
+            <VehicleMobileCard
               key={v.id}
-              className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <p className="font-semibold text-gray-900">
-                  {v.make} {v.model}
-                  {v.year ? `, ${v.year}` : ''}
-                </p>
-                <p className="mt-1 text-sm text-gray-600">
-                  {v.vin ? `VIN: ${v.vin}` : 'VIN не указан'}
-                  {v.plate ? ` · ${v.plate}` : ''}
-                  {v.color ? ` · ${v.color}` : ''}
-                </p>
-                {v.notes && <p className="mt-1 text-sm text-gray-500">{v.notes}</p>}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditVehicle(v)}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  Изменить
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteVehicle(v.id)}
-                  disabled={deletingId === v.id}
-                  className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-60"
-                >
-                  {deletingId === v.id ? '…' : 'Удалить'}
-                </button>
-              </div>
-            </div>
+              vehicle={v}
+              deletingId={deletingId}
+              onEdit={() => setEditVehicle(v)}
+              onDelete={() => handleDeleteVehicle(v.id)}
+            />
           ))
         )}
       </div>
 
-      {addOpen && addStep === 'vin' && (
-        <Modal title="Добавление авто в гараж" onClose={() => setAddOpen(false)}>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Введите VIN, госномер или Frame — подставим данные автоматически.
-            </p>
-            <div>
-              <label htmlFor="garage-add-lookup" className="block text-sm font-medium text-gray-700">
-                Госномер, VIN или Frame
-              </label>
-              <input
-                id="garage-add-lookup"
-                className={inputClass}
-                value={lookupInput}
-                onChange={(e) => {
-                  setLookupInput(formatVehicleLookupInput(e.target.value));
-                  setLookupError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleDecodeLookup();
-                  }
-                }}
-                maxLength={LOOKUP_INPUT_MAX_LENGTH}
-                disabled={lookupDecoding}
-                placeholder="М460УН154, WVWZZZ1JZYW123456 или SGL5-400683"
-                autoComplete="off"
-                autoFocus
-              />
-              {lookupError && <p className="mt-1 text-sm text-red-600">{lookupError}</p>}
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCandidate(null);
-                  setLookupFromPlate(false);
-                  setLookupFromFrame(false);
-                  setAddNotice(null);
-                  setAddForm(emptyForm);
-                  setAddStep('form');
-                }}
-                disabled={lookupDecoding}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-60"
-              >
-                Искать по марке
-              </button>
-              <button
-                type="button"
-                onClick={handleDecodeLookup}
-                disabled={lookupDecoding}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {lookupDecoding ? 'Проверка…' : 'Продолжить'}
-              </button>
-            </div>
+      <Modal
+        open={addOpen && addStep === 'vin'}
+        onClose={() => setAddOpen(false)}
+        title="Добавление авто в гараж"
+        size="sm"
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCandidate(null);
+                setLookupFromPlate(false);
+                setLookupFromFrame(false);
+                setAddNotice(null);
+                setAddForm(emptyForm);
+                setAddStep('form');
+              }}
+              disabled={lookupDecoding}
+              className={btnGhost}
+            >
+              Искать по марке
+            </button>
+            <button type="button" onClick={handleDecodeLookup} disabled={lookupDecoding} className={btnPrimary}>
+              {lookupDecoding ? 'Проверка…' : 'Продолжить'}
+            </button>
           </div>
-        </Modal>
-      )}
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Введите VIN, госномер или Frame — подставим данные автоматически.</p>
+          <div>
+            <label htmlFor="garage-add-lookup" className="block text-sm font-medium text-gray-700">
+              Госномер, VIN или Frame
+            </label>
+            <input
+              id="garage-add-lookup"
+              className={inputClass}
+              value={lookupInput}
+              onChange={(e) => {
+                setLookupInput(formatVehicleLookupInput(e.target.value));
+                setLookupError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleDecodeLookup();
+                }
+              }}
+              maxLength={LOOKUP_INPUT_MAX_LENGTH}
+              disabled={lookupDecoding}
+              placeholder="М460УН154, WVWZZZ1JZYW123456 или SGL5-400683"
+              autoComplete="off"
+              autoFocus
+            />
+            {lookupError ? <p className="mt-1 text-sm text-red-600">{lookupError}</p> : null}
+          </div>
+        </div>
+      </Modal>
 
-      {addOpen && addStep === 'pick' && (
-        <Modal title="Выберите автомобиль" onClose={() => setAddOpen(false)}>
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600">Найдено несколько вариантов. Выберите подходящий.</p>
-            <ul className="space-y-2">
-              {addCandidates.map((c, idx) => (
-                <li key={`${c.vehicle_id || 'v'}-${idx}`}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      applyCandidate(
-                        c,
-                        resolvedVin,
-                        addForm.plate || resolvedPlate,
-                      )
-                    }
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/40"
-                  >
-                    <span className="font-medium text-gray-900">{candidateLabel(c)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+      <Modal
+        open={addOpen && addStep === 'pick'}
+        onClose={() => setAddOpen(false)}
+        title="Выберите автомобиль"
+        size="sm"
+        footer={
+          <div className="flex justify-start">
             <button
               type="button"
               onClick={() => {
@@ -687,39 +788,59 @@ export default function GaragePage() {
                 setAddNotice(null);
                 setAddStep('form');
               }}
-              className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className={btnGhost}
             >
               Искать по марке
             </button>
           </div>
-        </Modal>
-      )}
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600">Найдено несколько вариантов. Выберите подходящий.</p>
+          <ul className="divide-y divide-gray-100">
+            {addCandidates.map((c, idx) => (
+              <li key={`${c.vehicle_id || 'v'}-${idx}`}>
+                <button
+                  type="button"
+                  onClick={() => applyCandidate(c, resolvedVin, addForm.plate || resolvedPlate)}
+                  className="w-full py-3 text-left text-sm transition hover:bg-gray-50"
+                >
+                  <span className="font-medium text-gray-900">{candidateLabel(c)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Modal>
 
-      {addOpen && addStep === 'form' && (
-        <Modal title="Данные автомобиля" onClose={() => setAddOpen(false)}>
-          <VehicleForm
-            initial={addForm}
-            saving={addSaving}
-            submitLabel="Добавить"
-            notice={addNotice}
-            onRetryDecode={
-              addNotice
-                ? () => {
-                    setAddStep('vin');
-                    setLookupInput(addForm.vin || addForm.plate || frameInput || lookupInput);
-                    setLookupError(null);
-                    setAddNotice(null);
-                  }
-                : undefined
-            }
-            onCancel={() => setAddOpen(false)}
-            onSubmit={handleCreateVehicle}
-          />
-        </Modal>
-      )}
+      <Modal
+        open={addOpen && addStep === 'form'}
+        onClose={() => setAddOpen(false)}
+        title="Данные автомобиля"
+        size="md"
+      >
+        <VehicleForm
+          initial={addForm}
+          saving={addSaving}
+          submitLabel="Добавить"
+          notice={addNotice}
+          onRetryDecode={
+            addNotice
+              ? () => {
+                  setAddStep('vin');
+                  setLookupInput(addForm.vin || addForm.plate || frameInput || lookupInput);
+                  setLookupError(null);
+                  setAddNotice(null);
+                }
+              : undefined
+          }
+          onCancel={() => setAddOpen(false)}
+          onSubmit={handleCreateVehicle}
+        />
+      </Modal>
 
-      {editVehicle && (
-        <Modal title="Изменить автомобиль" onClose={() => setEditVehicle(null)}>
+      <Modal open={Boolean(editVehicle)} onClose={() => setEditVehicle(null)} title="Изменить автомобиль" size="md">
+        {editVehicle ? (
           <VehicleForm
             initial={{
               vin: editVehicle.vin || '',
@@ -735,8 +856,8 @@ export default function GaragePage() {
             onCancel={() => setEditVehicle(null)}
             onSubmit={handleUpdateVehicle}
           />
-        </Modal>
-      )}
+        ) : null}
+      </Modal>
     </div>
   );
 }

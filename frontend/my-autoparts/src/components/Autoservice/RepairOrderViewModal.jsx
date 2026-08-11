@@ -69,220 +69,265 @@ export function OrderStatusBadge({ status, className = '' }) {
   );
 }
 
-function OrderLinesExpand({ row, showExecutors }) {
+function MetaItem({ label, children }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-gray-900">{children}</dd>
+    </div>
+  );
+}
+
+function Section({ title, children, total }) {
+  return (
+    <section className="border-t border-gray-100 pt-4">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h3>
+        {total != null ? (
+          <p className="text-xs tabular-nums text-gray-500">{total}</p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function EmptyLine({ children }) {
+  return <p className="py-1 text-sm text-gray-400">{children}</p>;
+}
+
+function LinesTable({ columns, children }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-left text-xs">
+        <thead>
+          <tr className="text-gray-400">
+            {columns.map((col) => (
+              <th key={col} className="pb-1.5 pr-3 font-medium">
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50 text-gray-700">{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+export function OrderLinesExpand({ row, showExecutors = false }) {
   const works = row.works || [];
   const parts = row.client_parts || [];
   const shop = row.shop_parts || [];
   const worksTotal = row.works_total ?? works.reduce((s, w) => s + lineSum(w.qty, w.unit_price), 0);
   const shopTotal =
-    row.shop_parts_total
-    ?? shop.reduce(
+    row.shop_parts_total ??
+    shop.reduce(
       (s, p) => s + (Number(p.line_sum) || shopLineSum(p.qty, p.unit_price, p.markup_percent)),
       0,
     );
-  const grand = row.grand_total ?? worksTotal + shopTotal;
 
   return (
-    <div className="space-y-4 text-sm text-gray-700">
-      {showExecutors && (
-        <div className="space-y-1 sm:hidden">
-          <p>
-            <span className="font-medium text-gray-900">Принял:</span> {row.accepted_by?.name || '—'}
-          </p>
-        </div>
-      )}
-      {row.work_zone?.name ? (
-        <p>
-          <span className="font-medium text-gray-900">Рабочая зона:</span> {row.work_zone.name}
-        </p>
-      ) : null}
-      {row.staff_comment && showExecutors ? (
-        <p>
-          <span className="font-medium text-gray-900">Комментарий сотрудника:</span> {row.staff_comment}
-        </p>
-      ) : null}
-      <div>
-        <p className="font-medium text-gray-900">Работы</p>
+    <div className="space-y-1">
+      <Section title="Работы" total={works.length ? `${formatMoney(worksTotal)} ₽` : null}>
         {works.length === 0 ? (
-          <p className="mt-1 text-gray-500">Нет работ</p>
+          <EmptyLine>Нет работ</EmptyLine>
         ) : (
-          <table className="mt-2 min-w-full text-left text-xs">
-            <thead className="text-gray-500">
-              <tr>
-                <th className="py-1 pr-3">№</th>
-                <th className="py-1 pr-3">Название</th>
-                <th className="py-1 pr-3">Кол-во</th>
-                <th className="py-1 pr-3">Цена</th>
-                <th className="py-1 pr-3">Сумма</th>
-                {showExecutors ? <th className="py-1">Исполнитель</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {works.map((w) => (
-                <tr key={w.id || `${w.position}-${w.title}`}>
-                  <td className="py-1 pr-3">{w.position}</td>
-                  <td className="py-1 pr-3">{w.title}</td>
-                  <td className="py-1 pr-3">{w.qty}</td>
-                  <td className="py-1 pr-3">{formatMoney(w.unit_price)}</td>
-                  <td className="py-1 pr-3">{formatMoney(w.line_sum ?? lineSum(w.qty, w.unit_price))}</td>
-                  {showExecutors ? (
-                    <td className="py-1">
-                      {(w.executors || []).length
-                        ? (w.executors || []).map((ex) => (
+          <LinesTable
+            columns={
+              showExecutors
+                ? ['№', 'Название', 'Кол-во', 'Цена', 'Сумма', 'Исполнитель']
+                : ['№', 'Название', 'Кол-во', 'Цена', 'Сумма']
+            }
+          >
+            {works.map((w) => (
+              <tr key={w.id || `${w.position}-${w.title}`}>
+                <td className="py-1.5 pr-3 tabular-nums text-gray-500">{w.position}</td>
+                <td className="py-1.5 pr-3 font-medium text-gray-900">{w.title}</td>
+                <td className="py-1.5 pr-3 tabular-nums">{w.qty}</td>
+                <td className="py-1.5 pr-3 tabular-nums">{formatMoney(w.unit_price)}</td>
+                <td className="py-1.5 pr-3 tabular-nums">
+                  {formatMoney(w.line_sum ?? lineSum(w.qty, w.unit_price))}
+                </td>
+                {showExecutors ? (
+                  <td className="py-1.5">
+                    {(w.executors || []).length
+                      ? (w.executors || []).map((ex) => (
                           <span key={ex.employee_id} className="mr-2 inline-block">
-                            {ex.employee?.name}
-                            {' '}
-                            {formatMoney(ex.pay_amount)} ₽
+                            {ex.employee?.name} {formatMoney(ex.pay_amount)} ₽
                           </span>
                         ))
-                        : w.executor?.name || '—'}
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      : w.executor?.name || '—'}
+                  </td>
+                ) : null}
+              </tr>
+            ))}
+          </LinesTable>
         )}
-        <p className="mt-2 font-medium text-gray-900">Итого работ: {formatMoney(worksTotal)} ₽</p>
-      </div>
-      <div>
-        <p className="font-medium text-gray-900">Запчасти клиента</p>
+      </Section>
+
+      <Section title="Запчасти клиента">
         {parts.length === 0 ? (
-          <p className="mt-1 text-gray-500">Нет запчастей клиента</p>
+          <EmptyLine>Нет запчастей клиента</EmptyLine>
         ) : (
-          <table className="mt-2 min-w-full text-left text-xs">
-            <thead className="text-gray-500">
-              <tr>
-                <th className="py-1 pr-3">№</th>
-                <th className="py-1 pr-3">Название</th>
-                <th className="py-1">Кол-во</th>
+          <LinesTable columns={['№', 'Название', 'Кол-во']}>
+            {parts.map((p) => (
+              <tr key={p.id || `${p.position}-${p.title}`}>
+                <td className="py-1.5 pr-3 tabular-nums text-gray-500">{p.position}</td>
+                <td className="py-1.5 pr-3 font-medium text-gray-900">{p.title}</td>
+                <td className="py-1.5 tabular-nums">{p.qty}</td>
               </tr>
-            </thead>
-            <tbody>
-              {parts.map((p) => (
-                <tr key={p.id || `${p.position}-${p.title}`}>
-                  <td className="py-1 pr-3">{p.position}</td>
-                  <td className="py-1 pr-3">{p.title}</td>
-                  <td className="py-1">{p.qty}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            ))}
+          </LinesTable>
         )}
-      </div>
-      <div>
-        <p className="font-medium text-gray-900">Запчасти исполнителя</p>
+      </Section>
+
+      <Section title="Запчасти исполнителя" total={shop.length ? `${formatMoney(shopTotal)} ₽` : null}>
         {shop.length === 0 ? (
-          <p className="mt-1 text-gray-500">Нет запчастей исполнителя</p>
+          <EmptyLine>Нет запчастей исполнителя</EmptyLine>
         ) : (
-          <table className="mt-2 min-w-full text-left text-xs">
-            <thead className="text-gray-500">
-              <tr>
-                <th className="py-1 pr-3">№</th>
-                <th className="py-1 pr-3">Название</th>
-                <th className="py-1 pr-3">Кол-во</th>
-                {showExecutors ? <th className="py-1 pr-3">Цена</th> : null}
-                {showExecutors ? <th className="py-1 pr-3">Наценка %</th> : null}
-                <th className="py-1 pr-3">Цена с наценкой</th>
-                <th className="py-1 pr-3">Сумма</th>
-                {showExecutors ? <th className="py-1">Источник</th> : null}
+          <LinesTable
+            columns={
+              showExecutors
+                ? ['№', 'Название', 'Кол-во', 'Цена', 'Наценка %', 'С наценкой', 'Сумма', 'Источник']
+                : ['№', 'Название', 'Кол-во', 'С наценкой', 'Сумма']
+            }
+          >
+            {shop.map((p) => (
+              <tr key={p.id || `${p.position}-${p.title}`}>
+                <td className="py-1.5 pr-3 tabular-nums text-gray-500">{p.position}</td>
+                <td className="py-1.5 pr-3 font-medium text-gray-900">{p.title}</td>
+                <td className="py-1.5 pr-3 tabular-nums">{p.qty}</td>
+                {showExecutors ? (
+                  <td className="py-1.5 pr-3 tabular-nums">{formatMoney(p.unit_price)}</td>
+                ) : null}
+                {showExecutors ? (
+                  <td className="py-1.5 pr-3 tabular-nums">{p.markup_percent}</td>
+                ) : null}
+                <td className="py-1.5 pr-3 tabular-nums">
+                  {formatMoney(p.price_with_markup ?? priceWithMarkup(p.unit_price, p.markup_percent))}
+                </td>
+                <td className="py-1.5 pr-3 tabular-nums">
+                  {formatMoney(p.line_sum ?? shopLineSum(p.qty, p.unit_price, p.markup_percent))}
+                </td>
+                {showExecutors ? <td className="py-1.5">{p.source || '—'}</td> : null}
               </tr>
-            </thead>
-            <tbody>
-              {shop.map((p) => (
-                <tr key={p.id || `${p.position}-${p.title}`}>
-                  <td className="py-1 pr-3">{p.position}</td>
-                  <td className="py-1 pr-3">{p.title}</td>
-                  <td className="py-1 pr-3">{p.qty}</td>
-                  {showExecutors ? <td className="py-1 pr-3">{formatMoney(p.unit_price)}</td> : null}
-                  {showExecutors ? <td className="py-1 pr-3">{p.markup_percent}</td> : null}
-                  <td className="py-1 pr-3">
-                    {formatMoney(p.price_with_markup ?? priceWithMarkup(p.unit_price, p.markup_percent))}
-                  </td>
-                  <td className="py-1 pr-3">
-                    {formatMoney(p.line_sum ?? shopLineSum(p.qty, p.unit_price, p.markup_percent))}
-                  </td>
-                  {showExecutors ? <td className="py-1">{p.source || '—'}</td> : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            ))}
+          </LinesTable>
         )}
-        <p className="mt-2 font-medium text-gray-900">Итого ЗЧ исполнителя: {formatMoney(shopTotal)} ₽</p>
-        <p className="mt-1 font-semibold text-gray-900">Итого заказ: {formatMoney(grand)} ₽</p>
-      </div>
+      </Section>
     </div>
   );
 }
 
-export default function RepairOrderViewModal({ order, loading = false, onClose, onEdit }) {
+function orderTotals(order) {
+  const works = order.works || [];
+  const shop = order.shop_parts || [];
+  const worksTotal = order.works_total ?? works.reduce((s, w) => s + lineSum(w.qty, w.unit_price), 0);
+  const shopTotal =
+    order.shop_parts_total ??
+    shop.reduce(
+      (s, p) => s + (Number(p.line_sum) || shopLineSum(p.qty, p.unit_price, p.markup_percent)),
+      0,
+    );
+  const grand = order.grand_total ?? worksTotal + shopTotal;
+  return { worksTotal, shopTotal, grand };
+}
+
+export default function RepairOrderViewModal({
+  order,
+  loading = false,
+  onClose,
+  onEdit,
+  showExecutors = true,
+}) {
   if (!order && !loading) return null;
+
+  const totals = order ? orderTotals(order) : null;
+  const clientLine = [order?.client?.name, order?.client?.phone].filter(Boolean).join(' · ') || '—';
+  const hasClientComment = Boolean(order?.client_comment?.trim());
+  const hasStaffComment = Boolean(order?.staff_comment?.trim());
 
   return (
     <Modal
       open={!!order || loading}
       onClose={onClose}
-      title={order ? `Заказ-наряд №${order.order_number}` : 'Заказ-наряд'}
       size="lg"
-      footer={order ? (
-        <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            Закрыть
-          </button>
-          {onEdit ? (
-            <button
-              type="button"
-              onClick={() => onEdit(order)}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-            >
-              Изменить
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      title={
+        order ? (
+          <div className="flex flex-wrap items-center gap-2.5 pr-2">
+            <h2 className="text-base font-semibold text-gray-900">Заказ-наряд №{order.order_number}</h2>
+            <OrderStatusBadge status={order.status} />
+          </div>
+        ) : (
+          'Заказ-наряд'
+        )
+      }
+      footer={
+        order ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Итого заказ</p>
+              <p className="mt-0.5 text-lg font-bold tabular-nums text-gray-900">
+                {formatMoney(totals.grand)} ₽
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                Закрыть
+              </button>
+              {onEdit ? (
+                <button
+                  type="button"
+                  onClick={() => onEdit(order)}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  Изменить
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null
+      }
     >
       {loading ? (
-        <p className="text-sm text-gray-500">Загрузка…</p>
+        <p className="py-8 text-center text-sm text-gray-500">Загрузка…</p>
       ) : (
-        <div className="space-y-4 text-sm text-gray-700">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <p>
-              <span className="font-medium text-gray-900">Клиент:</span>{' '}
-              {order.client?.name || '—'}
-              {order.client?.phone ? ` · ${order.client.phone}` : ''}
-            </p>
-            <p>
-              <span className="font-medium text-gray-900">Авто:</span>{' '}
-              {vehicleLabel(order.vehicle)}
-            </p>
-            <p>
-              <span className="font-medium text-gray-900">Дата:</span>{' '}
-              {formatDateTime(order.scheduled_at)}
-            </p>
-            <p>
-              <span className="font-medium text-gray-900">Рабочая зона:</span>{' '}
-              {order.work_zone?.name || '—'}
-            </p>
-            <p>
-              <span className="font-medium text-gray-900">Принял:</span>{' '}
-              {order.accepted_by?.name || '—'}
-            </p>
-            <p className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-gray-900">Статус:</span>
-              <OrderStatusBadge status={order.status} />
-            </p>
-          </div>
-          {order.client_comment ? (
-            <p>
-              <span className="font-medium text-gray-900">Комментарий клиента:</span>{' '}
-              {order.client_comment}
-            </p>
-          ) : null}
-          <OrderLinesExpand row={order} showExecutors />
+        <div className="space-y-5">
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <MetaItem label="Клиент">{clientLine}</MetaItem>
+            <MetaItem label="Авто">{vehicleLabel(order.vehicle)}</MetaItem>
+            <MetaItem label="Дата">{formatDateTime(order.scheduled_at) || '—'}</MetaItem>
+            <MetaItem label="Рабочая зона">{order.work_zone?.name || '—'}</MetaItem>
+            {showExecutors ? (
+              <MetaItem label="Принял">{order.accepted_by?.name || '—'}</MetaItem>
+            ) : null}
+          </dl>
+
+          {(hasClientComment || hasStaffComment || showExecutors) && (
+            <div className="space-y-2 rounded-xl bg-gray-50 px-3.5 py-3 text-sm">
+              <p>
+                <span className="font-medium text-gray-900">Комментарий клиента</span>
+                <span className="mt-0.5 block whitespace-pre-wrap text-gray-700">
+                  {order.client_comment?.trim() || '—'}
+                </span>
+              </p>
+              {showExecutors ? (
+                <p className="border-t border-gray-100 pt-2">
+                  <span className="font-medium text-gray-900">Комментарий сотрудника</span>
+                  <span className="mt-0.5 block whitespace-pre-wrap text-gray-700">
+                    {order.staff_comment?.trim() || '—'}
+                  </span>
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          <OrderLinesExpand row={order} showExecutors={showExecutors} />
         </div>
       )}
     </Modal>

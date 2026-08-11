@@ -1,15 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
+import Modal from '../../components/UI/Modal';
+import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 
 const inputClass =
-  'mt-1 block w-full max-w-xl rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
 
-const wideInputClass = inputClass;
+const fieldClass =
+  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
 
-const btnPrimary = 'rounded-xl bg-[#00a046] px-4 py-2 text-sm font-semibold text-white hover:bg-[#008f3e]';
-const btnGhost = 'rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50';
+const btnPrimary =
+  'inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60';
+
+const btnGhost =
+  'inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50';
 
 const SALARY_LABELS = {
   fixed: 'Фикс',
@@ -17,10 +24,38 @@ const SALARY_LABELS = {
   daily_rate: 'Ставка/день',
 };
 
-function WorksModal({ works, loading, onClose, onAdd, onRefresh }) {
+function employeeFormFromRow(emp) {
+  return {
+    name: emp?.name || '',
+    phone: emp?.phone || '',
+    position: emp?.position || '',
+    salary_type: emp?.salary_type || 'percent_work',
+    salary_amount: emp?.salary_amount != null ? String(emp.salary_amount) : '0',
+    work_percent: emp?.work_percent != null ? String(emp.work_percent) : '0',
+  };
+}
+
+function salarySummary(emp) {
+  const base =
+    emp.salary_type === 'percent_work'
+      ? `${emp.work_percent}%`
+      : `${Number(emp.salary_amount).toLocaleString('ru-RU')} ₽`;
+  const extra =
+    emp.salary_type !== 'percent_work' && Number(emp.work_percent) > 0 ? ` · ${emp.work_percent}%` : '';
+  return `${SALARY_LABELS[emp.salary_type] || emp.salary_type} · ${base}${extra}`;
+}
+
+function WorksModal({ open, works, loading, onClose, onAdd, onRefresh }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setName('');
+    setPrice('');
+    setSaving(false);
+  }, [open]);
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -38,77 +73,60 @@ function WorksModal({ works, loading, onClose, onAdd, onRefresh }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h3 className="text-lg font-semibold text-gray-900">Работы</h3>
-          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">×</button>
-        </div>
-        <form onSubmit={handleAdd} className="border-b border-gray-100 p-4">
-          <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1">
-              <label htmlFor="work-name" className="mb-1 block text-xs font-medium text-gray-500">
-                Название
-              </label>
-              <input
-                id="work-name"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                placeholder="Например, замена масла"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div className="w-36 shrink-0 sm:w-40">
-              <label htmlFor="work-price" className="mb-1 block text-xs font-medium text-gray-500">
-                Цена, ₽
-              </label>
-              <input
-                id="work-price"
-                type="text"
-                inputMode="decimal"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                placeholder=""
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-              />
-            </div>
-            <button type="submit" disabled={saving} className={`${btnPrimary} mb-0.5 shrink-0 px-3`}>
-              +
-            </button>
-          </div>
-        </form>
-        <div className="p-4">
-          {loading ? (
-            <p className="text-sm text-gray-500">Загрузка…</p>
-          ) : works.length === 0 ? (
-            <p className="text-sm text-gray-500">Пока пусто</p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {works.filter((w) => w.is_active).map((w) => (
-                <li key={w.id} className="flex items-center justify-between py-2.5 text-sm">
-                  <span className="font-medium text-gray-900">{w.name}</span>
-                  <span className="text-gray-600">{Number(w.default_unit_price).toLocaleString('ru-RU')} ₽</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+  const activeWorks = useMemo(() => works.filter((w) => w.is_active), [works]);
 
-function employeeFormFromRow(emp) {
-  return {
-    name: emp?.name || '',
-    phone: emp?.phone || '',
-    position: emp?.position || '',
-    salary_type: emp?.salary_type || 'percent_work',
-    salary_amount: emp?.salary_amount != null ? String(emp.salary_amount) : '0',
-    work_percent: emp?.work_percent != null ? String(emp.work_percent) : '0',
-  };
+  return (
+    <Modal open={open} onClose={onClose} title="Работы" size="md">
+      <form onSubmit={handleAdd} className="mb-4 border-b border-gray-100 pb-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <label htmlFor="work-name" className="mb-1 block text-xs font-medium text-gray-500">
+              Название
+            </label>
+            <input
+              id="work-name"
+              className={fieldClass}
+              placeholder="Например, замена масла"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="w-full sm:w-36">
+            <label htmlFor="work-price" className="mb-1 block text-xs font-medium text-gray-500">
+              Цена, ₽
+            </label>
+            <input
+              id="work-price"
+              type="text"
+              inputMode="decimal"
+              className={fieldClass}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
+          </div>
+          <button type="submit" disabled={saving} className={`${btnPrimary} shrink-0`}>
+            {saving ? '…' : 'Добавить'}
+          </button>
+        </div>
+      </form>
+      {loading ? (
+        <p className="py-6 text-center text-sm text-gray-500">Загрузка…</p>
+      ) : activeWorks.length === 0 ? (
+        <p className="py-6 text-center text-sm text-gray-500">Пока пусто</p>
+      ) : (
+        <ul className="divide-y divide-gray-100">
+          {activeWorks.map((w) => (
+            <li key={w.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+              <span className="min-w-0 truncate font-medium text-gray-900">{w.name}</span>
+              <span className="shrink-0 tabular-nums text-gray-600">
+                {Number(w.default_unit_price).toLocaleString('ru-RU')} ₽
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
+  );
 }
 
 function EmployeeEditModal({ employee, onClose, onSaved }) {
@@ -152,34 +170,51 @@ function EmployeeEditModal({ employee, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-lg font-semibold text-gray-900">Сотрудник</h3>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-700">×</button>
+    <Modal
+      open={Boolean(employee)}
+      onClose={onClose}
+      title="Сотрудник"
+      size="sm"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className={btnGhost} disabled={saving}>
+            Отмена
+          </button>
+          <button type="submit" form="edit-service-employee" disabled={saving} className={btnPrimary}>
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </button>
         </div>
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+      }
+    >
+      <form id="edit-service-employee" onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Имя</label>
           <input
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="Имя"
+            className={inputClass}
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Телефон</label>
           <input
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="Телефон"
+            className={inputClass}
             value={form.phone}
             onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Должность</label>
           <input
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            placeholder="Должность"
+            className={inputClass}
             value={form.position}
             onChange={(e) => setForm((p) => ({ ...p, position: e.target.value }))}
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Тип оплаты</label>
           <select
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className={inputClass}
             value={form.salary_type}
             onChange={(e) => setForm((p) => ({ ...p, salary_type: e.target.value }))}
           >
@@ -187,44 +222,47 @@ function EmployeeEditModal({ employee, onClose, onSaved }) {
             <option value="fixed">Фикс</option>
             <option value="daily_rate">Ставка/день</option>
           </select>
-          {form.salary_type === 'percent_work' ? (
+        </div>
+        {form.salary_type === 'percent_work' ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">% от работы</label>
             <input
               type="number"
               min={0}
               max={100}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              placeholder="% от работы"
+              className={inputClass}
               value={form.work_percent}
               onChange={(e) => setForm((p) => ({ ...p, work_percent: e.target.value }))}
             />
-          ) : (
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Сумма, ₽</label>
             <input
               type="number"
               min={0}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              placeholder="₽"
+              className={inputClass}
               value={form.salary_amount}
               onChange={(e) => setForm((p) => ({ ...p, salary_amount: e.target.value }))}
             />
-          )}
-          {form.salary_type !== 'percent_work' ? (
+          </div>
+        )}
+        {form.salary_type !== 'percent_work' ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Доп. % от работы</label>
             <input
               type="number"
               min={0}
               max={100}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              placeholder="% от работы"
+              className={inputClass}
               value={form.work_percent}
               onChange={(e) => setForm((p) => ({ ...p, work_percent: e.target.value }))}
             />
-          ) : null}
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          <button type="submit" disabled={saving} className={`w-full ${btnPrimary} py-2.5 disabled:opacity-60`}>
-            {saving ? 'Сохранение…' : 'Сохранить'}
-          </button>
-        </form>
-      </div>
-    </div>
+          </div>
+        ) : null}
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      </form>
+    </Modal>
   );
 }
 
@@ -235,73 +273,86 @@ function EmployeeStatsModal({ employee, stats, loading, period, onPeriod, onClos
     { id: 'month', label: 'Месяц' },
     { id: 'year', label: 'Год' },
   ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{employee?.name}</h3>
-            <p className="text-sm text-gray-500">{employee?.position || SALARY_LABELS[employee?.salary_type]}</p>
+    <Modal
+      open={Boolean(employee)}
+      onClose={onClose}
+      title={employee?.name || 'ЗП'}
+      size="sm"
+      footer={
+        <div className="flex justify-end">
+          <button type="button" onClick={onClose} className={btnGhost}>
+            Закрыть
+          </button>
+        </div>
+      }
+    >
+      <p className="mb-4 text-sm text-gray-500">
+        {employee?.position || SALARY_LABELS[employee?.salary_type] || 'Сотрудник'}
+      </p>
+      <div className="flex gap-1 rounded-full bg-gray-100 p-1">
+        {periods.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onPeriod(p.id)}
+            className={`flex-1 rounded-full py-1.5 text-xs font-medium transition ${
+              period === p.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {loading ? (
+        <p className="mt-6 text-sm text-gray-500">Считаем…</p>
+      ) : stats ? (
+        <div className="mt-5 space-y-3">
+          <div className="rounded-xl bg-gray-50 px-4 py-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500">ЗП</p>
+            <p className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
+              {Number(stats.total).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽
+            </p>
           </div>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-700">×</button>
-        </div>
-        <div className="mt-4 flex gap-1 rounded-xl bg-gray-100 p-1">
-          {periods.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => onPeriod(p.id)}
-              className={`flex-1 rounded-lg py-1.5 text-xs font-medium ${
-                period === p.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        {loading ? (
-          <p className="mt-6 text-sm text-gray-500">Считаем…</p>
-        ) : stats ? (
-          <div className="mt-5 space-y-3">
-            <div className="rounded-xl bg-[#f7f7f5] p-4">
-              <p className="text-xs uppercase text-gray-500">ЗП</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {Number(stats.total).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₽
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="rounded-xl bg-gray-50 px-2 py-3">
+              <p className="text-gray-500">Работы</p>
+              <p className="mt-1 font-semibold tabular-nums text-gray-900">
+                {Number(stats.from_works).toLocaleString('ru-RU')}
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="rounded-lg border border-gray-100 p-2">
-                <p className="text-gray-500">Работы</p>
-                <p className="font-semibold text-gray-900">{Number(stats.from_works).toLocaleString('ru-RU')}</p>
-              </div>
-              <div className="rounded-lg border border-gray-100 p-2">
-                <p className="text-gray-500">День</p>
-                <p className="font-semibold text-gray-900">{Number(stats.from_daily).toLocaleString('ru-RU')}</p>
-              </div>
-              <div className="rounded-lg border border-gray-100 p-2">
-                <p className="text-gray-500">Фикс</p>
-                <p className="font-semibold text-gray-900">{Number(stats.from_fixed).toLocaleString('ru-RU')}</p>
-              </div>
+            <div className="rounded-xl bg-gray-50 px-2 py-3">
+              <p className="text-gray-500">День</p>
+              <p className="mt-1 font-semibold tabular-nums text-gray-900">
+                {Number(stats.from_daily).toLocaleString('ru-RU')}
+              </p>
             </div>
-            <p className="text-xs text-gray-500">Заказов: {stats.completed_orders}</p>
+            <div className="rounded-xl bg-gray-50 px-2 py-3">
+              <p className="text-gray-500">Фикс</p>
+              <p className="mt-1 font-semibold tabular-nums text-gray-900">
+                {Number(stats.from_fixed).toLocaleString('ru-RU')}
+              </p>
+            </div>
           </div>
-        ) : null}
-      </div>
-    </div>
+          <p className="text-xs text-gray-500">Заказов: {stats.completed_orders}</p>
+        </div>
+      ) : null}
+    </Modal>
   );
 }
 
-
-function WorkZoneModal({ mode, zone, onClose, onSaved }) {
+function WorkZoneModal({ open, mode, zone, onClose, onSaved }) {
   const [name, setName] = useState(zone?.name || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!open) return;
     setName(zone?.name || '');
     setError('');
-  }, [zone, mode]);
+    setSaving(false);
+  }, [zone, mode, open]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -334,38 +385,41 @@ function WorkZoneModal({ mode, zone, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <form
-        onSubmit={handleSubmit}
-        className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
-      >
-        <h3 className="text-base font-semibold text-gray-900">
-          {mode === 'create' ? 'Новая зона' : 'Переименовать'}
-        </h3>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={mode === 'create' ? 'Новая зона' : 'Переименовать'}
+      size="sm"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className={btnGhost} disabled={saving}>
+            Отмена
+          </button>
+          <button type="submit" form="work-zone-form" disabled={saving} className={btnPrimary}>
+            {saving ? '…' : 'Сохранить'}
+          </button>
+        </div>
+      }
+    >
+      <form id="work-zone-form" onSubmit={handleSubmit}>
+        <label className="block text-sm font-medium text-gray-700">Название</label>
         <input
           autoFocus
-          className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className={inputClass}
           placeholder="Название"
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={120}
         />
         {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className={btnGhost}>Отмена</button>
-          <button type="submit" disabled={saving} className={btnPrimary}>
-            {saving ? '…' : 'Сохранить'}
-          </button>
-        </div>
       </form>
-    </div>
+    </Modal>
   );
 }
 
-
 export default function AutoserviceSettingsPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
+  const [tab, setTab] = useState('general');
   const [publicName, setPublicName] = useState('');
   const [publicDescription, setPublicDescription] = useState('');
   const [workZones, setWorkZones] = useState([]);
@@ -391,7 +445,6 @@ export default function AutoserviceSettingsPage() {
   const [employeeStats, setEmployeeStats] = useState(null);
   const [employeeStatsLoading, setEmployeeStatsLoading] = useState(false);
   const [employeeStatsPeriod, setEmployeeStatsPeriod] = useState('month');
-  const [employeeActionMenuId, setEmployeeActionMenuId] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
 
   const loadSettings = useCallback(async () => {
@@ -451,6 +504,9 @@ export default function AutoserviceSettingsPage() {
   useEffect(() => {
     if (isReady && isAuthenticated) load();
   }, [isReady, isAuthenticated, load]);
+
+  const activeEmployees = useMemo(() => employees.filter((e) => e.is_active), [employees]);
+  const activeWorks = useMemo(() => works.filter((w) => w.is_active), [works]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -528,7 +584,6 @@ export default function AutoserviceSettingsPage() {
   };
 
   const openEmployeeStats = async (employee, period = 'month') => {
-    setEmployeeActionMenuId(null);
     setStatsEmployee(employee);
     setEmployeeStatsPeriod(period);
     setEmployeeStats(null);
@@ -545,13 +600,7 @@ export default function AutoserviceSettingsPage() {
     }
   };
 
-  const startEditEmployee = (employee) => {
-    setEmployeeActionMenuId(null);
-    setEditingEmployee(employee);
-  };
-
   const archiveEmployee = async (employeeId) => {
-    setEmployeeActionMenuId(null);
     if (!window.confirm('Удалить сотрудника из списка?')) return;
     setError('');
     try {
@@ -585,230 +634,408 @@ export default function AutoserviceSettingsPage() {
   if (!isAuthenticated || !user) return null;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900">Настройки автосервиса</h1>
-      <p className="mt-1 text-sm text-gray-500">Параметры организации для записей и слотов</p>
+    <div className="w-full min-w-0">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Настройки</h1>
+          <p className="mt-0.5 text-sm text-gray-500">Параметры автосервиса, зоны, работы и сотрудники</p>
+        </div>
+        <button
+          type="button"
+          onClick={load}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900 sm:self-auto"
+          title="Обновить"
+          aria-label="Обновить"
+        >
+          <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"
+            />
+          </svg>
+        </button>
+      </div>
 
-      {error && (
-        <p className="mt-4 text-sm text-red-600" role="alert">
+      <UnderlineTabs
+        className="mb-4"
+        ariaLabel="Разделы настроек"
+        gapClassName="gap-4"
+        tabs={[
+          { id: 'general', label: 'Общее' },
+          { id: 'zones', label: 'Зоны' },
+          { id: 'works', label: 'Работы' },
+          { id: 'employees', label: 'Сотрудники' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+
+      {error ? (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}
         </p>
-      )}
-      {savedMessage && !error && (
-        <p className="mt-4 text-sm text-emerald-700" role="status">
+      ) : null}
+      {savedMessage && !error ? (
+        <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
           {savedMessage}
         </p>
-      )}
+      ) : null}
 
       {loading ? (
-        <p className="mt-8 text-sm text-gray-500">Загрузка…</p>
+        <p className="py-12 text-center text-sm text-gray-500">Загрузка…</p>
       ) : (
         <>
-          <form onSubmit={handleSave} className="mt-8 space-y-6">
-            <div>
-              <label htmlFor="public_name" className="block text-sm font-medium text-gray-700">
-                Название автосервиса
-              </label>
-              <input
-                id="public_name"
-                value={publicName}
-                onChange={(ev) => setPublicName(ev.target.value)}
-                maxLength={160}
-                className={wideInputClass}
-              />
-            </div>
-            <div>
-              <label htmlFor="public_description" className="block text-sm font-medium text-gray-700">
-                Описание
-              </label>
-              <textarea
-                id="public_description"
-                rows={3}
-                value={publicDescription}
-                onChange={(ev) => setPublicDescription(ev.target.value)}
-                maxLength={2000}
-                className={wideInputClass}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-          </form>
-
-          <section className="mt-10 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-gray-900">Рабочие зоны</h2>
-              <button
-                type="button"
-                onClick={() => setZoneModal({ mode: 'create' })}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-              >
-                Добавить
+          {tab === 'general' ? (
+            <form onSubmit={handleSave} className="max-w-2xl space-y-5">
+              <div>
+                <label htmlFor="public_name" className="block text-sm font-medium text-gray-700">
+                  Название автосервиса
+                </label>
+                <input
+                  id="public_name"
+                  value={publicName}
+                  onChange={(ev) => setPublicName(ev.target.value)}
+                  maxLength={160}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label htmlFor="public_description" className="block text-sm font-medium text-gray-700">
+                  Описание
+                </label>
+                <textarea
+                  id="public_description"
+                  rows={4}
+                  value={publicDescription}
+                  onChange={(ev) => setPublicDescription(ev.target.value)}
+                  maxLength={2000}
+                  className={inputClass}
+                />
+              </div>
+              <button type="submit" disabled={saving} className={btnPrimary}>
+                {saving ? 'Сохранение…' : 'Сохранить'}
               </button>
-            </div>
+            </form>
+          ) : null}
 
-            <div className="mt-3 divide-y divide-gray-100">
-              {workZonesLoading ? (
-                <p className="py-4 text-sm text-gray-500">…</p>
-              ) : workZones.length === 0 ? (
-                <p className="py-4 text-sm text-gray-400">—</p>
-              ) : (
-                workZones.map((zone) => (
-                  <div key={zone.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <span className="min-w-0 truncate text-sm font-medium text-gray-900">{zone.name}</span>
-                    <div className="flex shrink-0 items-center gap-3 text-sm">
-                      <button
-                        type="button"
-                        className="text-indigo-700 hover:underline"
-                        onClick={() => setZoneModal({ mode: 'edit', zone })}
+          {tab === 'zones' ? (
+            <section>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-gray-500">
+                  {workZonesLoading ? 'Загрузка…' : `${workZones.length} зон`}
+                </p>
+                <button type="button" onClick={() => setZoneModal({ mode: 'create' })} className={btnPrimary}>
+                  Добавить
+                </button>
+              </div>
+              <div className="hidden md:block">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <th className="py-3 pr-3">Название</th>
+                      <th className="w-40 py-3 text-right">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {workZonesLoading ? (
+                      <tr>
+                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                          Загрузка…
+                        </td>
+                      </tr>
+                    ) : workZones.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                          Зон пока нет
+                        </td>
+                      </tr>
+                    ) : (
+                      workZones.map((zone) => (
+                        <tr key={zone.id} className="transition-colors hover:bg-gray-50/70">
+                          <td className="py-3 pr-3 align-middle font-medium text-gray-900">{zone.name}</td>
+                          <td className="py-3 text-right align-middle">
+                            <ActionsDropdown
+                              menuClassName="w-40 z-50"
+                              estimatedMenuHeight={100}
+                              showLabel
+                              buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                            >
+                              <ActionsDropdownItem onClick={() => setZoneModal({ mode: 'edit', zone })}>
+                                Изменить
+                              </ActionsDropdownItem>
+                              <ActionsDropdownItem danger onClick={() => removeWorkZone(zone.id)}>
+                                Удалить
+                              </ActionsDropdownItem>
+                            </ActionsDropdown>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="md:hidden">
+                {workZonesLoading ? (
+                  <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+                ) : workZones.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-gray-500">Зон пока нет</p>
+                ) : (
+                  workZones.map((zone) => (
+                    <div key={zone.id} className="flex items-center justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0">
+                      <p className="min-w-0 truncate text-sm font-semibold text-gray-900">{zone.name}</p>
+                      <ActionsDropdown
+                        menuClassName="w-40 z-50"
+                        estimatedMenuHeight={100}
+                        showLabel={false}
+                        buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50"
                       >
-                        Изменить
-                      </button>
-                      <button
-                        type="button"
-                        className="text-red-600 hover:underline"
-                        onClick={() => removeWorkZone(zone.id)}
-                      >
-                        Удалить
-                      </button>
+                        <ActionsDropdownItem onClick={() => setZoneModal({ mode: 'edit', zone })}>
+                          Изменить
+                        </ActionsDropdownItem>
+                        <ActionsDropdownItem danger onClick={() => removeWorkZone(zone.id)}>
+                          Удалить
+                        </ActionsDropdownItem>
+                      </ActionsDropdown>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+                  ))
+                )}
+              </div>
+            </section>
+          ) : null}
 
-          <section className="mt-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-gray-900">Работы</h2>
-              <button type="button" className={btnGhost} onClick={() => setWorksOpen(true)}>
-                Посмотреть работы
-              </button>
-            </div>
-          </section>
+          {tab === 'works' ? (
+            <section>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-gray-500">
+                  {worksLoading ? 'Загрузка…' : `${activeWorks.length} работ`}
+                </p>
+                <button type="button" onClick={() => setWorksOpen(true)} className={btnPrimary}>
+                  Управление
+                </button>
+              </div>
+              <div className="hidden md:block">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <th className="py-3 pr-3">Название</th>
+                      <th className="w-36 py-3 text-right">Цена</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {worksLoading ? (
+                      <tr>
+                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                          Загрузка…
+                        </td>
+                      </tr>
+                    ) : activeWorks.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                          Работ пока нет
+                        </td>
+                      </tr>
+                    ) : (
+                      activeWorks.map((w) => (
+                        <tr key={w.id} className="transition-colors hover:bg-gray-50/70">
+                          <td className="py-3 pr-3 align-middle font-medium text-gray-900">{w.name}</td>
+                          <td className="py-3 text-right align-middle tabular-nums text-gray-700">
+                            {Number(w.default_unit_price).toLocaleString('ru-RU')} ₽
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="md:hidden">
+                {worksLoading ? (
+                  <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+                ) : activeWorks.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-gray-500">Работ пока нет</p>
+                ) : (
+                  activeWorks.map((w) => (
+                    <div
+                      key={w.id}
+                      className="flex items-center justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0"
+                    >
+                      <p className="min-w-0 truncate text-sm font-semibold text-gray-900">{w.name}</p>
+                      <p className="shrink-0 text-sm tabular-nums text-gray-600">
+                        {Number(w.default_unit_price).toLocaleString('ru-RU')} ₽
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          ) : null}
 
-          <section className="mt-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-gray-900">Сотрудники</h2>
-              <div className="flex items-center gap-2">
+          {tab === 'employees' ? (
+            <section>
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-gray-500">
+                  {employeesLoading ? 'Загрузка…' : `${activeEmployees.length} сотрудников`}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="h-10 w-20 rounded-full border-0 bg-gray-100 px-3 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+                    placeholder="%"
+                    value={bulkPercent}
+                    onChange={(e) => setBulkPercent(e.target.value)}
+                    aria-label="Процент для всех"
+                  />
+                  <button type="button" className={btnGhost} onClick={applyBulkPercent}>
+                    % всем
+                  </button>
+                </div>
+              </div>
+
+              <form
+                onSubmit={addEmployee}
+                className="mb-5 grid gap-2 rounded-xl bg-gray-50 p-3 sm:grid-cols-[1.4fr_1fr_0.8fr_auto]"
+              >
+                <input
+                  className={fieldClass}
+                  placeholder="Имя"
+                  value={newEmployee.name}
+                  onChange={(e) => setNewEmployee((p) => ({ ...p, name: e.target.value }))}
+                />
+                <select
+                  className={fieldClass}
+                  value={newEmployee.salary_type}
+                  onChange={(e) => setNewEmployee((p) => ({ ...p, salary_type: e.target.value }))}
+                >
+                  <option value="percent_work">% от работ</option>
+                  <option value="fixed">Фикс</option>
+                  <option value="daily_rate">Ставка/день</option>
+                </select>
                 <input
                   type="number"
                   min={0}
-                  max={100}
-                  className="w-16 rounded-lg border border-gray-200 px-2 py-1.5 text-sm"
-                  placeholder="%"
-                  value={bulkPercent}
-                  onChange={(e) => setBulkPercent(e.target.value)}
+                  className={fieldClass}
+                  placeholder={newEmployee.salary_type === 'percent_work' ? '%' : '₽'}
+                  value={
+                    newEmployee.salary_type === 'percent_work'
+                      ? newEmployee.work_percent
+                      : newEmployee.salary_amount
+                  }
+                  onChange={(e) =>
+                    setNewEmployee((p) => ({
+                      ...p,
+                      ...(p.salary_type === 'percent_work'
+                        ? { work_percent: e.target.value }
+                        : { salary_amount: e.target.value }),
+                    }))
+                  }
                 />
-                <button type="button" className={btnGhost} onClick={applyBulkPercent}>
-                  % всем
+                <button type="submit" className={btnPrimary}>
+                  Добавить
                 </button>
+              </form>
+
+              <div className="hidden md:block">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <th className="py-3 pr-3">Сотрудник</th>
+                      <th className="py-3 pr-3">Оплата</th>
+                      <th className="w-28 py-3 text-right">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {employeesLoading ? (
+                      <tr>
+                        <td colSpan={3} className="py-12 text-center text-gray-500">
+                          Загрузка…
+                        </td>
+                      </tr>
+                    ) : activeEmployees.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="py-12 text-center text-gray-500">
+                          Сотрудников пока нет
+                        </td>
+                      </tr>
+                    ) : (
+                      activeEmployees.map((emp) => (
+                        <tr key={emp.id} className="transition-colors hover:bg-gray-50/70">
+                          <td className="py-3 pr-3 align-middle">
+                            <div className="font-medium text-gray-900">{emp.name}</div>
+                            {emp.position ? (
+                              <div className="mt-0.5 text-xs text-gray-500">{emp.position}</div>
+                            ) : null}
+                          </td>
+                          <td className="py-3 pr-3 align-middle text-gray-600">{salarySummary(emp)}</td>
+                          <td className="py-3 text-right align-middle">
+                            <ActionsDropdown
+                              menuClassName="w-40 z-50"
+                              estimatedMenuHeight={140}
+                              showLabel
+                              buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                            >
+                              <ActionsDropdownItem onClick={() => setEditingEmployee(emp)}>
+                                Изменить
+                              </ActionsDropdownItem>
+                              <ActionsDropdownItem onClick={() => openEmployeeStats(emp)}>ЗП</ActionsDropdownItem>
+                              <ActionsDropdownItem danger onClick={() => archiveEmployee(emp.id)}>
+                                Удалить
+                              </ActionsDropdownItem>
+                            </ActionsDropdown>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <form onSubmit={addEmployee} className="mt-4 grid gap-2 sm:grid-cols-5">
-              <input
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm sm:col-span-2"
-                placeholder="Имя"
-                value={newEmployee.name}
-                onChange={(e) => setNewEmployee((p) => ({ ...p, name: e.target.value }))}
-              />
-              <select
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                value={newEmployee.salary_type}
-                onChange={(e) => setNewEmployee((p) => ({ ...p, salary_type: e.target.value }))}
-              >
-                <option value="percent_work">% от работ</option>
-                <option value="fixed">Фикс</option>
-                <option value="daily_rate">Ставка/день</option>
-              </select>
-              <input
-                type="number"
-                min={0}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                placeholder={newEmployee.salary_type === 'percent_work' ? '%' : '₽'}
-                value={newEmployee.salary_type === 'percent_work' ? newEmployee.work_percent : newEmployee.salary_amount}
-                onChange={(e) => setNewEmployee((p) => ({
-                  ...p,
-                  ...(p.salary_type === 'percent_work'
-                    ? { work_percent: e.target.value }
-                    : { salary_amount: e.target.value }),
-                }))}
-              />
-              <button type="submit" className={btnPrimary}>+</button>
-            </form>
-            <ul className="mt-4 divide-y divide-gray-100">
-              {employeesLoading ? (
-                <li className="py-4 text-sm text-gray-500">Загрузка…</li>
-              ) : employees.filter((e) => e.is_active).length === 0 ? (
-                <li className="py-4 text-sm text-gray-500">Пока нет</li>
-              ) : (
-                employees.filter((e) => e.is_active).map((emp) => (
-                  <li key={emp.id} className="relative flex items-center justify-between gap-3 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900">{emp.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {SALARY_LABELS[emp.salary_type]}
-                        {emp.salary_type === 'percent_work'
-                          ? ` · ${emp.work_percent}%`
-                          : ` · ${Number(emp.salary_amount).toLocaleString('ru-RU')} ₽`}
-                        {emp.salary_type !== 'percent_work' && Number(emp.work_percent) > 0
-                          ? ` · ${emp.work_percent}%`
-                          : ''}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEmployeeActionMenuId(employeeActionMenuId === emp.id ? null : emp.id)}
-                      className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-[#00a046] hover:bg-green-50"
+
+              <div className="md:hidden">
+                {employeesLoading ? (
+                  <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+                ) : activeEmployees.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-gray-500">Сотрудников пока нет</p>
+                ) : (
+                  activeEmployees.map((emp) => (
+                    <div
+                      key={emp.id}
+                      className="flex items-start justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0"
                     >
-                      Действия
-                    </button>
-                    {employeeActionMenuId === emp.id ? (
-                      <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
-                        <button
-                          type="button"
-                          className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                          onClick={() => startEditEmployee(emp)}
-                        >
-                          Изменить
-                        </button>
-                        <button
-                          type="button"
-                          className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                          onClick={() => openEmployeeStats(emp)}
-                        >
-                          ЗП
-                        </button>
-                        <button
-                          type="button"
-                          className="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
-                          onClick={() => archiveEmployee(emp.id)}
-                        >
-                          Удалить
-                        </button>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-900">{emp.name}</p>
+                        <p className="mt-0.5 text-xs text-gray-500">{salarySummary(emp)}</p>
                       </div>
-                    ) : null}
-                  </li>
-                ))
-              )}
-            </ul>
-          </section>
+                      <ActionsDropdown
+                        menuClassName="w-40 z-50"
+                        estimatedMenuHeight={140}
+                        showLabel={false}
+                        buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50"
+                      >
+                        <ActionsDropdownItem onClick={() => setEditingEmployee(emp)}>Изменить</ActionsDropdownItem>
+                        <ActionsDropdownItem onClick={() => openEmployeeStats(emp)}>ЗП</ActionsDropdownItem>
+                        <ActionsDropdownItem danger onClick={() => archiveEmployee(emp.id)}>
+                          Удалить
+                        </ActionsDropdownItem>
+                      </ActionsDropdown>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          ) : null}
         </>
       )}
 
-      {worksOpen ? (
-        <WorksModal
-          works={works}
-          loading={worksLoading}
-          onClose={() => setWorksOpen(false)}
-          onAdd={addWork}
-          onRefresh={loadWorks}
-        />
-      ) : null}
+      <WorksModal
+        open={worksOpen}
+        works={works}
+        loading={worksLoading}
+        onClose={() => setWorksOpen(false)}
+        onAdd={addWork}
+        onRefresh={loadWorks}
+      />
 
       {editingEmployee ? (
         <EmployeeEditModal
@@ -818,29 +1045,25 @@ export default function AutoserviceSettingsPage() {
         />
       ) : null}
 
-      {statsEmployee ? (
-        <EmployeeStatsModal
-          employee={statsEmployee}
-          stats={employeeStats}
-          loading={employeeStatsLoading}
-          period={employeeStatsPeriod}
-          onPeriod={reloadEmployeeStats}
-          onClose={() => {
-            setStatsEmployee(null);
-            setEmployeeStats(null);
-          }}
-        />
-      ) : null}
+      <EmployeeStatsModal
+        employee={statsEmployee}
+        stats={employeeStats}
+        loading={employeeStatsLoading}
+        period={employeeStatsPeriod}
+        onPeriod={reloadEmployeeStats}
+        onClose={() => {
+          setStatsEmployee(null);
+          setEmployeeStats(null);
+        }}
+      />
 
-      {zoneModal ? (
-        <WorkZoneModal
-          mode={zoneModal.mode}
-          zone={zoneModal.zone}
-          onClose={() => setZoneModal(null)}
-          onSaved={loadWorkZones}
-        />
-      ) : null}
-
+      <WorkZoneModal
+        open={Boolean(zoneModal)}
+        mode={zoneModal?.mode || 'create'}
+        zone={zoneModal?.zone}
+        onClose={() => setZoneModal(null)}
+        onSaved={loadWorkZones}
+      />
     </div>
   );
 }

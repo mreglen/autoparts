@@ -327,7 +327,6 @@ export default function AutoserviceOrdersPage() {
               <th className="w-28 py-3 pr-3">Заказ</th>
               <th className="py-3 pr-3">Автомобиль</th>
               <th className="py-3 pr-3">Клиент</th>
-              <th className="hidden py-3 pr-3 lg:table-cell">Комментарий</th>
               <th className="w-40 py-3 pr-3">Дата</th>
               <th className="hidden py-3 pr-3 xl:table-cell">Зона</th>
               <th className="hidden py-3 pr-3 xl:table-cell">Принял</th>
@@ -338,13 +337,13 @@ export default function AutoserviceOrdersPage() {
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-gray-500">
+                <td colSpan={8} className="py-12 text-center text-gray-500">
                   Загрузка…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-gray-500">
+                <td colSpan={8} className="py-12 text-center text-gray-500">
                   {viewHistory ? 'В истории пока нет заказ-нарядов' : 'Активных заказ-нарядов нет'}
                 </td>
               </tr>
@@ -367,9 +366,6 @@ export default function AutoserviceOrdersPage() {
                   <td className="py-3 pr-3 align-middle">
                     <div className="font-medium text-gray-900">{row.client?.name || '—'}</div>
                     {row.client?.phone ? <div className="mt-0.5 text-xs text-gray-500">{row.client.phone}</div> : null}
-                  </td>
-                  <td className="hidden max-w-[12rem] truncate py-3 pr-3 align-middle text-gray-500 lg:table-cell" title={row.client_comment || ''}>
-                    {row.client_comment || '—'}
                   </td>
                   <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">
                     {formatDateTime(row.scheduled_at)}
