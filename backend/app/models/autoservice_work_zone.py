@@ -4,10 +4,10 @@ from sqlalchemy.orm import relationship
 from app.db.database import Base
 
 
-class AutoserviceLift(Base):
-    __tablename__ = "autoservice_lifts"
+class AutoserviceWorkZone(Base):
+    __tablename__ = "autoservice_work_zones"
     __table_args__ = (
-        UniqueConstraint("organization_id", "name", name="uq_autoservice_lift_org_name"),
+        UniqueConstraint("organization_id", "name", name="uq_autoservice_work_zone_org_name"),
     )
 
     id = Column(Integer, primary_key=True)

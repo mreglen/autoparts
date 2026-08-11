@@ -11,20 +11,20 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db.database import Base
-from app.models.autoservice_lift import AutoserviceLift
-from app.services.autoservice_lift_helpers import (
-    next_lift_name,
-    validate_lift_id,
+from app.models.autoservice_work_zone import AutoserviceWorkZone
+from app.services.autoservice_work_zone_helpers import (
+    next_work_zone_name,
     validate_schedule_end,
+    validate_work_zone_id,
 )
 
 
-class AutoserviceLiftHelperTests(unittest.TestCase):
+class AutoserviceWorkZoneHelperTests(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(
             bind=self.engine,
-            tables=[AutoserviceLift.__table__],
+            tables=[AutoserviceWorkZone.__table__],
         )
         self.Session = sessionmaker(bind=self.engine)
         self.db = self.Session()
@@ -32,35 +32,35 @@ class AutoserviceLiftHelperTests(unittest.TestCase):
     def tearDown(self):
         self.db.close()
 
-    def test_next_lift_name_auto_numbering(self):
+    def test_next_work_zone_name_auto_numbering(self):
         self.db.add(
-            AutoserviceLift(
+            AutoserviceWorkZone(
                 organization_id="ORG1",
-                name="Подъёмник №1",
+                name="Рабочая зона №1",
                 sort_order=1,
                 is_active=True,
             )
         )
         self.db.commit()
-        name, sort_order = next_lift_name(self.db, "ORG1")
-        self.assertEqual(name, "Подъёмник №2")
+        name, sort_order = next_work_zone_name(self.db, "ORG1")
+        self.assertEqual(name, "Рабочая зона №2")
         self.assertEqual(sort_order, 2)
 
-    def test_validate_lift_id_rejects_missing(self):
+    def test_validate_work_zone_id_rejects_missing(self):
         with self.assertRaises(HTTPException):
-            validate_lift_id(self.db, "ORG1", 999)
+            validate_work_zone_id(self.db, "ORG1", 999)
 
-    def test_validate_lift_id_accepts_active(self):
-        lift = AutoserviceLift(
+    def test_validate_work_zone_id_accepts_active(self):
+        zone = AutoserviceWorkZone(
             organization_id="ORG1",
-            name="Подъёмник №1",
+            name="Рабочая зона №1",
             sort_order=1,
             is_active=True,
         )
-        self.db.add(lift)
+        self.db.add(zone)
         self.db.commit()
-        result = validate_lift_id(self.db, "ORG1", lift.id)
-        self.assertEqual(result, lift.id)
+        result = validate_work_zone_id(self.db, "ORG1", zone.id)
+        self.assertEqual(result, zone.id)
 
     def test_validate_schedule_end_requires_after_start(self):
         start = datetime(2026, 8, 11, 10, 0, 0)

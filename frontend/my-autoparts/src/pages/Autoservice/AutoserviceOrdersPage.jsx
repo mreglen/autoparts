@@ -279,7 +279,7 @@ export default function AutoserviceOrdersPage() {
               <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Клиент</th>
               <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Комментарий</th>
               <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Дата и время</th>
-              <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Подъёмник</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Рабочая зона</th>
               <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Принял</th>
               <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Статус</th>
               <th className="border-b border-gray-100 bg-gray-50/80 px-5 py-4 text-right">Действия</th>
@@ -337,7 +337,7 @@ export default function AutoserviceOrdersPage() {
                     {formatDateTime(row.scheduled_at)}
                   </td>
                   <td className="border-b border-gray-100 px-4 py-4 text-gray-600">
-                    {row.lift?.name || '—'}
+                    {row.work_zone?.name || '—'}
                   </td>
                   <td className="border-b border-gray-100 px-4 py-4 text-gray-600">{row.accepted_by?.name || '—'}</td>
                   <td className="border-b border-gray-100 px-4 py-4">

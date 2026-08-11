@@ -38,7 +38,7 @@ class RepairOrderClientBrief(BaseModel):
     phone: str
 
 
-class RepairOrderLiftBrief(BaseModel):
+class RepairOrderWorkZoneBrief(BaseModel):
     id: int
     name: str
     sort_order: int
@@ -152,7 +152,7 @@ class RepairOrderCreate(BaseModel):
     scheduled_end_at: Optional[datetime] = None
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
-    lift_id: Optional[int] = None
+    work_zone_id: Optional[int] = None
     assignee_user_ids: list[int] = Field(default_factory=list)
     works: list[RepairOrderWorkIn] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartIn] = Field(default_factory=list)
@@ -166,7 +166,7 @@ class RepairOrderUpdate(BaseModel):
     scheduled_end_at: Optional[datetime] = None
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
-    lift_id: Optional[int] = None
+    work_zone_id: Optional[int] = None
     assignee_user_ids: Optional[list[int]] = None
     works: Optional[list[RepairOrderWorkIn]] = None
     client_parts: Optional[list[RepairOrderClientPartIn]] = None
@@ -185,8 +185,8 @@ class RepairOrderStaffView(BaseModel):
     vehicle_id: int
     client_comment: Optional[str] = None
     staff_comment: Optional[str] = None
-    lift_id: Optional[int] = None
-    lift: Optional[RepairOrderLiftBrief] = None
+    work_zone_id: Optional[int] = None
+    work_zone: Optional[RepairOrderWorkZoneBrief] = None
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
     accepted_by_user_id: int
@@ -210,8 +210,8 @@ class RepairOrderClientView(BaseModel):
     order_number: str
     vehicle_id: int
     client_comment: Optional[str] = None
-    lift_id: Optional[int] = None
-    lift: Optional[RepairOrderLiftBrief] = None
+    work_zone_id: Optional[int] = None
+    work_zone: Optional[RepairOrderWorkZoneBrief] = None
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
     status: str
@@ -236,8 +236,8 @@ class RepairOrderServiceEmployeeOption(BaseModel):
     work_percent: Decimal
 
 
-class RepairOrderLiftsMeta(BaseModel):
-    lifts: list[RepairOrderLiftBrief] = Field(default_factory=list)
+class RepairOrderWorkZonesMeta(BaseModel):
+    work_zones: list[RepairOrderWorkZoneBrief] = Field(default_factory=list)
 
 
 class WarehouseProductOption(BaseModel):

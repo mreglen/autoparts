@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiRequest } from '../../utils/apiClient';
-import { formatServerDateTime } from '../../utils/serverDate';
 
 const inputClass =
   'mt-1 block w-full max-w-xl rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -293,96 +292,20 @@ function EmployeeStatsModal({ employee, stats, loading, period, onPeriod, onClos
   );
 }
 
-function LiftStatsModal({ lift, stats, loading, onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-gray-200">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h3 className="text-lg font-semibold text-gray-900">{lift?.name || 'Подъёмник'}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-            aria-label="Закрыть"
-          >
-            ×
-          </button>
-        </div>
-        <div className="space-y-4 p-5">
-          {loading ? (
-            <p className="text-sm text-gray-500">Загрузка статистики…</p>
-          ) : stats ? (
-            <>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-gray-200 p-3">
-                  <p className="text-xs uppercase text-gray-500">Заказов</p>
-                  <p className="text-2xl font-semibold text-gray-900">{stats.total_orders}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3">
-                  <p className="text-xs uppercase text-gray-500">Часов</p>
-                  <p className="text-2xl font-semibold text-gray-900">{stats.total_hours}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3">
-                  <p className="text-xs uppercase text-gray-500">Без окончания</p>
-                  <p className="text-2xl font-semibold text-gray-900">{stats.orders_without_end_time}</p>
-                </div>
-              </div>
-              {Object.keys(stats.orders_by_status || {}).length > 0 ? (
-                <div>
-                  <p className="text-sm font-medium text-gray-700">По статусам</p>
-                  <ul className="mt-2 space-y-1 text-sm text-gray-600">
-                    {Object.entries(stats.orders_by_status).map(([status, count]) => (
-                      <li key={status}>{status}: {count}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {stats.recent_orders?.length ? (
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Последние заказы</p>
-                  <ul className="mt-2 divide-y divide-gray-100 rounded-xl border border-gray-200">
-                    {stats.recent_orders.map((order) => (
-                      <li key={order.id} className="px-3 py-2 text-sm">
-                        <div className="font-medium text-gray-900">{order.order_number}</div>
-                        <div className="text-gray-600">
-                          {formatServerDateTime(order.scheduled_at)}
-                          {order.scheduled_end_at
-                            ? ` — ${formatServerDateTime(order.scheduled_end_at)}`
-                            : ' · Окончание не указано'}
-                        </div>
-                        <div className="text-gray-500">{order.client_name} · {order.vehicle}</div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <p className="text-sm text-gray-500">Статистика недоступна</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function AutoserviceSettingsPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const [publicName, setPublicName] = useState('');
   const [publicDescription, setPublicDescription] = useState('');
-  const [lifts, setLifts] = useState([]);
+  const [workZones, setWorkZones] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [liftsLoading, setLiftsLoading] = useState(false);
+  const [workZonesLoading, setWorkZonesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
-  const [editingLiftId, setEditingLiftId] = useState(null);
+  const [editingZoneId, setEditingZoneId] = useState(null);
   const [editingName, setEditingName] = useState('');
   const [actionMenuId, setActionMenuId] = useState(null);
-  const [statsLift, setStatsLift] = useState(null);
-  const [statsData, setStatsData] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(false);
   const [worksOpen, setWorksOpen] = useState(false);
   const [works, setWorks] = useState([]);
   const [worksLoading, setWorksLoading] = useState(false);
@@ -408,15 +331,15 @@ export default function AutoserviceSettingsPage() {
     setPublicDescription(data?.public_description || '');
   }, []);
 
-  const loadLifts = useCallback(async () => {
-    setLiftsLoading(true);
+  const loadWorkZones = useCallback(async () => {
+    setWorkZonesLoading(true);
     try {
-      const data = await apiRequest('/autoservice/lifts?include_archived=true');
-      setLifts(Array.isArray(data) ? data : []);
+      const data = await apiRequest('/autoservice/work-zones?include_archived=true');
+      setWorkZones(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError(e?.message || 'Не удалось загрузить подъёмники');
+      setError(e?.message || 'Не удалось загрузить рабочие зоны');
     } finally {
-      setLiftsLoading(false);
+      setWorkZonesLoading(false);
     }
   }, []);
 
@@ -448,13 +371,13 @@ export default function AutoserviceSettingsPage() {
     setLoading(true);
     setError('');
     try {
-      await Promise.all([loadSettings(), loadLifts(), loadWorks(), loadEmployees()]);
+      await Promise.all([loadSettings(), loadWorkZones(), loadWorks(), loadEmployees()]);
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить настройки');
     } finally {
       setLoading(false);
     }
-  }, [loadSettings, loadLifts, loadWorks, loadEmployees]);
+  }, [loadSettings, loadWorkZones, loadWorks, loadEmployees]);
 
   useEffect(() => {
     if (isReady && isAuthenticated) load();
@@ -483,60 +406,45 @@ export default function AutoserviceSettingsPage() {
     }
   };
 
-  const handleAddLift = async () => {
+  const handleAddWorkZone = async () => {
     setError('');
     try {
-      await apiRequest('/autoservice/lifts', { method: 'POST', body: JSON.stringify({}) });
-      await loadLifts();
+      await apiRequest('/autoservice/work-zones', { method: 'POST', body: JSON.stringify({}) });
+      await loadWorkZones();
     } catch (err) {
-      setError(err?.message || 'Не удалось добавить подъёмник');
+      setError(err?.message || 'Не удалось добавить рабочую зону');
     }
   };
 
-  const startRename = (lift) => {
-    setEditingLiftId(lift.id);
-    setEditingName(lift.name);
+  const startRename = (zone) => {
+    setEditingZoneId(zone.id);
+    setEditingName(zone.name);
     setActionMenuId(null);
   };
 
-  const saveRename = async (liftId) => {
+  const saveRename = async (zoneId) => {
     const name = editingName.trim();
     if (!name) return;
     try {
-      await apiRequest(`/autoservice/lifts/${liftId}`, {
+      await apiRequest(`/autoservice/work-zones/${zoneId}`, {
         method: 'PATCH',
         body: JSON.stringify({ name }),
       });
-      setEditingLiftId(null);
-      await loadLifts();
+      setEditingZoneId(null);
+      await loadWorkZones();
     } catch (err) {
       setError(err?.message || 'Не удалось переименовать');
     }
   };
 
-  const removeLift = async (liftId) => {
+  const removeWorkZone = async (zoneId) => {
     setActionMenuId(null);
-    if (!window.confirm('Удалить или архивировать подъёмник?')) return;
+    if (!window.confirm('Удалить или архивировать рабочую зону?')) return;
     try {
-      await apiRequest(`/autoservice/lifts/${liftId}`, { method: 'DELETE' });
-      await loadLifts();
+      await apiRequest(`/autoservice/work-zones/${zoneId}`, { method: 'DELETE' });
+      await loadWorkZones();
     } catch (err) {
       setError(err?.message || 'Не удалось удалить');
-    }
-  };
-
-  const openStats = async (lift) => {
-    setStatsLift(lift);
-    setStatsData(null);
-    setStatsLoading(true);
-    setActionMenuId(null);
-    try {
-      const data = await apiRequest(`/autoservice/lifts/${lift.id}/stats`);
-      setStatsData(data);
-    } catch (err) {
-      setError(err?.message || 'Не удалось загрузить статистику');
-    } finally {
-      setStatsLoading(false);
     }
   };
 
@@ -696,15 +604,15 @@ export default function AutoserviceSettingsPage() {
           <section className="mt-10 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Подъёмники</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Рабочие зоны</h2>
                 <p className="text-sm text-gray-500">Управление рабочими местами организации</p>
               </div>
               <button
                 type="button"
-                onClick={handleAddLift}
+                onClick={handleAddWorkZone}
                 className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
               >
-                Добавить подъёмник
+                Добавить рабочую зону
               </button>
             </div>
 
@@ -718,42 +626,38 @@ export default function AutoserviceSettingsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {liftsLoading ? (
+                  {workZonesLoading ? (
                     <tr>
                       <td colSpan={3} className="px-4 py-8 text-center text-gray-500">Загрузка…</td>
                     </tr>
-                  ) : lifts.length === 0 ? (
+                  ) : workZones.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-8 text-center text-gray-500">Подъёмников пока нет</td>
+                      <td colSpan={3} className="px-4 py-8 text-center text-gray-500">Рабочих зон пока нет</td>
                     </tr>
                   ) : (
-                    lifts.map((lift) => (
-                      <tr
-                        key={lift.id}
-                        className="hover:bg-gray-50/80"
-                        onDoubleClick={() => openStats(lift)}
-                      >
+                    workZones.map((zone) => (
+                      <tr key={zone.id} className="hover:bg-gray-50/80">
                         <td className="px-4 py-3">
-                          {editingLiftId === lift.id ? (
+                          {editingZoneId === zone.id ? (
                             <input
                               className="w-full rounded-lg border border-gray-300 px-2 py-1"
                               value={editingName}
                               onChange={(e) => setEditingName(e.target.value)}
-                              onBlur={() => saveRename(lift.id)}
+                              onBlur={() => saveRename(zone.id)}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') saveRename(lift.id);
-                                if (e.key === 'Escape') setEditingLiftId(null);
+                                if (e.key === 'Enter') saveRename(zone.id);
+                                if (e.key === 'Escape') setEditingZoneId(null);
                               }}
                               autoFocus
                             />
                           ) : (
-                            <span className="font-medium text-gray-900">{lift.name}</span>
+                            <span className="font-medium text-gray-900">{zone.name}</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {lift.is_active ? (
+                          {zone.is_active ? (
                             <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
-                              Активен
+                              Активна
                             </span>
                           ) : (
                             <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200">
@@ -764,16 +668,15 @@ export default function AutoserviceSettingsPage() {
                         <td className="relative px-4 py-3 text-right">
                           <button
                             type="button"
-                            onClick={() => setActionMenuId(actionMenuId === lift.id ? null : lift.id)}
+                            onClick={() => setActionMenuId(actionMenuId === zone.id ? null : zone.id)}
                             className="rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
                           >
                             Действия
                           </button>
-                          {actionMenuId === lift.id ? (
+                          {actionMenuId === zone.id ? (
                             <div className="absolute right-4 z-10 mt-1 w-44 rounded-xl border border-gray-200 bg-white py-1 text-left shadow-lg">
-                              <button type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50" onClick={() => startRename(lift)}>Переименовать</button>
-                              <button type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50" onClick={() => openStats(lift)}>Просмотреть</button>
-                              <button type="button" className="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50" onClick={() => removeLift(lift.id)}>Удалить</button>
+                              <button type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50" onClick={() => startRename(zone)}>Переименовать</button>
+                              <button type="button" className="block w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50" onClick={() => removeWorkZone(zone.id)}>Удалить</button>
                             </div>
                           ) : null}
                         </td>
@@ -935,17 +838,6 @@ export default function AutoserviceSettingsPage() {
         />
       ) : null}
 
-      {statsLift ? (
-        <LiftStatsModal
-          lift={statsLift}
-          stats={statsData}
-          loading={statsLoading}
-          onClose={() => {
-            setStatsLift(null);
-            setStatsData(null);
-          }}
-        />
-      ) : null}
     </div>
   );
 }

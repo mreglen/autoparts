@@ -91,9 +91,9 @@ function OrderLinesExpand({ row, showExecutors }) {
           </p>
         </div>
       )}
-      {row.lift?.name ? (
+      {row.work_zone?.name ? (
         <p>
-          <span className="font-medium text-gray-900">Подъёмник:</span> {row.lift.name}
+          <span className="font-medium text-gray-900">Рабочая зона:</span> {row.work_zone.name}
         </p>
       ) : null}
       {row.staff_comment && showExecutors ? (
@@ -264,8 +264,8 @@ export default function RepairOrderViewModal({ order, loading = false, onClose, 
               {formatDateTime(order.scheduled_at)}
             </p>
             <p>
-              <span className="font-medium text-gray-900">Подъёмник:</span>{' '}
-              {order.lift?.name || '—'}
+              <span className="font-medium text-gray-900">Рабочая зона:</span>{' '}
+              {order.work_zone?.name || '—'}
             </p>
             <p>
               <span className="font-medium text-gray-900">Принял:</span>{' '}

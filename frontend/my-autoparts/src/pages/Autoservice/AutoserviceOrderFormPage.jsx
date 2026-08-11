@@ -591,7 +591,7 @@ function mapOrderToFormState(order) {
       : toLocalInputValue(new Date().toISOString()),
     comment: order?.client_comment || '',
     staffComment: order?.staff_comment || '',
-    liftId: order?.lift_id != null ? String(order.lift_id) : '',
+    workZoneId: order?.work_zone_id != null ? String(order.work_zone_id) : '',
     scheduledEndAt: order?.scheduled_end_at
       ? toLocalInputValue(order.scheduled_end_at)
       : '',
@@ -644,7 +644,7 @@ export default function AutoserviceOrderFormPage() {
   const [clients, setClients] = useState([]);
   const [workCatalog, setWorkCatalog] = useState([]);
   const [serviceEmployees, setServiceEmployees] = useState([]);
-  const [lifts, setLifts] = useState([]);
+  const [workZones, setWorkZones] = useState([]);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState('');
 
@@ -659,7 +659,7 @@ export default function AutoserviceOrderFormPage() {
   const [comment, setComment] = useState('');
   const [staffComment, setStaffComment] = useState('');
   const [scheduledEndAt, setScheduledEndAt] = useState('');
-  const [liftId, setLiftId] = useState('');
+  const [workZoneId, setWorkZoneId] = useState('');
   const [works, setWorks] = useState([]);
   const [clientParts, setClientParts] = useState([]);
   const [shopParts, setShopParts] = useState([]);
@@ -687,7 +687,7 @@ export default function AutoserviceOrderFormPage() {
     setScheduledAt(state.scheduledAt);
     setComment(state.comment);
     setStaffComment(state.staffComment);
-    setLiftId(state.liftId);
+    setWorkZoneId(state.workZoneId);
     setScheduledEndAt(state.scheduledEndAt);
     setWorks(state.works);
     setClientParts(state.clientParts);
@@ -703,16 +703,16 @@ export default function AutoserviceOrderFormPage() {
     setMetaLoading(true);
     setMetaError('');
     try {
-      const [clientsData, worksData, employeesData, liftsData] = await Promise.all([
+      const [clientsData, worksData, employeesData, zonesData] = await Promise.all([
         apiRequest('/autoservice/clients'),
         apiRequest('/autoservice/works'),
         apiRequest('/autoservice/repair-orders/service-employees-options'),
-        apiRequest('/autoservice/repair-orders/lifts-meta'),
+        apiRequest('/autoservice/repair-orders/work-zones-meta'),
       ]);
       setClients(Array.isArray(clientsData) ? clientsData : []);
       setWorkCatalog(Array.isArray(worksData) ? worksData : []);
       setServiceEmployees(Array.isArray(employeesData) ? employeesData : []);
-      setLifts(Array.isArray(liftsData?.lifts) ? liftsData.lifts : []);
+      setWorkZones(Array.isArray(zonesData?.work_zones) ? zonesData.work_zones : []);
     } catch (err) {
       setMetaError(err?.message || 'Не удалось загрузить справочники');
     } finally {
@@ -748,6 +748,9 @@ export default function AutoserviceOrderFormPage() {
           initial.scheduledAt = prefill.scheduledAtLocal;
         } else if (prefill.scheduledAt) {
           initial.scheduledAt = toLocalInputValue(prefill.scheduledAt);
+        }
+        if (prefill.workZoneId != null) {
+          initial.workZoneId = String(prefill.workZoneId);
         }
         applyFormState(initial);
         setFormInitialized(true);
@@ -1021,7 +1024,7 @@ export default function AutoserviceOrderFormPage() {
     scheduled_end_at: scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null,
     client_comment: comment.trim() || null,
     staff_comment: staffComment.trim() || null,
-    lift_id: liftId ? Number(liftId) : null,
+    work_zone_id: workZoneId ? Number(workZoneId) : null,
     assignee_user_ids: [],
     works: works.map((w) => ({
       title: w.title.trim(),
@@ -1250,17 +1253,17 @@ export default function AutoserviceOrderFormPage() {
               />
             </div>
             <div>
-              <label className="block text-sg-caption font-medium text-ink-muted">Подъёмник</label>
+              <label className="block text-sg-caption font-medium text-ink-muted">Рабочая зона</label>
               <select
                 className={pillInputClass}
-                value={liftId}
-                onChange={(e) => setLiftId(e.target.value)}
-                disabled={lifts.length <= 0}
+                value={workZoneId}
+                onChange={(e) => setWorkZoneId(e.target.value)}
+                disabled={workZones.length <= 0}
               >
-                <option value="">{lifts.length > 0 ? 'Не назначен' : 'Нет подъёмников'}</option>
-                {lifts.map((lift) => (
-                  <option key={lift.id} value={lift.id}>
-                    {lift.name}
+                <option value="">{workZones.length > 0 ? 'Не назначена' : 'Нет рабочих зон'}</option>
+                {workZones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.name}
                   </option>
                 ))}
               </select>

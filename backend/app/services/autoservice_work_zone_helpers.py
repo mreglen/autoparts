@@ -6,37 +6,37 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models.autoservice_lift import AutoserviceLift
+from app.models.autoservice_work_zone import AutoserviceWorkZone
 
 
-def next_lift_name(db: Session, org_id: str) -> tuple[str, int]:
+def next_work_zone_name(db: Session, org_id: str) -> tuple[str, int]:
     max_sort = (
-        db.query(func.max(AutoserviceLift.sort_order))
-        .filter(AutoserviceLift.organization_id == org_id)
+        db.query(func.max(AutoserviceWorkZone.sort_order))
+        .filter(AutoserviceWorkZone.organization_id == org_id)
         .scalar()
     )
     next_sort = int(max_sort or 0) + 1
-    return f"Подъёмник №{next_sort}", next_sort
+    return f"Рабочая зона №{next_sort}", next_sort
 
 
-def validate_lift_id(db: Session, org_id: str, lift_id: int | None) -> int | None:
-    if lift_id is None:
+def validate_work_zone_id(db: Session, org_id: str, work_zone_id: int | None) -> int | None:
+    if work_zone_id is None:
         return None
-    lift = (
-        db.query(AutoserviceLift)
+    zone = (
+        db.query(AutoserviceWorkZone)
         .filter(
-            AutoserviceLift.id == lift_id,
-            AutoserviceLift.organization_id == org_id,
-            AutoserviceLift.is_active.is_(True),
+            AutoserviceWorkZone.id == work_zone_id,
+            AutoserviceWorkZone.organization_id == org_id,
+            AutoserviceWorkZone.is_active.is_(True),
         )
         .first()
     )
-    if not lift:
+    if not zone:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Подъёмник не найден или недоступен",
+            detail="Рабочая зона не найдена или недоступна",
         )
-    return lift.id
+    return zone.id
 
 
 def normalize_dt(value: datetime | None) -> datetime | None:

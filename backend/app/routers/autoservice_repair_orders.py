@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
-from app.models.autoservice_lift import AutoserviceLift
+from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.autoservice_work import AutoserviceWork
 from app.models.garage_vehicle import GarageVehicle
@@ -34,8 +34,8 @@ from app.schemas.repair_order import (
     RepairOrderClientView,
     RepairOrderClientWorkView,
     RepairOrderCreate,
-    RepairOrderLiftBrief,
-    RepairOrderLiftsMeta,
+    RepairOrderWorkZoneBrief,
+    RepairOrderWorkZonesMeta,
     RepairOrderShopPartIn,
     RepairOrderShopPartView,
     RepairOrderEmployeeBrief,
@@ -60,9 +60,9 @@ from app.utils.autoservice_access import (
 )
 from app.utils.repair_order_number import allocate_repair_order_number
 from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
-from app.services.autoservice_lift_helpers import (
+from app.services.autoservice_work_zone_helpers import (
     normalize_dt as _normalize_dt,
-    validate_lift_id as _validate_lift_id,
+    validate_work_zone_id as _validate_work_zone_id,
     validate_schedule_end as _validate_schedule_end,
 )
 
@@ -212,10 +212,10 @@ def _client_shop_part_view(part: RepairOrderShopPart) -> RepairOrderClientShopPa
     )
 
 
-def _lift_brief(lift: AutoserviceLift | None) -> RepairOrderLiftBrief | None:
-    if not lift:
+def _work_zone_brief(zone: AutoserviceWorkZone | None) -> RepairOrderWorkZoneBrief | None:
+    if not zone:
         return None
-    return RepairOrderLiftBrief(id=lift.id, name=lift.name, sort_order=lift.sort_order)
+    return RepairOrderWorkZoneBrief(id=zone.id, name=zone.name, sort_order=zone.sort_order)
 
 
 def _to_staff_view(row: RepairOrder) -> RepairOrderStaffView:
@@ -232,8 +232,8 @@ def _to_staff_view(row: RepairOrder) -> RepairOrderStaffView:
         vehicle_id=row.vehicle_id,
         client_comment=row.client_comment,
         staff_comment=row.staff_comment,
-        lift_id=row.lift_id,
-        lift=_lift_brief(row.lift),
+        work_zone_id=row.work_zone_id,
+        work_zone=_work_zone_brief(row.work_zone),
         scheduled_at=row.scheduled_at,
         scheduled_end_at=row.scheduled_end_at,
         accepted_by_user_id=row.accepted_by_user_id,
@@ -264,8 +264,8 @@ def _to_client_view(row: RepairOrder) -> RepairOrderClientView:
         order_number=row.order_number,
         vehicle_id=row.vehicle_id,
         client_comment=row.client_comment,
-        lift_id=row.lift_id,
-        lift=_lift_brief(row.lift),
+        work_zone_id=row.work_zone_id,
+        work_zone=_work_zone_brief(row.work_zone),
         scheduled_at=row.scheduled_at,
         scheduled_end_at=row.scheduled_end_at,
         status=row.status,
@@ -285,7 +285,7 @@ def _order_query(db: Session):
         joinedload(RepairOrder.client),
         joinedload(RepairOrder.vehicle),
         joinedload(RepairOrder.accepted_by),
-        joinedload(RepairOrder.lift),
+        joinedload(RepairOrder.work_zone),
         joinedload(RepairOrder.assignees),
         selectinload(RepairOrder.works).joinedload(RepairOrderWork.executor),
         selectinload(RepairOrder.works)
@@ -585,30 +585,30 @@ def _apply_search_filter(query, q: str | None):
     )
 
 
-def _list_active_lifts(db: Session, org_id: str) -> list[AutoserviceLift]:
+def _list_active_work_zones(db: Session, org_id: str) -> list[AutoserviceWorkZone]:
     return (
-        db.query(AutoserviceLift)
+        db.query(AutoserviceWorkZone)
         .filter(
-            AutoserviceLift.organization_id == org_id,
-            AutoserviceLift.is_active.is_(True),
+            AutoserviceWorkZone.organization_id == org_id,
+            AutoserviceWorkZone.is_active.is_(True),
         )
-        .order_by(AutoserviceLift.sort_order.asc(), AutoserviceLift.id.asc())
+        .order_by(AutoserviceWorkZone.sort_order.asc(), AutoserviceWorkZone.id.asc())
         .all()
     )
 
 
 @router.get(
-    "/autoservice/repair-orders/lifts-meta",
-    response_model=RepairOrderLiftsMeta,
+    "/autoservice/repair-orders/work-zones-meta",
+    response_model=RepairOrderWorkZonesMeta,
 )
-def get_repair_order_lifts_meta(
+def get_repair_order_work_zones_meta(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_staff(db, current_user)
-    lifts = _list_active_lifts(db, org_id)
-    return RepairOrderLiftsMeta(
-        lifts=[RepairOrderLiftBrief.model_validate(l) for l in lifts],
+    zones = _list_active_work_zones(db, org_id)
+    return RepairOrderWorkZonesMeta(
+        work_zones=[RepairOrderWorkZoneBrief.model_validate(z) for z in zones],
     )
 
 
@@ -806,7 +806,7 @@ def create_repair_order(
     assignees = _resolve_assignees(db, org_id, payload.assignee_user_ids)
     scheduled_at = _normalize_dt(payload.scheduled_at)
     scheduled_end_at = _validate_schedule_end(scheduled_at, payload.scheduled_end_at)
-    lift_id = _validate_lift_id(db, org_id, payload.lift_id)
+    work_zone_id = _validate_work_zone_id(db, org_id, payload.work_zone_id)
     row = RepairOrder(
         organization_id=org_id,
         order_number=allocate_repair_order_number(db, org_id),
@@ -814,7 +814,7 @@ def create_repair_order(
         vehicle_id=payload.vehicle_id,
         client_comment=(payload.client_comment or "").strip() or None,
         staff_comment=(payload.staff_comment or "").strip() or None,
-        lift_id=lift_id,
+        work_zone_id=work_zone_id,
         scheduled_at=scheduled_at,
         scheduled_end_at=scheduled_end_at,
         accepted_by_user_id=current_user.id,
@@ -866,8 +866,8 @@ def update_repair_order(
         staff_comment = payload.staff_comment
         row.staff_comment = (staff_comment or "").strip() or None
 
-    if "lift_id" in payload.model_fields_set:
-        row.lift_id = _validate_lift_id(db, org_id, payload.lift_id)
+    if "work_zone_id" in payload.model_fields_set:
+        row.work_zone_id = _validate_work_zone_id(db, org_id, payload.work_zone_id)
 
     if payload.assignee_user_ids is not None:
         row.assignees = _resolve_assignees(db, org_id, payload.assignee_user_ids)

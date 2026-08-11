@@ -14,53 +14,29 @@ class PlannerRepairOrder(BaseModel):
     status: str
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
-    lift_id: Optional[int] = None
-    lift_name: Optional[str] = None
+    work_zone_id: Optional[int] = None
+    work_zone_name: Optional[str] = None
 
 
-class PlannerRepairBooking(BaseModel):
-    id: int
-    client_id: Optional[int] = None
-    name: str
-    phone: str
-    preferred_date: date
-    comment: Optional[str] = None
-    status: str
-
-
-class PlannerInspectionBooking(BaseModel):
-    id: int
-    client_id: Optional[int] = None
-    name: str
-    phone: str
-    preferred_date: date
-    vehicle: Optional[str] = None
-    notes: Optional[str] = None
-    status: str
-    source: str
-
-
-class PlannerDay(BaseModel):
+class PlannerWeekDayHeader(BaseModel):
     date: date
-    repair_orders: list[PlannerRepairOrder] = []
-    repair_bookings: list[PlannerRepairBooking] = []
-    inspection_bookings: list[PlannerInspectionBooking] = []
 
 
-class PlannerResponse(BaseModel):
-    date_from: date
-    date_to: date
-    days: list[PlannerDay] = []
-
-
-class PlannerLiftColumn(BaseModel):
-    id: int
-    name: str
-    sort_order: int
+class PlannerWeekZoneDay(BaseModel):
+    date: date
     orders: list[PlannerRepairOrder] = Field(default_factory=list)
 
 
-class PlannerLiftsDayResponse(BaseModel):
-    date: date
-    lifts: list[PlannerLiftColumn] = Field(default_factory=list)
-    unassigned_orders: list[PlannerRepairOrder] = Field(default_factory=list)
+class PlannerWeekZoneRow(BaseModel):
+    id: Optional[int] = None
+    name: str
+    sort_order: int
+    is_unassigned: bool = False
+    days: list[PlannerWeekZoneDay] = Field(default_factory=list)
+
+
+class PlannerWeekResponse(BaseModel):
+    week_start: date
+    week_end: date
+    days: list[PlannerWeekDayHeader] = Field(default_factory=list)
+    zones: list[PlannerWeekZoneRow] = Field(default_factory=list)

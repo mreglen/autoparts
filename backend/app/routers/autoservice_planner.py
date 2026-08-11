@@ -7,25 +7,23 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
-from app.models.autoservice_lift import AutoserviceLift
+from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.garage_vehicle import GarageVehicle
-from app.models.inspection_booking import InspectionBooking
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_planner import (
-    PlannerDay,
-    PlannerInspectionBooking,
-    PlannerLiftColumn,
-    PlannerLiftsDayResponse,
-    PlannerRepairBooking,
     PlannerRepairOrder,
-    PlannerResponse,
+    PlannerWeekDayHeader,
+    PlannerWeekResponse,
+    PlannerWeekZoneDay,
+    PlannerWeekZoneRow,
 )
 from app.utils.autoservice_access import require_autoservice_staff
 
 router = APIRouter(tags=["Autoservice planner"])
 
-MAX_PLANNER_RANGE_DAYS = 62
+UNASSIGNED_ZONE_NAME = "Без рабочей зоны"
+UNASSIGNED_SORT_ORDER = 1_000_000
 
 
 def _vehicle_label(vehicle: GarageVehicle | None) -> str:
@@ -36,6 +34,10 @@ def _vehicle_label(vehicle: GarageVehicle | None) -> str:
     if vehicle.plate:
         label = f"{label} ({vehicle.plate})" if label else vehicle.plate
     return label or "—"
+
+
+def _week_start(value: date) -> date:
+    return value - timedelta(days=value.weekday())
 
 
 def _planner_order(row: RepairOrder) -> PlannerRepairOrder:
@@ -49,121 +51,32 @@ def _planner_order(row: RepairOrder) -> PlannerRepairOrder:
         status=row.status,
         scheduled_at=row.scheduled_at,
         scheduled_end_at=row.scheduled_end_at,
-        lift_id=row.lift_id,
-        lift_name=row.lift.name if row.lift else None,
+        work_zone_id=row.work_zone_id,
+        work_zone_name=row.work_zone.name if row.work_zone else None,
     )
 
 
-@router.get("/autoservice/planner", response_model=PlannerResponse)
-def get_planner(
-    date_from: date = Query(..., alias="from"),
-    date_to: date = Query(..., alias="to"),
+@router.get("/autoservice/planner/week", response_model=PlannerWeekResponse)
+def get_planner_week(
+    week_start: date = Query(..., alias="week_start"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_staff(db, current_user)
-    if date_to < date_from:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Дата окончания раньше даты начала",
-        )
-    if (date_to - date_from).days > MAX_PLANNER_RANGE_DAYS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Максимальный диапазон — {MAX_PLANNER_RANGE_DAYS} дней",
-        )
+    start = _week_start(week_start)
+    day_dates = [start + timedelta(days=offset) for offset in range(7)]
+    week_end = day_dates[-1]
 
-    range_start = datetime.combine(date_from, time.min)
-    range_end = datetime.combine(date_to + timedelta(days=1), time.min)
+    range_start = datetime.combine(day_dates[0], time.min)
+    range_end = datetime.combine(day_dates[-1] + timedelta(days=1), time.min)
 
-    orders = (
-        db.query(RepairOrder)
-        .options(
-            joinedload(RepairOrder.client),
-            joinedload(RepairOrder.vehicle),
-            joinedload(RepairOrder.lift),
-        )
+    zones = (
+        db.query(AutoserviceWorkZone)
         .filter(
-            RepairOrder.organization_id == org_id,
-            RepairOrder.scheduled_at >= range_start,
-            RepairOrder.scheduled_at < range_end,
+            AutoserviceWorkZone.organization_id == org_id,
+            AutoserviceWorkZone.is_active.is_(True),
         )
-        .order_by(RepairOrder.scheduled_at.asc(), RepairOrder.id.asc())
-        .all()
-    )
-
-    bookings = (
-        db.query(InspectionBooking)
-        .options(joinedload(InspectionBooking.vehicle))
-        .filter(
-            InspectionBooking.organization_id == org_id,
-            InspectionBooking.preferred_date >= date_from,
-            InspectionBooking.preferred_date <= date_to,
-            InspectionBooking.status != "cancelled",
-        )
-        .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
-        .all()
-    )
-
-    days: dict[date, PlannerDay] = {}
-    cursor = date_from
-    while cursor <= date_to:
-        days[cursor] = PlannerDay(
-            date=cursor,
-            repair_orders=[],
-            repair_bookings=[],
-            inspection_bookings=[],
-        )
-        cursor += timedelta(days=1)
-
-    for row in orders:
-        day = days.get(row.scheduled_at.date())
-        if day is None:
-            continue
-        day.repair_orders.append(_planner_order(row))
-
-    for row in bookings:
-        day = days.get(row.preferred_date)
-        if day is None:
-            continue
-        day.inspection_bookings.append(
-            PlannerInspectionBooking(
-                id=row.id,
-                client_id=row.client_id,
-                name=row.name,
-                phone=row.phone,
-                preferred_date=row.preferred_date,
-                vehicle=_vehicle_label(row.vehicle),
-                notes=row.notes,
-                status=row.status,
-                source=row.source,
-            )
-        )
-
-    return PlannerResponse(
-        date_from=date_from,
-        date_to=date_to,
-        days=[days[key] for key in sorted(days)],
-    )
-
-
-@router.get("/autoservice/planner/lifts", response_model=PlannerLiftsDayResponse)
-def get_planner_lifts_day(
-    day: date = Query(..., alias="date"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    org_id = require_autoservice_staff(db, current_user)
-    range_start = datetime.combine(day, time.min)
-    range_end = datetime.combine(day + timedelta(days=1), time.min)
-
-    lifts = (
-        db.query(AutoserviceLift)
-        .filter(
-            AutoserviceLift.organization_id == org_id,
-            AutoserviceLift.is_active.is_(True),
-        )
-        .order_by(AutoserviceLift.sort_order.asc(), AutoserviceLift.id.asc())
+        .order_by(AutoserviceWorkZone.sort_order.asc(), AutoserviceWorkZone.id.asc())
         .all()
     )
 
@@ -172,7 +85,7 @@ def get_planner_lifts_day(
         .options(
             joinedload(RepairOrder.client),
             joinedload(RepairOrder.vehicle),
-            joinedload(RepairOrder.lift),
+            joinedload(RepairOrder.work_zone),
         )
         .filter(
             RepairOrder.organization_id == org_id,
@@ -184,28 +97,51 @@ def get_planner_lifts_day(
         .all()
     )
 
-    by_lift: dict[int, list[PlannerRepairOrder]] = {lift.id: [] for lift in lifts}
-    unassigned: list[PlannerRepairOrder] = []
+    zone_day_map: dict[int | None, dict[date, list[PlannerRepairOrder]]] = {
+        zone.id: {day: [] for day in day_dates} for zone in zones
+    }
+    unassigned_days = {day: [] for day in day_dates}
 
+    active_zone_ids = {zone.id for zone in zones}
     for row in orders:
         item = _planner_order(row)
-        if row.lift_id and row.lift_id in by_lift:
-            by_lift[row.lift_id].append(item)
+        day_key = row.scheduled_at.date()
+        if day_key not in unassigned_days:
+            continue
+        if row.work_zone_id and row.work_zone_id in active_zone_ids:
+            zone_day_map[row.work_zone_id][day_key].append(item)
         else:
-            unassigned.append(item)
+            unassigned_days[day_key].append(item)
 
-    columns = [
-        PlannerLiftColumn(
-            id=lift.id,
-            name=lift.name,
-            sort_order=lift.sort_order,
-            orders=by_lift.get(lift.id, []),
+    zone_rows: list[PlannerWeekZoneRow] = [
+        PlannerWeekZoneRow(
+            id=zone.id,
+            name=zone.name,
+            sort_order=zone.sort_order,
+            days=[
+                PlannerWeekZoneDay(date=day, orders=zone_day_map[zone.id][day])
+                for day in day_dates
+            ],
         )
-        for lift in lifts
+        for zone in zones
     ]
 
-    return PlannerLiftsDayResponse(
-        date=day,
-        lifts=columns,
-        unassigned_orders=unassigned,
+    zone_rows.append(
+        PlannerWeekZoneRow(
+            id=None,
+            name=UNASSIGNED_ZONE_NAME,
+            sort_order=UNASSIGNED_SORT_ORDER,
+            is_unassigned=True,
+            days=[
+                PlannerWeekZoneDay(date=day, orders=unassigned_days[day])
+                for day in day_dates
+            ],
+        )
+    )
+
+    return PlannerWeekResponse(
+        week_start=day_dates[0],
+        week_end=week_end,
+        days=[PlannerWeekDayHeader(date=day) for day in day_dates],
+        zones=zone_rows,
     )

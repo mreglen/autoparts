@@ -1,6 +1,6 @@
-import { formatOrderTimeRange } from './autoserviceLiftDisplay';
+import { formatOrderTimeRange } from './autoserviceOrderDisplay';
 
-describe('autoserviceLiftDisplay', () => {
+describe('autoserviceOrderDisplay', () => {
   it('shows end time when present', () => {
     const text = formatOrderTimeRange({
       scheduled_at: '2026-08-11T10:00:00',

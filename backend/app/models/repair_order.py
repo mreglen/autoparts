@@ -75,10 +75,9 @@ class RepairOrder(Base):
         index=True,
     )
     status = Column(String(32), nullable=False, default="accepted")
-    lift_number = Column(Integer, nullable=True)
-    lift_id = Column(
+    work_zone_id = Column(
         Integer,
-        ForeignKey("autoservice_lifts.id", ondelete="SET NULL"),
+        ForeignKey("autoservice_work_zones.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -95,7 +94,7 @@ class RepairOrder(Base):
     client = relationship("AutoserviceClient", foreign_keys=[client_id])
     vehicle = relationship("GarageVehicle", foreign_keys=[vehicle_id])
     accepted_by = relationship("User", foreign_keys=[accepted_by_user_id])
-    lift = relationship("AutoserviceLift", foreign_keys=[lift_id])
+    work_zone = relationship("AutoserviceWorkZone", foreign_keys=[work_zone_id])
     assignees = relationship(
         "User",
         secondary=repair_order_assignees,

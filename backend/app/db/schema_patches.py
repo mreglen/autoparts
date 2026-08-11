@@ -4347,3 +4347,111 @@ def ensure_inspection_bookings_unified() -> None:
                 conn.execute(text(stmt))
         logger.info("Applied inspection_bookings unified indexes patch")
 
+
+WORK_ZONES_MIGRATION_MARKER = "autoservice_work_zones_v1"
+
+
+def ensure_autoservice_work_zones_migration() -> None:
+    """One-time destructive migration: purge repair orders, replace lifts with work zones."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+
+    if "schema_patch_markers" not in tables:
+        ddl = """
+        CREATE TABLE schema_patch_markers (
+            name VARCHAR(120) PRIMARY KEY,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """ if engine.dialect.name == "postgresql" else """
+        CREATE TABLE schema_patch_markers (
+            name VARCHAR(120) PRIMARY KEY,
+            applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+        tables.add("schema_patch_markers")
+
+    with engine.begin() as conn:
+        already = conn.execute(
+            text("SELECT 1 FROM schema_patch_markers WHERE name = :name LIMIT 1"),
+            {"name": WORK_ZONES_MIGRATION_MARKER},
+        ).fetchone()
+        if already:
+            return
+
+    is_pg = engine.dialect.name == "postgresql"
+    ts_type = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    bool_true = "TRUE" if is_pg else "1"
+
+    with engine.begin() as conn:
+        if "repair_orders" in tables:
+            conn.execute(text("DELETE FROM repair_orders"))
+
+        if "autoservice_work_zones" not in tables:
+            if "organizations" not in tables:
+                return
+            if is_pg:
+                ddl = f"""
+                CREATE TABLE autoservice_work_zones (
+                    id SERIAL PRIMARY KEY,
+                    organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                    name VARCHAR(120) NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 1,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    archived_at {ts_type},
+                    created_at {ts_type} NOT NULL DEFAULT NOW(),
+                    updated_at {ts_type} NOT NULL DEFAULT NOW(),
+                    CONSTRAINT uq_autoservice_work_zone_org_name UNIQUE (organization_id, name)
+                )
+                """
+            else:
+                ddl = f"""
+                CREATE TABLE autoservice_work_zones (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                    name VARCHAR(120) NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 1,
+                    is_active BOOLEAN NOT NULL DEFAULT {bool_true},
+                    archived_at {ts_type},
+                    created_at {ts_type} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (organization_id, name)
+                )
+                """
+            conn.execute(text(ddl))
+            logger.info("Created autoservice_work_zones table")
+
+        if "repair_orders" in tables:
+            columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+            if "work_zone_id" not in columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE repair_orders ADD COLUMN work_zone_id INTEGER "
+                        "REFERENCES autoservice_work_zones(id)"
+                    )
+                )
+            if "lift_id" in columns:
+                if is_pg:
+                    conn.execute(text("ALTER TABLE repair_orders DROP COLUMN lift_id"))
+                else:
+                    conn.execute(text("ALTER TABLE repair_orders DROP COLUMN lift_id"))
+            if "lift_number" in columns:
+                conn.execute(text("ALTER TABLE repair_orders DROP COLUMN lift_number"))
+
+        if "autoservice_lifts" in tables:
+            conn.execute(text("DROP TABLE autoservice_lifts"))
+            logger.info("Dropped autoservice_lifts table")
+
+        if "autoservice_settings" in tables:
+            settings_columns = {col["name"] for col in inspector.get_columns("autoservice_settings")}
+            if "lifts_count" in settings_columns:
+                conn.execute(text("UPDATE autoservice_settings SET lifts_count = 0"))
+
+        conn.execute(
+            text("INSERT INTO schema_patch_markers (name) VALUES (:name)"),
+            {"name": WORK_ZONES_MIGRATION_MARKER},
+        )
+
+    logger.info("Applied autoservice work zones migration patch")
+
