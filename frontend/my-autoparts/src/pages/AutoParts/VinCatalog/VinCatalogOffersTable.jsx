@@ -66,11 +66,10 @@ function QuantityInput({ value, max, onChange, disabled }) {
 
 function OfferRow({ row, markupPercent }) {
   const [quantity, setQuantity] = useState(1);
-  const { brand, number, name, stock, sectionType, detailHref, part } = row;
+  const { brand, number, name, stock, detailHref, part } = row;
   const maxQty = Math.max(1, Number(stock.available_count) || 1);
   const safeQty = Math.min(quantity, maxQty);
   const price = applyMarkup(stock.price, markupPercent);
-  const isAnalog = sectionType === 'analog';
 
   const cartItem = useMemo(
     () => {
@@ -108,11 +107,6 @@ function OfferRow({ row, markupPercent }) {
         >
           {number}
         </button>
-        {isAnalog ? (
-          <p className="mt-0.5 text-[11px] font-medium text-orange-700">аналог</p>
-        ) : (
-          <p className="mt-0.5 text-[11px] text-gray-500">оригинал</p>
-        )}
       </td>
       <td className="max-w-[200px] px-3 py-2.5 align-top">
         <button
