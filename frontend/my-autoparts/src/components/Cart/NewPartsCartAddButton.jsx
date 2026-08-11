@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   addNewPartsToCart,
@@ -10,6 +10,7 @@ import {
 import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 
 const DEFAULT_BASKET_NAME = 'Новые запчасти';
+const MENU_ESTIMATED_HEIGHT = 210;
 
 function CartIcon({ className = 'h-4 w-4' }) {
   return (
@@ -25,6 +26,22 @@ function CartIcon({ className = 'h-4 w-4' }) {
   );
 }
 
+function getScrollParent(node) {
+  let current = node?.parentElement || null;
+  while (current) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    if (
+      (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay')
+      && current.scrollHeight > current.clientHeight
+    ) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+
 export default function NewPartsCartAddButton({
   cartItem,
   disabled = false,
@@ -36,9 +53,11 @@ export default function NewPartsCartAddButton({
   const baskets = useSelector(selectNewPartsBaskets);
   const [adding, setAdding] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const [newBasketName, setNewBasketName] = useState('');
   const [menuError, setMenuError] = useState('');
   const wrapRef = useRef(null);
+  const menuRef = useRef(null);
 
   const defaultBasket = useMemo(
     () => baskets.find((b) => b.is_default) || baskets[0] || null,
@@ -49,6 +68,24 @@ export default function NewPartsCartAddButton({
     () => baskets.filter((b) => !b.is_default),
     [baskets]
   );
+
+  const updateMenuPlacement = useCallback(() => {
+    const anchor = wrapRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const scrollParent = getScrollParent(anchor);
+    const parentRect = scrollParent?.getBoundingClientRect();
+    const bottomLimit = parentRect ? parentRect.bottom : window.innerHeight;
+    const topLimit = parentRect ? parentRect.top : 0;
+    const spaceBelow = bottomLimit - rect.bottom;
+    const spaceAbove = rect.top - topLimit;
+    const menuHeight = menuRef.current?.offsetHeight || MENU_ESTIMATED_HEIGHT;
+    setOpenUpward(spaceBelow < menuHeight + 8 && spaceAbove > spaceBelow);
+  }, []);
+
+  const openMenu = useCallback(() => {
+    setMenuOpen(true);
+  }, []);
 
   const addToBasket = useCallback(
     async (basketId) => {
@@ -112,6 +149,14 @@ export default function NewPartsCartAddButton({
     }
   };
 
+  useLayoutEffect(() => {
+    if (!menuOpen) return undefined;
+    updateMenuPlacement();
+    const onResize = () => updateMenuPlacement();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [menuOpen, namedBaskets.length, menuError, updateMenuPlacement]);
+
   useEffect(() => {
     if (!menuOpen) return undefined;
     const onDocClick = (event) => {
@@ -130,16 +175,16 @@ export default function NewPartsCartAddButton({
   const isDisabled = disabled || adding || cartLoading;
 
   return (
-    <div ref={wrapRef} className={`relative inline-flex items-center gap-1 ${className}`}>
+    <div ref={wrapRef} className={`relative inline-flex items-center gap-0.5 ${className}`}>
       <button
         type="button"
         onClick={handleDefaultAdd}
         disabled={isDisabled}
         onMouseEnter={() => {
-          if (!isDisabled) setMenuOpen(true);
+          if (!isDisabled) openMenu();
         }}
         onFocus={() => {
-          if (!isDisabled) setMenuOpen(true);
+          if (!isDisabled) openMenu();
         }}
         className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
         aria-label={`Добавить в ${DEFAULT_BASKET_NAME}`}
@@ -160,20 +205,25 @@ export default function NewPartsCartAddButton({
 
       {menuOpen ? (
         <div
-          className="absolute right-0 top-full z-20 mt-1 w-64 rounded-xl border border-gray-200 bg-white p-3 shadow-lg"
+          ref={menuRef}
+          className={`absolute right-0 z-30 w-56 rounded-lg border border-gray-200 bg-white p-2 shadow-lg ${
+            openUpward ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
           onMouseLeave={() => setMenuOpen(false)}
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Корзины</p>
-          <div className="mt-2 space-y-1">
+          <p className="px-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+            Корзины
+          </p>
+          <div className="mt-1 space-y-0.5">
             {defaultBasket ? (
               <button
                 type="button"
                 disabled={isDisabled}
                 onClick={() => addToBasket(defaultBasket.id)}
-                className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm text-gray-800 hover:bg-indigo-50 disabled:opacity-50"
+                className="flex w-full items-center justify-between rounded-md px-1.5 py-1 text-left text-sm text-gray-800 hover:bg-indigo-50 disabled:opacity-50"
               >
-                <span>{defaultBasket.name}</span>
-                <span className="text-xs text-gray-500">основная</span>
+                <span className="truncate">{defaultBasket.name}</span>
+                <span className="ml-2 shrink-0 text-[10px] text-gray-500">основная</span>
               </button>
             ) : null}
             {namedBaskets.map((basket) => (
@@ -182,34 +232,34 @@ export default function NewPartsCartAddButton({
                 type="button"
                 disabled={isDisabled}
                 onClick={() => addToBasket(basket.id)}
-                className="flex w-full rounded-lg px-2.5 py-2 text-left text-sm text-gray-800 hover:bg-indigo-50 disabled:opacity-50"
+                className="flex w-full rounded-md px-1.5 py-1 text-left text-sm text-gray-800 hover:bg-indigo-50 disabled:opacity-50"
               >
-                {basket.name}
+                <span className="truncate">{basket.name}</span>
               </button>
             ))}
           </div>
 
-          <form onSubmit={handleCreateAndAdd} className="mt-3 border-t border-gray-100 pt-3">
-            <p className="text-sm font-medium text-gray-900">Создать новую корзину</p>
+          <form onSubmit={handleCreateAndAdd} className="mt-1.5 border-t border-gray-100 pt-1.5">
+            <p className="px-1.5 text-xs font-medium text-gray-900">Создать новую корзину</p>
             <input
               type="text"
               value={newBasketName}
               onChange={(e) => setNewBasketName(e.target.value)}
-              placeholder="Название корзины"
+              placeholder="Название"
               maxLength={100}
-              className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
               disabled={isDisabled}
             />
             <button
               type="submit"
               disabled={isDisabled}
-              className="mt-2 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+              className="mt-1.5 w-full rounded-md bg-indigo-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
             >
               Создать и добавить
             </button>
           </form>
 
-          {menuError ? <p className="mt-2 text-xs text-red-600">{menuError}</p> : null}
+          {menuError ? <p className="mt-1 px-1.5 text-[11px] text-red-600">{menuError}</p> : null}
         </div>
       ) : null}
     </div>

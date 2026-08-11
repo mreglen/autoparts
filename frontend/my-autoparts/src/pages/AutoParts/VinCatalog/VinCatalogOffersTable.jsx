@@ -114,11 +114,11 @@ function OfferRow({ row, markupPercent }) {
           <p className="mt-0.5 text-[11px] text-gray-500">оригинал</p>
         )}
       </td>
-      <td className="min-w-[180px] px-3 py-2.5">
+      <td className="max-w-[200px] px-3 py-2.5 align-top">
         <button
           type="button"
           onClick={() => window.open(detailHref, '_blank', 'noopener,noreferrer')}
-          className="line-clamp-2 text-left text-sm font-medium text-indigo-700 hover:text-indigo-900"
+          className="block w-full max-w-[200px] text-left text-sm font-medium leading-snug text-indigo-700 hover:text-indigo-900 line-clamp-2 break-words whitespace-normal"
         >
           {name}
         </button>
@@ -166,17 +166,17 @@ function OffersTable({ parts, sectionType, emptyText }) {
 
   return (
     <div className="-mx-1 overflow-x-auto">
-      <table className="min-w-[920px] w-full border-collapse text-left">
+      <table className="min-w-[780px] w-full table-fixed border-collapse text-left">
         <thead>
           <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <th className="px-3 py-2.5">Бренд</th>
-            <th className="px-3 py-2.5">Номер</th>
-            <th className="px-3 py-2.5">Наименование</th>
-            <th className="px-3 py-2.5">Доставим</th>
-            <th className="px-3 py-2.5">Остаток</th>
-            <th className="px-3 py-2.5">Цена, ₽</th>
-            <th className="px-3 py-2.5">К заказу</th>
-            <th className="px-3 py-2.5 w-16" aria-label="Корзина" />
+            <th className="w-[72px] px-3 py-2.5">Бренд</th>
+            <th className="w-[120px] px-3 py-2.5">Номер</th>
+            <th className="w-[200px] px-3 py-2.5">Наименование</th>
+            <th className="w-[120px] px-3 py-2.5">Доставим</th>
+            <th className="w-[72px] px-3 py-2.5">Остаток</th>
+            <th className="w-[88px] px-3 py-2.5">Цена, ₽</th>
+            <th className="w-[80px] px-3 py-2.5">К заказу</th>
+            <th className="w-14 px-3 py-2.5" aria-label="Корзина" />
           </tr>
         </thead>
         <tbody>

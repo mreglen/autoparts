@@ -222,7 +222,7 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
         onClick={requestClose}
       />
       <div
-        className={`relative flex h-full w-full max-w-5xl flex-col bg-white shadow-2xl sm:max-w-5xl lg:max-w-6xl ${
+        className={`relative flex h-full w-full max-w-4xl flex-col bg-white shadow-2xl sm:max-w-4xl lg:max-w-5xl ${
           isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'
         }`}
       >
