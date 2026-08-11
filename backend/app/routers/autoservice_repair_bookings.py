@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
+from app.models.autoservice_client import AutoserviceClient
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_booking import RepairBooking
 from app.models.user import User
@@ -20,6 +22,7 @@ from app.schemas.repair_booking import (
 )
 from app.utils.autoservice_access import (
     normalize_phone_or_400,
+    related_autoservice_client_ids,
     require_autoservice_staff,
     require_my_active_autoservice_client,
 )
@@ -30,18 +33,18 @@ router = APIRouter(tags=["Autoservice repair bookings"])
 def _resolve_garage_vehicle(
     db: Session,
     *,
-    client_id: int,
-    organization_id: str,
+    client: AutoserviceClient,
     garage_vehicle_id: int | None,
 ) -> GarageVehicle | None:
     if garage_vehicle_id is None:
         return None
+    related_ids = related_autoservice_client_ids(db, client)
     vehicle = (
         db.query(GarageVehicle)
         .filter(
             GarageVehicle.id == garage_vehicle_id,
-            GarageVehicle.client_id == client_id,
-            GarageVehicle.organization_id == organization_id,
+            GarageVehicle.client_id.in_(related_ids),
+            GarageVehicle.organization_id == client.organization_id,
         )
         .first()
     )
@@ -91,8 +94,7 @@ def create_repair_booking(
     phone = normalize_phone_or_400(raw_phone)
     vehicle = _resolve_garage_vehicle(
         db,
-        client_id=client.id,
-        organization_id=client.organization_id,
+        client=client,
         garage_vehicle_id=payload.garage_vehicle_id,
     )
 
@@ -176,10 +178,17 @@ def list_my_repair_bookings(
     current_user: User = Depends(get_current_user),
 ):
     client = require_my_active_autoservice_client(db, current_user)
+    related_ids = related_autoservice_client_ids(db, client)
     rows = (
         db.query(RepairBooking)
         .options(joinedload(RepairBooking.vehicle))
-        .filter(RepairBooking.client_id == client.id)
+        .filter(
+            RepairBooking.organization_id == client.organization_id,
+            or_(
+                RepairBooking.client_id.in_(related_ids),
+                RepairBooking.created_by_user_id == current_user.id,
+            ),
+        )
         .order_by(RepairBooking.preferred_date.desc(), RepairBooking.id.desc())
         .all()
     )

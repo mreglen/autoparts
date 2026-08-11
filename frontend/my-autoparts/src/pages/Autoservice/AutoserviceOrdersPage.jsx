@@ -9,7 +9,7 @@ import { formatServerDateTime } from '../../utils/serverDate';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
 const inputClass =
-  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+  'block h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 hover:border-gray-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10';
 
 function formatDateTime(value) {
   return formatServerDateTime(value);
@@ -157,68 +157,87 @@ export default function AutoserviceOrdersPage() {
   if (!isAuthenticated || !user) return null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen bg-[#f7f7f5]">
+    <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-8">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {viewHistory ? 'История записей' : 'Записи на ремонт'}
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-500">
+            <span>Автосервис</span>
+            <span className="text-gray-300">/</span>
+            <span className="text-gray-700">Заказ-наряды</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">
+            {viewHistory ? 'История заказ-нарядов' : 'Заказ-наряды'}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {viewHistory ? 'Завершённые и отменённые' : 'Текущие записи организации'}
+          <p className="mt-1.5 text-sm text-gray-500">
+            {viewHistory
+              ? `${rows.length} завершённых и отменённых`
+              : `${rows.length} активных заказ-нарядов`}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {viewHistory ? (
             <button
               type="button"
               onClick={() => setHistoryMode(false)}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 transition hover:border-gray-300 hover:bg-gray-50"
             >
-              К активным
+              ← Активные
             </button>
           ) : (
             <>
               <button
                 type="button"
                 onClick={() => setHistoryMode(true)}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-800 transition hover:border-gray-300 hover:bg-gray-50"
               >
-                История записей
+                История
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/autoservice/orders/new')}
-                className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[.98]"
               >
-                Добавить
+                <span className="text-lg leading-none">+</span>
+                Новый заказ-наряд
               </button>
             </>
           )}
         </div>
       </div>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700">Поиск</label>
+      <div className="mt-6 rounded-2xl border border-gray-200/80 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1">
+          <svg
+            className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+          </svg>
           <input
-            className={inputClass}
+            className={`${inputClass} pl-11`}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Номер, клиент, авто, VIN, номер"
+            placeholder="Номер заказа, клиент, автомобиль, VIN или госномер"
             onKeyDown={(e) => {
               if (e.key === 'Enter') setQApplied(q);
             }}
+            aria-label="Поиск заказ-нарядов"
           />
         </div>
         {viewHistory && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Статус</label>
+          <div className="sm:w-48">
             <select
               className={inputClass}
               value={historyStatus}
               onChange={(e) => setHistoryStatus(e.target.value)}
+              aria-label="Фильтр по статусу"
             >
-              <option value="">Все</option>
+              <option value="">Все статусы</option>
               <option value="completed">Завершён</option>
               <option value="cancelled">Отменён</option>
             </select>
@@ -227,58 +246,70 @@ export default function AutoserviceOrdersPage() {
         <button
           type="button"
           onClick={() => setQApplied(q)}
-          className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+          className="h-11 rounded-xl bg-gray-950 px-6 text-sm font-semibold text-white transition hover:bg-gray-800 active:scale-[.98]"
         >
           Найти
         </button>
         <button
           type="button"
           onClick={load}
-          className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-indigo-600"
+          title="Обновить"
+          aria-label="Обновить"
         >
-          Обновить
+          <svg className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15" />
+          </svg>
         </button>
+        </div>
       </div>
 
       {error && (
-        <p className="mt-4 text-sm text-red-600" role="alert">
+        <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}
         </p>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-200/80 bg-white shadow-sm">
+        <table className="min-w-[1120px] w-full border-separate border-spacing-0 text-sm">
+          <thead className="text-left text-xs font-semibold text-gray-500">
             <tr>
-              <th className="px-4 py-3">Номер</th>
-              <th className="px-4 py-3">Авто</th>
-              <th className="px-4 py-3">Клиент</th>
-              <th className="hidden px-4 py-3 md:table-cell">Комментарий</th>
-              <th className="px-4 py-3">Дата</th>
-              <th className="px-4 py-3">Подъёмник</th>
-              <th className="hidden px-4 py-3 sm:table-cell">Принял</th>
-              <th className="px-4 py-3">Статус</th>
-              <th className="px-4 py-3">Действия</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-5 py-4">Заказ</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Автомобиль</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Клиент</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Комментарий</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Дата и время</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Подъёмник</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Принял</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-4 py-4">Статус</th>
+              <th className="border-b border-gray-100 bg-gray-50/80 px-5 py-4 text-right">Действия</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                  Загрузка…
+                <td colSpan={9} className="px-4 py-14 text-center text-gray-500">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-200 border-t-indigo-600" />
+                    Загрузка заказ-нарядов…
+                  </span>
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                  Записей пока нет
+                <td colSpan={9} className="px-4 py-16 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-orange-50 text-xl text-orange-500">
+                    ✓
+                  </div>
+                  <p className="mt-3 font-semibold text-gray-900">Заказ-нарядов пока нет</p>
+                  <p className="mt-1 text-sm text-gray-500">Создайте первый заказ-наряд для клиента</p>
                 </td>
               </tr>
             ) : (
               rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="cursor-pointer hover:bg-gray-50/80"
+                  className="group cursor-pointer transition-colors hover:bg-indigo-50/35"
                   onDoubleClick={(e) => {
                     if (
                       e.target.closest('.actions-dropdown')
@@ -289,22 +320,27 @@ export default function AutoserviceOrdersPage() {
                     setViewOrder(row);
                   }}
                 >
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {row.order_number}
+                  <td className="border-b border-gray-100 px-5 py-4">
+                    <span className="inline-flex min-w-11 items-center justify-center rounded-lg bg-gray-950 px-2.5 py-1.5 text-xs font-bold text-white">
+                      № {row.order_number}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-800">{vehicleLabel(row.vehicle)}</td>
-                  <td className="px-4 py-3 text-gray-800">{row.client?.name || '—'}</td>
-                  <td className="hidden max-w-[12rem] truncate px-4 py-3 text-gray-600 md:table-cell">
+                  <td className="border-b border-gray-100 px-4 py-4 font-medium text-gray-900">{vehicleLabel(row.vehicle)}</td>
+                  <td className="border-b border-gray-100 px-4 py-4">
+                    <div className="font-medium text-gray-900">{row.client?.name || '—'}</div>
+                    {row.client?.phone ? <div className="mt-0.5 text-xs text-gray-500">{row.client.phone}</div> : null}
+                  </td>
+                  <td className="max-w-[13rem] truncate border-b border-gray-100 px-4 py-4 text-gray-500" title={row.client_comment || ''}>
                     {row.client_comment || '—'}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                  <td className="whitespace-nowrap border-b border-gray-100 px-4 py-4 text-gray-700">
                     {formatDateTime(row.scheduled_at)}
                   </td>
-                  <td className="px-4 py-3 text-gray-700">
+                  <td className="border-b border-gray-100 px-4 py-4 text-gray-600">
                     {row.lift?.name || '—'}
                   </td>
-                  <td className="hidden px-4 py-3 text-gray-700 sm:table-cell">{row.accepted_by?.name || '—'}</td>
-                  <td className="px-4 py-3">
+                  <td className="border-b border-gray-100 px-4 py-4 text-gray-600">{row.accepted_by?.name || '—'}</td>
+                  <td className="border-b border-gray-100 px-4 py-4">
                     <StatusPicker
                       status={row.status}
                       options={statusActions}
@@ -313,8 +349,12 @@ export default function AutoserviceOrdersPage() {
                       onChange={(nextStatus) => handleStatus(row.id, nextStatus)}
                     />
                   </td>
-                  <td className="px-4 py-3">
-                    <ActionsDropdown menuClassName="w-44 z-50" estimatedMenuHeight={120}>
+                  <td className="border-b border-gray-100 px-5 py-4 text-right">
+                    <ActionsDropdown
+                      menuClassName="w-44 z-50"
+                      estimatedMenuHeight={120}
+                      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 shadow-sm transition hover:border-indigo-300 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
                       <ActionsDropdownItem
                         onClick={() => setViewOrder(row)}
                       >
@@ -342,6 +382,7 @@ export default function AutoserviceOrdersPage() {
           navigate(`/autoservice/orders/${order.id}/edit`);
         }}
       />
+    </div>
     </div>
   );
 }

@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import MobileFormField from '../../components/MobileFormField/MobileFormField';
 import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
 import { apiRequest } from '../../utils/apiClient';
-import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
+import {
+  fetchAutoserviceClientMe,
+  selectIsAutoserviceClient,
+} from '../../redux/slices/AutoserviceClientSlice';
 import { formatGarageVehicleLabel, garageVehicleSearchText } from '../../utils/garageVehicleUi';
 import {
   warehouseEmptyShellClass,
@@ -142,6 +145,7 @@ function BookingsSkeleton() {
 }
 
 export default function AutoserviceRepairBookingPage() {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const { isReady, isAuthenticated } = useAuthReady();
@@ -167,6 +171,13 @@ export default function AutoserviceRepairBookingPage() {
   const [error, setError] = useState('');
   const [rows, setRows] = useState([]);
   const [rowsLoading, setRowsLoading] = useState(false);
+  const [rowsError, setRowsError] = useState('');
+
+  useEffect(() => {
+    if (isReady && isAuthenticated) {
+      dispatch(fetchAutoserviceClientMe());
+    }
+  }, [dispatch, isReady, isAuthenticated]);
 
   useEffect(() => {
     setName(defaultName);
@@ -203,22 +214,24 @@ export default function AutoserviceRepairBookingPage() {
 
   const loadBookings = useCallback(async () => {
     setRowsLoading(true);
+    setRowsError('');
     try {
       const data = await apiRequest('/autoservice/repair-bookings/me');
       setRows(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (err) {
       setRows([]);
+      setRowsError(err?.message || 'Не удалось загрузить заявки');
     } finally {
       setRowsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (isReady && isAuthenticated && isClient) {
+    if (isReady && isAuthenticated && clientStatus === 'succeeded' && isClient) {
       loadVehicles();
       loadBookings();
     }
-  }, [isReady, isAuthenticated, isClient, loadVehicles, loadBookings]);
+  }, [isReady, isAuthenticated, clientStatus, isClient, loadVehicles, loadBookings]);
 
   const vehicleOptions = useMemo(
     () =>
@@ -269,7 +282,7 @@ export default function AutoserviceRepairBookingPage() {
     [rows]
   );
 
-  if (!isReady) return <AuthLoadingScreen />;
+  if (!isReady || (isAuthenticated && clientStatus === 'loading')) return <AuthLoadingScreen />;
 
   return (
     <div className={`${warehousePageClass} mx-auto max-w-5xl`}>
@@ -409,6 +422,12 @@ export default function AutoserviceRepairBookingPage() {
               </p>
             )}
           </div>
+
+          {rowsError ? (
+            <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+              {rowsError}
+            </p>
+          ) : null}
 
           {rowsLoading ? (
             <BookingsSkeleton />
