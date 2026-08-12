@@ -275,17 +275,19 @@ function StockOfferRow({
         <div>{maxQty} шт.</div>
         {!isSubRow && warehousesToggle}
       </td>
-      <td className="whitespace-nowrap px-3 py-2 text-xs font-bold text-gray-900">
+      <td className="whitespace-nowrap px-3 py-2 pl-6 text-right text-xs font-bold text-gray-900">
         {formatPriceRub(price)}
       </td>
-      <td className="whitespace-nowrap px-3 py-2">
-        <CartQtyControl
+      <td className="whitespace-nowrap px-3 py-2 text-right">
+        <div className="inline-flex flex-col items-end">
+          <CartQtyControl
           quantity={cartQuantity}
           maxQty={maxQty}
           onAdd={handleAdd}
           onRemove={handleRemove}
           disabled={disabled}
         />
+        </div>
       </td>
     </tr>
   );
@@ -301,7 +303,7 @@ function PartOfferGroup({ group, markupPercent }) {
       onClick={() => setShowOthers((prev) => !prev)}
       className="mt-0.5 block text-left text-[10px] font-medium text-indigo-600 hover:text-indigo-800"
     >
-      {showOthers ? 'Скрыть др. склады' : `Показать др. склады (${otherStocks.length})`}
+      {showOthers ? 'Скрыть' : 'Другие склады'}
     </button>
   ) : null;
 
@@ -350,15 +352,24 @@ function OffersTable({ parts, emptyText }) {
   return (
     <div className="-mx-1 overflow-x-auto">
       <table className="min-w-[720px] w-full table-fixed border-collapse text-left">
+        <colgroup>
+          <col className="w-[72px]" />
+          <col className="w-[120px]" />
+          <col />
+          <col className="w-[120px]" />
+          <col className="w-[88px]" />
+          <col className="w-[96px]" />
+          <col className="w-[72px]" />
+        </colgroup>
         <thead>
           <tr className="border-b border-gray-200 bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            <th className="w-[72px] px-3 py-2">Бренд</th>
-            <th className="w-[120px] px-3 py-2">Номер</th>
-            <th className="w-[200px] px-3 py-2">Наименование</th>
-            <th className="w-[120px] px-3 py-2">Доставим</th>
-            <th className="w-[88px] px-3 py-2">Остаток</th>
-            <th className="w-[88px] px-3 py-2">Цена, ₽</th>
-            <th className="w-[88px] px-3 py-2">К заказу</th>
+            <th className="px-3 py-2">Бренд</th>
+            <th className="px-3 py-2">Номер</th>
+            <th className="px-3 py-2">Наименование</th>
+            <th className="px-3 py-2">Доставим</th>
+            <th className="px-3 py-2">Остаток</th>
+            <th className="px-3 py-2 pl-6 text-right">Цена, ₽</th>
+            <th className="px-3 py-2 pl-2 text-right">К заказу</th>
           </tr>
         </thead>
         <tbody>
