@@ -98,8 +98,6 @@ function AdminPanelPage() {
           setUsedPartsPurchaseModeLocal(
             mode === 'cart_only' || mode === 'cta_only' || mode === 'both' ? mode : 'both',
           );
-          const m = Number(data.new_parts_markup_percent);
-          setMarkupPercent(String(Number.isFinite(m) && m >= 0 ? m : 15));
         }
       } catch (e) {
         if (!cancelled) {
