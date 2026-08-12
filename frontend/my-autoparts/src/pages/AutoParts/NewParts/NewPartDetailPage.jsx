@@ -38,6 +38,7 @@ import {
 import { extractCityFromAddress } from '../../../utils/organizationCity';
 import { slugifyBrand } from '../../../utils/slugUtils';
 import NewPartHorizontalScroll from './NewPartHorizontalScroll';
+import NewPartDetailThumb from './NewPartDetailThumb';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import useDeferredMount from '../../../hooks/useDeferredMount';
 import {
@@ -45,7 +46,7 @@ import {
   readPartDetailCache,
   writePartDetailCache,
 } from '../../../utils/partDetailCache';
-import { Badge, Button, Card, EmptyState, SectionHeader, SkeletonCard } from '../../../components/UI';
+import { Badge, Button, EmptyState, SectionHeader, SkeletonCard } from '../../../components/UI';
 
 const safeText = (value, fallback = '') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -473,7 +474,13 @@ export default function NewPartDetailPage() {
     return (
       <div className="mx-auto max-w-6xl px-3 py-6 sm:px-4">
         {seo ? <PageSeoHelmet seo={seo} /> : null}
-        <SkeletonCard lines={5} className="min-h-56" />
+        <div className="flex gap-3 sm:gap-4">
+          <div className="h-20 w-20 shrink-0 animate-pulse rounded-xl bg-surface-subtle sm:h-24 sm:w-24" />
+          <div className="min-w-0 flex-1 space-y-3">
+            <SkeletonCard lines={3} className="min-h-24" />
+          </div>
+        </div>
+        <SkeletonCard lines={4} className="mt-6 min-h-40" />
       </div>
     );
   }
@@ -541,6 +548,9 @@ export default function NewPartDetailPage() {
 
   const analogsLoading = rosskoStatus === 'loading' && analogParts.length === 0;
   const hasLiveStocks = Boolean(livePart) && liveStocks.length > 0;
+  const partDescription = livePart
+    ? extractProductDescription(safeText(livePart?.name), brand, article)
+    : extractProductDescription(card?.name, brand, article);
 
   const mainProductBlock = hasLiveStocks ? (
     <NewPartProductCard
@@ -554,11 +564,12 @@ export default function NewPartDetailPage() {
     <EmptyState
       title="Нет доступных складов"
       description="Сейчас эту деталь нельзя добавить в корзину. Проверьте аналоги ниже."
+      className="border-solid py-8"
     />
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-3 py-4 max-md:pb-28 sm:px-4 sm:py-6 md:py-8">
+    <div className="mx-auto max-w-6xl px-3 py-4 max-md:pb-28 sm:px-4 sm:py-6">
       <PageSeoHelmet seo={seo} />
       <Helmet>
         {structuredDataBlocks.map((block) => (
@@ -570,70 +581,64 @@ export default function NewPartDetailPage() {
 
       <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
 
-      <Card as="section" className="mb-4 border-brand-100 bg-brand-50/30 sm:mb-6" padding="md">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleBackToList}
-          className="-ml-2 mb-3"
-        >
-          ← К поиску новых запчастей
-        </Button>
-        <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-center">
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold leading-snug text-ink sm:text-2xl">{pageH1}</h1>
-        <NewPartHorizontalScroll className="mt-3" hint="Листайте теги →" showHint={false}>
-          <div className="flex flex-nowrap gap-2 pb-0.5 text-xs sm:flex-wrap sm:text-sm">
-            <Badge className="shrink-0">Бренд: {brand}</Badge>
-            <Badge className="shrink-0">Артикул: {article}</Badge>
-            <Badge tone={inStock ? 'success' : 'warning'} className="shrink-0">
-              {inStock ? 'В наличии' : 'Под заказ'}
-            </Badge>
-            {slugifyBrand(brand) ? (
-              <Link
-                to={`/autoparts/new/brand/${encodeURIComponent(slugifyBrand(brand))}`}
-                className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 font-semibold text-brand-700 hover:bg-brand-100"
-              >
-                Все новые {brand}
-              </Link>
-            ) : null}
-          </div>
-        </NewPartHorizontalScroll>
-        <PartDetailSeoCrossLinks
-          brand={brand}
-          article={article}
-          isNew
-          usedCatalogPath={usedCatalogPath}
-        />
-          </div>
-          {card?.image_url ? (
-            <div className="hidden h-32 overflow-hidden rounded-sg border border-line bg-surface sm:block">
-              <img
-                src={card.image_url.startsWith('http') ? card.image_url : resolveOgImageUrl(card.image_url)}
-                alt={`${brand} ${article}`}
-                className="h-full w-full object-contain p-2"
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleBackToList}
+        className="-ml-2 mt-2"
+      >
+        ← К поиску
+      </Button>
+
+      <section className="mt-3 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="min-w-0">
+          <div className="flex gap-3 sm:gap-4">
+            <NewPartDetailThumb
+              imageUrl={card?.image_url}
+              alt={`${brand} ${article}`}
+            />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-bold leading-snug text-ink sm:text-2xl">{pageH1}</h1>
+              <NewPartHorizontalScroll className="mt-2.5" hint="Листайте теги →" showHint={false}>
+                <div className="flex flex-nowrap gap-1.5 pb-0.5">
+                  <Badge className="shrink-0">{brand}</Badge>
+                  <Badge className="shrink-0 font-mono">{article}</Badge>
+                  <Badge tone={inStock ? 'success' : 'warning'} className="shrink-0">
+                    {inStock ? 'В наличии' : 'Под заказ'}
+                  </Badge>
+                  {slugifyBrand(brand) ? (
+                    <Link
+                      to={`/autoparts/new/brand/${encodeURIComponent(slugifyBrand(brand))}`}
+                      className="shrink-0 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100"
+                    >
+                      Все {brand}
+                    </Link>
+                  ) : null}
+                </div>
+              </NewPartHorizontalScroll>
+              {partDescription ? (
+                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{partDescription}</p>
+              ) : null}
+              <PartDetailSeoCrossLinks
+                brand={brand}
+                article={article}
+                isNew
+                usedCatalogPath={usedCatalogPath}
               />
             </div>
-          ) : (
-            <div className="hidden h-32 items-center justify-center rounded-sg border border-line bg-surface text-ink-faint sm:flex">
-              <svg className="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            </div>
-          )}
+          </div>
+
+          <div className="mt-4 lg:hidden">{mainProductBlock}</div>
         </div>
-      </Card>
 
-      {mainProductBlock}
+        <aside className="hidden lg:block lg:sticky lg:top-4">
+          {mainProductBlock}
+        </aside>
+      </section>
 
-      <div className="mt-4">
-        <NewPartDeliveryStockBlock
-          stocks={liveStocks}
-          inStock={inStock}
-        />
-      </div>
+      <div className="mt-6 space-y-6">
+        <NewPartDeliveryStockBlock stocks={liveStocks} inStock={inStock} />
 
-      <div className="mt-6 space-y-4">
         <PartDetailAboutBlock bodyDescription={bodyDescription} isNew />
         <PartDetailFitmentBlock
           sellerVehicles={[]}
@@ -641,18 +646,16 @@ export default function NewPartDetailPage() {
           loading={secondaryEnabled ? fitmentLoading : true}
           fitmentMeta={fitmentMeta}
         />
-      </div>
 
-      <NewPartUsedMatchesBlock
-        brand={brand}
-        article={article}
-        items={usedMatches}
-        loading={secondaryEnabled ? usedMatchLoading : true}
-        error={usedMatchError}
-      />
+        <NewPartUsedMatchesBlock
+          brand={brand}
+          article={article}
+          items={usedMatches}
+          loading={secondaryEnabled ? usedMatchLoading : true}
+          error={usedMatchError}
+        />
 
-      {secondaryEnabled ? (
-        <div className="mt-6">
+        {secondaryEnabled ? (
           <PartDetailFaqBlock
             brand={brand}
             article={article}
@@ -663,29 +666,27 @@ export default function NewPartDetailPage() {
             inStock={inStock}
             items={faqItems}
           />
-        </div>
-      ) : null}
+        ) : null}
 
-      <section className="mt-8" ref={analogsSentinelRef}>
-        <SectionHeader
-          title="Аналоги"
-          action={analogsVisible && !analogsLoading && analogParts.length > 0
-            ? <Badge>{analogParts.length} шт.</Badge>
-            : null}
-          className="mb-4"
-        />
-        {analogsVisible ? (
-          <NewPartAnalogsTable
-            analogParts={analogParts}
-            loading={analogsLoading}
-            onNavigateCreate={handleAnalogNavigateCreate}
+        <section ref={analogsSentinelRef}>
+          <SectionHeader
+            title="Аналоги"
+            action={analogsVisible && !analogsLoading && analogParts.length > 0
+              ? <Badge>{analogParts.length}</Badge>
+              : null}
+            className="mb-3"
           />
-        ) : (
-          <div className="rounded-sg-lg border border-line bg-surface p-5 text-sm text-ink-muted shadow-sg">
-            Загрузка аналогов…
-          </div>
-        )}
-      </section>
+          {analogsVisible ? (
+            <NewPartAnalogsTable
+              analogParts={analogParts}
+              loading={analogsLoading}
+              onNavigateCreate={handleAnalogNavigateCreate}
+            />
+          ) : (
+            <p className="py-4 text-sm text-ink-muted">Загрузка аналогов…</p>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

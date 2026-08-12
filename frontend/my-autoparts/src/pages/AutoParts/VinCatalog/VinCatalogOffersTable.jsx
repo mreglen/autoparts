@@ -306,7 +306,7 @@ function StockOfferRow({
           <span className="block truncate" title={brand}>{brand}</span>
         ) : null}
       </td>
-      <td className="px-2 py-2 align-top overflow-hidden">
+      <td className="px-2 py-2 align-middle overflow-hidden">
         {!isSubRow ? (
           <button
             type="button"

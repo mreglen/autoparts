@@ -15,6 +15,7 @@ import {
     saveCartSummaryCache,
     clearCartSummaryCache,
 } from '../../utils/cartSummary';
+import { truncateRubles } from '../../pages/AutoParts/NewParts/newPartStockUtils';
 
 const ACTIVE_BASKET_STORAGE_KEY = 'active_new_parts_basket_id';
 
@@ -130,11 +131,33 @@ export const renameNewPartsBasket = createAsyncThunk(
     }
 );
 
+export const deleteNewPartsBasket = createAsyncThunk(
+    'cart/deleteNewPartsBasket',
+    async (basketId, { rejectWithValue, dispatch }) => {
+        try {
+            await apiAxios.delete(`/cart/new-parts/baskets/${basketId}`);
+            dispatch(fetchCart());
+            return basketId;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка удаления корзины'
+            );
+        }
+    }
+);
+
 export const addNewPartsToCart = createAsyncThunk(
     'cart/addNewPartsToCart',
     async (cartItem, { rejectWithValue, dispatch }) => {
         try {
-            const response = await apiAxios.post('/cart/new-parts', cartItem);
+            const payload = {
+                ...cartItem,
+                price: truncateRubles(cartItem?.price),
+            };
+            if (cartItem?.purchase_price != null) {
+                payload.purchase_price = truncateRubles(cartItem.purchase_price);
+            }
+            const response = await apiAxios.post('/cart/new-parts', payload);
             dispatch(fetchCart());
             return response.data;
         } catch (error) {
@@ -462,6 +485,23 @@ const cartSlice = createSlice({
             })
             .addCase(renameNewPartsBasket.fulfilled, (state) => {
                 // fetchCart in thunk refreshes baskets
+            })
+            .addCase(deleteNewPartsBasket.fulfilled, (state, action) => {
+                const deletedId = action.payload;
+                state.newPartsBaskets = state.newPartsBaskets.filter((b) => b.id !== deletedId);
+                if (state.cart?.new_parts_baskets) {
+                    state.cart.new_parts_baskets = state.cart.new_parts_baskets.filter(
+                        (b) => b.id !== deletedId,
+                    );
+                }
+                if (state.activeBasketId === deletedId) {
+                    const fallback =
+                        state.newPartsBaskets.find((b) => b.is_default)?.id
+                        || state.newPartsBaskets[0]?.id
+                        || null;
+                    state.activeBasketId = fallback;
+                    saveActiveBasketId(fallback);
+                }
             })
             .addCase(createNewPartsPaymentSession.pending, (state) => {
                 state.paymentSessionLoading = true;

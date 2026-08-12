@@ -379,3 +379,114 @@ def find_or_create_user_basket_by_name(
     if basket:
         return basket
     return create_user_basket(db, cart_id, user_id, cleaned)
+
+
+def maybe_delete_empty_non_default_user_basket(
+    db: Session,
+    cart_id: int,
+    user_id: int,
+    basket_id: int | None,
+) -> None:
+    """Remove a named basket when its last item was deleted."""
+    if not basket_id:
+        return
+    basket = (
+        db.query(NewPartsBasket)
+        .filter(
+            NewPartsBasket.id == basket_id,
+            NewPartsBasket.cart_id == cart_id,
+            NewPartsBasket.user_id == user_id,
+        )
+        .first()
+    )
+    if not basket or basket.is_default:
+        return
+    has_items = (
+        db.query(NewPartsCart.id)
+        .filter(
+            NewPartsCart.cart_id == cart_id,
+            NewPartsCart.user_id == user_id,
+            NewPartsCart.basket_id == basket.id,
+        )
+        .first()
+    )
+    if not has_items:
+        db.delete(basket)
+
+
+def maybe_delete_empty_non_default_guest_basket(
+    db: Session,
+    guest_cart_id: int,
+    basket_id: int | None,
+) -> None:
+    if not basket_id:
+        return
+    basket = (
+        db.query(GuestNewPartsBasket)
+        .filter(
+            GuestNewPartsBasket.id == basket_id,
+            GuestNewPartsBasket.guest_cart_id == guest_cart_id,
+        )
+        .first()
+    )
+    if not basket or basket.is_default:
+        return
+    has_items = (
+        db.query(GuestNewPartsCart.id)
+        .filter(
+            GuestNewPartsCart.guest_cart_id == guest_cart_id,
+            GuestNewPartsCart.basket_id == basket.id,
+        )
+        .first()
+    )
+    if not has_items:
+        db.delete(basket)
+
+
+def delete_user_basket(db: Session, cart_id: int, user_id: int, basket_id: int) -> None:
+    basket = resolve_user_basket(db, cart_id, user_id, basket_id)
+    if basket.is_default:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Основную корзину нельзя удалить",
+        )
+    has_items = (
+        db.query(NewPartsCart.id)
+        .filter(
+            NewPartsCart.cart_id == cart_id,
+            NewPartsCart.user_id == user_id,
+            NewPartsCart.basket_id == basket.id,
+        )
+        .first()
+    )
+    if has_items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Сначала удалите все позиции из корзины",
+        )
+    db.delete(basket)
+    db.flush()
+
+
+def delete_guest_basket(db: Session, guest_cart_id: int, basket_id: int) -> None:
+    basket = resolve_guest_basket(db, guest_cart_id, basket_id)
+    if basket.is_default:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Основную корзину нельзя удалить",
+        )
+    has_items = (
+        db.query(GuestNewPartsCart.id)
+        .filter(
+            GuestNewPartsCart.guest_cart_id == guest_cart_id,
+            GuestNewPartsCart.basket_id == basket.id,
+        )
+        .first()
+    )
+    if has_items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Сначала удалите все позиции из корзины",
+        )
+    db.delete(basket)
+    db.flush()

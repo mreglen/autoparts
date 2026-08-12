@@ -18,6 +18,7 @@ import {
   clearNewPartsCheckoutItemIds,
   readNewPartsCheckoutItemIds,
 } from '../../utils/newPartsCheckout';
+import { formatNewPartMoney, truncateRubles } from '../../pages/AutoParts/NewParts/newPartStockUtils';
 import {
   normalizeFullName,
   normalizeEmail,
@@ -45,10 +46,7 @@ function formatApiErrorDetail(detail) {
   return 'Ошибка при оформлении заказа. Попробуйте ещё раз.';
 }
 
-const formatMoney = (value) =>
-  new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(
-    Number(value) || 0
-  );
+const formatMoney = (value) => formatNewPartMoney(value);
 
 const inputClass = (hasError) =>
   `block w-full rounded-xl border px-3 py-2.5 text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 ${
@@ -180,7 +178,7 @@ export default function NewPartsOrderRegistration() {
       brand: item.brand,
       partnumber: item.partnumber,
       name: formatProductDisplayTitle(item.brand, item.partnumber, item.name),
-      price: Number(item.price),
+      price: truncateRubles(Number(item.price)),
       quantity: item.quantity,
     }));
     if (checkoutItemIds?.size) {

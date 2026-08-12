@@ -11,6 +11,7 @@ import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
+import { applyMarkup } from '../NewParts/newPartStockUtils';
 import {
   formatProductDisplayTitle,
 } from '../../../utils/productDisplayName';
@@ -26,12 +27,6 @@ function toSafeInt(value, fallback = 0) {
   const n = Number(value);
   if (Number.isFinite(n)) return Math.max(0, Math.trunc(n));
   return fallback;
-}
-
-function parseSupplierPrice(price) {
-  const numericPrice = parseFloat(price);
-  if (Number.isNaN(numericPrice) || numericPrice <= 0) return 0;
-  return parseFloat(numericPrice.toFixed(2));
 }
 
 function formatDeliveryShort(deliveryStart, deliveryEnd) {
@@ -139,12 +134,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
   const mainStock = stocks[0];
   const otherStocks = stocks.slice(1);
 
-  const priceWithMarkup = (price) => {
-    const base = parseSupplierPrice(price);
-    if (!base) return 0;
-    const mult = 1 + Number(newPartsMarkupPercent) / 100;
-    return parseFloat((base * mult).toFixed(2));
-  };
+  const priceWithMarkup = (price) => applyMarkup(price, newPartsMarkupPercent);
 
   const getCartQuantity = (stock) => {
     if (!stock?.stock_id || !cart?.new_parts_items) return 0;

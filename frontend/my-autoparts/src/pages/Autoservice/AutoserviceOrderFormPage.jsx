@@ -17,6 +17,7 @@ import {
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import { getRosskoMinPrice, getRosskoParts } from '../AutoParts/NewParts/rosskoHelpers';
+import { truncateRubles } from '../AutoParts/NewParts/newPartStockUtils';
 import {
   DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
   fetchPublicSiteConfig,
@@ -68,14 +69,20 @@ function lineSum(qty, unitPrice) {
   return Math.round(q * p * 100) / 100;
 }
 
-function priceWithMarkup(unitPrice, markupPercent) {
-  const p = Number(unitPrice) || 0;
-  const m = Number(markupPercent) || 0;
-  return Math.round(p * (1 + m / 100) * 100) / 100;
+function priceWithMarkup(unitPrice, markupPercent, { floorRubles = false } = {}) {
+  const value = (Number(unitPrice) || 0) * (1 + (Number(markupPercent) || 0) / 100);
+  if (floorRubles) return truncateRubles(value);
+  return Math.round(value * 100) / 100;
 }
 
-function shopLineSum(qty, unitPrice, markupPercent) {
-  return Math.round((Number(qty) || 0) * priceWithMarkup(unitPrice, markupPercent) * 100) / 100;
+function shopLineSum(qty, unitPrice, markupPercent, options = {}) {
+  const unit = priceWithMarkup(unitPrice, markupPercent, options);
+  const total = (Number(qty) || 0) * unit;
+  return options.floorRubles ? truncateRubles(total) : Math.round(total * 100) / 100;
+}
+
+function shopPartPricingOptions(part) {
+  return { floorRubles: part?.source === 'rossko' };
 }
 
 function vehicleLabel(v) {
@@ -868,7 +875,10 @@ export default function AutoserviceOrderFormPage() {
   );
 
   const shopPartsTotal = useMemo(
-    () => shopParts.reduce((sum, p) => sum + shopLineSum(p.qty, p.unit_price, p.markup_percent), 0),
+    () => shopParts.reduce(
+      (sum, p) => sum + shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p)),
+      0,
+    ),
     [shopParts],
   );
 
@@ -1003,7 +1013,7 @@ export default function AutoserviceOrderFormPage() {
         brand: part.brand || '',
         partnumber: part.partnumber || '',
         name: part.name || part.guid || '',
-        price: getRosskoMinPrice(part),
+        price: truncateRubles(getRosskoMinPrice(part)),
       }));
       setPickerResults(parts);
     } catch (err) {
@@ -1035,7 +1045,7 @@ export default function AutoserviceOrderFormPage() {
       ...prev,
       makeEmptyShopPart({
         title: title.slice(0, 255),
-        unit_price: String(item.price ?? 0),
+        unit_price: String(truncateRubles(item.price ?? 0)),
         source: 'rossko',
         rossko_brand: item.brand || '',
         rossko_partnumber: item.partnumber || '',
@@ -1673,8 +1683,8 @@ export default function AutoserviceOrderFormPage() {
                     <div>
                       <label className="text-xs text-ink-muted">Цена с наценкой / сумма</label>
                       <p className="mt-1 text-sm text-ink-soft">
-                        {formatMoney(priceWithMarkup(p.unit_price, p.markup_percent))} ₽ ·{' '}
-                        {formatMoney(shopLineSum(p.qty, p.unit_price, p.markup_percent))} ₽
+                        {formatMoney(priceWithMarkup(p.unit_price, p.markup_percent, shopPartPricingOptions(p)))} ₽ ·{' '}
+                        {formatMoney(shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p)))} ₽
                       </p>
                     </div>
                   </div>

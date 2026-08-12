@@ -36,6 +36,10 @@ from app.utils.cart_baskets import (
     list_user_baskets,
     rename_guest_basket,
     rename_user_basket,
+    delete_guest_basket,
+    delete_user_basket,
+    maybe_delete_empty_non_default_guest_basket,
+    maybe_delete_empty_non_default_user_basket,
     resolve_guest_basket,
     resolve_user_basket,
 )
@@ -440,15 +444,15 @@ def get_cart(
             selectinload(Cart.used_parts_items).selectinload(UsedPartsCart.product).selectinload(Product.organization)
         ).filter(Cart.user_id == current_user.id).first()
         if not cart:
-            get_or_create_default_user_basket(db, get_or_create_user_cart(db, current_user.id).id, current_user.id)
-            return CartResponse(
-                id=0,
-                user_id=current_user.id,
-                new_parts_baskets=[],
-                new_parts_items=[],
-                used_parts_items=[],
-            )
-        get_or_create_default_user_basket(db, cart.id, current_user.id)
+            cart = get_or_create_user_cart(db, current_user.id)
+            get_or_create_default_user_basket(db, cart.id, current_user.id)
+            db.commit()
+            cart = db.query(Cart).options(
+                selectinload(Cart.new_parts_items),
+                selectinload(Cart.used_parts_items).selectinload(UsedPartsCart.product).selectinload(Product.organization)
+            ).filter(Cart.user_id == current_user.id).first()
+        else:
+            get_or_create_default_user_basket(db, cart.id, current_user.id)
         return _build_user_cart_response(cart, db)
 
     guest_token = get_guest_token_from_request(request)
@@ -485,7 +489,18 @@ def remove_new_parts_from_cart(
             detail="Товар не найден в корзине"
         )
 
+    basket_id = cart_item.basket_id
+    if current_user:
+        cart_id = cart_item.cart_id
+        user_id = cart_item.user_id
+    else:
+        guest_cart_id = cart_item.guest_cart_id
+
     db.delete(cart_item)
+    if current_user:
+        maybe_delete_empty_non_default_user_basket(db, cart_id, user_id, basket_id)
+    else:
+        maybe_delete_empty_non_default_guest_basket(db, guest_cart_id, basket_id)
     db.commit()
     if not current_user:
         touch_guest_cart(db, guest_cart)
@@ -720,3 +735,25 @@ def rename_new_parts_basket(
     db.commit()
     db.refresh(basket)
     return _build_new_parts_basket_response(basket, items)
+
+
+@router.delete("/new-parts/baskets/{basket_id}", status_code=204)
+def delete_new_parts_basket(
+    basket_id: int,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional),
+):
+    """Удалить именованную пустую корзину новых запчастей."""
+    if current_user:
+        cart = get_or_create_user_cart(db, current_user.id)
+        delete_user_basket(db, cart.id, current_user.id, basket_id)
+        db.commit()
+        return
+
+    guest_cart = get_or_create_guest_cart(db, request, response)
+    delete_guest_basket(db, guest_cart.id, basket_id)
+    touch_guest_cart(db, guest_cart)
+    db.commit()
+    return

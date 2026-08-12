@@ -14,6 +14,7 @@ import {
   removeUsedFromCart,
   setActiveNewPartsBasket,
   renameNewPartsBasket,
+  deleteNewPartsBasket,
 } from '../../redux/slices/CartSlice';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { setNewPartsCheckoutItemIds, clearNewPartsCheckoutItemIds } from '../../utils/newPartsCheckout';
@@ -27,9 +28,12 @@ import { FieldLabel, Input } from '../../components/UI/Field';
 import { PageHeader } from '../../components/UI/SectionHeader';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../redux/slices/ClientMarkupSlice';
 import { isOrganizationStaff } from '../../utils/clientMarkupUtils';
+import { formatNewPartMoney, truncateRubles } from '../../pages/AutoParts/NewParts/newPartStockUtils';
 
-const formatPrice = (price) =>
-  new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price);
+const formatNewPartPrice = (price) => formatNewPartMoney(price);
+
+const formatUsedPrice = (price) =>
+  new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price || 0);
 
 function formatDeliveryTime(deliveryString) {
   if (!deliveryString) return 'Не указана';
@@ -160,6 +164,7 @@ function CartItemRow({
 }) {
   const maxQty = getMaxAllowedQuantity(item);
   const lineTotal = item.price * item.quantity;
+  const formatItemPrice = item.type === 'new' ? formatNewPartPrice : formatUsedPrice;
   const showPurchase = showPurchasePrice
     && item.purchasePrice > 0
     && Math.abs(item.price - item.purchasePrice) > 0.009;
@@ -225,11 +230,11 @@ function CartItemRow({
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <p className="text-sm font-bold text-ink">{formatPrice(lineTotal)}</p>
-        <p className="mt-0.5 text-[11px] text-ink-muted">{formatPrice(item.price)} / шт.</p>
+        <p className="text-sm font-bold text-ink">{formatItemPrice(lineTotal)}</p>
+        <p className="mt-0.5 text-[11px] text-ink-muted">{formatItemPrice(item.price)} / шт.</p>
         {showPurchase ? (
           <p className="mt-0.5 text-[10px] text-ink-muted">
-            Закуп. {formatPrice(item.purchasePrice)}
+            Закуп. {formatItemPrice(item.purchasePrice)}
           </p>
         ) : null}
       </div>
@@ -250,10 +255,12 @@ function SellerCartBlock({
   onRemoveSelected,
   onCheckout,
   onCheckoutSelected,
+  onClearAll,
   isAuthorized,
   calculateSellerTotal,
   checkoutLabel = 'Оформить заказ',
   showPurchasePrice = false,
+  formatTotalPrice = formatNewPartPrice,
 }) {
   const allSelected = allItems.length > 0 && allItems.every((item) => selectedItems.has(item.id));
   const someSelected = allItems.some((item) => selectedItems.has(item.id));
@@ -298,7 +305,7 @@ function SellerCartBlock({
               ) : null}
             </div>
             <p className="mt-0.5 text-xs text-ink-muted sm:text-sm">
-              {allItems.length} поз. · {totalQty} шт. · {formatPrice(calculateSellerTotal(allItems))}
+              {allItems.length} поз. · {totalQty} шт. · {formatTotalPrice(calculateSellerTotal(allItems))}
             </p>
           </div>
         </div>
@@ -336,9 +343,9 @@ function SellerCartBlock({
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <div className="mr-auto text-left sm:mr-0 sm:text-right">
                 <p className="text-[11px] text-ink-muted">Итого</p>
-                <p className="text-base font-bold text-ink">{formatPrice(calculateSellerTotal(allItems))}</p>
+                <p className="text-base font-bold text-ink">{formatTotalPrice(calculateSellerTotal(allItems))}</p>
               </div>
-              <Button variant="secondary" size="sm" onClick={() => allItems.forEach((item) => onRemove(item.id))}>
+              <Button variant="secondary" size="sm" onClick={onClearAll}>
                 Очистить
               </Button>
               <Button size="sm" onClick={onCheckout}>
@@ -388,8 +395,8 @@ export default function CartPage() {
     number: item.partnumber,
     name: formatProductDisplayTitle(item.brand, item.partnumber, item.name),
     deliveryDate: item.delivery,
-    price: item.price,
-    purchasePrice: item.purchase_price,
+    price: truncateRubles(item.price),
+    purchasePrice: truncateRubles(item.purchase_price),
     quantity: item.quantity,
     maxQuantity: item.max_quantity,
     stock_id: item.stock_id,
@@ -420,18 +427,39 @@ export default function CartPage() {
   }, [activeBasket, cart, mapNewItem]);
 
   const basketTabs = useMemo(() => {
-    const sorted = [...newPartsBaskets].sort((a, b) => {
-      if (a.is_default) return -1;
-      if (b.is_default) return 1;
-      return a.name.localeCompare(b.name, 'ru');
-    });
+    const sorted = [...newPartsBaskets]
+      .filter((basket) => basket.is_default || (basket.item_count ?? 0) > 0)
+      .sort((a, b) => {
+        if (a.is_default) return -1;
+        if (b.is_default) return 1;
+        return a.name.localeCompare(b.name, 'ru');
+      });
     return sorted.map((basket) => ({
       id: String(basket.id),
-      label: basket.is_default ? basket.name : basket.name,
+      label: basket.name,
       count: basket.item_count,
       title: basket.name,
     }));
   }, [newPartsBaskets]);
+
+  const defaultBasket = useMemo(
+    () => newPartsBaskets.find((b) => b.is_default) || newPartsBaskets[0] || null,
+    [newPartsBaskets],
+  );
+
+  useEffect(() => {
+    if (!newPartsBaskets.length) return;
+    const visibleIds = newPartsBaskets
+      .filter((b) => b.is_default || (b.item_count ?? 0) > 0)
+      .map((b) => b.id);
+    if (!visibleIds.length) return;
+    if (!visibleIds.includes(activeBasketId)) {
+      const fallbackId = defaultBasket?.id && visibleIds.includes(defaultBasket.id)
+        ? defaultBasket.id
+        : visibleIds[0];
+      dispatch(setActiveNewPartsBasket(fallbackId));
+    }
+  }, [activeBasketId, defaultBasket?.id, dispatch, newPartsBaskets]);
 
   const activeBasketTotal = useMemo(
     () => newPartsItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -472,6 +500,8 @@ export default function CartPage() {
     () => [...allNewPartsItems, ...Object.values(usedGroupedItems).flat()],
     [allNewPartsItems, usedGroupedItems]
   );
+
+  const hasVisibleCartContent = cartItems.length > 0;
 
   const usedSellerGroups = useMemo(
     () =>
@@ -531,6 +561,48 @@ export default function CartPage() {
       dispatch(fetchCart());
     }
   };
+
+  const handleClearNewPartsBasket = useCallback(async () => {
+    const basketToDelete = activeBasket && !activeBasket.is_default ? activeBasket : null;
+    const itemsToRemove = [...newPartsItems];
+
+    for (const item of itemsToRemove) {
+      try {
+        await dispatch(removeFromCart(item.id)).unwrap();
+      } catch {
+        // continue clearing remaining items
+      }
+    }
+
+    try {
+      await dispatch(fetchCart()).unwrap();
+    } catch {
+      // state will refresh on next interaction
+    }
+
+    if (basketToDelete?.id) {
+      try {
+        await dispatch(deleteNewPartsBasket(basketToDelete.id)).unwrap();
+      } catch {
+        // basket may already be auto-deleted after last item removal
+      }
+    }
+
+    if (defaultBasket?.id) {
+      dispatch(setActiveNewPartsBasket(defaultBasket.id));
+    }
+  }, [activeBasket, defaultBasket?.id, dispatch, newPartsItems]);
+
+  const handleClearUsedBasket = useCallback(async (items) => {
+    for (const item of items) {
+      try {
+        await dispatch(removeUsedFromCart(item.id)).unwrap();
+      } catch {
+        // continue
+      }
+    }
+    dispatch(fetchCart());
+  }, [dispatch]);
 
   const openAuthModalForCheckout = useCallback((payload) => {
     pendingCheckoutRef.current = payload;
@@ -679,7 +751,7 @@ export default function CartPage() {
         title="Корзина"
         subtitle={
           !isInitialLoad && cartItems.length > 0
-            ? `${cartItems.length} поз. · ${grandQty} шт. · ${formatPrice(grandTotal)}`
+            ? `${cartItems.length} поз. · ${grandQty} шт. · ${formatUsedPrice(grandTotal)}`
             : 'Новые запчасти и б/у от разных продавцов'
         }
       />
@@ -699,33 +771,26 @@ export default function CartPage() {
           onAction={() => dispatch(fetchCart())}
           className="border-solid"
         />
-      ) : cartItems.length === 0 ? (
-        <EmptyState
-          illustration="empty"
-          title="Корзина пуста"
-          description="Добавьте запчасти из каталога или VIN-поиска"
-          actionLabel="Перейти к каталогу"
-          actionHref="/autoparts"
-          className="border-solid"
-        />
       ) : (
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
+        <div className={hasVisibleCartContent ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]' : ''}>
           <div className="space-y-4">
-          {newPartsBaskets.length > 0 && (
+          {newPartsBaskets.length > 0 ? (
             <div className="space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <UnderlineTabs
-                  tabs={basketTabs}
-                  value={String(activeBasket?.id || basketTabs[0]?.id || '')}
-                  onChange={(id) => dispatch(setActiveNewPartsBasket(Number(id)))}
-                  ariaLabel="Корзины новых запчастей"
-                />
-                {activeBasket && !activeBasket.is_default ? (
-                  <Button variant="secondary" size="sm" onClick={openRenameModal} className="self-start">
-                    Переименовать
-                  </Button>
-                ) : null}
-              </div>
+              {basketTabs.length > 0 ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <UnderlineTabs
+                    tabs={basketTabs}
+                    value={String(activeBasket?.id || basketTabs[0]?.id || '')}
+                    onChange={(id) => dispatch(setActiveNewPartsBasket(Number(id)))}
+                    ariaLabel="Корзины новых запчастей"
+                  />
+                  {activeBasket && !activeBasket.is_default ? (
+                    <Button variant="secondary" size="sm" onClick={openRenameModal} className="self-start">
+                      Переименовать
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
 
               {newPartsItems.length > 0 ? (
                 <SellerCartBlock
@@ -745,20 +810,25 @@ export default function CartPage() {
                   }}
                   onCheckout={handleNewPartsCheckout}
                   onCheckoutSelected={handleNewPartsCheckoutSelected}
+                  onClearAll={handleClearNewPartsBasket}
                   isAuthorized={isAuthorized}
                   calculateSellerTotal={calculateSellerTotal}
                   checkoutLabel="Оформить заказ"
                   showPurchasePrice={showPurchaseInCart}
                 />
               ) : (
-                <EmptyState
-                  title={`Корзина «${activeBasket?.name || 'Новые запчасти'}» пуста`}
-                  description="Добавьте запчасти из каталога или переключите вкладку"
-                  className="border-solid py-8"
-                />
+                <div className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
+                  {activeBasket?.is_default
+                    ? 'Добавьте новые запчасти из каталога или VIN-поиска'
+                    : `Корзина «${activeBasket?.name || 'Новые запчасти'}» пуста`}
+                </div>
               )}
             </div>
-          )}
+          ) : !hasVisibleCartContent && usedSellerGroups.length === 0 ? (
+            <div className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
+              Добавьте новые запчасти из каталога или VIN-поиска
+            </div>
+          ) : null}
 
           {!newPartsBaskets.length && newPartsItems.length > 0 && (
             <SellerCartBlock
@@ -778,6 +848,7 @@ export default function CartPage() {
               }}
               onCheckout={handleNewPartsCheckout}
               onCheckoutSelected={handleNewPartsCheckoutSelected}
+              onClearAll={handleClearNewPartsBasket}
               isAuthorized={isAuthorized}
               calculateSellerTotal={calculateSellerTotal}
               checkoutLabel="Оформить заказ"
@@ -805,16 +876,19 @@ export default function CartPage() {
                 }}
                 onCheckout={() => handleCheckout(seller)}
                 onCheckoutSelected={() => handleCheckoutSelected(seller)}
+                onClearAll={() => handleClearUsedBasket(items)}
                 isAuthorized={isAuthorized}
                 calculateSellerTotal={calculateSellerTotal}
+                formatTotalPrice={formatUsedPrice}
               />
             ))}
           </div>
 
+          {hasVisibleCartContent ? (
           <aside className="mt-4 space-y-3 lg:sticky lg:top-4 lg:mt-0">
             <Card padding="sm">
               <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Общая сумма</p>
-              <p className="mt-1 text-2xl font-bold text-ink">{formatPrice(grandTotal)}</p>
+              <p className="mt-1 text-2xl font-bold text-ink">{formatUsedPrice(grandTotal)}</p>
               <p className="mt-1 text-xs text-ink-muted">
                 {grandQty} шт. · {cartItems.length} поз.
               </p>
@@ -825,7 +899,7 @@ export default function CartPage() {
                 <p className="mt-1 truncate text-sm font-semibold text-ink" title={activeBasket.name}>
                   {activeBasket.name}
                 </p>
-                <p className="mt-2 text-lg font-bold text-ink">{formatPrice(activeBasketTotal)}</p>
+                <p className="mt-2 text-lg font-bold text-ink">{formatNewPartPrice(activeBasketTotal)}</p>
                 <p className="text-xs text-ink-muted">{activeBasketQty} шт.</p>
                 <Button className="mt-3 w-full" size="sm" onClick={handleNewPartsCheckout}>
                   Оформить
@@ -833,6 +907,7 @@ export default function CartPage() {
               </Card>
             ) : null}
           </aside>
+          ) : null}
         </div>
       )}
 

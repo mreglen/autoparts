@@ -12,9 +12,9 @@ import {
     selectPaymentSessionLoading,
 } from '../../redux/slices/CartSlice';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { formatNewPartMoney } from '../AutoParts/NewParts/newPartStockUtils';
 
-const formatPrice = (price) =>
-    new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price || 0);
+const formatPrice = (price) => formatNewPartMoney(price);
 
 export default function NewPartsPaymentPage() {
     const { sessionId } = useParams();

@@ -38,7 +38,7 @@ export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
 
   if (!summary.active.length) {
     return (
-      <Card as="section" padding="sm" className="mb-4 border-warning-100 sm:mb-6 sm:p-5">
+      <Card as="section" padding="sm" className="sm:p-5">
         <h2 className="text-base font-semibold text-ink sm:text-lg">Наличие и поставка</h2>
         <p className="mt-2 text-sm text-ink-muted">
           {inStock ? 'Уточняем наличие на складах поставщика.' : 'Сейчас нет доступных складов для заказа.'}
@@ -48,7 +48,7 @@ export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
   }
 
   return (
-    <Card as="section" padding="sm" className="mb-4 sm:mb-6 sm:p-5">
+    <Card as="section" padding="sm" className="sm:p-5">
       <h2 className="text-base font-semibold text-ink sm:text-lg">Наличие и поставка</h2>
       <p className="mt-2 text-sm text-ink-muted">
         В наличии на {summary.warehouseCount} {summary.warehouseCount === 1 ? 'складе' : 'складах'}

@@ -18,6 +18,7 @@ import {
 import { prefetchNewPartOpenChunk } from '../../../utils/prefetchPartDetail';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
+import { applyMarkup } from './newPartStockUtils';
 
 const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
@@ -41,12 +42,6 @@ const toSafeInt = (value, fallback = 0) => {
   const n = Number(value);
   if (Number.isFinite(n)) return Math.max(0, Math.trunc(n));
   return fallback;
-};
-
-const parseSupplierPrice = (price) => {
-  const numericPrice = parseFloat(price);
-  if (Number.isNaN(numericPrice) || numericPrice <= 0) return 0;
-  return parseFloat(numericPrice.toFixed(2));
 };
 
 const formatDeliveryTimeText = (deliveryStart, deliveryEnd) => {
@@ -157,12 +152,7 @@ function NewPartProductCard({
   const mainStock = stocks[0];
   const otherStocks = stocks.slice(1);
 
-  const priceWithMarkup = (price) => {
-    const base = parseSupplierPrice(price);
-    if (!base) return 0;
-    const mult = 1 + Number(newPartsMarkupPercent) / 100;
-    return parseFloat((base * mult).toFixed(2));
-  };
+  const priceWithMarkup = (price) => applyMarkup(price, newPartsMarkupPercent);
 
   const getCartQuantity = (stock) => {
     if (!stock?.stock_id || !cart?.new_parts_items) return 0;
@@ -279,6 +269,101 @@ function NewPartProductCard({
   const mainStockInfo = getStockAvailability(mainStock);
   const price = priceWithMarkup(mainStock.price);
   const mainAvailableCount = toSafeInt(mainStock?.available_count, 0);
+
+  if (isDetailView) {
+    return (
+      <div className="relative rounded-sg-lg border border-line bg-surface p-4 shadow-sg" data-card-id={uniqueId}>
+        <FavoriteHeartOverlay
+          rossko={{
+            brand,
+            partnumber: number,
+            guid: part?.guid,
+            title: displayTitle,
+            minPrice: price,
+          }}
+          className="right-3 top-3"
+        />
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3 pr-8">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Цена</p>
+              <p className="text-2xl font-bold tabular-nums text-ink">{price} ₽</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-medium text-ink-muted">Остаток</p>
+              <p className="text-sm font-semibold text-ink">{mainAvailableCount} шт.</p>
+            </div>
+          </div>
+          {fastDelivery ? (
+            <span className="inline-flex rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700 ring-1 ring-inset ring-success-100">
+              Быстрая поставка
+            </span>
+          ) : null}
+          <p className="text-xs leading-relaxed text-ink-muted">
+            {formatDeliveryTimeText(mainStock.delivery_start, mainStock.delivery_end)}
+          </p>
+          <div className="flex flex-col gap-2">
+            <QuantityControl
+              quantity={mainQuantity}
+              onAdd={() => handleAddToCart(mainStock)}
+              onRemove={() => handleRemoveFromCart(mainStock)}
+              disabled={disabledControl}
+              noStock={mainStockInfo.noStock}
+              compact
+            />
+            {(mainStockInfo.noStock || mainStockInfo.limitedStock) ? (
+              <span className="text-xs text-accent-600">
+                {mainStockInfo.noStock ? 'Нет на складах' : 'Есть на других складах'}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {otherStocks.length > 0 ? (
+          <div className="mt-4 border-t border-line pt-3">
+            <button
+              type="button"
+              onClick={() => setShowDetails((prev) => !prev)}
+              className="text-sm font-medium text-brand-600 hover:text-brand-800"
+            >
+              {showDetails ? 'Скрыть другие склады' : `Другие склады (${otherStocks.length})`}
+            </button>
+            {showDetails ? (
+              <div className="mt-2 space-y-2">
+                {otherStocks.map((stock, idx) => {
+                  const quantity = getCartQuantity(stock);
+                  const stockInfo = getStockAvailability(stock);
+                  const availableCount = toSafeInt(stock?.available_count, 0);
+                  return (
+                    <div key={`${uniqueId}-stock-${idx}`} className="rounded-sg bg-surface-subtle p-2.5">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="text-sm">
+                          <p className="font-medium text-ink">
+                            {priceWithMarkup(stock.price)} ₽ · {availableCount} шт.
+                          </p>
+                          <p className="text-xs text-ink-muted">
+                            {formatDeliveryTimeText(stock.delivery_start, stock.delivery_end)}
+                          </p>
+                        </div>
+                        <QuantityControl
+                          quantity={quantity}
+                          onAdd={() => handleAddToCart(stock)}
+                          onRemove={() => handleRemoveFromCart(stock)}
+                          disabled={disabledControl}
+                          noStock={stockInfo.noStock}
+                          compact
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <article className="relative rounded-sg-lg border border-line bg-surface p-3 shadow-sg sm:p-5" data-card-id={uniqueId}>

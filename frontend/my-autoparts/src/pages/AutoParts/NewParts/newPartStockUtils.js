@@ -1,23 +1,38 @@
 const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 
+export function truncateRubles(price) {
+  const amount = Number(price);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.floor(amount);
+}
+
 export function parseSupplierPrice(price) {
   const numericPrice = parseFloat(price);
   if (Number.isNaN(numericPrice) || numericPrice <= 0) return 0;
-  return parseFloat(numericPrice.toFixed(2));
+  return truncateRubles(numericPrice);
 }
 
 export function applyMarkup(price, markupPercent = 0) {
   const base = parseSupplierPrice(price);
   if (!base) return 0;
   const mult = 1 + Number(markupPercent) / 100;
-  return parseFloat((base * mult).toFixed(2));
+  return truncateRubles(base * mult);
 }
 
 export function formatPriceRub(price) {
-  const amount = Number(price);
-  if (!Number.isFinite(amount) || amount <= 0) return '—';
-  return amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const amount = truncateRubles(price);
+  if (amount <= 0) return '—';
+  return amount.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+}
+
+export function formatNewPartMoney(price) {
+  const amount = truncateRubles(price);
+  return new Intl.NumberFormat('ru-RU', {
+    style: 'currency',
+    currency: 'RUB',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 export function formatDeliveryTimeText(deliveryStart, deliveryEnd) {

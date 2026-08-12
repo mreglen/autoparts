@@ -1,5 +1,6 @@
 import Modal from '../UI/Modal';
 import { formatServerDateTime } from '../../utils/serverDate';
+import { truncateRubles } from '../../pages/AutoParts/NewParts/newPartStockUtils';
 
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
@@ -39,14 +40,20 @@ function lineSum(qty, unitPrice) {
   return Math.round(q * p * 100) / 100;
 }
 
-function priceWithMarkup(unitPrice, markupPercent) {
-  const p = Number(unitPrice) || 0;
-  const m = Number(markupPercent) || 0;
-  return Math.round(p * (1 + m / 100) * 100) / 100;
+function priceWithMarkup(unitPrice, markupPercent, { floorRubles = false } = {}) {
+  const value = (Number(unitPrice) || 0) * (1 + (Number(markupPercent) || 0) / 100);
+  if (floorRubles) return truncateRubles(value);
+  return Math.round(value * 100) / 100;
 }
 
-function shopLineSum(qty, unitPrice, markupPercent) {
-  return Math.round((Number(qty) || 0) * priceWithMarkup(unitPrice, markupPercent) * 100) / 100;
+function shopLineSum(qty, unitPrice, markupPercent, options = {}) {
+  const unit = priceWithMarkup(unitPrice, markupPercent, options);
+  const total = (Number(qty) || 0) * unit;
+  return options.floorRubles ? truncateRubles(total) : Math.round(total * 100) / 100;
+}
+
+function shopPartPricingOptions(part) {
+  return { floorRubles: part?.source === 'rossko' };
 }
 
 export function vehicleLabel(v) {
@@ -123,7 +130,9 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
   const shopTotal =
     row.shop_parts_total ??
     shop.reduce(
-      (s, p) => s + (Number(p.line_sum) || shopLineSum(p.qty, p.unit_price, p.markup_percent)),
+      (s, p) => s + (
+        Number(p.line_sum) || shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p))
+      ),
       0,
     );
 
@@ -205,10 +214,16 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
                   <td className="py-1.5 pr-3 tabular-nums">{p.markup_percent}</td>
                 ) : null}
                 <td className="py-1.5 pr-3 tabular-nums">
-                  {formatMoney(p.price_with_markup ?? priceWithMarkup(p.unit_price, p.markup_percent))}
+                  {formatMoney(
+                    p.price_with_markup
+                    ?? priceWithMarkup(p.unit_price, p.markup_percent, shopPartPricingOptions(p)),
+                  )}
                 </td>
                 <td className="py-1.5 pr-3 tabular-nums">
-                  {formatMoney(p.line_sum ?? shopLineSum(p.qty, p.unit_price, p.markup_percent))}
+                  {formatMoney(
+                    p.line_sum
+                    ?? shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p)),
+                  )}
                 </td>
                 {showExecutors ? <td className="py-1.5">{p.source || '—'}</td> : null}
               </tr>
@@ -227,7 +242,9 @@ function orderTotals(order) {
   const shopTotal =
     order.shop_parts_total ??
     shop.reduce(
-      (s, p) => s + (Number(p.line_sum) || shopLineSum(p.qty, p.unit_price, p.markup_percent)),
+      (s, p) => s + (
+        Number(p.line_sum) || shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p))
+      ),
       0,
     );
   const grand = order.grand_total ?? worksTotal + shopTotal;
