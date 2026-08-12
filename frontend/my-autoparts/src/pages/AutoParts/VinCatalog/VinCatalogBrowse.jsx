@@ -112,6 +112,8 @@ export default function VinCatalogBrowse({
   onSubmitFilterStep,
   onCancelFilter,
   loadUsedProducts,
+  vinBasketId = null,
+  ensureVinBasket = null,
 }) {
   const token = useSelector((state) => state.auth?.token);
   const [inGarage, setInGarage] = useState(null);
@@ -433,6 +435,8 @@ export default function VinCatalogBrowse({
         detail={drawerDetail}
         onClose={() => setDrawerDetail(null)}
         loadUsedProducts={loadUsedProducts}
+        vinBasketId={vinBasketId}
+        ensureVinBasket={ensureVinBasket}
       />
     </div>
   );

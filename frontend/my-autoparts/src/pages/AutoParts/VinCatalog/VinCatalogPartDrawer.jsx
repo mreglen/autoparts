@@ -76,7 +76,13 @@ function hasOfferStock(part) {
   return mapPartToStocksData(part).length > 0;
 }
 
-export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts }) {
+export default function VinCatalogPartDrawer({
+  detail,
+  onClose,
+  loadUsedProducts,
+  vinBasketId = null,
+  ensureVinBasket = null,
+}) {
   const open = Boolean(detail);
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -215,7 +221,12 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
             {rosskoLoading ? (
               <OfferSkeleton rows={3} />
             ) : similarParts.length ? (
-              <VinCatalogOffersTable parts={similarParts} sectionType="available" />
+              <VinCatalogOffersTable
+                parts={similarParts}
+                sectionType="available"
+                vinBasketId={vinBasketId}
+                ensureVinBasket={ensureVinBasket}
+              />
             ) : (
               <p className="text-sm text-gray-500">Нет предложений</p>
             )}
@@ -268,7 +279,12 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
             {rosskoLoading ? (
               <OfferSkeleton rows={4} />
             ) : analogParts.length ? (
-              <VinCatalogOffersTable parts={analogParts} sectionType="analog" />
+              <VinCatalogOffersTable
+                parts={analogParts}
+                sectionType="analog"
+                vinBasketId={vinBasketId}
+                ensureVinBasket={ensureVinBasket}
+              />
             ) : (
               <p className="text-sm text-gray-500">Нет аналогов</p>
             )}

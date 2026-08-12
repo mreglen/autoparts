@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   selectCart,
   selectCartLoading,
@@ -16,28 +16,20 @@ import {
   renameNewPartsBasket,
 } from '../../redux/slices/CartSlice';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
+import { setNewPartsCheckoutItemIds, clearNewPartsCheckoutItemIds } from '../../utils/newPartsCheckout';
 import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
 import UnderlineTabs from '../../components/UI/UnderlineTabs';
 import Modal from '../../components/UI/Modal';
+import Button from '../../components/UI/Button';
+import Card from '../../components/UI/Card';
+import EmptyState from '../../components/UI/EmptyState';
+import { FieldLabel, Input } from '../../components/UI/Field';
+import { PageHeader } from '../../components/UI/SectionHeader';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../redux/slices/ClientMarkupSlice';
 import { isOrganizationStaff } from '../../utils/clientMarkupUtils';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price);
-
-function CartOutlineIcon({ className = 'h-10 w-10 text-brand-600' }) {
-  return (
-    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
-      <path
-        d="M15 15C13.8954 15 13 15.8954 13 17C13 18.1046 13.8954 19 15 19C16.1046 19 17 18.1046 17 17C17 15.8954 16.1046 15 15 15ZM15 15H7.29395C6.83288 15 6.60193 15 6.41211 14.918C6.24466 14.8456 6.09938 14.7291 5.99354 14.5805C5.8749 14.414 5.82719 14.1913 5.73274 13.7505L3.27148 2.26465C3.17484 1.81363 3.12587 1.58838 3.00586 1.41992C2.90002 1.27135 2.75477 1.15441 2.58732 1.08205C2.39746 1 2.16779 1 1.70653 1H1M4 4H16.8732C17.595 4 17.9555 4 18.1978 4.15036C18.41 4.28206 18.5653 4.48862 18.633 4.729C18.7104 5.00343 18.611 5.34996 18.411 6.04346L17.0264 10.8435C16.9068 11.2581 16.8469 11.465 16.7256 11.6189C16.6185 11.7547 16.4772 11.861 16.317 11.9263C16.1361 12 15.9211 12 15.4921 12H5.73047M6 19C4.89543 19 4 18.1046 4 17C4 15.8954 4.89543 15 6 15C7.10457 15 8 15.8954 8 17C8 18.1046 7.10457 19 6 19Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 function formatDeliveryTime(deliveryString) {
   if (!deliveryString) return 'Не указана';
@@ -129,27 +121,27 @@ function PartTypeBadge({ type }) {
 
 function QuantityControl({ quantity, onDecrease, onIncrease, max }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
+    <div className="inline-flex items-center gap-0.5 rounded-lg border border-line bg-surface-muted p-0.5">
       <button
         type="button"
         onClick={onDecrease}
         disabled={quantity <= 1}
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Уменьшить количество"
       >
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
         </svg>
       </button>
-      <span className="min-w-[2rem] text-center text-sm font-semibold text-gray-900">{quantity}</span>
+      <span className="min-w-[1.75rem] text-center text-sm font-semibold text-ink">{quantity}</span>
       <button
         type="button"
         onClick={onIncrease}
         disabled={quantity >= max}
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
         aria-label="Увеличить количество"
       >
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
       </button>
@@ -173,28 +165,33 @@ function CartItemRow({
     && Math.abs(item.price - item.purchasePrice) > 0.009;
 
   return (
-    <article className="flex gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-3 transition hover:border-gray-200 sm:p-4">
+    <article className="flex gap-2.5 rounded-sg border border-line bg-surface p-2.5 transition hover:border-brand-200 sm:gap-3 sm:p-3">
       <input
         type="checkbox"
         checked={selected}
         onChange={onSelect}
-        className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+        className="mt-1 h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
         aria-label={`Выбрать ${item.name}`}
       />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-start gap-2">
+        <div className="flex flex-wrap items-start gap-1.5">
           <PartTypeBadge type={item.type} />
-          <h3 className="min-w-0 flex-1 text-sm font-medium text-gray-900 sm:text-base">{item.name}</h3>
+          <h3 className="min-w-0 flex-1 text-sm font-medium leading-snug text-ink">{item.name}</h3>
         </div>
+        {item.type === 'new' && item.brand && item.number ? (
+          <p className="mt-0.5 text-xs text-ink-muted">
+            {item.brand} · {item.number}
+          </p>
+        ) : null}
         {item.type !== 'new' && (
-          <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+          <p className="mt-0.5 text-xs text-ink-muted">
             {item.brand} · {item.number}
           </p>
         )}
         {showDelivery && (
-          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-gray-600 sm:text-sm">
+          <p className="mt-1 flex items-start gap-1 text-xs text-ink-muted">
             <svg
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-500"
+              className="mt-0.5 h-3 w-3 shrink-0 text-brand-500"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -207,14 +204,11 @@ function CartItemRow({
               />
             </svg>
             <span>
-              Поставка:{' '}
-              <span className="font-medium text-gray-800">
-                {item.deliveryDate ? formatDeliveryTime(item.deliveryDate) : 'Не указана'}
-              </span>
+              {item.deliveryDate ? formatDeliveryTime(item.deliveryDate) : 'Срок не указан'}
             </span>
           </p>
         )}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
           <QuantityControl
             quantity={item.quantity}
             max={maxQty}
@@ -224,18 +218,18 @@ function CartItemRow({
           <button
             type="button"
             onClick={() => onRemove(item.id)}
-            className="text-xs font-medium text-red-600 hover:text-red-700 sm:text-sm"
+            className="text-xs font-medium text-danger-600 hover:text-danger-700"
           >
             Удалить
           </button>
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <p className="text-sm font-bold text-gray-900 sm:text-base">{formatPrice(lineTotal)}</p>
-        <p className="mt-0.5 text-xs text-gray-500">{formatPrice(item.price)} / шт.</p>
+        <p className="text-sm font-bold text-ink">{formatPrice(lineTotal)}</p>
+        <p className="mt-0.5 text-[11px] text-ink-muted">{formatPrice(item.price)} / шт.</p>
         {showPurchase ? (
-          <p className="mt-0.5 text-[11px] text-gray-400">
-            Закуп. {formatPrice(item.purchasePrice)} / шт.
+          <p className="mt-0.5 text-[10px] text-ink-muted">
+            Закуп. {formatPrice(item.purchasePrice)}
           </p>
         ) : null}
       </div>
@@ -283,112 +277,78 @@ function SellerCartBlock({
     ));
 
   return (
-    <section className="overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg">
-      <header className="border-b border-gray-100 bg-surface-muted px-4 py-4 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              checked={allSelected}
-              ref={(el) => {
-                if (el) el.indeterminate = someSelected && !allSelected;
-              }}
-              onChange={onSelectAll}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-              aria-label={`Выбрать все у ${seller}`}
-            />
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold text-gray-900 sm:text-xl">{seller}</h2>
-                {hasNew && hasUsed && (
-                  <span className="text-xs text-gray-500">новые и б/у</span>
-                )}
-              </div>
-              <p className="mt-0.5 text-sm text-gray-500">
-                {allItems.length} поз. · {totalQty} шт. · {formatPrice(calculateSellerTotal(allItems))}
-              </p>
+    <Card padding="none" className="overflow-hidden">
+      <header className="border-b border-line bg-surface-muted px-3 py-3 sm:px-4">
+        <div className="flex items-start gap-2.5">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = someSelected && !allSelected;
+            }}
+            onChange={onSelectAll}
+            className="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+            aria-label={`Выбрать все у ${seller}`}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate text-base font-semibold text-ink sm:text-lg">{seller}</h2>
+              {hasNew && hasUsed ? (
+                <span className="text-xs text-ink-muted">новые и б/у</span>
+              ) : null}
             </div>
+            <p className="mt-0.5 text-xs text-ink-muted sm:text-sm">
+              {allItems.length} поз. · {totalQty} шт. · {formatPrice(calculateSellerTotal(allItems))}
+            </p>
           </div>
         </div>
       </header>
 
-      <div className="space-y-2 px-4 py-5 sm:px-6">
-        {newItems.length > 0 && renderItems(newItems, false)}
+      <div className="space-y-2 p-3 sm:p-4">
+        {newItems.length > 0 && renderItems(newItems, true)}
         {usedItems.length > 0 && renderItems(usedItems, false)}
       </div>
 
-      <footer className="border-t border-gray-100 bg-gray-50/80 px-4 py-4 sm:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="text-sm text-gray-600">
+      <footer className="border-t border-line bg-surface-muted/80 px-3 py-3 sm:px-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <p className="text-xs text-ink-muted sm:text-sm">
             {selectedCount > 0 ? (
-              <span>
-                Выбрано: <span className="font-medium text-gray-900">{selectedCount}</span> из{' '}
-                {allItems.length}
-              </span>
+              <>
+                Выбрано <span className="font-medium text-ink">{selectedCount}</span> из {allItems.length}
+              </>
             ) : (
-              <span>Выберите товары для оформления</span>
+              'Отметьте позиции для частичного оформления'
             )}
-          </div>
+          </p>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-            {someSelected && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            {someSelected ? (
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={onRemoveSelected}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-                >
-                  <img src="/img/trash_full.svg" alt="" className="h-3.5 w-3.5 opacity-70" />
+                <Button variant="secondary" size="sm" onClick={onRemoveSelected}>
                   Удалить выбранное
-                </button>
-                <button
-                  type="button"
-                  onClick={onCheckoutSelected}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-sg border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100"
-                >
-                  {isAuthorized ? 'Оформить выбранное' : 'Оформить выбранное'}
-                </button>
+                </Button>
+                <Button variant="soft" size="sm" onClick={onCheckoutSelected}>
+                  Оформить выбранное
+                </Button>
               </div>
-            )}
+            ) : null}
 
-            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-              <div className="mr-auto sm:mr-0 sm:text-right">
-                <p className="text-xs text-gray-500">Итого по организации</p>
-                <p className="text-lg font-bold text-gray-900">
-                  {formatPrice(calculateSellerTotal(allItems))}
-                </p>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <div className="mr-auto text-left sm:mr-0 sm:text-right">
+                <p className="text-[11px] text-ink-muted">Итого</p>
+                <p className="text-base font-bold text-ink">{formatPrice(calculateSellerTotal(allItems))}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => allItems.forEach((item) => onRemove(item.id))}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
+              <Button variant="secondary" size="sm" onClick={() => allItems.forEach((item) => onRemove(item.id))}>
                 Очистить
-              </button>
-              <button
-                type="button"
-                onClick={onCheckout}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-sg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 sm:flex-none"
-              >
-                <img src="/img/cart.svg" alt="" className="h-4 w-4 brightness-0 invert" />
+              </Button>
+              <Button size="sm" onClick={onCheckout}>
                 {checkoutLabel}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </footer>
-    </section>
-  );
-}
-
-function PageState({ icon, title, description, action, iconWrapClassName = 'bg-gray-100' }) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-sg-lg border border-line bg-surface px-6 py-16 text-center shadow-sg">
-      <div className={`mb-6 flex h-20 w-20 items-center justify-center rounded-full ${iconWrapClassName}`}>{icon}</div>
-      <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">{title}</h2>
-      {description ? <p className="mt-2 max-w-sm text-sm text-gray-500">{description}</p> : null}
-      {action ? <div className="mt-6">{action}</div> : null}
-    </div>
+    </Card>
   );
 }
 
@@ -459,14 +419,28 @@ export default function CartPage() {
     return sourceItems.map((item) => mapNewItem(item));
   }, [activeBasket, cart, mapNewItem]);
 
-  const basketTabs = useMemo(
-    () =>
-      newPartsBaskets.map((basket) => ({
-        id: String(basket.id),
-        label: basket.name,
-        count: basket.item_count,
-      })),
-    [newPartsBaskets]
+  const basketTabs = useMemo(() => {
+    const sorted = [...newPartsBaskets].sort((a, b) => {
+      if (a.is_default) return -1;
+      if (b.is_default) return 1;
+      return a.name.localeCompare(b.name, 'ru');
+    });
+    return sorted.map((basket) => ({
+      id: String(basket.id),
+      label: basket.is_default ? basket.name : basket.name,
+      count: basket.item_count,
+      title: basket.name,
+    }));
+  }, [newPartsBaskets]);
+
+  const activeBasketTotal = useMemo(
+    () => newPartsItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [newPartsItems],
+  );
+
+  const activeBasketQty = useMemo(
+    () => newPartsItems.reduce((sum, item) => sum + item.quantity, 0),
+    [newPartsItems],
   );
 
   const usedGroupedItems = useMemo(() => {
@@ -591,6 +565,7 @@ export default function CartPage() {
     if (activeBasket?.id) {
       dispatch(setActiveNewPartsBasket(activeBasket.id));
     }
+    clearNewPartsCheckoutItemIds();
     if (!isAuthorized) {
       openAuthModalForCheckout({ type: 'new' });
       return;
@@ -602,12 +577,13 @@ export default function CartPage() {
     if (activeBasket?.id) {
       dispatch(setActiveNewPartsBasket(activeBasket.id));
     }
-    if (!isAuthorized) {
-      openAuthModalForCheckout({ type: 'new' });
-      return;
-    }
     const selected = newPartsItems.filter((item) => selectedItems.has(item.id));
     if (selected.length === 0) return;
+    setNewPartsCheckoutItemIds(selected.map((item) => item.id));
+    if (!isAuthorized) {
+      openAuthModalForCheckout({ type: 'new', partial: true });
+      return;
+    }
     navigate('/cart/new/checkout');
   }, [activeBasket?.id, dispatch, isAuthorized, navigate, newPartsItems, openAuthModalForCheckout, selectedItems]);
 
@@ -699,85 +675,42 @@ export default function CartPage() {
 
   return (
     <div className="max-md:mt-0 mt-5 pb-8">
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-600">Покупки</p>
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Корзина</h1>
-          {!isInitialLoad && cartItems.length > 0 && (
-            <p className="mt-1 text-sm text-gray-500">
-              {allNewPartsItems.length > 0 && 'новые запчасти'}
-              {allNewPartsItems.length > 0 && usedSellerGroups.length > 0 && ' · '}
-              {usedSellerGroups.length > 0 &&
-                `${usedSellerGroups.length} ${
-                  usedSellerGroups.length === 1 ? 'продавец б/у' : 'продавцов б/у'
-                }`}
-              · {cartItems.length} поз. · {grandQty} шт.
-            </p>
-          )}
-        </div>
-        {!isInitialLoad && cartItems.length > 0 && (
-          <div className="rounded-sg-lg border border-line bg-surface px-4 py-3 shadow-sg sm:text-right">
-            <p className="text-xs text-gray-500">Общая сумма</p>
-            <p className="text-xl font-bold text-gray-900">{formatPrice(grandTotal)}</p>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Корзина"
+        subtitle={
+          !isInitialLoad && cartItems.length > 0
+            ? `${cartItems.length} поз. · ${grandQty} шт. · ${formatPrice(grandTotal)}`
+            : 'Новые запчасти и б/у от разных продавцов'
+        }
+      />
 
       {isInitialLoad ? (
-        <PageState
-          icon={
-            <svg className="h-10 w-10 animate-spin text-brand-600" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-          }
-          title="Загрузка корзины..."
+        <EmptyState
+          illustration="empty"
+          title="Загрузка корзины…"
+          className="border-solid"
         />
       ) : error ? (
-        <PageState
-          icon={
-            <svg className="h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-              />
-            </svg>
-          }
+        <EmptyState
+          illustration="error"
           title="Не удалось загрузить корзину"
           description={typeof error === 'object' ? error.detail || 'Произошла ошибка' : String(error)}
-          action={
-            <button
-              type="button"
-              onClick={() => dispatch(fetchCart())}
-              className="rounded-sg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
-            >
-              Попробовать снова
-            </button>
-          }
+          actionLabel="Попробовать снова"
+          onAction={() => dispatch(fetchCart())}
+          className="border-solid"
         />
       ) : cartItems.length === 0 ? (
-        <PageState
-          icon={<CartOutlineIcon />}
-          iconWrapClassName="bg-brand-50"
+        <EmptyState
+          illustration="empty"
           title="Корзина пуста"
-          description="Добавьте новые или б/у запчасти — они сгруппируются по организациям продавцов"
-          action={
-            <Link
-              to="/autoparts"
-              className="inline-flex rounded-sg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
-            >
-              Перейти к каталогу
-            </Link>
-          }
+          description="Добавьте запчасти из каталога или VIN-поиска"
+          actionLabel="Перейти к каталогу"
+          actionHref="/autoparts"
+          className="border-solid"
         />
       ) : (
-        <div className="space-y-6">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
+          <div className="space-y-4">
           {newPartsBaskets.length > 0 && (
             <div className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -788,13 +721,9 @@ export default function CartPage() {
                   ariaLabel="Корзины новых запчастей"
                 />
                 {activeBasket && !activeBasket.is_default ? (
-                  <button
-                    type="button"
-                    onClick={openRenameModal}
-                    className="self-start rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
+                  <Button variant="secondary" size="sm" onClick={openRenameModal} className="self-start">
                     Переименовать
-                  </button>
+                  </Button>
                 ) : null}
               </div>
 
@@ -822,9 +751,11 @@ export default function CartPage() {
                   showPurchasePrice={showPurchaseInCart}
                 />
               ) : (
-                <div className="rounded-sg-lg border border-line bg-surface px-6 py-10 text-center text-sm text-gray-500 shadow-sg">
-                  В корзине «{activeBasket?.name || 'Новые запчасти'}» пока нет позиций
-                </div>
+                <EmptyState
+                  title={`Корзина «${activeBasket?.name || 'Новые запчасти'}» пуста`}
+                  description="Добавьте запчасти из каталога или переключите вкладку"
+                  className="border-solid py-8"
+                />
               )}
             </div>
           )}
@@ -878,6 +809,30 @@ export default function CartPage() {
                 calculateSellerTotal={calculateSellerTotal}
               />
             ))}
+          </div>
+
+          <aside className="mt-4 space-y-3 lg:sticky lg:top-4 lg:mt-0">
+            <Card padding="sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Общая сумма</p>
+              <p className="mt-1 text-2xl font-bold text-ink">{formatPrice(grandTotal)}</p>
+              <p className="mt-1 text-xs text-ink-muted">
+                {grandQty} шт. · {cartItems.length} поз.
+              </p>
+            </Card>
+            {activeBasket && newPartsItems.length > 0 ? (
+              <Card padding="sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Текущая корзина</p>
+                <p className="mt-1 truncate text-sm font-semibold text-ink" title={activeBasket.name}>
+                  {activeBasket.name}
+                </p>
+                <p className="mt-2 text-lg font-bold text-ink">{formatPrice(activeBasketTotal)}</p>
+                <p className="text-xs text-ink-muted">{activeBasketQty} шт.</p>
+                <Button className="mt-3 w-full" size="sm" onClick={handleNewPartsCheckout}>
+                  Оформить
+                </Button>
+              </Card>
+            ) : null}
+          </aside>
         </div>
       )}
 
@@ -899,35 +854,29 @@ export default function CartPage() {
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setRenameOpen(false)}
-              disabled={renameSaving}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
+            <Button variant="secondary" onClick={() => setRenameOpen(false)} disabled={renameSaving}>
               Отмена
-            </button>
-            <button
-              type="submit"
-              form="rename-basket-form"
-              disabled={renameSaving}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {renameSaving ? 'Сохранение…' : 'Сохранить'}
-            </button>
+            </Button>
+            <Button type="submit" form="rename-basket-form" loading={renameSaving}>
+              Сохранить
+            </Button>
           </div>
         }
       >
         <form id="rename-basket-form" onSubmit={handleRenameBasket} className="space-y-3">
-          <input
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            maxLength={100}
-            disabled={renameSaving}
-            autoFocus
-          />
-          {renameError ? <p className="text-sm text-red-600">{renameError}</p> : null}
+          <div>
+            <FieldLabel htmlFor="rename-basket-input">Название</FieldLabel>
+            <Input
+              id="rename-basket-input"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              maxLength={100}
+              disabled={renameSaving}
+              autoFocus
+              error={Boolean(renameError)}
+            />
+            {renameError ? <p className="mt-1.5 text-xs text-danger-600">{renameError}</p> : null}
+          </div>
         </form>
       </Modal>
     </div>

@@ -12,6 +12,7 @@ import { fetchPublicSiteConfig } from '../../../redux/slices/PublicInfoSlice';
 import VinCatalogBrowse from './VinCatalogBrowse';
 import VinScanModal from '../../../components/VinScanner/VinScanModal';
 import VinScanTriggerButton from '../../../components/VinScanner/VinScanTriggerButton';
+import useVinCartBasket from '../../../hooks/useVinCartBasket';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -89,6 +90,7 @@ export default function VinCatalogPage() {
   const imageMapReqId = useRef(0);
 
   const openWizard = searchParams.get('wizard') === '1';
+  const { basketId: vinBasketId, ensureVinBasket } = useVinCartBasket(vehicle, vin);
 
   const handleSoftFail = (result) => {
     if (!result || result.ok) return false;
@@ -1085,6 +1087,8 @@ export default function VinCatalogPage() {
           onSubmitFilterStep={submitFilterStep}
           onCancelFilter={() => setFilterStep(null)}
           loadUsedProducts={loadUsedProducts}
+          vinBasketId={vinBasketId}
+          ensureVinBasket={ensureVinBasket}
         />
       )}
     </div>

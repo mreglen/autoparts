@@ -15,6 +15,10 @@ import DadataAddressInput from '../../components/DadataAddressInput/DadataAddres
 import OrderOfferConsent from '../../components/Legal/OrderOfferConsent';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import {
+  clearNewPartsCheckoutItemIds,
+  readNewPartsCheckoutItemIds,
+} from '../../utils/newPartsCheckout';
+import {
   normalizeFullName,
   normalizeEmail,
   formatEmailInput,
@@ -156,7 +160,10 @@ export default function NewPartsOrderRegistration() {
       return;
     }
     dispatch(fetchCart());
+    return () => clearNewPartsCheckoutItemIds();
   }, [isReady, user, navigate, dispatch, location.pathname, location.search]);
+
+  const checkoutItemIds = useMemo(() => readNewPartsCheckoutItemIds(), []);
 
   const selectedItems = useMemo(() => {
     const baskets = cart?.new_parts_baskets || [];
@@ -168,7 +175,7 @@ export default function NewPartsOrderRegistration() {
       ? activeBasket.items
       : cart?.new_parts_items || [];
     if (!sourceItems.length) return [];
-    return sourceItems.map((item) => ({
+    let items = sourceItems.map((item) => ({
       id: item.id,
       brand: item.brand,
       partnumber: item.partnumber,
@@ -176,7 +183,11 @@ export default function NewPartsOrderRegistration() {
       price: Number(item.price),
       quantity: item.quantity,
     }));
-  }, [cart, activeBasketId]);
+    if (checkoutItemIds?.size) {
+      items = items.filter((item) => checkoutItemIds.has(item.id));
+    }
+    return items;
+  }, [cart, activeBasketId, checkoutItemIds]);
 
   const orderTotal = useMemo(
     () => selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0),

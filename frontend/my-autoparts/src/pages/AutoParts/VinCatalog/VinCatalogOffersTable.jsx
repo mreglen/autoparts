@@ -169,6 +169,8 @@ function StockOfferRow({
   isSubRow = false,
   warehousesToggle = null,
   onOpenPart = null,
+  vinBasketId = null,
+  ensureVinBasket = null,
 }) {
   const dispatch = useDispatch();
   const cart = useSelector(selectCart);
@@ -190,9 +192,10 @@ function StockOfferRow({
           item.stock_id === String(stock.stock_id)
           && item.brand === brand
           && item.partnumber === number
+          && (vinBasketId == null || item.basket_id === vinBasketId)
       ) || null
     );
-  }, [brand, cart?.new_parts_items, number, stock?.stock_id]);
+  }, [brand, cart?.new_parts_items, number, stock?.stock_id, vinBasketId]);
 
   const cartQuantity = cartItemInStore ? toSafeInt(cartItemInStore.quantity, 0) : 0;
   const disabled = busy || cartLoading;
@@ -228,7 +231,16 @@ function StockOfferRow({
     try {
       const cartItem = prepareCartItem(1);
       if (!cartItem.stock_id || cartItem.price <= 0) return;
-      await dispatch(addNewPartsToCart(cartItem)).unwrap();
+      let targetBasketId = vinBasketId;
+      if (!targetBasketId && ensureVinBasket) {
+        targetBasketId = await ensureVinBasket();
+      }
+      await dispatch(
+        addNewPartsToCart({
+          ...cartItem,
+          basket_id: targetBasketId || undefined,
+        })
+      ).unwrap();
       trackConversion(CONVERSION_EVENTS.ADD_TO_CART, {
         path: window.location.pathname + window.location.search,
         section: 'vin',
@@ -335,7 +347,15 @@ function StockOfferRow({
   );
 }
 
-function PartOfferGroup({ group, siteMarkupPercent, clientMarkupPercent, showBothPrices, onOpenPart }) {
+function PartOfferGroup({
+  group,
+  siteMarkupPercent,
+  clientMarkupPercent,
+  showBothPrices,
+  onOpenPart,
+  vinBasketId,
+  ensureVinBasket,
+}) {
   const [showOthers, setShowOthers] = useState(false);
   const { part, brand, number, name, mainStock, otherStocks, detailHref } = group;
 
@@ -363,6 +383,8 @@ function PartOfferGroup({ group, siteMarkupPercent, clientMarkupPercent, showBot
         showBothPrices={showBothPrices}
         warehousesToggle={warehousesToggle}
         onOpenPart={onOpenPart}
+        vinBasketId={vinBasketId}
+        ensureVinBasket={ensureVinBasket}
       />
       {showOthers
         ? otherStocks.map((stock, index) => (
@@ -379,6 +401,8 @@ function PartOfferGroup({ group, siteMarkupPercent, clientMarkupPercent, showBot
             showBothPrices={showBothPrices}
             isSubRow
             onOpenPart={onOpenPart}
+            vinBasketId={vinBasketId}
+            ensureVinBasket={ensureVinBasket}
           />
         ))
         : null}
@@ -386,7 +410,7 @@ function PartOfferGroup({ group, siteMarkupPercent, clientMarkupPercent, showBot
   );
 }
 
-function OffersTable({ parts, emptyText, onOpenPart }) {
+function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBasket }) {
   const siteMarkupPercent = useNewPartsMarkupPercent('auto');
   const user = useSelector((state) => state.auth.user);
   const clientMarkup = useSelector((state) => state.clientMarkup);
@@ -437,6 +461,8 @@ function OffersTable({ parts, emptyText, onOpenPart }) {
               clientMarkupPercent={clientMarkupPercent}
               showBothPrices={showBothPrices}
               onOpenPart={onOpenPart}
+              vinBasketId={vinBasketId}
+              ensureVinBasket={ensureVinBasket}
             />
           ))}
         </tbody>
@@ -450,6 +476,17 @@ export default function VinCatalogOffersTable({
   sectionType = 'available',
   emptyText = 'Нет предложений',
   onOpenPart = null,
+  vinBasketId = null,
+  ensureVinBasket = null,
 }) {
-  return <OffersTable parts={parts} sectionType={sectionType} emptyText={emptyText} onOpenPart={onOpenPart} />;
+  return (
+    <OffersTable
+      parts={parts}
+      sectionType={sectionType}
+      emptyText={emptyText}
+      onOpenPart={onOpenPart}
+      vinBasketId={vinBasketId}
+      ensureVinBasket={ensureVinBasket}
+    />
+  );
 }

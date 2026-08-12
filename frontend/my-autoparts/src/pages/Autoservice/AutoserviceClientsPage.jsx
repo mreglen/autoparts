@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { formatServerDateTime } from '../../utils/serverDate';
-import { sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 
 const pillControlClass =
   'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0';
@@ -28,7 +29,7 @@ function AccountBadge({ userId }) {
   );
 }
 
-function VehicleList({ vehicles, loading, canEdit = false, onEdit }) {
+function VehicleList({ vehicles, loading, canEdit = false, onEdit, onVinClick }) {
   if (loading) {
     return <p className="text-sm text-gray-500">Загрузка автомобилей…</p>;
   }
@@ -44,7 +45,22 @@ function VehicleList({ vehicles, loading, canEdit = false, onEdit }) {
               {v.make} {v.model}
               {v.year ? `, ${v.year}` : ''}
             </span>
-            {v.vin ? ` · VIN ${v.vin}` : ''}
+            {v.vin ? (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onVinClick?.(v.vin);
+                  }}
+                  className="font-mono text-indigo-600 underline decoration-indigo-300 underline-offset-2 transition hover:text-indigo-800 hover:decoration-indigo-600"
+                  title="Открыть VIN-каталог"
+                >
+                  VIN {v.vin}
+                </button>
+              </>
+            ) : null}
             {v.plate ? ` · ${v.plate}` : ''}
             {v.color ? ` · ${v.color}` : ''}
           </div>
@@ -70,6 +86,7 @@ function ClientVehiclesModal({
   loading,
   onClose,
   onEditVehicle,
+  onVinClick,
 }) {
   const isGuest = client && !client.user_id;
 
@@ -107,6 +124,7 @@ function ClientVehiclesModal({
             loading={loading}
             canEdit={isGuest}
             onEdit={onEditVehicle}
+            onVinClick={onVinClick}
           />
         </div>
       ) : null}
@@ -425,6 +443,7 @@ function AddClientModal({ open, onClose, onCreated }) {
 }
 
 export default function AutoserviceClientsPage() {
+  const navigate = useNavigate();
   const { isReady, user, isAuthenticated } = useAuthReady();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -436,6 +455,13 @@ export default function AutoserviceClientsPage() {
   const [clientVehicles, setClientVehicles] = useState({});
   const [vehiclesLoadingId, setVehiclesLoadingId] = useState(null);
   const [editVehicle, setEditVehicle] = useState(null);
+
+  const handleVinClick = useCallback((rawVin) => {
+    const vin = normalizeVinOrNull(rawVin);
+    if (!vin) return;
+    setVehiclesModalClient(null);
+    navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+  }, [navigate]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -667,6 +693,7 @@ export default function AutoserviceClientsPage() {
         loading={vehiclesModalClient ? vehiclesLoadingId === vehiclesModalClient.id : false}
         onClose={closeClientVehicles}
         onEditVehicle={setEditVehicle}
+        onVinClick={handleVinClick}
       />
 
       <EditGuestVehicleModal
