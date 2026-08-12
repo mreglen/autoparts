@@ -239,14 +239,7 @@ function StockOfferRow({
         isSubRow ? 'bg-gray-50/60' : 'bg-white'
       }`}
     >
-      <td className={`whitespace-nowrap px-3 py-2 text-xs font-medium text-gray-900 ${isSubRow ? 'relative' : ''}`}>
-        {isSubRow ? (
-          <span className="absolute left-1.5 top-1/2 h-px w-2 -translate-y-1/2 bg-gray-300" aria-hidden />
-        ) : (
-          brand
-        )}
-      </td>
-      <td className="whitespace-nowrap px-3 py-2">
+      <td className={`whitespace-nowrap px-3 py-2 ${isSubRow ? 'relative' : ''}`}>
         {!isSubRow ? (
           <button
             type="button"
@@ -255,14 +248,19 @@ function StockOfferRow({
           >
             {number}
           </button>
-        ) : null}
+        ) : (
+          <span className="absolute left-1.5 top-1/2 h-px w-2 -translate-y-1/2 bg-gray-300" aria-hidden />
+        )}
       </td>
-      <td className="max-w-[200px] px-3 py-2 align-top">
+      <td className="whitespace-nowrap px-2 py-2 pl-4 text-xs font-medium text-gray-900">
+        {!isSubRow ? brand : null}
+      </td>
+      <td className="max-w-[140px] px-2 py-2 align-top">
         {!isSubRow ? (
           <button
             type="button"
             onClick={() => window.open(detailHref, '_blank', 'noopener,noreferrer')}
-            className="block w-full max-w-[200px] text-left text-xs font-medium leading-snug text-indigo-700 hover:text-indigo-900 line-clamp-2 break-words whitespace-normal"
+            className="block w-full max-w-[140px] text-left text-xs font-medium leading-snug text-indigo-700 hover:text-indigo-900 line-clamp-2 break-words whitespace-normal"
           >
             {name}
           </button>
@@ -353,19 +351,19 @@ function OffersTable({ parts, emptyText }) {
     <div className="-mx-1 overflow-x-auto">
       <table className="min-w-[720px] w-full table-fixed border-collapse text-left">
         <colgroup>
-          <col className="w-[72px]" />
-          <col className="w-[120px]" />
+          <col className="w-[108px]" />
+          <col className="w-[56px]" />
+          <col className="w-[140px]" />
           <col />
-          <col className="w-[120px]" />
           <col className="w-[88px]" />
           <col className="w-[96px]" />
           <col className="w-[72px]" />
         </colgroup>
         <thead>
           <tr className="border-b border-gray-200 bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            <th className="px-3 py-2">Бренд</th>
             <th className="px-3 py-2">Номер</th>
-            <th className="px-3 py-2">Наименование</th>
+            <th className="px-2 py-2 pl-4">Бренд</th>
+            <th className="px-2 py-2">Наименование</th>
             <th className="px-3 py-2">Доставим</th>
             <th className="px-3 py-2">Остаток</th>
             <th className="px-3 py-2 pl-6 text-right">Цена, ₽</th>
