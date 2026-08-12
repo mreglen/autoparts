@@ -118,10 +118,10 @@ class OrgMarkupHelperTests(unittest.TestCase):
         # When paused, autoservice markup should stop being applied.
         self.assertEqual(effective_markup_percent(org, settings_row), 15.0)
 
-        # Manual override still works as for a normal seller.
+        # Manual override is ignored — prices should stay in sync with Rossko settings.
         org.new_parts_markup_manual = True
         org.new_parts_markup_percent = 99.0
-        self.assertEqual(effective_markup_percent(org, settings_row), 99.0)
+        self.assertEqual(effective_markup_percent(org, settings_row), 15.0)
 
 
 if __name__ == "__main__":

@@ -42,19 +42,17 @@ def effective_markup_percent(
     Choose markup percent for "seller context" pricing (used when we show markup inside seller workspace).
 
     Priority:
-    1) If organization is autoservice => always use autoservice markup (connected tariff rules).
-    2) If manual override is enabled => use organization's manual markup.
-    3) Fallback => use global seller markup from site_settings.new_parts_markup_percent.
+    1) If organization is autoservice => use autoservice markup (connected tariff rules),
+       unless autoservice is paused (then fallback to seller markup).
+    2) Fallback => use global seller markup from site_settings.new_parts_markup_percent.
+
+    Note: manual per-organization markup is intentionally ignored, so that changing
+    Rossko markup updates prices everywhere consistently.
     """
     if org is not None and getattr(org, "is_autoservice", False):
         # Если автосервис поставлен на паузу — считаем как для обычного продавца.
         if not getattr(org, "autoservice_paused", False):
             return autoservice_markup_percent(settings_row)
-
-    if org is not None and getattr(org, "new_parts_markup_manual", False):
-        org_value = getattr(org, "new_parts_markup_percent", None)
-        if org_value is not None:
-            return float(org_value)
     if settings_row is None:
         return DEFAULT_SELLER_MARKUP_PERCENT
     return global_markup_percent(settings_row)

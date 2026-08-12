@@ -11,7 +11,6 @@ import {
   setShowYandexBadge,
   setShowWarehouseInventory,
   setShowAutoservice,
-  setNewPartsMarkupPercent,
   setRoundProductPrices,
   setUsedPartsPurchaseMode,
   patchPublicSiteConfigCache,
@@ -31,7 +30,6 @@ const ADMIN_TOC = [
   { id: 'admin-deploy', label: 'Обновление' },
   { id: 'admin-backups', label: 'Копии' },
   { id: 'admin-features', label: 'Сайт' },
-  { id: 'admin-markup', label: 'Наценка' },
   { id: 'admin-openrouter', label: 'OpenRouter' },
   { id: 'admin-laximo', label: 'Laximo' },
   { id: 'admin-quick-links', label: 'Ссылки' },
@@ -58,14 +56,10 @@ function AdminPanelPage() {
   const [showAutoservice, setShowAutoserviceLocal] = useState(false);
   const [roundProductPrices, setRoundProductPricesLocal] = useState(false);
   const [usedPartsPurchaseMode, setUsedPartsPurchaseModeLocal] = useState('both');
-  const [markupPercent, setMarkupPercent] = useState('15');
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savingMarkup, setSavingMarkup] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [markupDialogOpen, setMarkupDialogOpen] = useState(false);
-  const [pendingMarkupValue, setPendingMarkupValue] = useState(null);
   const [internalCodeMigrationBusy, setInternalCodeMigrationBusy] = useState(false);
   const [internalCodeMigrationResult, setInternalCodeMigrationResult] = useState(null);
   const [internalCodeMigrationOrgId, setInternalCodeMigrationOrgId] = useState('');
@@ -282,39 +276,6 @@ function AdminPanelPage() {
       setError(e?.message || 'Ошибка сохранения');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const requestSaveMarkup = () => {
-    const n = parseFloat(String(markupPercent).replace(',', '.'));
-    if (!Number.isFinite(n) || n < 0 || n > 500) {
-      setError('Наценка: введите число от 0 до 500 %');
-      return;
-    }
-    setPendingMarkupValue(n);
-    setMarkupDialogOpen(true);
-  };
-
-  const applyGlobalMarkup = async (applyMode) => {
-    if (pendingMarkupValue == null) return;
-    setSavingMarkup(true);
-    setError(null);
-    setMarkupDialogOpen(false);
-    try {
-      await apiRequest('/admin/site-settings', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          new_parts_markup_percent: pendingMarkupValue,
-          global_markup_apply_mode: applyMode,
-        }),
-      });
-      dispatch(setNewPartsMarkupPercent(pendingMarkupValue));
-      dispatch(fetchPublicSiteConfig(true));
-    } catch (e) {
-      setError(e?.message || 'Ошибка сохранения наценки');
-    } finally {
-      setSavingMarkup(false);
-      setPendingMarkupValue(null);
     }
   };
 
@@ -567,39 +528,6 @@ function AdminPanelPage() {
           )}
         </section>
 
-        <section
-          id="admin-markup"
-          className="scroll-mt-24 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
-        >
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Наценка на новые</h2>
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label htmlFor="new-parts-markup" className="mb-1 block text-sm font-medium text-gray-700">
-                %
-              </label>
-              <input
-                id="new-parts-markup"
-                type="number"
-                min={0}
-                max={500}
-                step="0.01"
-                className="block w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                value={markupPercent}
-                disabled={loadingSettings || savingMarkup}
-                onChange={(e) => setMarkupPercent(e.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={requestSaveMarkup}
-              disabled={loadingSettings || savingMarkup}
-              className="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {savingMarkup ? 'Сохранение…' : 'Сохранить'}
-            </button>
-          </div>
-        </section>
-
         <section id="admin-openrouter" className="scroll-mt-24 space-y-6">
           <OpenRouterSection />
         </section>
@@ -845,52 +773,10 @@ function AdminPanelPage() {
         </section>
       </div>
 
-      {markupDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => !savingMarkup && setMarkupDialogOpen(false)}
-            aria-hidden
-          />
-          <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="mb-1 text-lg font-semibold text-gray-900">
-              Наценка {pendingMarkupValue}%
-            </h3>
-            <p className="mb-5 text-sm text-gray-500">Как применить у продавцов?</p>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={savingMarkup}
-                onClick={() => applyGlobalMarkup('all')}
-                className="w-full rounded-lg border border-gray-200 px-4 py-3 text-left hover:bg-gray-50 disabled:opacity-50"
-              >
-                <span className="block font-medium text-gray-900">Всем</span>
-                <span className="mt-0.5 block text-sm text-gray-500">В том числе с ручной наценкой</span>
-              </button>
-              <button
-                type="button"
-                disabled={savingMarkup}
-                onClick={() => applyGlobalMarkup('skip_manual')}
-                className="w-full rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-left hover:bg-indigo-100 disabled:opacity-50"
-              >
-                <span className="block font-medium text-gray-900">Без ручных</span>
-                <span className="mt-0.5 block text-sm text-gray-600">Пропустить продавцов с ручной наценкой</span>
-              </button>
-              <button
-                type="button"
-                disabled={savingMarkup}
-                onClick={() => {
-                  setMarkupDialogOpen(false);
-                  setPendingMarkupValue(null);
-                }}
-                className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-              >
-                Отмена
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/*
+        Блок редактирования наценки удалён намеренно:
+        теперь наценка «на новые» управляется только в `/admin/rossko/markup-settings`.
+      */}
     </div>
   );
 }

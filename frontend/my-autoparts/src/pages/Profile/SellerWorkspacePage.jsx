@@ -12,8 +12,6 @@ import {
     fetchSellerVehicles,
     fetchSellerWarehouseSales,
     fetchSellerWorkspace,
-    resetSellerMarkup,
-    updateSellerMarkup,
 } from '../../redux/slices/SellerSlice';
 import { setAdminSellerMarkupContext } from '../../redux/slices/PublicInfoSlice';
 import MediaModal from '../../components/MediaModal/MediaModal';
@@ -70,11 +68,9 @@ export default function SellerWorkspacePage() {
         warehouseSalesLoading,
         employees,
         employeesLoading,
-        markupSaving,
     } = useSelector((state) => state.sellers);
 
     const [activeTab, setActiveTab] = useState('overview');
-    const [markupInput, setMarkupInput] = useState('');
     const [partsSearch, setPartsSearch] = useState('');
     const [storageFilter, setStorageFilter] = useState('');
     const [selectedPart, setSelectedPart] = useState(null);
@@ -101,7 +97,6 @@ export default function SellerWorkspacePage() {
             organizationId: workspace.organization_id,
             markupPercent: workspace.new_parts_markup_percent,
         }));
-        setMarkupInput(String(workspace.new_parts_markup_percent ?? ''));
     }, [workspace, dispatch, numericSellerId]);
 
     useEffect(() => {
@@ -221,17 +216,6 @@ export default function SellerWorkspacePage() {
         return <Navigate to="/" replace />;
     }
 
-    const handleSaveMarkup = async () => {
-        const n = parseFloat(String(markupInput).replace(',', '.'));
-        if (!Number.isFinite(n) || n < 0 || n > 500) return;
-        await dispatch(updateSellerMarkup({ sellerId: numericSellerId, new_parts_markup_percent: n })).unwrap();
-    };
-
-    const handleResetMarkup = async () => {
-        const result = await dispatch(resetSellerMarkup(numericSellerId)).unwrap();
-        setMarkupInput(String(result.new_parts_markup_percent ?? ''));
-    };
-
     const stats = workspace?.stats;
 
     return (
@@ -319,43 +303,7 @@ export default function SellerWorkspacePage() {
                                     </dl>
                                 </div>
 
-                                <div className="bg-white rounded-xl border p-6">
-                                    <h2 className="text-lg font-semibold text-gray-900 mb-1">Наценка на новые запчасти</h2>
-                                    <p className="text-sm text-gray-500 mb-4">
-                                        Глобальная: {workspace.global_new_parts_markup_percent}%
-                                        {workspace.new_parts_markup_manual ? ' · у этого продавца задана вручную' : ' · наследуется глобальная'}
-                                    </p>
-                                    <div className="flex flex-wrap items-end gap-3">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Наценка, %</label>
-                                            <input
-                                                type="number"
-                                                min={0}
-                                                max={500}
-                                                step="0.01"
-                                                value={markupInput}
-                                                onChange={(e) => setMarkupInput(e.target.value)}
-                                                className="block w-36 rounded-md border border-gray-300 px-3 py-2 text-sm"
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            disabled={markupSaving}
-                                            onClick={handleSaveMarkup}
-                                            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                                        >
-                                            Сохранить
-                                        </button>
-                                        <button
-                                            type="button"
-                                            disabled={markupSaving}
-                                            onClick={handleResetMarkup}
-                                            className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                                        >
-                                            Как глобальная
-                                        </button>
-                                    </div>
-                                </div>
+                                {/* Редактирование наценки убрано: наценка «на новые» управляется только в `/admin/rossko/markup-settings`. */}
                             </div>
                         </div>
                     )}

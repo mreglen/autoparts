@@ -404,16 +404,19 @@ def patch_site_settings_admin(
         row.show_warehouse_inventory = bool(data["show_warehouse_inventory"])
     if "show_autoservice" in data:
         row.show_autoservice = bool(data["show_autoservice"])
-    apply_mode = data.pop("global_markup_apply_mode", None)
+    # Важно: наценки «на новые» редактируются только в `/admin/rossko/markup-settings`.
+    # `/admin/site-settings` оставляем для флагов и прочих параметров, чтобы не было
+    # двух конкурирующих источников правды.
     if "new_parts_markup_percent" in data:
-        new_global = float(data["new_parts_markup_percent"])
-        row.new_parts_markup_percent = new_global
-        if apply_mode in ("all", "skip_manual"):
-            apply_global_markup_to_organizations(
-                db,
-                new_global,
-                skip_manual=(apply_mode == "skip_manual"),
-            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Наценка «на новые» редактируется только в /admin/rossko",
+        )
+    if "global_markup_apply_mode" in data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Применение глобальной наценки редактируется только в /admin/rossko",
+        )
     if "used_parts_purchase_mode" in data:
         mode = data["used_parts_purchase_mode"]
         if mode not in ("cart_only", "cta_only", "both"):

@@ -188,7 +188,6 @@ export default function SellersPage() {
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Продавец</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Организация</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Контакты</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Наценка новые</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Действия</th>
                                 </tr>
                             </thead>
@@ -210,12 +209,6 @@ export default function SellersPage() {
                                         <td className="px-4 py-4 text-sm text-gray-600">
                                             <div>{seller.email}</div>
                                             <div className="text-gray-500">{seller.phone}</div>
-                                        </td>
-                                        <td className="px-4 py-4 text-sm">
-                                            <span className="font-medium text-gray-900">{seller.new_parts_markup_percent ?? '—'}%</span>
-                                            {seller.new_parts_markup_manual && (
-                                                <span className="ml-2 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">ручная</span>
-                                            )}
                                         </td>
                                         <td className={`px-4 py-4 text-right ${isMenuOpen ? 'relative z-30' : ''}`}>
                                             <ActionsDropdown
@@ -250,12 +243,7 @@ export default function SellersPage() {
                                         <p className="text-sm text-gray-600 mt-1">{seller.organization_name || 'Организация не указана'}</p>
                                         <p className="text-sm text-gray-500 mt-1">{seller.email}</p>
                                         <p className="text-sm text-gray-500">{seller.phone}</p>
-                                        <p className="text-sm mt-2">
-                                            Наценка: <span className="font-medium">{seller.new_parts_markup_percent}%</span>
-                                            {seller.new_parts_markup_manual && (
-                                                <span className="ml-1 text-xs text-amber-700">(ручная)</span>
-                                            )}
-                                        </p>
+                                        {/* Поле наценки убрано: редактирование наценки теперь только в `/admin/rossko/markup-settings`. */}
                                     </div>
                                     <button
                                         type="button"
