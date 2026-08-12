@@ -72,6 +72,7 @@ export default function VinCatalogPage() {
   const [unitInfo, setUnitInfo] = useState(null);
   const [imageMap, setImageMap] = useState([]);
   const [availability, setAvailability] = useState({});
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   // filterStep: { kind, unit, filter, detail?, conditions, answers: { [idx]: string } }
   const [filterStep, setFilterStep] = useState(null);
   const [filterLoading, setFilterLoading] = useState(false);
@@ -105,8 +106,10 @@ export default function VinCatalogPage() {
       .slice(0, 40);
     if (!oems.length) {
       setAvailability({});
+      setAvailabilityLoading(false);
       return;
     }
+    setAvailabilityLoading(true);
     try {
       const res = await apiRequestUnauth('/public/laximo/oem/availability', {
         method: 'POST',
@@ -123,6 +126,8 @@ export default function VinCatalogPage() {
       setAvailability(map);
     } catch {
       setAvailability({});
+    } finally {
+      setAvailabilityLoading(false);
     }
   };
 
@@ -446,7 +451,8 @@ export default function VinCatalogPage() {
       const detailRows = Array.isArray(res?.details) ? res.details : [];
       setUnitInfo(res?.unit || null);
       setDetails(detailRows);
-      await Promise.all([
+      setLoading(false);
+      void Promise.all([
         loadAvailability(detailRows),
         loadImageMap(unit.unit_id, ssd),
       ]);
@@ -657,9 +663,10 @@ export default function VinCatalogPage() {
           : { name: group.name, unit_id: group.quick_group_id }
       );
       setDetails(detailRows);
-      await loadAvailability(detailRows);
+      setLoading(false);
+      void loadAvailability(detailRows);
       if (unit?.unit_id) {
-        await loadImageMap(unit.unit_id, unit.ssd || ssd);
+        void loadImageMap(unit.unit_id, unit.ssd || ssd);
       } else {
         setImageMap([]);
       }
@@ -754,7 +761,8 @@ export default function VinCatalogPage() {
       const detailRows = Array.isArray(res?.details) ? res.details : [];
       setDetails(detailRows);
       setSearchEmpty(detailRows.length === 0);
-      await loadAvailability(detailRows);
+      setSearchLoading(false);
+      void loadAvailability(detailRows);
     } catch (err) {
       setNotice('unavailable');
       setError(err?.message || 'Не удалось выполнить поиск');
@@ -1030,6 +1038,7 @@ export default function VinCatalogPage() {
           unitInfo={unitInfo}
           details={details}
           availability={availability}
+          availabilityLoading={availabilityLoading}
           imageMap={imageMap}
           searchQuery={searchQuery}
           searchLoading={searchLoading}

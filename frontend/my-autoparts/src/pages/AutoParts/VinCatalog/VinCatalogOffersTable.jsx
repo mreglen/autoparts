@@ -239,12 +239,13 @@ function StockOfferRow({
         isSubRow ? 'bg-gray-50/60' : 'bg-white'
       }`}
     >
-      <td className={`whitespace-nowrap px-3 py-2 ${isSubRow ? 'relative' : ''}`}>
+      <td className={`whitespace-nowrap px-3 py-2 overflow-hidden ${isSubRow ? 'relative' : ''}`}>
         {!isSubRow ? (
           <button
             type="button"
             onClick={() => window.open(detailHref, '_blank', 'noopener,noreferrer')}
-            className="font-mono text-xs font-medium text-indigo-700 hover:text-indigo-900"
+            className="block max-w-full truncate text-left font-mono text-xs font-medium text-indigo-700 hover:text-indigo-900"
+            title={number}
           >
             {number}
           </button>
@@ -252,15 +253,18 @@ function StockOfferRow({
           <span className="absolute left-1.5 top-1/2 h-px w-2 -translate-y-1/2 bg-gray-300" aria-hidden />
         )}
       </td>
-      <td className="whitespace-nowrap px-2 py-2 pl-4 text-xs font-medium text-gray-900">
-        {!isSubRow ? brand : null}
+      <td className="whitespace-nowrap px-2 py-2 overflow-hidden text-xs font-medium text-gray-900">
+        {!isSubRow ? (
+          <span className="block truncate" title={brand}>{brand}</span>
+        ) : null}
       </td>
-      <td className="max-w-[140px] px-2 py-2 align-top">
+      <td className="px-2 py-2 align-top overflow-hidden">
         {!isSubRow ? (
           <button
             type="button"
             onClick={() => window.open(detailHref, '_blank', 'noopener,noreferrer')}
-            className="block w-full max-w-[140px] text-left text-xs font-medium leading-snug text-indigo-700 hover:text-indigo-900 line-clamp-2 break-words whitespace-normal"
+            className="block w-full text-left text-xs font-medium leading-snug text-indigo-700 hover:text-indigo-900 line-clamp-2 break-words whitespace-normal"
+            title={name}
           >
             {name}
           </button>
@@ -349,20 +353,20 @@ function OffersTable({ parts, emptyText }) {
 
   return (
     <div className="-mx-1 overflow-x-auto">
-      <table className="min-w-[720px] w-full table-fixed border-collapse text-left">
+      <table className="min-w-[800px] w-full table-fixed border-collapse text-left">
         <colgroup>
-          <col className="w-[108px]" />
-          <col className="w-[56px]" />
-          <col className="w-[140px]" />
-          <col />
-          <col className="w-[88px]" />
-          <col className="w-[96px]" />
-          <col className="w-[72px]" />
+          <col style={{ width: '112px' }} />
+          <col style={{ width: '96px' }} />
+          <col style={{ width: '148px' }} />
+          <col style={{ width: '128px' }} />
+          <col style={{ width: '80px' }} />
+          <col style={{ width: '88px' }} />
+          <col style={{ width: '72px' }} />
         </colgroup>
         <thead>
           <tr className="border-b border-gray-200 bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
             <th className="px-3 py-2">Номер</th>
-            <th className="px-2 py-2 pl-4">Бренд</th>
+            <th className="px-2 py-2">Бренд</th>
             <th className="px-2 py-2">Наименование</th>
             <th className="px-3 py-2">Доставим</th>
             <th className="px-3 py-2">Остаток</th>

@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from zeep import Client
 from zeep.helpers import serialize_object
 from zeep.transports import Transport
 
 from app.core.config import Settings
+from app.models.product import Product as ProductModel
 from app.services.laximo.doc_client import LaximoDocError, find_oem
 from app.services.laximo.gate import laximo_doc_ready
-from app.services.local_product_search import search_local_products_query
 from app.utils.partnumber import normalize_partnumber
+from app.utils.search_sql import get_sql_normalize
 
 logger = logging.getLogger(__name__)
 settings = Settings()
@@ -20,8 +24,13 @@ settings = Settings()
 OEM_BATCH_CAP = 40
 ANALOGS_CAP = 5
 ROSSKO_DELIVERY_ID = "000000001"
+ROSSKO_LOOKUP_WORKERS = 6
+_ROSSKO_CACHE_TTL_SEC = 300
+_ROSSKO_CACHE_MAX = 512
 
 _search_client = None
+_rossko_pool: ThreadPoolExecutor | None = None
+_rossko_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
 def _get_search_client():
@@ -31,6 +40,16 @@ def _get_search_client():
         wsdl_url = settings.GET_SEARCH.replace("?wsdl", "").rstrip("?")
         _search_client = Client(wsdl_url + "?wsdl", transport=transport)
     return _search_client
+
+
+def _get_rossko_pool() -> ThreadPoolExecutor:
+    global _rossko_pool
+    if _rossko_pool is None:
+        _rossko_pool = ThreadPoolExecutor(
+            max_workers=ROSSKO_LOOKUP_WORKERS,
+            thread_name_prefix="rossko-oem",
+        )
+    return _rossko_pool
 
 
 def _as_list(value: Any) -> list:
@@ -80,8 +99,16 @@ def _rossko_part_stock_count(part: dict[str, Any]) -> int:
     return total
 
 
+def _empty_rossko() -> dict[str, Any]:
+    return {"available": False, "count": 0, "min_price": None, "sample": None}
+
+
+def _empty_used() -> dict[str, Any]:
+    return {"available": False, "count": 0, "sample_product_id": None}
+
+
 def _lookup_rossko(oem: str) -> dict[str, Any]:
-    empty = {"available": False, "count": 0, "min_price": None, "sample": None}
+    empty = _empty_rossko()
     try:
         params = {
             "KEY1": settings.ROSSKO_KEY1,
@@ -120,9 +147,59 @@ def _lookup_rossko(oem: str) -> dict[str, Any]:
         return empty
 
 
+def _lookup_rossko_cached(oem: str) -> dict[str, Any]:
+    key = normalize_partnumber(oem) or oem.strip().upper()
+    now = time.monotonic()
+    cached = _rossko_cache.get(key)
+    if cached and now - cached[0] < _ROSSKO_CACHE_TTL_SEC:
+        return cached[1]
+
+    result = _lookup_rossko(oem)
+    _rossko_cache[key] = (now, result)
+    if len(_rossko_cache) > _ROSSKO_CACHE_MAX:
+        stale_before = now - _ROSSKO_CACHE_TTL_SEC
+        for cache_key, (ts, _) in list(_rossko_cache.items()):
+            if ts < stale_before:
+                _rossko_cache.pop(cache_key, None)
+    return result
+
+
+def _lookup_rossko_many(oems: list[str]) -> dict[str, dict[str, Any]]:
+    if not oems:
+        return {}
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for oem in oems:
+        key = normalize_partnumber(oem) or oem.strip().upper()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(oem)
+
+    if len(unique) == 1:
+        key = normalize_partnumber(unique[0]) or unique[0].strip().upper()
+        return {key: _lookup_rossko_cached(unique[0])}
+
+    out: dict[str, dict[str, Any]] = {}
+    pool = _get_rossko_pool()
+    futures = {pool.submit(_lookup_rossko_cached, oem): oem for oem in unique}
+    for future in as_completed(futures):
+        oem = futures[future]
+        key = normalize_partnumber(oem) or oem.strip().upper()
+        try:
+            out[key] = future.result()
+        except Exception:
+            logger.exception("ROSSKO batch lookup failed for oem=%r", oem)
+            out[key] = _empty_rossko()
+    return out
+
+
 def _lookup_used(db: Session, oem: str) -> dict[str, Any]:
-    empty = {"available": False, "count": 0, "sample_product_id": None}
+    empty = _empty_used()
     try:
+        from app.services.local_product_search import search_local_products_query
+
         rows = search_local_products_query(db, oem, is_new=False, limit=20).all()
         if not rows:
             return empty
@@ -134,6 +211,55 @@ def _lookup_used(db: Session, oem: str) -> dict[str, Any]:
     except Exception:
         logger.exception("Used availability lookup failed for oem=%r", oem)
         return empty
+
+
+def _lookup_used_many(db: Session, oems: list[str]) -> dict[str, dict[str, Any]]:
+    norms: list[str] = []
+    seen: set[str] = set()
+    for raw in oems:
+        norm = normalize_partnumber(raw) or raw.strip().upper()
+        if not norm or norm in seen:
+            continue
+        seen.add(norm)
+        norms.append(norm)
+
+    result = {norm: _empty_used() for norm in norms}
+    if not norms:
+        return result
+
+    try:
+        norm_expr = get_sql_normalize(ProductModel.article)
+        rows = (
+            db.query(ProductModel)
+            .filter(
+                ProductModel.is_new.is_(False),
+                func.coalesce(ProductModel.quantity, 0) > 0,
+                norm_expr.in_(norms),
+            )
+            .order_by(ProductModel.id.asc())
+            .limit(max(len(norms) * 20, 100))
+            .all()
+        )
+        counts: dict[str, int] = {}
+        samples: dict[str, Optional[int]] = {}
+        for row in rows:
+            norm = normalize_partnumber(row.article)
+            if not norm or norm not in result:
+                continue
+            counts[norm] = counts.get(norm, 0) + 1
+            if norm not in samples:
+                samples[norm] = getattr(row, "id", None)
+
+        for norm, count in counts.items():
+            result[norm] = {
+                "available": True,
+                "count": count,
+                "sample_product_id": samples.get(norm),
+            }
+    except Exception:
+        logger.exception("Used batch availability lookup failed")
+
+    return result
 
 
 def _empty_analogs() -> dict[str, Any]:
@@ -190,10 +316,15 @@ def _lookup_analogs(db: Session, oem: str) -> dict[str, Any]:
     }
 
 
-def lookup_oem_availability(db: Session, oems: list[str]) -> dict[str, Any]:
+def lookup_oem_availability(
+    db: Session,
+    oems: list[str],
+    *,
+    include_analogs: bool = False,
+) -> dict[str, Any]:
     """
-    Batch OEM → ROSSKO + used + DOC analogs availability.
-    Soft per-item failures; never raises tech details to client.
+    Batch OEM → ROSSKO + used (+ optional DOC analogs) availability.
+    Rossko lookups run in parallel; analog cross-checks are off by default for speed.
     """
     cleaned: list[str] = []
     seen: set[str] = set()
@@ -209,16 +340,28 @@ def lookup_oem_availability(db: Session, oems: list[str]) -> dict[str, Any]:
         if len(cleaned) >= OEM_BATCH_CAP:
             break
 
+    if not cleaned:
+        return {
+            "ok": True,
+            "reason": "ok",
+            "message": None,
+            "items": [],
+        }
+
+    rossko_by_norm = _lookup_rossko_many(cleaned)
+    used_by_norm = _lookup_used_many(db, cleaned)
+
     items = []
     for oem in cleaned:
         norm = normalize_partnumber(oem) or oem.upper()
+        analogs = _lookup_analogs(db, oem) if include_analogs else _empty_analogs()
         items.append(
             {
                 "oem": oem,
                 "normalized_oem": norm,
-                "rossko": _lookup_rossko(oem),
-                "used": _lookup_used(db, oem),
-                "analogs": _lookup_analogs(db, oem),
+                "rossko": rossko_by_norm.get(norm, _empty_rossko()),
+                "used": used_by_norm.get(norm, _empty_used()),
+                "analogs": analogs,
             }
         )
 

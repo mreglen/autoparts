@@ -21,7 +21,8 @@ function detailRowKey(d, idx) {
   return String(d.detail_id || `${d.oem || 'd'}-${idx}`);
 }
 
-function AvailCell({ row }) {
+function AvailCell({ row, loading }) {
+  if (loading && !row) return <span className="text-xs text-gray-400">…</span>;
   if (!row) return <span className="text-gray-400">—</span>;
   const used = row.used?.count ?? 0;
   const rossko = row.rossko?.count ?? 0;
@@ -236,6 +237,7 @@ export default function VinCatalogUnitView({
   imageMap,
   details,
   availability,
+  availabilityLoading = false,
   searchEmpty,
   hoverRowKey,
   onHoverRowKey,
@@ -380,7 +382,10 @@ export default function VinCatalogUnitView({
                       </td>
                       <td className="py-2.5 pr-2 font-mono text-xs text-indigo-700">{d.oem || '—'}</td>
                       <td className="py-2.5">
-                        <AvailCell row={lookupAvail(availability, d.oem)} />
+                        <AvailCell
+                          row={lookupAvail(availability, d.oem)}
+                          loading={availabilityLoading}
+                        />
                       </td>
                     </tr>
                   );

@@ -126,6 +126,49 @@ export const collectRosskoAnalogs = (parts) => {
   return out;
 };
 
+export function getPartArticleNorm(part) {
+  return normalizeArticle(part?.partnumber || part?.article || part?.oem);
+}
+
+/** Part matches catalog OEM by article (top-level or cross). */
+export function isRosskoOriginalOemPart(part, oemNorm) {
+  if (!oemNorm) return false;
+  const candidates = [part?.partnumber, part?.article, part?.oem];
+  return candidates.some((value) => normalizeArticle(value) === oemNorm);
+}
+
+/** Top-level Rossko hits plus crosses with available stock, deduped. */
+export function collectRosskoOfferParts(parts) {
+  const list = Array.isArray(parts) ? parts : [];
+  const seen = new Set();
+  const out = [];
+
+  const add = (part) => {
+    if (!part || typeof part !== 'object') return;
+    if (!mapPartToStocksData(part).length) return;
+    const guid = String(part?.guid || '').trim();
+    const key = guid || `${String(part?.brand || '').trim()}|${getPartArticleNorm(part)}`;
+    if (!key || key === '|' || seen.has(key)) return;
+    seen.add(key);
+    out.push(part);
+  };
+
+  list.forEach(add);
+  collectRosskoAnalogs(list).forEach(add);
+  return out;
+}
+
+export function splitRosskoOriginalAndAnalogs(parts, oemNorm) {
+  const all = collectRosskoOfferParts(parts);
+  const originals = [];
+  const analogs = [];
+  all.forEach((part) => {
+    if (isRosskoOriginalOemPart(part, oemNorm)) originals.push(part);
+    else analogs.push(part);
+  });
+  return { originals, analogs };
+}
+
 const scoreRosskoPart = (part, queryArticleNorm, queryBrandLower) => {
   let score = 0;
   const pn = normalizeArticle(part?.partnumber);

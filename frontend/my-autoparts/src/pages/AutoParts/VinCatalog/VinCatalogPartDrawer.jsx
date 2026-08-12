@@ -4,9 +4,9 @@ import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { buildPartDetailPath } from '../../../utils/partRoutes';
 import {
   getRosskoParts,
-  collectRosskoAnalogs,
   mapPartToStocksData,
   normalizeArticle,
+  splitRosskoOriginalAndAnalogs,
 } from '../NewParts/rosskoHelpers';
 import VinCatalogOffersTable from './VinCatalogOffersTable';
 
@@ -72,22 +72,8 @@ function UsedSkeleton({ count = 4 }) {
   );
 }
 
-function isExactOemMatch(part, oemNorm) {
-  if (!oemNorm) return false;
-  const pn = normalizeArticle(part?.partnumber || part?.article);
-  if (!pn) return false;
-  return pn === oemNorm;
-}
-
 function hasOfferStock(part) {
   return mapPartToStocksData(part).length > 0;
-}
-
-function partKey(part) {
-  return (
-    String(part?.guid || '').trim()
-    || `${String(part?.brand || '').trim()}|${normalizeArticle(part?.partnumber || part?.article)}`
-  );
 }
 
 export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts }) {
@@ -155,28 +141,8 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
         });
         if (cancelled) return;
         const parts = getRosskoParts(response?.data || response).filter(hasOfferStock);
-        const similar = [];
-        const listAnalogs = [];
-        parts.forEach((part) => {
-          if (isExactOemMatch(part, oemNorm)) similar.push(part);
-          else listAnalogs.push(part);
-        });
-        const similarFinal = similar.length ? similar : parts;
-        const similarKeys = new Set(similarFinal.map(partKey).filter(Boolean));
-        const crosses = collectRosskoAnalogs(parts).filter((cross) => {
-          const key = partKey(cross);
-          return key && !similarKeys.has(key);
-        });
-        const analogs = [];
-        const analogSeen = new Set();
-        [...(similar.length ? listAnalogs : []), ...crosses].forEach((part) => {
-          const key = partKey(part);
-          if (!key || similarKeys.has(key) || analogSeen.has(key)) return;
-          if (isExactOemMatch(part, oemNorm) && similar.length) return;
-          analogSeen.add(key);
-          analogs.push(part);
-        });
-        setSimilarParts(similarFinal);
+        const { originals, analogs } = splitRosskoOriginalAndAnalogs(parts, oemNorm);
+        setSimilarParts(originals);
         setAnalogParts(analogs);
       } catch {
         if (!cancelled) {

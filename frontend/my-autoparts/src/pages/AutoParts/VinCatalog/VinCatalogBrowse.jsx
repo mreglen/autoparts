@@ -92,6 +92,7 @@ export default function VinCatalogBrowse({
   unitInfo,
   details,
   availability,
+  availabilityLoading,
   imageMap,
   searchQuery,
   searchLoading,
@@ -337,7 +338,9 @@ export default function VinCatalogBrowse({
 
         <section className="min-w-0 self-start rounded-lg border border-gray-200 bg-white p-2 sm:p-3">
           {loading || filterLoading ? (
-            <p className="text-sm text-gray-500">Загрузка…</p>
+            !details.length ? (
+              <p className="text-sm text-gray-500">Загрузка…</p>
+            ) : null
           ) : null}
           {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
 
@@ -399,6 +402,7 @@ export default function VinCatalogBrowse({
               imageMap={[]}
               details={details}
               availability={availability}
+              availabilityLoading={availabilityLoading}
               searchEmpty={searchEmpty}
               hoverRowKey={hoverRowKey}
               onHoverRowKey={setHoverRowKey}
@@ -412,6 +416,7 @@ export default function VinCatalogBrowse({
               imageMap={imageMap}
               details={details}
               availability={availability}
+              availabilityLoading={availabilityLoading}
               searchEmpty={false}
               hoverRowKey={hoverRowKey}
               onHoverRowKey={setHoverRowKey}
