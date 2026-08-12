@@ -12,7 +12,6 @@ import OrganizationCard from './OrganizationCard';
 import ProfileEngagementPreview from './ProfileEngagementPreview';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import {
-  ChevronRight,
   ProfileBlock,
   ProfileQuickAction,
   ProfileRow,
@@ -25,23 +24,27 @@ import {
 function ProfilePageSkeleton() {
   return (
     <div className={`${profilePageShell} animate-pulse`}>
-      <div className="h-8 w-32 rounded-lg bg-gray-100" />
-      <div className="rounded-2xl bg-white p-5 ring-1 ring-gray-200/80">
+      <div className="space-y-2">
+        <div className="h-3 w-16 rounded bg-gray-100" />
+        <div className="h-8 w-36 rounded-lg bg-gray-100" />
+        <div className="h-4 w-48 rounded bg-gray-100" />
+      </div>
+      <div className="rounded-xl border border-gray-200 bg-white p-4">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-gray-100" />
           <div className="flex-1 space-y-2">
             <div className="h-5 w-44 rounded-lg bg-gray-100" />
             <div className="h-4 w-28 rounded-lg bg-gray-100" />
-            <div className="h-6 w-20 rounded-full bg-gray-100" />
+            <div className="h-6 w-20 rounded-lg bg-gray-100" />
           </div>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-24 rounded-2xl bg-gray-100" />
+          <div key={i} className="h-20 rounded-xl bg-gray-100" />
         ))}
       </div>
-      <div className="rounded-2xl bg-white ring-1 ring-gray-200/80">
+      <div className="rounded-xl border border-gray-200 bg-white">
         {[1, 2].map((i) => (
           <div key={i} className="border-b border-gray-100 px-4 py-4 last:border-0">
             <div className="h-4 w-36 rounded-lg bg-gray-100" />
@@ -136,10 +139,13 @@ export default function ProfilePage() {
   if (isReady && !user) {
     return (
       <div className={profilePageShell}>
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Профиль</h1>
+        <div>
+          
+          <h1 className="mt-0.5 text-xl font-bold text-gray-900 sm:text-2xl">Профиль</h1>
+        </div>
         <ProfileBlock padded>
           <div className="py-6 text-center">
-            <p className="text-[15px] text-gray-900">Войдите в аккаунт</p>
+            <p className="text-sm text-gray-900 sm:text-[15px]">Войдите в аккаунт</p>
             <Link to="/auth" className={`${profilePrimaryBtn} mt-5`}>
               Войти
             </Link>
@@ -228,15 +234,22 @@ export default function ProfilePage() {
 
   return (
     <div className={profilePageShell}>
-      <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Профиль</h1>
+      <div className="mb-1 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+       
+          <h1 className="mt-0.5 text-xl font-bold text-gray-900 sm:text-2xl">Профиль</h1>
+          <p className="mt-0.5 text-sm text-gray-500">{getRoleLabel(user)}</p>
+        </div>
+        {!isEditing ? (
+          <button type="button" onClick={handleEdit} className={profileSecondaryBtn}>
+            Редактировать
+          </button>
+        ) : null}
+      </div>
 
       {!isEditing ? (
         <ProfileBlock>
-          <button
-            type="button"
-            onClick={handleEdit}
-            className="flex w-full items-center gap-4 px-4 py-5 text-left transition hover:bg-gray-50 active:bg-gray-100 sm:px-5"
-          >
+          <div className="flex items-center gap-4 px-4 py-4 sm:px-5 sm:py-5">
             <UserAvatar
               avatarUrl={user.avatar_url}
               firstName={user.first_name}
@@ -245,19 +258,18 @@ export default function ProfilePage() {
               className="!h-16 !w-16 !rounded-full !text-xl"
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xl font-bold text-gray-900">{displayName}</p>
+              <p className="truncate text-lg font-semibold text-gray-900 sm:text-xl">{displayName}</p>
               <p className="mt-0.5 truncate text-sm text-gray-500">{profileSubtitle}</p>
-              <span className="mt-2 inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+              <span className="mt-2 inline-flex rounded-lg bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
                 {getRoleLabel(user)}
               </span>
             </div>
-            <ChevronRight />
-          </button>
+          </div>
         </ProfileBlock>
       ) : (
         <ProfileBlock title="Личные данные" padded>
           {saveError ? (
-            <div className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
+            <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
           ) : null}
 
           <div className="mb-5 flex items-center gap-4">

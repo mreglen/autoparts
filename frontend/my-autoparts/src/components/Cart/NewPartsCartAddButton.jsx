@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   addNewPartsToCart,
   createNewPartsBasket,
   fetchCart,
+  selectCart,
   selectCartLoading,
   selectNewPartsBaskets,
 } from '../../redux/slices/CartSlice';
 import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 
 const DEFAULT_BASKET_NAME = 'Новые запчасти';
-const MENU_ESTIMATED_HEIGHT = 210;
 
 function CartIcon({ className = 'h-4 w-4' }) {
   return (
@@ -26,20 +26,13 @@ function CartIcon({ className = 'h-4 w-4' }) {
   );
 }
 
-function getScrollParent(node) {
-  let current = node?.parentElement || null;
-  while (current) {
-    const style = window.getComputedStyle(current);
-    const overflowY = style.overflowY;
-    if (
-      (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay')
-      && current.scrollHeight > current.clientHeight
-    ) {
-      return current;
-    }
-    current = current.parentElement;
-  }
-  return null;
+function dedupeBaskets(baskets) {
+  const seen = new Set();
+  return (baskets || []).filter((basket) => {
+    if (!basket?.id || seen.has(basket.id)) return false;
+    seen.add(basket.id);
+    return true;
+  });
 }
 
 export default function NewPartsCartAddButton({
@@ -47,45 +40,32 @@ export default function NewPartsCartAddButton({
   disabled = false,
   analyticsSection = 'vin',
   className = '',
+  showBasketPicker = false,
 }) {
   const dispatch = useDispatch();
+  const cart = useSelector(selectCart);
   const cartLoading = useSelector(selectCartLoading);
   const baskets = useSelector(selectNewPartsBaskets);
   const [adding, setAdding] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
   const [newBasketName, setNewBasketName] = useState('');
   const [menuError, setMenuError] = useState('');
   const wrapRef = useRef(null);
-  const menuRef = useRef(null);
+
+  const liveBaskets = useMemo(() => {
+    const source = cart?.new_parts_baskets?.length ? cart.new_parts_baskets : baskets;
+    return dedupeBaskets(source);
+  }, [baskets, cart?.new_parts_baskets]);
 
   const defaultBasket = useMemo(
-    () => baskets.find((b) => b.is_default) || baskets[0] || null,
-    [baskets]
+    () => liveBaskets.find((b) => b.is_default) || liveBaskets[0] || null,
+    [liveBaskets]
   );
 
   const namedBaskets = useMemo(
-    () => baskets.filter((b) => !b.is_default),
-    [baskets]
+    () => liveBaskets.filter((b) => !b.is_default),
+    [liveBaskets]
   );
-
-  const updateMenuPlacement = useCallback(() => {
-    const anchor = wrapRef.current;
-    if (!anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    const scrollParent = getScrollParent(anchor);
-    const parentRect = scrollParent?.getBoundingClientRect();
-    const bottomLimit = parentRect ? parentRect.bottom : window.innerHeight;
-    const topLimit = parentRect ? parentRect.top : 0;
-    const spaceBelow = bottomLimit - rect.bottom;
-    const spaceAbove = rect.top - topLimit;
-    const menuHeight = menuRef.current?.offsetHeight || MENU_ESTIMATED_HEIGHT;
-    setOpenUpward(spaceBelow < menuHeight + 8 && spaceAbove > spaceBelow);
-  }, []);
-
-  const openMenu = useCallback(() => {
-    setMenuOpen(true);
-  }, []);
 
   const addToBasket = useCallback(
     async (basketId) => {
@@ -149,13 +129,7 @@ export default function NewPartsCartAddButton({
     }
   };
 
-  useLayoutEffect(() => {
-    if (!menuOpen) return undefined;
-    updateMenuPlacement();
-    const onResize = () => updateMenuPlacement();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [menuOpen, namedBaskets.length, menuError, updateMenuPlacement]);
+  const isDisabled = disabled || adding || cartLoading;
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -172,20 +146,12 @@ export default function NewPartsCartAddButton({
     };
   }, [menuOpen]);
 
-  const isDisabled = disabled || adding || cartLoading;
-
   return (
     <div ref={wrapRef} className={`relative inline-flex items-center gap-0.5 ${className}`}>
       <button
         type="button"
         onClick={handleDefaultAdd}
         disabled={isDisabled}
-        onMouseEnter={() => {
-          if (!isDisabled) openMenu();
-        }}
-        onFocus={() => {
-          if (!isDisabled) openMenu();
-        }}
         className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
         aria-label={`Добавить в ${DEFAULT_BASKET_NAME}`}
         title={`Добавить в ${DEFAULT_BASKET_NAME}`}
@@ -193,74 +159,73 @@ export default function NewPartsCartAddButton({
         <CartIcon />
       </button>
 
-      <button
-        type="button"
-        onClick={() => setMenuOpen((v) => !v)}
-        disabled={isDisabled}
-        className="inline-flex h-9 w-7 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50 md:hidden"
-        aria-label="Выбрать корзину"
-      >
-        ▾
-      </button>
+      {showBasketPicker ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            disabled={isDisabled}
+            className="inline-flex h-9 w-7 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Выбрать корзину"
+            aria-expanded={menuOpen}
+          >
+            ▾
+          </button>
 
-      {menuOpen ? (
-        <div
-          ref={menuRef}
-          className={`absolute right-0 z-30 w-56 rounded-lg border border-gray-200 bg-white p-2 shadow-lg ${
-            openUpward ? 'bottom-full mb-1' : 'top-full mt-1'
-          }`}
-          onMouseLeave={() => setMenuOpen(false)}
-        >
-          <p className="px-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-            Корзины
-          </p>
-          <div className="mt-1 space-y-0.5">
-            {defaultBasket ? (
-              <button
-                type="button"
-                disabled={isDisabled}
-                onClick={() => addToBasket(defaultBasket.id)}
-                className="flex w-full items-center justify-between rounded-md px-1.5 py-1 text-left text-sm text-gray-800 hover:bg-indigo-50 disabled:opacity-50"
-              >
-                <span className="truncate">{defaultBasket.name}</span>
-                <span className="ml-2 shrink-0 text-[10px] text-gray-500">основная</span>
-              </button>
-            ) : null}
-            {namedBaskets.map((basket) => (
-              <button
-                key={basket.id}
-                type="button"
-                disabled={isDisabled}
-                onClick={() => addToBasket(basket.id)}
-                className="flex w-full rounded-md px-1.5 py-1 text-left text-sm text-gray-800 hover:bg-indigo-50 disabled:opacity-50"
-              >
-                <span className="truncate">{basket.name}</span>
-              </button>
-            ))}
-          </div>
+          {menuOpen ? (
+            <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+              <p className="px-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                Корзины
+              </p>
+              <div className="mt-1 space-y-0.5">
+                {defaultBasket ? (
+                  <button
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => addToBasket(defaultBasket.id)}
+                    className="flex w-full items-center justify-between rounded-md px-1.5 py-1 text-left text-sm text-gray-800 hover:bg-indigo-50 disabled:opacity-50"
+                  >
+                    <span className="truncate">{defaultBasket.name}</span>
+                    <span className="ml-2 shrink-0 text-[10px] text-gray-500">основная</span>
+                  </button>
+                ) : null}
+                {namedBaskets.map((basket) => (
+                  <button
+                    key={basket.id}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => addToBasket(basket.id)}
+                    className="flex w-full rounded-md px-1.5 py-1 text-left text-sm text-gray-800 hover:bg-indigo-50 disabled:opacity-50"
+                  >
+                    <span className="truncate">{basket.name}</span>
+                  </button>
+                ))}
+              </div>
 
-          <form onSubmit={handleCreateAndAdd} className="mt-1.5 border-t border-gray-100 pt-1.5">
-            <p className="px-1.5 text-xs font-medium text-gray-900">Создать новую корзину</p>
-            <input
-              type="text"
-              value={newBasketName}
-              onChange={(e) => setNewBasketName(e.target.value)}
-              placeholder="Название"
-              maxLength={100}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
-              disabled={isDisabled}
-            />
-            <button
-              type="submit"
-              disabled={isDisabled}
-              className="mt-1.5 w-full rounded-md bg-indigo-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-            >
-              Создать и добавить
-            </button>
-          </form>
+              <form onSubmit={handleCreateAndAdd} className="mt-1.5 border-t border-gray-100 pt-1.5">
+                <p className="px-1.5 text-xs font-medium text-gray-900">Создать новую корзину</p>
+                <input
+                  type="text"
+                  value={newBasketName}
+                  onChange={(e) => setNewBasketName(e.target.value)}
+                  placeholder="Название"
+                  maxLength={100}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                  disabled={isDisabled}
+                />
+                <button
+                  type="submit"
+                  disabled={isDisabled}
+                  className="mt-1.5 w-full rounded-md bg-indigo-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  Создать и добавить
+                </button>
+              </form>
 
-          {menuError ? <p className="mt-1 px-1.5 text-[11px] text-red-600">{menuError}</p> : null}
-        </div>
+              {menuError ? <p className="mt-1 px-1.5 text-[11px] text-red-600">{menuError}</p> : null}
+            </div>
+          ) : null}
+        </>
       ) : null}
     </div>
   );

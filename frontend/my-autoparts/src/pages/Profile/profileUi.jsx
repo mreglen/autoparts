@@ -20,10 +20,10 @@ export function ProfileBlock({ title, children, className = '', padded = false }
   return (
     <section className={className}>
       {title ? (
-        <h2 className="mb-2 text-base font-bold text-gray-900 sm:text-[1.05rem]">{title}</h2>
+        <h2 className="mb-2 text-sm font-semibold text-gray-900 sm:text-base">{title}</h2>
       ) : null}
       <div
-        className={`overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/80 ${
+        className={`overflow-hidden rounded-xl border border-gray-200 bg-white ${
           padded ? 'p-4 sm:p-5' : ''
         }`}
       >
@@ -44,8 +44,8 @@ export function ProfileSectionHeader({
     'inline-flex items-center gap-0.5 text-sm font-medium text-indigo-600 hover:text-indigo-700';
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3.5">
-      <h3 className="text-base font-bold text-gray-900">{title}</h3>
+    <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+      <h3 className="text-sm font-semibold text-gray-900 sm:text-base">{title}</h3>
       {to ? (
         <Link to={to} className={actionClass}>
           {actionLabel || 'Все'}
@@ -86,7 +86,7 @@ export const profileProductCardProps = {
 
 function ProfileProductCardSkeleton() {
   return (
-    <div className="animate-pulse overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/80">
+    <div className="animate-pulse overflow-hidden rounded-xl border border-gray-100 bg-white">
       <div className="aspect-square w-full bg-gray-100" />
       <div className="space-y-2 p-2.5">
         <div className="h-4 w-2/3 rounded bg-gray-100" />
@@ -149,11 +149,11 @@ export function ProfileProductGrid({ items, loading }) {
 
 export function ProfileQuickAction({ to, onClick, label, icon }) {
   const className =
-    'flex min-h-[5.5rem] flex-col items-center justify-center gap-2 rounded-2xl bg-white px-3 py-4 text-center ring-1 ring-gray-200/80 transition hover:bg-gray-50 active:bg-gray-100';
+    'flex min-h-[4.75rem] flex-col items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-3 text-center transition hover:border-gray-300 hover:bg-gray-50 active:bg-gray-100';
 
   const content = (
     <>
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-600">
+      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
         {icon}
       </span>
       <span className="text-sm font-medium leading-tight text-gray-900">{label}</span>
@@ -192,7 +192,7 @@ export function ProfileRow({
     <>
       {icon ? (
         <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
             destructive ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-600'
           }`}
         >
@@ -200,7 +200,7 @@ export function ProfileRow({
         </span>
       ) : null}
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-medium leading-snug">{label}</span>
+        <span className="block text-sm font-medium leading-snug sm:text-[15px]">{label}</span>
         {hint ? <span className="mt-0.5 block truncate text-sm text-gray-500">{hint}</span> : null}
       </span>
       {trailing !== undefined ? trailing : <ChevronRight />}
@@ -222,12 +222,15 @@ export function ProfileRow({
   );
 }
 
-export const profilePageShell = `${warehousePageClass} space-y-4 pb-8`;
+export const profilePageShell = `${warehousePageClass} space-y-4 pb-8 sm:space-y-5`;
 
 export const profileFullPageShell = `${warehousePageClass} pb-8`;
 
-export const profileInputClass = warehousePillControlClass;
+export const profileInputClass =
+  'block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60';
 
 export const profilePrimaryBtn = warehousePrimaryButtonClass;
 
 export const profileSecondaryBtn = warehouseSecondaryButtonClass;
+
+export const profilePillControlClass = warehousePillControlClass;
