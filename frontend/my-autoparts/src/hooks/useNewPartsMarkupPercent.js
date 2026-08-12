@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { useSelector } from 'react-redux';
 import {
   DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
@@ -7,6 +8,8 @@ import {
 import {
   getSellerAutoserviceMode,
   SELLER_AUTOSERVICE_MODE_AUTOSERVICE,
+  SELLER_AUTOSERVICE_MODE_SELLER,
+  subscribeSellerAutoserviceMode,
   userHasAutoserviceOrganization,
 } from '../utils/sellerAutoserviceMode';
 
@@ -15,11 +18,8 @@ function isSellerStaff(user) {
   return Boolean(user.is_seller || user.is_director || user.is_employee);
 }
 
-function selectSellerStaffMarkup(user, sellerMarkup, autoserviceMarkup) {
-  if (
-    userHasAutoserviceOrganization(user)
-    && getSellerAutoserviceMode() === SELLER_AUTOSERVICE_MODE_AUTOSERVICE
-  ) {
+function selectSellerStaffMarkup(user, mode, sellerMarkup, autoserviceMarkup) {
+  if (userHasAutoserviceOrganization(user) && mode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE) {
     return autoserviceMarkup;
   }
   return sellerMarkup;
@@ -44,6 +44,11 @@ export function useNewPartsMarkupPercent(context = 'auto') {
     (state) => state.publicInfo.autoserviceMarkupPercent ?? DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
   );
   const adminCtx = useSelector((state) => state.publicInfo.adminSellerMarkupContext);
+  const sellerAutoserviceMode = useSyncExternalStore(
+    subscribeSellerAutoserviceMode,
+    getSellerAutoserviceMode,
+    () => SELLER_AUTOSERVICE_MODE_SELLER,
+  );
 
   if (context === 'public' || context === 'buyer') {
     return buyerMarkup;
@@ -53,26 +58,16 @@ export function useNewPartsMarkupPercent(context = 'auto') {
     return autoserviceMarkup;
   }
 
-  if (context === 'seller') {
-    if (adminCtx?.markupPercent != null) {
-      return adminCtx.markupPercent;
-    }
-    if (isSellerStaff(user) && user.organization_id) {
-      return selectSellerStaffMarkup(user, sellerMarkup, autoserviceMarkup);
-    }
-    return sellerMarkup;
-  }
-
-  // auto: публичный каталог — buyer; staff организации — seller/autoservice
   if (adminCtx?.markupPercent != null) {
     return adminCtx.markupPercent;
   }
 
   if (isSellerStaff(user) && user.organization_id) {
-    return selectSellerStaffMarkup(user, sellerMarkup, autoserviceMarkup);
+    return selectSellerStaffMarkup(user, sellerAutoserviceMode, sellerMarkup, autoserviceMarkup);
   }
 
-  return buyerMarkup;
+  // seller: наценка продавца даже вне организации; auto: публичный каталог — buyer
+  return context === 'seller' ? sellerMarkup : buyerMarkup;
 }
 
 export default useNewPartsMarkupPercent;

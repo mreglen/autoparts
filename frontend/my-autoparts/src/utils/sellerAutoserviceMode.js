@@ -2,6 +2,7 @@ export const SELLER_AUTOSERVICE_MODE_SELLER = 'seller';
 export const SELLER_AUTOSERVICE_MODE_AUTOSERVICE = 'autoservice';
 
 const STORAGE_KEY = 'sg_seller_autoservice_mode';
+const MODE_CHANGE_EVENT = 'sg:seller-autoservice-mode';
 
 export function getSellerAutoserviceMode() {
   try {
@@ -16,16 +17,30 @@ export function getSellerAutoserviceMode() {
 }
 
 export function setSellerAutoserviceMode(mode) {
+  const nextMode =
+    mode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE
+      ? SELLER_AUTOSERVICE_MODE_AUTOSERVICE
+      : SELLER_AUTOSERVICE_MODE_SELLER;
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      mode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE
-        ? SELLER_AUTOSERVICE_MODE_AUTOSERVICE
-        : SELLER_AUTOSERVICE_MODE_SELLER,
-    );
+    localStorage.setItem(STORAGE_KEY, nextMode);
   } catch (_) {
     /* ignore */
   }
+  try {
+    window.dispatchEvent(new CustomEvent(MODE_CHANGE_EVENT, { detail: nextMode }));
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+/** Подписка для useSyncExternalStore: режим меняется вне React (localStorage). */
+export function subscribeSellerAutoserviceMode(onChange) {
+  window.addEventListener(MODE_CHANGE_EVENT, onChange);
+  window.addEventListener('storage', onChange);
+  return () => {
+    window.removeEventListener(MODE_CHANGE_EVENT, onChange);
+    window.removeEventListener('storage', onChange);
+  };
 }
 
 export function userHasAutoserviceOrganization(user) {
