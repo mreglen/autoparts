@@ -24,6 +24,7 @@ import { formatDromExportMessage } from '../../utils/dromExport';
 import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopButton';
 import PillDropdown from '../../components/PillDropdown/PillDropdown';
 import { UnderlineTabs } from '../../components/UI';
+import MyPartsOnboarding from './MyPartsOnboarding';
 
 const CardPart = ({
   part,
@@ -50,6 +51,8 @@ const CardPart = ({
   imageErrors = {},
   onImageError,
   renderMode = 'table',
+  tourTargetRow = false,
+  tourShowActions = false,
 }) => {
   const [showActions, setShowActions] = useState(false);
   const isModeration = variant === 'moderation';
@@ -191,6 +194,12 @@ const CardPart = ({
 
   
   useEffect(() => {
+    setShowActions(tourShowActions);
+  }, [tourShowActions]);
+
+  useEffect(() => {
+    if (tourShowActions) return undefined;
+
     const handleClickOutside = (event) => {
       if (!event.target.closest('.actions-dropdown')) {
         setShowActions(false);
@@ -204,7 +213,7 @@ const CardPart = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showActions]);
+  }, [showActions, tourShowActions]);
 
   // Превью карточки: thumb → list → full (как в каталоге)
   const listPreviewChain = useMemo(() => {
@@ -306,7 +315,10 @@ const CardPart = ({
   <React.Fragment>
     {/* Desktop table row */}
     {renderMode === 'table' && (
-    <tr className="group hover:bg-gray-50/50 transition-colors border-b border-gray-100">
+    <tr
+      className="group hover:bg-gray-50/50 transition-colors border-b border-gray-100"
+      {...(tourTargetRow ? { 'data-tour': 'my-parts-row' } : {})}
+    >
       {!isModeration && (
         <td className="w-12 px-3 py-3 align-middle">
           <label className="inline-flex h-10 w-10 cursor-pointer items-center justify-center">
@@ -355,6 +367,7 @@ const CardPart = ({
         <div ref={desktopActionsPlacement.anchorRef} className="relative actions-dropdown inline-block">
           <button
             onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
+            {...(tourTargetRow ? { 'data-tour': 'my-parts-row-actions' } : {})}
             className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
             aria-label="Действия"
           >
@@ -372,7 +385,7 @@ const CardPart = ({
 
     {/* Mobile card version */}
     {renderMode === 'card' && (
-    <div>
+    <div {...(tourTargetRow ? { 'data-tour': 'my-parts-row' } : {})}>
       <div className="flex gap-3 py-3">
         <div className="relative h-20 w-20 shrink-0">
           {!isModeration && (
@@ -432,6 +445,7 @@ const CardPart = ({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
+                {...(tourTargetRow ? { 'data-tour': 'my-parts-row-actions' } : {})}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
                 aria-label="Действия"
                 aria-expanded={showActions}
@@ -919,6 +933,8 @@ function MyParts() {
   const draftLoading = useSelector(selectDraftLoading);
   const draftError = useSelector(selectDraftError);
   const loadMoreSentinelRef = useRef(null);
+  const startTourRef = useRef(null);
+  const tourActiveRef = useRef(false);
   const moderationHydratedRef = useRef(false);
   const draftsHydratedRef = useRef(false);
   const [moderationLoading, setModerationLoading] = useState(false);
@@ -936,7 +952,11 @@ function MyParts() {
   const selectAllCheckboxRef = useRef(null);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [tourRowActionsOpen, setTourRowActionsOpen] = useState(false);
   const bulkActionsPlacement = useActionsDropdownPlacement(showBulkActions, 130);
+  const [isDesktopView, setIsDesktopView] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
+  );
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock');
   const initialUrlSearch = searchParams.get('q') || '';
   const [inStockFilters, setInStockFilters] = useState(() => ({
@@ -970,8 +990,37 @@ function MyParts() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const handleChange = (event) => setIsDesktopView(event.matches);
+    setIsDesktopView(mediaQuery.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
   const isModerationTab = activeTab === 'pending';
   const isDraftsTab = activeTab === 'drafts';
+
+  const handleTourActiveChange = useCallback((isActive) => {
+    tourActiveRef.current = isActive;
+  }, []);
+
+  const switchTabForTour = useCallback((tab) => {
+    setActiveTab(tab);
+  }, []);
+
+  const resetTourUi = useCallback(() => {
+    setActiveTab('in-stock');
+    setFiltersOpen(false);
+    setOpenFilterDropdown(null);
+    setTourRowActionsOpen(false);
+  }, []);
+
+  const handleActiveTabChange = useCallback((tab) => {
+    if (tourActiveRef.current) return;
+    setActiveTab(tab);
+  }, []);
+
   const activeFilters = isModerationTab ? moderationFilters : inStockFilters;
   const searchDraft = isModerationTab ? moderationSearchDraft : inStockSearchDraft;
   const setSearchDraft = isModerationTab ? setModerationSearchDraft : setInStockSearchDraft;
@@ -2153,12 +2202,13 @@ function MyParts() {
   return (
     <div className="mt-3 sm:mt-5">
       <div className="mb-3 flex flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1" data-tour="my-parts-header">
           <div className="flex min-w-0 flex-wrap items-center gap-2.5 sm:gap-3">
             <h1 className="text-xl font-bold text-gray-900 sm:text-[1.75rem]">Мои запчасти</h1>
             {userHasWarehouseQrAccess(user, permissionCodes) && (
               <Link
                 to="/warehouse/scan"
+                data-tour="my-parts-qr"
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:min-h-10 sm:px-3 sm:py-2"
                 title="Сканировать QR"
               >
@@ -2168,6 +2218,17 @@ function MyParts() {
                 <span className="hidden sm:inline">QR</span>
               </Link>
             )}
+            <button
+              type="button"
+              onClick={() => startTourRef.current?.({ force: true })}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:min-h-10 sm:px-3 sm:py-2"
+              title="Показать тур"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="hidden sm:inline">Показать тур</span>
+            </button>
           </div>
           {!isDraftsTab && (
             <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm sm:hidden">
@@ -2184,10 +2245,8 @@ function MyParts() {
               )}
             </div>
           )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {!isDraftsTab && (
-            <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
+            <div className="mr-1 mt-2 hidden items-center gap-4 text-left sm:flex">
               <div>
                 <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
                   {displayValue.toLocaleString('ru-RU')} ₽
@@ -2214,8 +2273,11 @@ function MyParts() {
               )}
             </div>
           )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <button
             type="button"
+            data-tour="my-parts-add"
             onClick={() => navigate('/my-parts/add')}
             className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-5 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:w-auto"
           >
@@ -2224,13 +2286,40 @@ function MyParts() {
         </div>
       </div>
 
+      <div data-tour="my-parts-tabs" className="mb-4">
       <UnderlineTabs
-        className="mb-4"
+        className=""
         ariaLabel="Статусы запчастей"
         tabs={statusTabs}
         value={activeTab}
-        onChange={setActiveTab}
+        onChange={handleActiveTabChange}
       />
+      </div>
+
+      {isDraftsTab && (
+        <div className="mb-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-gray-100 px-3 py-2.5 sm:gap-3">
+            <p className="min-w-0 flex-1 text-sm leading-relaxed text-gray-600">
+              Черновики сохраняются автоматически при заполнении формы. Можно вернуться и продолжить позже.
+            </p>
+            {!isInitialDraftsLoad && (
+              <span className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-sm tabular-nums text-gray-700 ring-1 ring-gray-200">
+                {draftItems.length}{' '}
+                {draftItems.length === 1
+                  ? 'черновик'
+                  : draftItems.length >= 2 && draftItems.length <= 4
+                    ? 'черновика'
+                    : 'черновиков'}
+              </span>
+            )}
+          </div>
+          {avitoJob && (
+            <div className="text-sm text-gray-500">
+              Avito export: {avitoJob.status} ({avitoJob.processed_count || 0}/{avitoJob.total_count || 0})
+            </div>
+          )}
+        </div>
+      )}
 
       {!isDraftsTab && (
         <div className="mb-4 space-y-3">
@@ -2238,6 +2327,7 @@ function MyParts() {
             <div className="relative min-w-0 flex-1 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
               <input
                 id="my-parts-search"
+                data-tour="my-parts-search"
                 ref={searchInputRef}
                 type="text"
                 inputMode="search"
@@ -2270,6 +2360,7 @@ function MyParts() {
             </div>
             <button
               type="button"
+              data-tour="my-parts-filters"
               onClick={() => {
                 setFiltersOpen((v) => {
                   if (v) setOpenFilterDropdown(null);
@@ -2363,7 +2454,7 @@ function MyParts() {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-gray-100 px-3 py-2.5 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-gray-100 px-3 py-2.5 sm:gap-3" data-tour="my-parts-toolbar">
             {activeTab === 'in-stock' && (
               <label className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-white px-3 text-sm text-gray-700">
                 <input
@@ -2425,12 +2516,6 @@ function MyParts() {
               )}
             </div>
           </div>
-        </div>
-      )}
-
-      {isDraftsTab && avitoJob && (
-        <div className="mb-4 text-sm text-gray-500">
-          Avito export: {avitoJob.status} ({avitoJob.processed_count || 0}/{avitoJob.total_count || 0})
         </div>
       )}
 
@@ -2506,7 +2591,7 @@ function MyParts() {
           </button>
         </div>
       ) : displayParts.length === 0 ? (
-        <div className="mt-12 text-center py-16 px-6">
+        <div className="mt-12 text-center py-16 px-6" data-tour="my-parts-row">
           <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
             <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -2539,10 +2624,12 @@ function MyParts() {
             <table className={myPartsTableClass}>
               <MyPartsStockTableColGroup />
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedDisplayParts.map((part) => (
+                {sortedDisplayParts.map((part, index) => (
                   <CardPart
                     key={part.id}
                     part={part}
+                    tourTargetRow={index === 0 && isDesktopView}
+                    tourShowActions={index === 0 && isDesktopView && tourRowActionsOpen}
                     getStorageAddress={getStorageAddress}
                     cellCatalog={storageCells}
                     onSale={(p) => handleOpenModal(p, 'sale')}
@@ -2569,11 +2656,13 @@ function MyParts() {
 
           {/* Mobile version - card layout */}
           <div className="md:hidden">
-            {sortedDisplayParts.map((part) => (
+            {sortedDisplayParts.map((part, index) => (
               <CardPart
                 key={part.id}
                 renderMode="card"
                 part={part}
+                tourTargetRow={index === 0 && !isDesktopView}
+                tourShowActions={index === 0 && !isDesktopView && tourRowActionsOpen}
                 getStorageAddress={getStorageAddress}
                 cellCatalog={storageCells}
                 onSale={(p) => handleOpenModal(p, 'sale')}
@@ -2761,7 +2850,7 @@ function MyParts() {
             </button>
           </div>
         ) : draftItems.length === 0 ? (
-          <div className="mt-12 text-center py-16 px-6">
+          <div className="mt-4 text-center py-12 px-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Черновиков нет</h2>
             <p className="text-gray-600 text-base mb-6">
               Начните добавлять запчасть — форма сохранится автоматически, даже если вы выйдете со страницы.
@@ -2820,6 +2909,19 @@ function MyParts() {
       />
 
       <ScrollToTopButton />
+
+      <MyPartsOnboarding
+        canStart={isReady && hasPermission && !isInitialMyProductsLoad}
+        hasParts={displayParts.length > 0}
+        showQrStep={userHasWarehouseQrAccess(user, permissionCodes)}
+        onOpenFilters={() => setFiltersOpen(true)}
+        onCloseFilters={() => setFiltersOpen(false)}
+        onSwitchTab={switchTabForTour}
+        onSetRowActionsOpen={setTourRowActionsOpen}
+        onResetTourUi={resetTourUi}
+        onTourActiveChange={handleTourActiveChange}
+        startTourRef={startTourRef}
+      />
     </div>
   );
 }

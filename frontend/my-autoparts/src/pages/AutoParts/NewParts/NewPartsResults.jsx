@@ -1,12 +1,12 @@
-import React, { useMemo, useCallback, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import React, { useMemo, useCallback } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectRosskoItems, selectSearchQuery, selectRosskoStatus } from '../../../redux/slices/RosskoSlice';
 import NewPartsEmptyResults from './NewPartsEmptyResults';
 import NewPartsFiltersForm from './NewPartsFiltersForm';
 import UsedPartsSearchCount from './UsedPartsSearchCount';
 import VinCatalogOffersTable from '../VinCatalog/VinCatalogOffersTable';
-import NewPartDetailDrawer from './NewPartDetailDrawer';
+import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import {
   getRosskoStockCount,
   getRosskoMinPrice,
@@ -27,11 +27,11 @@ const toSafeText = (value, fallback = '') => {
 
 const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const partsData = useSelector(selectRosskoItems);
   const searchQuery = useSelector(selectSearchQuery);
   const status = useSelector(selectRosskoStatus);
-  const [drawerPart, setDrawerPart] = useState(null);
 
   const selectedBrands = searchParams.getAll('brand');
   const priceMin = searchParams.get('vmin') || '';
@@ -98,9 +98,21 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
   const safeSearchQuery = toSafeText(searchQuery, '');
   const safeUrlQuery = toSafeText(searchParams.get('q'), '');
 
-  const handleOpenPart = useCallback(({ part }) => {
-    if (part) setDrawerPart(part);
-  }, []);
+  const backToListPath = `/autoparts/new${location.search || ''}`;
+
+  const handleOpenPart = useCallback(({ part, brand, number, detailHref }) => {
+    const href = detailHref || buildNewPartOpenPath({
+      brand,
+      article: number,
+      backTo: backToListPath,
+    });
+    navigate(href, {
+      state: {
+        backTo: backToListPath,
+        rosskoPart: part,
+      },
+    });
+  }, [backToListPath, navigate]);
 
   const renderPartsTable = (parts, emptyText) => (
     <VinCatalogOffersTable
@@ -172,12 +184,6 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
           )}
         </div>
       </div>
-
-      <NewPartDetailDrawer
-        part={drawerPart}
-        onClose={() => setDrawerPart(null)}
-        onOpenPart={handleOpenPart}
-      />
     </div>
   );
 };
