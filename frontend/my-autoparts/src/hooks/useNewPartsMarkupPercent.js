@@ -1,36 +1,26 @@
-import { useSyncExternalStore } from 'react';
 import { useSelector } from 'react-redux';
 import {
   DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
   DEFAULT_BUYER_MARKUP_PERCENT,
   DEFAULT_SELLER_MARKUP_PERCENT,
 } from '../redux/slices/PublicInfoSlice';
-import {
-  getSellerAutoserviceMode,
-  SELLER_AUTOSERVICE_MODE_AUTOSERVICE,
-  SELLER_AUTOSERVICE_MODE_SELLER,
-  subscribeSellerAutoserviceMode,
-  userHasAutoserviceOrganization,
-} from '../utils/sellerAutoserviceMode';
+import { userHasAutoserviceOrganization } from '../utils/sellerAutoserviceMode';
 
-function isSellerStaff(user) {
+function isOrganizationStaff(user) {
   if (!user) return false;
-  return Boolean(user.is_seller || user.is_director || user.is_employee);
-}
-
-function selectSellerStaffMarkup(user, mode, sellerMarkup, autoserviceMarkup) {
-  if (userHasAutoserviceOrganization(user) && mode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE) {
-    return autoserviceMarkup;
-  }
-  return sellerMarkup;
+  return Boolean(user.is_seller || user.is_director || user.is_employee || user.is_admin);
 }
 
 /**
  * Контекст наценки для новых запчастей Rossko:
- * - public: только наценка покупателя (публичный каталог)
- * - seller: наценка продавца (кабинет продавца)
+ * - public / buyer: наценка покупателя (публичный каталог)
  * - autoservice: наценка автосервиса (заказ-наряды)
- * - auto: buyer для гостей; seller/autoservice для staff организации
+ * - seller: наценка продавца
+ * - auto: по организации пользователя — автосервис > продавец > покупатель
+ *
+ * Организация с активным тарифом «Автосервис» получает наценку автосервиса везде,
+ * независимо от режима меню «Продавец/Автосервис». На паузе backend снимает флаг
+ * organization_is_autoservice, и наценка возвращается к продавцу.
  */
 export function useNewPartsMarkupPercent(context = 'auto') {
   const user = useSelector((state) => state.auth.user);
@@ -44,11 +34,6 @@ export function useNewPartsMarkupPercent(context = 'auto') {
     (state) => state.publicInfo.autoserviceMarkupPercent ?? DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
   );
   const adminCtx = useSelector((state) => state.publicInfo.adminSellerMarkupContext);
-  const sellerAutoserviceMode = useSyncExternalStore(
-    subscribeSellerAutoserviceMode,
-    getSellerAutoserviceMode,
-    () => SELLER_AUTOSERVICE_MODE_SELLER,
-  );
 
   if (context === 'public' || context === 'buyer') {
     return buyerMarkup;
@@ -58,16 +43,19 @@ export function useNewPartsMarkupPercent(context = 'auto') {
     return autoserviceMarkup;
   }
 
+  if (userHasAutoserviceOrganization(user)) {
+    return autoserviceMarkup;
+  }
+
   if (adminCtx?.markupPercent != null) {
     return adminCtx.markupPercent;
   }
 
-  if (isSellerStaff(user) && user.organization_id) {
-    return selectSellerStaffMarkup(user, sellerAutoserviceMode, sellerMarkup, autoserviceMarkup);
+  if (context === 'seller' || (isOrganizationStaff(user) && user.organization_id)) {
+    return sellerMarkup;
   }
 
-  // seller: наценка продавца даже вне организации; auto: публичный каталог — buyer
-  return context === 'seller' ? sellerMarkup : buyerMarkup;
+  return buyerMarkup;
 }
 
 export default useNewPartsMarkupPercent;

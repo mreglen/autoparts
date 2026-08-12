@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import publicInfoReducer from '../redux/slices/PublicInfoSlice';
@@ -17,7 +17,7 @@ function makeStore({ user = null, adminSellerMarkupContext = null } = {}) {
   return configureStore({
     reducer: {
       publicInfo: publicInfoReducer,
-      auth: (state = { user, adminSellerMarkupContext }) => state,
+      auth: (state = { user }) => state,
     },
     preloadedState: {
       publicInfo: {
@@ -31,21 +31,23 @@ function makeStore({ user = null, adminSellerMarkupContext = null } = {}) {
   });
 }
 
-function renderMarkup(context, options) {
+function markupFor(context, options) {
   const store = makeStore(options);
   const wrapper = ({ children }) => <Provider store={store}>{children}</Provider>;
-  return renderHook(() => useNewPartsMarkupPercent(context), { wrapper });
+  return renderHook(() => useNewPartsMarkupPercent(context), { wrapper }).result.current;
 }
 
 const guest = null;
 const buyerUser = { id: 1, is_buyer: true };
 const sellerUser = { id: 2, is_seller: true, organization_id: 'ORG-1' };
+// organization_is_autoservice приходит с backend уже с учётом паузы
 const autoserviceUser = {
   id: 3,
   is_seller: true,
   organization_id: 'ORG-2',
   organization_is_autoservice: true,
 };
+const pausedAutoserviceUser = { ...autoserviceUser, organization_is_autoservice: false };
 
 beforeEach(() => {
   setSellerAutoserviceMode(SELLER_AUTOSERVICE_MODE_SELLER);
@@ -53,49 +55,64 @@ beforeEach(() => {
 
 describe('useNewPartsMarkupPercent: наценки не влияют друг на друга', () => {
   it('гость в публичном каталоге видит наценку покупателя', () => {
-    expect(renderMarkup('auto', { user: guest }).result.current).toBe(BUYER);
+    expect(markupFor('auto', { user: guest })).toBe(BUYER);
   });
 
   it('покупатель без организации видит наценку покупателя', () => {
-    expect(renderMarkup('auto', { user: buyerUser }).result.current).toBe(BUYER);
+    expect(markupFor('auto', { user: buyerUser })).toBe(BUYER);
   });
 
   it('продавец видит наценку продавца, а не покупателя', () => {
-    expect(renderMarkup('auto', { user: sellerUser }).result.current).toBe(SELLER);
-  });
-
-  it('автосервис в режиме «Автосервис» видит наценку автосервиса', () => {
-    setSellerAutoserviceMode(SELLER_AUTOSERVICE_MODE_AUTOSERVICE);
-    expect(renderMarkup('auto', { user: autoserviceUser }).result.current).toBe(AUTOSERVICE);
-  });
-
-  it('автосервис в режиме «Продавец» видит наценку продавца', () => {
-    setSellerAutoserviceMode(SELLER_AUTOSERVICE_MODE_SELLER);
-    expect(renderMarkup('auto', { user: autoserviceUser }).result.current).toBe(SELLER);
+    expect(markupFor('auto', { user: sellerUser })).toBe(SELLER);
   });
 
   it('явные контексты игнорируют пользователя', () => {
-    expect(renderMarkup('public', { user: autoserviceUser }).result.current).toBe(BUYER);
-    expect(renderMarkup('autoservice', { user: guest }).result.current).toBe(AUTOSERVICE);
-    expect(renderMarkup('seller', { user: guest }).result.current).toBe(SELLER);
+    expect(markupFor('public', { user: autoserviceUser })).toBe(BUYER);
+    expect(markupFor('autoservice', { user: guest })).toBe(AUTOSERVICE);
+    expect(markupFor('seller', { user: guest })).toBe(SELLER);
   });
 
   it('админ в кабинете продавца видит наценку этого продавца', () => {
-    const { result } = renderMarkup('auto', {
-      user: { id: 4, is_admin: true },
-      adminSellerMarkupContext: { sellerId: 2, markupPercent: 42 },
-    });
-    expect(result.current).toBe(42);
+    expect(
+      markupFor('auto', {
+        user: { id: 4, is_admin: true },
+        adminSellerMarkupContext: { sellerId: 2, markupPercent: 42 },
+      }),
+    ).toBe(42);
+  });
+});
+
+describe('useNewPartsMarkupPercent: подключённый автосервис', () => {
+  it('получает наценку автосервиса в режиме меню «Продавец»', () => {
+    setSellerAutoserviceMode(SELLER_AUTOSERVICE_MODE_SELLER);
+    expect(markupFor('auto', { user: autoserviceUser })).toBe(AUTOSERVICE);
   });
 
-  it('переключение режима пересчитывает наценку без перемонтирования', () => {
-    const { result } = renderMarkup('auto', { user: autoserviceUser });
-    expect(result.current).toBe(SELLER);
+  it('получает наценку автосервиса в режиме меню «Автосервис»', () => {
+    setSellerAutoserviceMode(SELLER_AUTOSERVICE_MODE_AUTOSERVICE);
+    expect(markupFor('auto', { user: autoserviceUser })).toBe(AUTOSERVICE);
+  });
 
-    act(() => setSellerAutoserviceMode(SELLER_AUTOSERVICE_MODE_AUTOSERVICE));
-    expect(result.current).toBe(AUTOSERVICE);
+  it('наценка автосервиса ниже наценки продавца и покупателя', () => {
+    const autoservice = markupFor('auto', { user: autoserviceUser });
+    expect(autoservice).toBeLessThan(markupFor('auto', { user: sellerUser }));
+    expect(autoservice).toBeLessThan(markupFor('auto', { user: guest }));
+  });
 
-    act(() => setSellerAutoserviceMode(SELLER_AUTOSERVICE_MODE_SELLER));
-    expect(result.current).toBe(SELLER);
+  it('на паузе возвращается к наценке продавца', () => {
+    expect(markupFor('auto', { user: pausedAutoserviceUser })).toBe(SELLER);
+  });
+
+  it('приоритетнее контекста админа по продавцу', () => {
+    expect(
+      markupFor('auto', {
+        user: autoserviceUser,
+        adminSellerMarkupContext: { sellerId: 2, markupPercent: 42 },
+      }),
+    ).toBe(AUTOSERVICE);
+  });
+
+  it('в контексте seller тоже получает наценку автосервиса', () => {
+    expect(markupFor('seller', { user: autoserviceUser })).toBe(AUTOSERVICE);
   });
 });
