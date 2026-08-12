@@ -3,7 +3,8 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequestUnauth } from '../../utils/apiClient';
 
 const PUBLIC_INFO_CACHE_TTL_MS = 10 * 60 * 1000;
-const SITE_CONFIG_CACHE_KEY = 'sg_public_site_config_v2';
+/** v3: наценки всегда с сервера; старый v2-кэш не читаем. */
+const SITE_CONFIG_CACHE_KEY = 'sg_public_site_config_v3';
 const QUICK_LINKS_CACHE_KEY = 'sg_site_quick_links_v1';
 
 export const DEFAULT_BUYER_MARKUP_PERCENT = 30;
@@ -65,32 +66,21 @@ export function patchPublicSiteConfigCache(patch) {
   }
 }
 
-/** Сразу обновить наценки в Redux и sessionStorage после сохранения в /admin/rossko. */
-export function applyPublicMarkupSettings(dispatch, { buyerMarkupPercent, autoserviceMarkupPercent }) {
-  patchPublicSiteConfigCache({
-    new_parts_markup_percent: buyerMarkupPercent,
-    autoservice_markup_percent: autoserviceMarkupPercent,
-  });
-  dispatch(setNewPartsMarkupPercent(buyerMarkupPercent));
-  dispatch(setAutoserviceMarkupPercent(autoserviceMarkupPercent));
-}
-
 /** Публичный конфиг: телефон админ-орг., флаг «новые запчасти», наценка на новые (всегда 200). */
 export const fetchPublicSiteConfig = createAsyncThunk(
   'publicInfo/fetchPublicSiteConfig',
   async (forceRefresh = false, { rejectWithValue }) => {
-    if (!forceRefresh) {
-      const cached = readSessionCache(SITE_CONFIG_CACHE_KEY);
-      if (cached) return cached;
-    } else {
+    if (forceRefresh) {
       clearPublicSiteConfigCache();
     }
     try {
-      const suffix = forceRefresh ? `?_nc=${Date.now()}` : '';
-      const result = await apiRequestUnauth(`/auth/public-site-config${suffix}`);
+      // Наценки должны обновляться сразу после /admin/rossko — всегда ходим на сервер.
+      const result = await apiRequestUnauth(`/auth/public-site-config?_nc=${Date.now()}`);
       writeSessionCache(SITE_CONFIG_CACHE_KEY, result);
       return result;
     } catch (err) {
+      const cached = readSessionCache(SITE_CONFIG_CACHE_KEY);
+      if (cached) return cached;
       return rejectWithValue(err?.message || 'Ошибка загрузки информации');
     }
   }
@@ -263,4 +253,15 @@ export const {
   setUsedPartsPurchaseMode,
   setAdminSellerMarkupContext,
 } = publicInfoSlice.actions;
+
+/** Сразу обновить наценки в Redux и sessionStorage после сохранения в /admin/rossko. */
+export function applyPublicMarkupSettings(dispatch, { buyerMarkupPercent, autoserviceMarkupPercent }) {
+  patchPublicSiteConfigCache({
+    new_parts_markup_percent: buyerMarkupPercent,
+    autoservice_markup_percent: autoserviceMarkupPercent,
+  });
+  dispatch(setNewPartsMarkupPercent(buyerMarkupPercent));
+  dispatch(setAutoserviceMarkupPercent(autoserviceMarkupPercent));
+}
+
 export default publicInfoSlice.reducer;

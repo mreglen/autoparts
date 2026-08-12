@@ -321,7 +321,7 @@ function App() {
   const { token, user } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    dispatch(fetchPublicSiteConfig());
+    dispatch(fetchPublicSiteConfig(true));
     dispatch(fetchSiteQuickLinks());
   }, [dispatch]);
 

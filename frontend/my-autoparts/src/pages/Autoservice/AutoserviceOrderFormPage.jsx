@@ -752,7 +752,7 @@ export default function AutoserviceOrderFormPage() {
   }, [orderId, applyFormState]);
 
   useEffect(() => {
-    dispatch(fetchPublicSiteConfig());
+    dispatch(fetchPublicSiteConfig(true));
   }, [dispatch]);
 
   useEffect(() => {
