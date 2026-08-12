@@ -420,9 +420,9 @@ function OffersTable({ parts, emptyText, onOpenPart }) {
             <th className="px-3 py-2">Доставим</th>
             <th className="px-3 py-2">Остаток</th>
             <th className="px-3 py-2 pl-6 text-right">
-              <div className="inline-flex items-center justify-end gap-1">
-                <span>Цена, ₽</span>
+              <div className="inline-flex items-center justify-end gap-1.5">
                 {showStaffMarkup ? <ClientMarkupPopover /> : null}
+                <span>Цена, ₽</span>
               </div>
             </th>
             <th className="px-3 py-2 pl-2 text-right">К заказу</th>
