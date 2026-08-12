@@ -94,6 +94,7 @@ class OrgMarkupHelperTests(unittest.TestCase):
     def test_effective_markup_for_autoservice_org_is_always_autoservice(self):
         org = MagicMock()
         org.is_autoservice = True
+        org.autoservice_paused = False
         # manual override should not affect autoservice connected pricing
         org.new_parts_markup_manual = True
         org.new_parts_markup_percent = 99.0
@@ -102,6 +103,25 @@ class OrgMarkupHelperTests(unittest.TestCase):
         settings_row.autoservice_new_parts_markup_percent = 7.0
 
         self.assertEqual(effective_markup_percent(org, settings_row), 7.0)
+
+    def test_effective_markup_for_autoservice_paused_org_is_seller(self):
+        org = MagicMock()
+        org.is_autoservice = True
+        org.autoservice_paused = True
+        org.new_parts_markup_manual = False
+        org.new_parts_markup_percent = 15.0
+
+        settings_row = MagicMock()
+        settings_row.autoservice_new_parts_markup_percent = 7.0
+        settings_row.new_parts_markup_percent = 15.0
+
+        # When paused, autoservice markup should stop being applied.
+        self.assertEqual(effective_markup_percent(org, settings_row), 15.0)
+
+        # Manual override still works as for a normal seller.
+        org.new_parts_markup_manual = True
+        org.new_parts_markup_percent = 99.0
+        self.assertEqual(effective_markup_percent(org, settings_row), 99.0)
 
 
 if __name__ == "__main__":

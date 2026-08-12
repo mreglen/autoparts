@@ -47,7 +47,9 @@ def effective_markup_percent(
     3) Fallback => use global seller markup from site_settings.new_parts_markup_percent.
     """
     if org is not None and getattr(org, "is_autoservice", False):
-        return autoservice_markup_percent(settings_row)
+        # Если автосервис поставлен на паузу — считаем как для обычного продавца.
+        if not getattr(org, "autoservice_paused", False):
+            return autoservice_markup_percent(settings_row)
 
     if org is not None and getattr(org, "new_parts_markup_manual", False):
         org_value = getattr(org, "new_parts_markup_percent", None)

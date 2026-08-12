@@ -17,6 +17,7 @@ class Organization(Base):
     new_parts_markup_manual = Column(Boolean, nullable=False, default=False)
     append_marketplace_site_info = Column(Boolean, nullable=False, default=False)
     is_autoservice = Column(Boolean, nullable=False, default=False)
+    autoservice_paused = Column(Boolean, nullable=False, default=False)
     users = relationship("User", back_populates="organization")
     avito_integration = relationship(
         "OrganizationAvitoIntegration",

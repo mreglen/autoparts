@@ -12,6 +12,7 @@ class OrganizationBase(BaseModel):
     new_parts_markup_manual: Optional[bool] = False
     append_marketplace_site_info: Optional[bool] = False
     is_autoservice: Optional[bool] = False
+    autoservice_paused: Optional[bool] = False
 
 class OrganizationCreate(OrganizationBase):
     pass
@@ -27,6 +28,7 @@ class OrganizationUpdate(BaseModel):
     new_parts_markup_manual: Optional[bool] = None
     append_marketplace_site_info: Optional[bool] = None
     is_autoservice: Optional[bool] = None
+    autoservice_paused: Optional[bool] = None
 
 class Organization(OrganizationBase):
     id: str

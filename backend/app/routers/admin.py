@@ -1283,7 +1283,9 @@ def _serialize_autoservice_application(db: Session, row: AutoserviceTariffApplic
         "reviewed_at": row.reviewed_at,
         "created_at": row.created_at,
         "updated_at": row.updated_at,
-        "organization_is_autoservice": bool(getattr(org, "is_autoservice", False)) if org else False,
+        "organization_is_autoservice": (
+            bool(getattr(org, "is_autoservice", False)) and not bool(getattr(org, "autoservice_paused", False))
+        ) if org else False,
     }
 
 
@@ -1346,7 +1348,8 @@ def list_autoservice_organizations(
                 "organization_phone": org.phone,
                 "application_id": app.id if app else None,
                 "approved_at": app.reviewed_at if app else None,
-                "is_active": True,
+                "is_paused": bool(getattr(org, "autoservice_paused", False)),
+                "is_active": not bool(getattr(org, "autoservice_paused", False)),
             }
         )
     return result
@@ -1375,6 +1378,7 @@ def approve_autoservice_application(
     row.reviewed_at = now
     row.rejection_reason = None
     org.is_autoservice = True
+    org.autoservice_paused = False
     _ensure_autoservice_settings(db, org)
     db.commit()
     db.refresh(row)
@@ -1438,6 +1442,7 @@ def disable_autoservice_organization(
     if not org:
         raise HTTPException(status_code=404, detail="Организация не найдена")
     org.is_autoservice = False
+    org.autoservice_paused = False
     db.commit()
     log_audit(
         db,
@@ -1451,6 +1456,57 @@ def disable_autoservice_organization(
         entity_id=org.id,
     )
     return {"ok": True, "organization_id": org.id, "is_autoservice": False}
+
+
+@router.post("/autoservice-organizations/{org_id}/pause")
+def pause_autoservice_organization(
+    org_id: str,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Организация не найдена")
+    org.autoservice_paused = True
+    db.commit()
+    log_audit(
+        db,
+        event_type="autoservice_organization_paused",
+        category="settings",
+        summary=f"Автосервис приостановлен: {org.name}",
+        user=current_user,
+        organization_id=org.id,
+        details={"organization_id": org.id},
+        entity_type="organization",
+        entity_id=org.id,
+    )
+    return {"ok": True, "organization_id": org.id, "is_paused": True}
+
+
+@router.post("/autoservice-organizations/{org_id}/resume")
+def resume_autoservice_organization(
+    org_id: str,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Организация не найдена")
+    org.autoservice_paused = False
+    org.is_autoservice = True
+    db.commit()
+    log_audit(
+        db,
+        event_type="autoservice_organization_resumed",
+        category="settings",
+        summary=f"Автосервис возобновлён: {org.name}",
+        user=current_user,
+        organization_id=org.id,
+        details={"organization_id": org.id},
+        entity_type="organization",
+        entity_id=org.id,
+    )
+    return {"ok": True, "organization_id": org.id, "is_paused": False}
 
 
 class SellerMarkupPatch(BaseModel):

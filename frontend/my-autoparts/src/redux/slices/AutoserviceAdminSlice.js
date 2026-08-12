@@ -64,6 +64,36 @@ export const disableAutoserviceOrganization = createAsyncThunk(
   },
 );
 
+export const pauseAutoserviceOrganization = createAsyncThunk(
+  'autoserviceAdmin/pauseOrganization',
+  async (organizationId, { rejectWithValue }) => {
+    try {
+      const res = await apiRequest(
+        `/admin/autoservice-organizations/${organizationId}/pause`,
+        { method: 'POST' },
+      );
+      return res?.organization_id || organizationId;
+    } catch (error) {
+      return rejectWithValue(error?.message || 'Ошибка приостановки автосервиса');
+    }
+  },
+);
+
+export const resumeAutoserviceOrganization = createAsyncThunk(
+  'autoserviceAdmin/resumeOrganization',
+  async (organizationId, { rejectWithValue }) => {
+    try {
+      const res = await apiRequest(
+        `/admin/autoservice-organizations/${organizationId}/resume`,
+        { method: 'POST' },
+      );
+      return res?.organization_id || organizationId;
+    } catch (error) {
+      return rejectWithValue(error?.message || 'Ошибка возобновления автосервиса');
+    }
+  },
+);
+
 export const fetchMyAutoserviceApplication = createAsyncThunk(
   'autoserviceAdmin/fetchMyApplication',
   async (_, { rejectWithValue }) => {
@@ -149,6 +179,22 @@ const autoserviceAdminSlice = createSlice({
       .addCase(disableAutoserviceOrganization.fulfilled, (state, action) => {
         state.connectedOrgs = state.connectedOrgs.filter(
           (org) => org.organization_id !== action.payload,
+        );
+      })
+      .addCase(pauseAutoserviceOrganization.fulfilled, (state, action) => {
+        const orgId = action.payload;
+        state.connectedOrgs = state.connectedOrgs.map((org) =>
+          org.organization_id === orgId
+            ? { ...org, is_paused: true, is_active: false }
+            : org,
+        );
+      })
+      .addCase(resumeAutoserviceOrganization.fulfilled, (state, action) => {
+        const orgId = action.payload;
+        state.connectedOrgs = state.connectedOrgs.map((org) =>
+          org.organization_id === orgId
+            ? { ...org, is_paused: false, is_active: true }
+            : org,
         );
       })
       .addCase(fetchMyAutoserviceApplication.pending, (state) => {

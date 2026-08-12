@@ -93,6 +93,29 @@ def ensure_organizations_autoservice_columns() -> None:
     logger.info("Applied organizations is_autoservice column patch")
 
 
+def ensure_organizations_autoservice_paused_columns() -> None:
+    """Add autoservice_paused flag to organizations."""
+    inspector = inspect(engine)
+    if "organizations" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("organizations")}
+    if "autoservice_paused" in columns:
+        return
+
+    if engine.dialect.name == "postgresql":
+        stmt = (
+            "ALTER TABLE organizations ADD COLUMN autoservice_paused BOOLEAN NOT NULL DEFAULT FALSE"
+        )
+    else:
+        stmt = "ALTER TABLE organizations ADD COLUMN autoservice_paused BOOLEAN NOT NULL DEFAULT 0"
+
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+
+    logger.info("Applied organizations autoservice_paused column patch")
+
+
 def ensure_site_settings_markup_tiers_columns() -> None:
     """Add buyer and autoservice markup columns to site_settings."""
     inspector = inspect(engine)

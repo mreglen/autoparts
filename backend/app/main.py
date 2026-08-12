@@ -10,6 +10,7 @@ from app.db.schema_patches import (
     ensure_garage_order_delivery_columns,
     ensure_organization_markup_columns,
     ensure_organizations_autoservice_columns,
+    ensure_organizations_autoservice_paused_columns,
     ensure_site_settings_markup_tiers_columns,
     ensure_organization_drom_api_columns,
     ensure_stock_out_source_columns,
@@ -193,6 +194,7 @@ except Exception as e:
 try:
     ensure_organization_markup_columns()
     ensure_organizations_autoservice_columns()
+    ensure_organizations_autoservice_paused_columns()
     ensure_site_settings_markup_tiers_columns()
     ensure_organization_drom_api_columns()
     ensure_stock_out_source_columns()

@@ -27,7 +27,10 @@ def resolve_autoservice_organization_id(db: Session) -> Optional[str]:
     """Organization flagged as autoservice in organizations.is_autoservice."""
     row = (
         db.query(Organization.id)
-        .filter(Organization.is_autoservice.is_(True))
+        .filter(
+            Organization.is_autoservice.is_(True),
+            Organization.autoservice_paused.is_(False),
+        )
         .order_by(Organization.id)
         .first()
     )

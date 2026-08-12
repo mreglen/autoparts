@@ -12,6 +12,8 @@ import {
   disableAutoserviceOrganization,
   fetchAutoserviceApplications,
   fetchAutoserviceConnectedOrgs,
+  pauseAutoserviceOrganization,
+  resumeAutoserviceOrganization,
   rejectAutoserviceApplication,
 } from '../../redux/slices/AutoserviceAdminSlice';
 
@@ -38,6 +40,8 @@ export default function AutoserviceApplicationsPage() {
   const [rejectId, setRejectId] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [disableOrgId, setDisableOrgId] = useState(null);
+  const [toggleOrgId, setToggleOrgId] = useState(null);
+  const [toggleToPaused, setToggleToPaused] = useState(true);
 
   useEffect(() => {
     if (!isReady) return;
@@ -78,6 +82,17 @@ export default function AutoserviceApplicationsPage() {
     refresh();
   };
 
+  const handleTogglePause = async () => {
+    if (!toggleOrgId) return;
+    if (toggleToPaused) {
+      await dispatch(pauseAutoserviceOrganization(toggleOrgId));
+    } else {
+      await dispatch(resumeAutoserviceOrganization(toggleOrgId));
+    }
+    setToggleOrgId(null);
+    refresh();
+  };
+
   if (!isReady || !user?.is_admin) return null;
 
   const pendingApps = applications.filter((item) => item.status === 'pending');
@@ -86,7 +101,7 @@ export default function AutoserviceApplicationsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Регистрация автосервиса"
-        subtitle="Заявки на подключение тарифа и список активных автосервисов"
+        subtitle="Заявки на подключение тарифа и список подключённых автосервисов"
       />
 
       {error ? (
@@ -169,7 +184,7 @@ export default function AutoserviceApplicationsPage() {
         <h2 className="text-sg-subtitle text-ink">Подключённые автосервисы</h2>
         {connectedOrgs.length === 0 ? (
           <Card>
-            <p className="text-sm text-ink-muted">Нет активных подключений</p>
+            <p className="text-sm text-ink-muted">Нет подключённых организаций</p>
           </Card>
         ) : (
           <div className="space-y-3">
@@ -185,14 +200,44 @@ export default function AutoserviceApplicationsPage() {
                     <p className="text-xs text-ink-muted">
                       Подключён: {formatDate(org.approved_at)}
                     </p>
+                    {org.is_paused ? (
+                      <div className="mt-2">
+                        <Badge tone="warning">Пауза</Badge>
+                      </div>
+                    ) : null}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setDisableOrgId(org.organization_id)}
-                  >
-                    Отключить
-                  </Button>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {org.is_paused ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setToggleOrgId(org.organization_id);
+                          setToggleToPaused(false);
+                        }}
+                      >
+                        Возобновить
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setToggleOrgId(org.organization_id);
+                          setToggleToPaused(true);
+                        }}
+                      >
+                        Приостановить
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setDisableOrgId(org.organization_id)}
+                    >
+                      Отключить
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}
@@ -240,6 +285,18 @@ export default function AutoserviceApplicationsPage() {
         title="Отключить автосервис?"
         message="Организация потеряет доступ к автосервисному кабинету. Продавец продолжит работать как обычно."
         confirmText="Отключить"
+      />
+      <ConfirmationModal
+        isOpen={Boolean(toggleOrgId)}
+        onClose={() => setToggleOrgId(null)}
+        onConfirm={handleTogglePause}
+        title={toggleToPaused ? 'Приостановить автосервис?' : 'Возобновить автосервис?'}
+        message={
+          toggleToPaused
+            ? 'Автосервис будет приостановлен: наценка на новые запчасти станет как у обычного продавца.'
+            : 'Автосервис будет возобновлен: наценка на новые запчасти станет автосервисной (7%).'
+        }
+        confirmText={toggleToPaused ? 'Приостановить' : 'Возобновить'}
       />
     </div>
   );

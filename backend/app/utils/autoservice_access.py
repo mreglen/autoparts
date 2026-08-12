@@ -23,7 +23,7 @@ def require_autoservice_enabled(db: Session) -> None:
 def require_autoservice_org_id(db: Session, user: User | None = None) -> str:
     if user and user.organization_id and not user.is_admin:
         org = db.query(Organization).filter(Organization.id == user.organization_id).first()
-        if org and getattr(org, "is_autoservice", False):
+        if org and getattr(org, "is_autoservice", False) and not getattr(org, "autoservice_paused", False):
             return org.id
     org_id = resolve_autoservice_organization_id(db)
     if not org_id:
@@ -45,7 +45,7 @@ def require_autoservice_staff(db: Session, user: User) -> str:
             detail="Нет доступа к записям автосервиса",
         )
     org = db.query(Organization).filter(Organization.id == org_id).first()
-    if not org or not getattr(org, "is_autoservice", False):
+    if not org or not getattr(org, "is_autoservice", False) or getattr(org, "autoservice_paused", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Автосервис не подключён для вашей организации",

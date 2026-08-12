@@ -70,6 +70,7 @@ def build_user_profile_response(user: User) -> dict:
         "organization_phone": user.organization.phone if user.organization_id and user.organization else None,
         "organization_is_autoservice": bool(
             getattr(user.organization, "is_autoservice", False)
+            and not getattr(user.organization, "autoservice_paused", False)
         ) if user.organization_id and user.organization else False,
         "notification_prefs": NotificationPrefs.model_validate(
             get_user_notification_prefs(user)
