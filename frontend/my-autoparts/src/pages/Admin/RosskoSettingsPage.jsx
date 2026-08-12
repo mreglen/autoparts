@@ -9,6 +9,7 @@ import {
     saveRosskoMarkupSettings,
     clearRosskoAdminErrors,
 } from '../../redux/slices/RosskoAdminSlice';
+import { applyPublicMarkupSettings } from '../../redux/slices/PublicInfoSlice';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
@@ -211,7 +212,11 @@ export default function RosskoSettingsPage() {
             autoservice_markup_percent: Number(markupForm.autoservice_markup_percent),
         };
         try {
-            await dispatch(saveRosskoMarkupSettings(payload)).unwrap();
+            const saved = await dispatch(saveRosskoMarkupSettings(payload)).unwrap();
+            applyPublicMarkupSettings(dispatch, {
+                buyerMarkupPercent: saved.buyer_markup_percent,
+                autoserviceMarkupPercent: saved.autoservice_markup_percent,
+            });
             setNotification({ type: 'success', message: 'Наценки сохранены' });
         } catch (err) {
             setNotification({ type: 'error', message: err || 'Не удалось сохранить наценки' });

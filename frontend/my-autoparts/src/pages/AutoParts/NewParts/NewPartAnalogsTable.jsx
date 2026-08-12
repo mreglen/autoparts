@@ -161,7 +161,7 @@ function AnalogRow({ part, markupPercent, onNavigateCreate }) {
 }
 
 export default function NewPartAnalogsTable({ analogParts, loading, onNavigateCreate }) {
-  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 15);
+  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 30);
 
   if (loading) {
     return <p className="text-sm text-ink-muted">Загрузка аналогов…</p>;

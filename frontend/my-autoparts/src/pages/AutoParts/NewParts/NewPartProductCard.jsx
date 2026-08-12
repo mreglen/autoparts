@@ -136,9 +136,9 @@ function NewPartProductCard({
   const location = useLocation();
   const cartLoading = useSelector(selectCartLoading);
   const cart = useSelector(selectCart);
-  const adminSellerMarkupContext = useSelector((state) => state.publicInfo.adminSellerMarkupContext);
-  const globalMarkupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 15);
-  const newPartsMarkupPercent = adminSellerMarkupContext?.markupPercent ?? globalMarkupPercent;
+  const newPartsMarkupPercent = useSelector(
+    (state) => state.publicInfo.newPartsMarkupPercent ?? 30,
+  );
 
   const [showDetails, setShowDetails] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);

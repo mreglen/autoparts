@@ -127,7 +127,7 @@ export default function NewPartDetailPage() {
   const { cardId: cardIdParam } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 15);
+  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 30);
   const [rosskoData, setRosskoData] = useState(null);
   const [rosskoStatus, setRosskoStatus] = useState('idle');
 

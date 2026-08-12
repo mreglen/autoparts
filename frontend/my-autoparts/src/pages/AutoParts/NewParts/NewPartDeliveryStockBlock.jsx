@@ -33,7 +33,7 @@ function StockMobileCard({ stock, markupPercent }) {
 }
 
 export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
-  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 15);
+  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 30);
   const summary = summarizeStocks(stocks, markupPercent);
 
   if (!summary.active.length) {

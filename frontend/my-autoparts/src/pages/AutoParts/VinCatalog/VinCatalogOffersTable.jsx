@@ -341,9 +341,9 @@ function PartOfferGroup({ group, markupPercent }) {
 }
 
 function OffersTable({ parts, emptyText }) {
-  const adminSellerMarkupContext = useSelector((state) => state.publicInfo.adminSellerMarkupContext);
-  const globalMarkupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 15);
-  const markupPercent = adminSellerMarkupContext?.markupPercent ?? globalMarkupPercent;
+  const markupPercent = useSelector(
+    (state) => state.publicInfo.newPartsMarkupPercent ?? 30,
+  );
 
   const groups = useMemo(() => buildPartGroups(parts), [parts]);
 

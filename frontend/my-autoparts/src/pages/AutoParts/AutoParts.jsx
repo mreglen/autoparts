@@ -39,6 +39,7 @@ import { buildAutoPartsSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import { looksLikeVin, normalizeVinOrNull } from '../../utils/laximoVin';
+import { fetchPublicSiteConfig } from '../../redux/slices/PublicInfoSlice';
 
 const UsedPartsList = React.lazy(() => import('./UsedParts/UsedPartsList'));
 const NewPartsResults = React.lazy(() => import('./NewParts/NewPartsResults'));
@@ -52,6 +53,11 @@ function AutoParts() {
   const dispatch = useDispatch();
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const status = useSelector(selectRosskoStatus);
+
+  useEffect(() => {
+    if (!showNewAutoparts || !location.pathname.includes('/autoparts/new')) return;
+    dispatch(fetchPublicSiteConfig(true));
+  }, [dispatch, showNewAutoparts, location.pathname]);
   const error = useSelector(selectRosskoError);
   const searchQuery = useSelector(selectSearchQuery);
   

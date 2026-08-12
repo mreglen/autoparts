@@ -65,6 +65,16 @@ export function patchPublicSiteConfigCache(patch) {
   }
 }
 
+/** Сразу обновить наценки в Redux и sessionStorage после сохранения в /admin/rossko. */
+export function applyPublicMarkupSettings(dispatch, { buyerMarkupPercent, autoserviceMarkupPercent }) {
+  patchPublicSiteConfigCache({
+    new_parts_markup_percent: buyerMarkupPercent,
+    autoservice_markup_percent: autoserviceMarkupPercent,
+  });
+  dispatch(setNewPartsMarkupPercent(buyerMarkupPercent));
+  dispatch(setAutoserviceMarkupPercent(autoserviceMarkupPercent));
+}
+
 /** Публичный конфиг: телефон админ-орг., флаг «новые запчасти», наценка на новые (всегда 200). */
 export const fetchPublicSiteConfig = createAsyncThunk(
   'publicInfo/fetchPublicSiteConfig',
