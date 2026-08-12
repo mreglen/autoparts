@@ -7,6 +7,7 @@ from app.utils.org_markup import (
     autoservice_markup_percent,
     buyer_markup_percent,
     global_markup_percent,
+    effective_markup_percent,
 )
 
 
@@ -89,6 +90,18 @@ class OrgMarkupHelperTests(unittest.TestCase):
         self.assertEqual(buyer_markup_percent(row), 28.5)
         self.assertEqual(global_markup_percent(row), 12.0)
         self.assertEqual(autoservice_markup_percent(row), 6.0)
+
+    def test_effective_markup_for_autoservice_org_is_always_autoservice(self):
+        org = MagicMock()
+        org.is_autoservice = True
+        # manual override should not affect autoservice connected pricing
+        org.new_parts_markup_manual = True
+        org.new_parts_markup_percent = 99.0
+
+        settings_row = MagicMock()
+        settings_row.autoservice_new_parts_markup_percent = 7.0
+
+        self.assertEqual(effective_markup_percent(org, settings_row), 7.0)
 
 
 if __name__ == "__main__":

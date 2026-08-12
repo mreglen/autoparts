@@ -34,8 +34,21 @@ def autoservice_markup_percent(settings_row: Optional[SiteSettings]) -> float:
     return float(value) if value is not None else DEFAULT_AUTOSERVICE_MARKUP_PERCENT
 
 
-def effective_markup_percent(org: Optional[Organization], settings_row: Optional[SiteSettings] = None) -> float:
-    """Manual org override wins; otherwise use global seller markup."""
+def effective_markup_percent(
+    org: Optional[Organization],
+    settings_row: Optional[SiteSettings] = None,
+) -> float:
+    """
+    Choose markup percent for "seller context" pricing (used when we show markup inside seller workspace).
+
+    Priority:
+    1) If organization is autoservice => always use autoservice markup (connected tariff rules).
+    2) If manual override is enabled => use organization's manual markup.
+    3) Fallback => use global seller markup from site_settings.new_parts_markup_percent.
+    """
+    if org is not None and getattr(org, "is_autoservice", False):
+        return autoservice_markup_percent(settings_row)
+
     if org is not None and getattr(org, "new_parts_markup_manual", False):
         org_value = getattr(org, "new_parts_markup_percent", None)
         if org_value is not None:
