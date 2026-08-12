@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import {
     fetchRosskoCheckoutDetails,
     fetchRosskoSettings,
+    fetchRosskoMarkupSettings,
     saveRosskoSettings,
+    saveRosskoMarkupSettings,
     clearRosskoAdminErrors,
 } from '../../redux/slices/RosskoAdminSlice';
 import { useAuthReady } from '../../hooks/useAuthReady';
@@ -20,11 +22,15 @@ export default function RosskoSettingsPage() {
     const {
         checkoutDetails,
         settings,
+        markupSettings,
         loadingDetails,
         loadingSettings,
+        loadingMarkupSettings,
         saving,
+        savingMarkup,
         error,
         saveError,
+        markupSaveError,
     } = useSelector((state) => state.rosskoAdmin);
 
     const [form, setForm] = useState({
@@ -44,6 +50,11 @@ export default function RosskoSettingsPage() {
         requires_address: true,
         requires_requisite: false,
     });
+    const [markupForm, setMarkupForm] = useState({
+        buyer_markup_percent: '30',
+        seller_markup_percent: '15',
+        autoservice_markup_percent: '7',
+    });
     const [notification, setNotification] = useState(null);
 
     useEffect(() => {
@@ -55,7 +66,17 @@ export default function RosskoSettingsPage() {
         dispatch(clearRosskoAdminErrors());
         dispatch(fetchRosskoCheckoutDetails());
         dispatch(fetchRosskoSettings());
+        dispatch(fetchRosskoMarkupSettings());
     }, [isReady, user, navigate, dispatch]);
+
+    useEffect(() => {
+        if (!markupSettings) return;
+        setMarkupForm({
+            buyer_markup_percent: String(markupSettings.buyer_markup_percent ?? 30),
+            seller_markup_percent: String(markupSettings.seller_markup_percent ?? 15),
+            autoservice_markup_percent: String(markupSettings.autoservice_markup_percent ?? 7),
+        });
+    }, [markupSettings]);
 
     useEffect(() => {
         if (!settings) return;
@@ -174,6 +195,29 @@ export default function RosskoSettingsPage() {
         }
     };
 
+    const canSaveMarkup = useMemo(() => {
+        const buyer = Number(markupForm.buyer_markup_percent);
+        const seller = Number(markupForm.seller_markup_percent);
+        const autoservice = Number(markupForm.autoservice_markup_percent);
+        return [buyer, seller, autoservice].every((n) => Number.isFinite(n) && n >= 0);
+    }, [markupForm]);
+
+    const handleSaveMarkup = async () => {
+        if (!canSaveMarkup || savingMarkup) return;
+        setNotification(null);
+        const payload = {
+            buyer_markup_percent: Number(markupForm.buyer_markup_percent),
+            seller_markup_percent: Number(markupForm.seller_markup_percent),
+            autoservice_markup_percent: Number(markupForm.autoservice_markup_percent),
+        };
+        try {
+            await dispatch(saveRosskoMarkupSettings(payload)).unwrap();
+            setNotification({ type: 'success', message: 'Наценки сохранены' });
+        } catch (err) {
+            setNotification({ type: 'error', message: err || 'Не удалось сохранить наценки' });
+        }
+    };
+
     if (!isReady) return <AuthLoadingScreen />;
 
     const loading = loadingDetails || loadingSettings;
@@ -199,9 +243,9 @@ export default function RosskoSettingsPage() {
                 </button>
             </div>
 
-            {(error || saveError) && (
+            {(error || saveError || markupSaveError) && (
                 <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                    {error || saveError}
+                    {error || saveError || markupSaveError}
                 </div>
             )}
             {notification && (
@@ -392,6 +436,88 @@ export default function RosskoSettingsPage() {
                     </button>
                 </div>
             )}
+
+            <div className="mt-8 space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Наценки для цен / автосервиса</h2>
+                    <p className="mt-1 text-sm text-gray-600">
+                        Покупатели — публичные цены новых запчастей. Продавцы — рабочая наценка в кабинете
+                        продавца. Автосервис — значение по умолчанию в заказах автосервиса.
+                    </p>
+                </div>
+
+                {loadingMarkupSettings ? (
+                    <p className="text-gray-600">Загрузка наценок…</p>
+                ) : (
+                    <>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700">
+                                    Покупатели, %
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    className={inputClass}
+                                    value={markupForm.buyer_markup_percent}
+                                    onChange={(e) =>
+                                        setMarkupForm((prev) => ({
+                                            ...prev,
+                                            buyer_markup_percent: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700">
+                                    Продавцы, %
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    className={inputClass}
+                                    value={markupForm.seller_markup_percent}
+                                    onChange={(e) =>
+                                        setMarkupForm((prev) => ({
+                                            ...prev,
+                                            seller_markup_percent: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700">
+                                    Автосервис, %
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    className={inputClass}
+                                    value={markupForm.autoservice_markup_percent}
+                                    onChange={(e) =>
+                                        setMarkupForm((prev) => ({
+                                            ...prev,
+                                            autoservice_markup_percent: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={handleSaveMarkup}
+                            disabled={!canSaveMarkup || savingMarkup}
+                            className="inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                            {savingMarkup ? 'Сохранение…' : 'Сохранить наценки'}
+                        </button>
+                    </>
+                )}
+            </div>
         </div>
     );
 }

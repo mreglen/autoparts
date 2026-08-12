@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.models.user import User
 from app.models.organization import Organization
 from app.models.pending_seller import PendingSeller
+from app.models.autoservice_tariff_application import AutoserviceTariffApplication
+from app.models.autoservice_settings import AutoserviceSettings
 from app.models.product import Product
 from app.models.stock_out import StockOut
 from app.services.stock_out_sales import list_warehouse_sales, warehouse_sales_totals
@@ -98,7 +100,7 @@ from app.services.deploy_update_service import (
 import math
 import secrets
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -1258,6 +1260,197 @@ def reject_pending_seller(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Ошибка при отклонении заявки")
+
+
+def _serialize_autoservice_application(db: Session, row: AutoserviceTariffApplication) -> dict:
+    org = db.query(Organization).filter(Organization.id == row.organization_id).first()
+    applicant = db.query(User).filter(User.id == row.applicant_user_id).first()
+    applicant_name = None
+    if applicant:
+        parts = [applicant.last_name or "", applicant.first_name or "", applicant.patronymic or ""]
+        applicant_name = " ".join(p for p in parts if p).strip() or applicant.email
+    return {
+        "id": row.id,
+        "organization_id": row.organization_id,
+        "organization_name": org.name if org else None,
+        "applicant_user_id": row.applicant_user_id,
+        "applicant_name": applicant_name,
+        "contact_name": row.contact_name,
+        "contact_phone": row.contact_phone,
+        "message": row.message,
+        "status": row.status,
+        "rejection_reason": row.rejection_reason,
+        "reviewed_at": row.reviewed_at,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+        "organization_is_autoservice": bool(getattr(org, "is_autoservice", False)) if org else False,
+    }
+
+
+def _ensure_autoservice_settings(db: Session, org: Organization) -> None:
+    existing = (
+        db.query(AutoserviceSettings)
+        .filter(AutoserviceSettings.organization_id == org.id)
+        .first()
+    )
+    if existing:
+        return
+    db.add(
+        AutoserviceSettings(
+            organization_id=org.id,
+            public_name=org.name,
+            public_description=org.description,
+        )
+    )
+
+
+@router.get("/autoservice-applications")
+def list_autoservice_applications(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(AutoserviceTariffApplication)
+        .order_by(AutoserviceTariffApplication.created_at.desc())
+        .all()
+    )
+    return [_serialize_autoservice_application(db, row) for row in rows]
+
+
+@router.get("/autoservice-organizations")
+def list_autoservice_organizations(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    orgs = (
+        db.query(Organization)
+        .filter(Organization.is_autoservice.is_(True))
+        .order_by(Organization.name)
+        .all()
+    )
+    result = []
+    for org in orgs:
+        app = (
+            db.query(AutoserviceTariffApplication)
+            .filter(
+                AutoserviceTariffApplication.organization_id == org.id,
+                AutoserviceTariffApplication.status == "approved",
+            )
+            .order_by(AutoserviceTariffApplication.reviewed_at.desc())
+            .first()
+        )
+        result.append(
+            {
+                "organization_id": org.id,
+                "organization_name": org.name,
+                "organization_phone": org.phone,
+                "application_id": app.id if app else None,
+                "approved_at": app.reviewed_at if app else None,
+                "is_active": True,
+            }
+        )
+    return result
+
+
+@router.post("/autoservice-applications/{application_id}/approve")
+def approve_autoservice_application(
+    application_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(AutoserviceTariffApplication)
+        .filter(AutoserviceTariffApplication.id == application_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    org = db.query(Organization).filter(Organization.id == row.organization_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Организация не найдена")
+
+    now = datetime.now(timezone.utc)
+    row.status = "approved"
+    row.reviewed_by_user_id = current_user.id
+    row.reviewed_at = now
+    row.rejection_reason = None
+    org.is_autoservice = True
+    _ensure_autoservice_settings(db, org)
+    db.commit()
+    db.refresh(row)
+    log_audit(
+        db,
+        event_type="autoservice_application_approved",
+        category="settings",
+        summary=f"Автосервис подключён: {org.name}",
+        user=current_user,
+        organization_id=org.id,
+        details={"application_id": row.id, "organization_id": org.id},
+        entity_type="autoservice_tariff_application",
+        entity_id=str(row.id),
+    )
+    return _serialize_autoservice_application(db, row)
+
+
+@router.post("/autoservice-applications/{application_id}/reject")
+def reject_autoservice_application(
+    application_id: int,
+    request: RejectSellerRequest,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(AutoserviceTariffApplication)
+        .filter(AutoserviceTariffApplication.id == application_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+
+    now = datetime.now(timezone.utc)
+    row.status = "rejected"
+    row.reviewed_by_user_id = current_user.id
+    row.reviewed_at = now
+    row.rejection_reason = request.reason or "Причина не указана"
+    db.commit()
+    db.refresh(row)
+    log_audit(
+        db,
+        event_type="autoservice_application_rejected",
+        category="settings",
+        summary=f"Заявка на автосервис отклонена: {row.organization_id}",
+        user=current_user,
+        organization_id=row.organization_id,
+        details={"application_id": row.id, "reason": row.rejection_reason},
+        entity_type="autoservice_tariff_application",
+        entity_id=str(row.id),
+    )
+    return _serialize_autoservice_application(db, row)
+
+
+@router.post("/autoservice-organizations/{org_id}/disable")
+def disable_autoservice_organization(
+    org_id: str,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Организация не найдена")
+    org.is_autoservice = False
+    db.commit()
+    log_audit(
+        db,
+        event_type="autoservice_organization_disabled",
+        category="settings",
+        summary=f"Автосервис отключён: {org.name}",
+        user=current_user,
+        organization_id=org.id,
+        details={"organization_id": org.id},
+        entity_type="organization",
+        entity_id=org.id,
+    )
+    return {"ok": True, "organization_id": org.id, "is_autoservice": False}
 
 
 class SellerMarkupPatch(BaseModel):

@@ -175,8 +175,11 @@ class PublicSiteConfigFlagTests(unittest.TestCase):
             "app.routers.auth.get_or_create_site_settings",
             return_value=settings_row,
         ), patch(
-            "app.routers.auth.global_markup_percent",
-            return_value=15,
+            "app.routers.auth.buyer_markup_percent",
+            return_value=30,
+        ), patch(
+            "app.routers.auth.autoservice_markup_percent",
+            return_value=7,
         ), patch(
             "app.routers.auth.resolve_autoservice_organization_id",
             return_value=None,
@@ -192,8 +195,11 @@ class PublicSiteConfigFlagTests(unittest.TestCase):
             "app.routers.auth.get_or_create_site_settings",
             return_value=settings_row,
         ), patch(
-            "app.routers.auth.global_markup_percent",
-            return_value=15,
+            "app.routers.auth.buyer_markup_percent",
+            return_value=30,
+        ), patch(
+            "app.routers.auth.autoservice_markup_percent",
+            return_value=7,
         ), patch(
             "app.routers.auth.resolve_autoservice_organization_id",
             return_value=None,

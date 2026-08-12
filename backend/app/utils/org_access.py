@@ -24,9 +24,13 @@ def org_has_admin_director(db: Session, org_id: Optional[str]) -> bool:
 
 
 def resolve_autoservice_organization_id(db: Session) -> Optional[str]:
-    """First organization that has an admin director (is_director && is_admin)."""
-    org_ids = [row[0] for row in db.query(Organization.id).order_by(Organization.id).all()]
-    for org_id in org_ids:
-        if org_has_admin_director(db, org_id):
-            return org_id
+    """Organization flagged as autoservice in organizations.is_autoservice."""
+    row = (
+        db.query(Organization.id)
+        .filter(Organization.is_autoservice.is_(True))
+        .order_by(Organization.id)
+        .first()
+    )
+    if row:
+        return row[0]
     return None

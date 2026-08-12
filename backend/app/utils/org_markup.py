@@ -7,22 +7,41 @@ from app.models.organization import Organization
 from app.models.site_settings import SiteSettings
 from app.utils.site_settings_db import get_or_create_site_settings
 
+DEFAULT_BUYER_MARKUP_PERCENT = 30.0
+DEFAULT_SELLER_MARKUP_PERCENT = 15.0
+DEFAULT_AUTOSERVICE_MARKUP_PERCENT = 7.0
+
 
 def global_markup_percent(settings_row: Optional[SiteSettings]) -> float:
+    """Seller markup from site settings."""
     if settings_row is None:
-        return 15.0
+        return DEFAULT_SELLER_MARKUP_PERCENT
     value = getattr(settings_row, "new_parts_markup_percent", None)
-    return float(value) if value is not None else 15.0
+    return float(value) if value is not None else DEFAULT_SELLER_MARKUP_PERCENT
+
+
+def buyer_markup_percent(settings_row: Optional[SiteSettings]) -> float:
+    if settings_row is None:
+        return DEFAULT_BUYER_MARKUP_PERCENT
+    value = getattr(settings_row, "buyer_new_parts_markup_percent", None)
+    return float(value) if value is not None else DEFAULT_BUYER_MARKUP_PERCENT
+
+
+def autoservice_markup_percent(settings_row: Optional[SiteSettings]) -> float:
+    if settings_row is None:
+        return DEFAULT_AUTOSERVICE_MARKUP_PERCENT
+    value = getattr(settings_row, "autoservice_new_parts_markup_percent", None)
+    return float(value) if value is not None else DEFAULT_AUTOSERVICE_MARKUP_PERCENT
 
 
 def effective_markup_percent(org: Optional[Organization], settings_row: Optional[SiteSettings] = None) -> float:
-    """Manual org override wins; otherwise use global site markup."""
+    """Manual org override wins; otherwise use global seller markup."""
     if org is not None and getattr(org, "new_parts_markup_manual", False):
         org_value = getattr(org, "new_parts_markup_percent", None)
         if org_value is not None:
             return float(org_value)
     if settings_row is None:
-        return 15.0
+        return DEFAULT_SELLER_MARKUP_PERCENT
     return global_markup_percent(settings_row)
 
 

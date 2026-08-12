@@ -3,8 +3,20 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequestUnauth } from '../../utils/apiClient';
 
 const PUBLIC_INFO_CACHE_TTL_MS = 10 * 60 * 1000;
-const SITE_CONFIG_CACHE_KEY = 'sg_public_site_config_v1';
+const SITE_CONFIG_CACHE_KEY = 'sg_public_site_config_v2';
 const QUICK_LINKS_CACHE_KEY = 'sg_site_quick_links_v1';
+
+export const DEFAULT_BUYER_MARKUP_PERCENT = 30;
+export const DEFAULT_AUTOSERVICE_MARKUP_PERCENT = 7;
+
+export function parseMarkupPercent(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+export function parseAutoserviceMarkupPercent(payload) {
+  return parseMarkupPercent(payload?.autoservice_markup_percent, DEFAULT_AUTOSERVICE_MARKUP_PERCENT);
+}
 
 function readSessionCache(key) {
   try {
@@ -103,7 +115,8 @@ const publicInfoSlice = createSlice({
         showWarehouseInventory: false,
         showAutoservice: false,
         autoserviceOrganizationId: null,
-        newPartsMarkupPercent: 15,
+        newPartsMarkupPercent: DEFAULT_BUYER_MARKUP_PERCENT,
+        autoserviceMarkupPercent: DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
         usedPartsPurchaseMode: 'both',
         roundProductPrices: false,
         laximoVinCatalogAvailable: false,
@@ -122,7 +135,8 @@ const publicInfoSlice = createSlice({
       state.showWarehouseInventory = false;
       state.showAutoservice = false;
       state.autoserviceOrganizationId = null;
-      state.newPartsMarkupPercent = 15;
+      state.newPartsMarkupPercent = DEFAULT_BUYER_MARKUP_PERCENT;
+      state.autoserviceMarkupPercent = DEFAULT_AUTOSERVICE_MARKUP_PERCENT;
       state.usedPartsPurchaseMode = 'both';
       state.roundProductPrices = false;
       state.laximoVinCatalogAvailable = false;
@@ -147,9 +161,13 @@ const publicInfoSlice = createSlice({
       state.autoserviceOrganizationId = action.payload || null;
     },
     setNewPartsMarkupPercent: (state, action) => {
-      const n = Number(action.payload);
-      state.newPartsMarkupPercent =
-        Number.isFinite(n) && n >= 0 ? n : 15;
+      state.newPartsMarkupPercent = parseMarkupPercent(action.payload, DEFAULT_BUYER_MARKUP_PERCENT);
+    },
+    setAutoserviceMarkupPercent: (state, action) => {
+      state.autoserviceMarkupPercent = parseMarkupPercent(
+        action.payload,
+        DEFAULT_AUTOSERVICE_MARKUP_PERCENT
+      );
     },
     setRoundProductPrices: (state, action) => {
       state.roundProductPrices = action.payload === true;
@@ -178,9 +196,11 @@ const publicInfoSlice = createSlice({
         state.showWarehouseInventory = p?.show_warehouse_inventory === true;
         state.showAutoservice = p?.show_autoservice === true;
         state.autoserviceOrganizationId = p?.autoservice_organization_id || null;
-        const m = Number(p?.new_parts_markup_percent);
-        state.newPartsMarkupPercent =
-          Number.isFinite(m) && m >= 0 ? m : 15;
+        state.newPartsMarkupPercent = parseMarkupPercent(
+          p?.new_parts_markup_percent,
+          DEFAULT_BUYER_MARKUP_PERCENT
+        );
+        state.autoserviceMarkupPercent = parseAutoserviceMarkupPercent(p);
         const mode = p?.used_parts_purchase_mode;
         state.usedPartsPurchaseMode =
           mode === 'cart_only' || mode === 'cta_only' || mode === 'both' ? mode : 'both';
@@ -201,7 +221,8 @@ const publicInfoSlice = createSlice({
         state.showNewAutoparts = true;
         state.showSiteReviews = true;
         state.showYandexBadge = true;
-        state.newPartsMarkupPercent = 15;
+        state.newPartsMarkupPercent = DEFAULT_BUYER_MARKUP_PERCENT;
+        state.autoserviceMarkupPercent = DEFAULT_AUTOSERVICE_MARKUP_PERCENT;
         state.laximoVinCatalogAvailable = false;
       })
       .addCase(fetchSiteQuickLinks.pending, (state) => {
@@ -227,6 +248,7 @@ export const {
   setShowAutoservice,
   setAutoserviceOrganizationId,
   setNewPartsMarkupPercent,
+  setAutoserviceMarkupPercent,
   setRoundProductPrices,
   setUsedPartsPurchaseMode,
   setAdminSellerMarkupContext,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
@@ -16,6 +17,10 @@ import {
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import { getRosskoMinPrice, getRosskoParts } from '../AutoParts/NewParts/rosskoHelpers';
+import {
+  DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
+  fetchPublicSiteConfig,
+} from '../../redux/slices/PublicInfoSlice';
 
 const pillInputClass =
   'mt-1 block h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
@@ -112,12 +117,12 @@ function emptyClientPart() {
   return { title: '', qty: 1 };
 }
 
-function emptyShopPart(overrides = {}) {
+function emptyShopPart(overrides = {}, defaultMarkupPercent = DEFAULT_AUTOSERVICE_MARKUP_PERCENT) {
   return {
     title: '',
     qty: 1,
     unit_price: '0',
-    markup_percent: '5',
+    markup_percent: String(defaultMarkupPercent),
     source: 'manual',
     product_id: null,
     rossko_brand: '',
@@ -620,7 +625,7 @@ function mapOrderToFormState(order) {
           title: p.title || '',
           qty: p.qty || 1,
           unit_price: String(p.unit_price ?? '0'),
-          markup_percent: String(p.markup_percent ?? '5'),
+          markup_percent: String(p.markup_percent ?? DEFAULT_AUTOSERVICE_MARKUP_PERCENT),
           source: p.source || 'manual',
           product_id: p.product_id || null,
           rossko_brand: p.rossko_brand || '',
@@ -638,7 +643,15 @@ export default function AutoserviceOrderFormPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   const { isReady, isAuthenticated, user } = useAuthReady();
+  const autoserviceMarkupPercent = useSelector(
+    (state) => state.publicInfo.autoserviceMarkupPercent ?? DEFAULT_AUTOSERVICE_MARKUP_PERCENT
+  );
+  const makeEmptyShopPart = useCallback(
+    (overrides = {}) => emptyShopPart(overrides, autoserviceMarkupPercent),
+    [autoserviceMarkupPercent]
+  );
 
   const isCreate = location.pathname.endsWith('/new');
   const isEdit = !isCreate && Boolean(orderId);
@@ -737,6 +750,10 @@ export default function AutoserviceOrderFormPage() {
       setOrderLoading(false);
     }
   }, [orderId, applyFormState]);
+
+  useEffect(() => {
+    dispatch(fetchPublicSiteConfig());
+  }, [dispatch]);
 
   useEffect(() => {
     if (isReady && isAuthenticated) {
@@ -1000,7 +1017,7 @@ export default function AutoserviceOrderFormPage() {
   const pickWarehouse = (item) => {
     setShopParts((prev) => [
       ...prev,
-      emptyShopPart({
+      makeEmptyShopPart({
         title: item.title || '',
         unit_price: String(item.price ?? 0),
         source: 'warehouse',
@@ -1016,7 +1033,7 @@ export default function AutoserviceOrderFormPage() {
       || 'Rossko';
     setShopParts((prev) => [
       ...prev,
-      emptyShopPart({
+      makeEmptyShopPart({
         title: title.slice(0, 255),
         unit_price: String(item.price ?? 0),
         source: 'rossko',
@@ -1482,7 +1499,7 @@ export default function AutoserviceOrderFormPage() {
           <div className="mb-4 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => setShopParts((prev) => [...prev, emptyShopPart()])}
+              onClick={() => setShopParts((prev) => [...prev, makeEmptyShopPart()])}
               className="inline-flex h-9 items-center rounded-full bg-gray-100 px-4 text-sm font-medium text-ink-soft transition hover:bg-gray-200"
             >
               Вручную

@@ -54,6 +54,7 @@ class UserResponse(BaseModel):
     organization_id: Optional[str] = None
     organization_name: Optional[str] = None
     organization_phone: Optional[str] = None
+    organization_is_autoservice: bool = False
     notification_prefs: NotificationPrefs = NotificationPrefs()
 
     class Config:

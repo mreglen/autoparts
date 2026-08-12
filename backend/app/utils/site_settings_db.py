@@ -14,6 +14,8 @@ def get_or_create_site_settings(db: Session) -> SiteSettings:
             show_new_autoparts=True,
             show_site_reviews=True,
             new_parts_markup_percent=15.0,
+            buyer_new_parts_markup_percent=30.0,
+            autoservice_new_parts_markup_percent=7.0,
         )
         db.add(row)
         db.commit()

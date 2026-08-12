@@ -140,6 +140,9 @@ export default function ProfileWithMenuLayout() {
         adminMenuMode,
         setAdminMenuMode,
         showAdminMenuSwitch,
+        sellerAutoserviceMode,
+        setSellerAutoserviceMode,
+        showSellerAutoserviceSwitch,
     } = useMobileMenuShell(user);
 
     useEffect(() => {
@@ -202,6 +205,9 @@ export default function ProfileWithMenuLayout() {
                 showAdminMenuSwitch={showAdminMenuSwitch}
                 adminMenuMode={adminMenuMode}
                 onAdminMenuModeChange={setAdminMenuMode}
+                showSellerAutoserviceSwitch={showSellerAutoserviceSwitch}
+                sellerAutoserviceMode={sellerAutoserviceMode}
+                onSellerAutoserviceModeChange={setSellerAutoserviceMode}
             />
 
             <main
@@ -227,6 +233,9 @@ export default function ProfileWithMenuLayout() {
                             showAdminMenuSwitch={showAdminMenuSwitch}
                             adminMenuMode={adminMenuMode}
                             onAdminMenuModeChange={setAdminMenuMode}
+                            showSellerAutoserviceSwitch={showSellerAutoserviceSwitch}
+                            sellerAutoserviceMode={sellerAutoserviceMode}
+                            onSellerAutoserviceModeChange={setSellerAutoserviceMode}
                         />
                     </div>
 

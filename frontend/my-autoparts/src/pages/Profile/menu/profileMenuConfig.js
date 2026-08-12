@@ -30,6 +30,7 @@ export const TAB_PATH_MAP = {
     sellers: '/sellers',
     'settings-employees': '/settings/employees',
     'pending-sellers': '/moderation/pending-sellers',
+    'autoservice-applications': '/moderation/autoservice-applications',
     'product-moderation': '/moderation/products',
     'audit-log': '/admin/audit-log',
     'admin-users': '/admin/users',
@@ -156,6 +157,7 @@ export const getActiveTabFromPath = (path, user) => {
     }
     if (path.startsWith('/vehicles/edit')) return 'vehicles';
     if (path.startsWith('/sellers')) return 'sellers';
+    if (path.startsWith('/moderation/autoservice-applications')) return 'autoservice-applications';
     if (path.startsWith('/moderation/products')) return 'product-moderation';
     if (path.startsWith('/design-system')) return 'design-system';
     if (path.startsWith('/admin/analytics')) return 'analytics';
@@ -186,6 +188,8 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
         showAutoservice,
         autoserviceOrganizationId,
         adminMenuMode: options.adminMenuMode,
+        organizationIsAutoservice: options.organizationIsAutoservice === true,
+        sellerAutoserviceMode: options.sellerAutoserviceMode,
     };
 
     if (!menuUser) return [];
@@ -341,6 +345,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             submenu: [
                 { id: 'sellers', label: 'Продавцы' },
                 { id: 'pending-sellers', label: 'Регистрация продавцов' },
+                { id: 'autoservice-applications', label: 'Регистрация автосервиса' },
                 { id: 'product-moderation', label: 'Проверка запчастей' },
                 { id: 'analytics', label: 'Аналитика' },
                 { id: 'admin-panel', label: 'Настройки' },

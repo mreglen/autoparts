@@ -36,7 +36,10 @@ from app.utils.phone import normalize_to_storage_format
 from app.utils.guest_cart import merge_guest_cart_from_request
 from app.utils.site_settings_db import get_or_create_site_settings
 from app.utils.org_access import resolve_autoservice_organization_id
-from app.utils.org_markup import effective_markup_percent, global_markup_percent
+from app.utils.org_markup import (
+    autoservice_markup_percent,
+    buyer_markup_percent,
+)
 from app.utils.user_public_code import assign_public_code
 from app.utils.user_avatar import avatar_public_url
 import logging
@@ -65,6 +68,9 @@ def build_user_profile_response(user: User) -> dict:
         "organization_id": user.organization_id,
         "organization_name": user.organization.name if user.organization_id and user.organization else None,
         "organization_phone": user.organization.phone if user.organization_id and user.organization else None,
+        "organization_is_autoservice": bool(
+            getattr(user.organization, "is_autoservice", False)
+        ) if user.organization_id and user.organization else False,
         "notification_prefs": NotificationPrefs.model_validate(
             get_user_notification_prefs(user)
         ).model_dump(),
@@ -653,10 +659,10 @@ def get_admin_organization_phone(db: Session = Depends(get_db)):
 
 @router.get("/public-site-config")
 def get_public_site_config(
-    organization_id: str | None = Query(None, description="Опционально: наценка для организации продавца"),
+    organization_id: str | None = Query(None, description="Deprecated, ignored: публичная наценка всегда buyer markup"),
     db: Session = Depends(get_db),
 ):
-    """Публичная конфигурация: телефон админ-организации (если есть), флаг «новые запчасти», наценка на новые %. Всегда 200."""
+    """Публичная конфигурация: телефон админ-организации (если есть), флаг «новые запчасти», наценки на новые %. Всегда 200."""
     settings_row = get_or_create_site_settings(db)
     org_name = None
     org_phone = None
@@ -669,11 +675,6 @@ def get_public_site_config(
     purchase_mode = getattr(settings_row, "used_parts_purchase_mode", None) or "both"
     if purchase_mode not in ("cart_only", "cta_only", "both"):
         purchase_mode = "both"
-    markup = global_markup_percent(settings_row)
-    if organization_id:
-        org = db.query(Organization).filter(Organization.id == organization_id).first()
-        if org:
-            markup = effective_markup_percent(org, settings_row)
 
     return {
         "organization_name": org_name,
@@ -684,7 +685,8 @@ def get_public_site_config(
         "show_warehouse_inventory": getattr(settings_row, "show_warehouse_inventory", False) is True,
         "show_autoservice": getattr(settings_row, "show_autoservice", False) is True,
         "autoservice_organization_id": resolve_autoservice_organization_id(db),
-        "new_parts_markup_percent": markup,
+        "new_parts_markup_percent": buyer_markup_percent(settings_row),
+        "autoservice_markup_percent": autoservice_markup_percent(settings_row),
         "used_parts_purchase_mode": purchase_mode,
         "round_product_prices": getattr(settings_row, "round_product_prices", False) is True,
         "laximo_vin_catalog_available": laximo_cat_ready(db),

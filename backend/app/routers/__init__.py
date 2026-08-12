@@ -66,6 +66,7 @@ from app.routers.autoservice_service_employees import router as autoservice_serv
 from app.routers.autoservice_repair_orders import router as autoservice_repair_orders_router
 from app.routers.autoservice_repair_bookings import router as autoservice_repair_bookings_router
 from app.routers.autoservice_planner import router as autoservice_planner_router
+from app.routers.autoservice_applications import router as autoservice_applications_router
 from app.routers.public_pages import router as public_pages_router
 from app.routers.public_pages_seo import router as public_pages_seo_router
 from app.routers.public_product_seo import router as public_product_seo_router
@@ -153,6 +154,7 @@ api_router.include_router(autoservice_service_employees_router)
 api_router.include_router(autoservice_repair_orders_router)
 api_router.include_router(autoservice_repair_bookings_router)
 api_router.include_router(autoservice_planner_router)
+api_router.include_router(autoservice_applications_router)
 api_router.include_router(public_pages_router)
 api_router.include_router(public_new_parts_cards_router)
 api_router.include_router(seo_landing_pages_router)

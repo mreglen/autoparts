@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.models.organization import Organization
 from app.models.autoservice_client import AutoserviceClient
 from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.phone import normalize_to_storage_format
@@ -19,7 +20,11 @@ def require_autoservice_enabled(db: Session) -> None:
         )
 
 
-def require_autoservice_org_id(db: Session) -> str:
+def require_autoservice_org_id(db: Session, user: User | None = None) -> str:
+    if user and user.organization_id and not user.is_admin:
+        org = db.query(Organization).filter(Organization.id == user.organization_id).first()
+        if org and getattr(org, "is_autoservice", False):
+            return org.id
     org_id = resolve_autoservice_organization_id(db)
     if not org_id:
         raise HTTPException(
@@ -31,13 +36,21 @@ def require_autoservice_org_id(db: Session) -> str:
 
 def require_autoservice_staff(db: Session, user: User) -> str:
     require_autoservice_enabled(db)
-    org_id = require_autoservice_org_id(db)
+    org_id = require_autoservice_org_id(db, user)
+    if user.is_admin:
+        return org_id
     if not user.organization_id or user.organization_id != org_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Нет доступа к записям автосервиса",
         )
-    if not (user.is_admin or user.is_director or user.is_seller or user.is_employee):
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org or not getattr(org, "is_autoservice", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Автосервис не подключён для вашей организации",
+        )
+    if not (user.is_director or user.is_seller or user.is_employee):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Нет доступа к записям автосервиса",

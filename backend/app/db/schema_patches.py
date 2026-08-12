@@ -52,6 +52,89 @@ def ensure_organization_markup_columns() -> None:
     logger.info("Applied organization markup column patches: %s", statements)
 
 
+def ensure_organizations_autoservice_columns() -> None:
+    """Add is_autoservice flag to organizations."""
+    inspector = inspect(engine)
+    if "organizations" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("organizations")}
+    if "is_autoservice" in columns:
+        return
+
+    if engine.dialect.name == "postgresql":
+        stmt = "ALTER TABLE organizations ADD COLUMN is_autoservice BOOLEAN NOT NULL DEFAULT FALSE"
+    else:
+        stmt = "ALTER TABLE organizations ADD COLUMN is_autoservice BOOLEAN NOT NULL DEFAULT 0"
+
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+        # Backfill: first org with admin director (legacy autoservice resolution).
+        conn.execute(
+            text(
+                """
+                UPDATE organizations o
+                SET is_autoservice = TRUE
+                WHERE o.id = (
+                    SELECT u.organization_id
+                    FROM users u
+                    WHERE u.is_director = TRUE AND u.is_admin = TRUE
+                      AND u.organization_id IS NOT NULL
+                    ORDER BY u.organization_id
+                    LIMIT 1
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM organizations WHERE is_autoservice = TRUE
+                )
+                """
+            )
+        )
+
+    logger.info("Applied organizations is_autoservice column patch")
+
+
+def ensure_site_settings_markup_tiers_columns() -> None:
+    """Add buyer and autoservice markup columns to site_settings."""
+    inspector = inspect(engine)
+    if "site_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_settings")}
+    statements = []
+
+    if "buyer_new_parts_markup_percent" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE site_settings ADD COLUMN buyer_new_parts_markup_percent "
+                "DOUBLE PRECISION NOT NULL DEFAULT 30"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE site_settings ADD COLUMN buyer_new_parts_markup_percent "
+                "REAL NOT NULL DEFAULT 30"
+            )
+    if "autoservice_new_parts_markup_percent" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE site_settings ADD COLUMN autoservice_new_parts_markup_percent "
+                "DOUBLE PRECISION NOT NULL DEFAULT 7"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE site_settings ADD COLUMN autoservice_new_parts_markup_percent "
+                "REAL NOT NULL DEFAULT 7"
+            )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied site_settings markup tier column patches: %s", statements)
+
+
 def _index_exists(inspector, table_name: str, index_name: str) -> bool:
     return any(index.get("name") == index_name for index in inspector.get_indexes(table_name))
 
@@ -3633,6 +3716,53 @@ def ensure_autoservice_clients_table() -> None:
             conn.execute(text(index_ddl))
 
     logger.info("Applied autoservice_clients table patch")
+
+
+def ensure_autoservice_tariff_applications_table() -> None:
+    """Create autoservice_tariff_applications for org tariff requests."""
+    inspector = inspect(engine)
+    if "autoservice_tariff_applications" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE autoservice_tariff_applications (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            applicant_user_id INTEGER NOT NULL REFERENCES users(id),
+            contact_name VARCHAR(160) NOT NULL,
+            contact_phone VARCHAR(32) NOT NULL,
+            message TEXT,
+            status VARCHAR(32) NOT NULL DEFAULT 'pending',
+            rejection_reason TEXT,
+            reviewed_by_user_id INTEGER REFERENCES users(id),
+            reviewed_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE autoservice_tariff_applications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            applicant_user_id INTEGER NOT NULL REFERENCES users(id),
+            contact_name VARCHAR(160) NOT NULL,
+            contact_phone VARCHAR(32) NOT NULL,
+            message TEXT,
+            status VARCHAR(32) NOT NULL DEFAULT 'pending',
+            rejection_reason TEXT,
+            reviewed_by_user_id INTEGER REFERENCES users(id),
+            reviewed_at DATETIME,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+
+    logger.info("Applied autoservice_tariff_applications table patch")
 
 
 def ensure_garage_vehicles_table() -> None:

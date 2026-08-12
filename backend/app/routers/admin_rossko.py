@@ -12,16 +12,24 @@ from app.models.user import User
 from app.routers.rossko_api.rossko_api import get_details_client
 from app.schemas.rossko_settings import (
     RosskoCheckoutDetailsResponse,
+    RosskoMarkupSettingsResponse,
+    RosskoMarkupSettingsUpdate,
     RosskoSettingsResponse,
     RosskoSettingsUpdate,
 )
 from app.services.audit_service import log_audit
 from app.services.rossko_checkout_details import get_checkout_details_error, normalize_checkout_details
+from app.utils.org_markup import (
+    autoservice_markup_percent,
+    buyer_markup_percent,
+    global_markup_percent,
+)
 from app.utils.rossko_settings_db import (
     get_rossko_settings,
     rossko_settings_configured,
     update_rossko_settings,
 )
+from app.utils.site_settings_db import get_or_create_site_settings
 
 router = APIRouter(prefix="/admin/rossko", tags=["Admin Rossko"])
 settings = Settings()
@@ -153,3 +161,49 @@ def admin_put_rossko_settings(
         entity_id=row.id,
     )
     return _settings_to_response(row)
+
+
+def _markup_settings_to_response(row) -> RosskoMarkupSettingsResponse:
+    return RosskoMarkupSettingsResponse(
+        buyer_markup_percent=buyer_markup_percent(row),
+        seller_markup_percent=global_markup_percent(row),
+        autoservice_markup_percent=autoservice_markup_percent(row),
+    )
+
+
+@router.get("/markup-settings", response_model=RosskoMarkupSettingsResponse)
+def admin_get_rossko_markup_settings(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = get_or_create_site_settings(db)
+    return _markup_settings_to_response(row)
+
+
+@router.put("/markup-settings", response_model=RosskoMarkupSettingsResponse)
+def admin_put_rossko_markup_settings(
+    payload: RosskoMarkupSettingsUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = get_or_create_site_settings(db)
+    row.buyer_new_parts_markup_percent = float(payload.buyer_markup_percent)
+    row.new_parts_markup_percent = float(payload.seller_markup_percent)
+    row.autoservice_new_parts_markup_percent = float(payload.autoservice_markup_percent)
+    db.commit()
+    db.refresh(row)
+    log_audit(
+        db,
+        event_type="rossko_markup_settings_updated",
+        category="integrations",
+        summary="Наценки Rossko/автосервиса обновлены",
+        user=current_user,
+        details={
+            "buyer_markup_percent": row.buyer_new_parts_markup_percent,
+            "seller_markup_percent": row.new_parts_markup_percent,
+            "autoservice_markup_percent": row.autoservice_new_parts_markup_percent,
+        },
+        entity_type="site_settings",
+        entity_id=row.id,
+    )
+    return _markup_settings_to_response(row)

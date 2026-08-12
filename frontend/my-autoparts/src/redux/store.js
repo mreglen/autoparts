@@ -24,6 +24,7 @@ import partTypesReducer from './slices/PartTypeSlice';
 import userEngagementReducer from './slices/UserEngagementSlice';
 import salesMenuCountsReducer from './slices/SalesMenuCountsSlice';
 import autoserviceClientReducer from './slices/AutoserviceClientSlice';
+import autoserviceAdminReducer from './slices/AutoserviceAdminSlice';
 
 export const store = configureStore({
   reducer: {
@@ -52,6 +53,7 @@ export const store = configureStore({
     userEngagement: userEngagementReducer,
     salesMenuCounts: salesMenuCountsReducer,
     autoserviceClient: autoserviceClientReducer,
+    autoserviceAdmin: autoserviceAdminReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -74,6 +74,18 @@ class RosskoSettingsUpdate(BaseModel):
     requires_requisite: Optional[bool] = None
 
 
+class RosskoMarkupSettingsResponse(BaseModel):
+    buyer_markup_percent: float = 30.0
+    seller_markup_percent: float = 15.0
+    autoservice_markup_percent: float = 7.0
+
+
+class RosskoMarkupSettingsUpdate(BaseModel):
+    buyer_markup_percent: float = Field(..., ge=0, le=500)
+    seller_markup_percent: float = Field(..., ge=0, le=500)
+    autoservice_markup_percent: float = Field(..., ge=0, le=500)
+
+
 class NewPartsOrderCreateIn(BaseModel):
     recipient_name: str = ""
     recipient_phone: str = ""

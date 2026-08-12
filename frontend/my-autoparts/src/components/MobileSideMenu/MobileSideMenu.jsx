@@ -18,6 +18,9 @@ export default function MobileSideMenu({
     showAdminMenuSwitch = false,
     adminMenuMode,
     onAdminMenuModeChange,
+    showSellerAutoserviceSwitch = false,
+    sellerAutoserviceMode,
+    onSellerAutoserviceModeChange,
 }) {
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -146,6 +149,9 @@ export default function MobileSideMenu({
                             showAdminMenuSwitch={showAdminMenuSwitch}
                             adminMenuMode={adminMenuMode}
                             onAdminMenuModeChange={onAdminMenuModeChange}
+                            showSellerAutoserviceSwitch={showSellerAutoserviceSwitch}
+                            sellerAutoserviceMode={sellerAutoserviceMode}
+                            onSellerAutoserviceModeChange={onSellerAutoserviceModeChange}
                         />
                     )}
                     <PublicSiteMenuLinks variant="drawer" onNavigate={requestClose} />

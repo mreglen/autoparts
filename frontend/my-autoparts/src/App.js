@@ -86,6 +86,7 @@ const WmsStoragesPage = lazy(() => import('./pages/Warehouse/WmsStoragesPage'));
 const WarehouseScanPage = lazy(() => import('./pages/Warehouse/WarehouseScanPage'));
 const LabelQrResolvePage = lazy(() => import('./pages/Warehouse/LabelQrResolvePage'));
 const PendingSellersPage = lazy(() => import('./pages/Moderation/PendingSellersPage'));
+const AutoserviceApplicationsPage = lazy(() => import('./pages/Moderation/AutoserviceApplicationsPage'));
 const ProductModeration = lazy(() => import('./pages/Moderation/ProductModeration/ProductModeration'));
 const OrganizationProductModerationPage = lazy(() => import('./pages/Moderation/ProductModeration/OrganizationProductModerationPage'));
 const SellersPage = lazy(() => import('./pages/Profile/SellersPage'));
@@ -820,6 +821,14 @@ function App() {
             element={(
               <LazyRoute>
                 <PendingSellersPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/moderation/autoservice-applications"
+            element={(
+              <LazyRoute>
+                <AutoserviceApplicationsPage />
               </LazyRoute>
             )}
           />

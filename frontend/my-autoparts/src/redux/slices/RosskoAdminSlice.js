@@ -37,21 +37,51 @@ export const saveRosskoSettings = createAsyncThunk(
     }
 );
 
+export const fetchRosskoMarkupSettings = createAsyncThunk(
+    'rosskoAdmin/fetchMarkupSettings',
+    async (_, { rejectWithValue }) => {
+        try {
+            return await apiRequest('/admin/rossko/markup-settings');
+        } catch (error) {
+            return rejectWithValue(error?.message || 'Ошибка загрузки наценок');
+        }
+    }
+);
+
+export const saveRosskoMarkupSettings = createAsyncThunk(
+    'rosskoAdmin/saveMarkupSettings',
+    async (payload, { rejectWithValue }) => {
+        try {
+            return await apiRequest('/admin/rossko/markup-settings', {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+            });
+        } catch (error) {
+            return rejectWithValue(error?.message || 'Ошибка сохранения наценок');
+        }
+    }
+);
+
 const rosskoAdminSlice = createSlice({
     name: 'rosskoAdmin',
     initialState: {
         checkoutDetails: null,
         settings: null,
+        markupSettings: null,
         loadingDetails: false,
         loadingSettings: false,
+        loadingMarkupSettings: false,
         saving: false,
+        savingMarkup: false,
         error: null,
         saveError: null,
+        markupSaveError: null,
     },
     reducers: {
         clearRosskoAdminErrors: (state) => {
             state.error = null;
             state.saveError = null;
+            state.markupSaveError = null;
         },
     },
     extraReducers: (builder) => {
@@ -90,6 +120,29 @@ const rosskoAdminSlice = createSlice({
             .addCase(saveRosskoSettings.rejected, (state, action) => {
                 state.saving = false;
                 state.saveError = action.payload;
+            })
+            .addCase(fetchRosskoMarkupSettings.pending, (state) => {
+                state.loadingMarkupSettings = true;
+            })
+            .addCase(fetchRosskoMarkupSettings.fulfilled, (state, action) => {
+                state.loadingMarkupSettings = false;
+                state.markupSettings = action.payload;
+            })
+            .addCase(fetchRosskoMarkupSettings.rejected, (state, action) => {
+                state.loadingMarkupSettings = false;
+                state.error = action.payload;
+            })
+            .addCase(saveRosskoMarkupSettings.pending, (state) => {
+                state.savingMarkup = true;
+                state.markupSaveError = null;
+            })
+            .addCase(saveRosskoMarkupSettings.fulfilled, (state, action) => {
+                state.savingMarkup = false;
+                state.markupSettings = action.payload;
+            })
+            .addCase(saveRosskoMarkupSettings.rejected, (state, action) => {
+                state.savingMarkup = false;
+                state.markupSaveError = action.payload;
             });
     },
 });

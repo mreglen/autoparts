@@ -50,6 +50,9 @@ export default function MainLayout() {
         adminMenuMode,
         setAdminMenuMode,
         showAdminMenuSwitch,
+        sellerAutoserviceMode,
+        setSellerAutoserviceMode,
+        showSellerAutoserviceSwitch,
     } = useMobileMenuShell(user);
 
     useEffect(() => {
@@ -83,6 +86,9 @@ export default function MainLayout() {
                 showAdminMenuSwitch={showAdminMenuSwitch}
                 adminMenuMode={adminMenuMode}
                 onAdminMenuModeChange={setAdminMenuMode}
+                showSellerAutoserviceSwitch={showSellerAutoserviceSwitch}
+                sellerAutoserviceMode={sellerAutoserviceMode}
+                onSellerAutoserviceModeChange={setSellerAutoserviceMode}
             />
 
             <main

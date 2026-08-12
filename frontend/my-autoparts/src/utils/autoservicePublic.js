@@ -1,5 +1,9 @@
 import { useSelector } from 'react-redux';
 import { ADMIN_MENU_MODE_USER } from './adminMenuMode';
+import {
+  SELLER_AUTOSERVICE_MODE_AUTOSERVICE,
+  SELLER_AUTOSERVICE_MODE_SELLER,
+} from './sellerAutoserviceMode';
 
 export function selectShowAutoservice(state) {
   return state.publicInfo.showAutoservice === true;
@@ -20,30 +24,46 @@ export function useAutoserviceOrganizationId() {
 /**
  * Staff menu / routes for autoservice org employees.
  * Admins bypass the org check, but only while the menu is in «Админ» mode.
- * @param {object|null} user
- * @param {{ showAutoservice?: boolean, autoserviceOrganizationId?: string|null, adminMenuMode?: string }} options
+ * Sellers with connected autoservice use sellerAutoserviceMode.
  */
 export function canAccessAutoserviceStaffMenu(user, options = {}) {
   if (!user) return false;
+  const orgIsAutoservice = options.organizationIsAutoservice === true;
+
+  if (user.is_admin) {
+    if (options.adminMenuMode === ADMIN_MENU_MODE_USER) return false;
+    return Boolean(options.autoserviceOrganizationId);
+  }
+
+  if (orgIsAutoservice) {
+    if (options.sellerAutoserviceMode !== SELLER_AUTOSERVICE_MODE_AUTOSERVICE) return false;
+    return Boolean(user.is_director || user.is_seller || user.is_employee);
+  }
+
   const orgId = options.autoserviceOrganizationId;
   if (!orgId) return false;
-  if (user.is_admin) return options.adminMenuMode !== ADMIN_MENU_MODE_USER;
   if (options.showAutoservice !== true) return false;
   if (user.organization_id !== orgId) return false;
-  return Boolean(
-    user.is_director || user.is_seller || user.is_employee,
-  );
+  return Boolean(user.is_director || user.is_seller || user.is_employee);
 }
 
 /**
  * Client-facing autoservice menu (my cars / booking / repair history).
- * For admins: only in «Пользователь» mode; in «Админ» mode staff tab «Сервис» is shown instead.
  */
 export function canAccessAutoserviceClientMenu(user, options = {}) {
   if (!user) return false;
   if (user.is_admin) {
     return options.adminMenuMode === ADMIN_MENU_MODE_USER;
   }
+
+  const orgIsAutoservice = options.organizationIsAutoservice === true;
+  if (orgIsAutoservice && options.sellerAutoserviceMode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE) {
+    return false;
+  }
+  if (orgIsAutoservice && options.sellerAutoserviceMode === SELLER_AUTOSERVICE_MODE_SELLER) {
+    return options.showAutoservice === true;
+  }
+
   return options.showAutoservice === true;
 }
 

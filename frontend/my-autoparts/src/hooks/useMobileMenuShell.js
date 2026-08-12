@@ -20,6 +20,13 @@ import {
     isAdminOnlyPath,
     setAdminMenuMode as persistAdminMenuMode,
 } from '../utils/adminMenuMode';
+import {
+    SELLER_AUTOSERVICE_MODE_AUTOSERVICE,
+    SELLER_AUTOSERVICE_MODE_SELLER,
+    getSellerAutoserviceMode,
+    setSellerAutoserviceMode as persistSellerAutoserviceMode,
+    showSellerAutoserviceSwitch,
+} from '../utils/sellerAutoserviceMode';
 import { selectIsAutoserviceClient } from '../redux/slices/AutoserviceClientSlice';
 
 export function useMobileMenuShell(userOverride) {
@@ -33,11 +40,17 @@ export function useMobileMenuShell(userOverride) {
     const user = userOverride ?? authUser;
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [adminMenuMode, setAdminMenuModeState] = useState(getAdminMenuMode);
+    const [sellerAutoserviceMode, setSellerAutoserviceModeState] = useState(getSellerAutoserviceMode);
 
     useEffect(() => {
         if (!user?.is_admin) return;
         setAdminMenuModeState(getAdminMenuMode());
     }, [user?.id, user?.is_admin]);
+
+    useEffect(() => {
+        if (!showSellerAutoserviceSwitch(user)) return;
+        setSellerAutoserviceModeState(getSellerAutoserviceMode());
+    }, [user?.id, user?.organization_is_autoservice]);
 
     const activeTab = getActiveTabFromPath(location.pathname, user);
     const tabs = getAvailableTabs(user, permissionCodes, {
@@ -46,6 +59,8 @@ export function useMobileMenuShell(userOverride) {
         autoserviceOrganizationId,
         isAutoserviceClient,
         adminMenuMode: user?.is_admin ? adminMenuMode : undefined,
+        organizationIsAutoservice: Boolean(user?.organization_is_autoservice),
+        sellerAutoserviceMode: showSellerAutoserviceSwitch(user) ? sellerAutoserviceMode : undefined,
     });
 
     const setAdminMenuMode = useCallback(
@@ -63,6 +78,27 @@ export function useMobileMenuShell(userOverride) {
             }
         },
         [user?.is_admin, location.pathname, navigate],
+    );
+
+    const setSellerAutoserviceMode = useCallback(
+        (mode) => {
+            if (!showSellerAutoserviceSwitch(user)) return;
+            const nextMode =
+                mode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE
+                    ? SELLER_AUTOSERVICE_MODE_AUTOSERVICE
+                    : SELLER_AUTOSERVICE_MODE_SELLER;
+            persistSellerAutoserviceMode(nextMode);
+            setSellerAutoserviceModeState(nextMode);
+            if (nextMode === SELLER_AUTOSERVICE_MODE_SELLER && isAutoserviceStaffPath(location.pathname)) {
+                navigate('/dashboard', { replace: true });
+            } else if (
+                nextMode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE &&
+                isAutoserviceClientPath(location.pathname)
+            ) {
+                navigate('/autoservice/planner', { replace: true });
+            }
+        },
+        [user, location.pathname, navigate],
     );
 
     useEffect(() => {
@@ -125,6 +161,9 @@ export function useMobileMenuShell(userOverride) {
         adminMenuMode,
         setAdminMenuMode,
         showAdminMenuSwitch: Boolean(user?.is_admin),
+        sellerAutoserviceMode,
+        setSellerAutoserviceMode,
+        showSellerAutoserviceSwitch: showSellerAutoserviceSwitch(user),
     };
 }
 
@@ -163,6 +202,7 @@ export function getPageTitle(pathname) {
         '/settings/printers': 'Печать',
         '/settings/integration': 'Интеграции',
         '/moderation/pending-sellers': 'Регистрация продавцов',
+        '/moderation/autoservice-applications': 'Регистрация автосервиса',
         '/moderation/products': 'Модерация',
         '/admin-settings': 'Настройки',
         '/admin/audit-log': 'Журнал событий',
@@ -192,5 +232,5 @@ export function getPageTitle(pathname) {
     if (pathname.startsWith('/admin/')) return exact[pathname] || 'Админ';
     if (pathname.startsWith('/sales')) return 'Продажи';
     if (pathname.startsWith('/purchases')) return 'Покупки';
-    return 'Свой Гараж';
+    return 'Свой гараж';
 }
