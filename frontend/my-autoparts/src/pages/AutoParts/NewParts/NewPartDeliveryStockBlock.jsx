@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
+import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import { Card } from '../../../components/UI';
 import {
   formatDeliveryTimeText,
@@ -33,7 +33,7 @@ function StockMobileCard({ stock, markupPercent }) {
 }
 
 export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
-  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 30);
+  const markupPercent = useNewPartsMarkupPercent('auto');
   const summary = summarizeStocks(stocks, markupPercent);
 
   if (!summary.active.length) {

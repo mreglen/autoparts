@@ -215,6 +215,7 @@ export default function RosskoSettingsPage() {
             const saved = await dispatch(saveRosskoMarkupSettings(payload)).unwrap();
             applyPublicMarkupSettings(dispatch, {
                 buyerMarkupPercent: saved.buyer_markup_percent,
+                sellerMarkupPercent: saved.seller_markup_percent,
                 autoserviceMarkupPercent: saved.autoservice_markup_percent,
             });
             setNotification({ type: 'success', message: 'Наценки сохранены' });

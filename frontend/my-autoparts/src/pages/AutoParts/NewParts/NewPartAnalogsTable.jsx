@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import { Card } from '../../../components/UI';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { buildNewPartDetailPath } from '../../../utils/partRoutes';
@@ -161,7 +161,7 @@ function AnalogRow({ part, markupPercent, onNavigateCreate }) {
 }
 
 export default function NewPartAnalogsTable({ analogParts, loading, onNavigateCreate }) {
-  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 30);
+  const markupPercent = useNewPartsMarkupPercent('auto');
 
   if (loading) {
     return <p className="text-sm text-ink-muted">Загрузка аналогов…</p>;

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import { Helmet } from 'react-helmet-async';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { PageSeoHelmet } from '../../../utils/pageSeo';
@@ -127,7 +128,7 @@ export default function NewPartDetailPage() {
   const { cardId: cardIdParam } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 30);
+  const markupPercent = useNewPartsMarkupPercent('auto');
   const [rosskoData, setRosskoData] = useState(null);
   const [rosskoStatus, setRosskoStatus] = useState('idle');
 

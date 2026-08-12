@@ -1,8 +1,10 @@
 import {
   DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
   DEFAULT_BUYER_MARKUP_PERCENT,
+  DEFAULT_SELLER_MARKUP_PERCENT,
   parseAutoserviceMarkupPercent,
   parseMarkupPercent,
+  parseSellerMarkupPercent,
 } from './PublicInfoSlice';
 
 describe('PublicInfoSlice markup parsing', () => {
@@ -25,5 +27,14 @@ describe('PublicInfoSlice markup parsing', () => {
   it('parseAutoserviceMarkupPercent falls back to default', () => {
     expect(parseAutoserviceMarkupPercent({})).toBe(DEFAULT_AUTOSERVICE_MARKUP_PERCENT);
     expect(parseAutoserviceMarkupPercent(null)).toBe(DEFAULT_AUTOSERVICE_MARKUP_PERCENT);
+  });
+
+  it('parseSellerMarkupPercent reads seller_markup_percent', () => {
+    expect(parseSellerMarkupPercent({ seller_markup_percent: 15 })).toBe(15);
+    expect(parseSellerMarkupPercent({ seller_markup_percent: '12.5' })).toBe(12.5);
+  });
+
+  it('parseSellerMarkupPercent falls back to default', () => {
+    expect(parseSellerMarkupPercent({})).toBe(DEFAULT_SELLER_MARKUP_PERCENT);
   });
 });

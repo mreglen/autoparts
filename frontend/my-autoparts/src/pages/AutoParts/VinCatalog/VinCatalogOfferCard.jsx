@@ -10,6 +10,7 @@ import {
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
+import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import {
   formatProductDisplayTitle,
 } from '../../../utils/productDisplayName';
@@ -108,9 +109,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
   const dispatch = useDispatch();
   const cartLoading = useSelector(selectCartLoading);
   const cart = useSelector(selectCart);
-  const newPartsMarkupPercent = useSelector(
-    (state) => state.publicInfo.newPartsMarkupPercent ?? 30,
-  );
+  const newPartsMarkupPercent = useNewPartsMarkupPercent('auto');
 
   const [showWarehouses, setShowWarehouses] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);

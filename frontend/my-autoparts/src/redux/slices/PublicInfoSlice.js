@@ -3,11 +3,12 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequestUnauth } from '../../utils/apiClient';
 
 const PUBLIC_INFO_CACHE_TTL_MS = 10 * 60 * 1000;
-/** v3: наценки всегда с сервера; старый v2-кэш не читаем. */
-const SITE_CONFIG_CACHE_KEY = 'sg_public_site_config_v3';
+/** v4: три независимые наценки (buyer / seller / autoservice). */
+const SITE_CONFIG_CACHE_KEY = 'sg_public_site_config_v4';
 const QUICK_LINKS_CACHE_KEY = 'sg_site_quick_links_v1';
 
 export const DEFAULT_BUYER_MARKUP_PERCENT = 30;
+export const DEFAULT_SELLER_MARKUP_PERCENT = 15;
 export const DEFAULT_AUTOSERVICE_MARKUP_PERCENT = 7;
 
 export function parseMarkupPercent(value, fallback) {
@@ -17,6 +18,10 @@ export function parseMarkupPercent(value, fallback) {
 
 export function parseAutoserviceMarkupPercent(payload) {
   return parseMarkupPercent(payload?.autoservice_markup_percent, DEFAULT_AUTOSERVICE_MARKUP_PERCENT);
+}
+
+export function parseSellerMarkupPercent(payload) {
+  return parseMarkupPercent(payload?.seller_markup_percent, DEFAULT_SELLER_MARKUP_PERCENT);
 }
 
 function readSessionCache(key) {
@@ -116,6 +121,7 @@ const publicInfoSlice = createSlice({
         showAutoservice: false,
         autoserviceOrganizationId: null,
         newPartsMarkupPercent: DEFAULT_BUYER_MARKUP_PERCENT,
+        sellerMarkupPercent: DEFAULT_SELLER_MARKUP_PERCENT,
         autoserviceMarkupPercent: DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
         usedPartsPurchaseMode: 'both',
         roundProductPrices: false,
@@ -136,6 +142,7 @@ const publicInfoSlice = createSlice({
       state.showAutoservice = false;
       state.autoserviceOrganizationId = null;
       state.newPartsMarkupPercent = DEFAULT_BUYER_MARKUP_PERCENT;
+      state.sellerMarkupPercent = DEFAULT_SELLER_MARKUP_PERCENT;
       state.autoserviceMarkupPercent = DEFAULT_AUTOSERVICE_MARKUP_PERCENT;
       state.usedPartsPurchaseMode = 'both';
       state.roundProductPrices = false;
@@ -162,6 +169,9 @@ const publicInfoSlice = createSlice({
     },
     setNewPartsMarkupPercent: (state, action) => {
       state.newPartsMarkupPercent = parseMarkupPercent(action.payload, DEFAULT_BUYER_MARKUP_PERCENT);
+    },
+    setSellerMarkupPercent: (state, action) => {
+      state.sellerMarkupPercent = parseMarkupPercent(action.payload, DEFAULT_SELLER_MARKUP_PERCENT);
     },
     setAutoserviceMarkupPercent: (state, action) => {
       state.autoserviceMarkupPercent = parseMarkupPercent(
@@ -200,6 +210,7 @@ const publicInfoSlice = createSlice({
           p?.new_parts_markup_percent,
           DEFAULT_BUYER_MARKUP_PERCENT
         );
+        state.sellerMarkupPercent = parseSellerMarkupPercent(p);
         state.autoserviceMarkupPercent = parseAutoserviceMarkupPercent(p);
         const mode = p?.used_parts_purchase_mode;
         state.usedPartsPurchaseMode =
@@ -222,6 +233,7 @@ const publicInfoSlice = createSlice({
         state.showSiteReviews = true;
         state.showYandexBadge = true;
         state.newPartsMarkupPercent = DEFAULT_BUYER_MARKUP_PERCENT;
+        state.sellerMarkupPercent = DEFAULT_SELLER_MARKUP_PERCENT;
         state.autoserviceMarkupPercent = DEFAULT_AUTOSERVICE_MARKUP_PERCENT;
         state.laximoVinCatalogAvailable = false;
       })
@@ -248,6 +260,7 @@ export const {
   setShowAutoservice,
   setAutoserviceOrganizationId,
   setNewPartsMarkupPercent,
+  setSellerMarkupPercent,
   setAutoserviceMarkupPercent,
   setRoundProductPrices,
   setUsedPartsPurchaseMode,
@@ -255,12 +268,17 @@ export const {
 } = publicInfoSlice.actions;
 
 /** Сразу обновить наценки в Redux и sessionStorage после сохранения в /admin/rossko. */
-export function applyPublicMarkupSettings(dispatch, { buyerMarkupPercent, autoserviceMarkupPercent }) {
+export function applyPublicMarkupSettings(
+  dispatch,
+  { buyerMarkupPercent, sellerMarkupPercent, autoserviceMarkupPercent },
+) {
   patchPublicSiteConfigCache({
     new_parts_markup_percent: buyerMarkupPercent,
+    seller_markup_percent: sellerMarkupPercent,
     autoservice_markup_percent: autoserviceMarkupPercent,
   });
   dispatch(setNewPartsMarkupPercent(buyerMarkupPercent));
+  dispatch(setSellerMarkupPercent(sellerMarkupPercent));
   dispatch(setAutoserviceMarkupPercent(autoserviceMarkupPercent));
 }
 

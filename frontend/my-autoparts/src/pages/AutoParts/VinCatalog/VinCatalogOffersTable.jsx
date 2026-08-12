@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import { mapPartToStocksData } from '../NewParts/rosskoHelpers';
@@ -341,9 +342,7 @@ function PartOfferGroup({ group, markupPercent }) {
 }
 
 function OffersTable({ parts, emptyText }) {
-  const markupPercent = useSelector(
-    (state) => state.publicInfo.newPartsMarkupPercent ?? 30,
-  );
+  const markupPercent = useNewPartsMarkupPercent('auto');
 
   const groups = useMemo(() => buildPartGroups(parts), [parts]);
 

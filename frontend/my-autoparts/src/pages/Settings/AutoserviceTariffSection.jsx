@@ -5,6 +5,10 @@ import {
   fetchMyAutoserviceApplication,
   submitAutoserviceApplication,
 } from '../../redux/slices/AutoserviceAdminSlice';
+import {
+  DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
+  fetchPublicSiteConfig,
+} from '../../redux/slices/PublicInfoSlice';
 import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import { Badge } from '../../components/UI/Badge';
@@ -38,17 +42,24 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
   }, [dispatch, user?.organization_id, isDirector]);
 
   useEffect(() => {
+    dispatch(fetchPublicSiteConfig(true));
+  }, [dispatch]);
+
+  useEffect(() => {
     if (!user) return;
     const fullName = [user.last_name, user.first_name, user.patronymic].filter(Boolean).join(' ');
     setContactName((prev) => prev || fullName);
     setContactPhone((prev) => prev || user.phone || user.organization_phone || '');
   }, [user]);
 
+  const autoserviceMarkupFromConfig = useSelector(
+    (state) => state.publicInfo.autoserviceMarkupPercent ?? DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
+  );
   const connected = Boolean(
     user?.organization_is_autoservice || myApplicationState?.organization_is_autoservice,
   );
   const application = myApplicationState?.application;
-  const markupPercent = myApplicationState?.autoservice_markup_percent ?? 7;
+  const markupPercent = autoserviceMarkupFromConfig;
   const priceRub = myApplicationState?.price_rub_per_month ?? 10000;
   const statusMeta = application ? STATUS_MAP[application.status] : null;
 

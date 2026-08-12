@@ -17,6 +17,7 @@ import {
 } from '../../../utils/productDisplayName';
 import { prefetchNewPartOpenChunk } from '../../../utils/prefetchPartDetail';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
+import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 
 const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
@@ -136,9 +137,7 @@ function NewPartProductCard({
   const location = useLocation();
   const cartLoading = useSelector(selectCartLoading);
   const cart = useSelector(selectCart);
-  const newPartsMarkupPercent = useSelector(
-    (state) => state.publicInfo.newPartsMarkupPercent ?? 30,
-  );
+  const newPartsMarkupPercent = useNewPartsMarkupPercent('auto');
 
   const [showDetails, setShowDetails] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);

@@ -79,6 +79,8 @@ export default function SellerWorkspacePage() {
     const [currentMediaItems, setCurrentMediaItems] = useState([]);
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
     const numericSellerId = Number(sellerId);
+    const sellerMarkupPercent = useSelector((state) => state.publicInfo.sellerMarkupPercent);
+    const autoserviceMarkupPercent = useSelector((state) => state.publicInfo.autoserviceMarkupPercent);
 
     useEffect(() => {
         if (!user?.is_admin || !numericSellerId) return undefined;
@@ -88,7 +90,7 @@ export default function SellerWorkspacePage() {
             dispatch(clearWorkspace());
             dispatch(setAdminSellerMarkupContext(null));
         };
-    }, [dispatch, user?.is_admin, numericSellerId]);
+    }, [dispatch, user?.is_admin, numericSellerId, sellerMarkupPercent, autoserviceMarkupPercent]);
 
     useEffect(() => {
         if (!workspace || !numericSellerId) return;

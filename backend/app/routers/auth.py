@@ -39,6 +39,7 @@ from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.org_markup import (
     autoservice_markup_percent,
     buyer_markup_percent,
+    global_markup_percent,
 )
 from app.utils.user_public_code import assign_public_code
 from app.utils.user_avatar import avatar_public_url
@@ -687,6 +688,7 @@ def get_public_site_config(
         "show_autoservice": getattr(settings_row, "show_autoservice", False) is True,
         "autoservice_organization_id": resolve_autoservice_organization_id(db),
         "new_parts_markup_percent": buyer_markup_percent(settings_row),
+        "seller_markup_percent": global_markup_percent(settings_row),
         "autoservice_markup_percent": autoservice_markup_percent(settings_row),
         "used_parts_purchase_mode": purchase_mode,
         "round_product_prices": getattr(settings_row, "round_product_prices", False) is True,

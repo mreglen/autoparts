@@ -63,6 +63,7 @@ class PublicSiteConfigMarkupTests(unittest.TestCase):
             cfg = get_public_site_config(organization_id="seller-org", db=db)
 
         self.assertEqual(cfg["new_parts_markup_percent"], 30.0)
+        self.assertEqual(cfg["seller_markup_percent"], 15.0)
         self.assertEqual(cfg["autoservice_markup_percent"], 7.0)
         self.assertEqual(cfg["autoservice_organization_id"], "ORG-AUTO")
 
