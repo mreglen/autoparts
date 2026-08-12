@@ -7,7 +7,7 @@ import {
   setSearchQuery as setGlobalSearchQuery,
 } from '../../../redux/slices/RosskoSlice';
 import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
-import { looksLikeVin, normalizeVinOrNull } from '../../../utils/laximoVin';
+import { queryLooksLikeVin, normalizeVinForSearchOrNull } from '../../../utils/laximoVin';
 import VinScanModal from '../../../components/VinScanner/VinScanModal';
 import VinScanTriggerButton from '../../../components/VinScanner/VinScanTriggerButton';
 
@@ -53,7 +53,7 @@ function Search() {
     const trimmedTerm = searchTerm.trim();
     if (!trimmedTerm || isSearching) return;
 
-    const vin = normalizeVinOrNull(trimmedTerm);
+    const vin = normalizeVinForSearchOrNull(trimmedTerm);
     if (vin) {
       setIsSearching(false);
       navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
@@ -80,7 +80,7 @@ function Search() {
     const value = e.target.value;
     setSearchTerm(value);
 
-    if (looksLikeVin(value.trim())) {
+    if (queryLooksLikeVin(value.trim())) {
       return;
     }
 

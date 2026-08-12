@@ -218,7 +218,7 @@ export default function ProfileWithMenuLayout() {
                 }`}
             >
                 <div
-                    className={`grid min-h-0 grid-cols-1 lg:grid-cols-[minmax(15.5rem,17.5rem)_1fr] ${
+                    className={`grid min-h-0 grid-cols-1 lg:grid-cols-[minmax(15.5rem,17.5rem)_1fr] lg:items-start ${
                         isChatsPage
                             ? 'max-lg:gap-0 flex-1 gap-6 lg:overflow-hidden'
                             : 'gap-6'

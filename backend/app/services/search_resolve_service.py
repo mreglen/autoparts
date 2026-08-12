@@ -6,7 +6,7 @@ from urllib.parse import quote
 from sqlalchemy.orm import Session
 
 from app.services.laximo.gate import laximo_cat_ready
-from app.services.laximo.vin import looks_like_vin, normalize_vin_or_none
+from app.services.laximo.vin import looks_like_vin, normalize_vin_for_search_or_none
 from app.services.new_parts_seo_card_service import (
     build_new_part_card_path,
     find_active_new_part_card_by_brand_article,
@@ -36,7 +36,7 @@ def resolve_search_query(db: Session, q: str, *, site_origin: str) -> ResolveSea
             match_type=None,
         )
 
-    vin = normalize_vin_or_none(trimmed)
+    vin = normalize_vin_for_search_or_none(trimmed)
     if vin and looks_like_vin(vin):
         if laximo_cat_ready(db):
             redirect_path = f"/autoparts/vin?vin={quote(vin, safe='')}"

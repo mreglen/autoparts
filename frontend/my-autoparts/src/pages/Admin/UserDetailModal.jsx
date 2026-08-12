@@ -18,6 +18,25 @@ function userFullName(user) {
     return parts.join(' ').trim() || user?.email || '—';
 }
 
+const MARKUP_TIER_OPTIONS = [
+    { value: 'auto', label: 'Авто (по типу организации)' },
+    { value: 'buyer', label: 'Покупатели' },
+    { value: 'seller', label: 'Продавцы' },
+    { value: 'autoservice', label: 'Автосервис' },
+];
+
+function tierLabel(tier) {
+    return MARKUP_TIER_OPTIONS.find((o) => o.value === tier)?.label ?? tier;
+}
+
+function tierPercent(markup, tier) {
+    if (!markup || tier === 'auto') return null;
+    if (tier === 'buyer') return markup.buyer_markup_percent;
+    if (tier === 'seller') return markup.seller_markup_percent;
+    if (tier === 'autoservice') return markup.autoservice_markup_percent;
+    return null;
+}
+
 export default function UserDetailModal({
     user,
     audit,
@@ -27,6 +46,9 @@ export default function UserDetailModal({
     onTabChange,
     onAuditPageChange,
     onClose,
+    onMarkupTierChange,
+    markupSaving,
+    markupError,
     formatAuditDate,
     labelCategory,
     labelEventType,
@@ -134,6 +156,65 @@ export default function UserDetailModal({
                                     <span className="text-gray-500">Активных сессий</span>
                                     <p className="font-medium">{user.active_sessions_count ?? 0}</p>
                                 </div>
+                            </div>
+
+                            <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+                                <h4 className="font-semibold text-gray-900 mb-1">Наценка на новые запчасти</h4>
+                                {!user.organization_id ? (
+                                    <p className="text-gray-500 text-sm">
+                                        У пользователя нет организации — применяется наценка покупателя (
+                                        {user.markup?.buyer_markup_percent ?? 30}%).
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="text-sm">
+                                            <span className="text-gray-500">Сейчас: </span>
+                                            <span className="font-medium text-gray-900">
+                                                {tierLabel(user.markup?.tier_override || 'auto')}
+                                                {' · '}
+                                                {user.markup?.markup_percent ?? '—'}%
+                                            </span>
+                                            {!user.markup?.tier_override && user.markup?.tier_effective && (
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    Автоматически: {tierLabel(user.markup.tier_effective)} (
+                                                    {user.markup.markup_percent}%)
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                                            <label className="flex-1 text-sm">
+                                                <span className="text-gray-500 block mb-1">Изменить наценку</span>
+                                                <select
+                                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                                                    value={user.markup?.tier_override || 'auto'}
+                                                    disabled={markupSaving}
+                                                    onChange={(e) => onMarkupTierChange?.(e.target.value)}
+                                                >
+                                                    {MARKUP_TIER_OPTIONS.map((opt) => {
+                                                        const pct = tierPercent(user.markup, opt.value);
+                                                        return (
+                                                            <option key={opt.value} value={opt.value}>
+                                                                {opt.label}
+                                                                {pct != null ? ` (${pct}%)` : ''}
+                                                            </option>
+                                                        );
+                                                    })}
+                                                </select>
+                                            </label>
+                                        </div>
+                                        <p className="text-xs text-gray-500">
+                                            Покупатели {user.markup?.buyer_markup_percent}% · Продавцы{' '}
+                                            {user.markup?.seller_markup_percent}% · Автосервис{' '}
+                                            {user.markup?.autoservice_markup_percent}%
+                                        </p>
+                                        {markupSaving && (
+                                            <p className="text-xs text-indigo-600">Сохранение…</p>
+                                        )}
+                                        {markupError && (
+                                            <p className="text-xs text-red-600">{markupError}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div>

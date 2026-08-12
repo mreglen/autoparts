@@ -39,7 +39,9 @@ from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.org_markup import (
     autoservice_markup_percent,
     buyer_markup_percent,
+    effective_markup_tier,
     global_markup_percent,
+    org_markup_tier_override,
 )
 from app.utils.user_public_code import assign_public_code
 from app.utils.user_avatar import avatar_public_url
@@ -73,6 +75,14 @@ def build_user_profile_response(user: User) -> dict:
             getattr(user.organization, "is_autoservice", False)
             and not getattr(user.organization, "autoservice_paused", False)
         ) if user.organization_id and user.organization else False,
+        "organization_new_parts_markup_tier": (
+            org_markup_tier_override(user.organization)
+            if user.organization_id and user.organization else None
+        ),
+        "organization_effective_markup_tier": (
+            effective_markup_tier(user.organization)
+            if user.organization_id and user.organization else "buyer"
+        ),
         "notification_prefs": NotificationPrefs.model_validate(
             get_user_notification_prefs(user)
         ).model_dump(),

@@ -11,16 +11,19 @@ function isOrganizationStaff(user) {
   return Boolean(user.is_seller || user.is_director || user.is_employee || user.is_admin);
 }
 
+function markupForTier(tier, { buyerMarkup, sellerMarkup, autoserviceMarkup }) {
+  if (tier === 'buyer') return buyerMarkup;
+  if (tier === 'autoservice') return autoserviceMarkup;
+  if (tier === 'seller') return sellerMarkup;
+  return null;
+}
+
 /**
  * Контекст наценки для новых запчастей Rossko:
  * - public / buyer: наценка покупателя (публичный каталог)
  * - autoservice: наценка автосервиса (заказ-наряды)
  * - seller: наценка продавца
- * - auto: по организации пользователя — автосервис > продавец > покупатель
- *
- * Организация с активным тарифом «Автосервис» получает наценку автосервиса везде,
- * независимо от режима меню «Продавец/Автосервис». На паузе backend снимает флаг
- * organization_is_autoservice, и наценка возвращается к продавцу.
+ * - auto: по организации пользователя — индивидуальная > автосервис > продавец > покупатель
  */
 export function useNewPartsMarkupPercent(context = 'auto') {
   const user = useSelector((state) => state.auth.user);
@@ -35,12 +38,22 @@ export function useNewPartsMarkupPercent(context = 'auto') {
   );
   const adminCtx = useSelector((state) => state.publicInfo.adminSellerMarkupContext);
 
+  const tierMarkups = { buyerMarkup, sellerMarkup, autoserviceMarkup };
+
   if (context === 'public' || context === 'buyer') {
     return buyerMarkup;
   }
 
   if (context === 'autoservice') {
     return autoserviceMarkup;
+  }
+
+  const tierOverride = user?.organization_new_parts_markup_tier;
+  if (tierOverride) {
+    const overridePercent = markupForTier(tierOverride, tierMarkups);
+    if (overridePercent != null) {
+      return overridePercent;
+    }
   }
 
   if (userHasAutoserviceOrganization(user)) {

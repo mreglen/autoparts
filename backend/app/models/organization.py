@@ -15,6 +15,8 @@ class Organization(Base):
     watermark = Column(Integer, default=1)
     new_parts_markup_percent = Column(Float, nullable=True)
     new_parts_markup_manual = Column(Boolean, nullable=False, default=False)
+    # null = auto (by org type); buyer | seller | autoservice = fixed tier from site_settings
+    new_parts_markup_tier = Column(String(16), nullable=True)
     append_marketplace_site_info = Column(Boolean, nullable=False, default=False)
     is_autoservice = Column(Boolean, nullable=False, default=False)
     autoservice_paused = Column(Boolean, nullable=False, default=False)

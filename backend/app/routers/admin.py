@@ -15,7 +15,9 @@ from app.utils.site_settings_db import get_or_create_site_settings
 from app.utils.admin_org_access import get_seller_organization
 from app.utils.org_markup import (
     apply_global_markup_to_organizations,
+    build_org_markup_info,
     effective_markup_percent,
+    effective_markup_tier,
     global_markup_percent,
 )
 from app.models.client import Client as ClientModel
@@ -26,6 +28,7 @@ from app.schemas.user import (
     AdminUserAuditResponse,
     AdminUserDetail,
     AdminUserListItem,
+    AdminUserMarkupInfo,
     UserResponse,
     UserSessionBrief,
     UserUpdate,
@@ -38,7 +41,7 @@ from app.services.audit_service import (
 )
 from app.utils.user_avatar import avatar_public_url
 from app.schemas.organization import Organization as OrganizationSchema, OrganizationCreate, OrganizationUpdate
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 from app.core.auth import get_current_admin_user, get_current_user
 from app.core.security import get_password_hash
@@ -865,7 +868,63 @@ def get_admin_user_detail(
     )
 
     base = _admin_user_list_item(user, db)
-    return AdminUserDetail(**base.model_dump(), sessions=session_briefs)
+    settings_row = get_or_create_site_settings(db)
+    markup = None
+    if user.organization:
+        markup = AdminUserMarkupInfo(**build_org_markup_info(user.organization, settings_row))
+    return AdminUserDetail(**base.model_dump(), sessions=session_briefs, markup=markup)
+
+
+class UserMarkupTierPatch(BaseModel):
+    tier: Literal["auto", "buyer", "seller", "autoservice"]
+
+
+@router.patch("/users/{user_id}/markup", response_model=AdminUserMarkupInfo)
+def patch_admin_user_markup(
+    user_id: int,
+    payload: UserMarkupTierPatch,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).options(joinedload(User.organization)).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if not user.organization_id or not user.organization:
+        raise HTTPException(status_code=400, detail="У пользователя нет организации — наценка не применяется")
+
+    org = user.organization
+    settings_row = get_or_create_site_settings(db)
+
+    if payload.tier == "auto":
+        org.new_parts_markup_tier = None
+        org.new_parts_markup_manual = False
+    else:
+        org.new_parts_markup_tier = payload.tier
+        org.new_parts_markup_manual = True
+
+    org.new_parts_markup_percent = effective_markup_percent(org, settings_row)
+
+    db.commit()
+    db.refresh(org)
+
+    log_audit(
+        db,
+        event_type="admin_user_markup_changed",
+        category="users",
+        summary=f"Наценка пользователя #{user_id} ({org.name}): {payload.tier}",
+        user=current_user,
+        organization_id=org.id,
+        details={
+            "target_user_id": user.id,
+            "tier": payload.tier,
+            "tier_effective": effective_markup_tier(org),
+            "markup_percent": effective_markup_percent(org, settings_row),
+        },
+        entity_type="user",
+        entity_id=user.id,
+    )
+
+    return AdminUserMarkupInfo(**build_org_markup_info(org, settings_row))
 
 
 @router.get("/users/{user_id}/audit", response_model=AdminUserAuditResponse)

@@ -19,6 +19,9 @@ class QueryModerationTests(unittest.TestCase):
     def test_query_contains_vin_rejects_articles(self):
         self.assertFalse(query_contains_vin("KRAFT KT 100529"))
         self.assertFalse(query_contains_vin("W712/75"))
+        self.assertFalse(query_contains_vin("VAG 059198405"))
+        self.assertFalse(query_contains_vin("059198405AB"))
+        self.assertFalse(query_contains_vin("VAG059198405"))
 
     def test_contains_profanity(self):
         self.assertTrue(contains_profanity("хуй"))

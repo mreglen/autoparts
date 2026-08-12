@@ -320,7 +320,7 @@ export default function AutoserviceOrdersPage() {
       ) : null}
 
       {/* Desktop table */}
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden md:block min-w-0">
         <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
           <thead>
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">

@@ -7,6 +7,11 @@ export const VIN_INPUT_MAX_LENGTH = 32;
 
 const VIN_FORBIDDEN = /[IOQ]/;
 const VIN_ALLOWED = /^[A-HJ-NPR-Z0-9]+$/;
+const SHORT_VIN_MAX_DIGIT_RATIO = 0.65;
+const SHORT_VIN_MIN_LETTERS = 3;
+const FULL_VIN_MIN_LETTERS = 3;
+const TOKEN_SPLIT_RE = /[\s,;/]+/;
+const VIN_FRAGMENT_RE = /^[A-Za-z0-9]{1,8}$/;
 
 /** Cyrillic lookalikes (RU keyboard) → Latin VIN letters */
 const CYR_TO_LATIN = {
@@ -23,6 +28,36 @@ const CYR_TO_LATIN = {
   У: 'Y',
   Х: 'X',
 };
+
+function letterAndDigitStats(norm) {
+  let letters = 0;
+  let digits = 0;
+  for (const ch of norm) {
+    if (ch >= 'A' && ch <= 'Z') letters += 1;
+    else if (ch >= '0' && ch <= '9') digits += 1;
+  }
+  return { letters, digits };
+}
+
+function looksLikePartNumber(norm) {
+  const length = norm.length;
+  if (length < VIN_MIN_LENGTH) return true;
+
+  const { letters, digits } = letterAndDigitStats(norm);
+  if (letters < FULL_VIN_MIN_LETTERS) return true;
+
+  if (length < VIN_MAX_LENGTH) {
+    if (letters < SHORT_VIN_MIN_LETTERS) return true;
+    const total = letters + digits;
+    if (total > 0 && digits / total >= SHORT_VIN_MAX_DIGIT_RATIO) return true;
+  }
+
+  return false;
+}
+
+function tokenLooksLikeBrandWord(token) {
+  return token.length >= 4 && /^[A-Za-z]+$/.test(token);
+}
 
 /**
  * Uppercase, strip spaces/dashes/etc., map Cyrillic lookalikes.
@@ -42,10 +77,35 @@ export function looksLikeVin(value) {
   if (VIN_FORBIDDEN.test(norm)) return false;
   if (!VIN_ALLOWED.test(norm)) return false;
   if (!/[A-Z]/.test(norm)) return false;
+  if (looksLikePartNumber(norm)) return false;
   return true;
 }
 
 export function normalizeVinOrNull(value) {
   if (!looksLikeVin(value)) return null;
   return sanitizeVinInput(value);
+}
+
+/**
+ * VIN detection for global search — skips brand+article and part-number false positives.
+ */
+export function normalizeVinForSearchOrNull(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+
+  const tokens = text.split(TOKEN_SPLIT_RE).map((token) => token.trim()).filter(Boolean);
+  if (tokens.length > 1) {
+    if (tokens.some(tokenLooksLikeBrandWord)) return null;
+    const joined = tokens.join('');
+    if (!tokens.every((token) => VIN_FRAGMENT_RE.test(token))) return null;
+    return normalizeVinOrNull(joined);
+  }
+
+  if (/[/\\._]/.test(text)) return null;
+
+  return normalizeVinOrNull(text);
+}
+
+export function queryLooksLikeVin(value) {
+  return normalizeVinForSearchOrNull(value) != null;
 }

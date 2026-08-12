@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import Modal from '../../components/UI/Modal';
@@ -63,15 +63,61 @@ function VehicleList({ vehicles, loading, canEdit = false, onEdit }) {
   );
 }
 
-function ClientMobileCard({
-  row,
-  expanded,
+function ClientVehiclesModal({
+  open,
+  client,
   vehicles,
-  vehiclesLoading,
-  onToggleVehicles,
+  loading,
+  onClose,
   onEditVehicle,
 }) {
-  const isGuest = !row.user_id;
+  const isGuest = client && !client.user_id;
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={client ? `Автомобили — ${client.name}` : 'Автомобили'}
+      size="md"
+      footer={
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            Закрыть
+          </button>
+        </div>
+      }
+    >
+      {client ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            <span>{client.phone || '—'}</span>
+            <AccountBadge userId={client.user_id} />
+          </div>
+          {isGuest ? (
+            <p className="text-xs text-gray-500">
+              Клиент без аккаунта — автомобили можно редактировать.
+            </p>
+          ) : null}
+          <VehicleList
+            vehicles={vehicles}
+            loading={loading}
+            canEdit={isGuest}
+            onEdit={onEditVehicle}
+          />
+        </div>
+      ) : null}
+    </Modal>
+  );
+}
+
+function ClientMobileCard({
+  row,
+  onShowVehicles,
+}) {
   return (
     <div className="border-b border-gray-100 py-3 last:border-b-0">
       <div className="flex items-start justify-between gap-3">
@@ -87,22 +133,12 @@ function ClientMobileCard({
         </div>
         <button
           type="button"
-          onClick={onToggleVehicles}
+          onClick={onShowVehicles}
           className="shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
         >
-          {expanded ? 'Скрыть' : 'Авто'}
+          Авто
         </button>
       </div>
-      {expanded ? (
-        <div className="mt-3 rounded-xl bg-gray-50 px-3 py-3">
-          <VehicleList
-            vehicles={vehicles}
-            loading={vehiclesLoading}
-            canEdit={isGuest}
-            onEdit={onEditVehicle}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -396,7 +432,7 @@ export default function AutoserviceClientsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [q, setQ] = useState('');
   const [qApplied, setQApplied] = useState('');
-  const [expandedClientId, setExpandedClientId] = useState(null);
+  const [vehiclesModalClient, setVehiclesModalClient] = useState(null);
   const [clientVehicles, setClientVehicles] = useState({});
   const [vehiclesLoadingId, setVehiclesLoadingId] = useState(null);
   const [editVehicle, setEditVehicle] = useState(null);
@@ -433,22 +469,23 @@ export default function AutoserviceClientsPage() {
     });
   }, [rows, qApplied]);
 
-  const toggleClientVehicles = async (clientId) => {
-    if (expandedClientId === clientId) {
-      setExpandedClientId(null);
-      return;
-    }
-    setExpandedClientId(clientId);
-    if (clientVehicles[clientId]) return;
-    setVehiclesLoadingId(clientId);
+  const openClientVehicles = async (client) => {
+    if (!client?.id) return;
+    setVehiclesModalClient(client);
+    if (clientVehicles[client.id]) return;
+    setVehiclesLoadingId(client.id);
     try {
-      const data = await apiRequest(`/autoservice/garage/vehicles?client_id=${clientId}`);
-      setClientVehicles((prev) => ({ ...prev, [clientId]: Array.isArray(data) ? data : [] }));
+      const data = await apiRequest(`/autoservice/garage/vehicles?client_id=${client.id}`);
+      setClientVehicles((prev) => ({ ...prev, [client.id]: Array.isArray(data) ? data : [] }));
     } catch {
-      setClientVehicles((prev) => ({ ...prev, [clientId]: [] }));
+      setClientVehicles((prev) => ({ ...prev, [client.id]: [] }));
     } finally {
       setVehiclesLoadingId(null);
     }
+  };
+
+  const closeClientVehicles = () => {
+    setVehiclesModalClient(null);
   };
 
   if (!isReady) return <AuthLoadingScreen />;
@@ -561,39 +598,32 @@ export default function AutoserviceClientsPage() {
               </tr>
             ) : (
               filteredRows.map((row) => (
-                <Fragment key={row.id}>
-                  <tr className="transition-colors hover:bg-gray-50/70">
-                    <td className="py-3 pr-3 align-middle font-medium text-gray-900">{row.name}</td>
-                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">{row.phone || '—'}</td>
-                    <td className="hidden whitespace-nowrap py-3 pr-3 align-middle text-gray-600 lg:table-cell">
-                      {formatServerDateTime(row.consented_at) || '—'}
-                    </td>
-                    <td className="py-3 pr-3 align-middle">
-                      <AccountBadge userId={row.user_id} />
-                    </td>
-                    <td className="py-3 text-right align-middle">
-                      <button
-                        type="button"
-                        onClick={() => toggleClientVehicles(row.id)}
-                        className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
-                      >
-                        {expandedClientId === row.id ? 'Скрыть' : 'Показать'}
-                      </button>
-                    </td>
-                  </tr>
-                  {expandedClientId === row.id ? (
-                    <tr className="bg-gray-50/60">
-                      <td colSpan={5} className="px-1 py-3">
-                        <VehicleList
-                          vehicles={clientVehicles[row.id]}
-                          loading={vehiclesLoadingId === row.id}
-                          canEdit={!row.user_id}
-                          onEdit={setEditVehicle}
-                        />
-                      </td>
-                    </tr>
-                  ) : null}
-                </Fragment>
+                <tr
+                  key={row.id}
+                  className="cursor-pointer transition-colors hover:bg-gray-50/70"
+                  onDoubleClick={() => openClientVehicles(row)}
+                >
+                  <td className="py-3 pr-3 align-middle font-medium text-gray-900">{row.name}</td>
+                  <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">{row.phone || '—'}</td>
+                  <td className="hidden whitespace-nowrap py-3 pr-3 align-middle text-gray-600 lg:table-cell">
+                    {formatServerDateTime(row.consented_at) || '—'}
+                  </td>
+                  <td className="py-3 pr-3 align-middle">
+                    <AccountBadge userId={row.user_id} />
+                  </td>
+                  <td className="py-3 text-right align-middle">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openClientVehicles(row);
+                      }}
+                      className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
+                    >
+                      Показать
+                    </button>
+                  </td>
+                </tr>
               ))
             )}
           </tbody>
@@ -609,15 +639,15 @@ export default function AutoserviceClientsPage() {
           </p>
         ) : (
           filteredRows.map((row) => (
-            <ClientMobileCard
+            <div
               key={row.id}
-              row={row}
-              expanded={expandedClientId === row.id}
-              vehicles={clientVehicles[row.id]}
-              vehiclesLoading={vehiclesLoadingId === row.id}
-              onToggleVehicles={() => toggleClientVehicles(row.id)}
-              onEditVehicle={setEditVehicle}
-            />
+              onDoubleClick={() => openClientVehicles(row)}
+            >
+              <ClientMobileCard
+                row={row}
+                onShowVehicles={() => openClientVehicles(row)}
+              />
+            </div>
           ))
         )}
       </div>
@@ -628,6 +658,15 @@ export default function AutoserviceClientsPage() {
         onCreated={(row) => {
           setRows((prev) => [row, ...prev.filter((r) => r.id !== row.id)]);
         }}
+      />
+
+      <ClientVehiclesModal
+        open={Boolean(vehiclesModalClient)}
+        client={vehiclesModalClient}
+        vehicles={vehiclesModalClient ? clientVehicles[vehiclesModalClient.id] : []}
+        loading={vehiclesModalClient ? vehiclesLoadingId === vehiclesModalClient.id : false}
+        onClose={closeClientVehicles}
+        onEditVehicle={setEditVehicle}
       />
 
       <EditGuestVehicleModal

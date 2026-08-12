@@ -73,6 +73,15 @@ class UserSessionBrief(BaseModel):
         from_attributes = True
 
 
+class AdminUserMarkupInfo(BaseModel):
+    tier_override: Optional[str] = None
+    tier_effective: str
+    markup_percent: float
+    buyer_markup_percent: float
+    seller_markup_percent: float
+    autoservice_markup_percent: float
+
+
 class AdminUserListItem(UserResponse):
     organization_name: Optional[str] = None
     active_sessions_count: int = 0
@@ -80,6 +89,7 @@ class AdminUserListItem(UserResponse):
 
 class AdminUserDetail(AdminUserListItem):
     sessions: list[UserSessionBrief] = []
+    markup: Optional[AdminUserMarkupInfo] = None
 
 
 class AdminUserAuditResponse(BaseModel):

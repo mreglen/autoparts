@@ -152,8 +152,17 @@ const autoserviceAdminSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+      .addCase(fetchAutoserviceConnectedOrgs.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchAutoserviceConnectedOrgs.fulfilled, (state, action) => {
+        state.loading = false;
         state.connectedOrgs = action.payload || [];
+      })
+      .addCase(fetchAutoserviceConnectedOrgs.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       })
       .addCase(approveAutoserviceApplication.pending, (state) => {
         state.actionLoading = true;

@@ -1,16 +1,16 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectRosskoItems, selectSearchQuery, selectRosskoStatus } from '../../../redux/slices/RosskoSlice';
 import NewPartsEmptyResults from './NewPartsEmptyResults';
 import NewPartsFiltersForm from './NewPartsFiltersForm';
 import UsedPartsSearchCount from './UsedPartsSearchCount';
-import NewPartProductCard from './NewPartProductCard';
+import VinCatalogOffersTable from '../VinCatalog/VinCatalogOffersTable';
+import NewPartDetailDrawer from './NewPartDetailDrawer';
 import {
   getRosskoStockCount,
   getRosskoMinPrice,
   getRosskoEarliestDelivery,
-  mapPartToStocksData,
 } from './rosskoHelpers';
 
 const toSafeText = (value, fallback = '') => {
@@ -31,6 +31,7 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
   const partsData = useSelector(selectRosskoItems);
   const searchQuery = useSelector(selectSearchQuery);
   const status = useSelector(selectRosskoStatus);
+  const [drawerPart, setDrawerPart] = useState(null);
 
   const selectedBrands = searchParams.getAll('brand');
   const priceMin = searchParams.get('vmin') || '';
@@ -97,31 +98,24 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
   const safeSearchQuery = toSafeText(searchQuery, '');
   const safeUrlQuery = toSafeText(searchParams.get('q'), '');
 
-  const renderPartCards = (parts, idPrefix, sectionType) => (
-    <div className="space-y-4">
-      {parts.map((part, idx) => {
-        const baseKey = toSafeText(part?.guid, '') || toSafeText(part?.id, '') || toSafeText(part?.partnumber, '') || 'row';
-        const uniqueId = `${idPrefix}-${baseKey}-${idx}`;
-        const stocksData = mapPartToStocksData(part);
-        return (
-          <NewPartProductCard
-            key={uniqueId}
-            part={part}
-            stocksData={stocksData}
-            sectionType={sectionType}
-            uniqueId={uniqueId}
-          />
-        );
-      })}
-    </div>
+  const handleOpenPart = useCallback(({ part }) => {
+    if (part) setDrawerPart(part);
+  }, []);
+
+  const renderPartsTable = (parts, emptyText) => (
+    <VinCatalogOffersTable
+      parts={parts}
+      emptyText={emptyText}
+      onOpenPart={handleOpenPart}
+    />
   );
 
-  const renderSection = (title, parts, idPrefix, sectionType, accentClass) => (
+  const renderSection = (title, parts, accentClass, emptyText) => (
     <>
       <div className="my-4 text-lg font-medium">
         <h2 className={`inline-block border-b-4 pb-2 ${accentClass}`}>{title}</h2>
       </div>
-      {renderPartCards(parts, idPrefix, sectionType)}
+      {renderPartsTable(parts, emptyText)}
     </>
   );
 
@@ -160,14 +154,30 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
 
         <div className="min-w-0 flex-1">
           {filteredRosskoParts.length > 0 && (
-            renderSection('По вашему запросу', filteredRosskoParts, 'available', 'available', 'border-indigo-500')
+            renderSection(
+              'По вашему запросу',
+              filteredRosskoParts,
+              'border-indigo-500',
+              'Нет предложений по запросу',
+            )
           )}
 
           {showAnalogs && filteredCrossParts.length > 0 && (
-            renderSection('Аналоги', filteredCrossParts, 'analog', 'analog', 'border-blue-500')
+            renderSection(
+              'Аналоги',
+              filteredCrossParts,
+              'border-blue-500',
+              'Нет аналогов',
+            )
           )}
         </div>
       </div>
+
+      <NewPartDetailDrawer
+        part={drawerPart}
+        onClose={() => setDrawerPart(null)}
+        onOpenPart={handleOpenPart}
+      />
     </div>
   );
 };

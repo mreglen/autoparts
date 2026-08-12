@@ -31,6 +31,14 @@ _CYR_TO_LATIN = str.maketrans(
 
 _SEPARATORS = (" ", "\t", "\r", "\n", "-", "–", "—", "_", ".", "/", "\\")
 
+# Heuristics: long part numbers often look like VIN charset but are mostly digits.
+_SHORT_VIN_MAX_DIGIT_RATIO = 0.65
+_SHORT_VIN_MIN_LETTERS = 3
+_FULL_VIN_MIN_LETTERS = 3
+
+_TOKEN_SPLIT = frozenset((" ", "\t", "\r", "\n", ",", ";", "/"))
+_VIN_FRAGMENT_MAX_LEN = 8
+
 
 def normalize_vin(vin: str | None) -> str:
     """Uppercase, strip separators, map Cyrillic lookalikes to Latin. No validation."""
@@ -40,6 +48,32 @@ def normalize_vin(vin: str | None) -> str:
     for sep in _SEPARATORS:
         text = text.replace(sep, "")
     return text
+
+
+def _letter_and_digit_stats(norm: str) -> tuple[int, int]:
+    letters = sum(1 for ch in norm if ch.isalpha())
+    digits = sum(1 for ch in norm if ch.isdigit())
+    return letters, digits
+
+
+def _looks_like_part_number(norm: str) -> bool:
+    """Reject strings that resemble long catalog numbers rather than VIN/chassis."""
+    length = len(norm)
+    if length < VIN_MIN_LENGTH:
+        return True
+
+    letters, digits = _letter_and_digit_stats(norm)
+    if letters < _FULL_VIN_MIN_LETTERS:
+        return True
+
+    if length < VIN_MAX_LENGTH:
+        if letters < _SHORT_VIN_MIN_LETTERS:
+            return True
+        total = letters + digits
+        if total > 0 and digits / total >= _SHORT_VIN_MAX_DIGIT_RATIO:
+            return True
+
+    return False
 
 
 def looks_like_vin(vin: str | None) -> bool:
@@ -54,7 +88,50 @@ def looks_like_vin(vin: str | None) -> bool:
     # Require at least one letter so pure numeric strings are not treated as VIN
     if not any(ch.isalpha() for ch in norm):
         return False
+    if _looks_like_part_number(norm):
+        return False
     return True
+
+
+def _split_search_tokens(value: str) -> list[str]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    for sep in _TOKEN_SPLIT:
+        text = text.replace(sep, " ")
+    return [token.strip() for token in text.split() if token.strip()]
+
+
+def _token_looks_like_brand_word(token: str) -> bool:
+    return len(token) >= 4 and token.isalpha() and token.isascii()
+
+
+def normalize_vin_for_search_or_none(value: str | None) -> str | None:
+    """
+    VIN normalization for global search: ignore brand+article queries and other
+    false positives that sanitize to a VIN-shaped string.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    tokens = _split_search_tokens(text)
+    if len(tokens) > 1:
+        if any(_token_looks_like_brand_word(token) for token in tokens):
+            return None
+        joined = "".join(tokens)
+        if not all(1 <= len(token) <= _VIN_FRAGMENT_MAX_LEN and token.isalnum() for token in tokens):
+            return None
+        if not looks_like_vin(joined):
+            return None
+        return normalize_vin(joined)
+
+    if any(sep in text for sep in ("/", "\\", ".", "_")):
+        return None
+
+    if not looks_like_vin(text):
+        return None
+    return normalize_vin(text)
 
 
 def normalize_vin_or_none(vin: str | None) -> str | None:
@@ -89,5 +166,10 @@ def normalize_vin_or_raise(vin: str | None) -> str:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="VIN должен содержать хотя бы одну букву",
+        )
+    if _looks_like_part_number(norm):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Строка похожа на артикул, а не на VIN",
         )
     return norm

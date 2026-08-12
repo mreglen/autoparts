@@ -116,3 +116,28 @@ describe('useNewPartsMarkupPercent: подключённый автосерви�
     expect(markupFor('seller', { user: autoserviceUser })).toBe(AUTOSERVICE);
   });
 });
+
+describe('useNewPartsMarkupPercent: индивидуальная наценка организации', () => {
+  it('приоритетнее автоматической наценки автосервиса', () => {
+    expect(
+      markupFor('auto', {
+        user: {
+          ...autoserviceUser,
+          organization_new_parts_markup_tier: 'buyer',
+        },
+      }),
+    ).toBe(BUYER);
+  });
+
+  it('приоритетнее контекста админа по продавцу', () => {
+    expect(
+      markupFor('auto', {
+        user: {
+          ...sellerUser,
+          organization_new_parts_markup_tier: 'autoservice',
+        },
+        adminSellerMarkupContext: { sellerId: 2, markupPercent: 42 },
+      }),
+    ).toBe(AUTOSERVICE);
+  });
+});

@@ -27,6 +27,27 @@ class LooksLikeVinTests(unittest.TestCase):
     def test_pure_numeric_rejected(self):
         self.assertFalse(looks_like_vin("12345678901234567"))
 
+    def test_long_part_numbers_rejected(self):
+        self.assertFalse(looks_like_vin("059198405AB"))
+        self.assertFalse(looks_like_vin("VAG059198405"))
+        self.assertFalse(looks_like_vin("1234567890123456A"))
+        self.assertFalse(looks_like_vin("W71275ABC123"))
+
+    def test_normalize_vin_for_search_rejects_brand_article(self):
+        from app.services.laximo.vin import normalize_vin_for_search_or_none
+
+        self.assertIsNone(normalize_vin_for_search_or_none("VAG 059198405"))
+        self.assertIsNone(normalize_vin_for_search_or_none("KRAFT KT 100529"))
+        self.assertIsNone(normalize_vin_for_search_or_none("W712/75"))
+        self.assertEqual(
+            normalize_vin_for_search_or_none("WBA 3A5C58 CF123456"),
+            "WBA3A5C58CF123456",
+        )
+        self.assertEqual(
+            normalize_vin_for_search_or_none("XW8ZZZ7PZDG00269"),
+            "XW8ZZZ7PZDG00269",
+        )
+
     def test_spaces_and_dashes(self):
         self.assertEqual(
             normalize_vin_or_none("WBA 3A5C58-CF123456"),

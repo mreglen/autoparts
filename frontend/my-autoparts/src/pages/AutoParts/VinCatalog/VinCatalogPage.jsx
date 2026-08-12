@@ -841,13 +841,13 @@ export default function VinCatalogPage() {
                 : undefined
             }
           />
-          {notice === 'unavailable' ? (
+          {notice === 'unavailable' || notice === 'not_found' ? (
             <button
               type="button"
               onClick={goFallbackSearch}
               className="mt-2 text-sm font-medium text-indigo-600 hover:text-indigo-800"
             >
-              Искать как обычный запрос
+              Искать как артикул или название
             </button>
           ) : null}
           {notice === 'not_found' && step === 'boot' ? (

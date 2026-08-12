@@ -38,7 +38,7 @@ import {
 import { buildAutoPartsSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
-import { looksLikeVin, normalizeVinOrNull } from '../../utils/laximoVin';
+import { normalizeVinForSearchOrNull, queryLooksLikeVin } from '../../utils/laximoVin';
 import { fetchPublicSiteConfig } from '../../redux/slices/PublicInfoSlice';
 
 const UsedPartsList = React.lazy(() => import('./UsedParts/UsedPartsList'));
@@ -165,7 +165,7 @@ function AutoParts() {
   const handleNewPartsSearch = useCallback(async (text) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    const vin = normalizeVinOrNull(trimmed);
+    const vin = normalizeVinForSearchOrNull(trimmed);
     if (vin) {
       navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
       return;
@@ -180,7 +180,7 @@ function AutoParts() {
     params.delete('page');
     params.delete('vin_unavailable');
     const trimmed = text.trim();
-    const vin = normalizeVinOrNull(trimmed);
+    const vin = normalizeVinForSearchOrNull(trimmed);
     if (vin) {
       navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`, { replace });
       return;
@@ -200,7 +200,7 @@ function AutoParts() {
   }, [searchParams, navigate, location.pathname, dispatch]);
 
   const handleUsedLiveQueryChange = useCallback((text) => {
-    if (looksLikeVin(text.trim())) {
+    if (queryLooksLikeVin(text.trim())) {
       return;
     }
     applyUsedQueryToUrl(text, { replace: true });
@@ -260,7 +260,7 @@ function AutoParts() {
 
   // VIN in listing query → OEM catalog page (same as header search)
   useEffect(() => {
-    const vin = normalizeVinOrNull(urlQuery || '');
+    const vin = normalizeVinForSearchOrNull(urlQuery || '');
     if (!vin) return;
     navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`, { replace: true });
   }, [urlQuery, navigate]);

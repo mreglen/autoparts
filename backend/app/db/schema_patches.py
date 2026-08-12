@@ -25,6 +25,10 @@ def ensure_organization_markup_columns() -> None:
         statements.append(
             "ALTER TABLE organizations ADD COLUMN new_parts_markup_manual BOOLEAN NOT NULL DEFAULT FALSE"
         )
+    if "new_parts_markup_tier" not in columns:
+        statements.append(
+            "ALTER TABLE organizations ADD COLUMN new_parts_markup_tier VARCHAR(16)"
+        )
     if "append_marketplace_site_info" not in columns:
         statements.append(
             "ALTER TABLE organizations ADD COLUMN append_marketplace_site_info BOOLEAN NOT NULL DEFAULT FALSE"
@@ -1717,6 +1721,32 @@ def ensure_cart_max_quantity_columns() -> None:
             conn.execute(text(stmt))
 
     logger.info("Applied cart max_quantity column patches: %s", statements)
+
+
+def ensure_cart_purchase_price_columns() -> None:
+    """Add purchase_price to new-parts cart tables for client markup display."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    statements: list[str] = []
+
+    for table in ("new_parts_cart", "guest_new_parts_cart"):
+        if table not in table_names:
+            continue
+        columns = {col["name"] for col in inspector.get_columns(table)}
+        if "purchase_price" not in columns:
+            if engine.dialect.name == "postgresql":
+                statements.append(f"ALTER TABLE {table} ADD COLUMN purchase_price DOUBLE PRECISION")
+            else:
+                statements.append(f"ALTER TABLE {table} ADD COLUMN purchase_price NUMERIC(12, 2)")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied cart purchase_price column patches: %s", statements)
 
 
 def ensure_new_parts_basket_tables() -> None:

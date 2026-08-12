@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import re
 
-from app.services.laximo.vin import looks_like_vin
+from app.services.laximo.vin import (
+    normalize_vin_for_search_or_none,
+    normalize_vin_or_none,
+)
 
 # Roots/substrings unlikely in legitimate part searches; checked on compacted text.
 _PROFANITY_ROOTS = (
@@ -38,12 +41,6 @@ _PROFANITY_ROOTS = (
 )
 
 _TOKEN_SPLIT_RE = re.compile(r"[\s,;/]+")
-_VIN_FRAGMENT_RE = re.compile(r"^[A-Za-z0-9]{1,8}$")
-
-
-def _token_looks_like_brand_word(token: str) -> bool:
-    """Brand names like KRAFT should not trigger spaced-VIN detection."""
-    return len(token) >= 4 and token.isalpha() and token.isascii()
 
 
 def _compact_text(text: str) -> str:
@@ -83,22 +80,14 @@ def query_contains_vin(value: str | None) -> bool:
     if not text:
         return False
 
-    tokens = [token.strip() for token in _TOKEN_SPLIT_RE.split(text) if token.strip()]
-    if not tokens:
-        return False
-
-    if len(tokens) == 1:
-        return looks_like_vin(tokens[0])
-
-    if any(looks_like_vin(token) for token in tokens):
+    if normalize_vin_for_search_or_none(text) is not None:
         return True
 
-    joined = "".join(tokens)
-    if not looks_like_vin(joined):
+    tokens = [token.strip() for token in _TOKEN_SPLIT_RE.split(text) if token.strip()]
+    if len(tokens) <= 1:
         return False
-    if any(_token_looks_like_brand_word(token) for token in tokens[:-1]):
-        return False
-    return all(_VIN_FRAGMENT_RE.fullmatch(token) for token in tokens)
+
+    return any(normalize_vin_or_none(token) for token in tokens)
 
 
 def is_allowed_popular_query(value: str | None) -> bool:

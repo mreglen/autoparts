@@ -19,6 +19,7 @@ class NewPartsCart(Base):
     quantity = Column(Integer, nullable=False, default=1)
     max_quantity = Column(Integer, nullable=True)
     price = Column(Numeric(12, 2), nullable=False)
+    purchase_price = Column(Numeric(12, 2), nullable=True)
     stock_id = Column(String(50), nullable=False)  # ID склада из Rossmann API
 
     # Дополнительные поля для совместимости

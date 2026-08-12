@@ -10,6 +10,7 @@ class NewPartsCartItem(BaseModel):
     delivery: Optional[str] = None
     quantity: int = 1
     price: float
+    purchase_price: Optional[float] = None
     stock_id: str
     max_quantity: Optional[int] = None
     guid: Optional[str] = None
@@ -32,6 +33,7 @@ class CartItemResponse(BaseModel):
     quantity: int
     max_quantity: Optional[int] = None
     price: Optional[float] = None
+    purchase_price: Optional[float] = None
     stock_id: Optional[str] = None
     product_id: Optional[int] = None
     seller: str

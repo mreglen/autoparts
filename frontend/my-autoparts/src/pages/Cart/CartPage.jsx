@@ -19,6 +19,8 @@ import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
 import UnderlineTabs from '../../components/UI/UnderlineTabs';
 import Modal from '../../components/UI/Modal';
+import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../redux/slices/ClientMarkupSlice';
+import { isOrganizationStaff } from '../../utils/clientMarkupUtils';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price);
@@ -162,9 +164,13 @@ function CartItemRow({
   onQuantityChange,
   onRemove,
   showDelivery,
+  showPurchasePrice,
 }) {
   const maxQty = getMaxAllowedQuantity(item);
   const lineTotal = item.price * item.quantity;
+  const showPurchase = showPurchasePrice
+    && item.purchasePrice > 0
+    && Math.abs(item.price - item.purchasePrice) > 0.009;
 
   return (
     <article className="flex gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-3 transition hover:border-gray-200 sm:p-4">
@@ -227,6 +233,11 @@ function CartItemRow({
       <div className="shrink-0 text-right">
         <p className="text-sm font-bold text-gray-900 sm:text-base">{formatPrice(lineTotal)}</p>
         <p className="mt-0.5 text-xs text-gray-500">{formatPrice(item.price)} / шт.</p>
+        {showPurchase ? (
+          <p className="mt-0.5 text-[11px] text-gray-400">
+            Закуп. {formatPrice(item.purchasePrice)} / шт.
+          </p>
+        ) : null}
       </div>
     </article>
   );
@@ -248,6 +259,7 @@ function SellerCartBlock({
   isAuthorized,
   calculateSellerTotal,
   checkoutLabel = 'Оформить заказ',
+  showPurchasePrice = false,
 }) {
   const allSelected = allItems.length > 0 && allItems.every((item) => selectedItems.has(item.id));
   const someSelected = allItems.some((item) => selectedItems.has(item.id));
@@ -266,6 +278,7 @@ function SellerCartBlock({
         onQuantityChange={onQuantityChange}
         onRemove={onRemove}
         showDelivery={showDelivery}
+        showPurchasePrice={showPurchasePrice && item.type === 'new'}
       />
     ));
 
@@ -389,6 +402,11 @@ export default function CartPage() {
   const activeBasketId = useSelector(selectActiveNewPartsBasketId);
   const isInitialLoad = loading && !cart;
   const isAuthorized = useSelector((state) => Boolean(state.auth.token));
+  const user = useSelector((state) => state.auth.user);
+  const clientMarkup = useSelector((state) => state.clientMarkup);
+  const showPurchaseInCart = isOrganizationStaff(user)
+    && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH
+    && clientMarkup.showPurchaseInCart;
 
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -411,6 +429,7 @@ export default function CartPage() {
     name: formatProductDisplayTitle(item.brand, item.partnumber, item.name),
     deliveryDate: item.delivery,
     price: item.price,
+    purchasePrice: item.purchase_price,
     quantity: item.quantity,
     maxQuantity: item.max_quantity,
     stock_id: item.stock_id,
@@ -800,6 +819,7 @@ export default function CartPage() {
                   isAuthorized={isAuthorized}
                   calculateSellerTotal={calculateSellerTotal}
                   checkoutLabel="Оформить заказ"
+                  showPurchasePrice={showPurchaseInCart}
                 />
               ) : (
                 <div className="rounded-sg-lg border border-line bg-surface px-6 py-10 text-center text-sm text-gray-500 shadow-sg">
@@ -830,6 +850,7 @@ export default function CartPage() {
               isAuthorized={isAuthorized}
               calculateSellerTotal={calculateSellerTotal}
               checkoutLabel="Оформить заказ"
+              showPurchasePrice={showPurchaseInCart}
             />
           )}
 

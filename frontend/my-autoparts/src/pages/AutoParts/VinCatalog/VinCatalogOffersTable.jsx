@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
+import ClientMarkupPopover from '../../../components/NewParts/ClientMarkupPopover';
+import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../../redux/slices/ClientMarkupSlice';
+import { computeClientPrices, isOrganizationStaff } from '../../../utils/clientMarkupUtils';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import { mapPartToStocksData } from '../NewParts/rosskoHelpers';
 import {
-  applyMarkup,
   formatDeliveryParts,
   formatPriceRub,
 } from '../NewParts/newPartStockUtils';
@@ -139,6 +141,21 @@ function buildPartGroups(parts) {
   );
 }
 
+function PriceCell({ purchasePrice, clientPrice, showBoth }) {
+  const showPurchase = showBoth && purchasePrice > 0 && Math.abs(clientPrice - purchasePrice) > 0.009;
+  if (showPurchase) {
+    return (
+      <div className="text-right leading-tight">
+        <div className="text-xs font-bold text-gray-900">{formatPriceRub(clientPrice)}</div>
+        <div className="text-[10px] text-gray-500">{formatPriceRub(purchasePrice)}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="text-right text-xs font-bold text-gray-900">{formatPriceRub(clientPrice)}</div>
+  );
+}
+
 function StockOfferRow({
   stock,
   part,
@@ -146,9 +163,12 @@ function StockOfferRow({
   number,
   name,
   detailHref,
-  markupPercent,
+  siteMarkupPercent,
+  clientMarkupPercent,
+  showBothPrices,
   isSubRow = false,
   warehousesToggle = null,
+  onOpenPart = null,
 }) {
   const dispatch = useDispatch();
   const cart = useSelector(selectCart);
@@ -156,7 +176,11 @@ function StockOfferRow({
   const [busy, setBusy] = useState(false);
 
   const maxQty = Math.max(1, Number(stock.available_count) || 1);
-  const price = applyMarkup(stock.price, markupPercent);
+  const { purchasePrice, clientPrice } = computeClientPrices(
+    stock.price,
+    siteMarkupPercent,
+    clientMarkupPercent,
+  );
 
   const cartItemInStore = useMemo(() => {
     if (!stock?.stock_id || !cart?.new_parts_items) return null;
@@ -178,10 +202,13 @@ function StockOfferRow({
       brand,
       partnumber: number,
       quantity: quantityToAdd,
-      price,
+      price: clientPrice,
       stock_id: String(stock.stock_id || '').trim(),
       max_quantity: maxQty,
     };
+    if (purchasePrice > 0 && Math.abs(purchasePrice - clientPrice) > 0.009) {
+      item.purchase_price = purchasePrice;
+    }
     if (name) item.name = name;
     if (part?.guid) item.guid = String(part.guid);
     if (stock.delivery_start) {
@@ -234,6 +261,14 @@ function StockOfferRow({
     }
   };
 
+  const handleOpen = () => {
+    if (onOpenPart) {
+      onOpenPart({ part, brand, number, name, detailHref });
+      return;
+    }
+    window.open(detailHref, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <tr
       className={`border-b border-gray-100 transition hover:bg-indigo-50/30 ${
@@ -244,7 +279,7 @@ function StockOfferRow({
         {!isSubRow ? (
           <button
             type="button"
-            onClick={() => window.open(detailHref, '_blank', 'noopener,noreferrer')}
+            onClick={handleOpen}
             className="block max-w-full truncate text-left font-mono text-xs font-medium text-indigo-700 hover:text-indigo-900"
             title={number}
           >
@@ -263,7 +298,7 @@ function StockOfferRow({
         {!isSubRow ? (
           <button
             type="button"
-            onClick={() => window.open(detailHref, '_blank', 'noopener,noreferrer')}
+            onClick={handleOpen}
             className="block w-full text-left text-xs font-medium leading-tight text-indigo-700 hover:text-indigo-900 line-clamp-2 break-words whitespace-normal"
             title={name}
           >
@@ -278,8 +313,12 @@ function StockOfferRow({
         <div>{maxQty} шт.</div>
         {!isSubRow && warehousesToggle}
       </td>
-      <td className="whitespace-nowrap px-3 py-2 pl-6 text-right text-xs font-bold text-gray-900">
-        {formatPriceRub(price)}
+      <td className="whitespace-nowrap px-3 py-2 pl-6">
+        <PriceCell
+          purchasePrice={purchasePrice}
+          clientPrice={clientPrice}
+          showBoth={showBothPrices}
+        />
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-right">
         <div className="inline-flex flex-col items-end">
@@ -296,7 +335,7 @@ function StockOfferRow({
   );
 }
 
-function PartOfferGroup({ group, markupPercent }) {
+function PartOfferGroup({ group, siteMarkupPercent, clientMarkupPercent, showBothPrices, onOpenPart }) {
   const [showOthers, setShowOthers] = useState(false);
   const { part, brand, number, name, mainStock, otherStocks, detailHref } = group;
 
@@ -319,8 +358,11 @@ function PartOfferGroup({ group, markupPercent }) {
         number={number}
         name={name}
         detailHref={detailHref}
-        markupPercent={markupPercent}
+        siteMarkupPercent={siteMarkupPercent}
+        clientMarkupPercent={clientMarkupPercent}
+        showBothPrices={showBothPrices}
         warehousesToggle={warehousesToggle}
+        onOpenPart={onOpenPart}
       />
       {showOthers
         ? otherStocks.map((stock, index) => (
@@ -332,8 +374,11 @@ function PartOfferGroup({ group, markupPercent }) {
             number={number}
             name={name}
             detailHref={detailHref}
-            markupPercent={markupPercent}
+            siteMarkupPercent={siteMarkupPercent}
+            clientMarkupPercent={clientMarkupPercent}
+            showBothPrices={showBothPrices}
             isSubRow
+            onOpenPart={onOpenPart}
           />
         ))
         : null}
@@ -341,8 +386,13 @@ function PartOfferGroup({ group, markupPercent }) {
   );
 }
 
-function OffersTable({ parts, emptyText }) {
-  const markupPercent = useNewPartsMarkupPercent('auto');
+function OffersTable({ parts, emptyText, onOpenPart }) {
+  const siteMarkupPercent = useNewPartsMarkupPercent('auto');
+  const user = useSelector((state) => state.auth.user);
+  const clientMarkup = useSelector((state) => state.clientMarkup);
+  const showStaffMarkup = isOrganizationStaff(user);
+  const clientMarkupPercent = showStaffMarkup ? (Number(clientMarkup.percent) || 0) : 0;
+  const showBothPrices = showStaffMarkup && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH;
 
   const groups = useMemo(() => buildPartGroups(parts), [parts]);
 
@@ -369,13 +419,25 @@ function OffersTable({ parts, emptyText }) {
             <th className="px-2 py-2">Наименование</th>
             <th className="px-3 py-2">Доставим</th>
             <th className="px-3 py-2">Остаток</th>
-            <th className="px-3 py-2 pl-6 text-right">Цена, ₽</th>
+            <th className="px-3 py-2 pl-6 text-right">
+              <div className="inline-flex items-center justify-end gap-1">
+                <span>Цена, ₽</span>
+                {showStaffMarkup ? <ClientMarkupPopover /> : null}
+              </div>
+            </th>
             <th className="px-3 py-2 pl-2 text-right">К заказу</th>
           </tr>
         </thead>
         <tbody>
           {groups.map((group) => (
-            <PartOfferGroup key={group.key} group={group} markupPercent={markupPercent} />
+            <PartOfferGroup
+              key={group.key}
+              group={group}
+              siteMarkupPercent={siteMarkupPercent}
+              clientMarkupPercent={clientMarkupPercent}
+              showBothPrices={showBothPrices}
+              onOpenPart={onOpenPart}
+            />
           ))}
         </tbody>
       </table>
@@ -383,6 +445,11 @@ function OffersTable({ parts, emptyText }) {
   );
 }
 
-export default function VinCatalogOffersTable({ parts, sectionType = 'available', emptyText = 'Нет предложений' }) {
-  return <OffersTable parts={parts} sectionType={sectionType} emptyText={emptyText} />;
+export default function VinCatalogOffersTable({
+  parts,
+  sectionType = 'available',
+  emptyText = 'Нет предложений',
+  onOpenPart = null,
+}) {
+  return <OffersTable parts={parts} sectionType={sectionType} emptyText={emptyText} onOpenPart={onOpenPart} />;
 }

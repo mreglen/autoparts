@@ -95,6 +95,9 @@ def _new_parts_cart_item_response(cart_item) -> CartItemResponse:
         quantity=cart_item.quantity,
         max_quantity=cart_item.max_quantity,
         price=float(cart_item.price) if cart_item.price is not None else None,
+        purchase_price=float(cart_item.purchase_price)
+        if getattr(cart_item, "purchase_price", None) is not None
+        else None,
         stock_id=cart_item.stock_id,
         seller=cart_item.seller,
         created_at=cart_item.created_at,
@@ -252,6 +255,9 @@ async def add_new_parts_to_cart(
             merged_max = _merge_new_parts_max(existing_item.max_quantity, incoming_max)
             existing_item.max_quantity = merged_max
             existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, merged_max)
+            existing_item.price = item.price
+            if item.purchase_price is not None:
+                existing_item.purchase_price = item.purchase_price
             if delivery_str is not None:
                 existing_item.delivery = delivery_str
             existing_item.updated_at = datetime.utcnow()
@@ -269,6 +275,7 @@ async def add_new_parts_to_cart(
             delivery=delivery_str,
             quantity=_cap_to_max(item.quantity, incoming_max),
             price=item.price,
+            purchase_price=item.purchase_price,
             stock_id=item.stock_id,
             max_quantity=incoming_max,
             guid=item.guid,
@@ -290,6 +297,9 @@ async def add_new_parts_to_cart(
             merged_max = _merge_new_parts_max(existing_item.max_quantity, incoming_max)
             existing_item.max_quantity = merged_max
             existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, merged_max)
+            existing_item.price = item.price
+            if item.purchase_price is not None:
+                existing_item.purchase_price = item.purchase_price
             if delivery_str is not None:
                 existing_item.delivery = delivery_str
             existing_item.updated_at = datetime.utcnow()
@@ -307,6 +317,7 @@ async def add_new_parts_to_cart(
             delivery=delivery_str,
             quantity=_cap_to_max(item.quantity, incoming_max),
             price=item.price,
+            purchase_price=item.purchase_price,
             stock_id=item.stock_id,
             max_quantity=incoming_max,
             guid=item.guid,

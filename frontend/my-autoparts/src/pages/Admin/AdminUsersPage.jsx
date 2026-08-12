@@ -6,6 +6,7 @@ import {
     fetchAdminUserDetail,
     fetchAdminUserAudit,
     revokeUserSessions,
+    patchAdminUserMarkup,
 } from '../../redux/slices/AdminSlice';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -47,6 +48,8 @@ export default function AdminUsersPage() {
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [detailTab, setDetailTab] = useState('overview');
     const [auditPage, setAuditPage] = useState(1);
+    const [markupSaving, setMarkupSaving] = useState(false);
+    const [markupError, setMarkupError] = useState(null);
 
     useEffect(() => {
         if (!isReady) return;
@@ -114,6 +117,7 @@ export default function AdminUsersPage() {
     const closeDetail = () => {
         setSelectedUserId(null);
         setDetailTab('overview');
+        setMarkupError(null);
     };
 
     const handleRevokeSessions = async (userId) => {
@@ -131,6 +135,19 @@ export default function AdminUsersPage() {
         if (!selectedUserId) return;
         setAuditPage(page);
         dispatch(fetchAdminUserAudit({ userId: selectedUserId, page }));
+    };
+
+    const handleMarkupTierChange = async (tier) => {
+        if (!selectedUserId) return;
+        setMarkupError(null);
+        setMarkupSaving(true);
+        try {
+            await dispatch(patchAdminUserMarkup({ userId: selectedUserId, tier })).unwrap();
+        } catch (err) {
+            setMarkupError(typeof err === 'string' ? err : 'Не удалось сохранить наценку');
+        } finally {
+            setMarkupSaving(false);
+        }
     };
 
     if (!isReady) {
@@ -396,6 +413,9 @@ export default function AdminUsersPage() {
                     }}
                     onAuditPageChange={loadAuditPage}
                     onClose={closeDetail}
+                    onMarkupTierChange={handleMarkupTierChange}
+                    markupSaving={markupSaving}
+                    markupError={markupError}
                     formatAuditDate={formatAuditDate}
                     labelCategory={labelCategory}
                     labelEventType={labelEventType}

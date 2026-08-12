@@ -469,7 +469,7 @@ export default function ProfileMenuTabs({
 
     return (
         <div
-            className="sticky top-[calc(var(--sg-desktop-header-h)+1rem)] h-[calc(100vh-var(--sg-desktop-header-h)-2rem)] w-full min-w-[15.5rem] overflow-y-auto overscroll-contain scroll-pb-32 bg-white [&::-webkit-scrollbar]:hidden"
+            className="sticky top-[calc(var(--sg-desktop-header-h)+1rem)] max-h-[calc(100dvh-var(--sg-desktop-header-h)-2rem)] w-full min-w-[15.5rem] overflow-y-auto overscroll-contain scroll-pb-32 bg-white [&::-webkit-scrollbar]:hidden"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
             {showAdminMenuSwitch ? (

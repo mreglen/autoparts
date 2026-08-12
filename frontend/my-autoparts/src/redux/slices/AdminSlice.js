@@ -1,4 +1,3 @@
-// src/redux/slices/AdminSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequest } from '../../utils/apiClient';
 
@@ -45,6 +44,20 @@ export const revokeUserSessions = createAsyncThunk(
             return await apiRequest(`/admin/users/${userId}/revoke-sessions`, { method: 'POST' });
         } catch (err) {
             return rejectWithValue(err?.message || 'Не удалось завершить сессии');
+        }
+    }
+);
+
+export const patchAdminUserMarkup = createAsyncThunk(
+    'admin/patchAdminUserMarkup',
+    async ({ userId, tier }, { rejectWithValue }) => {
+        try {
+            return await apiRequest(`/admin/users/${userId}/markup`, {
+                method: 'PATCH',
+                body: JSON.stringify({ tier }),
+            });
+        } catch (err) {
+            return rejectWithValue(err?.message || 'Не удалось сохранить наценку');
         }
     }
 );
@@ -165,6 +178,14 @@ const adminSlice = createSlice({
                 const index = state.organizations.findIndex((org) => org.id === action.payload.id);
                 if (index !== -1) {
                     state.organizations[index] = action.payload;
+                }
+            })
+            .addCase(patchAdminUserMarkup.fulfilled, (state, action) => {
+                if (state.userDetail) {
+                    state.userDetail = {
+                        ...state.userDetail,
+                        markup: action.payload,
+                    };
                 }
             });
     },
