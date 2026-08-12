@@ -15,6 +15,19 @@ jest.mock('react-router-dom', () => ({
   useSearchParams: () => [mockSearchParams],
 }), { virtual: true });
 
+jest.mock('../../../components/VinScanner/VinScanModal', () => ({
+  __esModule: true,
+  default: ({ open, onConfirm, onClose }) => (
+    open ? (
+      <div>
+        <span>VIN scan modal</span>
+        <button type="button" onClick={() => onConfirm('JHMGD18908S212467')}>Confirm VIN</button>
+        <button type="button" onClick={onClose}>Close scan</button>
+      </div>
+    ) : null
+  ),
+}));
+
 // eslint-disable-next-line import/first
 import Search from './Search';
 
@@ -66,5 +79,19 @@ describe('Search clear button', () => {
     fireEvent.click(screen.getByLabelText('Очистить поиск'));
     expect(mockNavigate).toHaveBeenCalledWith('/autoparts/new', { replace: true });
     expect(screen.getByRole('searchbox')).toHaveValue('');
+  });
+
+  it('opens VIN scan modal from camera button', () => {
+    renderSearch();
+    fireEvent.click(screen.getByLabelText('Распознать VIN'));
+    expect(screen.getByText('VIN scan modal')).toBeInTheDocument();
+  });
+
+  it('navigates to VIN catalog after scan confirm', () => {
+    renderSearch();
+    fireEvent.click(screen.getByLabelText('Распознать VIN'));
+    fireEvent.click(screen.getByText('Confirm VIN'));
+    expect(mockNavigate).toHaveBeenCalledWith('/autoparts/vin?vin=JHMGD18908S212467');
+    expect(screen.getByRole('searchbox')).toHaveValue('JHMGD18908S212467');
   });
 });

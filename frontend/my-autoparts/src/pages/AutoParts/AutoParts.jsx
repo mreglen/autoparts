@@ -152,6 +152,10 @@ function AutoParts() {
     navigate(`${basePath}${qs ? `?${qs}` : ''}`, { replace: true });
   }, [searchParams, navigate, location.pathname]);
 
+  const handleVinScanConfirm = useCallback((vin) => {
+    navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+  }, [navigate]);
+
   const handleNewPartsSearch = useCallback(async (text) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -454,6 +458,8 @@ function AutoParts() {
             onClear={handleUsedPartsClear}
             liveSearch
             sticky={false}
+            enableVinScan
+            onVinScanConfirm={handleVinScanConfirm}
           />
         )}
         {activeTab === 'rossko' && (
@@ -462,6 +468,8 @@ function AutoParts() {
             onClear={handleNewPartsClear}
             sticky={false}
             placeholder="Артикул, бренд или наименование"
+            enableVinScan
+            onVinScanConfirm={handleVinScanConfirm}
           />
         )}
 

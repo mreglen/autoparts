@@ -10,6 +10,8 @@ import {
 import { looksLikeVin, normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../../utils/laximoVin';
 import { fetchPublicSiteConfig } from '../../../redux/slices/PublicInfoSlice';
 import VinCatalogBrowse from './VinCatalogBrowse';
+import VinScanModal from '../../../components/VinScanner/VinScanModal';
+import VinScanTriggerButton from '../../../components/VinScanner/VinScanTriggerButton';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -56,6 +58,7 @@ export default function VinCatalogPage() {
   const [candidates, setCandidates] = useState([]);
   const [vehicle, setVehicle] = useState(null);
   const [fromWizard, setFromWizard] = useState(false);
+  const [vinScanOpen, setVinScanOpen] = useState(false);
 
   const [mode, setMode] = useState('quick');
   const [hasQuickgroups, setHasQuickgroups] = useState(false);
@@ -265,6 +268,16 @@ export default function VinCatalogPage() {
     },
     []
   );
+
+  const submitVinSearch = useCallback((vinValue) => {
+    const next = normalizeVinOrNull(vinValue);
+    if (!next) {
+      setError('VIN должен содержать от 11 до 17 символов');
+      return;
+    }
+    navigate(`/autoparts/vin?vin=${encodeURIComponent(next)}`, { replace: true });
+    decodeVin(next);
+  }, [decodeVin, navigate]);
 
   const beginWizard = async () => {
     setStep('wizard');
@@ -852,38 +865,52 @@ export default function VinCatalogPage() {
       {step === 'boot' && !loading && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
           <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              className="block w-full rounded-lg border border-gray-300 px-4 py-3 text-base shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-              value={vin}
-              onChange={(e) => setVin(sanitizeVinInput(e.target.value))}
-              maxLength={VIN_INPUT_MAX_LENGTH}
-              placeholder="VIN автомобиля"
-              autoCapitalize="characters"
-            />
+            <div className="relative min-w-0 flex-1">
+              <input
+                className="block w-full rounded-lg border border-gray-300 py-3 pl-4 pr-12 text-base shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                value={vin}
+                onChange={(e) => setVin(sanitizeVinInput(e.target.value))}
+                maxLength={VIN_INPUT_MAX_LENGTH}
+                placeholder="VIN автомобиля"
+                autoCapitalize="characters"
+              />
+              <VinScanTriggerButton
+                onClick={() => setVinScanOpen(true)}
+                className="absolute inset-y-0 right-2 px-2"
+              />
+            </div>
             <button
               type="button"
-              onClick={() => {
-                const next = normalizeVinOrNull(vin);
-                if (!next) {
-                  setError('VIN должен содержать от 11 до 17 символов');
-                  return;
-                }
-                navigate(`/autoparts/vin?vin=${encodeURIComponent(next)}`, { replace: true });
-                decodeVin(next);
-              }}
+              onClick={() => submitVinSearch(vin)}
               className="shrink-0 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white hover:bg-indigo-700"
             >
               Найти
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setVinScanOpen(true)}
+            className="mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+          >
+            Распознать VIN с камеры
+          </button>
           {error && !notice ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
           <button
             type="button"
             onClick={beginWizard}
-            className="mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            className="mt-3 block text-sm font-medium text-indigo-600 hover:text-indigo-800"
           >
             Подобрать по параметрам
           </button>
+          <VinScanModal
+            open={vinScanOpen}
+            onClose={() => setVinScanOpen(false)}
+            onConfirm={(nextVin) => {
+              setVinScanOpen(false);
+              setVin(nextVin);
+              submitVinSearch(nextVin);
+            }}
+          />
         </div>
       )}
 

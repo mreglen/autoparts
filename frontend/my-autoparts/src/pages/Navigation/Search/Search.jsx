@@ -8,11 +8,14 @@ import {
 } from '../../../redux/slices/RosskoSlice';
 import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
 import { looksLikeVin, normalizeVinOrNull } from '../../../utils/laximoVin';
+import VinScanModal from '../../../components/VinScanner/VinScanModal';
+import VinScanTriggerButton from '../../../components/VinScanner/VinScanTriggerButton';
 
 function Search() {
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [isSearching, setIsSearching] = useState(false);
+  const [vinScanOpen, setVinScanOpen] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -96,6 +99,12 @@ function Search() {
     if (e.key === 'Enter') handleSearch();
   };
 
+  const handleVinScanConfirm = useCallback((vin) => {
+    setVinScanOpen(false);
+    setSearchTerm(vin);
+    navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+  }, [navigate]);
+
   const handleClear = useCallback(() => {
     setSearchTerm('');
     dispatch(setGlobalSearchQuery(''));
@@ -131,48 +140,62 @@ function Search() {
     showNewAutoparts,
   ]);
 
+  const rightPadding = showClear ? 'pr-[5.75rem]' : 'pr-[4.25rem]';
+
   return (
-    <div className="relative w-full">
-      <input
-        type="text"
-        role="searchbox"
-        inputMode="search"
-        value={searchTerm}
-        onChange={handleInputChange}
-        onKeyPress={handleKeyPress}
-        placeholder="Поиск: VIN, бренд, артикул или название"
-        className={`block w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-4 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 ${showClear ? 'pr-20' : 'pr-11'}`}
-        disabled={isSearching}
-      />
-      {showClear ? (
+    <>
+      <div className="relative w-full">
+        <input
+          type="text"
+          role="searchbox"
+          inputMode="search"
+          value={searchTerm}
+          onChange={handleInputChange}
+          onKeyPress={handleKeyPress}
+          placeholder="Поиск: VIN, бренд, артикул или название"
+          className={`block w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-4 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 ${rightPadding}`}
+          disabled={isSearching}
+        />
+        {showClear ? (
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={isSearching}
+            className="absolute inset-y-0 right-[4.25rem] flex items-center px-2 text-gray-400 transition hover:text-gray-600 disabled:opacity-50"
+            aria-label="Очистить поиск"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        ) : null}
+        <VinScanTriggerButton
+          onClick={() => setVinScanOpen(true)}
+          disabled={isSearching}
+          className="absolute inset-y-0 right-10 px-2"
+        />
         <button
           type="button"
-          onClick={handleClear}
+          onClick={handleSearch}
           disabled={isSearching}
-          className="absolute inset-y-0 right-10 flex items-center px-2 text-gray-400 transition hover:text-gray-600 disabled:opacity-50"
-          aria-label="Очистить поиск"
+          className="absolute inset-y-0 right-0 flex items-center rounded-r-xl px-3 text-gray-500 transition hover:text-indigo-600 disabled:opacity-50"
+          aria-label="Искать"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          {isSearching ? (
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+          ) : (
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          )}
         </button>
-      ) : null}
-      <button
-        type="button"
-        onClick={handleSearch}
-        disabled={isSearching}
-        className="absolute inset-y-0 right-0 flex items-center rounded-r-xl px-3 text-gray-500 transition hover:text-indigo-600 disabled:opacity-50"
-        aria-label="Искать"
-      >
-        {isSearching ? (
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-        ) : (
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        )}
-      </button>
-    </div>
+      </div>
+      <VinScanModal
+        open={vinScanOpen}
+        onClose={() => setVinScanOpen(false)}
+        onConfirm={handleVinScanConfirm}
+      />
+    </>
   );
 }
 

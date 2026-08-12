@@ -263,7 +263,7 @@ function StockOfferRow({
           <button
             type="button"
             onClick={() => window.open(detailHref, '_blank', 'noopener,noreferrer')}
-            className="block w-full text-left text-xs font-medium leading-snug text-indigo-700 hover:text-indigo-900 line-clamp-2 break-words whitespace-normal"
+            className="block w-full text-left text-xs font-medium leading-tight text-indigo-700 hover:text-indigo-900 line-clamp-2 break-words whitespace-normal"
             title={name}
           >
             {name}
@@ -353,15 +353,15 @@ function OffersTable({ parts, emptyText }) {
 
   return (
     <div className="-mx-1 overflow-x-auto">
-      <table className="min-w-[800px] w-full table-fixed border-collapse text-left">
+      <table className="min-w-[840px] w-full table-fixed border-collapse text-left">
         <colgroup>
-          <col style={{ width: '112px' }} />
-          <col style={{ width: '96px' }} />
-          <col style={{ width: '148px' }} />
-          <col style={{ width: '128px' }} />
-          <col style={{ width: '80px' }} />
-          <col style={{ width: '88px' }} />
-          <col style={{ width: '72px' }} />
+          <col style={{ width: '108px' }} />
+          <col style={{ width: '92px' }} />
+          <col style={{ width: '176px' }} />
+          <col style={{ width: '124px' }} />
+          <col style={{ width: '76px' }} />
+          <col style={{ width: '84px' }} />
+          <col style={{ width: '68px' }} />
         </colgroup>
         <thead>
           <tr className="border-b border-gray-200 bg-gray-50 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
