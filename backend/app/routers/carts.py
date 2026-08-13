@@ -96,6 +96,8 @@ def _new_parts_cart_item_response(cart_item) -> CartItemResponse:
         partnumber=cart_item.partnumber,
         name=cart_item.name,
         delivery=cart_item.delivery,
+        delivery_start=getattr(cart_item, "delivery_start", None),
+        delivery_end=getattr(cart_item, "delivery_end", None),
         quantity=cart_item.quantity,
         max_quantity=cart_item.max_quantity,
         price=float(cart_item.price) if cart_item.price is not None else None,
@@ -264,6 +266,10 @@ async def add_new_parts_to_cart(
                 existing_item.purchase_price = item.purchase_price
             if delivery_str is not None:
                 existing_item.delivery = delivery_str
+            if item.delivery_start is not None:
+                existing_item.delivery_start = item.delivery_start
+            if item.delivery_end is not None:
+                existing_item.delivery_end = item.delivery_end
             existing_item.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(existing_item)
@@ -306,6 +312,10 @@ async def add_new_parts_to_cart(
                 existing_item.purchase_price = item.purchase_price
             if delivery_str is not None:
                 existing_item.delivery = delivery_str
+            if item.delivery_start is not None:
+                existing_item.delivery_start = item.delivery_start
+            if item.delivery_end is not None:
+                existing_item.delivery_end = item.delivery_end
             existing_item.updated_at = datetime.utcnow()
             db.commit()
             touch_guest_cart(db, guest_cart)

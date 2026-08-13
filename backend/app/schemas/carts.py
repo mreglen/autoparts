@@ -30,6 +30,8 @@ class CartItemResponse(BaseModel):
     partnumber: Optional[str] = None
     name: Optional[str] = None
     delivery: Optional[str] = None
+    delivery_start: Optional[datetime] = None
+    delivery_end: Optional[datetime] = None
     quantity: int
     max_quantity: Optional[int] = None
     price: Optional[float] = None

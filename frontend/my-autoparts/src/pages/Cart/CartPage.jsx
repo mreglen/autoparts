@@ -25,77 +25,31 @@ import { FieldLabel, Input } from '../../components/UI/Field';
 import { PageHeader } from '../../components/UI/SectionHeader';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../redux/slices/ClientMarkupSlice';
 import { isOrganizationStaff } from '../../utils/clientMarkupUtils';
-import { formatNewPartMoney, truncateRubles } from '../../pages/AutoParts/NewParts/newPartStockUtils';
+import {
+  formatDeliveryParts,
+  formatNewPartMoney,
+  truncateRubles,
+} from '../../pages/AutoParts/NewParts/newPartStockUtils';
 
 const formatNewPartPrice = (price) => formatNewPartMoney(price);
 
 const formatUsedPrice = (price) =>
   new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price || 0);
 
-function formatDeliveryTime(deliveryString) {
-  if (!deliveryString) return '—';
-
-  if (
-    typeof deliveryString === 'string'
-    && deliveryString.includes('с')
-    && deliveryString.includes('до')
-  ) {
-    return deliveryString;
+function DeliveryCell({ deliveryStart, deliveryEnd, deliveryFallback }) {
+  const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
+  if (parts) {
+    return (
+      <div className="text-xs leading-snug text-ink">
+        <p className="font-semibold text-ink">{parts.dateLine}</p>
+        <p className="text-ink-muted">{parts.timeLine}</p>
+      </div>
+    );
   }
-
-  if (
-    deliveryString
-    && typeof deliveryString === 'object'
-    && deliveryString.delivery_start
-    && deliveryString.delivery_end
-  ) {
-    try {
-      const startDate = new Date(deliveryString.delivery_start);
-      const endDate = new Date(deliveryString.delivery_end);
-      const dayText = startDate.toLocaleDateString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-      const startTime = startDate.toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const endTime = endDate.toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      return `${dayText} с ${startTime} до ${endTime}`;
-    } catch {
-      return '—';
-    }
+  if (typeof deliveryFallback === 'string' && deliveryFallback.trim()) {
+    return <p className="text-xs text-ink-muted">{deliveryFallback}</p>;
   }
-
-  return formatDate(deliveryString);
-}
-
-function formatDate(dateString) {
-  if (!dateString) return '—';
-  try {
-    let date;
-    if (typeof dateString === 'string') {
-      date = new Date(dateString);
-    } else if (dateString?.year) {
-      date = new Date(
-        dateString.year,
-        dateString.month - 1,
-        dateString.day,
-        dateString.hour || 0,
-        dateString.minute || 0,
-      );
-    } else {
-      date = new Date(dateString);
-    }
-    if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleDateString('ru-RU');
-  } catch {
-    return '—';
-  }
+  return <span className="text-xs text-ink-muted">—</span>;
 }
 
 function getMaxAllowedQuantity(item) {
@@ -172,8 +126,12 @@ function CartTableRow({
         <p className="text-sm text-ink">{item.partTitle || item.name}</p>
       </td>
       {showDeliveryColumn ? (
-        <td className="min-w-[7rem] px-2 py-2.5 align-middle text-xs text-ink-muted">
-          {item.deliveryDate ? formatDeliveryTime(item.deliveryDate) : '—'}
+        <td className="min-w-[7rem] px-2 py-2.5 align-middle">
+          <DeliveryCell
+            deliveryStart={item.deliveryStart}
+            deliveryEnd={item.deliveryEnd}
+            deliveryFallback={item.deliveryFallback}
+          />
         </td>
       ) : null}
       <td className="min-w-[5rem] whitespace-nowrap px-2 py-2.5 align-middle text-right">
@@ -365,7 +323,9 @@ export default function CartPage() {
     number: item.partnumber,
     partTitle: item.name || '',
     name: formatProductDisplayTitle(item.brand, item.partnumber, item.name),
-    deliveryDate: item.delivery,
+    deliveryStart: item.delivery_start || null,
+    deliveryEnd: item.delivery_end || null,
+    deliveryFallback: item.delivery || null,
     price: truncateRubles(item.price),
     purchasePrice: truncateRubles(item.purchase_price),
     quantity: item.quantity,
@@ -417,7 +377,9 @@ export default function CartPage() {
         number: item.partnumber,
         partTitle: item.name || `${item.brand} ${item.partnumber}`,
         name: `${item.brand} ${item.partnumber}`,
-        deliveryDate: item.delivery,
+        deliveryStart: item.delivery_start || null,
+        deliveryEnd: item.delivery_end || null,
+        deliveryFallback: item.delivery || null,
         price: item.price,
         quantity: item.quantity,
         maxQuantity: item.max_quantity,
