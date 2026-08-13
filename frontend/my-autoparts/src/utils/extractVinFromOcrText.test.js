@@ -11,8 +11,8 @@ describe('extractVinFromOcrText', () => {
     expect(result?.normalized).toBe('JHMGD18908S212467');
   });
 
-  it('fixes common OCR confusion O to 0 in middle of VIN', () => {
-    const result = extractVinFromOcrText('JHMGD189O8S212467');
+  it('maps Latin O and I to 0 and 1 in a 17-char VIN', () => {
+    const result = extractVinFromOcrText('JHMGD189O8S2I2467');
     expect(result?.normalized).toBe('JHMGD18908S212467');
   });
 

@@ -27,11 +27,19 @@ const VIN_LABEL_RE = /^(?:VIN|V\.I\.N\.?|WIN|W1N)\s*/i;
 function normalizeOcrChar(ch) {
   if (!ch) return '';
   const upper = String(ch).toUpperCase();
+  if (upper === 'O' || upper === 'О' || upper === 'Q') return '0';
+  if (upper === 'I' || upper === '|' || upper === '!') return '1';
   if (VIN_CHARS.includes(upper)) return upper;
-  if (upper === 'О') return '0'; // Cyrillic O
   if (upper === 'З') return '3';
   if (upper === 'Ч') return '4';
   return '';
+}
+
+function rewriteForbiddenVinChars(text) {
+  return String(text || '')
+    .toUpperCase()
+    .replace(/[OОQ]/g, '0')
+    .replace(/[I|!]/g, '1');
 }
 
 function fixOcrSequence(raw) {
@@ -54,7 +62,7 @@ function buildCandidate(value) {
   const trimmed = String(value || '').trim();
   if (!trimmed) return null;
 
-  const withoutLabel = trimmed.replace(VIN_LABEL_RE, '');
+  const withoutLabel = rewriteForbiddenVinChars(trimmed.replace(VIN_LABEL_RE, ''));
   const sanitized = sanitizeVinInput(withoutLabel);
   const normalized = normalizeVinOrNull(sanitized);
   const fixed = fixOcrSequence(sanitized);
@@ -78,7 +86,7 @@ function collectCandidates(text) {
     found.set(candidate.normalized, candidate);
   };
 
-  const upper = String(text || '').toUpperCase();
+  const upper = rewriteForbiddenVinChars(String(text || ''));
   upper.split(/[^A-Z0-9]+/).forEach((token) => add(token));
 
   const compact = upper.replace(/[^A-Z0-9]/g, '');

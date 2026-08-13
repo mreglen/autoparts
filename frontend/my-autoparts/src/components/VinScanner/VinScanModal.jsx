@@ -65,6 +65,8 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
   const streamRef = useRef(null);
   const fileInputRef = useRef(null);
   const liveBusyRef = useRef(false);
+  const liveVinRef = useRef('');
+  const liveMatchRef = useRef(0);
 
   const [mode, setMode] = useState(MODES.SCAN);
   const [cameraError, setCameraError] = useState('');
@@ -79,6 +81,8 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     setProcessing(false);
     setVinDraft('');
     setMessage('');
+    liveVinRef.current = '';
+    liveMatchRef.current = 0;
   }, []);
 
   const handleClose = useCallback(() => {
@@ -140,14 +144,32 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     const nextVin = extracted?.normalized || extracted?.raw || sanitizeVinInput(text);
 
     if (!nextVin) {
-      if (fromLive) return false;
+      if (fromLive) {
+        liveVinRef.current = '';
+        liveMatchRef.current = 0;
+        return false;
+      }
       setMessage('Не удалось распознать VIN. Держите номер в рамке или введите вручную.');
       setVinDraft('');
       setMode(MODES.CONFIRM);
       return false;
     }
 
-    if (fromLive && !extracted?.normalized) return false;
+    if (fromLive) {
+      if (!extracted?.normalized) {
+        liveVinRef.current = '';
+        liveMatchRef.current = 0;
+        return false;
+      }
+      if (extracted.normalized === liveVinRef.current) {
+        liveMatchRef.current += 1;
+      } else {
+        liveVinRef.current = extracted.normalized;
+        liveMatchRef.current = 1;
+        return false;
+      }
+      if (liveMatchRef.current < 2) return false;
+    }
 
     setVinDraft(nextVin);
     if (!extracted?.normalized) {
@@ -159,20 +181,6 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     setMode(MODES.CONFIRM);
     return true;
   }, []);
-
-  const processCanvas = useCallback(async (canvas) => {
-    setProcessing(true);
-    setMessage('');
-    try {
-      const text = await recognizeVinFromCanvas(canvas);
-      applyOcrText(text);
-    } catch (_) {
-      setMessage('Ошибка распознавания. Попробуйте ещё раз или загрузите другое фото.');
-      setMode(MODES.ERROR);
-    } finally {
-      setProcessing(false);
-    }
-  }, [applyOcrText]);
 
   useEffect(() => {
     if (!open || mode !== MODES.SCAN || !engineReady || processing) return undefined;
@@ -202,18 +210,6 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
       liveBusyRef.current = false;
     };
   }, [open, mode, engineReady, processing, applyOcrText]);
-
-  const handleCapture = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video) return;
-    const canvas = captureFrame(video, guideRef.current);
-    if (!canvas) {
-      setMessage('Не удалось сделать снимок');
-      setMode(MODES.ERROR);
-      return;
-    }
-    await processCanvas(canvas);
-  }, [processCanvas]);
 
   const handleFileChange = useCallback(async (event) => {
     const file = event.target.files?.[0];
@@ -276,28 +272,22 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
               >
                 С фото
               </Button>
-              <Button variant="primary" onClick={handleCapture} loading={processing}>
-                Считать рамку
-              </Button>
             </>
           ) : null}
           {mode === MODES.CONFIRM ? (
             <>
-              <Button variant="secondary" onClick={handleRetry} disabled={processing}>
-                Переснять
+              <Button variant="secondary" onClick={handleClose} disabled={processing}>
+                Отмена
               </Button>
               <Button variant="primary" onClick={handleContinue} disabled={!canContinue}>
-                Продолжить
+                Найти
               </Button>
             </>
           ) : null}
           {mode === MODES.ERROR ? (
             <>
               <Button variant="secondary" onClick={handleClose}>
-                Закрыть
-              </Button>
-              <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
-                С фото
+                Отмена
               </Button>
               <Button variant="primary" onClick={handleRetry}>
                 Попробовать снова

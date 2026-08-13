@@ -2,8 +2,8 @@ let workerPromise = null;
 let idleTimer = null;
 
 const IDLE_TERMINATE_MS = 120000;
-const MIN_OCR_WIDTH = 1100;
-const MAX_OCR_WIDTH = 1600;
+const MIN_OCR_WIDTH = 1200;
+const MAX_OCR_WIDTH = 1800;
 
 function bumpIdleTimer() {
   if (typeof window === 'undefined') return;
@@ -81,21 +81,31 @@ function otsuThreshold(hist, total) {
   return threshold;
 }
 
+function canvasMeanGray(data) {
+  let sum = 0;
+  let count = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    sum += data[i];
+    count += 1;
+  }
+  return count ? sum / count : 128;
+}
+
 function removeHorizontalFormLines(data, width, height) {
   for (let y = 0; y < height; y += 1) {
     let dark = 0;
     for (let x = 0; x < width; x += 1) {
-      if (data[(y * width + x) * 4] < 90) dark += 1;
+      if (data[(y * width + x) * 4] < 110) dark += 1;
     }
     const ratio = dark / width;
-    if (ratio < 0.45 || ratio > 0.97) continue;
+    if (ratio < 0.38 || ratio > 0.98) continue;
     const prevY = Math.max(0, y - 1);
     const nextY = Math.min(height - 1, y + 1);
     for (let x = 0; x < width; x += 1) {
       const i = (y * width + x) * 4;
       const p = (prevY * width + x) * 4;
       const n = (nextY * width + x) * 4;
-      const fill = Math.max(data[p], data[n], 245);
+      const fill = Math.max(data[p], data[n], 250);
       data[i] = fill;
       data[i + 1] = fill;
       data[i + 2] = fill;
@@ -103,12 +113,49 @@ function removeHorizontalFormLines(data, width, height) {
   }
 }
 
-export function preprocessVinCanvas(sourceCanvas) {
+function copyCanvas(sourceCanvas) {
+  const canvas = document.createElement('canvas');
+  canvas.width = sourceCanvas.width;
+  canvas.height = sourceCanvas.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return sourceCanvas;
+  ctx.drawImage(sourceCanvas, 0, 0);
+  return canvas;
+}
+
+function padCanvas(sourceCanvas, pad = 18) {
+  const canvas = document.createElement('canvas');
+  canvas.width = sourceCanvas.width + pad * 2;
+  canvas.height = sourceCanvas.height + pad * 2;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return sourceCanvas;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(sourceCanvas, pad, pad);
+  return canvas;
+}
+
+function invertCanvas(sourceCanvas) {
+  const canvas = copyCanvas(sourceCanvas);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return sourceCanvas;
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = imageData;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 255 - data[i];
+    data[i + 1] = 255 - data[i + 1];
+    data[i + 2] = 255 - data[i + 2];
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
+function upscaleGrayCanvas(sourceCanvas) {
   if (!sourceCanvas?.width || !sourceCanvas?.height) return sourceCanvas;
 
   const srcW = sourceCanvas.width;
   const srcH = sourceCanvas.height;
-  const scale = Math.min(MAX_OCR_WIDTH / srcW, Math.max(MIN_OCR_WIDTH / srcW, 2.4));
+  const scale = Math.min(MAX_OCR_WIDTH / srcW, Math.max(MIN_OCR_WIDTH / srcW, 2.6));
   const width = Math.max(1, Math.round(srcW * scale));
   const height = Math.max(1, Math.round(srcH * scale));
 
@@ -117,31 +164,52 @@ export function preprocessVinCanvas(sourceCanvas) {
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) return sourceCanvas;
-
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(sourceCanvas, 0, 0, width, height);
+
   const imageData = ctx.getImageData(0, 0, width, height);
   const { data } = imageData;
-  const hist = new Uint32Array(256);
-  const gray = new Uint8Array(width * height);
-
-  for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
-    const value = Math.round(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-    gray[p] = value;
-    hist[value] += 1;
+  let min = 255;
+  let max = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    if (gray < min) min = gray;
+    if (gray > max) max = gray;
   }
+  const span = Math.max(1, max - min);
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    const stretched = Math.round(((gray - min) / span) * 255);
+    data[i] = stretched;
+    data[i + 1] = stretched;
+    data[i + 2] = stretched;
+  }
+  removeHorizontalFormLines(data, width, height);
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
 
-  const threshold = otsuThreshold(hist, width * height);
-  for (let p = 0, i = 0; p < gray.length; p += 1, i += 4) {
-    const bin = gray[p] < threshold ? 0 : 255;
+function binarizeCanvas(sourceCanvas) {
+  const canvas = copyCanvas(sourceCanvas);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return sourceCanvas;
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = imageData;
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < data.length; i += 4) hist[data[i]] += 1;
+  const threshold = otsuThreshold(hist, canvas.width * canvas.height);
+  for (let i = 0; i < data.length; i += 4) {
+    const bin = data[i] < threshold ? 0 : 255;
     data[i] = bin;
     data[i + 1] = bin;
     data[i + 2] = bin;
   }
-
-  removeHorizontalFormLines(data, width, height);
   ctx.putImageData(imageData, 0, 0);
   return canvas;
+}
+
+export function preprocessVinCanvas(sourceCanvas) {
+  return padCanvas(upscaleGrayCanvas(sourceCanvas));
 }
 
 export function cropVinBand(sourceCanvas, { yRatio = 0.35, heightRatio = 0.3 } = {}) {
@@ -167,12 +235,42 @@ export function cropVinBand(sourceCanvas, { yRatio = 0.35, heightRatio = 0.3 } =
   return canvas;
 }
 
-export async function recognizeVinFromCanvas(sourceCanvas) {
-  const worker = await getWorker();
-  const canvas = preprocessVinCanvas(sourceCanvas);
+function compactLen(text) {
+  return String(text || '').replace(/[^A-Za-z0-9]/g, '').length;
+}
+
+async function recognizePrepared(worker, canvas) {
   const { data } = await worker.recognize(canvas);
-  bumpIdleTimer();
   return data?.text || '';
+}
+
+export async function recognizeVinFromCanvas(sourceCanvas, { thorough = false } = {}) {
+  const worker = await getWorker();
+  const gray = preprocessVinCanvas(sourceCanvas);
+  const mean = (() => {
+    const ctx = gray.getContext('2d');
+    if (!ctx) return 128;
+    const { data } = ctx.getImageData(0, 0, gray.width, gray.height);
+    return canvasMeanGray(data);
+  })();
+
+  const first = mean < 118 ? invertCanvas(gray) : gray;
+  let text = await recognizePrepared(worker, first);
+  bumpIdleTimer();
+  if (compactLen(text) >= 11 && !thorough) return text;
+
+  const second = mean < 118 ? gray : invertCanvas(gray);
+  const secondText = await recognizePrepared(worker, second);
+  if (compactLen(secondText) > compactLen(text)) text = secondText;
+  if (compactLen(text) >= 17 && !thorough) {
+    bumpIdleTimer();
+    return text;
+  }
+
+  const binaryText = await recognizePrepared(worker, binarizeCanvas(first));
+  if (compactLen(binaryText) > compactLen(text)) text = binaryText;
+  bumpIdleTimer();
+  return text;
 }
 
 export async function recognizeVinFromImageSource(imageSource) {
@@ -197,16 +295,14 @@ export async function recognizeVinFromImageSource(imageSource) {
 
   const bands = [
     cropVinBand(canvas, { yRatio: 0.35, heightRatio: 0.3 }),
-    cropVinBand(canvas, { yRatio: 0.15, heightRatio: 0.28 }),
+    cropVinBand(canvas, { yRatio: 0.12, heightRatio: 0.28 }),
     canvas,
   ];
 
   let lastText = '';
   for (const band of bands) {
-    lastText = await recognizeVinFromCanvas(band);
-    if (lastText && lastText.replace(/[^A-Za-z0-9]/g, '').length >= 11) {
-      return lastText;
-    }
+    lastText = await recognizeVinFromCanvas(band, { thorough: true });
+    if (compactLen(lastText) >= 11) return lastText;
   }
   return lastText;
 }
