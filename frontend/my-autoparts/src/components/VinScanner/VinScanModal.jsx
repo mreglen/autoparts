@@ -132,13 +132,20 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
 
     resetState();
     setEngineReady(false);
-    startCamera();
     warmupVinOcrWorker().then(() => setEngineReady(true)).catch(() => setEngineReady(true));
 
     return () => {
       stopMediaStream(streamRef);
     };
-  }, [open, resetState, startCamera]);
+  }, [open, resetState]);
+
+  useEffect(() => {
+    if (!open || mode !== MODES.SCAN) return undefined;
+    startCamera();
+    return () => {
+      stopMediaStream(streamRef);
+    };
+  }, [open, mode, startCamera]);
 
   const applyOcrText = useCallback((text, { fromLive = false } = {}) => {
     const extracted = extractVinFromOcrText(text);
@@ -239,9 +246,8 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
 
   const handleRetry = useCallback(() => {
     resetState();
-    startCamera();
     warmupVinOcrWorker().then(() => setEngineReady(true)).catch(() => setEngineReady(true));
-  }, [resetState, startCamera]);
+  }, [resetState]);
 
   const handleContinue = useCallback(() => {
     const next = normalizeVinOrNull(vinDraft);
@@ -355,6 +361,14 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
             className="w-full"
           >
             Найти
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleRetry}
+            disabled={processing}
+            className="w-full"
+          >
+            Заново
           </Button>
           {message ? <p className="text-sm text-amber-700">{message}</p> : null}
           {!canContinue ? (
