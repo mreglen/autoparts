@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Card } from '../../components/UI';
+import { Badge, Button, Card } from '../../components/UI';
 
 export default function PartDetailPurchaseSidebar({
   product,
@@ -23,15 +23,9 @@ export default function PartDetailPurchaseSidebar({
 
   return (
     <Card as="section" padding="sm">
-      {inStock ? (
-        <span className="mb-3 inline-flex items-center rounded-sg-sm bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700 ring-1 ring-success-100">
-          В наличии · {product.quantity || 0} шт.
-        </span>
-      ) : (
-        <span className="mb-3 inline-flex items-center rounded-sg-sm bg-warning-50 px-2.5 py-1 text-xs font-semibold text-warning-700 ring-1 ring-warning-100">
-          Нет в наличии
-        </span>
-      )}
+      <Badge tone={inStock ? 'success' : 'warning'} className="mb-3">
+        {inStock ? `В наличии · ${product.quantity || 0} шт.` : 'Нет в наличии'}
+      </Badge>
 
       <div className="text-2xl font-bold text-brand-700 sm:text-3xl">
         {product.price ? formatPrice(product.price) : '—'}

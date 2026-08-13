@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { Card } from '../../components/UI';
 import { countGroupedFitmentRows, groupFitmentForDisplay, hasDonorDetails } from '../../utils/fitmentDisplay';
 import { splitFitmentForDisplay } from '../../utils/mergeProductFitment';
 import PartDetailDonorVehicleCard from './PartDetailDonorVehicleCard';
@@ -54,18 +53,18 @@ export default function PartDetailFitmentBlock({
 
   if (loading && !hasContent) {
     return (
-      <Card as="section" padding="sm" className="sm:p-5">
+      <section>
         <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
         <p className="mt-1 text-sm text-ink-muted">Загружаем применимость…</p>
         <FitmentSkeleton />
-      </Card>
+      </section>
     );
   }
 
   if (!hasContent) return null;
 
   return (
-    <Card as="section" padding="sm" className="sm:p-5">
+    <section>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">Подходит для автомобилей</h2>
         {groupedCount > 0 ? (
@@ -92,6 +91,6 @@ export default function PartDetailFitmentBlock({
       {loading && hasContent ? (
         <p className="mt-3 text-xs text-ink-muted">Обновляем справочную применимость…</p>
       ) : null}
-    </Card>
+    </section>
   );
 }

@@ -15,7 +15,9 @@ import ProgressiveProductImage from '../../components/ProductMedia/ProgressivePr
 import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath, parsePartDetailParam, partDetailPathsMatch } from '../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../utils/productDisplayName';
-import { buildProductSeo, seoFromPartMetaResponse, buildProductStructuredDataBlocks, buildProductPhotoAlt } from '../../utils/productSeo';
+import { buildProductSeo, seoFromPartMetaResponse, buildProductStructuredDataBlocks, buildProductPhotoAlt, buildProductUsedCatalogPath } from '../../utils/productSeo';
+import { buildProductFaqJsonLd } from '../../utils/partDetailFaq';
+import { resolveProductCity } from '../../utils/productSearchSeo';
 import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
@@ -35,7 +37,6 @@ import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 import useHistoryBack from '../../hooks/useHistoryBack';
 import useDeferredMount from '../../hooks/useDeferredMount';
 import { recordProductView } from '../../redux/slices/UserEngagementSlice';
-import { buildProductUsedCatalogPath } from '../../utils/productSeo';
 import {
   PART_DETAIL_CACHE,
   readPartDetailCache,
@@ -44,7 +45,7 @@ import {
 import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
 import { getUsedPurchaseActions } from '../../utils/usedPurchaseMode';
 import { mapLaximoApplicableVehicles } from '../../utils/fitmentDisplay';
-import { Badge } from '../../components/UI';
+import { Badge, Button, EmptyState, Modal, SkeletonCard } from '../../components/UI';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -845,89 +846,72 @@ const PartDetail = () => {
 
     if (!soldOutLabel && soldOutResolveState === 'loading') {
       return (
-        <div className="min-h-screen bg-surface max-md:pb-28">
-          <div className="max-w-6xl mx-auto px-4 py-16">
-            <div className="rounded-sg-lg border border-line bg-surface px-6 py-12 text-center shadow-sg-sm">
-              <p className="text-lg text-ink-muted">Загрузка информации о запчасти...</p>
-            </div>
-          </div>
+        <div className="px-4 py-10 md:px-0">
+          <SkeletonCard lines={4} className="shadow-none" />
         </div>
       );
     }
 
     if (soldOutLabel) {
       return (
-        <div className="min-h-screen bg-surface">
+        <div className="px-4 py-6 md:px-0">
           <Helmet>
             <title>{soldOutLabel} — продано | Свой Гараж</title>
             <meta name="robots" content="noindex, follow" />
           </Helmet>
-          <div className="max-w-6xl mx-auto px-4 py-8">
-            <Breadcrumbs
-              items={[
-                { label: 'Главная', href: '/' },
-                { label: 'Б/у запчасти', href: '/autoparts/used' },
-                { label: soldOutLabel },
-              ]}
-              includeJsonLd={false}
+          <Breadcrumbs
+            items={[
+              { label: 'Главная', href: '/' },
+              { label: 'Б/у запчасти', href: '/autoparts/used' },
+              { label: soldOutLabel },
+            ]}
+            includeJsonLd={false}
+          />
+          <section className="mt-4">
+            <p className="text-sm font-semibold text-warning-700">Продано</p>
+            <h1 className="mt-1 text-2xl font-bold text-ink">{soldOutLabel}</h1>
+            <p className="mt-2 text-sm text-ink-muted">
+              Это предложение уже недоступно. Посмотрите другие варианты с тем же артикулом.
+            </p>
+            <Button className="mt-4" onClick={() => navigate(catalogPath)}>
+              Каталог по артикулу
+            </Button>
+          </section>
+          <div className="mt-6">
+            <PartArticleMatchesBlock
+              title={`Другие предложения ${soldOutLabel}`}
+              items={soldOutAlternates}
+              loading={soldOutAlternatesLoading}
+              error={soldOutAlternates.length ? '' : 'Других предложений не найдено'}
             />
-            <div className="rounded-sg-lg border border-warning-100 bg-warning-50 px-6 py-8 text-center shadow-sg-sm">
-              <p className="text-sm font-semibold uppercase tracking-wide text-warning-700">Продано</p>
-              <h1 className="mt-2 text-2xl font-bold text-ink">{soldOutLabel}</h1>
-              <p className="mt-3 text-ink-muted">
-                Это предложение уже недоступно. Посмотрите другие варианты с тем же артикулом.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate(catalogPath)}
-                className="mt-5 inline-flex rounded-md bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
-              >
-                Каталог по артикулу
-              </button>
-            </div>
-            <div className="mt-6">
-              <PartArticleMatchesBlock
-                title={`Другие предложения ${soldOutLabel}`}
-                items={soldOutAlternates}
-                loading={soldOutAlternatesLoading}
-                error={soldOutAlternates.length ? '' : 'Других предложений не найдено'}
-              />
-            </div>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="px-4 py-10 md:px-0">
         <Helmet>
           <title>Запчасть не найдена | Свой Гараж</title>
           <meta name="robots" content="noindex, nofollow" />
         </Helmet>
-        <div className="text-center">
-          <p className="text-lg text-red-600">Ошибка загрузки информации о запчасти</p>
-          <p className="text-sm text-ink-muted mt-2">{formatErrorText(error)}</p>
-          <button 
-            type="button"
-            onClick={handleBackToList}
-            className="mt-4 px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700"
-          >
-            Назад
-          </button>
-        </div>
+        <EmptyState
+          illustration="error"
+          title="Запчасть не найдена"
+          description={formatErrorText(error)}
+          actionLabel="Назад"
+          onAction={handleBackToList}
+          className="border-solid"
+        />
       </div>
     );
   }
 
   if (!showProduct) {
     return (
-      <div className="min-h-screen bg-surface max-md:pb-28">
+      <div className="px-4 py-10 md:px-0">
         {apiSeo ? <PartProductSeoHelmet seo={apiSeo} structuredDataBlocks={null} product={null} /> : null}
-        <div className="max-w-6xl mx-auto px-4 py-16">
-          <div className="rounded-sg-lg border border-line bg-surface px-6 py-12 text-center shadow-sg-sm">
-            <p className="text-lg text-ink-muted">Загрузка информации о запчасти...</p>
-          </div>
-        </div>
+        <SkeletonCard lines={5} className="shadow-none" />
       </div>
     );
   }
@@ -956,17 +940,6 @@ const PartDetail = () => {
   const partBrand = (currentProduct.brand || '').trim();
   const partArticle = (currentProduct.article || '').trim();
   const inStock = (currentProduct.quantity || 0) > 0;
-  const structuredDataBlocks = buildProductStructuredDataBlocks({
-    productJsonLd: seo.jsonLd,
-    breadcrumbJsonLd,
-  });
-
-  const photoAltMain = buildProductPhotoAlt({
-    brand: partBrand,
-    article: partArticle,
-    name: currentProduct.name,
-    isMain: true,
-  });
   const h1Primary = apiSeo?.h1
     || [partBrand, partArticle].filter(Boolean).join(' ')
     || formatProductDisplayTitle(partBrand, partArticle, currentProduct.name);
@@ -975,6 +948,29 @@ const PartDetail = () => {
     partBrand,
     partArticle,
   );
+  const faqJsonLd = seo.faqJsonLd || buildProductFaqJsonLd({
+    canonicalUrl: seo.canonicalUrl,
+    brand: partBrand,
+    article: partArticle,
+    partTypeName: seo.partTypeName || h1Subtitle || currentProduct.part_type?.name,
+    isNew: Boolean(currentProduct.is_new),
+    city: resolveProductCity(currentProduct.organization),
+    fitmentText: seo.fitmentText,
+    inStock,
+    quantity: currentProduct.quantity,
+    price: currentProduct.price,
+  });
+  const structuredDataBlocks = buildProductStructuredDataBlocks({
+    productJsonLd: seo.jsonLd,
+    breadcrumbJsonLd,
+    faqJsonLd,
+  });
+  const photoAltMain = buildProductPhotoAlt({
+    brand: partBrand,
+    article: partArticle,
+    name: currentProduct.name,
+    isMain: true,
+  });
   const alternateOffersTitle = partBrand && partArticle
     ? `Другие предложения ${partBrand} ${partArticle}`
     : 'Другие предложения с этим артикулом';
@@ -994,6 +990,9 @@ const PartDetail = () => {
   const canShowBuyNow = showCart && inStock && !stockInfo.noStock;
   const canShowWrite = hasSellerContact;
   const showMobileStickyCta = canShowBuyNow || canShowWrite;
+  const mobileHeroItem = allMediaItems[currentMainMediaIndex];
+  const mobileHeroIsVideo = Boolean(mobileHeroItem && isVideo(mobileHeroItem));
+  const sellerPhoneDigits = sellerOrg?.phone ? sellerOrg.phone.replace(/\D/g, '') : '';
 
   const renderMediaThumbnails = (className = '') => {
     if (allMediaItems.length <= 1) return null;
@@ -1061,172 +1060,162 @@ const PartDetail = () => {
     </div>
   );
 
-  const renderMobileTitleBlock = () => (
+  const renderProductTitle = () => (
     <>
-      <div className="mb-2">{renderProductBadges()}</div>
-      <h1 className="text-xl font-bold leading-snug text-ink">
-        <span className="block">{h1Primary}</span>
-        {h1Subtitle ? (
-          <span className="mt-1 block text-base font-medium text-ink-muted">{h1Subtitle}</span>
-        ) : null}
-      </h1>
-      <PartDetailSeoCrossLinks
-        brand={partBrand}
-        article={partArticle}
-        isNew={Boolean(currentProduct.is_new)}
-        organizationId={sellerOrg?.id}
-        organizationName={sellerOrg?.name}
-        usedCatalogPath={seo.usedCatalogPath}
-        deferEnabled={secondaryEnabled}
-      />
+      <h1 className="text-xl font-bold leading-snug text-ink md:text-[1.65rem]">{h1Primary}</h1>
+      {h1Subtitle ? (
+        <p className="mt-1 text-base font-medium text-ink-muted">{h1Subtitle}</p>
+      ) : null}
     </>
   );
 
+  const renderSeoCrossLinks = () => (
+    <PartDetailSeoCrossLinks
+      brand={partBrand}
+      article={partArticle}
+      isNew={Boolean(currentProduct.is_new)}
+      organizationId={sellerOrg?.id}
+      organizationName={sellerOrg?.name}
+      usedCatalogPath={seo.usedCatalogPath}
+      deferEnabled={secondaryEnabled}
+    />
+  );
+
+  const renderSellerDescription = () => (
+    currentProduct.description ? (
+      <section>
+        <h2 className="text-base font-semibold text-ink">Описание от продавца</h2>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft whitespace-pre-line">
+          {stripHtmlTags(currentProduct.description)}
+        </p>
+      </section>
+    ) : null
+  );
+
+  const renderPurchaseSidebar = () => (
+    <PartDetailPurchaseSidebar
+      product={currentProduct}
+      inStock={inStock}
+      formatPrice={formatProductPriceDisplay}
+      showCart={showCart}
+      cartQuantity={getCartQuantity(currentProduct.id)}
+      stockNoStock={stockInfo.noStock}
+      isAdding={addingToCartId === currentProduct.id}
+      buyingNow={buyingNow}
+      canShowBuyNow={canShowBuyNow}
+      onAddToCart={() => handleAddToCart(currentProduct)}
+      onRemoveFromCart={() => handleRemoveFromCart(currentProduct)}
+      onBuyNow={handleBuyNow}
+    />
+  );
+
+  const renderOrganizationSidebar = () => (
+    <PartDetailOrganizationSidebar
+      organization={sellerOrg}
+      logoUrl={sellerLogoUrl}
+      showSellerContact={showSellerContact}
+      onPhoneClick={handleOpenPhoneModal}
+      onWriteClick={handleWriteToSeller}
+      creatingChat={creatingChat}
+    />
+  );
+
   return (
-    <div className="min-h-screen bg-surface max-md:pb-28">
+    <div className={showMobileStickyCta ? 'max-md:pb-32' : undefined}>
       <PartProductSeoHelmet seo={seo} structuredDataBlocks={structuredDataBlocks} product={currentProduct} />
 
-      <div className="md:hidden">
-        <div className="relative min-h-[52dvh] max-h-[62dvh] bg-surface-subtle">
-          {allMediaItems.length > 0 ? (
-            <div
-              className="relative h-full min-h-[52dvh] max-h-[62dvh] cursor-pointer"
-              onClick={() => handleOpenMediaModal(currentMainMediaIndex)}
-            >
-              {(() => {
-                const firstItem = allMediaItems[currentMainMediaIndex];
-                const isVideoItem = isVideo(firstItem);
-                if (isVideoItem) {
-                  const mediaUrl = normalizeImageUrl(getMediaUrl(firstItem));
-                  return (
-                    <div className="relative h-full min-h-[52dvh] max-h-[62dvh]">
-                      <video
-                        src={mediaUrl}
-                        className="h-full w-full object-contain"
-                        muted
-                        playsInline
-                        preload="metadata"
-                      />
-                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
-                        <div className="rounded-full bg-surface/90 p-3">
-                          <svg className="ml-0.5 h-8 w-8 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <ProgressiveProductImage
-                    key={currentMainMediaIndex}
-                    photo={firstItem}
-                    alt={photoAltMain}
-                    className="h-full min-h-[52dvh] max-h-[62dvh] w-full object-contain"
-                    priority
-                    upgradeToFull
-                    sizes="100vw"
-                  />
-                );
-              })()}
-
-              {allMediaItems.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink-soft shadow-sg-sm backdrop-blur"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentMainMediaIndex((prev) => (prev > 0 ? prev - 1 : allMediaItems.length - 1));
-                    }}
-                    aria-label="Предыдущее фото"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink-soft shadow-sg-sm backdrop-blur"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentMainMediaIndex((prev) => (prev < allMediaItems.length - 1 ? prev + 1 : 0));
-                    }}
-                    aria-label="Следующее фото"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                  <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white">
-                    {currentMainMediaIndex + 1}/{allMediaItems.length}
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="flex min-h-[52dvh] items-center justify-center bg-surface-subtle">
-              <p className="text-sm text-ink-faint">Нет фотографий</p>
-            </div>
-          )}
-
+      <div className="relative bg-surface-subtle md:hidden">
+        {allMediaItems.length > 0 ? (
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]"
+            className="relative min-h-[52dvh] max-h-[62dvh] cursor-pointer"
+            onClick={() => handleOpenMediaModal(currentMainMediaIndex)}
           >
-            <button
-              type="button"
-              onClick={handleBackToList}
-              className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface/80 text-ink-soft shadow-sg-sm backdrop-blur"
-              aria-label="Назад"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div className="pointer-events-auto flex items-center gap-2">
-              <FavoriteButton
-                productId={currentProduct.id}
-                size="sm"
-                showLabel={false}
-                className="h-10 w-10 min-h-0 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
+            {mobileHeroIsVideo ? (
+              <div className="relative min-h-[52dvh] max-h-[62dvh]">
+                <video
+                  src={normalizeImageUrl(getMediaUrl(mobileHeroItem))}
+                  className="h-full min-h-[52dvh] max-h-[62dvh] w-full object-contain"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                  <div className="rounded-full bg-surface/90 p-3">
+                    <svg className="ml-0.5 h-8 w-8 text-brand-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <ProgressiveProductImage
+                key={currentMainMediaIndex}
+                photo={mobileHeroItem}
+                alt={photoAltMain}
+                className="h-full min-h-[52dvh] max-h-[62dvh] w-full object-contain"
+                priority
+                upgradeToFull
+                sizes="100vw"
               />
-              <ShareButton
-                url={seo.canonicalUrl}
-                title={h1Primary}
-                text={shareText}
-                showLabel={false}
-                size="sm"
-                className="h-10 w-10 min-h-0 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
-              />
-            </div>
-          </div>
-        </div>
+            )}
 
-        <div className="border-b border-line bg-surface px-4 py-3">
-          <div className="text-2xl font-bold text-ink">
-            {currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : '—'}
+            {allMediaItems.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink-soft shadow-sg-sm backdrop-blur"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentMainMediaIndex((prev) => (prev > 0 ? prev - 1 : allMediaItems.length - 1));
+                  }}
+                  aria-label="Предыдущее фото"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink-soft shadow-sg-sm backdrop-blur"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentMainMediaIndex((prev) => (prev < allMediaItems.length - 1 ? prev + 1 : 0));
+                  }}
+                  aria-label="Следующее фото"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white">
+                  {currentMainMediaIndex + 1}/{allMediaItems.length}
+                </div>
+              </>
+            ) : null}
           </div>
-        </div>
-      </div>
+        ) : (
+          <div className="flex min-h-[52dvh] items-center justify-center">
+            <p className="text-sm text-ink-faint">Нет фотографий</p>
+          </div>
+        )}
 
-      <div className="mx-auto max-w-7xl px-3 pb-8 pt-3 md:px-4 max-md:px-0 max-md:pb-32 max-md:pt-0">
-        <div className="mb-3 hidden md:block">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleBackToList}
-              className="inline-flex items-center rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink-muted shadow-sg-sm transition-colors hover:border-brand-200 hover:text-brand-600"
-            >
-              <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-              </svg>
-              Назад к списку
-            </button>
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface/80 text-ink-soft shadow-sg-sm backdrop-blur"
+            aria-label="Назад"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="pointer-events-auto flex items-center gap-2">
             <FavoriteButton
               productId={currentProduct.id}
               size="sm"
               showLabel={false}
-              className="h-9 w-9 min-h-0 gap-0 rounded-lg border border-line p-0 shadow-sg-sm"
+              className="h-10 w-10 min-h-0 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
             />
             <ShareButton
               url={seo.canonicalUrl}
@@ -1234,219 +1223,89 @@ const PartDetail = () => {
               text={shareText}
               showLabel={false}
               size="sm"
-              className="h-9 w-9 min-h-0 gap-0 rounded-lg border border-line p-0 shadow-sg-sm"
+              className="h-10 w-10 min-h-0 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
             />
           </div>
-          <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
-        </div>
-
-        <div className="mb-4 px-4 pt-3 md:hidden">
-          <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
-        </div>
-
-        <div className="overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg max-md:rounded-none max-md:border-x-0 max-md:shadow-none md:border-0 md:shadow-none md:rounded-none">
-          <div className="md:hidden">
-            <div className="grid grid-cols-1">
-              <div className="space-y-4 p-4 max-md:px-4 max-md:pt-4">
-                <div className="space-y-3">{renderMobileTitleBlock()}</div>
-                {renderMediaThumbnails('')}
-                <PartDetailSpecsBlock product={currentProduct} />
-              </div>
-
-              <div className="flex flex-col gap-4 bg-surface-muted p-4 max-md:px-4">
-                <div className="rounded-sg border border-line bg-surface p-4 shadow-sg">
-                  <dl className="space-y-2.5 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <dt className="text-ink-muted">В наличии</dt>
-                      <dd className={`font-semibold ${inStock ? 'text-success-700' : 'text-warning-700'}`}>
-                        {currentProduct.quantity || 0} шт.
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-ink-muted">Адрес</dt>
-                      <dd className="mt-1 font-medium leading-snug text-ink break-words">
-                        {currentProduct.storage_location?.address
-                          || currentProduct.storage_location?.name
-                          || '—'}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-
-                {currentProduct.description ? (
-                  <div className="rounded-sg border border-line bg-surface p-4 shadow-sg">
-                    <h2 className="mb-2 text-sm font-semibold text-ink">Описание от продавца</h2>
-                    <div className="text-sm leading-relaxed text-ink-soft whitespace-pre-line">
-                      {stripHtmlTags(currentProduct.description)}
-                    </div>
-                  </div>
-                ) : null}
-
-                {showSellerContact && (sellerOrg?.phone || sellerOrg?.contact_person) ? (
-                  <div className="rounded-sg border border-line bg-surface p-4 shadow-sg">
-                    <h2 className="mb-3 text-sm font-semibold text-ink">Продавец</h2>
-                    <div className="mb-3 flex items-center gap-2.5">
-                      <div
-                        className={`flex h-9 w-9 shrink-0 overflow-hidden rounded-full ${
-                          sellerLogoUrl ? 'border border-line bg-surface' : 'bg-brand-600'
-                        }`}
-                      >
-                        {sellerLogoUrl ? (
-                          <img
-                            src={sellerLogoUrl}
-                            alt={sellerOrg?.name || 'Логотип продавца'}
-                            className="h-full w-full object-contain p-0.5"
-                          />
-                        ) : (
-                          <span className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
-                            {(sellerOrg?.name || 'П').substring(0, 2).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        {sellerOrg?.name ? (
-                          <p className="truncate text-sm font-medium text-ink">{sellerOrg.name}</p>
-                        ) : null}
-                        {sellerOrg?.contact_person ? (
-                          <p className="truncate text-xs text-ink-muted">{sellerOrg.contact_person}</p>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      {sellerOrg?.phone ? (
-                        <button
-                          type="button"
-                          onClick={handleOpenPhoneModal}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 py-2.5 text-sm font-semibold text-brand-800 hover:bg-brand-100"
-                        >
-                          Позвонить
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={handleWriteToSeller}
-                        disabled={creatingChat}
-                        className="flex flex-1 items-center justify-center rounded-md bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:bg-brand-400"
-                      >
-                        {creatingChat ? 'Создание чата…' : 'Написать'}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="space-y-3">
-                  <PartDetailTrustRow />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="hidden md:block py-2 lg:py-4">
-            <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-8 xl:gap-10">
-              <div className="min-w-0 overflow-hidden lg:col-span-5">
-                <PartDetailDesktopGallery
-                  items={allMediaItems}
-                  currentIndex={currentMainMediaIndex}
-                  onIndexChange={setCurrentMainMediaIndex}
-                  onOpenModal={handleOpenMediaModal}
-                  brand={partBrand}
-                  article={partArticle}
-                  name={currentProduct.name}
-                  mainAlt={photoAltMain}
-                />
-              </div>
-
-              <div className="min-w-0 lg:col-span-4">
-                <div className="mb-3">{renderProductBadges()}</div>
-
-                <h1 className="text-xl font-bold leading-snug text-ink lg:text-[1.65rem]">
-                  <span className="block">{h1Primary}</span>
-                  {h1Subtitle ? (
-                    <span className="mt-1 block text-base font-medium text-ink-muted">{h1Subtitle}</span>
-                  ) : null}
-                </h1>
-
-                <div className="mt-3">
-                  <PartDetailSeoCrossLinks
-                  brand={partBrand}
-                  article={partArticle}
-                  isNew={Boolean(currentProduct.is_new)}
-                  organizationId={sellerOrg?.id}
-                  organizationName={sellerOrg?.name}
-                  usedCatalogPath={seo.usedCatalogPath}
-                  deferEnabled={secondaryEnabled}
-                  />
-                </div>
-
-                <PartDetailSpecsBlock product={currentProduct} variant="inline" />
-
-                {currentProduct.description ? (
-                  <section className="mt-4">
-                    <h2 className="text-base font-semibold text-ink">Описание от продавца</h2>
-                    <div className="mt-2 text-sm leading-relaxed text-ink-soft whitespace-pre-line">
-                      {stripHtmlTags(currentProduct.description)}
-                    </div>
-                  </section>
-                ) : null}
-              </div>
-
-              <div className="min-w-0 lg:col-span-3">
-                <div className="space-y-5 lg:sticky lg:top-4">
-                  <PartDetailPurchaseSidebar
-                    product={currentProduct}
-                    inStock={inStock}
-                    formatPrice={formatProductPriceDisplay}
-                    showCart={showCart}
-                    cartQuantity={getCartQuantity(currentProduct.id)}
-                    stockNoStock={stockInfo.noStock}
-                    isAdding={addingToCartId === currentProduct.id}
-                    buyingNow={buyingNow}
-                    canShowBuyNow={canShowBuyNow}
-                    onAddToCart={() => handleAddToCart(currentProduct)}
-                    onRemoveFromCart={() => handleRemoveFromCart(currentProduct)}
-                    onBuyNow={handleBuyNow}
-                  />
-                  <PartDetailOrganizationSidebar
-                    organization={sellerOrg}
-                    logoUrl={sellerLogoUrl}
-                    showSellerContact={showSellerContact}
-                    onPhoneClick={handleOpenPhoneModal}
-                    onWriteClick={handleWriteToSeller}
-                    creatingChat={creatingChat}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-5 border-t border-line-soft pt-8 lg:mt-10 lg:pt-10">
-              <PartDetailTrustRow />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8 space-y-5 max-md:px-4 md:mt-10 lg:space-y-6">
-      <PartDetailFitmentBlock
-        sellerVehicles={currentProduct.compatible_vehicles}
-        referenceVehicles={referenceFitment}
-        loading={secondaryEnabled ? referenceFitmentLoading : true}
-        fitmentMeta={fitmentMeta}
-      />
-
-      <PartArticleMatchesBlock
-        title={alternateOffersTitle}
-        items={alternateOffers}
-        loading={secondaryEnabled ? alternateOffersLoading : true}
-        error={alternateOffersError}
-        currentProductId={currentProduct.id}
-      />
-
-      {secondaryEnabled ? (
-        <PartDetailReturnPolicyBlock isNew={Boolean(currentProduct.is_new)} />
-      ) : null}
         </div>
       </div>
 
-      {/* Media Modal */}
+      <div className="px-4 pb-8 pt-3 md:px-0">
+        <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
+        <div className="mt-2 hidden flex-wrap items-center gap-2 md:flex">
+          <Button variant="ghost" size="sm" onClick={handleBackToList} className="-ml-2">
+            ← К списку
+          </Button>
+          <FavoriteButton
+            productId={currentProduct.id}
+            size="sm"
+            showLabel={false}
+            className="h-9 w-9 min-h-0 gap-0 rounded-sg border border-line p-0"
+          />
+          <ShareButton
+            url={seo.canonicalUrl}
+            title={h1Primary}
+            text={shareText}
+            showLabel={false}
+            size="sm"
+            className="h-9 w-9 min-h-0 gap-0 rounded-sg border border-line p-0"
+          />
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8 xl:gap-10">
+          <div className="hidden min-w-0 overflow-hidden md:block lg:col-span-5">
+            <PartDetailDesktopGallery
+              items={allMediaItems}
+              currentIndex={currentMainMediaIndex}
+              onIndexChange={setCurrentMainMediaIndex}
+              onOpenModal={handleOpenMediaModal}
+              brand={partBrand}
+              article={partArticle}
+              name={currentProduct.name}
+              mainAlt={photoAltMain}
+            />
+          </div>
+
+          <div className="min-w-0 lg:col-span-4">
+            {renderProductTitle()}
+            <div className="mt-3">{renderProductBadges()}</div>
+            {renderSeoCrossLinks()}
+            <div className="mt-4 md:hidden">{renderMediaThumbnails()}</div>
+            <div className="mt-4 lg:hidden">{renderPurchaseSidebar()}</div>
+            <PartDetailSpecsBlock product={currentProduct} variant="inline" />
+            {currentProduct.description ? <div className="mt-5">{renderSellerDescription()}</div> : null}
+            <div className="mt-5 lg:hidden">{renderOrganizationSidebar()}</div>
+          </div>
+
+          <aside className="hidden min-w-0 space-y-5 lg:sticky lg:top-4 lg:col-span-3 lg:block">
+            {renderPurchaseSidebar()}
+            {renderOrganizationSidebar()}
+          </aside>
+        </div>
+
+        <div className="mt-8 border-t border-line pt-6">
+          <PartDetailTrustRow />
+        </div>
+
+        <div className="mt-8 space-y-6 md:mt-10">
+          <PartDetailFitmentBlock
+            sellerVehicles={currentProduct.compatible_vehicles}
+            referenceVehicles={referenceFitment}
+            loading={secondaryEnabled ? referenceFitmentLoading : true}
+            fitmentMeta={fitmentMeta}
+          />
+          <PartArticleMatchesBlock
+            title={alternateOffersTitle}
+            items={alternateOffers}
+            loading={secondaryEnabled ? alternateOffersLoading : true}
+            error={alternateOffersError}
+            currentProductId={currentProduct.id}
+          />
+          {secondaryEnabled ? (
+            <PartDetailReturnPolicyBlock isNew={Boolean(currentProduct.is_new)} />
+          ) : null}
+        </div>
+      </div>
+
       <MediaModal
         isOpen={isMediaModalOpen}
         onClose={() => setIsMediaModalOpen(false)}
@@ -1454,100 +1313,60 @@ const PartDetail = () => {
         initialIndex={initialMediaIndex}
       />
 
-      {/* Phone Modal */}
-      {isPhoneModalOpen && sellerOrg?.phone && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-4 sm:items-center"
-          onClick={handleClosePhoneModal}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="part-phone-modal-title"
+      {sellerOrg?.phone ? (
+        <Modal
+          open={isPhoneModalOpen}
+          onClose={handleClosePhoneModal}
+          title="Позвонить продавцу"
+          size="sm"
+          footer={(
+            <div className="flex flex-col gap-2">
+              <Button as="a" href={`tel:${sellerPhoneDigits}`} className="w-full">
+                Позвонить
+              </Button>
+              <Button variant="ghost" onClick={handleClosePhoneModal} className="w-full">
+                Отмена
+              </Button>
+            </div>
+          )}
         >
-          <div
-            className="w-full max-w-sm overflow-hidden rounded-sg-lg bg-surface shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="border-b border-brand-100 bg-brand-50/70 px-5 py-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 id="part-phone-modal-title" className="text-base font-semibold text-ink">
-                    Позвонить продавцу
-                  </h3>
-                  {sellerOrg?.name ? (
-                    <p className="mt-0.5 truncate text-sm text-ink-muted">{sellerOrg.name}</p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleClosePhoneModal}
-                  className="shrink-0 rounded-md p-1 text-ink-faint hover:bg-surface/80 hover:text-ink-muted"
-                  aria-label="Закрыть"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="px-5 py-5">
-              <p className="text-sm text-ink-muted">Номер телефона</p>
-              <p className="mt-1 text-2xl font-bold tracking-wide text-ink">
-                {formatPhoneNumber(sellerOrg.phone)}
-              </p>
-
-              <div className="mt-5 flex flex-col gap-2">
-                <a
-                  href={`tel:${sellerOrg.phone.replace(/\D/g, '')}`}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
-                >
-                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  Позвонить
-                </a>
-                <button
-                  type="button"
-                  onClick={handleClosePhoneModal}
-                  className="rounded-lg py-2.5 text-sm font-medium text-ink-muted hover:bg-surface-muted"
-                >
-                  Отмена
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          {sellerOrg.name ? (
+            <p className="text-sm text-ink-muted">{sellerOrg.name}</p>
+          ) : null}
+          <p className="mt-1 text-2xl font-bold tracking-wide text-ink">
+            {formatPhoneNumber(sellerOrg.phone)}
+          </p>
+        </Modal>
+      ) : null}
 
       {showMobileStickyCta ? (
         <div
-          className="md:hidden fixed inset-x-0 z-[44] border-t border-line bg-surface/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface/90 shadow-[0_-6px_24px_rgba(0,0,0,0.08)]"
+          className="fixed inset-x-0 z-[44] border-t border-line bg-surface/95 px-4 py-3 shadow-[0_-6px_24px_rgba(0,0,0,0.08)] backdrop-blur supports-[backdrop-filter]:bg-surface/90 md:hidden"
           style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          <div className="mx-auto flex max-w-6xl gap-2">
+          <div className="flex gap-2">
             {canShowBuyNow ? (
-              <button
-                type="button"
+              <Button
+                variant="soft"
+                size="lg"
+                className="min-h-11 flex-1"
                 onClick={handleBuyNow}
                 disabled={buyingNow}
-                className={`min-h-11 flex-1 rounded-sg bg-brand-50 px-3 text-sm font-semibold text-brand-800 transition-colors hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  !canShowWrite ? 'w-full' : ''
-                }`}
+                loading={buyingNow}
               >
-                {buyingNow ? '…' : 'Купить сейчас'}
-              </button>
+                Купить сейчас
+              </Button>
             ) : null}
             {canShowWrite ? (
-              <button
-                type="button"
+              <Button
+                size="lg"
+                className="min-h-11 flex-1"
                 onClick={handleWriteToSeller}
                 disabled={creatingChat}
-                className={`min-h-11 flex-1 rounded-sg bg-brand-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  !canShowBuyNow ? 'w-full' : ''
-                }`}
+                loading={creatingChat}
               >
-                {creatingChat ? '…' : 'Написать'}
-              </button>
+                Написать
+              </Button>
             ) : null}
           </div>
         </div>

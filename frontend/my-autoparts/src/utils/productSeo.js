@@ -310,6 +310,8 @@ export function seoFromPartMetaResponse(meta) {
     isNew: Boolean(meta.is_new),
     inStock: meta.in_stock !== false,
     price: meta.price,
+    partTypeName: meta.part_type_name || '',
+    fitmentText: meta.fitment_text || '',
   };
 }
 
