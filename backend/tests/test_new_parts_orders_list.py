@@ -211,6 +211,15 @@ class NewPartsOrderEnrichmentTests(unittest.TestCase):
         self.assertEqual(order.status_code, "new_waiting_confirmation")
         self.assertEqual(order.items[0].status_code, "new_waiting_confirmation")
 
+    def test_pending_rossko_sync_skips_ready_for_pickup(self):
+        from app.services.new_parts_order_enrichment import orders_pending_rossko_sync
+
+        waiting = _sample_order()
+        ready = _sample_order()
+        ready.status_code = "new_ready_for_pickup"
+        pending = orders_pending_rossko_sync([waiting, ready])
+        self.assertEqual(pending, [waiting])
+
     def test_buyer_response_falls_back_to_db_on_api_failure(self):
         order = _sample_order()
         response = build_buyer_new_parts_order_response(

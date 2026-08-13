@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional, TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.auth import get_current_user
@@ -49,6 +50,7 @@ from app.services.new_parts_order_enrichment import (
     build_seller_new_parts_order_response,
     fetch_rossko_snapshots_for_orders,
     persist_rossko_supplier_statuses,
+    sync_active_rossko_supplier_statuses,
 )
 if TYPE_CHECKING:
     from app.services.rossko_get_orders_service import RosskoOrderSnapshot
@@ -533,8 +535,36 @@ def list_new_parts_orders(
         q = q.filter(GarageNewOrder.organization_id == org_id)
     orders = q.all()
 
-    rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders(orders)
-    if persist_rossko_supplier_statuses(orders, rossko_by_id, rossko_sync_error):
+    return [
+        _new_order_response(db, o)
+        for o in orders
+    ]
+
+
+@router.post("/new-parts-orders/sync-supplier-status", response_model=list[NewPartsOrderResponse])
+def sync_new_parts_supplier_statuses(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Фоновая подтяжка статусов Rossko без блокировки списка."""
+    _require_sales_orders_access(db, current_user)
+    org_id = current_user.organization_id
+    if not _can_view_new_parts_orders(db, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Новые заказы недоступны для организации")
+    if not org_id and not current_user.is_admin:
+        return []
+
+    q = (
+        db.query(GarageNewOrder)
+        .options(selectinload(GarageNewOrder.items))
+        .order_by(GarageNewOrder.created_at.desc())
+    )
+    if not current_user.is_admin:
+        q = q.filter(GarageNewOrder.organization_id == org_id)
+    orders = q.all()
+
+    rossko_by_id, rossko_sync_error = sync_active_rossko_supplier_statuses(orders)
+    if rossko_by_id:
         db.commit()
 
     return [
@@ -1701,9 +1731,14 @@ def list_purchased_used_orders(
     target_email = current_user.email or ""
     target_phone = current_user.phone or ""
 
+    visibility = [GarageUsedOrder.user_id == current_user.id]
+    if target_email:
+        visibility.append(GarageUsedOrder.buyer_email == target_email)
+
     orders = (
         db.query(GarageUsedOrder)
         .options(selectinload(GarageUsedOrder.items))
+        .filter(or_(*visibility))
         .order_by(GarageUsedOrder.created_at.desc())
         .all()
     )
@@ -1717,17 +1752,28 @@ def list_purchased_used_orders(
         order_type="used",
         item_ids=used_item_ids,
     )
-    for order in orders:
-        if not order_visible_to_buyer(order, current_user.id, target_email, target_phone):
-            continue
+    visible_orders = [
+        order
+        for order in orders
+        if order_visible_to_buyer(order, current_user.id, target_email, target_phone)
+    ]
+    org_ids = {order.organization_id for order in visible_orders if order.organization_id}
+    orgs = {
+        org.id: org
+        for org in db.query(Organization).filter(Organization.id.in_(org_ids)).all()
+    } if org_ids else {}
+    seller_by_org: dict[str | None, int | None] = {}
+    for order in visible_orders:
         apply_purchase_item_repair_order_links(order.items, used_links)
-        org = db.query(Organization).filter(Organization.id == order.organization_id).first()
+        org = orgs.get(order.organization_id)
+        if order.organization_id not in seller_by_org:
+            seller_by_org[order.organization_id] = _seller_user_id_for_org(db, order.organization_id)
         pickup = get_buyer_pickup_payload(order, order_kind="used")
         order_dict = {
             "id": order.id,
             "organization_id": order.organization_id,
             "organization_name": org.name if org else "Не указана",
-            "seller_user_id": _seller_user_id_for_org(db, order.organization_id),
+            "seller_user_id": seller_by_org.get(order.organization_id),
             "buyer_name": order.buyer_name,
             "buyer_phone": order.buyer_phone,
             "buyer_email": order.buyer_email,
@@ -1752,6 +1798,49 @@ def list_purchased_used_orders(
     return result
 
 
+def _purchased_new_order_responses(
+    db: Session,
+    current_user: UserModel,
+    orders: list,
+    *,
+    rossko_by_id: dict | None = None,
+    rossko_sync_error: str | None = None,
+) -> list:
+    autoservice_org_id = _buyer_autoservice_org_id(db, current_user)
+    new_item_ids = [item.id for order in orders for item in (order.items or [])]
+    new_links = lookup_purchase_item_repair_orders(
+        db,
+        org_id=autoservice_org_id,
+        order_type="new",
+        item_ids=new_item_ids,
+    )
+    org_ids = {order.organization_id for order in orders if order.organization_id}
+    orgs = {
+        org.id: org
+        for org in db.query(Organization).filter(Organization.id.in_(org_ids)).all()
+    } if org_ids else {}
+    seller_by_org: dict[str | None, int | None] = {}
+    result = []
+    for order in orders:
+        org_id = order.organization_id
+        if org_id not in seller_by_org:
+            seller_by_org[org_id] = _seller_user_id_for_org(db, org_id)
+        org = orgs.get(org_id)
+        result.append(
+            build_buyer_new_parts_order_response(
+                db,
+                order,
+                rossko_by_id=rossko_by_id,
+                rossko_sync_error=rossko_sync_error,
+                organization_name=org.name if org else None,
+                seller_user_id=seller_by_org.get(org_id),
+                resolve_seo_card_id=_resolve_new_part_seo_card_id,
+                repair_order_links=new_links,
+            )
+        )
+    return result
+
+
 @router.get("/purchases/new-orders", response_model=list[PurchasedNewOrderResponse])
 def list_purchased_new_orders(
     db: Session = Depends(get_db),
@@ -1765,35 +1854,30 @@ def list_purchased_new_orders(
         .order_by(GarageNewOrder.created_at.desc())
         .all()
     )
+    return _purchased_new_order_responses(db, current_user, orders)
 
-    rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders(orders)
-    if persist_rossko_supplier_statuses(orders, rossko_by_id, rossko_sync_error):
-        db.commit()
 
-    autoservice_org_id = _buyer_autoservice_org_id(db, current_user)
-    new_item_ids = [item.id for order in orders for item in (order.items or [])]
-    new_links = lookup_purchase_item_repair_orders(
-        db,
-        org_id=autoservice_org_id,
-        order_type="new",
-        item_ids=new_item_ids,
+@router.post("/purchases/new-orders/sync-supplier-status", response_model=list[PurchasedNewOrderResponse])
+def sync_purchased_new_supplier_statuses(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Фоновая подтяжка статусов Rossko для заказов покупателя."""
+    orders = (
+        db.query(GarageNewOrder)
+        .options(selectinload(GarageNewOrder.items))
+        .filter(GarageNewOrder.user_id == current_user.id)
+        .order_by(GarageNewOrder.created_at.desc())
+        .all()
     )
-
-    result = []
-    for order in orders:
-        org = db.query(Organization).filter(Organization.id == order.organization_id).first()
-        result.append(
-            build_buyer_new_parts_order_response(
-                db,
-                order,
-                rossko_by_id=rossko_by_id,
-                rossko_sync_error=rossko_sync_error,
-                organization_name=org.name if org else None,
-                seller_user_id=_seller_user_id_for_org(db, order.organization_id),
-                resolve_seo_card_id=_resolve_new_part_seo_card_id,
-                repair_order_links=new_links,
-            )
-        )
-
-    return result
+    rossko_by_id, rossko_sync_error = sync_active_rossko_supplier_statuses(orders)
+    if rossko_by_id:
+        db.commit()
+    return _purchased_new_order_responses(
+        db,
+        current_user,
+        orders,
+        rossko_by_id=rossko_by_id,
+        rossko_sync_error=rossko_sync_error,
+    )
 

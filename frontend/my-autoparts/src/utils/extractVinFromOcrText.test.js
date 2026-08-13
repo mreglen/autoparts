@@ -20,6 +20,16 @@ describe('extractVinFromOcrText', () => {
     expect(extractVinFromOcrText('hello world')).toBeNull();
   });
 
+  it('extracts AvtoVAZ VIN from noisy handwritten OCR', () => {
+    const result = extractVinFromOcrText('XTA 211440 A4264969');
+    expect(result?.normalized).toBe('XTA211440A4264969');
+  });
+
+  it('extracts VIN photographed from a screen in lowercase', () => {
+    const result = extractVinFromOcrText('jhmgd18908s212467');
+    expect(result?.normalized).toBe('JHMGD18908S212467');
+  });
+
   it('prefers longest valid candidate in mixed text', () => {
     const result = extractVinFromOcrText('ABC JHMGD18908S212467 XYZ1234567890');
     expect(result?.normalized).toBe('JHMGD18908S212467');

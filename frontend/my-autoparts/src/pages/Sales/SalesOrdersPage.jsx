@@ -258,19 +258,13 @@ export default function SalesOrdersPage() {
       }
       setError(null);
 
-      // Keep Avito orders cache fresh before reading it.
-      // If sync fails (e.g., integration not configured), we still render from existing cache.
-      if (avitoProActive) {
-        await apiAxios.post('/sales/avito-orders/sync').catch(() => {});
-      }
-
       const results = await Promise.allSettled([
         apiAxios.get('/sales/used-parts-orders'),
-        apiAxios.get('/sales/new-parts-orders/can-view'),
+        apiAxios.get('/sales/new-parts-orders'),
         avitoProActive ? apiAxios.get('/sales/avito-orders') : Promise.resolve({ data: [] }),
       ]);
 
-      const [usedRes, canViewRes, avitoRes] = results;
+      const [usedRes, newRes, avitoRes] = results;
 
       if (usedRes.status === 'fulfilled') {
         setUsedOrders(Array.isArray(usedRes.value.data) ? usedRes.value.data : []);
@@ -287,21 +281,36 @@ export default function SalesOrdersPage() {
       }
 
       let canView = false;
-      if (canViewRes.status === 'fulfilled') {
-        canView = Boolean(canViewRes.value.data?.can_view);
+      if (newRes.status === 'fulfilled') {
+        canView = true;
+        setNewOrders(Array.isArray(newRes.value.data) ? newRes.value.data : []);
       } else {
-        const statusCode = canViewRes.reason?.response?.status;
-        if (statusCode !== 403) {
-          throw canViewRes.reason;
+        const statusCode = newRes.reason?.response?.status;
+        if (statusCode === 403) {
+          setNewOrders([]);
+        } else {
+          throw newRes.reason;
         }
       }
       setCanViewNewOrders(canView);
 
       if (canView) {
-        const newRes = await apiAxios.get('/sales/new-parts-orders');
-        setNewOrders(Array.isArray(newRes.data) ? newRes.data : []);
-      } else {
-        setNewOrders([]);
+        apiAxios
+          .post('/sales/new-parts-orders/sync-supplier-status')
+          .then((response) => {
+            setNewOrders(Array.isArray(response.data) ? response.data : []);
+          })
+          .catch(() => {});
+      }
+      if (avitoProActive) {
+        apiAxios
+          .post('/sales/avito-orders/sync')
+          .catch(() => {})
+          .then(() => apiAxios.get('/sales/avito-orders'))
+          .then((response) => {
+            setAvitoOrders(Array.isArray(response.data) ? response.data : []);
+          })
+          .catch(() => {});
       }
     } catch (e) {
       setError(e?.response?.data?.detail || e.message || 'Ошибка загрузки');

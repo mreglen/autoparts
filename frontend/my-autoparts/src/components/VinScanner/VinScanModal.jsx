@@ -10,7 +10,7 @@ import { extractVinFromOcrText } from '../../utils/extractVinFromOcrText';
 import {
   recognizeVinFromCanvas,
   recognizeVinFromImageSource,
-  terminateVinOcrWorker,
+  warmupVinOcrWorker,
 } from '../../utils/vinOcr';
 
 const MODES = {
@@ -18,6 +18,8 @@ const MODES = {
   CONFIRM: 'confirm',
   ERROR: 'error',
 };
+
+const LIVE_SCAN_MS = 420;
 
 function stopMediaStream(streamRef) {
   const stream = streamRef.current;
@@ -32,19 +34,21 @@ function captureFrame(videoEl, guideRect) {
   const vh = videoEl.videoHeight;
   if (!vw || !vh) return null;
 
-  const container = videoEl.parentElement;
-  if (!container) return null;
-
   const videoBox = videoEl.getBoundingClientRect();
   const guideBox = guideRect?.getBoundingClientRect?.() || videoBox;
 
-  const scaleX = vw / videoBox.width;
-  const scaleY = vh / videoBox.height;
+  const scale = Math.max(videoBox.width / vw, videoBox.height / vh);
+  const dispW = vw * scale;
+  const dispH = vh * scale;
+  const offsetX = videoBox.left + (videoBox.width - dispW) / 2;
+  const offsetY = videoBox.top + (videoBox.height - dispH) / 2;
 
-  const sx = Math.max(0, (guideBox.left - videoBox.left) * scaleX);
-  const sy = Math.max(0, (guideBox.top - videoBox.top) * scaleY);
-  const sw = Math.min(vw - sx, guideBox.width * scaleX);
-  const sh = Math.min(vh - sy, guideBox.height * scaleY);
+  const sx = Math.max(0, (guideBox.left - offsetX) / scale);
+  const sy = Math.max(0, (guideBox.top - offsetY) / scale);
+  const sw = Math.min(vw - sx, guideBox.width / scale);
+  const sh = Math.min(vh - sy, guideBox.height / scale);
+
+  if (sw < 8 || sh < 8) return null;
 
   canvas.width = Math.max(1, Math.round(sw));
   canvas.height = Math.max(1, Math.round(sh));
@@ -60,10 +64,12 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
   const guideRef = useRef(null);
   const streamRef = useRef(null);
   const fileInputRef = useRef(null);
+  const liveBusyRef = useRef(false);
 
   const [mode, setMode] = useState(MODES.SCAN);
   const [cameraError, setCameraError] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [engineReady, setEngineReady] = useState(false);
   const [vinDraft, setVinDraft] = useState('');
   const [message, setMessage] = useState('');
 
@@ -95,8 +101,8 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
         },
         audio: false,
       });
@@ -120,16 +126,38 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     }
 
     resetState();
+    setEngineReady(false);
     startCamera();
+    warmupVinOcrWorker().then(() => setEngineReady(true)).catch(() => setEngineReady(true));
 
     return () => {
       stopMediaStream(streamRef);
     };
   }, [open, resetState, startCamera]);
 
-  useEffect(() => () => {
+  const applyOcrText = useCallback((text, { fromLive = false } = {}) => {
+    const extracted = extractVinFromOcrText(text);
+    const nextVin = extracted?.normalized || extracted?.raw || sanitizeVinInput(text);
+
+    if (!nextVin) {
+      if (fromLive) return false;
+      setMessage('Не удалось распознать VIN. Держите номер в рамке или введите вручную.');
+      setVinDraft('');
+      setMode(MODES.CONFIRM);
+      return false;
+    }
+
+    if (fromLive && !extracted?.normalized) return false;
+
+    setVinDraft(nextVin);
+    if (!extracted?.normalized) {
+      setMessage('Проверьте VIN перед поиском — распознавание может содержать ошибки.');
+    } else {
+      setMessage('');
+    }
     stopMediaStream(streamRef);
-    terminateVinOcrWorker();
+    setMode(MODES.CONFIRM);
+    return true;
   }, []);
 
   const processCanvas = useCallback(async (canvas) => {
@@ -137,28 +165,43 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     setMessage('');
     try {
       const text = await recognizeVinFromCanvas(canvas);
-      const extracted = extractVinFromOcrText(text);
-      const nextVin = extracted?.normalized || extracted?.raw || sanitizeVinInput(text);
-
-      if (!nextVin) {
-        setMessage('Не удалось распознать VIN. Попробуйте переснять или введите вручную.');
-        setVinDraft('');
-        setMode(MODES.CONFIRM);
-        return;
-      }
-
-      setVinDraft(nextVin);
-      if (!extracted?.normalized) {
-        setMessage('Проверьте VIN перед поиском — распознавание может содержать ошибки.');
-      }
-      setMode(MODES.CONFIRM);
+      applyOcrText(text);
     } catch (_) {
       setMessage('Ошибка распознавания. Попробуйте ещё раз или загрузите другое фото.');
       setMode(MODES.ERROR);
     } finally {
       setProcessing(false);
     }
-  }, []);
+  }, [applyOcrText]);
+
+  useEffect(() => {
+    if (!open || mode !== MODES.SCAN || !engineReady || processing) return undefined;
+
+    const tick = async () => {
+      if (liveBusyRef.current) return;
+      const video = videoRef.current;
+      if (!video || video.readyState < 2) return;
+      const canvas = captureFrame(video, guideRef.current);
+      if (!canvas) return;
+
+      liveBusyRef.current = true;
+      try {
+        const text = await recognizeVinFromCanvas(canvas);
+        applyOcrText(text, { fromLive: true });
+      } catch (_) {
+        /* keep scanning */
+      } finally {
+        liveBusyRef.current = false;
+      }
+    };
+
+    const id = window.setInterval(tick, LIVE_SCAN_MS);
+    tick();
+    return () => {
+      window.clearInterval(id);
+      liveBusyRef.current = false;
+    };
+  }, [open, mode, engineReady, processing, applyOcrText]);
 
   const handleCapture = useCallback(async () => {
     const video = videoRef.current;
@@ -169,7 +212,6 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
       setMode(MODES.ERROR);
       return;
     }
-    stopMediaStream(streamRef);
     await processCanvas(canvas);
   }, [processCanvas]);
 
@@ -186,32 +228,19 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
       const bitmap = await createImageBitmap(file);
       const text = await recognizeVinFromImageSource(bitmap);
       bitmap.close?.();
-      const extracted = extractVinFromOcrText(text);
-      const nextVin = extracted?.normalized || extracted?.raw || sanitizeVinInput(text);
-
-      if (!nextVin) {
-        setMessage('Не удалось распознать VIN на фото.');
-        setVinDraft('');
-        setMode(MODES.CONFIRM);
-        return;
-      }
-
-      setVinDraft(nextVin);
-      if (!extracted?.normalized) {
-        setMessage('Проверьте VIN перед поиском — распознавание может содержать ошибки.');
-      }
-      setMode(MODES.CONFIRM);
+      applyOcrText(text);
     } catch (_) {
       setMessage('Не удалось обработать фото.');
       setMode(MODES.ERROR);
     } finally {
       setProcessing(false);
     }
-  }, []);
+  }, [applyOcrText]);
 
   const handleRetry = useCallback(() => {
     resetState();
     startCamera();
+    warmupVinOcrWorker().then(() => setEngineReady(true)).catch(() => setEngineReady(true));
   }, [resetState, startCamera]);
 
   const handleContinue = useCallback(() => {
@@ -245,10 +274,10 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={processing}
               >
-                Загрузить фото
+                С фото
               </Button>
               <Button variant="primary" onClick={handleCapture} loading={processing}>
-                Сфотографировать
+                Считать рамку
               </Button>
             </>
           ) : null}
@@ -268,7 +297,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
                 Закрыть
               </Button>
               <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
-                Загрузить фото
+                С фото
               </Button>
               <Button variant="primary" onClick={handleRetry}>
                 Попробовать снова
@@ -289,22 +318,31 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
 
       {mode === MODES.SCAN ? (
         <div className="space-y-3">
-          <div className="relative min-h-[240px] overflow-hidden rounded-xl border border-gray-200 bg-black">
+          <div className="relative min-h-[280px] overflow-hidden rounded-xl border border-gray-200 bg-black">
             <video
               ref={videoRef}
-              className="h-full min-h-[240px] w-full object-cover"
+              className="h-full min-h-[280px] w-full object-cover"
               playsInline
               muted
             />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center p-5">
               <div
                 ref={guideRef}
-                className="h-16 w-[88%] rounded-md border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+                className="h-[4.25rem] w-[92%] max-w-xl rounded-md border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
               />
+            </div>
+            <div className="pointer-events-none absolute inset-x-0 bottom-3 px-4 text-center">
+              <p className="text-xs font-medium text-white/90">
+                {!engineReady
+                  ? 'Готовим распознавание…'
+                  : processing
+                    ? 'Считываем рамку…'
+                    : 'Держите VIN в рамке — считаем автоматически'}
+              </p>
             </div>
           </div>
           <p className="text-sm text-gray-600">
-            Наведите камеру на VIN-номер на табличке или стикере и нажмите «Сфотографировать».
+            Поместите номер в белую рамку. Как только VIN будет прочитан, появится поле для проверки.
           </p>
           {cameraError ? <p className="text-sm text-red-600">{cameraError}</p> : null}
         </div>
@@ -332,7 +370,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
         <div className="space-y-3">
           <p className="text-sm text-red-600">{cameraError || message || 'Не удалось распознать VIN'}</p>
           <p className="text-sm text-gray-600">
-            Можно загрузить фото с галереи или попробовать снова с лучшим освещением.
+            Наведите номер в рамку ещё раз или загрузите фото.
           </p>
         </div>
       ) : null}

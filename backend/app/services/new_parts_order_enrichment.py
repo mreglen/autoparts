@@ -150,6 +150,27 @@ def persist_rossko_supplier_statuses(
     return changed
 
 
+def orders_pending_rossko_sync(orders: list[GarageNewOrder]) -> list[GarageNewOrder]:
+    return [
+        order
+        for order in orders
+        if order.rossko_order_id
+        and order.status_code not in (NEW_PICKUP_READY_STATUS, "new_received")
+    ]
+
+
+def sync_active_rossko_supplier_statuses(
+    orders: list[GarageNewOrder],
+) -> tuple[dict[str, RosskoOrderSnapshot], str | None]:
+    """GetOrders только для активных заказов. Список страниц это не вызывает."""
+    pending = orders_pending_rossko_sync(orders)
+    if not pending:
+        return {}, None
+    snapshots, err = fetch_rossko_snapshots_for_orders(pending)
+    persist_rossko_supplier_statuses(pending, snapshots, err)
+    return snapshots, err
+
+
 def merge_seller_items_with_rossko(
     db: Session,
     order: GarageNewOrder,

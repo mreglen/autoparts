@@ -156,7 +156,16 @@ export default function PurchasesOrdersPage() {
 
       if (newRes.status === 'fulfilled') {
         setNewOrdersLoadFailed(false);
-        setNewOrders(Array.isArray(newRes.value.data) ? newRes.value.data : []);
+        const loaded = Array.isArray(newRes.value.data) ? newRes.value.data : [];
+        setNewOrders(loaded);
+        if (loaded.length) {
+          apiAxios
+            .post('/sales/purchases/new-orders/sync-supplier-status')
+            .then((response) => {
+              setNewOrders(Array.isArray(response.data) ? response.data : []);
+            })
+            .catch(() => {});
+        }
       } else {
         setNewOrders([]);
         setNewOrdersLoadFailed(true);
