@@ -47,8 +47,8 @@ const VIRTUALIZE_THRESHOLD_MOBILE = 80;
 const LIST_ROW_ESTIMATE_MOBILE_PX = 148;
 const LIST_ROW_ESTIMATE_TABLET_PX = 196;
 const LIST_ROW_ESTIMATE_DESKTOP_PX = 220;
-/** Небольшой overscan: слишком большой + eager = очередь из десятков full-JPG. */
-const VIRTUAL_OVERSCAN = 4;
+/** Overscan покрывает рывок скролла; eager остаётся только у первых карточек. */
+const VIRTUAL_OVERSCAN = 10;
 const LOAD_MORE_ROOT_MARGIN = '600px';
 /** high fetchPriority — только LCP-карточки. */
 const LCP_PRIORITY_COUNT = 2;
@@ -89,6 +89,12 @@ function chunkIntoRows(items, columns) {
     rows.push(items.slice(i, i + columns));
   }
   return rows;
+}
+
+/** Document Y of the list start. offsetTop is wrong inside position:relative ancestors. */
+function getElementDocumentTop(el) {
+  if (!el) return 0;
+  return Math.round(el.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0));
 }
 
 // Функция форматирования телефона
@@ -516,25 +522,27 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
   useLayoutEffect(() => {
     if (!shouldVirtualize) return undefined;
-    const el = viewMode === 'grid' ? virtualGridRef.current : virtualListRef.current;
-    if (!el) return undefined;
+    let raf = 0;
 
     const updateMargin = () => {
-      const top = el.offsetTop || 0;
-      if (viewMode === 'grid') setGridScrollMargin(top);
-      else setListScrollMargin(top);
+      const el = viewMode === 'grid' ? virtualGridRef.current : virtualListRef.current;
+      if (!el) {
+        raf = requestAnimationFrame(updateMargin);
+        return;
+      }
+      const top = getElementDocumentTop(el);
+      if (viewMode === 'grid') {
+        setGridScrollMargin((prev) => (prev === top ? prev : top));
+      } else {
+        setListScrollMargin((prev) => (prev === top ? prev : top));
+      }
     };
 
     updateMargin();
     window.addEventListener('resize', updateMargin);
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateMargin) : null;
-    if (ro) {
-      ro.observe(el);
-      if (el.offsetParent) ro.observe(el.offsetParent);
-    }
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener('resize', updateMargin);
-      ro?.disconnect();
     };
   }, [shouldVirtualize, viewMode, gridRows.length, sortedAvailableParts.length]);
 
@@ -571,7 +579,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     if (viewMode === 'grid') gridRowVirtualizer.measure();
     else listRowVirtualizer.measure();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- measure only when geometry inputs change
-  }, [shouldVirtualize, viewMode, gridRowEstimatePx, listRowEstimatePx, gridColumns]);
+  }, [shouldVirtualize, viewMode, gridRowEstimatePx, listRowEstimatePx, gridColumns, gridScrollMargin, listScrollMargin]);
 
   const gridVirtualEndIndex = gridRowVirtualizer.range?.endIndex ?? -1;
   const listVirtualEndIndex = listRowVirtualizer.range?.endIndex ?? -1;
@@ -887,41 +895,47 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </div>
           )}
           {viewMode === 'grid' && shouldVirtualize && (
-            <div
-              ref={virtualGridRef}
-              className="relative w-full"
-              style={{ height: `${gridRowVirtualizer.getTotalSize()}px` }}
-            >
-              {gridRowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const rowParts = gridRows[virtualRow.index] || [];
-                return (
-                  <div
-                    key={virtualRow.key}
-                    data-index={virtualRow.index}
-                    ref={gridRowVirtualizer.measureElement}
-                    className="absolute left-0 top-0 grid w-full grid-cols-2 gap-3 pb-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                    style={{
-                      transform: `translateY(${virtualRow.start - gridScrollMargin}px)`,
-                    }}
-                  >
-                    {rowParts.map((part, colIndex) => {
-                      const flatIndex = virtualRow.index * gridColumns + colIndex;
-                      return (
-                        <ProductCard
-                          key={part.id}
-                          listPriority={flatIndex < LCP_PRIORITY_COUNT}
-                          eagerImage={flatIndex < EAGER_VIEWPORT_COUNT}
-                          part={productCardPartsMap.get(part.id)}
-                          isTestOrganization={true}
-                          hideConditionAndQuantity={true}
-                          hideWarehouse={true}
-                          compactMarketplace
-                        />
-                      );
-                    })}
-                  </div>
-                );
-              })}
+            <div ref={virtualGridRef} className="w-full">
+              <div
+                className="relative w-full"
+                style={{
+                  height: `${gridRowVirtualizer.getTotalSize()}px`,
+                  overflowAnchor: 'none',
+                }}
+              >
+                {gridRowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const rowParts = gridRows[virtualRow.index] || [];
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={gridRowVirtualizer.measureElement}
+                      className="absolute left-0 top-0 grid w-full grid-cols-2 gap-3 pb-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                      style={{
+                        transform: `translateY(${
+                          virtualRow.start - gridRowVirtualizer.options.scrollMargin
+                        }px)`,
+                      }}
+                    >
+                      {rowParts.map((part, colIndex) => {
+                        const flatIndex = virtualRow.index * gridColumns + colIndex;
+                        return (
+                          <ProductCard
+                            key={part.id}
+                            listPriority={flatIndex < LCP_PRIORITY_COUNT}
+                            eagerImage={flatIndex < EAGER_VIEWPORT_COUNT}
+                            part={productCardPartsMap.get(part.id)}
+                            isTestOrganization={true}
+                            hideConditionAndQuantity={true}
+                            hideWarehouse={true}
+                            compactMarketplace
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -939,33 +953,39 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </div>
           )}
           {viewMode === 'list' && shouldVirtualize && (
-            <div
-              ref={virtualListRef}
-              className="relative w-full"
-              style={{ height: `${listRowVirtualizer.getTotalSize()}px` }}
-            >
-              {listRowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const part = sortedAvailableParts[virtualRow.index];
-                if (!part) return null;
-                return (
-                  <div
-                    key={virtualRow.key}
-                    data-index={virtualRow.index}
-                    ref={listRowVirtualizer.measureElement}
-                    className="absolute left-0 top-0 w-full pb-3"
-                    style={{
-                      transform: `translateY(${virtualRow.start - listScrollMargin}px)`,
-                    }}
-                  >
-                    {renderPartListCard(
-                      part,
-                      part.id,
-                      virtualRow.index < LCP_PRIORITY_COUNT,
-                      virtualRow.index < EAGER_VIEWPORT_COUNT,
-                    )}
-                  </div>
-                );
-              })}
+            <div ref={virtualListRef} className="w-full">
+              <div
+                className="relative w-full"
+                style={{
+                  height: `${listRowVirtualizer.getTotalSize()}px`,
+                  overflowAnchor: 'none',
+                }}
+              >
+                {listRowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const part = sortedAvailableParts[virtualRow.index];
+                  if (!part) return null;
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={listRowVirtualizer.measureElement}
+                      className="absolute left-0 top-0 w-full pb-3"
+                      style={{
+                        transform: `translateY(${
+                          virtualRow.start - listRowVirtualizer.options.scrollMargin
+                        }px)`,
+                      }}
+                    >
+                      {renderPartListCard(
+                        part,
+                        part.id,
+                        virtualRow.index < LCP_PRIORITY_COUNT,
+                        virtualRow.index < EAGER_VIEWPORT_COUNT,
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
