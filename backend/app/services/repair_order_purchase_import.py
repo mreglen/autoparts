@@ -244,3 +244,41 @@ def append_purchase_items_to_repair_order(
 
 def shop_part_is_imported(part: RepairOrderShopPart) -> bool:
     return bool(part.cart_item_type and part.cart_item_id is not None)
+
+
+def lookup_purchase_item_repair_orders(
+    db: Session,
+    *,
+    org_id: str | None,
+    order_type: str,
+    item_ids: list[int],
+) -> dict[int, dict[str, int | str | None]]:
+    """Map purchase item id -> {id, order_number} of the linked repair order."""
+    if not org_id or not item_ids:
+        return {}
+    rows = (
+        db.query(
+            RepairOrderShopPart.cart_item_id,
+            RepairOrder.id,
+            RepairOrder.order_number,
+        )
+        .join(RepairOrder, RepairOrderShopPart.order_id == RepairOrder.id)
+        .filter(
+            RepairOrder.organization_id == org_id,
+            RepairOrderShopPart.cart_item_type == order_type,
+            RepairOrderShopPart.cart_item_id.in_(item_ids),
+        )
+        .all()
+    )
+    return {
+        int(item_id): {"id": int(order_id), "order_number": order_number}
+        for item_id, order_id, order_number in rows
+        if item_id is not None
+    }
+
+
+def apply_purchase_item_repair_order_links(items, links: dict[int, dict]) -> None:
+    for item in items or []:
+        link = links.get(getattr(item, "id", None)) or {}
+        item.repair_order_id = link.get("id")
+        item.repair_order_number = link.get("order_number")

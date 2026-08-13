@@ -99,8 +99,10 @@ export function snapshotPurchaseItems(items) {
     partnumber: item.partnumber || '',
     name: item.name || '',
     quantity: Number(item.quantity) || 1,
-    price: Number(item.price) || 0,
+        price: Number(item.price) || 0,
     product_id: item.product_id || null,
+    repairOrderId: item.repairOrderId || item.repair_order_id || null,
+    repairOrderNumber: item.repairOrderNumber || item.repair_order_number || null,
   }));
 }
 
@@ -125,6 +127,8 @@ export function groupPurchaseSelections(selections) {
         quantity: entry.quantity || 1,
         price: entry.price || 0,
         product_id: entry.product_id || null,
+        repairOrderId: entry.repairOrderId || entry.repair_order_id || null,
+        repairOrderNumber: entry.repairOrderNumber || entry.repair_order_number || null,
       });
     }
   });
@@ -176,4 +180,19 @@ export async function importPurchaseGroupsToRepairOrder(
     });
   }
   return lastUpdated;
+}
+
+export function linkedRepairOrderFromItems(items) {
+  const linked = (items || []).find((item) => item.repairOrderId || item.repair_order_id);
+  if (!linked) return null;
+  return {
+    id: linked.repairOrderId || linked.repair_order_id,
+    order_number: linked.repairOrderNumber || linked.repair_order_number || null,
+  };
+}
+
+export function purchaseItemsAlreadyOnRepairOrder(groups, orderId) {
+  const items = (groups || []).flatMap((group) => group.items || []);
+  if (!items.length || !orderId) return false;
+  return items.every((item) => (item.repairOrderId || item.repair_order_id) === orderId);
 }

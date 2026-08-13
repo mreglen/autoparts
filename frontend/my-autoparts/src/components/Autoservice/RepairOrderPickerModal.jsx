@@ -10,6 +10,7 @@ import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import { vehicleLabel } from './RepairOrderViewModal';
 import {
   importPurchaseGroupsToRepairOrder,
+  purchaseItemsAlreadyOnRepairOrder,
   saveLinkedRepairOrder,
   saveRepairOrderPurchaseDraft,
   snapshotPurchaseItems,
@@ -89,6 +90,10 @@ export default function RepairOrderPickerModal({
   }, [orders, search, linkedRepairOrder]);
 
   const handleImport = async (orderId) => {
+    if (purchaseItemsAlreadyOnRepairOrder(groups, orderId)) {
+      onClose();
+      return;
+    }
     setImportingId(orderId);
     setError('');
     try {
@@ -189,8 +194,10 @@ export default function RepairOrderPickerModal({
                   </div>
                   <span className="shrink-0 text-xs font-medium text-brand-600">
                     {importingId === order.id
-                      ? 'Добавление…'
-                      : (isCurrent ? 'Добавить сюда' : 'Выбрать')}
+                      ? (linkedRepairOrder ? 'Перенос…' : 'Добавление…')
+                      : (isCurrent
+                        ? 'Оставить'
+                        : (linkedRepairOrder ? 'Перенести' : 'Выбрать'))}
                   </span>
                 </button>
               </li>

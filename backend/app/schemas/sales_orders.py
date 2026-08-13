@@ -206,6 +206,8 @@ class PurchasedUsedOrderItemResponse(BaseModel):
     quantity: int
     price: float
     status_code: str
+    repair_order_id: Optional[int] = None
+    repair_order_number: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -248,6 +250,8 @@ class PurchasedNewOrderItemResponse(BaseModel):
     price: float
     status_code: str
     seo_card_id: Optional[int] = None
+    repair_order_id: Optional[int] = None
+    repair_order_number: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -18,6 +18,10 @@ from app.models.permission import Permission
 from app.models.user import User as UserModel
 from app.models.user_permission import UserPermission
 from app.utils.org_access import org_has_admin_director
+from app.services.repair_order_purchase_import import (
+    apply_purchase_item_repair_order_links,
+    lookup_purchase_item_repair_orders,
+)
 from app.services.notification_service import notify_order_status_buyer
 from app.services.order_pickup_chat_service import maybe_send_order_ready_pickup_chat_message
 from app.schemas.sales_orders import (
@@ -220,6 +224,15 @@ def _seller_user_id_for_org(db: Session, org_id: str | None) -> int | None:
     if not seller:
         seller = db.query(UserModel).filter(UserModel.organization_id == org_id).first()
     return seller.id if seller else None
+
+
+def _buyer_autoservice_org_id(db: Session, user: UserModel) -> str | None:
+    if not user.organization_id:
+        return None
+    org = db.query(Organization).filter(Organization.id == user.organization_id).first()
+    if org and getattr(org, "is_autoservice", False) and not getattr(org, "autoservice_paused", False):
+        return org.id
+    return None
 
 
 def _product_storage_payloads(
@@ -1691,9 +1704,18 @@ def list_purchased_used_orders(
     )
 
     result = []
+    autoservice_org_id = _buyer_autoservice_org_id(db, current_user)
+    used_item_ids = [item.id for order in orders for item in (order.items or [])]
+    used_links = lookup_purchase_item_repair_orders(
+        db,
+        org_id=autoservice_org_id,
+        order_type="used",
+        item_ids=used_item_ids,
+    )
     for order in orders:
         if not order_visible_to_buyer(order, current_user.id, target_email, target_phone):
             continue
+        apply_purchase_item_repair_order_links(order.items, used_links)
         org = db.query(Organization).filter(Organization.id == order.organization_id).first()
         pickup = get_buyer_pickup_payload(order, order_kind="used")
         order_dict = {
@@ -1741,6 +1763,15 @@ def list_purchased_new_orders(
 
     rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders(orders)
 
+    autoservice_org_id = _buyer_autoservice_org_id(db, current_user)
+    new_item_ids = [item.id for order in orders for item in (order.items or [])]
+    new_links = lookup_purchase_item_repair_orders(
+        db,
+        org_id=autoservice_org_id,
+        order_type="new",
+        item_ids=new_item_ids,
+    )
+
     result = []
     for order in orders:
         org = db.query(Organization).filter(Organization.id == order.organization_id).first()
@@ -1753,6 +1784,7 @@ def list_purchased_new_orders(
                 organization_name=org.name if org else None,
                 seller_user_id=_seller_user_id_for_org(db, order.organization_id),
                 resolve_seo_card_id=_resolve_new_part_seo_card_id,
+                repair_order_links=new_links,
             )
         )
 

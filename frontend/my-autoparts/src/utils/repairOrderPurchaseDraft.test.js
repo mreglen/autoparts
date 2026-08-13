@@ -3,7 +3,9 @@ import {
   clearRepairOrderPurchaseDraft,
   clearLinkedRepairOrder,
   groupPurchaseSelections,
+  linkedRepairOrderFromItems,
   mapPurchaseItemsToShopParts,
+  purchaseItemsAlreadyOnRepairOrder,
   purchaseSelectionKey,
   readLinkedRepairOrder,
   readRepairOrderPurchaseDraft,
@@ -97,6 +99,20 @@ describe('repairOrderPurchaseDraft', () => {
 
   it('builds stable selection keys', () => {
     expect(purchaseSelectionKey('new', 10, 5)).toBe('new:10:5');
+  });
+
+  it('detects current repair order from selected items', () => {
+    expect(linkedRepairOrderFromItems([
+      { repairOrderId: 42, repairOrderNumber: 'A-100' },
+    ])).toEqual({ id: 42, order_number: 'A-100' });
+    expect(purchaseItemsAlreadyOnRepairOrder(
+      [{ items: [{ repairOrderId: 42 }, { repairOrderId: 42 }] }],
+      42,
+    )).toBe(true);
+    expect(purchaseItemsAlreadyOnRepairOrder(
+      [{ items: [{ repairOrderId: 42 }, { repairOrderId: 7 }] }],
+      42,
+    )).toBe(false);
   });
 });
 

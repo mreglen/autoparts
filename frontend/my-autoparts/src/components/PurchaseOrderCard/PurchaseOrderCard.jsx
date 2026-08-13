@@ -333,6 +333,12 @@ export default function PurchaseOrderCard({
                       <p className="mt-2 text-xs text-gray-500">
                         {item.quantity || 0} шт. × {formatPrice(item.price)}
                       </p>
+                      {item.repair_order_id ? (
+                        <p className="mt-1 text-xs font-medium text-indigo-600">
+                          Заказ-наряд
+                          {item.repair_order_number ? ` №${item.repair_order_number}` : ''}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>

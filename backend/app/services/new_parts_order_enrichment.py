@@ -116,12 +116,14 @@ def merge_buyer_items_with_rossko(
     snapshot: RosskoOrderSnapshot | None,
     *,
     resolve_seo_card_id: Callable[[Session, GarageNewOrderItem], int | None],
+    repair_order_links: dict[int, dict] | None = None,
 ) -> list[PurchasedNewOrderItemResponse]:
     rossko_by_key = _rossko_lines_by_key(snapshot)
     merged: list[PurchasedNewOrderItemResponse] = []
     for item in order.items:
         line = rossko_by_key.get(item_match_key(item.brand, item.partnumber))
         status_code = _display_status_from_rossko_line(item.status_code, line)
+        link = (repair_order_links or {}).get(item.id) or {}
         merged.append(
             PurchasedNewOrderItemResponse(
                 id=item.id,
@@ -132,6 +134,8 @@ def merge_buyer_items_with_rossko(
                 price=float(item.price),
                 status_code=status_code,
                 seo_card_id=resolve_seo_card_id(db, item),
+                repair_order_id=link.get("id"),
+                repair_order_number=link.get("order_number"),
             )
         )
     return merged
@@ -178,10 +182,17 @@ def build_buyer_new_parts_order_response(
     organization_name: str | None = None,
     seller_user_id: int | None = None,
     resolve_seo_card_id: Callable[[Session, GarageNewOrderItem], int | None],
+    repair_order_links: dict[int, dict] | None = None,
 ) -> PurchasedNewOrderResponse:
     rossko_id = order.rossko_order_id
     snapshot = (rossko_by_id or {}).get(str(rossko_id)) if rossko_id else None
-    items = merge_buyer_items_with_rossko(db, order, snapshot, resolve_seo_card_id=resolve_seo_card_id)
+    items = merge_buyer_items_with_rossko(
+        db,
+        order,
+        snapshot,
+        resolve_seo_card_id=resolve_seo_card_id,
+        repair_order_links=repair_order_links,
+    )
 
     status_code = order.status_code
     if order.status_code in (NEW_PICKUP_READY_STATUS, "new_received"):

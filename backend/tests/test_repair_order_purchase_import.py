@@ -118,5 +118,35 @@ class DetachPurchaseItemsTests(unittest.TestCase):
         db.delete.assert_not_called()
 
 
+class LookupPurchaseItemRepairOrdersTests(unittest.TestCase):
+    def test_maps_item_ids_to_repair_orders(self):
+        from app.services.repair_order_purchase_import import lookup_purchase_item_repair_orders
+
+        db = MagicMock()
+        db.query.return_value.join.return_value.filter.return_value.all.return_value = [
+            (15, 42, "A-100"),
+        ]
+        links = lookup_purchase_item_repair_orders(
+            db,
+            org_id="ORG1",
+            order_type="new",
+            item_ids=[15],
+        )
+        self.assertEqual(links[15], {"id": 42, "order_number": "A-100"})
+
+    def test_empty_without_org(self):
+        from app.services.repair_order_purchase_import import lookup_purchase_item_repair_orders
+
+        self.assertEqual(
+            lookup_purchase_item_repair_orders(
+                MagicMock(),
+                org_id=None,
+                order_type="new",
+                item_ids=[1],
+            ),
+            {},
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

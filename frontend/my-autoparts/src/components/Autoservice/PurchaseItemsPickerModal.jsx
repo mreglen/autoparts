@@ -203,6 +203,9 @@ export default function PurchaseItemsPickerModal({
                                     {[item.brand, item.partnumber].filter(Boolean).join(' · ')}
                                     {' · '}
                                     {item.quantity || 0} шт. × {formatPrice(item.price)}
+                                    {item.repair_order_id
+                                      ? ` · заказ-наряд${item.repair_order_number ? ` №${item.repair_order_number}` : ''}`
+                                      : ''}
                                   </span>
                                 </span>
                               </label>

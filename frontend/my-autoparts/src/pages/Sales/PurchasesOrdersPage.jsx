@@ -16,8 +16,8 @@ import { isOrganizationStaff } from '../../utils/clientMarkupUtils';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import {
   groupPurchaseSelections,
+  linkedRepairOrderFromItems,
   purchaseSelectionKey,
-  readLinkedRepairOrder,
   saveLinkedRepairOrder,
 } from '../../utils/repairOrderPurchaseDraft';
 import {
@@ -116,7 +116,7 @@ export default function PurchasesOrdersPage() {
   const [activeReturnOrderIds, setActiveReturnOrderIds] = useState(new Set());
   const [selectedItemKeys, setSelectedItemKeys] = useState(new Set());
   const [repairPickerOpen, setRepairPickerOpen] = useState(false);
-  const [linkedRepairOrder, setLinkedRepairOrder] = useState(() => readLinkedRepairOrder());
+  const [pickerLinkedOrder, setPickerLinkedOrder] = useState(null);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
@@ -279,6 +279,8 @@ export default function PurchasesOrdersPage() {
         quantity: item.quantity || 1,
         price: item.price || 0,
         product_id: item.product_id || null,
+        repairOrderId: item.repair_order_id || null,
+        repairOrderNumber: item.repair_order_number || null,
       });
     });
     return entries;
@@ -306,25 +308,26 @@ export default function PurchasesOrdersPage() {
   };
 
   const handleAddToRepairOrder = (orderType, orderId, items) => {
-    const groups = groupPurchaseSelections(buildEntriesForOrder(orderType, orderId, items));
+    const entries = buildEntriesForOrder(orderType, orderId, items);
+    const groups = groupPurchaseSelections(entries);
     if (!groups.length) return;
     setPickerGroups(groups);
+    setPickerLinkedOrder(linkedRepairOrderFromItems(entries));
     setRepairPickerOpen(true);
   };
 
   const handleRepairImported = (order) => {
     if (order?.id) {
       saveLinkedRepairOrder(order);
-      setLinkedRepairOrder(readLinkedRepairOrder());
     }
+    setPickerLinkedOrder(order?.id
+      ? { id: order.id, order_number: order.order_number || null }
+      : null);
     setSelectedItemKeys(new Set());
     setPickerGroups([]);
     setRepairPickerOpen(false);
+    fetchAll(true);
   };
-
-  const repairOrderActionLabel = linkedRepairOrder
-    ? 'Изменить заказ-наряд'
-    : 'Добавить к заказ-наряду';
 
   if (!isReady || !isAuthenticated) {
     return <AuthLoadingScreen className="min-h-[16rem]" />;
@@ -414,6 +417,12 @@ export default function PurchasesOrdersPage() {
               const isExpanded = expandedOrderKey === key;
               const isUsed = entry.source === 'used';
               const order = entry.order;
+              const selectedItems = (order.items || []).filter((item) => (
+                selectedItemKeys.has(purchaseSelectionKey(entry.source, order.id, item.id))
+              ));
+              const repairOrderActionLabel = selectedItems.some((item) => item.repair_order_id)
+                ? 'Изменить заказ-наряд'
+                : 'Добавить к заказ-наряду';
 
               return (
                 <PurchaseOrderCard
@@ -464,7 +473,7 @@ export default function PurchasesOrdersPage() {
           setPickerGroups([]);
         }}
         groups={pickerGroups}
-        linkedRepairOrder={linkedRepairOrder}
+        linkedRepairOrder={pickerLinkedOrder}
         onImported={handleRepairImported}
       />
     </div>
