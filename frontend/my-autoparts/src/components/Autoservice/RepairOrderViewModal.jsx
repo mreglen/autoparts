@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
@@ -59,75 +59,69 @@ function paymentSummary(order, grandTotal) {
   return { paid, remaining, isPaid };
 }
 
-function PaymentWizard({ remaining, method, amount, saving, error, onMethodChange, onAmountChange, onSubmit, onCancel }) {
+function PaymentWizard({ remaining, method, amount, saving, error, onMethodChange, onAmountChange, onSubmit }) {
   const payAmount = Number(amount) || 0;
   const afterPay = Math.max(0, Math.round((remaining - payAmount) * 100) / 100);
+  const canSubmit = Boolean(method) && payAmount > 0 && payAmount <= remaining + 0.005;
 
   return (
-    <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-gray-900">Оплата заказ-наряда</h3>
+    <div className="flex min-h-[22rem] flex-col justify-center">
+      <div className="mx-auto w-full max-w-md space-y-5">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Оплата заказ-наряда</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            К оплате: <span className="font-semibold tabular-nums text-gray-800">{formatMoney(remaining)} ₽</span>
+          </p>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-3">
+          {PAYMENT_METHODS.map((option) => {
+            const active = method === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                disabled={saving}
+                onClick={() => onMethodChange(option.value)}
+                className={`inline-flex h-11 items-center justify-center rounded-lg border px-3 text-sm font-medium transition disabled:opacity-50 ${
+                  active
+                    ? 'border-indigo-500 bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200'
+                    : 'border-gray-200 bg-white text-gray-800 hover:border-indigo-300 hover:bg-indigo-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <label className="block text-xs font-medium text-gray-700">
+          Сумма, ₽
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            max={remaining}
+            value={amount}
+            onChange={(e) => onAmountChange(e.target.value)}
+            disabled={saving}
+            className="mt-1 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm tabular-nums text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+          />
+        </label>
+        <p className="text-sm text-gray-500">
+          Останется после оплаты:{' '}
+          <span className="font-semibold tabular-nums text-gray-800">{formatMoney(afterPay)} ₽</span>
+        </p>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <button
           type="button"
-          onClick={onCancel}
-          disabled={saving}
-          className="text-xs font-medium text-gray-500 transition hover:text-gray-700 disabled:opacity-50"
+          onClick={onSubmit}
+          disabled={saving || !canSubmit}
+          className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Отмена
+          {saving ? 'Оплата…' : 'Оплатить'}
         </button>
       </div>
-
-      {!method ? (
-        <div className="grid gap-2 sm:grid-cols-3">
-          {PAYMENT_METHODS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              disabled={saving}
-              onClick={() => onMethodChange(option.value)}
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 transition hover:border-indigo-300 hover:bg-indigo-50 disabled:opacity-50"
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-xs text-gray-600">
-            Способ: <span className="font-medium text-gray-900">{PAYMENT_METHODS.find((m) => m.value === method)?.label}</span>
-            {' · '}
-            <button type="button" onClick={() => onMethodChange(null)} className="text-indigo-600 hover:underline">
-              изменить
-            </button>
-          </p>
-          <label className="block text-xs font-medium text-gray-700">
-            Сумма, ₽
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              max={remaining}
-              value={amount}
-              onChange={(e) => onAmountChange(e.target.value)}
-              disabled={saving}
-              className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm tabular-nums text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
-            />
-          </label>
-          <p className="text-xs text-gray-500">
-            Останется после оплаты:{' '}
-            <span className="font-semibold tabular-nums text-gray-800">{formatMoney(afterPay)} ₽</span>
-          </p>
-          {error ? <p className="text-xs text-red-600">{error}</p> : null}
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={saving || payAmount <= 0 || payAmount > remaining + 0.005}
-            className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? 'Оплата…' : 'Оплатить'}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -380,7 +374,14 @@ export default function RepairOrderViewModal({
         body: JSON.stringify({ method: payMethod, amount: Number(payAmount) }),
       });
       onOrderChange?.(updated);
-      resetPaymentWizard();
+      const nextRemaining = Number(updated?.remaining_amount ?? 0);
+      if (nextRemaining > 0.005) {
+        setPayMethod(null);
+        setPayAmount(String(nextRemaining));
+        setPayError('');
+      } else {
+        resetPaymentWizard();
+      }
     } catch (e) {
       setPayError(e?.message || 'Не удалось провести оплату');
     } finally {
@@ -455,14 +456,7 @@ export default function RepairOrderViewModal({
             </div>
             {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
             <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                Закрыть окно
-              </button>
-              {onEdit ? (
+              {onEdit && !payOpen ? (
                 <button
                   type="button"
                   onClick={() => onEdit(order)}
@@ -471,7 +465,17 @@ export default function RepairOrderViewModal({
                   Изменить
                 </button>
               ) : null}
-              {canPay ? (
+              {canPay && payOpen ? (
+                <button
+                  type="button"
+                  onClick={resetPaymentWizard}
+                  disabled={paySaving}
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Подробности
+                </button>
+              ) : null}
+              {canPay && !payOpen ? (
                 <button
                   type="button"
                   onClick={handleStartPayment}
@@ -481,7 +485,7 @@ export default function RepairOrderViewModal({
                   Оплата
                 </button>
               ) : null}
-              {canComplete ? (
+              {canComplete && !payOpen ? (
                 <button
                   type="button"
                   onClick={handleCompleteOrder}
@@ -498,6 +502,22 @@ export default function RepairOrderViewModal({
     >
       {loading ? (
         <p className="py-8 text-center text-sm text-gray-500">Загрузка…</p>
+      ) : payOpen && enablePayment ? (
+        <PaymentWizard
+          remaining={payment.remaining}
+          method={payMethod}
+          amount={payAmount}
+          saving={paySaving}
+          error={payError}
+          onMethodChange={(value) => {
+            setPayMethod(value);
+            if (value && !payAmount) {
+              setPayAmount(String(payment.remaining));
+            }
+          }}
+          onAmountChange={setPayAmount}
+          onSubmit={handleSubmitPayment}
+        />
       ) : (
         <div className="space-y-5">
           <dl className="grid gap-4 sm:grid-cols-2">
@@ -528,25 +548,6 @@ export default function RepairOrderViewModal({
               ) : null}
             </div>
           )}
-
-          {payOpen && enablePayment ? (
-            <PaymentWizard
-              remaining={payment.remaining}
-              method={payMethod}
-              amount={payAmount}
-              saving={paySaving}
-              error={payError}
-              onMethodChange={(value) => {
-                setPayMethod(value);
-                if (value && !payAmount) {
-                  setPayAmount(String(payment.remaining));
-                }
-              }}
-              onAmountChange={setPayAmount}
-              onSubmit={handleSubmitPayment}
-              onCancel={resetPaymentWizard}
-            />
-          ) : null}
 
           <OrderLinesExpand row={order} showExecutors={showExecutors} />
         </div>
