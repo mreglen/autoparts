@@ -59,6 +59,35 @@ function syncBasketsFromCart(state) {
     }
 }
 
+function patchBasketItemQuantity(state, itemId, quantity, maxQuantity = undefined) {
+    const apply = (baskets) => {
+        if (!Array.isArray(baskets)) return;
+        for (const basket of baskets) {
+            if (!Array.isArray(basket.items)) continue;
+            const index = basket.items.findIndex((item) => item.id === itemId);
+            if (index === -1) continue;
+            basket.items[index] = {
+                ...basket.items[index],
+                quantity,
+                ...(maxQuantity != null ? { max_quantity: maxQuantity } : {}),
+            };
+            basket.item_count = basket.items.reduce(
+                (sum, item) => sum + (Number(item.quantity) || 0),
+                0,
+            );
+            basket.total_price = basket.items.reduce(
+                (sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+                0,
+            );
+            return true;
+        }
+        return false;
+    };
+
+    apply(state.cart?.new_parts_baskets);
+    apply(state.newPartsBaskets);
+}
+
 function patchCartItemInState(state, payload, listKey) {
     if (!state.cart?.[listKey]) return;
     const index = state.cart[listKey].findIndex((item) => item.id === payload.id);
@@ -68,6 +97,9 @@ function patchCartItemInState(state, payload, listKey) {
         quantity: payload.quantity,
         ...(payload.max_quantity != null ? { max_quantity: payload.max_quantity } : {}),
     };
+    if (listKey === 'new_parts_items') {
+        patchBasketItemQuantity(state, payload.id, payload.quantity, payload.max_quantity);
+    }
 }
 
 function setCartItemQuantityById(state, itemId, quantity, listKey) {
@@ -75,6 +107,9 @@ function setCartItemQuantityById(state, itemId, quantity, listKey) {
     const index = state.cart[listKey].findIndex((item) => item.id === itemId);
     if (index === -1) return;
     state.cart[listKey][index].quantity = quantity;
+    if (listKey === 'new_parts_items') {
+        patchBasketItemQuantity(state, itemId, quantity);
+    }
 }
 
 function removeQuantityUpdatingId(state, itemId) {

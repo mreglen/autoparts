@@ -6,6 +6,7 @@ import {
   selectCartLoading,
   selectCartError,
   selectNewPartsBaskets,
+  selectCartQuantityUpdatingIds,
   fetchCart,
   updateCartItemQuantity,
   updateUsedCartItemQuantity,
@@ -53,19 +54,21 @@ function DeliveryCell({ deliveryStart, deliveryEnd, deliveryFallback }) {
 }
 
 function getMaxAllowedQuantity(item) {
-  const max = item?.maxQuantity;
-  if (max != null && max > 0) return max;
-  if (item?.type === 'new') return 99;
-  return Math.max(1, item?.quantity || 1);
+  const max = Number(item?.maxQuantity);
+  if (Number.isFinite(max) && max > 0) return Math.floor(max);
+  // без лимита со склада — не даём увеличить сверх текущего количества
+  return Math.max(1, Number(item?.quantity) || 1);
 }
 
-function QuantityStepper({ quantity, onDecrease, onIncrease, max }) {
+function QuantityStepper({ quantity, onDecrease, onIncrease, max, disabled = false }) {
+  const atMin = quantity <= 1;
+  const atMax = quantity >= max;
   return (
     <div className="inline-flex items-center overflow-hidden rounded-lg border border-line bg-surface">
       <button
         type="button"
         onClick={onDecrease}
-        disabled={quantity <= 1}
+        disabled={disabled || atMin}
         className="flex h-8 w-7 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
         aria-label="Уменьшить"
       >
@@ -77,13 +80,15 @@ function QuantityStepper({ quantity, onDecrease, onIncrease, max }) {
         value={quantity}
         className="h-8 w-9 border-x border-line bg-surface text-center text-sm font-medium text-ink"
         aria-label="Количество"
+        title={max > 0 ? `Доступно: ${max}` : undefined}
       />
       <button
         type="button"
         onClick={onIncrease}
-        disabled={quantity >= max}
+        disabled={disabled || atMax}
         className="flex h-8 w-7 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
         aria-label="Увеличить"
+        title={atMax ? `Максимум ${max} шт.` : undefined}
       >
         +
       </button>
@@ -100,9 +105,11 @@ function CartTableRow({
   showDeliveryColumn,
   showPurchasePrice,
   formatItemPrice,
+  quantityBusy = false,
 }) {
   const maxQty = getMaxAllowedQuantity(item);
-  const lineTotal = item.price * item.quantity;
+  const quantity = Math.min(Math.max(1, Number(item.quantity) || 1), maxQty);
+  const lineTotal = item.price * quantity;
   const showPurchase = showPurchasePrice
     && item.purchasePrice > 0
     && Math.abs(item.price - item.purchasePrice) > 0.009;
@@ -142,10 +149,11 @@ function CartTableRow({
       </td>
       <td className="w-[5.5rem] px-2 py-2.5 align-middle">
         <QuantityStepper
-          quantity={item.quantity}
+          quantity={quantity}
           max={maxQty}
-          onDecrease={() => onQuantityChange(item.id, item.quantity - 1)}
-          onIncrease={() => onQuantityChange(item.id, item.quantity + 1)}
+          disabled={quantityBusy}
+          onDecrease={() => onQuantityChange(item.id, quantity - 1)}
+          onIncrease={() => onQuantityChange(item.id, quantity + 1)}
         />
       </td>
       <td className="min-w-[5rem] whitespace-nowrap px-2 py-2.5 align-middle text-right">
@@ -185,6 +193,7 @@ function CartTableBlock({
   showPurchasePrice = false,
   formatItemPrice = formatNewPartPrice,
   checkoutLabel = 'Оформить заказ',
+  quantityUpdatingIds = [],
 }) {
   const allSelected = items.length > 0 && items.every((item) => selectedItems.has(item.id));
   const someSelected = items.some((item) => selectedItems.has(item.id));
@@ -278,6 +287,7 @@ function CartTableBlock({
                 showDeliveryColumn={showDeliveryColumn}
                 showPurchasePrice={showPurchasePrice}
                 formatItemPrice={formatItemPrice}
+                quantityBusy={quantityUpdatingIds.includes(item.id)}
               />
             ))}
           </tbody>
@@ -294,6 +304,7 @@ export default function CartPage() {
   const loading = useSelector(selectCartLoading);
   const error = useSelector(selectCartError);
   const newPartsBaskets = useSelector(selectNewPartsBaskets);
+  const quantityUpdatingIds = useSelector(selectCartQuantityUpdatingIds);
   const isInitialLoad = loading && !cart;
   const isAuthorized = useSelector((state) => Boolean(state.auth.token));
   const user = useSelector((state) => state.auth.user);
@@ -416,14 +427,17 @@ export default function CartPage() {
   );
 
   const handleQuantityChange = async (id, newQuantity) => {
-    const quantity = Math.max(1, newQuantity);
     const cartItem = cartItems.find((item) => item.id === id);
     if (!cartItem) {
       dispatch(fetchCart());
       return;
     }
+    if (quantityUpdatingIds.includes(id)) return;
+
     const maxAllowed = getMaxAllowedQuantity(cartItem);
-    const safeQuantity = Math.max(1, Math.min(quantity, maxAllowed));
+    const safeQuantity = Math.max(1, Math.min(Math.floor(newQuantity), maxAllowed));
+    if (safeQuantity === cartItem.quantity) return;
+
     try {
       if (cartItem.type === 'used') {
         await dispatch(updateUsedCartItemQuantity({ itemId: id, quantity: safeQuantity })).unwrap();
@@ -686,6 +700,7 @@ export default function CartPage() {
                 showDeliveryColumn
                 showPurchasePrice={showPurchaseInCart}
                 formatItemPrice={formatNewPartPrice}
+                quantityUpdatingIds={quantityUpdatingIds}
               />
             );
           })}
@@ -719,6 +734,7 @@ export default function CartPage() {
               onClearAll={() => handleClearUsedBasket(items)}
               showDeliveryColumn={false}
               formatItemPrice={formatUsedPrice}
+              quantityUpdatingIds={quantityUpdatingIds}
             />
           ))}
         </div>
