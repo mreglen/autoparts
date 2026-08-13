@@ -10,6 +10,14 @@ import { useShowSiteReviews, useShowYandexBadge } from '../../utils/siteReviewsP
 import HeaderYandexBadge from '../../components/Seo/HeaderYandexBadge';
 import CitySelectModal from '../../components/CitySelectModal/CitySelectModal';
 import { useSelectedCity } from '../../hooks/useSelectedCity';
+import { Button } from '../../components/UI';
+import {
+  HEADER_CONTENT_CLASS,
+  HeaderAvatar,
+  HeaderCityChip,
+  HeaderIconButton,
+  HeaderLogo,
+} from '../../components/Header/headerPrimitives';
 
 const formatPhoneNumber = (phone) => {
   if (!phone) return '';
@@ -40,28 +48,6 @@ function DesktopNavLink({ to, children, end }) {
     >
       {children}
     </NavLink>
-  );
-}
-
-function HeaderBadge({ count }) {
-  if (!count || count <= 0) return null;
-  return (
-    <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-      {count > 99 ? '99+' : count}
-    </span>
-  );
-}
-
-function HeaderIconLink({ to, label, badge, children }) {
-  return (
-    <Link
-      to={to}
-      aria-label={label}
-      className="relative flex h-10 w-10 items-center justify-center rounded-sg border border-line bg-surface-muted text-ink-muted transition hover:border-brand-200 hover:bg-brand-50/50 hover:text-brand-600"
-    >
-      {children}
-      <HeaderBadge count={badge} />
-    </Link>
   );
 }
 
@@ -148,41 +134,29 @@ export default function Navigation() {
 
   const totalUnreadCount = garageUnreadCount + avitoUnreadCount;
 
-  const formatPrice = (price) =>
-    new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(
-      price
-    );
+  const formatCartLine = (count, price) => {
+    const amount = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(price);
+    return `${count}шт Х ${amount} Р`;
+  };
 
   return (
     <>
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-line bg-surface">
       {showYandexBadge ? <HeaderYandexBadge /> : null}
-      {/* Верхняя полоска: контакты и навигация */}
-      <div className="border-b border-gray-100 bg-gray-50/90">
-        <div className="mx-auto flex h-9 max-w-7xl items-center justify-between gap-4 px-4 lg:px-6">
-          <div className="flex min-w-0 items-center gap-3 text-xs text-gray-600">
-            <button
-              type="button"
+      <div className="border-b border-line bg-surface-subtle">
+        <div className={`flex h-9 items-center justify-between gap-4 ${HEADER_CONTENT_CLASS}`}>
+          <div className="flex min-w-0 items-center gap-3 text-xs text-ink-muted">
+            <HeaderCityChip
+              city={selectedCity}
               onClick={openCityModal}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition hover:bg-white hover:text-indigo-600 hover:shadow-sm"
-              aria-haspopup="dialog"
-              aria-expanded={isCityModalOpen}
-            >
-              <svg className="h-3.5 w-3.5 shrink-0 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span className="truncate">г. {selectedCity}</span>
-              <svg className="h-3 w-3 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+              isOpen={isCityModalOpen}
+            />
             {adminOrganizationPhone?.organization_phone && (
               <>
-                <span className="hidden text-gray-300 sm:inline">|</span>
+                <span className="hidden text-line-strong sm:inline">|</span>
                 <a
                   href={`tel:${adminOrganizationPhone.organization_phone.replace(/\D/g, '')}`}
-                  className="hidden items-center gap-1.5 font-medium text-gray-700 transition hover:text-indigo-600 sm:inline-flex"
+                  className="hidden items-center gap-1.5 font-medium text-ink-soft transition hover:text-brand-600 sm:inline-flex"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -207,76 +181,52 @@ export default function Navigation() {
         </div>
       </div>
 
-      {/* Основная строка */}
-      <div className="mx-auto max-w-7xl px-4 lg:px-6">
-        <div className="flex h-[4.25rem] items-center gap-4 lg:gap-5">
-          <NavLink to="/" className="flex shrink-0 items-center gap-2.5">
-            <img
-              src="/img/LogoWithoutBg.png"
-              alt="Свой Гараж"
-              className="h-9 w-auto"
-              width={144}
-              height={36}
-              fetchPriority="high"
-            />
-            <div className="hidden leading-tight text-blue-900 xl:block">
-              <span className="block text-sm font-bold">Свой</span>
-              <span className="block text-sm font-bold">Гараж</span>
-            </div>
-          </NavLink>
+      <div className={HEADER_CONTENT_CLASS}>
+        <div className="flex h-[4.25rem] min-w-0 w-full items-center gap-4 lg:gap-5">
+          <HeaderLogo wordmarkClassName="hidden xl:block" />
 
-          <NavLink
-            to="/catalog"
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <Button as={NavLink} to="/catalog" size="sm" className="shrink-0">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
             Каталог
-          </NavLink>
+          </Button>
 
-          <div className="min-w-0 flex-1 max-w-2xl">
+          <div className="min-w-0 flex-1">
             <Search />
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             <Link
               to="/cart"
               aria-label="Корзина"
-              className="relative hidden items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm transition hover:border-indigo-200 hover:bg-indigo-50/50 sm:flex"
+              className="relative hidden items-center gap-2 rounded-sg border border-line bg-surface-muted px-3 py-2 text-sm transition hover:border-brand-200 hover:bg-brand-50/50 sm:flex"
             >
-              <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="h-5 w-5 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
               {cartData.itemCount > 0 ? (
-                <span className="flex flex-col items-start leading-tight">
-                  <span className="text-xs text-gray-500">{cartData.itemCount} шт.</span>
-                  <span className="font-semibold text-gray-900">{formatPrice(cartData.totalPrice)}</span>
+                <span className="whitespace-nowrap font-medium text-ink">
+                  {formatCartLine(cartData.itemCount, cartData.totalPrice)}
                 </span>
               ) : (
-                <span className="font-medium text-gray-700">Корзина</span>
+                <span className="font-medium text-ink-soft">Корзина</span>
               )}
-              <HeaderBadge count={cartData.itemCount} />
             </Link>
 
-            <Link
-              to="/cart"
-              aria-label="Корзина"
-              className="relative flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-gray-100 hover:text-indigo-600 sm:hidden"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <HeaderIconButton to="/cart" label="Корзина" className="sm:hidden">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
-              <HeaderBadge count={cartData.itemCount} />
-            </Link>
+            </HeaderIconButton>
 
             {token && user ? (
               <>
-                <HeaderIconLink to="/chats" label="Чаты" badge={totalUnreadCount}>
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <HeaderIconButton to="/chats" label="Чаты" badge={totalUnreadCount}>
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
-                </HeaderIconLink>
+                </HeaderIconButton>
 
                 <div
                   className="relative ml-1 flex items-center"
@@ -286,50 +236,36 @@ export default function Navigation() {
                   <Link
                     to={profilePath}
                     aria-label="Профиль"
-                    className="flex items-center gap-2 rounded-xl border border-gray-200 py-1.5 pl-1.5 pr-3 transition hover:border-indigo-200 hover:bg-gray-50"
+                    className="flex items-center gap-2 rounded-sg border border-line py-1 pl-1 pr-3 transition hover:border-brand-200 hover:bg-surface-subtle"
                   >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 text-sm font-semibold text-white">
-                      {firstName.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 lg:block">
+                    <HeaderAvatar initial={firstName} size="sm" />
+                    <span className="hidden max-w-[120px] truncate text-sm font-medium text-ink lg:block">
                       {firstName}
                     </span>
                   </Link>
-                  <button
-                    type="button"
-                    aria-label="Меню аккаунта"
-                    aria-expanded={isProfileOpen}
-                    className="ml-0.5 hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 lg:flex"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
 
                   {isProfileOpen && (
-                    <div className="absolute right-0 top-[calc(100%+6px)] w-80 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+                    <div className="absolute right-0 top-[calc(100%+6px)] w-80 overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg-md">
                       <Link
                         to={profilePath}
                         onClick={() => setIsProfileOpen(false)}
-                        className="block border-b border-gray-100 bg-gradient-to-br from-indigo-50/80 to-white px-4 py-4 transition hover:bg-indigo-50/90"
+                        className="block border-b border-line bg-brand-50 px-4 py-4 transition hover:bg-brand-100"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-lg font-semibold text-white">
-                            {firstName.charAt(0).toUpperCase()}
-                          </span>
+                          <HeaderAvatar initial={firstName} size="lg" />
                           <div className="min-w-0">
-                            <p className="truncate font-semibold text-gray-900">{fullName || firstName}</p>
+                            <p className="truncate font-semibold text-ink">{fullName || firstName}</p>
                             {user.organization_name && (
-                              <p className="truncate text-xs text-gray-500">{user.organization_name}</p>
+                              <p className="truncate text-xs text-ink-muted">{user.organization_name}</p>
                             )}
                           </div>
                         </div>
                       </Link>
 
-                      <div className="space-y-0.5 p-2 text-sm text-gray-600">
+                      <div className="space-y-0.5 p-2 text-sm text-ink-muted">
                         {user.phone && (
                           <p className="flex items-center gap-2 px-3 py-1.5">
-                            <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="h-4 w-4 shrink-0 text-ink-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                             </svg>
                             <span className="truncate">{user.phone}</span>
@@ -337,7 +273,7 @@ export default function Navigation() {
                         )}
                         {user.email && (
                           <p className="flex items-center gap-2 px-3 py-1.5">
-                            <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="h-4 w-4 shrink-0 text-ink-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                             </svg>
                             <span className="truncate">{user.email}</span>
@@ -345,21 +281,21 @@ export default function Navigation() {
                         )}
                       </div>
 
-                      <div className="border-t border-gray-100 p-2">
+                      <div className="border-t border-line p-2">
                         <button
                           type="button"
                           onClick={() => {
                             setIsProfileOpen(false);
                             navigate(profilePath);
                           }}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          className="flex w-full items-center gap-2 rounded-sg px-3 py-2 text-sm font-medium text-ink-soft hover:bg-surface-subtle"
                         >
                           Личный кабинет
                         </button>
                         <button
                           type="button"
                           onClick={handleLogout}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                          className="flex w-full items-center gap-2 rounded-sg px-3 py-2 text-sm font-medium text-danger hover:bg-danger-50"
                         >
                           Выйти
                         </button>
@@ -369,15 +305,9 @@ export default function Navigation() {
                 </div>
               </>
             ) : (
-              <NavLink
-                to="/auth"
-                className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                </svg>
+              <Button as={NavLink} to="/auth" variant="secondary" size="sm" className="shrink-0">
                 Войти
-              </NavLink>
+              </Button>
             )}
           </div>
         </div>

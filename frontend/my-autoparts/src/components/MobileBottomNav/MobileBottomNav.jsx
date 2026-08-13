@@ -3,6 +3,9 @@ import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectCartSummary } from '../../redux/slices/CartSlice';
+import { usePwaStandalone } from '../../utils/pwaStandalone';
+
+const EMPTY_CART_SUMMARY = { itemCount: 0, totalPrice: 0 };
 
 const navItems = [
     {
@@ -153,16 +156,18 @@ function NavItemLink({ item, isActive, badge }) {
 export default function MobileBottomNav() {
     const { user, token } = useSelector((state) => state.auth);
     const isAuthenticated = Boolean(token && user);
-    const cartData = useSelector(selectCartSummary);
+    const cartData = useSelector(selectCartSummary) || EMPTY_CART_SUMMARY;
     const { chats } = useSelector((state) => state.chats);
     const { chats: avitoChats } = useSelector((state) => state.avitoChats);
     const navigate = useNavigate();
     const location = useLocation();
 
-    const visibleNavItems = React.useMemo(
-        () => (isAuthenticated ? navItems : navItems.filter((item) => !item.authOnly)),
-        [isAuthenticated]
-    );
+    const isPwa = usePwaStandalone();
+    const visibleNavItems = React.useMemo(() => {
+        let items = isAuthenticated ? navItems : navItems.filter((item) => !item.authOnly);
+        if (isPwa) items = items.filter((item) => item.id !== 'home');
+        return items;
+    }, [isAuthenticated, isPwa]);
 
     const garageUnreadCount = React.useMemo(() => {
         if (!chats || chats.length === 0) return 0;
@@ -197,7 +202,9 @@ export default function MobileBottomNav() {
             ? 'grid-cols-5'
             : visibleNavItems.length === 4
               ? 'grid-cols-4'
-              : 'grid-cols-3';
+              : visibleNavItems.length === 2
+                ? 'grid-cols-2'
+                : 'grid-cols-3';
 
     return (
         <nav

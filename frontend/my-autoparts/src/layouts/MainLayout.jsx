@@ -96,22 +96,22 @@ export default function MainLayout() {
                     isFullBleedAmbientPage
                         ? 'max-w-none bg-surface px-0 py-0 min-h-[calc(100dvh-var(--sg-mobile-header-h)-4.5rem)] lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]'
                         : isChatsPage
-                        ? `max-w-7xl max-lg:px-0 max-lg:py-0 max-lg:overflow-hidden px-3 sm:px-1 lg:px-2 py-6 sm:py-8 ${
+                        ? `max-w-sg-content max-lg:px-0 max-lg:py-0 max-lg:overflow-hidden px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${
                             isMobileActiveChat
                               ? 'max-lg:h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))]'
                               : 'max-lg:h-[calc(100dvh-var(--sg-mobile-header-h)-4.5rem-env(safe-area-inset-bottom,0px))]'
                           } lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]`
                         : isPartPage
-                        ? 'max-w-7xl max-lg:px-0 max-lg:py-0 px-3 sm:px-1 lg:px-2 py-6 sm:py-8 max-lg:min-h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))]'
+                        ? 'max-w-sg-content max-lg:px-0 max-lg:py-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-lg:min-h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))]'
                         : isVinCatalogPage
-                        ? 'max-w-7xl max-lg:px-0 max-lg:py-0 px-3 sm:px-1 lg:px-2 py-2 sm:py-3'
+                        ? 'max-w-sg-content max-lg:px-0 max-lg:py-0 px-4 sm:px-6 lg:px-8 py-2 sm:py-3'
                         : isAutopartsPage
-                        ? 'max-w-7xl max-lg:px-0 max-lg:py-2 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
-                        : 'max-w-7xl max-lg:px-3 max-lg:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
+                        ? 'max-w-sg-content max-lg:px-0 max-lg:py-2 px-4 sm:px-6 lg:px-8 py-6 sm:py-8'
+                        : 'max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8'
                 }`}
             >
                 {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage && !isNewPartDetailPage && !isChatsPage && !isVinCatalogPage ? (
-                    <div className={isFullBleedAmbientPage ? 'mx-auto max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8' : undefined}>
+                    <div className={isFullBleedAmbientPage ? 'mx-auto max-w-sg-content px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8' : undefined}>
                         <Breadcrumbs items={breadcrumbItems} includeJsonLd={!isPartPage} />
                     </div>
                 ) : null}

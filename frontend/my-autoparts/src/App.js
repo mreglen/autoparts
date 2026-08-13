@@ -23,6 +23,7 @@ import {
 import { getAdminMenuMode } from './utils/adminMenuMode';
 import { buildAutopartsRedirectSeo, PageSeoHelmet } from './utils/pageSeo';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
+import { isPwaStandalone, PWA_START_PATH } from './utils/pwaStandalone';
 
 // Eager: публичный каталог и первый экран
 import Authorization from './pages/Autorization/Authorization';
@@ -188,6 +189,13 @@ function ServiceWorkerNavigationHandler() {
 function SiteAnalyticsTracker() {
   useSiteAnalytics();
   return null;
+}
+
+function PwaHomeRedirect() {
+  if (isPwaStandalone()) {
+    return <Navigate to={PWA_START_PATH} replace />;
+  }
+  return <Main />;
 }
 
 function AutopartsRedirect() {
@@ -369,7 +377,7 @@ function App() {
         <Route path="/auth/password-reset" element={<PasswordReset />} />
 
         <Route path="/" element={<MainLayout />}>
-          <Route index element={<Main />} />
+          <Route index element={<PwaHomeRedirect />} />
           <Route path="/find" element={<FindRedirectPage />} />
           <Route path="/autoparts" element={<AutopartsRedirect />} />
           <Route path="/contacts" element={<Navigate to="/about" replace />} />

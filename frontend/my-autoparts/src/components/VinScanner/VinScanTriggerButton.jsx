@@ -12,7 +12,7 @@ export default function VinScanTriggerButton({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className={`inline-flex items-center justify-center text-gray-500 transition hover:text-indigo-600 disabled:opacity-50 ${className}`}
+      className={`inline-flex items-center justify-center text-ink-muted transition hover:text-brand-600 disabled:opacity-50 ${className}`}
     >
       <svg
         className={compact ? 'h-4 w-4' : 'h-5 w-5'}
