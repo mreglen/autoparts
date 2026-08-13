@@ -30,6 +30,11 @@ describe('extractVinFromOcrText', () => {
     expect(result?.normalized).toBe('JHMGD18908S212467');
   });
 
+  it('extracts Chrysler VIN from lowercase screen text', () => {
+    const result = extractVinFromOcrText('1c4pjmbx2kd250039');
+    expect(result?.normalized).toBe('1C4PJMBX2KD250039');
+  });
+
   it('prefers longest valid candidate in mixed text', () => {
     const result = extractVinFromOcrText('ABC JHMGD18908S212467 XYZ1234567890');
     expect(result?.normalized).toBe('JHMGD18908S212467');

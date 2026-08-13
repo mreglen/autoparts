@@ -5,6 +5,7 @@ import {
   normalizeVinOrNull,
   sanitizeVinInput,
   VIN_INPUT_MAX_LENGTH,
+  VIN_MAX_LENGTH,
 } from '../../utils/laximoVin';
 import { extractVinFromOcrText } from '../../utils/extractVinFromOcrText';
 import {
@@ -161,7 +162,10 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
         liveMatchRef.current = 0;
         return false;
       }
-      if (extracted.normalized === liveVinRef.current) {
+      if (extracted.normalized.length === VIN_MAX_LENGTH) {
+        liveVinRef.current = extracted.normalized;
+        liveMatchRef.current = 2;
+      } else if (extracted.normalized === liveVinRef.current) {
         liveMatchRef.current += 1;
       } else {
         liveVinRef.current = extracted.normalized;
@@ -275,14 +279,9 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
             </>
           ) : null}
           {mode === MODES.CONFIRM ? (
-            <>
-              <Button variant="secondary" onClick={handleClose} disabled={processing}>
-                Отмена
-              </Button>
-              <Button variant="primary" onClick={handleContinue} disabled={!canContinue}>
-                Найти
-              </Button>
-            </>
+            <Button variant="secondary" onClick={handleClose} disabled={processing}>
+              Отмена
+            </Button>
           ) : null}
           {mode === MODES.ERROR ? (
             <>
@@ -349,6 +348,14 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
             autoCapitalize="characters"
             placeholder="VIN автомобиля"
           />
+          <Button
+            variant="primary"
+            onClick={handleContinue}
+            disabled={!canContinue}
+            className="w-full"
+          >
+            Найти
+          </Button>
           {message ? <p className="text-sm text-amber-700">{message}</p> : null}
           {!canContinue ? (
             <p className="text-sm text-red-600">VIN должен содержать от 11 до 17 символов</p>

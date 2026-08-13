@@ -4,6 +4,8 @@ let idleTimer = null;
 const IDLE_TERMINATE_MS = 120000;
 const MIN_OCR_WIDTH = 1200;
 const MAX_OCR_WIDTH = 1800;
+/** Include lowercase: VINs on screens/docs are often not uppercase. I/O/Q stay so we can map them to 1/0. */
+const VIN_OCR_WHITELIST = 'ABCDEFGHJKLMNPRSTUVWXYZabcdefghjklmnprstuvwxyzIOQioq0123456789';
 
 function bumpIdleTimer() {
   if (typeof window === 'undefined') return;
@@ -21,7 +23,7 @@ async function getWorker() {
         logger: () => {},
       });
       await worker.setParameters({
-        tessedit_char_whitelist: 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789',
+        tessedit_char_whitelist: VIN_OCR_WHITELIST,
         tessedit_pageseg_mode: '7',
       });
       return worker;
@@ -98,9 +100,15 @@ function removeHorizontalFormLines(data, width, height) {
       if (data[(y * width + x) * 4] < 110) dark += 1;
     }
     const ratio = dark / width;
-    if (ratio < 0.38 || ratio > 0.98) continue;
+    if (ratio < 0.62 || ratio > 0.98) continue;
     const prevY = Math.max(0, y - 1);
     const nextY = Math.min(height - 1, y + 1);
+    let neighborDark = 0;
+    for (let x = 0; x < width; x += 1) {
+      if (data[(prevY * width + x) * 4] < 110) neighborDark += 1;
+      if (data[(nextY * width + x) * 4] < 110) neighborDark += 1;
+    }
+    if (neighborDark / (width * 2) > 0.28) continue;
     for (let x = 0; x < width; x += 1) {
       const i = (y * width + x) * 4;
       const p = (prevY * width + x) * 4;
@@ -150,11 +158,33 @@ function invertCanvas(sourceCanvas) {
   return canvas;
 }
 
+function reduceScreenMoiré(sourceCanvas) {
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+  if (w < 40 || h < 12) return sourceCanvas;
+  const small = document.createElement('canvas');
+  small.width = Math.max(8, Math.round(w * 0.5));
+  small.height = Math.max(8, Math.round(h * 0.5));
+  const sctx = small.getContext('2d');
+  if (!sctx) return sourceCanvas;
+  sctx.imageSmoothingEnabled = true;
+  sctx.drawImage(sourceCanvas, 0, 0, small.width, small.height);
+  const out = document.createElement('canvas');
+  out.width = w;
+  out.height = h;
+  const octx = out.getContext('2d');
+  if (!octx) return sourceCanvas;
+  octx.imageSmoothingEnabled = true;
+  octx.drawImage(small, 0, 0, w, h);
+  return out;
+}
+
 function upscaleGrayCanvas(sourceCanvas) {
   if (!sourceCanvas?.width || !sourceCanvas?.height) return sourceCanvas;
 
-  const srcW = sourceCanvas.width;
-  const srcH = sourceCanvas.height;
+  const denoised = reduceScreenMoiré(sourceCanvas);
+  const srcW = denoised.width;
+  const srcH = denoised.height;
   const scale = Math.min(MAX_OCR_WIDTH / srcW, Math.max(MIN_OCR_WIDTH / srcW, 2.6));
   const width = Math.max(1, Math.round(srcW * scale));
   const height = Math.max(1, Math.round(srcH * scale));
@@ -165,7 +195,7 @@ function upscaleGrayCanvas(sourceCanvas) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return sourceCanvas;
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(sourceCanvas, 0, 0, width, height);
+  ctx.drawImage(denoised, 0, 0, width, height);
 
   const imageData = ctx.getImageData(0, 0, width, height);
   const { data } = imageData;
