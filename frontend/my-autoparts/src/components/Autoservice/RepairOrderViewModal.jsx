@@ -1,5 +1,7 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '../UI/Modal';
 import { formatServerDateTime } from '../../utils/serverDate';
+import { apiRequest } from '../../utils/apiClient';
 import {
   formatShopPartQty,
   formatShopPartUnit,
@@ -39,6 +41,95 @@ function formatMoney(value) {
   const n = Number(value);
   if (Number.isNaN(n)) return '0,00';
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const PAYMENT_METHODS = [
+  { value: 'card', label: 'Картой' },
+  { value: 'cash', label: 'Наличными' },
+  { value: 'bank', label: 'Расчётный счёт' },
+];
+
+function paymentSummary(order, grandTotal) {
+  const paid = Number(order?.paid_amount ?? 0);
+  const remaining =
+    order?.remaining_amount != null
+      ? Number(order.remaining_amount)
+      : Math.max(0, grandTotal - paid);
+  const isPaid = order?.is_paid === true || remaining <= 0.005;
+  return { paid, remaining, isPaid };
+}
+
+function PaymentWizard({ remaining, method, amount, saving, error, onMethodChange, onAmountChange, onSubmit, onCancel }) {
+  const payAmount = Number(amount) || 0;
+  const afterPay = Math.max(0, Math.round((remaining - payAmount) * 100) / 100);
+
+  return (
+    <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-gray-900">Оплата заказ-наряда</h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="text-xs font-medium text-gray-500 transition hover:text-gray-700 disabled:opacity-50"
+        >
+          Отмена
+        </button>
+      </div>
+
+      {!method ? (
+        <div className="grid gap-2 sm:grid-cols-3">
+          {PAYMENT_METHODS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              disabled={saving}
+              onClick={() => onMethodChange(option.value)}
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 transition hover:border-indigo-300 hover:bg-indigo-50 disabled:opacity-50"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-600">
+            Способ: <span className="font-medium text-gray-900">{PAYMENT_METHODS.find((m) => m.value === method)?.label}</span>
+            {' · '}
+            <button type="button" onClick={() => onMethodChange(null)} className="text-indigo-600 hover:underline">
+              изменить
+            </button>
+          </p>
+          <label className="block text-xs font-medium text-gray-700">
+            Сумма, ₽
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              max={remaining}
+              value={amount}
+              onChange={(e) => onAmountChange(e.target.value)}
+              disabled={saving}
+              className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm tabular-nums text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+            />
+          </label>
+          <p className="text-xs text-gray-500">
+            Останется после оплаты:{' '}
+            <span className="font-semibold tabular-nums text-gray-800">{formatMoney(afterPay)} ₽</span>
+          </p>
+          {error ? <p className="text-xs text-red-600">{error}</p> : null}
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={saving || payAmount <= 0 || payAmount > remaining + 0.005}
+            className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? 'Оплата…' : 'Оплатить'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function lineSum(qty, unitPrice) {
@@ -235,11 +326,87 @@ export default function RepairOrderViewModal({
   loading = false,
   onClose,
   onEdit,
+  onOrderChange,
   showExecutors = true,
+  enablePayment = false,
 }) {
-  if (!order && !loading) return null;
+  const [payOpen, setPayOpen] = useState(false);
+  const [payMethod, setPayMethod] = useState(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [paySaving, setPaySaving] = useState(false);
+  const [payError, setPayError] = useState('');
+  const [completeSaving, setCompleteSaving] = useState(false);
+  const [completeError, setCompleteError] = useState('');
+
+  useEffect(() => {
+    setPayOpen(false);
+    setPayMethod(null);
+    setPayAmount('');
+    setPayError('');
+    setCompleteError('');
+  }, [order?.id]);
 
   const totals = order ? orderTotals(order) : null;
+  const payment = order && totals ? paymentSummary(order, totals.grand) : null;
+  const canPay = enablePayment && payment && payment.remaining > 0.005 && order.status !== 'completed' && order.status !== 'cancelled';
+  const canComplete =
+    enablePayment &&
+    payment?.isPaid &&
+    order?.status !== 'completed' &&
+    order?.status !== 'cancelled';
+
+  const resetPaymentWizard = useCallback(() => {
+    setPayOpen(false);
+    setPayMethod(null);
+    setPayAmount('');
+    setPayError('');
+  }, []);
+
+  const handleStartPayment = useCallback(() => {
+    setCompleteError('');
+    setPayOpen(true);
+    setPayMethod(null);
+    setPayAmount(payment?.remaining ? String(payment.remaining) : '');
+    setPayError('');
+  }, [payment?.remaining]);
+
+  const handleSubmitPayment = useCallback(async () => {
+    if (!order?.id || !payMethod) return;
+    setPaySaving(true);
+    setPayError('');
+    try {
+      const updated = await apiRequest(`/autoservice/repair-orders/${order.id}/payments`, {
+        method: 'POST',
+        body: JSON.stringify({ method: payMethod, amount: Number(payAmount) }),
+      });
+      onOrderChange?.(updated);
+      resetPaymentWizard();
+    } catch (e) {
+      setPayError(e?.message || 'Не удалось провести оплату');
+    } finally {
+      setPaySaving(false);
+    }
+  }, [order?.id, payMethod, payAmount, onOrderChange, resetPaymentWizard]);
+
+  const handleCompleteOrder = useCallback(async () => {
+    if (!order?.id) return;
+    setCompleteSaving(true);
+    setCompleteError('');
+    try {
+      const updated = await apiRequest(`/autoservice/repair-orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      onOrderChange?.(updated);
+    } catch (e) {
+      setCompleteError(e?.message || 'Не удалось закрыть заказ-наряд');
+    } finally {
+      setCompleteSaving(false);
+    }
+  }, [order?.id, onOrderChange]);
+
+  if (!order && !loading) return null;
+
   const clientLine = [order?.client?.name, order?.client?.phone].filter(Boolean).join(' · ') || '—';
   const hasClientComment = Boolean(order?.client_comment?.trim());
   const hasStaffComment = Boolean(order?.staff_comment?.trim());
@@ -261,28 +428,67 @@ export default function RepairOrderViewModal({
       }
       footer={
         order ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Итого заказ</p>
-              <p className="mt-0.5 text-lg font-bold tabular-nums text-gray-900">
-                {formatMoney(totals.grand)} ₽
-              </p>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Итого заказ</p>
+                <p className="mt-0.5 text-lg font-bold tabular-nums text-gray-900">
+                  {formatMoney(totals.grand)} ₽
+                </p>
+              </div>
+              {enablePayment && payment ? (
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Оплачено</p>
+                    <p className="mt-0.5 font-semibold tabular-nums text-emerald-700">
+                      {formatMoney(payment.paid)} ₽
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Осталось</p>
+                    <p className="mt-0.5 font-semibold tabular-nums text-gray-900">
+                      {formatMoney(payment.remaining)} ₽
+                    </p>
+                  </div>
+                </div>
+              ) : null}
             </div>
+            {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={onClose}
                 className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
               >
-                Закрыть
+                Закрыть окно
               </button>
               {onEdit ? (
                 <button
                   type="button"
                   onClick={() => onEdit(order)}
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                 >
                   Изменить
+                </button>
+              ) : null}
+              {canPay ? (
+                <button
+                  type="button"
+                  onClick={handleStartPayment}
+                  disabled={paySaving || completeSaving}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  Оплата
+                </button>
+              ) : null}
+              {canComplete ? (
+                <button
+                  type="button"
+                  onClick={handleCompleteOrder}
+                  disabled={completeSaving || paySaving}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {completeSaving ? 'Закрытие…' : 'Закрыть'}
                 </button>
               ) : null}
             </div>
@@ -322,6 +528,25 @@ export default function RepairOrderViewModal({
               ) : null}
             </div>
           )}
+
+          {payOpen && enablePayment ? (
+            <PaymentWizard
+              remaining={payment.remaining}
+              method={payMethod}
+              amount={payAmount}
+              saving={paySaving}
+              error={payError}
+              onMethodChange={(value) => {
+                setPayMethod(value);
+                if (value && !payAmount) {
+                  setPayAmount(String(payment.remaining));
+                }
+              }}
+              onAmountChange={setPayAmount}
+              onSubmit={handleSubmitPayment}
+              onCancel={resetPaymentWizard}
+            />
+          ) : null}
 
           <OrderLinesExpand row={order} showExecutors={showExecutors} />
         </div>

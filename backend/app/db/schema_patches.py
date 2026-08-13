@@ -5015,3 +5015,59 @@ def ensure_autoservice_digest_log_table() -> None:
 
     logger.info("Applied autoservice_digest_log table patch")
 
+
+def ensure_autoservice_payments_table() -> None:
+    """Create autoservice_payments for repair order receipts (separate from warehouse finance)."""
+    inspector = inspect(engine)
+    if "autoservice_payments" in inspector.get_table_names():
+        return
+    if "repair_orders" not in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE autoservice_payments (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            repair_order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+            sequential_number INTEGER NOT NULL,
+            method VARCHAR(16) NOT NULL,
+            amount NUMERIC(12, 2) NOT NULL,
+            created_by_user_id INTEGER NOT NULL REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_autoservice_payments_org_seq UNIQUE (organization_id, sequential_number)
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE autoservice_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            repair_order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+            sequential_number INTEGER NOT NULL,
+            method VARCHAR(16) NOT NULL,
+            amount NUMERIC(12, 2) NOT NULL,
+            created_by_user_id INTEGER NOT NULL REFERENCES users(id),
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (organization_id, sequential_number)
+        )
+        """
+
+    index_stmts = [
+        "CREATE INDEX IF NOT EXISTS ix_autoservice_payments_organization_id "
+        "ON autoservice_payments (organization_id)",
+        "CREATE INDEX IF NOT EXISTS ix_autoservice_payments_repair_order_id "
+        "ON autoservice_payments (repair_order_id)",
+        "CREATE INDEX IF NOT EXISTS ix_autoservice_payments_created_at "
+        "ON autoservice_payments (created_at)",
+        "CREATE INDEX IF NOT EXISTS ix_autoservice_payments_created_by_user_id "
+        "ON autoservice_payments (created_by_user_id)",
+    ]
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        for stmt in index_stmts:
+            conn.execute(text(stmt))
+
+    logger.info("Applied autoservice_payments table patch")
+

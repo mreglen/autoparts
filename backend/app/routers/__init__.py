@@ -64,6 +64,7 @@ from app.routers.autoservice_work_zones import router as autoservice_work_zones_
 from app.routers.autoservice_works import router as autoservice_works_router
 from app.routers.autoservice_service_employees import router as autoservice_service_employees_router
 from app.routers.autoservice_repair_orders import router as autoservice_repair_orders_router
+from app.routers.autoservice_finance import router as autoservice_finance_router
 from app.routers.autoservice_repair_bookings import router as autoservice_repair_bookings_router
 from app.routers.autoservice_planner import router as autoservice_planner_router
 from app.routers.autoservice_applications import router as autoservice_applications_router
@@ -152,6 +153,7 @@ api_router.include_router(autoservice_work_zones_router)
 api_router.include_router(autoservice_works_router)
 api_router.include_router(autoservice_service_employees_router)
 api_router.include_router(autoservice_repair_orders_router)
+api_router.include_router(autoservice_finance_router)
 api_router.include_router(autoservice_repair_bookings_router)
 api_router.include_router(autoservice_planner_router)
 api_router.include_router(autoservice_applications_router)

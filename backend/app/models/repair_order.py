@@ -121,6 +121,12 @@ class RepairOrder(Base):
         order_by="RepairOrderShopPart.position",
         lazy="selectin",
     )
+    payments = relationship(
+        "AutoservicePayment",
+        foreign_keys="AutoservicePayment.repair_order_id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
 
 class RepairOrderWork(Base):

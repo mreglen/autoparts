@@ -80,11 +80,19 @@ export default function ActionsDropdown({
   );
 }
 
-export function ActionsDropdownItem({ onClick, children, className = '', danger = false, disabled = false }) {
+export function ActionsDropdownItem({
+  onClick,
+  children,
+  className = '',
+  danger = false,
+  disabled = false,
+  title,
+}) {
   return (
     <button
       type="button"
       disabled={disabled}
+      title={title}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.(e);

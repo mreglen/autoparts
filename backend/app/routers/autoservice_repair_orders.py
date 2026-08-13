@@ -53,6 +53,7 @@ from app.schemas.repair_order import (
     RepairOrderWorkView,
     WarehouseProductOption,
 )
+from app.schemas.autoservice_finance import AutoservicePaymentIn
 from app.utils.autoservice_access import (
     related_autoservice_client_ids,
     require_autoservice_staff,
@@ -61,6 +62,12 @@ from app.utils.autoservice_access import (
 )
 from app.utils.repair_order_number import allocate_repair_order_number
 from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
+from app.services.autoservice_payment_service import (
+    batch_paid_amounts,
+    create_repair_order_payment,
+    ensure_order_fully_paid,
+    order_payment_summary,
+)
 from app.services.repair_order_cart_import import shop_part_display_name
 from app.services.repair_order_purchase_import import (
     append_purchase_items_to_repair_order,
@@ -273,12 +280,32 @@ def _work_zone_brief(zone: AutoserviceWorkZone | None) -> RepairOrderWorkZoneBri
     return RepairOrderWorkZoneBrief(id=zone.id, name=zone.name, sort_order=zone.sort_order)
 
 
-def _to_staff_view(row: RepairOrder) -> RepairOrderStaffView:
+def _order_grand_total(row: RepairOrder) -> Decimal:
+    works = [_work_view(w) for w in _sorted_works(row)]
+    shop = [_shop_part_view(p) for p in _sorted_shop_parts(row)]
+    works_total = _money(sum((w.line_sum for w in works), Decimal("0.00")))
+    shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
+    return _money(works_total + shop_total)
+
+
+def _to_staff_view(
+    db: Session,
+    row: RepairOrder,
+    *,
+    paid_amount: Decimal | None = None,
+) -> RepairOrderStaffView:
     works = [_work_view(w) for w in _sorted_works(row)]
     parts = [_client_part_view(p) for p in _sorted_client_parts(row)]
     shop = [_shop_part_view(p) for p in _sorted_shop_parts(row)]
     works_total = _money(sum((w.line_sum for w in works), Decimal("0.00")))
     shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
+    grand_total = _money(works_total + shop_total)
+    if paid_amount is None:
+        paid, remaining, is_paid = order_payment_summary(db, row, grand_total)
+    else:
+        paid = _money(paid_amount)
+        remaining = _money(max(Decimal("0.00"), grand_total - paid))
+        is_paid = remaining <= Decimal("0.00")
     return RepairOrderStaffView(
         id=row.id,
         organization_id=row.organization_id,
@@ -304,7 +331,10 @@ def _to_staff_view(row: RepairOrder) -> RepairOrderStaffView:
         shop_parts=shop,
         works_total=works_total,
         shop_parts_total=shop_total,
-        grand_total=_money(works_total + shop_total),
+        grand_total=grand_total,
+        paid_amount=paid,
+        remaining_amount=remaining,
+        is_paid=is_paid,
     )
 
 
@@ -866,7 +896,11 @@ def list_repair_orders(
             query = query.filter(RepairOrder.status.in_(HISTORY_STATUSES))
     query = _apply_search_filter(query, q)
     rows = query.order_by(RepairOrder.scheduled_at.desc(), RepairOrder.id.desc()).all()
-    return [_to_staff_view(row) for row in rows]
+    paid_map = batch_paid_amounts(db, [row.id for row in rows])
+    return [
+        _to_staff_view(db, row, paid_amount=paid_map.get(row.id, Decimal("0.00")))
+        for row in rows
+    ]
 
 
 @router.get(
@@ -880,7 +914,7 @@ def get_repair_order(
 ):
     org_id = require_autoservice_staff(db, current_user)
     row = _get_org_order_or_404(db, org_id, order_id)
-    return _to_staff_view(row)
+    return _to_staff_view(db, row)
 
 
 @router.post(
@@ -920,7 +954,7 @@ def create_repair_order(
     _replace_shop_parts(db, row, org_id, payload.shop_parts)
     db.commit()
     row = _get_org_order_or_404(db, org_id, row.id)
-    return _to_staff_view(row)
+    return _to_staff_view(db, row)
 
 
 @router.patch(
@@ -975,7 +1009,7 @@ def update_repair_order(
 
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
-    return _to_staff_view(row)
+    return _to_staff_view(db, row)
 
 
 @router.post(
@@ -999,7 +1033,7 @@ def import_repair_order_purchase_items(
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
-    return _to_staff_view(row)
+    return _to_staff_view(db, row)
 
 
 @router.patch(
@@ -1020,6 +1054,8 @@ def patch_repair_order_status(
             detail="Недопустимый статус",
         )
     prev_status = row.status
+    if payload.status == "completed" and prev_status != "completed":
+        ensure_order_fully_paid(db, row, _order_grand_total(row))
     row.status = payload.status
     if prev_status == "completed" and payload.status != "completed":
         clear_order_accruals(db, row.id)
@@ -1028,4 +1064,31 @@ def patch_repair_order_status(
         accrue_order_payroll(db, row)
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
-    return _to_staff_view(row)
+    return _to_staff_view(db, row)
+
+
+@router.post(
+    "/autoservice/repair-orders/{order_id}/payments",
+    response_model=RepairOrderStaffView,
+)
+def post_repair_order_payment(
+    order_id: int,
+    payload: AutoservicePaymentIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    row = _get_org_order_or_404(db, org_id, order_id)
+    grand_total = _order_grand_total(row)
+    create_repair_order_payment(
+        db,
+        order=row,
+        org_id=org_id,
+        user_id=current_user.id,
+        method=payload.method,
+        amount=payload.amount,
+        grand_total=grand_total,
+    )
+    db.commit()
+    row = _get_org_order_or_404(db, org_id, order_id)
+    return _to_staff_view(db, row)

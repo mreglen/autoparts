@@ -46,6 +46,7 @@ from app.db.schema_patches import (
     ensure_autoservice_work_zones_migration,
     ensure_autoservice_works_and_employees_tables,
     ensure_autoservice_digest_log_table,
+    ensure_autoservice_payments_table,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
@@ -238,6 +239,7 @@ try:
     ensure_autoservice_work_zones_migration()
     ensure_autoservice_works_and_employees_tables()
     ensure_autoservice_digest_log_table()
+    ensure_autoservice_payments_table()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
     ensure_group_chat_columns()

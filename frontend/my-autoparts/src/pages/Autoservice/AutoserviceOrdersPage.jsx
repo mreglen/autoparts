@@ -62,7 +62,10 @@ function StatusPicker({ status, options, disabled, saving, onChange }) {
           {available.map((option) => (
             <ActionsDropdownItem
               key={option.value}
+              disabled={option.disabled}
+              title={option.disabled ? option.disabledTitle : undefined}
               onClick={() => {
+                if (option.disabled) return;
                 setOpen(false);
                 onChange(option.value);
               }}
@@ -206,6 +209,33 @@ export default function AutoserviceOrdersPage() {
             { value: 'cancelled', label: 'Отменить' },
           ],
     [viewHistory],
+  );
+
+  const statusActionsForRow = useCallback(
+    (row) => {
+      const unpaid = row?.is_paid === false || Number(row?.remaining_amount ?? 0) > 0.005;
+      return statusActions.map((option) =>
+        option.value === 'completed' && unpaid
+          ? {
+              ...option,
+              disabled: true,
+              disabledTitle: 'Сначала оплатите заказ-наряд полностью',
+            }
+          : option,
+      );
+    },
+    [statusActions],
+  );
+
+  const handleOrderUpdated = useCallback(
+    (updated) => {
+      setViewOrder(updated);
+      setRows((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
+      if (updated.status === 'completed' || updated.status === 'cancelled') {
+        load();
+      }
+    },
+    [load],
   );
 
   if (!isReady) return <AuthLoadingScreen />;
@@ -379,7 +409,7 @@ export default function AutoserviceOrdersPage() {
                   <td className="py-3 pr-3 align-middle">
                     <StatusPicker
                       status={row.status}
-                      options={statusActions}
+                      options={statusActionsForRow(row)}
                       saving={statusSavingId === row.id}
                       disabled={statusSavingId === row.id}
                       onChange={(nextStatus) => handleStatus(row.id, nextStatus)}
@@ -411,7 +441,7 @@ export default function AutoserviceOrdersPage() {
             <OrderMobileCard
               key={row.id}
               row={row}
-              statusActions={statusActions}
+              statusActions={statusActionsForRow(row)}
               statusSavingId={statusSavingId}
               onStatusChange={handleStatus}
               onView={() => setViewOrder(row)}
@@ -423,6 +453,8 @@ export default function AutoserviceOrdersPage() {
 
       <RepairOrderViewModal
         order={viewOrder}
+        enablePayment
+        onOrderChange={handleOrderUpdated}
         onClose={() => setViewOrder(null)}
         onEdit={(order) => {
           setViewOrder(null);

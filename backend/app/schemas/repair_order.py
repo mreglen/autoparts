@@ -226,6 +226,9 @@ class RepairOrderStaffView(BaseModel):
     works_total: Decimal = Decimal("0.00")
     shop_parts_total: Decimal = Decimal("0.00")
     grand_total: Decimal = Decimal("0.00")
+    paid_amount: Decimal = Decimal("0.00")
+    remaining_amount: Decimal = Decimal("0.00")
+    is_paid: bool = False
 
 
 class RepairOrderClientView(BaseModel):
