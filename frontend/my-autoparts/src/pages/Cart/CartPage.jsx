@@ -198,8 +198,8 @@ function CartTableBlock({
   if (!items.length) return null;
 
   return (
-    <section className="overflow-hidden rounded-sg border border-line bg-surface shadow-sm">
-      <header className="flex flex-wrap items-center gap-3 border-b border-line bg-brand-50/50 px-3 py-3 sm:px-4">
+    <section className="overflow-hidden rounded-sg border-2 border-brand-200 bg-surface shadow-sm">
+      <header className="flex flex-wrap items-center gap-3 border-b border-brand-200 bg-brand-100 px-3 py-3 sm:px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <h2 className="truncate text-base font-semibold text-ink sm:text-lg">{title}</h2>
           {canRename && onRename ? (
@@ -644,7 +644,7 @@ export default function CartPage() {
           className="border-solid"
         />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-8">
           {visibleNewPartsBaskets.map((basket) => {
             const items = mapBasketItems(basket);
             if (!items.length) {
