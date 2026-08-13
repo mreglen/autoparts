@@ -5,6 +5,15 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiAxios } from '../../utils/apiClient';
 import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  SectionHeader,
+  Skeleton,
+} from '../../components/UI';
+import {
   computeProductStats,
   computeWarehouseSalesStats,
   formatCurrency,
@@ -31,90 +40,92 @@ function getFirstName(user) {
 
 function MetricCard({ label, value, hint, href, accent = 'brand' }) {
   const accents = {
-    brand: 'border-brand-100 bg-brand-50/40',
-    emerald: 'border-success-100 bg-success-50/50',
-    amber: 'border-warning-100 bg-warning-50/50',
-    indigo: 'border-brand-100 bg-brand-50/40',
+    brand: {
+      card: 'border-brand-100 bg-brand-50/50',
+      value: 'text-brand-800',
+    },
+    success: {
+      card: 'border-success-100 bg-success-50/50',
+      value: 'text-success-700',
+    },
+    warning: {
+      card: 'border-warning-100 bg-warning-50/50',
+      value: 'text-warning-700',
+    },
   };
-
-  const className = `group block rounded-sg-lg border p-5 shadow-sg transition-shadow hover:shadow-sg-md ${accents[accent] || accents.brand}`;
+  const tone = accents[accent] || accents.brand;
 
   const content = (
     <>
       <p className="text-sm font-medium text-ink-muted">{label}</p>
-      <p className="mt-2 text-3xl font-bold tracking-tight text-ink tabular-nums">{value}</p>
+      <p className={`mt-3 text-2xl font-bold tabular-nums tracking-tight sm:text-[1.75rem] ${tone.value}`}>
+        {value}
+      </p>
       {hint ? <p className="mt-2 text-sm text-ink-faint">{hint}</p> : null}
     </>
   );
 
   if (href) {
     return (
-      <Link to={href} className={className}>
+      <Card as={Link} to={href} hover padding="md" className={`block ${tone.card}`}>
         {content}
-      </Link>
+      </Card>
     );
   }
-  return <div className={className}>{content}</div>;
+  return <Card padding="md" className={tone.card}>{content}</Card>;
 }
 
-const TASK_STYLES = {
-  high: {
-    ring: 'ring-red-200/80',
-    bg: 'bg-red-50/80',
-    dot: 'bg-red-500',
-    badge: 'bg-red-100 text-red-700',
-  },
-  medium: {
-    ring: 'ring-amber-200/80',
-    bg: 'bg-amber-50/80',
-    dot: 'bg-amber-500',
-    badge: 'bg-amber-100 text-amber-800',
-  },
-  low: {
-    ring: 'ring-gray-200',
-    bg: 'bg-gray-50/80',
-    dot: 'bg-gray-400',
-    badge: 'bg-gray-100 text-gray-700',
-  },
+const TASK_TONE = {
+  high: 'danger',
+  medium: 'warning',
+  low: 'neutral',
 };
 
-function TaskCard({ task, onNavigate }) {
-  const style = TASK_STYLES[task.severity] || TASK_STYLES.low;
+const TASK_DOT = {
+  high: 'bg-danger-600',
+  medium: 'bg-warning-600',
+  low: 'bg-ink-faint',
+};
 
+function TaskRow({ task, onNavigate }) {
   return (
     <button
       type="button"
       onClick={() => onNavigate(task.url)}
-      className={`flex w-full items-center gap-4 rounded-xl p-4 text-left ring-1 transition-all hover:shadow-sm ${style.ring} ${style.bg}`}
+      className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-gray-50/80"
     >
-      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} aria-hidden />
+      <span className={`h-2 w-2 shrink-0 rounded-full ${TASK_DOT[task.severity] || TASK_DOT.low}`} aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-gray-900">{task.title}</span>
+        <span className="block text-sm font-semibold text-ink">{task.title}</span>
         {task.hint ? (
-          <span className="mt-0.5 block text-sm text-gray-600">{task.hint}</span>
+          <span className="mt-0.5 block text-sm text-ink-muted">{task.hint}</span>
         ) : null}
       </span>
-      <span className={`shrink-0 rounded-full px-2.5 py-1 text-sm font-bold tabular-nums ${style.badge}`}>
+      <Badge tone={TASK_TONE[task.severity] || 'neutral'} className="tabular-nums">
         {task.count}
-      </span>
+      </Badge>
     </button>
   );
 }
 
-function QuickAction({ label, description, href, icon }) {
+const ACTION_TONES = {
+  brand: 'bg-brand-50 text-brand-600',
+  sky: 'bg-sky-50 text-sky-600',
+  success: 'bg-success-50 text-success-600',
+  accent: 'bg-accent-50 text-accent-600',
+};
+
+function QuickAction({ label, description, href, icon, tone = 'brand' }) {
   return (
-    <Link
-      to={href}
-      className="flex items-center gap-3 rounded-sg-lg border border-line bg-surface p-4 shadow-sg transition-shadow hover:border-brand-200 hover:shadow-sg-md"
-    >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sg bg-brand-50 text-brand-600">
+    <Card as={Link} to={href} hover padding="sm" className="flex items-center gap-3">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ACTION_TONES[tone] || ACTION_TONES.brand}`}>
         {icon}
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-ink">{label}</span>
         <span className="mt-0.5 block text-xs text-ink-muted">{description}</span>
       </span>
-    </Link>
+    </Card>
   );
 }
 
@@ -265,6 +276,7 @@ export default function DashboardPage() {
         description: 'Новые и в работе',
         href: '/sales/orders',
         icon: ICONS.orders,
+        tone: 'brand',
       });
     }
     actions.push({
@@ -272,6 +284,7 @@ export default function DashboardPage() {
       description: 'Чаты с покупателями',
       href: '/chats',
       icon: ICONS.chats,
+      tone: 'sky',
     });
     if (canViewParts) {
       actions.push({
@@ -279,6 +292,7 @@ export default function DashboardPage() {
         description: 'Склад и остатки',
         href: '/my-parts',
         icon: ICONS.parts,
+        tone: 'success',
       });
     }
     if (canViewFinance) {
@@ -287,6 +301,7 @@ export default function DashboardPage() {
         description: 'История продаж',
         href: '/warehouse-sales',
         icon: ICONS.sales,
+        tone: 'accent',
       });
     }
     return actions;
@@ -314,29 +329,63 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className={`${warehousePageClass} mx-auto max-w-4xl space-y-6 py-2`}>
-        <div className="h-10 w-56 rounded-lg bg-gray-100 animate-pulse" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-28 rounded-2xl bg-gray-100 animate-pulse" />
-          ))}
+      <div className={`${warehousePageClass} w-full min-w-0 space-y-8 pb-12`}>
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-56 sm:h-9" />
+          <Skeleton className="h-4 w-64" />
         </div>
-        <div className="h-40 rounded-2xl bg-gray-100 animate-pulse" />
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-sg-lg border border-line bg-surface p-5 shadow-sg">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="mt-3 h-8 w-32" />
+              <Skeleton className="mt-2 h-4 w-40" />
+            </div>
+          ))}
+        </section>
+        <section className="space-y-3">
+          <Skeleton className="h-6 w-40" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3 rounded-sg-lg border border-line bg-surface p-4 shadow-sg">
+                <Skeleton className="h-10 w-10 rounded-xl" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-36" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="space-y-3">
+          <Skeleton className="h-6 w-44" />
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-3 py-2">
+                <Skeleton className="h-2 w-2 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/5" />
+                  <Skeleton className="h-3 w-2/5" />
+                </div>
+                <Skeleton className="h-6 w-10 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className={`${warehousePageClass} mx-auto max-w-md py-16 text-center`}>
-        <p className="text-gray-600">{error || 'Нет данных'}</p>
-        <button
-          type="button"
-          onClick={loadDashboard}
-          className="mt-4 text-sm font-medium text-indigo-600 hover:text-indigo-800"
-        >
-          Попробовать снова
-        </button>
+      <div className={`${warehousePageClass} w-full min-w-0`}>
+        <EmptyState
+          illustration="error"
+          title={error || 'Нет данных'}
+          description="Не удалось загрузить обзор магазина. Попробуйте ещё раз."
+          actionLabel="Попробовать снова"
+          onAction={loadDashboard}
+        />
       </div>
     );
   }
@@ -345,22 +394,18 @@ export default function DashboardPage() {
   const recentSales = sales?.recentSales?.slice(0, 4) || [];
 
   return (
-    <div className={`${warehousePageClass} mx-auto max-w-4xl space-y-8 pb-12 pt-2 sm:pt-4`}>
+    <div className={`${warehousePageClass} w-full min-w-0 space-y-8 pb-12`}>
       {showOnboarding && (
         <SellerOnboardingPanel onboarding={onboarding} loading={onboardingLoading} />
       )}
 
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-          {getGreeting()}
-          {firstName ? `, ${firstName}` : ''}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Краткий обзор магазина на сегодня
-        </p>
-      </header>
+      <PageHeader
+        className="mb-0"
+        title={`${getGreeting()}${firstName ? `, ${firstName}` : ''}`}
+        subtitle="Краткий обзор магазина на сегодня"
+      />
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {canViewFinance && sales ? (
           <>
             <MetricCard
@@ -368,20 +413,20 @@ export default function DashboardPage() {
               value={formatCurrency(sales.revenue30d)}
               hint={`За 7 дней: ${formatCurrency(sales.revenue7d)}`}
               href="/warehouse-sales"
-              accent="indigo"
+              accent="brand"
             />
             <MetricCard
               label="На складе"
               value={`${data.totalWarehouseQuantity.toLocaleString('ru-RU')} шт.`}
               hint={`${data.totalProducts} позиций · ${formatCurrency(data.totalWarehouseValue)}`}
               href="/my-parts"
-              accent="emerald"
+              accent="success"
             />
             <MetricCard
               label="Нужно внимание"
               value={tasks.length}
               hint={tasks.length === 0 ? 'Всё в порядке' : `${urgentTasks.length} срочных`}
-              accent="amber"
+              accent={tasks.length === 0 ? 'success' : 'warning'}
             />
           </>
         ) : (
@@ -391,7 +436,7 @@ export default function DashboardPage() {
               value={`${data.totalWarehouseQuantity.toLocaleString('ru-RU')} шт.`}
               hint={`${data.totalProducts} позиций`}
               href={canViewParts ? '/my-parts' : undefined}
-              accent="emerald"
+              accent="success"
             />
             {data.lowStock > 0 ? (
               <MetricCard
@@ -399,14 +444,14 @@ export default function DashboardPage() {
                 value={data.lowStock}
                 hint="1–2 шт. на позицию"
                 href={canViewParts ? '/my-parts?stock=low' : undefined}
-                accent="amber"
+                accent="warning"
               />
             ) : (
               <MetricCard
                 label="Задачи"
                 value={tasks.length}
                 hint={tasks.length === 0 ? 'Всё в порядке' : 'Требуют действий'}
-                accent="amber"
+                accent={tasks.length === 0 ? 'success' : 'warning'}
               />
             )}
           </>
@@ -414,11 +459,9 @@ export default function DashboardPage() {
       </section>
 
       {quickActions.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-            Быстрые действия
-          </h2>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <section className="space-y-3">
+          <SectionHeader title="Быстрые действия" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {quickActions.map((action) => (
               <QuickAction key={action.href} {...action} />
             ))}
@@ -426,57 +469,47 @@ export default function DashboardPage() {
         </section>
       )}
 
-      <section>
+      <section className="space-y-3">
         {tasksSectionHidden ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <span className="text-sm text-gray-600">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gray-100 px-4 py-3">
+            <span className="text-sm text-ink-muted">
               Блок «Требует внимания» скрыт
               {tasks.length > 0 ? ` · ${tasks.length} задач` : ''}
             </span>
-            <button
-              type="button"
-              onClick={() => toggleTasksSection(false)}
-              className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-indigo-600 shadow-sm ring-1 ring-gray-200 hover:bg-indigo-50"
-            >
+            <Button size="sm" variant="secondary" onClick={() => toggleTasksSection(false)}>
               Показать
-            </button>
+            </Button>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-gray-900">Требует внимания</h2>
-              <div className="flex items-center gap-3">
-                {tasks.length > 0 && (
-                  <span className="text-sm text-gray-500">{tasks.length} задач</span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => toggleTasksSection(true)}
-                  className="rounded-lg px-2.5 py-1 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
-                >
+            <SectionHeader
+              title="Требует внимания"
+              subtitle={tasks.length > 0 ? `${tasks.length} задач` : undefined}
+              action={(
+                <Button size="sm" variant="ghost" onClick={() => toggleTasksSection(true)}>
                   Скрыть
-                </button>
-              </div>
-            </div>
+                </Button>
+              )}
+            />
 
             {tasksLoading ? (
-              <div className="mt-4 space-y-3">
-                {[1, 2].map((i) => (
-                  <div key={i} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
-                ))}
+              <div className="space-y-2">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
               </div>
             ) : tasks.length === 0 ? (
-              <div className="mt-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/50 px-5 py-8 text-center">
-                <p className="text-base font-medium text-emerald-900">Всё в порядке</p>
-                <p className="mt-1 text-sm text-emerald-700/80">Срочных задач нет — можно спокойно работать</p>
-              </div>
+              <EmptyState
+                illustration="success"
+                title="Всё в порядке"
+                description="Срочных задач нет — можно спокойно работать"
+              />
             ) : (
-              <div className="mt-4 space-y-3">
+              <div className="divide-y divide-gray-100">
                 {urgentTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} onNavigate={navigate} />
+                  <TaskRow key={task.id} task={task} onNavigate={navigate} />
                 ))}
                 {otherTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} onNavigate={navigate} />
+                  <TaskRow key={task.id} task={task} onNavigate={navigate} />
                 ))}
               </div>
             )}
@@ -485,26 +518,28 @@ export default function DashboardPage() {
       </section>
 
       {canViewFinance && recentSales.length > 0 && (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-gray-900">Последние продажи</h2>
-            <Link to="/warehouse-sales" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-              Все →
-            </Link>
-          </div>
-          <ul className="mt-4 divide-y divide-gray-100">
+        <section className="space-y-3">
+          <SectionHeader
+            title="Последние продажи"
+            action={(
+              <Button as={Link} to="/warehouse-sales" variant="ghost" size="sm">
+                Все
+              </Button>
+            )}
+          />
+          <ul className="divide-y divide-gray-100">
             {recentSales.map((sale) => (
-              <li key={sale.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+              <li key={sale.id} className="flex items-center justify-between gap-4 py-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900">
+                  <p className="truncate text-sm font-medium text-ink">
                     {sale.product?.brand ? `${sale.product.brand} · ` : ''}
                     {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
                   </p>
-                  <p className="mt-0.5 text-xs text-gray-500">
+                  <p className="mt-0.5 text-xs text-ink-muted">
                     {formatShortDate(sale.movement_date)} · {sale.quantity} шт.
                   </p>
                 </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-success-700">
                   {formatCurrency(saleLineTotal(sale))}
                 </p>
               </li>

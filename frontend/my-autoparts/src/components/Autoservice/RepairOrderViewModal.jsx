@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
+import { Skeleton } from '../UI';
 import {
   formatShopPartQty,
   formatShopPartUnit,
@@ -41,6 +42,11 @@ function formatMoney(value) {
   const n = Number(value);
   if (Number.isNaN(n)) return '0,00';
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function vatIncluded(amount) {
+  const cents = Math.round((Number(amount) || 0) * 100);
+  return Math.round((cents * 20) / 120) / 100;
 }
 
 const PAYMENT_METHODS = [
@@ -374,14 +380,7 @@ export default function RepairOrderViewModal({
         body: JSON.stringify({ method: payMethod, amount: Number(payAmount) }),
       });
       onOrderChange?.(updated);
-      const nextRemaining = Number(updated?.remaining_amount ?? 0);
-      if (nextRemaining > 0.005) {
-        setPayMethod(null);
-        setPayAmount(String(nextRemaining));
-        setPayError('');
-      } else {
-        resetPaymentWizard();
-      }
+      resetPaymentWizard();
     } catch (e) {
       setPayError(e?.message || 'Не удалось провести оплату');
     } finally {
@@ -428,13 +427,28 @@ export default function RepairOrderViewModal({
         )
       }
       footer={
-        order ? (
+        loading && !order ? (
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-6 w-28" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-10 w-24 rounded-lg" />
+              <Skeleton className="h-10 w-20 rounded-lg" />
+            </div>
+          </div>
+        ) : order ? (
           <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Итого заказ</p>
-                <p className="mt-0.5 text-lg font-bold tabular-nums text-gray-900">
-                  {formatMoney(totals.grand)} ₽
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 space-y-0.5 text-sm text-gray-900">
+                <p>
+                  Итого заказ:{' '}
+                  <span className="tabular-nums">{formatMoney(totals.grand)} ₽</span>
+                </p>
+                <p>
+                  В том числе НДС:{' '}
+                  <span className="tabular-nums">{formatMoney(vatIncluded(totals.grand))} ₽</span>
                 </p>
               </div>
               {enablePayment && payment ? (
@@ -501,7 +515,32 @@ export default function RepairOrderViewModal({
       }
     >
       {loading ? (
-        <p className="py-8 text-center text-sm text-gray-500">Загрузка…</p>
+        <div className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-4 w-36" />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2 rounded-xl bg-gray-50 px-3.5 py-3">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+          <div className="space-y-3 pt-2">
+            <Skeleton className="h-3 w-20" />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-4 w-8" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-12" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ))}
+          </div>
+        </div>
       ) : payOpen && enablePayment ? (
         <PaymentWizard
           remaining={payment.remaining}

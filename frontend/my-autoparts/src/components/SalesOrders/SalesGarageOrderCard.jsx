@@ -200,12 +200,6 @@ export default function SalesGarageOrderCard({
       }
     }
     if (isNew) {
-      if (orderStatusCode === 'new_waiting_confirmation') {
-        return { label: 'В сборку', status: 'new_assembling' };
-      }
-      if (orderStatusCode === 'new_assembling') {
-        return { label: 'Отгружено', status: 'new_shipped' };
-      }
       if (orderStatusCode === 'new_shipped' || orderStatusCode === 'new_awaiting_arrival') {
         if (isPickup) {
           return { label: 'К выдаче', status: 'new_ready_for_pickup' };
@@ -437,8 +431,9 @@ export default function SalesGarageOrderCard({
               const lineTotal = (item.price || 0) * (item.quantity || 0);
               const title = item.product_name || item.name || 'Товар';
               const itemStatusCode = item.status_code || orderStatusCode;
-              const showItemConfirmActions = isGarageItemAwaitingSellerConfirm(itemStatusCode, orderType)
-                && (isUsed ? Boolean(item.product_id) : isRossko);
+              const showItemConfirmActions = isUsed
+                && isGarageItemAwaitingSellerConfirm(itemStatusCode, orderType)
+                && Boolean(item.product_id);
               const isItemConfirmed = isUsed && itemStatusCode === 'confirmed';
               const isItemRejected = isUsed && itemStatusCode === 'rejected';
               const storage = isUsed

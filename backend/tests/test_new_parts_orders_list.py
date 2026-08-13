@@ -10,6 +10,7 @@ from app.services.new_parts_order_enrichment import (
     build_buyer_new_parts_order_response,
     build_seller_new_parts_order_response,
     fetch_rossko_snapshots_for_orders,
+    persist_rossko_supplier_statuses,
 )
 from app.services.rossko_get_orders_service import RosskoOrderLine, RosskoOrderSnapshot
 
@@ -126,6 +127,89 @@ class NewPartsOrderEnrichmentTests(unittest.TestCase):
         )
         self.assertEqual(response.rossko_sync_error, "SOAP timeout")
         self.assertEqual(response.items[0].status_code, "new_waiting_confirmation")
+
+    def test_seller_item_status_mapped_from_supplier_snapshot(self):
+        order = _sample_order()
+        snapshot = _sample_snapshot()
+        response = build_seller_new_parts_order_response(
+            self.db,
+            order,
+            rossko_by_id={"12345": snapshot},
+            resolve_seo_card_id=_noop_seo,
+        )
+        self.assertEqual(response.items[0].status_code, "new_shipped")
+        self.assertEqual(response.status_code, "new_shipped")
+
+    def test_seller_does_not_override_ready_for_pickup(self):
+        order = _sample_order()
+        order.status_code = "new_ready_for_pickup"
+        order.items[0].status_code = "new_ready_for_pickup"
+        snapshot = _sample_snapshot()
+        response = build_seller_new_parts_order_response(
+            self.db,
+            order,
+            rossko_by_id={"12345": snapshot},
+            resolve_seo_card_id=_noop_seo,
+        )
+        self.assertEqual(response.status_code, "new_ready_for_pickup")
+        self.assertEqual(response.items[0].status_code, "new_ready_for_pickup")
+
+    def test_seller_rossko_warehouse_maps_to_awaiting_not_received(self):
+        order = _sample_order()
+        snapshot = RosskoOrderSnapshot(
+            order_id="12345",
+            status="6",
+            lines=[
+                RosskoOrderLine(
+                    name="Фильтр масляный",
+                    brand="MANN",
+                    partnumber="W712/75",
+                    quantity=2,
+                    price=450.0,
+                    status_code="6",
+                )
+            ],
+        )
+        seller = build_seller_new_parts_order_response(
+            self.db,
+            order,
+            rossko_by_id={"12345": snapshot},
+            resolve_seo_card_id=_noop_seo,
+        )
+        self.assertEqual(seller.items[0].status_code, "new_awaiting_arrival")
+        self.assertEqual(seller.status_code, "new_awaiting_arrival")
+
+        buyer = build_buyer_new_parts_order_response(
+            self.db,
+            order,
+            rossko_by_id={"12345": snapshot},
+            resolve_seo_card_id=_noop_seo,
+        )
+        self.assertEqual(buyer.items[0].status_code, "new_received")
+
+    def test_persist_rossko_statuses_updates_db_fields(self):
+        order = _sample_order()
+        snapshot = _sample_snapshot()
+        changed = persist_rossko_supplier_statuses(
+            [order],
+            {"12345": snapshot},
+            None,
+        )
+        self.assertTrue(changed)
+        self.assertEqual(order.status_code, "new_shipped")
+        self.assertEqual(order.items[0].status_code, "new_shipped")
+
+    def test_persist_skips_on_sync_error(self):
+        order = _sample_order()
+        snapshot = _sample_snapshot()
+        changed = persist_rossko_supplier_statuses(
+            [order],
+            {"12345": snapshot},
+            "SOAP timeout",
+        )
+        self.assertFalse(changed)
+        self.assertEqual(order.status_code, "new_waiting_confirmation")
+        self.assertEqual(order.items[0].status_code, "new_waiting_confirmation")
 
     def test_buyer_response_falls_back_to_db_on_api_failure(self):
         order = _sample_order()

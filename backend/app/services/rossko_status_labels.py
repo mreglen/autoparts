@@ -71,14 +71,22 @@ ROSSKO_LINE_STATUS_TO_NEW_PARTS_STATUS_CODE: dict[str, str] = {
 }
 
 
-def map_rossko_line_status_to_new_parts_status_code(raw: str | int | None) -> str | None:
+def map_rossko_line_status_to_new_parts_status_code(
+    raw: str | int | None,
+    *,
+    for_seller: bool = False,
+) -> str | None:
     """Переводит Rossko status-код строки номенклатуры в локальный status_code (1 из 5)."""
     if raw is None:
         return None
     text = str(raw).strip()
     if not text:
         return None
-    return ROSSKO_LINE_STATUS_TO_NEW_PARTS_STATUS_CODE.get(text)
+    mapped = ROSSKO_LINE_STATUS_TO_NEW_PARTS_STATUS_CODE.get(text)
+    # Для продавца «на складе филиала» ещё не выдано покупателю — ждём «К выдаче».
+    if for_seller and text == "6" and mapped == "new_received":
+        return "new_awaiting_arrival"
+    return mapped
 
 
 def format_rossko_status(raw: str | int | None) -> str | None:

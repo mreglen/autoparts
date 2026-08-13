@@ -4,7 +4,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import RepairOrderViewModal, { OrderStatusBadge, vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
-import { UnderlineTabs } from '../../components/UI';
+import { Skeleton, UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
@@ -366,11 +366,21 @@ export default function AutoserviceOrdersPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
-              <tr>
-                <td colSpan={8} className="py-12 text-center text-gray-500">
-                  Загрузка…
-                </td>
-              </tr>
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={`sk-${i}`}>
+                  <td className="py-3 pr-3"><Skeleton className="h-4 w-16" /></td>
+                  <td className="py-3 pr-3"><Skeleton className="h-4 w-36" /></td>
+                  <td className="py-3 pr-3">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="mt-1 h-3 w-20" />
+                  </td>
+                  <td className="py-3 pr-3"><Skeleton className="h-4 w-28" /></td>
+                  <td className="hidden py-3 pr-3 xl:table-cell"><Skeleton className="h-4 w-20" /></td>
+                  <td className="hidden py-3 pr-3 xl:table-cell"><Skeleton className="h-4 w-20" /></td>
+                  <td className="py-3 pr-3"><Skeleton className="h-6 w-20 rounded-full" /></td>
+                  <td className="py-3 text-right"><Skeleton className="ml-auto h-8 w-16 rounded-lg" /></td>
+                </tr>
+              ))
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-12 text-center text-gray-500">
@@ -431,7 +441,18 @@ export default function AutoserviceOrdersPage() {
       {/* Mobile list */}
       <div className="md:hidden">
         {loading ? (
-          <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+          <div className="divide-y divide-gray-100">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={`msk-${i}`} className="flex items-start justify-between gap-3 py-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-8 w-8 rounded-lg" />
+              </div>
+            ))}
+          </div>
         ) : rows.length === 0 ? (
           <p className="py-10 text-center text-sm text-gray-500">
             {viewHistory ? 'В истории пока нет заказ-нарядов' : 'Активных заказ-нарядов нет'}

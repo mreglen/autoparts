@@ -48,6 +48,7 @@ from app.services.new_parts_order_enrichment import (
     build_buyer_new_parts_order_response,
     build_seller_new_parts_order_response,
     fetch_rossko_snapshots_for_orders,
+    persist_rossko_supplier_statuses,
 )
 if TYPE_CHECKING:
     from app.services.rossko_get_orders_service import RosskoOrderSnapshot
@@ -533,6 +534,8 @@ def list_new_parts_orders(
     orders = q.all()
 
     rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders(orders)
+    if persist_rossko_supplier_statuses(orders, rossko_by_id, rossko_sync_error):
+        db.commit()
 
     return [
         _new_order_response(db, o, rossko_by_id=rossko_by_id, rossko_sync_error=rossko_sync_error)
@@ -564,6 +567,8 @@ def refresh_new_parts_supplier_status(
         raise HTTPException(status_code=403, detail="Нет доступа к заказу")
 
     rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders([order])
+    if persist_rossko_supplier_statuses([order], rossko_by_id, rossko_sync_error):
+        db.commit()
     return _new_order_response(db, order, rossko_by_id=rossko_by_id, rossko_sync_error=rossko_sync_error)
 
 
@@ -1762,6 +1767,8 @@ def list_purchased_new_orders(
     )
 
     rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders(orders)
+    if persist_rossko_supplier_statuses(orders, rossko_by_id, rossko_sync_error):
+        db.commit()
 
     autoservice_org_id = _buyer_autoservice_org_id(db, current_user)
     new_item_ids = [item.id for order in orders for item in (order.items or [])]

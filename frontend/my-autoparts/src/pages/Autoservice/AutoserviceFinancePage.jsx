@@ -8,6 +8,7 @@ import {
 } from '../Finance/financeDisplay';
 import { formatServerDateTime } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
+import { Skeleton } from '../../components/UI';
 import {
   warehouseEmptyShellClass,
   warehousePageClass,
@@ -48,7 +49,7 @@ export default function AutoserviceFinancePage() {
   const todayDate = useMemo(() => getFinanceTodayDate(), []);
   const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
   const [dateTo, setDateTo] = useState(defaults.dateTo);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState({ totals: {}, total_amount: 0, count: 0, items: [] });
   const [selectedMethod, setSelectedMethod] = useState(null);
@@ -94,15 +95,23 @@ export default function AutoserviceFinancePage() {
         <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Финансы</h1>
         <div className="grid grid-cols-2 gap-4 sm:flex sm:shrink-0 sm:gap-8">
           <div className="text-center">
-            <div className="text-2xl font-bold tabular-nums leading-none text-gray-900 sm:text-[1.75rem]">
-              {formatFinanceCurrency(data.total_amount)}
-            </div>
+            {loading ? (
+              <Skeleton className="mx-auto h-8 w-24 sm:h-9" />
+            ) : (
+              <div className="text-2xl font-bold tabular-nums leading-none text-gray-900 sm:text-[1.75rem]">
+                {formatFinanceCurrency(data.total_amount)}
+              </div>
+            )}
             <div className="mt-1.5 text-xs text-gray-500 sm:text-sm">Итого</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold tabular-nums leading-none text-indigo-600 sm:text-[1.75rem]">
-              {data.count ?? 0}
-            </div>
+            {loading ? (
+              <Skeleton className="mx-auto h-8 w-12 sm:h-9" />
+            ) : (
+              <div className="text-2xl font-bold tabular-nums leading-none text-indigo-600 sm:text-[1.75rem]">
+                {data.count ?? 0}
+              </div>
+            )}
             <div className="mt-1.5 text-xs text-gray-500 sm:text-sm">Записей</div>
           </div>
         </div>
@@ -158,10 +167,55 @@ export default function AutoserviceFinancePage() {
         </button>
       </div>
 
-      {loading && !items.length && !data.count ? (
-        <div className="flex justify-center py-16">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-        </div>
+      {loading ? (
+        selectedBlock ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Skeleton className="h-9 w-24 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="ml-auto h-4 w-28" />
+                <Skeleton className="ml-auto h-3 w-36" />
+              </div>
+            </div>
+            <div className="space-y-3 md:hidden">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-4/5" />
+                  <Skeleton className="h-4 w-3/5" />
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/80 md:block">
+              <div className="space-y-0 divide-y divide-gray-100 px-4 py-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center gap-4 py-3">
+                    <Skeleton className="h-4 w-10" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 flex-1" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80 sm:p-5"
+              >
+                <Skeleton className="h-3 w-16 sm:h-4 sm:w-24" />
+                <div className="mt-3 space-y-2">
+                  <Skeleton className="h-6 w-20 sm:h-8 sm:w-28" />
+                  <Skeleton className="h-3 w-14 sm:w-20" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       ) : selectedBlock ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -250,10 +304,10 @@ export default function AutoserviceFinancePage() {
               key={block.id}
               type="button"
               onClick={() => setSelectedMethod(block.id)}
-              className="flex aspect-square flex-col justify-between rounded-2xl bg-white p-3 text-left ring-1 ring-gray-200/80 transition hover:bg-gray-50 hover:ring-gray-300 sm:p-5"
+              className="rounded-2xl bg-white p-4 text-left ring-1 ring-gray-200/80 transition hover:bg-gray-50 hover:ring-gray-300 sm:p-5"
             >
               <p className="text-[11px] font-medium leading-tight text-gray-500 sm:text-sm">{block.label}</p>
-              <div>
+              <div className="mt-3">
                 <p className="text-base font-bold tabular-nums leading-tight text-gray-900 sm:text-2xl">
                   {formatFinanceCurrency(block.amount)}
                 </p>

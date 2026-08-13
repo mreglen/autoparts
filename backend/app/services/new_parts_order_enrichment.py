@@ -17,14 +17,22 @@ from app.services.rossko_get_orders_service import (
     RosskoOrderSnapshot,
     fetch_orders_by_ids_safe,
 )
+from app.services.pickup_verification_service import (
+    NEW_PICKUP_READY_STATUS,
+    get_buyer_pickup_payload,
+)
 from app.services.rossko_status_labels import (
     NEW_PARTS_STATUS_PRIORITY,
     format_rossko_status,
     map_rossko_line_status_to_new_parts_status_code,
 )
-from app.services.pickup_verification_service import (
-    NEW_PICKUP_READY_STATUS,
-    get_buyer_pickup_payload,
+
+SELLER_LOCKED_NEW_PARTS_STATUSES = frozenset(
+    {
+        NEW_PICKUP_READY_STATUS,
+        "new_received",
+        "rejected",
+    }
 )
 
 
@@ -69,10 +77,20 @@ def _rossko_lines_by_key(snapshot: RosskoOrderSnapshot | None) -> dict[tuple[str
     return out
 
 
-def _display_status_from_rossko_line(db_status: str, line: RosskoOrderLine | None) -> str:
+def _display_status_from_rossko_line(
+    db_status: str,
+    line: RosskoOrderLine | None,
+    *,
+    for_seller: bool = False,
+) -> str:
+    if for_seller and db_status in SELLER_LOCKED_NEW_PARTS_STATUSES:
+        return db_status
     if not line:
         return db_status
-    mapped = map_rossko_line_status_to_new_parts_status_code(line.status_code)
+    mapped = map_rossko_line_status_to_new_parts_status_code(
+        line.status_code,
+        for_seller=for_seller,
+    )
     return mapped or db_status
 
 
@@ -81,6 +99,55 @@ def aggregate_status_from_codes(codes: list[str], *, default: str) -> str:
     if not filtered:
         return default
     return min(filtered, key=lambda c: NEW_PARTS_STATUS_PRIORITY.get(c, 999))
+
+
+def apply_rossko_statuses_to_order(
+    order: GarageNewOrder,
+    snapshot: RosskoOrderSnapshot | None,
+) -> bool:
+    """Пишет статусы Rossko в БД. Не трогает «К выдаче» / «Получен»."""
+    if not snapshot or not snapshot.lines:
+        return False
+    if order.status_code in (NEW_PICKUP_READY_STATUS, "new_received"):
+        return False
+
+    rossko_by_key = _rossko_lines_by_key(snapshot)
+    changed = False
+    for item in order.items:
+        if item.status_code in SELLER_LOCKED_NEW_PARTS_STATUSES:
+            continue
+        line = rossko_by_key.get(item_match_key(item.brand, item.partnumber))
+        mapped = _display_status_from_rossko_line(item.status_code, line, for_seller=True)
+        if mapped != item.status_code:
+            item.status_code = mapped
+            changed = True
+
+    new_order_status = aggregate_status_from_codes(
+        [item.status_code for item in order.items],
+        default=order.status_code or "new_waiting_confirmation",
+    )
+    if new_order_status != order.status_code:
+        order.status_code = new_order_status
+        changed = True
+    return changed
+
+
+def persist_rossko_supplier_statuses(
+    orders: list[GarageNewOrder],
+    rossko_by_id: dict[str, RosskoOrderSnapshot],
+    sync_error: str | None,
+) -> bool:
+    if sync_error:
+        return False
+    changed = False
+    for order in orders:
+        rossko_id = order.rossko_order_id
+        if not rossko_id:
+            continue
+        snapshot = rossko_by_id.get(str(rossko_id))
+        if apply_rossko_statuses_to_order(order, snapshot):
+            changed = True
+    return changed
 
 
 def merge_seller_items_with_rossko(
@@ -102,7 +169,11 @@ def merge_seller_items_with_rossko(
                 partnumber=item.partnumber,
                 quantity=int(item.quantity),
                 price=float(item.price),
-                status_code=item.status_code,
+                status_code=_display_status_from_rossko_line(
+                    item.status_code,
+                    line,
+                    for_seller=True,
+                ),
                 rossko_status=format_rossko_status(line.status_code) if line else None,
                 seo_card_id=resolve_seo_card_id(db, item),
             )
@@ -157,8 +228,18 @@ def build_seller_new_parts_order_response(
     items = merge_seller_items_with_rossko(db, order, snapshot, resolve_seo_card_id=resolve_seo_card_id)
     sync_error = per_order_sync_error(snapshot, rossko_sync_error) if rossko_id else None
 
+    status_code = order.status_code
+    if order.status_code in (NEW_PICKUP_READY_STATUS, "new_received"):
+        status_code = order.status_code
+    elif snapshot and not rossko_sync_error:
+        status_code = aggregate_status_from_codes(
+            [item.status_code for item in items],
+            default=order.status_code or "new_waiting_confirmation",
+        )
+
     update: dict = {
         "items": items,
+        "status_code": status_code,
         "buyer_avatar_url": buyer_avatar_url,
         "buyer_user_id": buyer_user_id,
     }
