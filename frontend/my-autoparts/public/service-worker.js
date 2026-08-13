@@ -16,6 +16,7 @@ function buildNotificationTag(data) {
   if (data.chatId) return `chat-${data.chatId}`;
   if (data.productId) return `product-${data.productId}`;
   if (data.returnId) return `return-${data.returnId}`;
+  if (data.inspectionId) return `inspection-${data.inspectionId}`;
   if (data.type) return `${data.type}-general`;
   return 'notification-general';
 }
@@ -37,6 +38,12 @@ function resolveNotificationUrl(data) {
   if (data.type === 'search_subscription' && data.productId) {
     return `/part/${data.productId}`;
   }
+  if (data.type === 'autoservice_inspection') {
+    return '/autoservice/inspections';
+  }
+  if (data.type === 'autoservice_planner') {
+    return '/autoservice/planner';
+  }
   if (data.chatId) {
     return `/chats?chatId=${data.chatId}`;
   }
@@ -53,6 +60,7 @@ function pathsShareSection(targetPath, clientPath) {
     '/my-parts',
     '/profile/subscriptions',
     '/part/',
+    '/autoservice/',
   ];
   return prefixes.some((prefix) => targetPath.startsWith(prefix) && clientPath.startsWith(prefix));
 }
@@ -73,6 +81,7 @@ self.addEventListener('push', (event) => {
       orderId: data.orderId,
       productId: data.productId,
       returnId: data.returnId,
+      inspectionId: data.inspectionId,
       senderId: data.senderId,
       senderName: data.senderName,
       url: targetUrl,

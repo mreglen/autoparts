@@ -27,6 +27,7 @@ from app.utils.autoservice_access import (
 from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.phone import normalize_to_storage_format
 from app.utils.site_settings_db import autoservice_enabled
+from app.services.autoservice_notifications import notify_new_inspection_booking
 
 router = APIRouter(tags=["Autoservice inspections"])
 
@@ -134,6 +135,7 @@ def create_public_inspection_booking(
     db.add(row)
     db.commit()
     db.refresh(row)
+    notify_new_inspection_booking(db, row)
     return _booking_to_view(row)
 
 
@@ -199,6 +201,7 @@ def create_client_inspection_booking(
     db.refresh(row)
     if vehicle:
         row.vehicle = vehicle
+    notify_new_inspection_booking(db, row)
     return _booking_to_view(row)
 
 

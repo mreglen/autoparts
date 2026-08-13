@@ -4875,3 +4875,51 @@ def ensure_autoservice_work_zones_migration() -> None:
 
     logger.info("Applied autoservice work zones migration patch")
 
+
+def ensure_autoservice_digest_log_table() -> None:
+    """Create autoservice_digest_log for idempotent daily planner digests."""
+    inspector = inspect(engine)
+    if "autoservice_digest_log" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE autoservice_digest_log (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL,
+            digest_date DATE NOT NULL,
+            kind VARCHAR(32) NOT NULL DEFAULT 'planner_daily',
+            sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_autoservice_digest_log_org_date_kind
+                UNIQUE (organization_id, digest_date, kind)
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE autoservice_digest_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL,
+            digest_date DATE NOT NULL,
+            kind VARCHAR(32) NOT NULL DEFAULT 'planner_daily',
+            sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (organization_id, digest_date, kind)
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_autoservice_digest_log_org_id "
+                "ON autoservice_digest_log (organization_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_autoservice_digest_log_digest_date "
+                "ON autoservice_digest_log (digest_date)"
+            )
+        )
+
+    logger.info("Applied autoservice_digest_log table patch")
+

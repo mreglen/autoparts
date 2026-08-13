@@ -18,12 +18,14 @@ const DEFAULT_PREFS = {
   messages: { push: true, email: true },
   search: { push: true, email: true },
   other: { push: true, email: true },
+  autoservice: { push: true, email: true },
 };
 
 const CATEGORIES = [
   { key: 'orders', label: 'Заказы' },
   { key: 'messages', label: 'Сообщения' },
   { key: 'search', label: 'Подписки' },
+  { key: 'autoservice', label: 'Автосервис' },
   { key: 'other', label: 'Прочее' },
 ];
 

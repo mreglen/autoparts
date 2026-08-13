@@ -22,6 +22,7 @@ celery_app = Celery(
         'app.tasks.analytics_tasks',
         'app.tasks.notification_tasks',
         'app.tasks.search_subscription_tasks',
+        'app.tasks.autoservice_notification_tasks',
     ]
 )
 

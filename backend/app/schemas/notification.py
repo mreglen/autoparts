@@ -32,6 +32,7 @@ class NotificationPrefs(BaseModel):
     messages: NotificationChannelPrefs = NotificationChannelPrefs()
     search: NotificationChannelPrefs = NotificationChannelPrefs()
     other: NotificationChannelPrefs = NotificationChannelPrefs()
+    autoservice: NotificationChannelPrefs = NotificationChannelPrefs()
 
 
 class NotificationPreferencesResponse(BaseModel):

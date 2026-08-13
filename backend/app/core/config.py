@@ -132,6 +132,9 @@ class Settings(BaseSettings):
     BACKUP_RETENTION_COUNT: int = 8
     BACKUP_WEEKLY_HOUR_UTC: int = 4
 
+    # Autoservice planner daily digest (12:00 MSK = 09:00 UTC)
+    AUTOSERVICE_PLANNER_DIGEST_HOUR_UTC: int = 9
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 
     @property

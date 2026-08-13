@@ -24,17 +24,21 @@ EVENT_RETURN_REQUEST_SELLER = "return_request_seller"
 EVENT_RETURN_STATUS_BUYER = "return_status_buyer"
 EVENT_SEARCH_SUBSCRIPTION_MATCH = "search_subscription_match"
 EVENT_AVITO_MESSENGER = "avito_messenger"
+EVENT_AUTOSERVICE_PLANNER_DAILY = "autoservice_planner_daily"
+EVENT_AUTOSERVICE_NEW_INSPECTION = "autoservice_new_inspection"
 
 CATEGORY_ORDERS = "orders"
 CATEGORY_MESSAGES = "messages"
 CATEGORY_SEARCH = "search"
 CATEGORY_OTHER = "other"
+CATEGORY_AUTOSERVICE = "autoservice"
 
 DEFAULT_NOTIFICATION_PREFS: dict[str, dict[str, bool]] = {
     CATEGORY_ORDERS: {"push": True, "email": True},
     CATEGORY_MESSAGES: {"push": True, "email": True},
     CATEGORY_SEARCH: {"push": True, "email": True},
     CATEGORY_OTHER: {"push": True, "email": True},
+    CATEGORY_AUTOSERVICE: {"push": True, "email": True},
 }
 
 EVENT_TO_CATEGORY: dict[str, str] = {
@@ -48,6 +52,8 @@ EVENT_TO_CATEGORY: dict[str, str] = {
     EVENT_STOCK_LOW: CATEGORY_OTHER,
     EVENT_MODERATION_APPROVED: CATEGORY_OTHER,
     EVENT_MODERATION_REJECTED: CATEGORY_OTHER,
+    EVENT_AUTOSERVICE_PLANNER_DAILY: CATEGORY_AUTOSERVICE,
+    EVENT_AUTOSERVICE_NEW_INSPECTION: CATEGORY_AUTOSERVICE,
 }
 
 ORDER_STATUS_LABELS: dict[str, str] = {

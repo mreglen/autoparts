@@ -43,6 +43,7 @@ from app.db.schema_patches import (
     ensure_autoservice_lifts_tables,
     ensure_autoservice_work_zones_migration,
     ensure_autoservice_works_and_employees_tables,
+    ensure_autoservice_digest_log_table,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
@@ -232,6 +233,7 @@ try:
     ensure_autoservice_lifts_tables()
     ensure_autoservice_work_zones_migration()
     ensure_autoservice_works_and_employees_tables()
+    ensure_autoservice_digest_log_table()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
     ensure_group_chat_columns()
@@ -462,6 +464,13 @@ async def startup_event():
         name="Weekly database and uploads backups",
         replace_existing=True,
     )
+    scheduler.add_job(
+        func=run_autoservice_planner_digest_tick,
+        trigger=CronTrigger(hour=settings.AUTOSERVICE_PLANNER_DIGEST_HOUR_UTC, minute=0),
+        id="autoservice_planner_daily_digest",
+        name="Autoservice planner daily digest (12:00 MSK)",
+        replace_existing=True,
+    )
     
     scheduler.start()
     set_apscheduler(scheduler)
@@ -669,6 +678,16 @@ async def run_weekly_backups():
         logger.info("Weekly backups completed: %s", result)
     except Exception as e:
         logger.error("Ошибка еженедельного резервного копирования: %s", e)
+
+
+async def run_autoservice_planner_digest_tick():
+    try:
+        from app.tasks.autoservice_notification_tasks import send_daily_planner_digest
+
+        await enqueue_celery_task(send_daily_planner_digest)
+        logger.info("Autoservice planner daily digest dispatched to Celery")
+    except Exception as e:
+        logger.error("Ошибка постановки autoservice planner digest в Celery: %s", e)
 
 
 async def run_yandex_feed_scheduler_tick():

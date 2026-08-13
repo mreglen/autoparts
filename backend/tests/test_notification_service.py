@@ -6,7 +6,10 @@ from app.services.notification_service import (
     CATEGORY_ORDERS,
     CATEGORY_OTHER,
     CATEGORY_SEARCH,
+    CATEGORY_AUTOSERVICE,
     EVENT_AVITO_MESSENGER,
+    EVENT_AUTOSERVICE_NEW_INSPECTION,
+    EVENT_AUTOSERVICE_PLANNER_DAILY,
     EVENT_CHAT_MESSAGE,
     EVENT_NEW_ORDER_SELLER,
     EVENT_ORDER_STATUS_BUYER,
@@ -51,6 +54,8 @@ class NotificationServiceTests(unittest.TestCase):
         self.assertEqual(event_category(EVENT_AVITO_MESSENGER), CATEGORY_MESSAGES)
         self.assertEqual(event_category(EVENT_SEARCH_SUBSCRIPTION_MATCH), CATEGORY_SEARCH)
         self.assertEqual(event_category(EVENT_STOCK_LOW), CATEGORY_OTHER)
+        self.assertEqual(event_category(EVENT_AUTOSERVICE_PLANNER_DAILY), CATEGORY_AUTOSERVICE)
+        self.assertEqual(event_category(EVENT_AUTOSERVICE_NEW_INSPECTION), CATEGORY_AUTOSERVICE)
 
     def test_notification_prefs_from_legacy(self):
         user = MagicMock()
@@ -86,6 +91,7 @@ class NotificationServiceTests(unittest.TestCase):
             "messages": {"push": True, "email": False},
             "search": {"push": True, "email": True},
             "other": {"push": True, "email": True},
+            "autoservice": {"push": True, "email": True},
         }
         user.notify_push_enabled = True
         user.notify_email_enabled = True
