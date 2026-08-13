@@ -6,7 +6,6 @@ import {
   selectCartLoading,
   selectCartError,
   selectNewPartsBaskets,
-  selectActiveNewPartsBasketId,
   fetchCart,
   updateCartItemQuantity,
   updateUsedCartItemQuantity,
@@ -19,10 +18,8 @@ import {
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { setNewPartsCheckoutItemIds, clearNewPartsCheckoutItemIds } from '../../utils/newPartsCheckout';
 import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
-import UnderlineTabs from '../../components/UI/UnderlineTabs';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
-import Card from '../../components/UI/Card';
 import EmptyState from '../../components/UI/EmptyState';
 import { FieldLabel, Input } from '../../components/UI/Field';
 import { PageHeader } from '../../components/UI/SectionHeader';
@@ -36,21 +33,21 @@ const formatUsedPrice = (price) =>
   new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price || 0);
 
 function formatDeliveryTime(deliveryString) {
-  if (!deliveryString) return 'Не указана';
+  if (!deliveryString) return '—';
 
   if (
-    typeof deliveryString === 'string' &&
-    deliveryString.includes('с') &&
-    deliveryString.includes('до')
+    typeof deliveryString === 'string'
+    && deliveryString.includes('с')
+    && deliveryString.includes('до')
   ) {
     return deliveryString;
   }
 
   if (
-    deliveryString &&
-    typeof deliveryString === 'object' &&
-    deliveryString.delivery_start &&
-    deliveryString.delivery_end
+    deliveryString
+    && typeof deliveryString === 'object'
+    && deliveryString.delivery_start
+    && deliveryString.delivery_end
   ) {
     try {
       const startDate = new Date(deliveryString.delivery_start);
@@ -70,7 +67,7 @@ function formatDeliveryTime(deliveryString) {
       });
       return `${dayText} с ${startTime} до ${endTime}`;
     } catch {
-      return 'Не указана';
+      return '—';
     }
   }
 
@@ -78,7 +75,7 @@ function formatDeliveryTime(deliveryString) {
 }
 
 function formatDate(dateString) {
-  if (!dateString) return 'Не указана';
+  if (!dateString) return '—';
   try {
     let date;
     if (typeof dateString === 'string') {
@@ -89,15 +86,15 @@ function formatDate(dateString) {
         dateString.month - 1,
         dateString.day,
         dateString.hour || 0,
-        dateString.minute || 0
+        dateString.minute || 0,
       );
     } else {
       date = new Date(dateString);
     }
-    if (Number.isNaN(date.getTime())) return 'Не указана';
+    if (Number.isNaN(date.getTime())) return '—';
     return date.toLocaleDateString('ru-RU');
   } catch {
-    return 'Не указана';
+    return '—';
   }
 }
 
@@ -108,145 +105,113 @@ function getMaxAllowedQuantity(item) {
   return Math.max(1, item?.quantity || 1);
 }
 
-function PartTypeBadge({ type }) {
-  if (type === 'used') {
-    return (
-      <span className="inline-flex items-center rounded-sg bg-accent-50 px-2 py-0.5 text-xs font-medium text-accent-700 ring-1 ring-inset ring-accent-600/20">
-        Б/У
-      </span>
-    );
-  }
+function QuantityStepper({ quantity, onDecrease, onIncrease, max }) {
   return (
-    <span className="inline-flex items-center rounded-sg bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-600/20">
-      Новая
-    </span>
-  );
-}
-
-function QuantityControl({ quantity, onDecrease, onIncrease, max }) {
-  return (
-    <div className="inline-flex items-center gap-0.5 rounded-lg border border-line bg-surface-muted p-0.5">
+    <div className="inline-flex items-center overflow-hidden rounded-lg border border-line bg-surface">
       <button
         type="button"
         onClick={onDecrease}
         disabled={quantity <= 1}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label="Уменьшить количество"
+        className="flex h-8 w-7 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
+        aria-label="Уменьшить"
       >
-        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-        </svg>
+        −
       </button>
-      <span className="min-w-[1.75rem] text-center text-sm font-semibold text-ink">{quantity}</span>
+      <input
+        type="text"
+        readOnly
+        value={quantity}
+        className="h-8 w-9 border-x border-line bg-surface text-center text-sm font-medium text-ink"
+        aria-label="Количество"
+      />
       <button
         type="button"
         onClick={onIncrease}
         disabled={quantity >= max}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label="Увеличить количество"
+        className="flex h-8 w-7 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
+        aria-label="Увеличить"
       >
-        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
+        +
       </button>
     </div>
   );
 }
 
-function CartItemRow({
+function CartTableRow({
   item,
   selected,
   onSelect,
   onQuantityChange,
   onRemove,
-  showDelivery,
+  showDeliveryColumn,
   showPurchasePrice,
+  formatItemPrice,
 }) {
   const maxQty = getMaxAllowedQuantity(item);
   const lineTotal = item.price * item.quantity;
-  const formatItemPrice = item.type === 'new' ? formatNewPartPrice : formatUsedPrice;
   const showPurchase = showPurchasePrice
     && item.purchasePrice > 0
     && Math.abs(item.price - item.purchasePrice) > 0.009;
 
   return (
-    <article className="flex gap-2.5 rounded-sg border border-line bg-surface p-2.5 transition hover:border-brand-200 sm:gap-3 sm:p-3">
-      <input
-        type="checkbox"
-        checked={selected}
-        onChange={onSelect}
-        className="mt-1 h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
-        aria-label={`Выбрать ${item.name}`}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-start gap-1.5">
-          <PartTypeBadge type={item.type} />
-          <h3 className="min-w-0 flex-1 text-sm font-medium leading-snug text-ink">{item.name}</h3>
-        </div>
-        {item.type === 'new' && item.brand && item.number ? (
-          <p className="mt-0.5 text-xs text-ink-muted">
-            {item.brand} · {item.number}
-          </p>
-        ) : null}
-        {item.type !== 'new' && (
-          <p className="mt-0.5 text-xs text-ink-muted">
-            {item.brand} · {item.number}
-          </p>
-        )}
-        {showDelivery && (
-          <p className="mt-1 flex items-start gap-1 text-xs text-ink-muted">
-            <svg
-              className="mt-0.5 h-3 w-3 shrink-0 text-brand-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <span>
-              {item.deliveryDate ? formatDeliveryTime(item.deliveryDate) : 'Срок не указан'}
-            </span>
-          </p>
-        )}
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <QuantityControl
-            quantity={item.quantity}
-            max={maxQty}
-            onDecrease={() => onQuantityChange(item.id, item.quantity - 1)}
-            onIncrease={() => onQuantityChange(item.id, item.quantity + 1)}
-          />
-          <button
-            type="button"
-            onClick={() => onRemove(item.id)}
-            className="text-xs font-medium text-danger-600 hover:text-danger-700"
-          >
-            Удалить
-          </button>
-        </div>
-      </div>
-      <div className="shrink-0 text-right">
-        <p className="text-sm font-bold text-ink">{formatItemPrice(lineTotal)}</p>
-        <p className="mt-0.5 text-[11px] text-ink-muted">{formatItemPrice(item.price)} / шт.</p>
+    <tr className="border-b border-line last:border-b-0 hover:bg-surface-muted/40">
+      <td className="w-10 px-2 py-2.5 align-middle">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onSelect}
+          className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+          aria-label={`Выбрать ${item.partTitle || item.name}`}
+        />
+      </td>
+      <td className="min-w-[5.5rem] px-2 py-2.5 align-middle">
+        <p className="text-sm font-semibold text-ink">{item.brand || '—'}</p>
+        <p className="text-sm font-medium text-brand-600">{item.number || '—'}</p>
+      </td>
+      <td className="min-w-[8rem] px-2 py-2.5 align-middle">
+        <p className="text-sm text-ink">{item.partTitle || item.name}</p>
+      </td>
+      {showDeliveryColumn ? (
+        <td className="min-w-[7rem] px-2 py-2.5 align-middle text-xs text-ink-muted">
+          {item.deliveryDate ? formatDeliveryTime(item.deliveryDate) : '—'}
+        </td>
+      ) : null}
+      <td className="min-w-[5rem] whitespace-nowrap px-2 py-2.5 align-middle text-right">
+        <p className="text-sm font-semibold text-brand-600">{formatItemPrice(item.price)}</p>
         {showPurchase ? (
-          <p className="mt-0.5 text-[10px] text-ink-muted">
-            Закуп. {formatItemPrice(item.purchasePrice)}
-          </p>
+          <p className="text-xs text-ink-muted">{formatItemPrice(item.purchasePrice)}</p>
         ) : null}
-      </div>
-    </article>
+      </td>
+      <td className="w-[5.5rem] px-2 py-2.5 align-middle">
+        <QuantityStepper
+          quantity={item.quantity}
+          max={maxQty}
+          onDecrease={() => onQuantityChange(item.id, item.quantity - 1)}
+          onIncrease={() => onQuantityChange(item.id, item.quantity + 1)}
+        />
+      </td>
+      <td className="min-w-[5rem] whitespace-nowrap px-2 py-2.5 align-middle text-right">
+        <p className="text-sm font-bold text-ink">{formatItemPrice(lineTotal)}</p>
+      </td>
+      <td className="w-10 px-2 py-2.5 align-middle text-center">
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-muted transition hover:bg-danger-50 hover:text-danger-600"
+          aria-label="Удалить"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </td>
+    </tr>
   );
 }
 
-function SellerCartBlock({
-  seller,
-  newItems,
-  usedItems,
-  allItems,
+function CartTableBlock({
+  title,
+  items,
   selectedItems,
   onSelectAll,
   onItemSelect,
@@ -256,106 +221,111 @@ function SellerCartBlock({
   onCheckout,
   onCheckoutSelected,
   onClearAll,
-  isAuthorized,
-  calculateSellerTotal,
-  checkoutLabel = 'Оформить заказ',
+  onRename,
+  canRename = false,
+  showDeliveryColumn = true,
   showPurchasePrice = false,
-  formatTotalPrice = formatNewPartPrice,
+  formatItemPrice = formatNewPartPrice,
+  checkoutLabel = 'Оформить заказ',
 }) {
-  const allSelected = allItems.length > 0 && allItems.every((item) => selectedItems.has(item.id));
-  const someSelected = allItems.some((item) => selectedItems.has(item.id));
-  const selectedCount = allItems.filter((item) => selectedItems.has(item.id)).length;
-  const totalQty = allItems.reduce((sum, item) => sum + item.quantity, 0);
-  const hasNew = newItems.length > 0;
-  const hasUsed = usedItems.length > 0;
+  const allSelected = items.length > 0 && items.every((item) => selectedItems.has(item.id));
+  const someSelected = items.some((item) => selectedItems.has(item.id));
+  const selectedCount = items.filter((item) => selectedItems.has(item.id)).length;
+  const blockTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const selectedTotal = items
+    .filter((item) => selectedItems.has(item.id))
+    .reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const displayTotal = someSelected ? selectedTotal : blockTotal;
 
-  const renderItems = (items, showDelivery) =>
-    items.map((item) => (
-      <CartItemRow
-        key={item.id}
-        item={item}
-        selected={selectedItems.has(item.id)}
-        onSelect={() => onItemSelect(item.id)}
-        onQuantityChange={onQuantityChange}
-        onRemove={onRemove}
-        showDelivery={showDelivery}
-        showPurchasePrice={showPurchasePrice && item.type === 'new'}
-      />
-    ));
+  if (!items.length) return null;
 
   return (
-    <Card padding="none" className="overflow-hidden">
-      <header className="border-b border-line bg-surface-muted px-3 py-3 sm:px-4">
-        <div className="flex items-start gap-2.5">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            ref={(el) => {
-              if (el) el.indeterminate = someSelected && !allSelected;
-            }}
-            onChange={onSelectAll}
-            className="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
-            aria-label={`Выбрать все у ${seller}`}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-base font-semibold text-ink sm:text-lg">{seller}</h2>
-              {hasNew && hasUsed ? (
-                <span className="text-xs text-ink-muted">новые и б/у</span>
-              ) : null}
-            </div>
-            <p className="mt-0.5 text-xs text-ink-muted sm:text-sm">
-              {allItems.length} поз. · {totalQty} шт. · {formatTotalPrice(calculateSellerTotal(allItems))}
-            </p>
-          </div>
+    <section className="overflow-hidden rounded-sg border border-line bg-surface shadow-sm">
+      <header className="flex flex-wrap items-center gap-3 border-b border-line bg-brand-50/50 px-3 py-3 sm:px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <h2 className="truncate text-base font-semibold text-ink sm:text-lg">{title}</h2>
+          {canRename && onRename ? (
+            <button
+              type="button"
+              onClick={onRename}
+              className="shrink-0 text-ink-muted transition hover:text-brand-600"
+              aria-label="Переименовать корзину"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                />
+              </svg>
+            </button>
+          ) : null}
+        </div>
+        <p className="text-lg font-bold text-ink sm:ml-auto">{formatItemPrice(displayTotal)}</p>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          {someSelected ? (
+            <>
+              <Button variant="secondary" size="sm" onClick={onRemoveSelected}>
+                Удалить выбранное
+              </Button>
+              <Button variant="soft" size="sm" onClick={onCheckoutSelected}>
+                Оформить выбранное ({selectedCount})
+              </Button>
+            </>
+          ) : null}
+          <Button variant="secondary" size="sm" onClick={onClearAll}>
+            Очистить
+          </Button>
+          <Button size="sm" onClick={onCheckout}>
+            {checkoutLabel}
+          </Button>
         </div>
       </header>
 
-      <div className="space-y-2 p-3 sm:p-4">
-        {newItems.length > 0 && renderItems(newItems, true)}
-        {usedItems.length > 0 && renderItems(usedItems, false)}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-line bg-surface-muted/60 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              <th className="w-10 px-2 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected && !allSelected;
+                  }}
+                  onChange={onSelectAll}
+                  className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+                  aria-label={`Выбрать все в ${title}`}
+                />
+              </th>
+              <th className="px-2 py-2.5">Запчасть</th>
+              <th className="px-2 py-2.5">Наименование</th>
+              {showDeliveryColumn ? <th className="px-2 py-2.5">Доставка</th> : null}
+              <th className="px-2 py-2.5 text-right">Цена, ₽</th>
+              <th className="px-2 py-2.5">Кол-во</th>
+              <th className="px-2 py-2.5 text-right">Стоимость, ₽</th>
+              <th className="w-10 px-2 py-2.5" aria-hidden />
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <CartTableRow
+                key={item.id}
+                item={item}
+                selected={selectedItems.has(item.id)}
+                onSelect={() => onItemSelect(item.id)}
+                onQuantityChange={onQuantityChange}
+                onRemove={onRemove}
+                showDeliveryColumn={showDeliveryColumn}
+                showPurchasePrice={showPurchasePrice}
+                formatItemPrice={formatItemPrice}
+              />
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      <footer className="border-t border-line bg-surface-muted/80 px-3 py-3 sm:px-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <p className="text-xs text-ink-muted sm:text-sm">
-            {selectedCount > 0 ? (
-              <>
-                Выбрано <span className="font-medium text-ink">{selectedCount}</span> из {allItems.length}
-              </>
-            ) : (
-              'Отметьте позиции для частичного оформления'
-            )}
-          </p>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-            {someSelected ? (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" size="sm" onClick={onRemoveSelected}>
-                  Удалить выбранное
-                </Button>
-                <Button variant="soft" size="sm" onClick={onCheckoutSelected}>
-                  Оформить выбранное
-                </Button>
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <div className="mr-auto text-left sm:mr-0 sm:text-right">
-                <p className="text-[11px] text-ink-muted">Итого</p>
-                <p className="text-base font-bold text-ink">{formatTotalPrice(calculateSellerTotal(allItems))}</p>
-              </div>
-              <Button variant="secondary" size="sm" onClick={onClearAll}>
-                Очистить
-              </Button>
-              <Button size="sm" onClick={onCheckout}>
-                {checkoutLabel}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </Card>
+    </section>
   );
 }
 
@@ -366,7 +336,6 @@ export default function CartPage() {
   const loading = useSelector(selectCartLoading);
   const error = useSelector(selectCartError);
   const newPartsBaskets = useSelector(selectNewPartsBaskets);
-  const activeBasketId = useSelector(selectActiveNewPartsBasketId);
   const isInitialLoad = loading && !cart;
   const isAuthorized = useSelector((state) => Boolean(state.auth.token));
   const user = useSelector((state) => state.auth.user);
@@ -378,6 +347,7 @@ export default function CartPage() {
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [renameBasketId, setRenameBasketId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const [renameSaving, setRenameSaving] = useState(false);
   const [renameError, setRenameError] = useState('');
@@ -393,6 +363,7 @@ export default function CartPage() {
     seller: 'Новые запчасти',
     brand: item.brand,
     number: item.partnumber,
+    partTitle: item.name || '',
     name: formatProductDisplayTitle(item.brand, item.partnumber, item.name),
     deliveryDate: item.delivery,
     price: truncateRubles(item.price),
@@ -401,45 +372,25 @@ export default function CartPage() {
     maxQuantity: item.max_quantity,
     stock_id: item.stock_id,
     product_id: item.product_id,
-    image: '/api/placeholder/80/80',
+    basket_id: item.basket_id,
   }), []);
 
-  const activeBasket = useMemo(() => {
-    if (!newPartsBaskets.length) return null;
-    return (
-      newPartsBaskets.find((b) => b.id === activeBasketId)
-      || newPartsBaskets.find((b) => b.is_default)
-      || newPartsBaskets[0]
-    );
-  }, [newPartsBaskets, activeBasketId]);
+  const mapBasketItems = useCallback(
+    (basket) => {
+      const sourceItems = basket?.items?.length ? basket.items : [];
+      return sourceItems.map((item) => mapNewItem(item));
+    },
+    [mapNewItem],
+  );
 
-  const allNewPartsItems = useMemo(() => {
-    if (!cart?.new_parts_items?.length) return [];
-    return cart.new_parts_items.map((item) => mapNewItem(item));
-  }, [cart, mapNewItem]);
-
-  const newPartsItems = useMemo(() => {
-    const sourceItems = activeBasket?.items?.length
-      ? activeBasket.items
-      : cart?.new_parts_items || [];
-    if (!sourceItems.length) return [];
-    return sourceItems.map((item) => mapNewItem(item));
-  }, [activeBasket, cart, mapNewItem]);
-
-  const basketTabs = useMemo(() => {
-    const sorted = [...newPartsBaskets]
+  const visibleNewPartsBaskets = useMemo(() => {
+    return [...newPartsBaskets]
       .filter((basket) => basket.is_default || (basket.item_count ?? 0) > 0)
       .sort((a, b) => {
         if (a.is_default) return -1;
         if (b.is_default) return 1;
         return a.name.localeCompare(b.name, 'ru');
       });
-    return sorted.map((basket) => ({
-      id: String(basket.id),
-      label: basket.name,
-      count: basket.item_count,
-      title: basket.name,
-    }));
   }, [newPartsBaskets]);
 
   const defaultBasket = useMemo(
@@ -447,29 +398,10 @@ export default function CartPage() {
     [newPartsBaskets],
   );
 
-  useEffect(() => {
-    if (!newPartsBaskets.length) return;
-    const visibleIds = newPartsBaskets
-      .filter((b) => b.is_default || (b.item_count ?? 0) > 0)
-      .map((b) => b.id);
-    if (!visibleIds.length) return;
-    if (!visibleIds.includes(activeBasketId)) {
-      const fallbackId = defaultBasket?.id && visibleIds.includes(defaultBasket.id)
-        ? defaultBasket.id
-        : visibleIds[0];
-      dispatch(setActiveNewPartsBasket(fallbackId));
-    }
-  }, [activeBasketId, defaultBasket?.id, dispatch, newPartsBaskets]);
-
-  const activeBasketTotal = useMemo(
-    () => newPartsItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [newPartsItems],
-  );
-
-  const activeBasketQty = useMemo(
-    () => newPartsItems.reduce((sum, item) => sum + item.quantity, 0),
-    [newPartsItems],
-  );
+  const allNewPartsItems = useMemo(() => {
+    if (!cart?.new_parts_items?.length) return [];
+    return cart.new_parts_items.map((item) => mapNewItem(item));
+  }, [cart, mapNewItem]);
 
   const usedGroupedItems = useMemo(() => {
     if (!cart?.used_parts_items?.length) return {};
@@ -483,14 +415,13 @@ export default function CartPage() {
         seller,
         brand: item.brand,
         number: item.partnumber,
-        internalCode: item.partnumber,
+        partTitle: item.name || `${item.brand} ${item.partnumber}`,
         name: `${item.brand} ${item.partnumber}`,
         deliveryDate: item.delivery,
         price: item.price,
         quantity: item.quantity,
         maxQuantity: item.max_quantity,
         product_id: item.product_id,
-        image: '/api/placeholder/80/80',
       });
     });
     return groups;
@@ -498,7 +429,7 @@ export default function CartPage() {
 
   const cartItems = useMemo(
     () => [...allNewPartsItems, ...Object.values(usedGroupedItems).flat()],
-    [allNewPartsItems, usedGroupedItems]
+    [allNewPartsItems, usedGroupedItems],
   );
 
   const hasVisibleCartContent = cartItems.length > 0;
@@ -508,20 +439,18 @@ export default function CartPage() {
       Object.entries(usedGroupedItems).map(([seller, items]) => ({
         seller,
         items,
-        newItems: [],
-        usedItems: items,
       })),
-    [usedGroupedItems]
+    [usedGroupedItems],
   );
 
   const grandTotal = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [cartItems]
+    [cartItems],
   );
 
   const grandQty = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
-    [cartItems]
+    [cartItems],
   );
 
   const handleQuantityChange = async (id, newQuantity) => {
@@ -562,36 +491,35 @@ export default function CartPage() {
     }
   };
 
-  const handleClearNewPartsBasket = useCallback(async () => {
-    const basketToDelete = activeBasket && !activeBasket.is_default ? activeBasket : null;
-    const itemsToRemove = [...newPartsItems];
+  const handleClearNewPartsBasket = useCallback(async (basket, items) => {
+    const basketToDelete = basket && !basket.is_default ? basket : null;
 
-    for (const item of itemsToRemove) {
+    for (const item of items) {
       try {
         await dispatch(removeFromCart(item.id)).unwrap();
       } catch {
-        // continue clearing remaining items
+        // continue
       }
     }
 
     try {
       await dispatch(fetchCart()).unwrap();
     } catch {
-      // state will refresh on next interaction
+      // ignore
     }
 
     if (basketToDelete?.id) {
       try {
         await dispatch(deleteNewPartsBasket(basketToDelete.id)).unwrap();
       } catch {
-        // basket may already be auto-deleted after last item removal
+        // ignore
       }
     }
 
     if (defaultBasket?.id) {
       dispatch(setActiveNewPartsBasket(defaultBasket.id));
     }
-  }, [activeBasket, defaultBasket?.id, dispatch, newPartsItems]);
+  }, [defaultBasket?.id, dispatch]);
 
   const handleClearUsedBasket = useCallback(async (items) => {
     for (const item of items) {
@@ -630,45 +558,46 @@ export default function CartPage() {
       }
       finalizeUsedCheckout(items, seller);
     },
-    [finalizeUsedCheckout, isAuthorized, openAuthModalForCheckout]
+    [finalizeUsedCheckout, isAuthorized, openAuthModalForCheckout],
   );
 
-  const handleNewPartsCheckout = useCallback(() => {
-    if (activeBasket?.id) {
-      dispatch(setActiveNewPartsBasket(activeBasket.id));
+  const handleNewPartsCheckout = useCallback((basketId) => {
+    if (basketId) {
+      dispatch(setActiveNewPartsBasket(basketId));
     }
     clearNewPartsCheckoutItemIds();
     if (!isAuthorized) {
-      openAuthModalForCheckout({ type: 'new' });
+      openAuthModalForCheckout({ type: 'new', basketId });
       return;
     }
     navigate('/cart/new/checkout');
-  }, [activeBasket?.id, dispatch, isAuthorized, navigate, openAuthModalForCheckout]);
+  }, [dispatch, isAuthorized, navigate, openAuthModalForCheckout]);
 
-  const handleNewPartsCheckoutSelected = useCallback(() => {
-    if (activeBasket?.id) {
-      dispatch(setActiveNewPartsBasket(activeBasket.id));
+  const handleNewPartsCheckoutSelected = useCallback((basketId, items) => {
+    if (basketId) {
+      dispatch(setActiveNewPartsBasket(basketId));
     }
-    const selected = newPartsItems.filter((item) => selectedItems.has(item.id));
+    const selected = items.filter((item) => selectedItems.has(item.id));
     if (selected.length === 0) return;
     setNewPartsCheckoutItemIds(selected.map((item) => item.id));
     if (!isAuthorized) {
-      openAuthModalForCheckout({ type: 'new', partial: true });
+      openAuthModalForCheckout({ type: 'new', partial: true, basketId });
       return;
     }
     navigate('/cart/new/checkout');
-  }, [activeBasket?.id, dispatch, isAuthorized, navigate, newPartsItems, openAuthModalForCheckout, selectedItems]);
+  }, [dispatch, isAuthorized, navigate, openAuthModalForCheckout, selectedItems]);
 
-  const openRenameModal = () => {
-    if (!activeBasket || activeBasket.is_default) return;
-    setRenameValue(activeBasket.name);
+  const openRenameModal = (basket) => {
+    if (!basket || basket.is_default) return;
+    setRenameBasketId(basket.id);
+    setRenameValue(basket.name);
     setRenameError('');
     setRenameOpen(true);
   };
 
   const handleRenameBasket = async (e) => {
     e.preventDefault();
-    if (!activeBasket || activeBasket.is_default) return;
+    if (!renameBasketId) return;
     const name = renameValue.trim();
     if (!name) {
       setRenameError('Укажите название');
@@ -677,7 +606,7 @@ export default function CartPage() {
     setRenameSaving(true);
     setRenameError('');
     try {
-      await dispatch(renameNewPartsBasket({ basketId: activeBasket.id, name })).unwrap();
+      await dispatch(renameNewPartsBasket({ basketId: renameBasketId, name })).unwrap();
       setRenameOpen(false);
     } catch (err) {
       setRenameError(typeof err === 'string' ? err : 'Не удалось переименовать');
@@ -698,18 +627,12 @@ export default function CartPage() {
     }
 
     if (pending.type === 'new') {
+      if (pending.basketId) {
+        dispatch(setActiveNewPartsBasket(pending.basketId));
+      }
       navigate('/cart/new/checkout');
     }
-  }, [finalizeUsedCheckout, navigate]);
-
-  const handleCheckout = (seller) => {
-    saveUsedOrderAndNavigate(usedGroupedItems[seller] || [], seller);
-  };
-
-  const handleCheckoutSelected = (seller) => {
-    const selected = (usedGroupedItems[seller] || []).filter((item) => selectedItems.has(item.id));
-    saveUsedOrderAndNavigate(selected, seller);
-  };
+  }, [dispatch, finalizeUsedCheckout, navigate]);
 
   const handleItemSelect = (itemId) => {
     setSelectedItems((prev) => {
@@ -720,8 +643,8 @@ export default function CartPage() {
     });
   };
 
-  const handleSelectAllNewItems = () => {
-    const ids = newPartsItems.map((item) => item.id);
+  const handleSelectAllItems = (items) => {
+    const ids = items.map((item) => item.id);
     const allSelected = ids.every((id) => selectedItems.has(id));
     setSelectedItems((prev) => {
       const newSet = new Set(prev);
@@ -731,19 +654,10 @@ export default function CartPage() {
     });
   };
 
-  const handleSelectAllSellerItems = (seller) => {
-    const sellerItemIds = (usedGroupedItems[seller] || []).map((item) => item.id);
-    const allSelected = sellerItemIds.every((id) => selectedItems.has(id));
-    setSelectedItems((prev) => {
-      const newSet = new Set(prev);
-      if (allSelected) sellerItemIds.forEach((id) => newSet.delete(id));
-      else sellerItemIds.forEach((id) => newSet.add(id));
-      return newSet;
-    });
-  };
-
-  const calculateSellerTotal = (items) =>
-    items.reduce((total, item) => total + item.price * item.quantity, 0);
+  const hasOnlyEmptyDefault = visibleNewPartsBaskets.length === 1
+    && visibleNewPartsBaskets[0]?.is_default
+    && (visibleNewPartsBaskets[0]?.item_count ?? 0) === 0
+    && usedSellerGroups.length === 0;
 
   return (
     <div className="max-md:mt-0 mt-5 pb-8">
@@ -757,11 +671,7 @@ export default function CartPage() {
       />
 
       {isInitialLoad ? (
-        <EmptyState
-          illustration="empty"
-          title="Загрузка корзины…"
-          className="border-solid"
-        />
+        <EmptyState illustration="empty" title="Загрузка корзины…" className="border-solid" />
       ) : error ? (
         <EmptyState
           illustration="error"
@@ -772,100 +682,32 @@ export default function CartPage() {
           className="border-solid"
         />
       ) : (
-        <div className={hasVisibleCartContent ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]' : ''}>
-          <div className="space-y-4">
-          {newPartsBaskets.length > 0 ? (
-            <div className="space-y-4">
-              {basketTabs.length > 0 ? (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <UnderlineTabs
-                    tabs={basketTabs}
-                    value={String(activeBasket?.id || basketTabs[0]?.id || '')}
-                    onChange={(id) => dispatch(setActiveNewPartsBasket(Number(id)))}
-                    ariaLabel="Корзины новых запчастей"
-                  />
-                  {activeBasket && !activeBasket.is_default ? (
-                    <Button variant="secondary" size="sm" onClick={openRenameModal} className="self-start">
-                      Переименовать
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null}
+        <div className="space-y-4">
+          {visibleNewPartsBaskets.map((basket) => {
+            const items = mapBasketItems(basket);
+            if (!items.length) {
+              if (!basket.is_default || hasOnlyEmptyDefault) {
+                return (
+                  <div
+                    key={basket.id}
+                    className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted"
+                  >
+                    {basket.is_default
+                      ? 'Добавьте новые запчасти из каталога или VIN-поиска'
+                      : `Корзина «${basket.name}» пуста`}
+                  </div>
+                );
+              }
+              return null;
+            }
 
-              {newPartsItems.length > 0 ? (
-                <SellerCartBlock
-                  seller={activeBasket?.name || 'Новые запчасти'}
-                  newItems={newPartsItems}
-                  usedItems={[]}
-                  allItems={newPartsItems}
-                  selectedItems={selectedItems}
-                  onSelectAll={handleSelectAllNewItems}
-                  onItemSelect={handleItemSelect}
-                  onQuantityChange={handleQuantityChange}
-                  onRemove={handleRemoveItem}
-                  onRemoveSelected={() => {
-                    newPartsItems
-                      .filter((item) => selectedItems.has(item.id))
-                      .forEach((item) => handleRemoveItem(item.id));
-                  }}
-                  onCheckout={handleNewPartsCheckout}
-                  onCheckoutSelected={handleNewPartsCheckoutSelected}
-                  onClearAll={handleClearNewPartsBasket}
-                  isAuthorized={isAuthorized}
-                  calculateSellerTotal={calculateSellerTotal}
-                  checkoutLabel="Оформить заказ"
-                  showPurchasePrice={showPurchaseInCart}
-                />
-              ) : (
-                <div className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
-                  {activeBasket?.is_default
-                    ? 'Добавьте новые запчасти из каталога или VIN-поиска'
-                    : `Корзина «${activeBasket?.name || 'Новые запчасти'}» пуста`}
-                </div>
-              )}
-            </div>
-          ) : !hasVisibleCartContent && usedSellerGroups.length === 0 ? (
-            <div className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
-              Добавьте новые запчасти из каталога или VIN-поиска
-            </div>
-          ) : null}
-
-          {!newPartsBaskets.length && newPartsItems.length > 0 && (
-            <SellerCartBlock
-              seller="Новые запчасти"
-              newItems={newPartsItems}
-              usedItems={[]}
-              allItems={newPartsItems}
-              selectedItems={selectedItems}
-              onSelectAll={handleSelectAllNewItems}
-              onItemSelect={handleItemSelect}
-              onQuantityChange={handleQuantityChange}
-              onRemove={handleRemoveItem}
-              onRemoveSelected={() => {
-                newPartsItems
-                  .filter((item) => selectedItems.has(item.id))
-                  .forEach((item) => handleRemoveItem(item.id));
-              }}
-              onCheckout={handleNewPartsCheckout}
-              onCheckoutSelected={handleNewPartsCheckoutSelected}
-              onClearAll={handleClearNewPartsBasket}
-              isAuthorized={isAuthorized}
-              calculateSellerTotal={calculateSellerTotal}
-              checkoutLabel="Оформить заказ"
-              showPurchasePrice={showPurchaseInCart}
-            />
-          )}
-
-          {usedSellerGroups.length > 0 &&
-            usedSellerGroups.map(({ seller, items, usedItems }) => (
-              <SellerCartBlock
-                key={seller}
-                seller={seller}
-                newItems={[]}
-                usedItems={usedItems}
-                allItems={items}
+            return (
+              <CartTableBlock
+                key={basket.id}
+                title={basket.name}
+                items={items}
                 selectedItems={selectedItems}
-                onSelectAll={() => handleSelectAllSellerItems(seller)}
+                onSelectAll={() => handleSelectAllItems(items)}
                 onItemSelect={handleItemSelect}
                 onQuantityChange={handleQuantityChange}
                 onRemove={handleRemoveItem}
@@ -874,40 +716,49 @@ export default function CartPage() {
                     .filter((item) => selectedItems.has(item.id))
                     .forEach((item) => handleRemoveItem(item.id));
                 }}
-                onCheckout={() => handleCheckout(seller)}
-                onCheckoutSelected={() => handleCheckoutSelected(seller)}
-                onClearAll={() => handleClearUsedBasket(items)}
-                isAuthorized={isAuthorized}
-                calculateSellerTotal={calculateSellerTotal}
-                formatTotalPrice={formatUsedPrice}
+                onCheckout={() => handleNewPartsCheckout(basket.id)}
+                onCheckoutSelected={() => handleNewPartsCheckoutSelected(basket.id, items)}
+                onClearAll={() => handleClearNewPartsBasket(basket, items)}
+                onRename={() => openRenameModal(basket)}
+                canRename={!basket.is_default}
+                showDeliveryColumn
+                showPurchasePrice={showPurchaseInCart}
+                formatItemPrice={formatNewPartPrice}
               />
-            ))}
-          </div>
+            );
+          })}
 
-          {hasVisibleCartContent ? (
-          <aside className="mt-4 space-y-3 lg:sticky lg:top-4 lg:mt-0">
-            <Card padding="sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Общая сумма</p>
-              <p className="mt-1 text-2xl font-bold text-ink">{formatUsedPrice(grandTotal)}</p>
-              <p className="mt-1 text-xs text-ink-muted">
-                {grandQty} шт. · {cartItems.length} поз.
-              </p>
-            </Card>
-            {activeBasket && newPartsItems.length > 0 ? (
-              <Card padding="sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Текущая корзина</p>
-                <p className="mt-1 truncate text-sm font-semibold text-ink" title={activeBasket.name}>
-                  {activeBasket.name}
-                </p>
-                <p className="mt-2 text-lg font-bold text-ink">{formatNewPartPrice(activeBasketTotal)}</p>
-                <p className="text-xs text-ink-muted">{activeBasketQty} шт.</p>
-                <Button className="mt-3 w-full" size="sm" onClick={handleNewPartsCheckout}>
-                  Оформить
-                </Button>
-              </Card>
-            ) : null}
-          </aside>
+          {!hasVisibleCartContent && usedSellerGroups.length === 0 && visibleNewPartsBaskets.length === 0 ? (
+            <div className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
+              Добавьте новые запчасти из каталога или VIN-поиска
+            </div>
           ) : null}
+
+          {usedSellerGroups.map(({ seller, items }) => (
+            <CartTableBlock
+              key={seller}
+              title={seller}
+              items={items}
+              selectedItems={selectedItems}
+              onSelectAll={() => handleSelectAllItems(items)}
+              onItemSelect={handleItemSelect}
+              onQuantityChange={handleQuantityChange}
+              onRemove={handleRemoveItem}
+              onRemoveSelected={() => {
+                items
+                  .filter((item) => selectedItems.has(item.id))
+                  .forEach((item) => handleRemoveItem(item.id));
+              }}
+              onCheckout={() => saveUsedOrderAndNavigate(items, seller)}
+              onCheckoutSelected={() => {
+                const selected = items.filter((item) => selectedItems.has(item.id));
+                saveUsedOrderAndNavigate(selected, seller);
+              }}
+              onClearAll={() => handleClearUsedBasket(items)}
+              showDeliveryColumn={false}
+              formatItemPrice={formatUsedPrice}
+            />
+          ))}
         </div>
       )}
 
