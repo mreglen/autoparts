@@ -6,6 +6,7 @@ import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import WarehouseSaleCard from '../../components/WarehouseSales/WarehouseSaleCard';
 import WarehouseSalesEmptyState from '../../components/WarehouseSales/WarehouseSalesEmptyState';
+import { SkeletonHeaderStats, SkeletonListCards } from '../../components/UI';
 import {
   formatWarehouseMoney,
   matchesSaleSourceFilter,
@@ -140,7 +141,9 @@ const WarehouseSalesPage = () => {
     <div className={`${warehousePageClass} min-w-0 space-y-4`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Продажи со склада</h1>
-        {!salesLoading && !error ? (
+        {salesLoading ? (
+          <SkeletonHeaderStats />
+        ) : !error ? (
           <WarehouseSalesHeaderStats stats={stats} formatPrice={formatWarehouseMoney} />
         ) : null}
       </div>
@@ -182,12 +185,7 @@ const WarehouseSalesPage = () => {
         </div>
       </div>
 
-      {salesLoading && (
-        <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
-          <AuthLoadingScreen className="h-24" />
-          <p className="mt-4 text-sm text-gray-600">Загружаем продажи…</p>
-        </div>
-      )}
+      {salesLoading && <SkeletonListCards />}
 
       {error && !salesLoading && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center">

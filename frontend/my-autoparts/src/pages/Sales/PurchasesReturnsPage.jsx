@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiAxios, apiRequestFormData } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { SkeletonListCards } from '../../components/UI';
 import { MOBILE_STICKY_BOTTOM_OFFSET } from '../../constants/mobileTokens';
 import {
   RETURN_REASONS,
@@ -305,7 +306,7 @@ export default function PurchasesReturnsPage() {
         Возвраты заказов Avito оформляются в приложении Avito. Здесь — только покупки б/у запчастей на сайте.
       </p>
 
-      {loading && <AuthLoadingScreen />}
+      {loading ? <SkeletonListCards count={3} /> : null}
       {error && <p className="text-red-600">{error}</p>}
 
       {!loading && !error && returns.length === 0 && (

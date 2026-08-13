@@ -25,6 +25,7 @@ import {
   warehousePillControlClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
+import { SkeletonHeaderStats, SkeletonListCards } from '../../components/UI';
 
 const ACTIVE_STATUSES = new Set([
   'pending',
@@ -337,7 +338,7 @@ export default function PurchasesOrdersPage() {
     <div className={`${warehousePageClass} min-w-0 space-y-4`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Мои заказы</h1>
-        {!loading && !error ? <OrdersHeaderStats stats={stats} formatPrice={formatPrice} /> : null}
+        {loading ? <SkeletonHeaderStats /> : !error ? <OrdersHeaderStats stats={stats} formatPrice={formatPrice} /> : null}
       </div>
 
       <div className="space-y-3">
@@ -377,12 +378,7 @@ export default function PurchasesOrdersPage() {
         </div>
       </div>
 
-      {loading && (
-        <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
-          <AuthLoadingScreen className="h-24" />
-          <p className="mt-4 text-sm text-gray-600">Загружаем заказы…</p>
-        </div>
-      )}
+      {loading && <SkeletonListCards />}
 
       {error && !loading && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center">

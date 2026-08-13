@@ -10,13 +10,13 @@ import PickupVerifyModal from '../../components/SalesOrders/PickupVerifyModal';
 import ItemConfirmScanModal from '../../components/SalesOrders/ItemConfirmScanModal';
 import OrderPaymentModal from '../../components/SalesOrders/OrderPaymentModal';
 import ConfirmModal from '../../components/ConfirmModal';
-import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import OrderSourceBadge from '../../components/Orders/OrderSourceBadge';
 import {
   warehousePageClass,
   warehousePillControlClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
+import { Skeleton, SkeletonHeaderStats, SkeletonListCards } from '../../components/UI';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
 import {
   getAvitoBuyerAndDelivery,
@@ -1286,9 +1286,16 @@ export default function SalesOrdersPage() {
       <div className="space-y-3">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Заказы</h1>
-          {!loading && !error ? <OrdersHeaderStats stats={stats} formatPrice={formatPrice} /> : null}
+          {loading ? <SkeletonHeaderStats /> : !error ? <OrdersHeaderStats stats={stats} formatPrice={formatPrice} /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-3" aria-label="Источники заказов">
+          {loading ? (
+            <>
+              <Skeleton className="h-5 w-20 rounded-full" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </>
+          ) : (
+            <>
           <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
             <OrderSourceBadge source="used" size="sm" />
             <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
@@ -1310,6 +1317,8 @@ export default function SalesOrdersPage() {
                 {sourceCounts.avito}
               </span>
             </span>
+          )}
+            </>
           )}
         </div>
       </div>
@@ -1351,12 +1360,7 @@ export default function SalesOrdersPage() {
         </div>
       </div>
 
-      {loading && (
-        <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
-          <AuthLoadingScreen className="h-24" />
-          <p className="mt-4 text-sm text-gray-600">Загружаем заказы…</p>
-        </div>
-      )}
+      {loading && <SkeletonListCards />}
 
       {error && !loading && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center">

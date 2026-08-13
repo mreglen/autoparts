@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { SkeletonListCards } from '../../components/UI';
 import { subscribeToPushNotifications } from '../../redux/slices/ChatSlice';
 import { fetchSalesMenuCounts } from '../../redux/slices/SalesMenuCountsSlice';
 import {
@@ -242,37 +243,42 @@ export default function SalesReturnsPage() {
         <p className="mt-1 text-sm text-gray-600">Заявки покупателей и возвраты Avito</p>
       </div>
 
-      {loading && <AuthLoadingScreen />}
       {error && <p className="text-red-600">{error}</p>}
 
-      <section>
-        <h2 className="text-lg font-bold text-gray-900 mb-3">Заявки с сайта</h2>
-        {(!loading && siteReturns.length === 0) && (
-          <p className="text-sm text-gray-500">Нет заявок на возврат</p>
-        )}
-        <div className="space-y-4">
-          {siteReturns.map((item) => (
-            <SiteReturnCard key={item.id} item={item} onStatusChange={handleStatusChange} />
-          ))}
-        </div>
-      </section>
+      {loading ? (
+        <SkeletonListCards count={3} />
+      ) : (
+        <>
+          <section>
+            <h2 className="text-lg font-bold text-gray-900 mb-3">Заявки с сайта</h2>
+            {siteReturns.length === 0 && (
+              <p className="text-sm text-gray-500">Нет заявок на возврат</p>
+            )}
+            <div className="space-y-4">
+              {siteReturns.map((item) => (
+                <SiteReturnCard key={item.id} item={item} onStatusChange={handleStatusChange} />
+              ))}
+            </div>
+          </section>
 
-      <section>
-        <h2 className="text-lg font-bold text-gray-900 mb-3">Avito</h2>
-        {(!loading && avitoReturns.length === 0) && (
-          <p className="text-sm text-gray-500">Нет заказов Avito в статусе возврата</p>
-        )}
-        <div className="space-y-4">
-          {avitoReturns.map((order) => (
-            <AvitoReturnCard
-              key={order.id}
-              order={order}
-              onAcceptReturn={handleAvitoAccept}
-              onTransition={handleAvitoTransition}
-            />
-          ))}
-        </div>
-      </section>
+          <section>
+            <h2 className="text-lg font-bold text-gray-900 mb-3">Avito</h2>
+            {avitoReturns.length === 0 && (
+              <p className="text-sm text-gray-500">Нет заказов Avito в статусе возврата</p>
+            )}
+            <div className="space-y-4">
+              {avitoReturns.map((order) => (
+                <AvitoReturnCard
+                  key={order.id}
+                  order={order}
+                  onAcceptReturn={handleAvitoAccept}
+                  onTransition={handleAvitoTransition}
+                />
+              ))}
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }
