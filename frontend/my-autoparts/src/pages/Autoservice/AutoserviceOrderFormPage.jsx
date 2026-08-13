@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
-import { apiAxios, apiRequest } from '../../utils/apiClient';
+import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { parseServerDate } from '../../utils/serverDate';
 import {
@@ -15,13 +15,24 @@ import {
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
-import { getRosskoMinPrice, getRosskoParts } from '../AutoParts/NewParts/rosskoHelpers';
-import { truncateRubles } from '../AutoParts/NewParts/newPartStockUtils';
+import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItemsPickerModal';
+import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import {
-  DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
-  fetchPublicSiteConfig,
-} from '../../redux/slices/PublicInfoSlice';
+  clearRepairOrderPurchaseDraft,
+  importPurchaseGroupsToRepairOrder,
+  mapPurchaseItemsToShopParts,
+  readRepairOrderPurchaseDraft,
+  saveLinkedRepairOrder,
+} from '../../utils/repairOrderPurchaseDraft';
+import {
+  isValidShopPartQty,
+  priceWithMarkup,
+  shopLineSum,
+  shopPartDisplayName,
+  shopPartPricingOptions,
+} from '../../utils/repairOrderShopPartUtils';
 
 const pillInputClass =
   'mt-1 block h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
@@ -69,22 +80,6 @@ function lineSum(qty, unitPrice) {
   return Math.round(q * p * 100) / 100;
 }
 
-function priceWithMarkup(unitPrice, markupPercent, { floorRubles = false } = {}) {
-  const value = (Number(unitPrice) || 0) * (1 + (Number(markupPercent) || 0) / 100);
-  if (floorRubles) return truncateRubles(value);
-  return Math.round(value * 100) / 100;
-}
-
-function shopLineSum(qty, unitPrice, markupPercent, options = {}) {
-  const unit = priceWithMarkup(unitPrice, markupPercent, options);
-  const total = (Number(qty) || 0) * unit;
-  return options.floorRubles ? truncateRubles(total) : Math.round(total * 100) / 100;
-}
-
-function shopPartPricingOptions(part) {
-  return { floorRubles: part?.source === 'rossko' };
-}
-
 function vehicleLabel(v) {
   if (!v) return '—';
   const parts = [v.make, v.model, v.year].filter(Boolean);
@@ -121,21 +116,29 @@ function workPayAmount(qty, unitPrice, percent) {
 }
 
 function emptyClientPart() {
-  return { title: '', qty: 1 };
+  return { title: '', qty: '', unit: 'pcs' };
 }
 
-function emptyShopPart(overrides = {}, defaultMarkupPercent = DEFAULT_AUTOSERVICE_MARKUP_PERCENT) {
+function emptyShopPart(overrides = {}, defaultMarkupPercent = 0) {
   return {
     title: '',
+    brand: '',
+    partnumber: '',
     qty: 1,
+    unit: 'pcs',
     unit_price: '0',
     markup_percent: String(defaultMarkupPercent),
+    client_unit_price_override: '',
     source: 'manual',
     product_id: null,
     rossko_brand: '',
     rossko_partnumber: '',
     ...overrides,
   };
+}
+
+function shopPartLineValue(part) {
+  return shopPartDisplayName(part) === '—' ? (part?.title || '') : shopPartDisplayName(part);
 }
 
 function moveItem(list, index, delta) {
@@ -625,18 +628,31 @@ function mapOrderToFormState(order) {
       ? order.client_parts.map((p) => ({
           title: p.title || '',
           qty: p.qty || 1,
+          unit: p.unit || 'pcs',
         }))
       : [],
     shopParts: (order?.shop_parts || []).length
       ? order.shop_parts.map((p) => ({
+          id: p.id,
           title: p.title || '',
-          qty: p.qty || 1,
+          brand: p.brand || p.rossko_brand || '',
+          partnumber: p.partnumber || p.rossko_partnumber || '',
+          qty: (() => {
+            const n = Number(p.qty ?? 1);
+            if (Number.isNaN(n)) return 1;
+            return (p.unit || 'pcs') === 'pcs' ? Math.round(n) : Number(n);
+          })(),
+          unit: p.unit || 'pcs',
           unit_price: String(p.unit_price ?? '0'),
-          markup_percent: String(p.markup_percent ?? DEFAULT_AUTOSERVICE_MARKUP_PERCENT),
+          markup_percent: String(p.markup_percent ?? 0),
+          client_unit_price_override: p.client_unit_price_override == null
+            ? ''
+            : String(p.client_unit_price_override),
           source: p.source || 'manual',
           product_id: p.product_id || null,
           rossko_brand: p.rossko_brand || '',
           rossko_partnumber: p.rossko_partnumber || '',
+          is_imported: Boolean(p.is_imported),
         }))
       : [],
   };
@@ -650,14 +666,15 @@ export default function AutoserviceOrderFormPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const dispatch = useDispatch();
   const { isReady, isAuthenticated, user } = useAuthReady();
-  const autoserviceMarkupPercent = useSelector(
-    (state) => state.publicInfo.autoserviceMarkupPercent ?? DEFAULT_AUTOSERVICE_MARKUP_PERCENT
+  const storedClientMarkupPercent = useSelector(
+    (state) => Number(state.clientMarkup.percent) || 0,
   );
+  const clientMarkupEnabled = canUseClientMarkup(user);
+  const clientMarkupPercent = clientMarkupEnabled ? storedClientMarkupPercent : 0;
   const makeEmptyShopPart = useCallback(
-    (overrides = {}) => emptyShopPart(overrides, autoserviceMarkupPercent),
-    [autoserviceMarkupPercent]
+    (overrides = {}) => emptyShopPart(overrides, clientMarkupPercent),
+    [clientMarkupPercent]
   );
 
   const isCreate = location.pathname.endsWith('/new');
@@ -685,23 +702,20 @@ export default function AutoserviceOrderFormPage() {
   const [works, setWorks] = useState([]);
   const [clientParts, setClientParts] = useState([]);
   const [shopParts, setShopParts] = useState([]);
+  const [pendingPurchaseGroups, setPendingPurchaseGroups] = useState([]);
+  const [shopPartAddMenuOpen, setShopPartAddMenuOpen] = useState(false);
+  const [purchasePickerOpen, setPurchasePickerOpen] = useState(false);
 
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
   const [vehiclesError, setVehiclesError] = useState('');
-
-  const [bulkMarkup, setBulkMarkup] = useState('');
-  const [picker, setPicker] = useState(null);
-  const [pickerQuery, setPickerQuery] = useState('');
-  const [pickerResults, setPickerResults] = useState([]);
-  const [pickerLoading, setPickerLoading] = useState(false);
-  const [pickerError, setPickerError] = useState('');
 
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const plannerPrefillRef = useRef(location.state);
+  const createInitRef = useRef(false);
 
   const applyFormState = useCallback((state) => {
     setClientId(state.clientId);
@@ -759,15 +773,12 @@ export default function AutoserviceOrderFormPage() {
   }, [orderId, applyFormState]);
 
   useEffect(() => {
-    dispatch(fetchPublicSiteConfig(true));
-  }, [dispatch]);
-
-  useEffect(() => {
     if (isReady && isAuthenticated) {
       loadMeta();
       if (isEdit) {
         loadOrder();
-      } else if (isCreate) {
+      } else if (isCreate && !createInitRef.current) {
+        createInitRef.current = true;
         const prefill = plannerPrefillRef.current || {};
         const initial = emptyFormState();
         if (prefill.scheduledAtLocal) {
@@ -778,11 +789,18 @@ export default function AutoserviceOrderFormPage() {
         if (prefill.workZoneId != null) {
           initial.workZoneId = String(prefill.workZoneId);
         }
+        const draft = readRepairOrderPurchaseDraft();
+        if (draft?.groups?.length) {
+          setPendingPurchaseGroups(draft.groups);
+          initial.shopParts = draft.groups.flatMap((group) => (
+            mapPurchaseItemsToShopParts(group.items, clientMarkupPercent)
+          ));
+        }
         applyFormState(initial);
         setFormInitialized(true);
       }
     }
-  }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState]);
+  }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState, clientMarkupPercent]);
 
   useEffect(() => {
     if (!isCreate || !formInitialized || metaLoading || clients.length === 0) return;
@@ -884,13 +902,6 @@ export default function AutoserviceOrderFormPage() {
 
   const grandTotal = worksTotal + shopPartsTotal;
 
-  const bulkMarkupDisplay = useMemo(() => {
-    if (shopParts.length === 0) return '';
-    const values = shopParts.map((p) => String(Number(p.markup_percent)));
-    const unique = [...new Set(values)];
-    return unique.length === 1 ? unique[0] : '';
-  }, [shopParts]);
-
   const handleClientCreated = async (row) => {
     await loadClients();
     if (row?.id) setClientId(String(row.id));
@@ -966,92 +977,60 @@ export default function AutoserviceOrderFormPage() {
     setShopParts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
 
-  const applyBulkMarkup = (value) => {
-    setBulkMarkup(value);
-    if (value === '' || Number.isNaN(Number(value)) || Number(value) < 0) return;
-    setShopParts((prev) => prev.map((p) => ({ ...p, markup_percent: String(value) })));
+  const addShopPart = () => {
+    setShopParts((prev) => [...prev, makeEmptyShopPart()]);
   };
 
-  const openPicker = (kind) => {
-    setPicker(kind);
-    setPickerQuery('');
-    setPickerResults([]);
-    setPickerError('');
+  const applyShopPartsMarkup = (percent) => {
+    setShopParts((prev) => prev.map((part) => ({
+      ...part,
+      markup_percent: String(percent),
+    })));
   };
 
-  const runWarehouseSearch = async () => {
-    setPickerLoading(true);
-    setPickerError('');
-    try {
-      const data = await apiRequest(
-        `/autoservice/repair-orders/warehouse-products?q=${encodeURIComponent(pickerQuery.trim())}`,
-      );
-      setPickerResults(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setPickerError(err?.message || 'Ошибка поиска склада');
-      setPickerResults([]);
-    } finally {
-      setPickerLoading(false);
-    }
-  };
-
-  const runRosskoSearch = async () => {
-    const text = pickerQuery.trim();
-    if (!text) {
-      setPickerError('Введите артикул или название');
+  const handlePurchaseGroupsConfirm = async (groups) => {
+    if (!groups?.length) return;
+    if (isEdit && orderId) {
+      setError('');
+      try {
+        const updated = await importPurchaseGroupsToRepairOrder(
+          apiRequest,
+          orderId,
+          groups,
+          clientMarkupPercent,
+        );
+        applyFormState(mapOrderToFormState(updated));
+        saveLinkedRepairOrder(updated);
+      } catch (err) {
+        setError(err?.message || 'Не удалось импортировать позиции из заказов');
+      }
       return;
     }
-    setPickerLoading(true);
-    setPickerError('');
-    try {
-      const response = await apiAxios.post('/rossko/GetSearch', {
-        text,
-        delivery_id: '000000001',
-        address_id: 176458,
+    setPendingPurchaseGroups((prev) => {
+      const merged = [...prev];
+      groups.forEach((group) => {
+        const existing = merged.find((entry) => entry.orderType === group.orderType);
+        if (existing) {
+          group.itemIds.forEach((itemId, index) => {
+            if (!existing.itemIds.includes(itemId)) {
+              existing.itemIds.push(itemId);
+              existing.items.push(group.items[index]);
+            }
+          });
+        } else {
+          merged.push({
+            orderType: group.orderType,
+            itemIds: [...group.itemIds],
+            items: [...group.items],
+          });
+        }
       });
-      const parts = getRosskoParts(response.data).slice(0, 20).map((part) => ({
-        brand: part.brand || '',
-        partnumber: part.partnumber || '',
-        name: part.name || part.guid || '',
-        price: truncateRubles(getRosskoMinPrice(part)),
-      }));
-      setPickerResults(parts);
-    } catch (err) {
-      setPickerError(err?.response?.data?.detail || err?.message || 'Ошибка поиска Rossko');
-      setPickerResults([]);
-    } finally {
-      setPickerLoading(false);
-    }
-  };
-
-  const pickWarehouse = (item) => {
-    setShopParts((prev) => [
-      ...prev,
-      makeEmptyShopPart({
-        title: item.title || '',
-        unit_price: String(item.price ?? 0),
-        source: 'warehouse',
-        product_id: item.id,
-      }),
-    ]);
-    setPicker(null);
-  };
-
-  const pickRossko = (item) => {
-    const title = [item.brand, item.partnumber, item.name].filter(Boolean).join(' ').trim()
-      || item.partnumber
-      || 'Rossko';
-    setShopParts((prev) => [
-      ...prev,
-      makeEmptyShopPart({
-        title: title.slice(0, 255),
-        unit_price: String(truncateRubles(item.price ?? 0)),
-        source: 'rossko',
-        rossko_brand: item.brand || '',
-        rossko_partnumber: item.partnumber || '',
-      }),
-    ]);
-    setPicker(null);
+      return merged;
+    });
+    const previewParts = groups.flatMap((group) => (
+      mapPurchaseItemsToShopParts(group.items, clientMarkupPercent)
+    ));
+    setShopParts((prev) => [...prev, ...previewParts]);
   };
 
   const goBack = () => {
@@ -1082,17 +1061,28 @@ export default function AutoserviceOrderFormPage() {
     client_parts: clientParts.map((p) => ({
       title: p.title.trim(),
       qty: Number(p.qty),
+      unit: p.unit || 'pcs',
     })),
-    shop_parts: shopParts.map((p) => ({
-      title: p.title.trim(),
-      qty: Number(p.qty),
-      unit_price: Number(p.unit_price),
-      markup_percent: Number(p.markup_percent),
-      source: p.source || 'manual',
-      product_id: p.source === 'warehouse' ? p.product_id : null,
-      rossko_brand: p.source === 'rossko' ? (p.rossko_brand || null) : null,
-      rossko_partnumber: p.source === 'rossko' ? (p.rossko_partnumber || null) : null,
-    })),
+    shop_parts: shopParts
+      .filter((p) => !p.pending_import)
+      .map((p) => ({
+        ...(p.id ? { id: p.id } : {}),
+        title: p.title.trim(),
+        brand: (p.brand || p.rossko_brand || '').trim() || null,
+        partnumber: (p.partnumber || p.rossko_partnumber || '').trim() || null,
+        qty: Number(p.qty),
+        unit: p.unit || 'pcs',
+        unit_price: Number(p.unit_price),
+        markup_percent: Number(p.markup_percent),
+        client_unit_price_override: p.client_unit_price_override === ''
+          || p.client_unit_price_override == null
+          ? null
+          : Number(p.client_unit_price_override),
+        source: p.source || 'manual',
+        product_id: p.source === 'warehouse' ? p.product_id : null,
+        rossko_brand: p.source === 'rossko' ? (p.rossko_brand || p.brand || null) : null,
+        rossko_partnumber: p.source === 'rossko' ? (p.rossko_partnumber || p.partnumber || null) : null,
+      })),
   });
 
   const validateForm = () => {
@@ -1121,9 +1111,22 @@ export default function AutoserviceOrderFormPage() {
       }
     }
     for (const p of shopParts) {
-      if (!String(p.title || '').trim()) return 'У каждой запчасти исполнителя должно быть название';
-      if (!Number.isInteger(Number(p.qty)) || Number(p.qty) < 1) {
-        return 'Количество ЗЧ исполнителя должно быть целым числом ≥ 1';
+      if (
+        p.client_unit_price_override !== ''
+        && p.client_unit_price_override != null
+        && (Number.isNaN(Number(p.client_unit_price_override))
+          || Number(p.client_unit_price_override) < 0)
+      ) {
+        return 'Итоговая цена ЗЧ исполнителя должна быть ≥ 0';
+      }
+      if (p.pending_import) continue;
+      if (!String(p.title || '').trim() && !String(p.brand || '').trim()) {
+        return 'У каждой запчасти исполнителя должно быть наименование';
+      }
+      if (!isValidShopPartQty(p.qty, p.unit || 'pcs')) {
+        return p.unit === 'pcs'
+          ? 'Количество ЗЧ исполнителя должно быть целым числом ≥ 1'
+          : 'Количество ЗЧ исполнителя должно быть ≥ 0,001';
       }
       if (Number.isNaN(Number(p.unit_price)) || Number(p.unit_price) < 0) {
         return 'Цена ЗЧ исполнителя должна быть ≥ 0';
@@ -1146,18 +1149,64 @@ export default function AutoserviceOrderFormPage() {
     setSaving(true);
     try {
       const body = buildPayload();
+      const groupsToImport = isCreate
+        ? pendingPurchaseGroups
+          .map((group) => {
+            const itemIds = group.itemIds.filter((itemId) => shopParts.some(
+              (part) => part.pending_import
+                && part.purchase_item_id === itemId
+                && part.purchase_order_type === group.orderType,
+            ));
+            const items = group.items.filter((item) => itemIds.includes(item.id));
+            return { ...group, itemIds, items };
+          })
+          .filter((group) => group.itemIds.length > 0)
+        : [];
       if (isEdit) {
         await apiRequest(`/autoservice/repair-orders/${orderId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
+        navigate('/autoservice/orders');
       } else {
-        await apiRequest('/autoservice/repair-orders', {
+        const created = await apiRequest('/autoservice/repair-orders', {
           method: 'POST',
           body: JSON.stringify(body),
         });
+        if (created?.id && groupsToImport.length) {
+          saveLinkedRepairOrder(created);
+          try {
+            const itemPriceOverrides = Object.fromEntries(
+              shopParts
+                .filter((part) => (
+                  part.pending_import
+                  && part.purchase_item_id
+                  && part.client_unit_price_override !== ''
+                  && part.client_unit_price_override != null
+                ))
+                .map((part) => [
+                  part.purchase_item_id,
+                  Number(part.client_unit_price_override),
+                ]),
+            );
+            const updated = await importPurchaseGroupsToRepairOrder(
+              apiRequest,
+              created.id,
+              groupsToImport,
+              clientMarkupPercent,
+              itemPriceOverrides,
+            );
+            saveLinkedRepairOrder(updated || created);
+          } catch (importErr) {
+            setError(importErr?.message || 'Заказ-наряд создан, но импорт из заказов не удался');
+            clearRepairOrderPurchaseDraft();
+            navigate(`/autoservice/orders/${created.id}/edit`);
+            return;
+          }
+          clearRepairOrderPurchaseDraft();
+        }
+        navigate('/autoservice/orders');
       }
-      navigate('/autoservice/orders');
     } catch (err) {
       setError(err?.message || 'Не удалось сохранить');
     } finally {
@@ -1498,6 +1547,15 @@ export default function AutoserviceOrderFormPage() {
                       value={p.qty}
                       onChange={(e) => updatePart(index, { qty: e.target.value })}
                     />
+                    <select
+                      className={`w-20 shrink-0 ${pillSelectSmClass}`}
+                      value={p.unit || 'pcs'}
+                      onChange={(e) => updatePart(index, { unit: e.target.value })}
+                    >
+                      <option value="pcs">шт.</option>
+                      <option value="l">л</option>
+                      <option value="kg">кг</option>
+                    </select>
                   </div>
                 </div>
               ))}
@@ -1505,193 +1563,146 @@ export default function AutoserviceOrderFormPage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Запчасти исполнителя">
-          <div className="mb-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setShopParts((prev) => [...prev, makeEmptyShopPart()])}
-              className="inline-flex h-9 items-center rounded-full bg-gray-100 px-4 text-sm font-medium text-ink-soft transition hover:bg-gray-200"
-            >
-              Вручную
+        <SectionCard
+          title="Запчасти исполнителя"
+          action={(
+            <button type="button" onClick={() => setShopPartAddMenuOpen(true)} className={linkActionClass}>
+              + Добавить
             </button>
-            <button
-              type="button"
-              onClick={() => openPicker('warehouse')}
-              className="inline-flex h-9 items-center rounded-full bg-gray-100 px-4 text-sm font-medium text-ink-soft transition hover:bg-gray-200"
-            >
-              Со склада
-            </button>
-            <button
-              type="button"
-              onClick={() => openPicker('rossko')}
-              className="inline-flex h-9 items-center rounded-full bg-gray-100 px-4 text-sm font-medium text-ink-soft transition hover:bg-gray-200"
-            >
-              Из Rossko
-            </button>
-          </div>
-          <div className="mb-4 flex items-end gap-2">
-            <div>
-              <label className="text-xs text-ink-muted">Наценка для всех %</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                className={pillInputSmClass}
-                placeholder={shopParts.length && bulkMarkupDisplay === '' ? '—' : ''}
-                value={bulkMarkup !== '' ? bulkMarkup : bulkMarkupDisplay}
-                onChange={(e) => applyBulkMarkup(e.target.value)}
-              />
-            </div>
-          </div>
-          {picker ? (
-            <div className="mb-4 rounded-sg border border-brand-100 bg-brand-50/50 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-ink">
-                  {picker === 'warehouse' ? 'Поиск по складу' : 'Поиск Rossko'}
-                </p>
-                <button type="button" className="text-xs text-ink-muted hover:text-ink-soft" onClick={() => setPicker(null)}>
-                  Закрыть
-                </button>
-              </div>
-              <div className="mt-2 flex gap-2">
-                <input
-                  className={`${pillInputSmClass} flex-1`}
-                  value={pickerQuery}
-                  onChange={(e) => setPickerQuery(e.target.value)}
-                  placeholder={picker === 'warehouse' ? 'Название / артикул' : 'Артикул'}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (picker === 'warehouse') runWarehouseSearch();
-                      else runRosskoSearch();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={pickerLoading}
-                  onClick={() => (picker === 'warehouse' ? runWarehouseSearch() : runRosskoSearch())}
-                  className={`${btnPrimaryClass} h-9 px-4`}
-                >
-                  {pickerLoading ? '…' : 'Найти'}
-                </button>
-              </div>
-              {pickerError ? <p className="mt-2 text-xs text-danger-600">{pickerError}</p> : null}
-              <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
-                {pickerResults.length === 0 && !pickerLoading ? (
-                  <p className="text-xs text-ink-muted">Нет результатов</p>
-                ) : (
-                  pickerResults.map((item, idx) => (
-                    <button
-                      key={item.id || `${item.brand}-${item.partnumber}-${idx}`}
-                      type="button"
-                      className="block w-full rounded-full border border-line bg-surface px-3 py-2 text-left text-xs text-ink-soft transition hover:border-brand-300 hover:bg-brand-50"
-                      onClick={() => (picker === 'warehouse' ? pickWarehouse(item) : pickRossko(item))}
-                    >
-                      {picker === 'warehouse' ? (
-                        <>
-                          <span className="font-medium">{item.title}</span>
-                          {' · '}
-                          {formatMoney(item.price)} ₽
-                          {item.article ? ` · ${item.article}` : ''}
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-medium">
-                            {item.brand} {item.partnumber}
-                          </span>
-                          {item.name ? ` — ${item.name}` : ''}
-                          {' · '}
-                          {formatMoney(item.price)} ₽
-                        </>
-                      )}
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          ) : null}
-          {shopParts.length === 0 ? (
-            <p className="text-sm text-ink-muted">Пока нет запчастей исполнителя</p>
-          ) : (
-            <div className="space-y-3">
-              {shopParts.map((p, index) => (
-                <div key={index} className={lineItemClass}>
-                  <div className="mb-2 flex items-center justify-between text-xs text-ink-muted">
-                    <span>
-                      № {index + 1}
-                      {p.source && p.source !== 'manual' ? ` · ${p.source}` : ''}
-                    </span>
-                    <div className="flex gap-1">
-                      <button type="button" className={rowActionBtnClass} onClick={() => setShopParts((prev) => moveItem(prev, index, -1))}>
-                        ↑
-                      </button>
-                      <button type="button" className={rowActionBtnClass} onClick={() => setShopParts((prev) => moveItem(prev, index, 1))}>
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-danger-600 hover:text-danger-700"
-                        onClick={() => setShopParts((prev) => prev.filter((_, i) => i !== index))}
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <input
-                        className={pillInputSmClass}
-                        placeholder="Название"
-                        value={p.title}
-                        onChange={(e) => updateShopPart(index, { title: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-ink-muted">Кол-во</label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        className={pillInputSmClass}
-                        value={p.qty}
-                        onChange={(e) => updateShopPart(index, { qty: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-ink-muted">Цена</label>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        className={pillInputSmClass}
-                        value={p.unit_price}
-                        onChange={(e) => updateShopPart(index, { unit_price: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-ink-muted">Наценка %</label>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        className={pillInputSmClass}
-                        value={p.markup_percent}
-                        onChange={(e) => updateShopPart(index, { markup_percent: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-ink-muted">Цена с наценкой / сумма</label>
-                      <p className="mt-1 text-sm text-ink-soft">
-                        {formatMoney(priceWithMarkup(p.unit_price, p.markup_percent, shopPartPricingOptions(p)))} ₽ ·{' '}
-                        {formatMoney(shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p)))} ₽
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           )}
+        >
+          <div className="overflow-x-auto rounded-sg border border-line">
+            <table className="min-w-[820px] w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-line bg-surface-muted/60 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                  <th className="w-10 px-2 py-2.5">№</th>
+                  <th className="min-w-[22rem] w-[45%] px-2 py-2.5">Наименование</th>
+                  <th className="w-20 px-2 py-2.5">Кол-во</th>
+                  <th className="w-16 px-2 py-2.5">Ед.</th>
+                  <th className="w-28 px-2 py-2.5">
+                    <span className="inline-flex items-center gap-1.5">
+                      {clientMarkupEnabled ? (
+                        <ClientMarkupPopover onApply={applyShopPartsMarkup} />
+                      ) : null}
+                      <span>Цена</span>
+                    </span>
+                  </th>
+                  <th className="w-24 px-2 py-2.5 text-right">Сумма</th>
+                  <th className="w-10 px-2 py-2.5" aria-hidden />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {shopParts.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-6 text-center text-sm text-ink-muted">
+                      Пока нет запчастей исполнителя
+                    </td>
+                  </tr>
+                ) : (
+                  shopParts.map((p, index) => {
+                    const pricingOptions = shopPartPricingOptions(p);
+                    const automaticClientUnit = priceWithMarkup(
+                      p.unit_price,
+                      p.markup_percent,
+                      { ...pricingOptions, clientUnitPriceOverride: null },
+                    );
+                    const lineTotal = shopLineSum(p.qty, p.unit_price, p.markup_percent, pricingOptions);
+                    const qtyStep = p.unit === 'pcs' ? 1 : 0.001;
+                    const qtyMin = p.unit === 'pcs' ? 1 : 0.001;
+                    const isImported = Boolean(p.is_imported || p.pending_import);
+                    const qtyValue = (p.unit || 'pcs') === 'pcs'
+                      ? (Number.isFinite(Number(p.qty)) ? Math.round(Number(p.qty)) : '')
+                      : p.qty;
+                    const inputClass = `${pillInputSmClass}${isImported ? ' cursor-not-allowed opacity-80' : ''}`;
+                    const selectClass = `${pillSelectSmClass}${isImported ? ' cursor-not-allowed opacity-80' : ''}`;
+                    return (
+                      <tr key={p.id || `shop-part-${index}`} className="align-top">
+                        <td className="px-2 py-2.5 tabular-nums text-ink-muted">{index + 1}</td>
+                        <td className="px-2 py-2.5">
+                          <input
+                            className={`w-full min-w-[18rem] ${inputClass}`}
+                            placeholder="Бренд, артикул, наименование"
+                            value={shopPartLineValue(p)}
+                            readOnly={isImported}
+                            disabled={isImported}
+                            onChange={(e) => updateShopPart(index, {
+                              title: e.target.value,
+                              brand: '',
+                              partnumber: '',
+                              rossko_brand: '',
+                              rossko_partnumber: '',
+                            })}
+                          />
+                        </td>
+                        <td className="px-2 py-2.5">
+                          <input
+                            type="number"
+                            min={qtyMin}
+                            step={qtyStep}
+                            className={`w-full min-w-[4rem] ${inputClass}`}
+                            value={qtyValue}
+                            readOnly={isImported}
+                            disabled={isImported}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if ((p.unit || 'pcs') === 'pcs') {
+                                updateShopPart(index, {
+                                  qty: raw === '' ? '' : Math.round(Number(raw) || 0),
+                                });
+                              } else {
+                                updateShopPart(index, { qty: raw });
+                              }
+                            }}
+                          />
+                        </td>
+                        <td className="px-2 py-2.5">
+                          <select
+                            className={`w-full min-w-[3.5rem] ${selectClass}`}
+                            value={p.unit || 'pcs'}
+                            disabled={isImported}
+                            onChange={(e) => updateShopPart(index, { unit: e.target.value })}
+                          >
+                            <option value="pcs">шт.</option>
+                            <option value="l">л</option>
+                            <option value="kg">кг</option>
+                          </select>
+                        </td>
+                        <td className="px-2 py-2.5">
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className={`w-full min-w-[5rem] ${pillInputSmClass}`}
+                            value={p.client_unit_price_override ?? ''}
+                            placeholder={formatMoney(automaticClientUnit)}
+                            aria-label="Итоговая клиентская цена"
+                            onChange={(e) => updateShopPart(index, {
+                              client_unit_price_override: e.target.value,
+                            })}
+                          />
+                        </td>
+                        <td className="px-2 py-2.5 text-right tabular-nums font-medium text-ink whitespace-nowrap">
+                          {formatMoney(lineTotal)} ₽
+                        </td>
+                        <td className="px-2 py-2.5">
+                          {!isImported ? (
+                            <button
+                              type="button"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-muted transition hover:bg-danger-50 hover:text-danger-600"
+                              aria-label="Удалить"
+                              onClick={() => setShopParts((prev) => prev.filter((_, i) => i !== index))}
+                            >
+                              ×
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
           <p className="mt-3 text-sm font-medium text-ink">
             Итого ЗЧ исполнителя: {formatMoney(shopPartsTotal)} ₽
           </p>
@@ -1736,6 +1747,42 @@ export default function AutoserviceOrderFormPage() {
           onCreated={handleVehicleCreated}
         />
       ) : null}
+
+      {shopPartAddMenuOpen ? (
+        <Modal
+          title="Добавить запчасть исполнителя"
+          onClose={() => setShopPartAddMenuOpen(false)}
+        >
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              className={`${btnSecondaryClass} w-full`}
+              onClick={() => {
+                setShopPartAddMenuOpen(false);
+                setPurchasePickerOpen(true);
+              }}
+            >
+              Из оформленных заказов
+            </button>
+            <button
+              type="button"
+              className={`${btnPrimaryClass} w-full`}
+              onClick={() => {
+                setShopPartAddMenuOpen(false);
+                addShopPart();
+              }}
+            >
+              Добавить вручную
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+
+      <PurchaseItemsPickerModal
+        open={purchasePickerOpen}
+        onClose={() => setPurchasePickerOpen(false)}
+        onConfirm={handlePurchaseGroupsConfirm}
+      />
     </div>
     </div>
   );

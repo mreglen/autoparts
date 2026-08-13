@@ -4219,7 +4219,8 @@ def ensure_repair_order_lines_tables() -> None:
                             order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
                             position INTEGER NOT NULL DEFAULT 1,
                             title VARCHAR(255) NOT NULL,
-                            qty INTEGER NOT NULL DEFAULT 1
+                            qty INTEGER NOT NULL DEFAULT 1,
+                            unit VARCHAR(16) NOT NULL DEFAULT 'pcs'
                         )
                         """
                     )
@@ -4233,7 +4234,8 @@ def ensure_repair_order_lines_tables() -> None:
                             order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
                             position INTEGER NOT NULL DEFAULT 1,
                             title VARCHAR(255) NOT NULL,
-                            qty INTEGER NOT NULL DEFAULT 1
+                            qty INTEGER NOT NULL DEFAULT 1,
+                            unit VARCHAR(16) NOT NULL DEFAULT 'pcs'
                         )
                         """
                     )
@@ -4267,13 +4269,19 @@ def ensure_repair_order_shop_parts_table() -> None:
             order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
             position INTEGER NOT NULL DEFAULT 1,
             title VARCHAR(255) NOT NULL,
-            qty INTEGER NOT NULL DEFAULT 1,
+            qty NUMERIC(12, 3) NOT NULL DEFAULT 1,
+            unit VARCHAR(16) NOT NULL DEFAULT 'pcs',
             unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
             markup_percent NUMERIC(6, 2) NOT NULL DEFAULT 5,
+            client_unit_price_override NUMERIC(12, 2),
             source VARCHAR(32) NOT NULL DEFAULT 'manual',
             product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+            brand VARCHAR(120),
+            partnumber VARCHAR(120),
             rossko_brand VARCHAR(120),
-            rossko_partnumber VARCHAR(120)
+            rossko_partnumber VARCHAR(120),
+            cart_item_type VARCHAR(16),
+            cart_item_id INTEGER
         )
         """
     else:
@@ -4283,13 +4291,19 @@ def ensure_repair_order_shop_parts_table() -> None:
             order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
             position INTEGER NOT NULL DEFAULT 1,
             title VARCHAR(255) NOT NULL,
-            qty INTEGER NOT NULL DEFAULT 1,
+            qty NUMERIC(12, 3) NOT NULL DEFAULT 1,
+            unit VARCHAR(16) NOT NULL DEFAULT 'pcs',
             unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
             markup_percent NUMERIC(6, 2) NOT NULL DEFAULT 5,
+            client_unit_price_override NUMERIC(12, 2),
             source VARCHAR(32) NOT NULL DEFAULT 'manual',
             product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+            brand VARCHAR(120),
+            partnumber VARCHAR(120),
             rossko_brand VARCHAR(120),
-            rossko_partnumber VARCHAR(120)
+            rossko_partnumber VARCHAR(120),
+            cart_item_type VARCHAR(16),
+            cart_item_id INTEGER
         )
         """
 
@@ -4306,6 +4320,84 @@ def ensure_repair_order_shop_parts_table() -> None:
             pass
 
     logger.info("Applied repair_order_shop_parts table patch")
+
+
+def ensure_repair_order_shop_parts_extended() -> None:
+    """Extend repair_order_shop_parts: unit, decimal qty, brand/article, cart provenance."""
+    inspector = inspect(engine)
+    if "repair_order_shop_parts" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"]: col for col in inspector.get_columns("repair_order_shop_parts")}
+    statements: list[str] = []
+
+    if "unit" not in columns:
+        statements.append(
+            "ALTER TABLE repair_order_shop_parts ADD COLUMN unit VARCHAR(16) NOT NULL DEFAULT 'pcs'"
+        )
+    if "brand" not in columns:
+        statements.append("ALTER TABLE repair_order_shop_parts ADD COLUMN brand VARCHAR(120)")
+    if "partnumber" not in columns:
+        statements.append("ALTER TABLE repair_order_shop_parts ADD COLUMN partnumber VARCHAR(120)")
+    if "cart_item_type" not in columns:
+        statements.append("ALTER TABLE repair_order_shop_parts ADD COLUMN cart_item_type VARCHAR(16)")
+    if "cart_item_id" not in columns:
+        statements.append("ALTER TABLE repair_order_shop_parts ADD COLUMN cart_item_id INTEGER")
+    if "client_unit_price_override" not in columns:
+        statements.append(
+            "ALTER TABLE repair_order_shop_parts "
+            "ADD COLUMN client_unit_price_override NUMERIC(12,2)"
+        )
+
+    if engine.dialect.name == "postgresql" and "qty" in columns:
+        qty_type = str(columns["qty"]["type"]).upper()
+        if "INT" in qty_type and "NUMERIC" not in qty_type:
+            statements.append(
+                "ALTER TABLE repair_order_shop_parts "
+                "ALTER COLUMN qty TYPE NUMERIC(12,3) USING qty::numeric"
+            )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        conn.execute(
+            text(
+                "UPDATE repair_order_shop_parts SET unit = 'pcs' "
+                "WHERE unit IS NULL OR unit = ''"
+            )
+        )
+
+    logger.info("Applied repair_order_shop_parts extended patch")
+
+
+def ensure_repair_order_client_parts_unit() -> None:
+    """Add unit column to repair_order_client_parts."""
+    inspector = inspect(engine)
+    if "repair_order_client_parts" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("repair_order_client_parts")}
+    if "unit" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE repair_order_client_parts "
+                "ADD COLUMN unit VARCHAR(16) NOT NULL DEFAULT 'pcs'"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE repair_order_client_parts SET unit = 'pcs' "
+                "WHERE unit IS NULL OR unit = ''"
+            )
+        )
+
+    logger.info("Applied repair_order_client_parts unit patch")
 
 
 def ensure_repair_order_stage10() -> None:

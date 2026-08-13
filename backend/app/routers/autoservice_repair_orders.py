@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
@@ -33,6 +33,7 @@ from app.schemas.repair_order import (
     RepairOrderClientShopPartView,
     RepairOrderClientView,
     RepairOrderClientWorkView,
+    RepairOrderPurchaseImportIn,
     RepairOrderCreate,
     RepairOrderWorkZoneBrief,
     RepairOrderWorkZonesMeta,
@@ -60,6 +61,11 @@ from app.utils.autoservice_access import (
 )
 from app.utils.repair_order_number import allocate_repair_order_number
 from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
+from app.services.repair_order_cart_import import shop_part_display_name
+from app.services.repair_order_purchase_import import (
+    append_purchase_items_to_repair_order,
+    shop_part_is_imported,
+)
 from app.services.autoservice_work_zone_helpers import (
     normalize_dt as _normalize_dt,
     validate_work_zone_id as _validate_work_zone_id,
@@ -69,10 +75,15 @@ from app.services.autoservice_work_zone_helpers import (
 router = APIRouter(tags=["Autoservice repair orders"])
 
 _TWOPLACES = Decimal("0.01")
+_THREEPLACES = Decimal("0.001")
 
 
 def _money(value: Decimal | int | float | str) -> Decimal:
     return Decimal(str(value)).quantize(_TWOPLACES, rounding=ROUND_HALF_UP)
+
+
+def _qty(value: Decimal | int | float | str) -> Decimal:
+    return Decimal(str(value)).quantize(_THREEPLACES, rounding=ROUND_HALF_UP)
 
 
 def _line_sum(qty: int, unit_price: Decimal | int | float | str) -> Decimal:
@@ -82,18 +93,33 @@ def _line_sum(qty: int, unit_price: Decimal | int | float | str) -> Decimal:
 def _price_with_markup(
     unit_price: Decimal | int | float | str,
     markup_percent: Decimal | int | float | str,
+    *,
+    floor_rubles: bool = False,
 ) -> Decimal:
     price = _money(unit_price)
     markup = Decimal(str(markup_percent))
-    return _money(price * (Decimal("1") + markup / Decimal("100")))
+    result = price * (Decimal("1") + markup / Decimal("100"))
+    if floor_rubles:
+        return result.quantize(Decimal("1"), rounding=ROUND_DOWN).quantize(_TWOPLACES)
+    return _money(result)
+
+
+def _effective_shop_unit_price(part: RepairOrderShopPart) -> Decimal:
+    override = getattr(part, "client_unit_price_override", None)
+    if override is not None:
+        return _money(override)
+    return _price_with_markup(
+        part.unit_price,
+        part.markup_percent,
+        floor_rubles=part.source == "rossko",
+    )
 
 
 def _shop_line_sum(
-    qty: int,
-    unit_price: Decimal | int | float | str,
-    markup_percent: Decimal | int | float | str,
+    qty: Decimal | int | float | str,
+    client_unit_price: Decimal | int | float | str,
 ) -> Decimal:
-    return _money(Decimal(qty) * _price_with_markup(unit_price, markup_percent))
+    return _money(_qty(qty) * _money(client_unit_price))
 
 
 def _user_brief(user: User) -> RepairOrderUserBrief:
@@ -175,40 +201,69 @@ def _client_part_view(part: RepairOrderClientPart) -> RepairOrderClientPartView:
         position=part.position,
         title=part.title,
         qty=part.qty,
+        unit=getattr(part, "unit", None) or "pcs",
     )
 
 
 def _shop_part_view(part: RepairOrderShopPart) -> RepairOrderShopPartView:
     unit = _money(part.unit_price)
     markup = _money(part.markup_percent)
-    price_marked = _price_with_markup(unit, markup)
+    price_marked = _effective_shop_unit_price(part)
+    qty = _qty(part.qty)
+    display = shop_part_display_name(
+        title=part.title,
+        brand=part.brand,
+        partnumber=part.partnumber,
+        rossko_brand=part.rossko_brand,
+        rossko_partnumber=part.rossko_partnumber,
+    )
     return RepairOrderShopPartView(
         id=part.id,
         position=part.position,
         title=part.title,
-        qty=part.qty,
+        display_name=display,
+        qty=qty,
+        unit=part.unit or "pcs",
         unit_price=unit,
         markup_percent=markup,
+        client_unit_price_override=(
+            _money(part.client_unit_price_override)
+            if part.client_unit_price_override is not None
+            else None
+        ),
         price_with_markup=price_marked,
-        line_sum=_shop_line_sum(part.qty, unit, markup),
+        line_sum=_shop_line_sum(qty, price_marked),
         source=part.source,
         product_id=part.product_id,
+        brand=part.brand,
+        partnumber=part.partnumber,
         rossko_brand=part.rossko_brand,
         rossko_partnumber=part.rossko_partnumber,
+        is_imported=shop_part_is_imported(part),
     )
 
 
 def _client_shop_part_view(part: RepairOrderShopPart) -> RepairOrderClientShopPartView:
     unit = _money(part.unit_price)
     markup = _money(part.markup_percent)
-    price_marked = _price_with_markup(unit, markup)
+    price_marked = _effective_shop_unit_price(part)
+    qty = _qty(part.qty)
+    display = shop_part_display_name(
+        title=part.title,
+        brand=part.brand,
+        partnumber=part.partnumber,
+        rossko_brand=part.rossko_brand,
+        rossko_partnumber=part.rossko_partnumber,
+    )
     return RepairOrderClientShopPartView(
         id=part.id,
         position=part.position,
         title=part.title,
-        qty=part.qty,
+        display_name=display,
+        qty=qty,
+        unit=part.unit or "pcs",
         price_with_markup=price_marked,
-        line_sum=_shop_line_sum(part.qty, unit, markup),
+        line_sum=_shop_line_sum(qty, price_marked),
     )
 
 
@@ -499,6 +554,7 @@ def _replace_client_parts(
                 position=idx,
                 title=title[:255],
                 qty=item.qty,
+                unit=item.unit if item.unit in ("pcs", "l", "kg") else "pcs",
             )
         )
 
@@ -535,9 +591,31 @@ def _replace_shop_parts(
     org_id: str,
     items: list[RepairOrderShopPartIn],
 ) -> None:
-    order.shop_parts.clear()
+    imported_by_id = {
+        part.id: part
+        for part in (order.shop_parts or [])
+        if shop_part_is_imported(part) and part.id is not None
+    }
+
+    manual_items: list[RepairOrderShopPartIn] = []
+    for item in items:
+        if item.id is not None and item.id in imported_by_id:
+            imported_by_id[item.id].markup_percent = _money(item.markup_percent)
+            imported_by_id[item.id].client_unit_price_override = (
+                _money(item.client_unit_price_override)
+                if item.client_unit_price_override is not None
+                else None
+            )
+        else:
+            manual_items.append(item)
+
+    order.shop_parts[:] = [
+        part for part in (order.shop_parts or [])
+        if shop_part_is_imported(part)
+    ]
     db.flush()
-    for idx, item in enumerate(items, start=1):
+
+    for item in manual_items:
         title = item.title.strip()
         if not title:
             raise HTTPException(
@@ -545,24 +623,38 @@ def _replace_shop_parts(
                 detail="Название запчасти исполнителя не может быть пустым",
             )
         product_id = _validate_shop_part_product(db, org_id, item.source, item.product_id)
-        brand = (item.rossko_brand or "").strip() or None
-        partnumber = (item.rossko_partnumber or "").strip() or None
+        brand = (item.brand or item.rossko_brand or "").strip() or None
+        partnumber = (item.partnumber or item.rossko_partnumber or "").strip() or None
+        rossko_brand = (item.rossko_brand or "").strip() or None
+        rossko_partnumber = (item.rossko_partnumber or "").strip() or None
         if item.source != "rossko":
-            brand = None
-            partnumber = None
+            rossko_brand = None
+            rossko_partnumber = None
+        unit = item.unit if item.unit in ("pcs", "l", "kg") else "pcs"
         order.shop_parts.append(
             RepairOrderShopPart(
-                position=idx,
+                position=1,
                 title=title[:255],
-                qty=item.qty,
+                brand=brand[:120] if brand else None,
+                partnumber=partnumber[:120] if partnumber else None,
+                qty=_qty(item.qty),
+                unit=unit,
                 unit_price=_money(item.unit_price),
                 markup_percent=_money(item.markup_percent),
+                client_unit_price_override=(
+                    _money(item.client_unit_price_override)
+                    if item.client_unit_price_override is not None
+                    else None
+                ),
                 source=item.source,
                 product_id=product_id,
-                rossko_brand=brand[:120] if brand else None,
-                rossko_partnumber=partnumber[:120] if partnumber else None,
+                rossko_brand=rossko_brand[:120] if rossko_brand else None,
+                rossko_partnumber=rossko_partnumber[:120] if rossko_partnumber else None,
             )
         )
+
+    for idx, part in enumerate(order.shop_parts or [], start=1):
+        part.position = idx
 
 
 def _apply_search_filter(query, q: str | None):
@@ -881,6 +973,30 @@ def update_repair_order(
     if "shop_parts" in payload.model_fields_set and payload.shop_parts is not None:
         _replace_shop_parts(db, row, org_id, payload.shop_parts)
 
+    db.commit()
+    row = _get_org_order_or_404(db, org_id, order_id)
+    return _to_staff_view(row)
+
+
+@router.post(
+    "/autoservice/repair-orders/{order_id}/purchase-items",
+    response_model=RepairOrderStaffView,
+)
+def import_repair_order_purchase_items(
+    order_id: int,
+    payload: RepairOrderPurchaseImportIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    row = _get_org_order_or_404(db, org_id, order_id)
+    append_purchase_items_to_repair_order(
+        db,
+        order=row,
+        org_id=org_id,
+        user_id=current_user.id,
+        payload=payload,
+    )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
     return _to_staff_view(row)

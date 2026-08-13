@@ -103,6 +103,12 @@ export default function PurchaseOrderCard({
   onProductClick,
   onReturnRequest,
   canRequestReturn,
+  selectable = false,
+  selectedItemKeys = new Set(),
+  onToggleItem,
+  onToggleAllItems,
+  repairOrderActionLabel = 'Добавить к заказ-наряду',
+  onAddToRepairOrder,
 }) {
   const items = order.items || [];
   const isUsed = orderType === 'used';
@@ -247,11 +253,42 @@ export default function PurchaseOrderCard({
               {order.buyer_comment}
             </div>
           ) : null}
+          {selectable && items.length > 0 ? (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={items.every((item) => selectedItemKeys.has(`${orderType}:${order.id}:${item.id}`))}
+                  ref={(el) => {
+                    if (!el) return;
+                    const keys = items.map((item) => `${orderType}:${order.id}:${item.id}`);
+                    const some = keys.some((key) => selectedItemKeys.has(key));
+                    const all = keys.length > 0 && keys.every((key) => selectedItemKeys.has(key));
+                    el.indeterminate = some && !all;
+                  }}
+                  onChange={() => onToggleAllItems?.(orderType, order.id, items)}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Выбрать всё
+              </label>
+              {items.some((item) => selectedItemKeys.has(`${orderType}:${order.id}:${item.id}`))
+                && onAddToRepairOrder ? (
+                <button
+                  type="button"
+                  onClick={() => onAddToRepairOrder(orderType, order.id, items)}
+                  className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-700"
+                >
+                  {repairOrderActionLabel}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <ul className="space-y-3">
             {items.map((item, idx) => {
               const lineTotal = (item.price || 0) * (item.quantity || 0);
               const title = item.name || item.product_name || 'Товар';
               const canLink = canLinkGarageOrderItem(item, orderType);
+              const selectionKey = `${orderType}:${order.id}:${item.id}`;
 
               return (
                 <li
@@ -260,6 +297,17 @@ export default function PurchaseOrderCard({
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
+                      {selectable ? (
+                        <label className="mb-2 flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedItemKeys.has(selectionKey)}
+                            onChange={() => onToggleItem?.(orderType, order.id, item)}
+                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-xs text-gray-500">Выбрать позицию</span>
+                        </label>
+                      ) : null}
                       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                         {item.brand && (
                           <span className="font-medium text-gray-700">{item.brand}</span>

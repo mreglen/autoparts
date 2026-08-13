@@ -1,6 +1,13 @@
 import Modal from '../UI/Modal';
 import { formatServerDateTime } from '../../utils/serverDate';
-import { truncateRubles } from '../../pages/AutoParts/NewParts/newPartStockUtils';
+import {
+  formatShopPartQty,
+  formatShopPartUnit,
+  priceWithMarkup,
+  shopLineSum,
+  shopPartDisplayName,
+  shopPartPricingOptions,
+} from '../../utils/repairOrderShopPartUtils';
 
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
@@ -38,22 +45,6 @@ function lineSum(qty, unitPrice) {
   const q = Number(qty) || 0;
   const p = Number(unitPrice) || 0;
   return Math.round(q * p * 100) / 100;
-}
-
-function priceWithMarkup(unitPrice, markupPercent, { floorRubles = false } = {}) {
-  const value = (Number(unitPrice) || 0) * (1 + (Number(markupPercent) || 0) / 100);
-  if (floorRubles) return truncateRubles(value);
-  return Math.round(value * 100) / 100;
-}
-
-function shopLineSum(qty, unitPrice, markupPercent, options = {}) {
-  const unit = priceWithMarkup(unitPrice, markupPercent, options);
-  const total = (Number(qty) || 0) * unit;
-  return options.floorRubles ? truncateRubles(total) : Math.round(total * 100) / 100;
-}
-
-function shopPartPricingOptions(part) {
-  return { floorRubles: part?.source === 'rossko' };
 }
 
 export function vehicleLabel(v) {
@@ -179,12 +170,13 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
         {parts.length === 0 ? (
           <EmptyLine>Нет запчастей клиента</EmptyLine>
         ) : (
-          <LinesTable columns={['№', 'Название', 'Кол-во']}>
+          <LinesTable columns={['№', 'Название', 'Кол-во', 'Ед.']}>
             {parts.map((p) => (
               <tr key={p.id || `${p.position}-${p.title}`}>
                 <td className="py-1.5 pr-3 tabular-nums text-gray-500">{p.position}</td>
                 <td className="py-1.5 pr-3 font-medium text-gray-900">{p.title}</td>
-                <td className="py-1.5 tabular-nums">{p.qty}</td>
+                <td className="py-1.5 pr-3 tabular-nums">{p.qty}</td>
+                <td className="py-1.5 tabular-nums">{formatShopPartUnit(p.unit || 'pcs')}</td>
               </tr>
             ))}
           </LinesTable>
@@ -195,39 +187,26 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
         {shop.length === 0 ? (
           <EmptyLine>Нет запчастей исполнителя</EmptyLine>
         ) : (
-          <LinesTable
-            columns={
-              showExecutors
-                ? ['№', 'Название', 'Кол-во', 'Цена', 'Наценка %', 'С наценкой', 'Сумма', 'Источник']
-                : ['№', 'Название', 'Кол-во', 'С наценкой', 'Сумма']
-            }
-          >
-            {shop.map((p) => (
-              <tr key={p.id || `${p.position}-${p.title}`}>
-                <td className="py-1.5 pr-3 tabular-nums text-gray-500">{p.position}</td>
-                <td className="py-1.5 pr-3 font-medium text-gray-900">{p.title}</td>
-                <td className="py-1.5 pr-3 tabular-nums">{p.qty}</td>
-                {showExecutors ? (
-                  <td className="py-1.5 pr-3 tabular-nums">{formatMoney(p.unit_price)}</td>
-                ) : null}
-                {showExecutors ? (
-                  <td className="py-1.5 pr-3 tabular-nums">{p.markup_percent}</td>
-                ) : null}
-                <td className="py-1.5 pr-3 tabular-nums">
-                  {formatMoney(
-                    p.price_with_markup
-                    ?? priceWithMarkup(p.unit_price, p.markup_percent, shopPartPricingOptions(p)),
-                  )}
-                </td>
-                <td className="py-1.5 pr-3 tabular-nums">
-                  {formatMoney(
-                    p.line_sum
-                    ?? shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p)),
-                  )}
-                </td>
-                {showExecutors ? <td className="py-1.5">{p.source || '—'}</td> : null}
-              </tr>
-            ))}
+          <LinesTable columns={['№', 'Наименование', 'Кол-во', 'Ед.', 'Цена', 'Сумма']}>
+            {shop.map((p) => {
+              const unitLabel = formatShopPartUnit(p.unit || 'pcs');
+              const qtyLabel = formatShopPartQty(p.qty, p.unit || 'pcs');
+              const name = p.display_name || shopPartDisplayName(p);
+              const clientPrice = p.price_with_markup
+                ?? priceWithMarkup(p.unit_price, p.markup_percent, shopPartPricingOptions(p));
+              const sum = p.line_sum
+                ?? shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p));
+              return (
+                <tr key={p.id || `${p.position}-${p.title}`}>
+                  <td className="py-1.5 pr-3 tabular-nums text-gray-500">{p.position}</td>
+                  <td className="py-1.5 pr-3 font-medium text-gray-900">{name}</td>
+                  <td className="py-1.5 pr-3 tabular-nums">{qtyLabel}</td>
+                  <td className="py-1.5 pr-3 tabular-nums">{unitLabel}</td>
+                  <td className="py-1.5 pr-3 tabular-nums">{formatMoney(clientPrice)}</td>
+                  <td className="py-1.5 pr-3 tabular-nums">{formatMoney(sum)}</td>
+                </tr>
+              );
+            })}
           </LinesTable>
         )}
       </Section>

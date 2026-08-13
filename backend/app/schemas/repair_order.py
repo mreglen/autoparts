@@ -16,6 +16,7 @@ LEGACY_STATUS_MAP = {
     "open": "pending",
 }
 SHOP_PART_SOURCES = ("manual", "warehouse", "rossko")
+SHOP_PART_UNITS = ("pcs", "l", "kg")
 
 
 class RepairOrderUserBrief(BaseModel):
@@ -75,17 +76,30 @@ class RepairOrderWorkIn(BaseModel):
 class RepairOrderClientPartIn(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     qty: int = Field(ge=1)
+    unit: Literal["pcs", "l", "kg"] = "pcs"
 
 
 class RepairOrderShopPartIn(BaseModel):
+    id: Optional[int] = None
     title: str = Field(min_length=1, max_length=255)
-    qty: int = Field(ge=1)
+    qty: Decimal = Field(default=Decimal("1"), ge=Decimal("0.001"))
+    unit: Literal["pcs", "l", "kg"] = "pcs"
     unit_price: Decimal = Field(ge=0)
     markup_percent: Decimal = Field(default=Decimal("5"), ge=0)
+    client_unit_price_override: Optional[Decimal] = Field(None, ge=0)
     source: Literal["manual", "warehouse", "rossko"] = "manual"
     product_id: Optional[int] = None
+    brand: Optional[str] = Field(None, max_length=120)
+    partnumber: Optional[str] = Field(None, max_length=120)
     rossko_brand: Optional[str] = Field(None, max_length=120)
     rossko_partnumber: Optional[str] = Field(None, max_length=120)
+
+
+class RepairOrderPurchaseImportIn(BaseModel):
+    order_type: Literal["new", "used"]
+    item_ids: list[int] = Field(min_length=1)
+    markup_percent: Decimal = Field(default=Decimal("0"), ge=0, le=500)
+    item_price_overrides: dict[int, Decimal] = Field(default_factory=dict)
 
 
 class RepairOrderWorkView(BaseModel):
@@ -117,21 +131,28 @@ class RepairOrderClientPartView(BaseModel):
     position: int
     title: str
     qty: int
+    unit: str = "pcs"
 
 
 class RepairOrderShopPartView(BaseModel):
     id: int
     position: int
     title: str
-    qty: int
+    display_name: str
+    qty: Decimal
+    unit: str
     unit_price: Decimal
     markup_percent: Decimal
+    client_unit_price_override: Optional[Decimal] = None
     price_with_markup: Decimal
     line_sum: Decimal
     source: str
     product_id: Optional[int] = None
+    brand: Optional[str] = None
+    partnumber: Optional[str] = None
     rossko_brand: Optional[str] = None
     rossko_partnumber: Optional[str] = None
+    is_imported: bool = False
 
 
 class RepairOrderClientShopPartView(BaseModel):
@@ -140,7 +161,9 @@ class RepairOrderClientShopPartView(BaseModel):
     id: int
     position: int
     title: str
-    qty: int
+    display_name: str
+    qty: Decimal
+    unit: str
     price_with_markup: Decimal
     line_sum: Decimal
 

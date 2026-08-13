@@ -19,7 +19,7 @@ function clampPanelLeft(triggerRect) {
   return Math.max(PANEL_GAP, Math.min(ideal, window.innerWidth - PANEL_WIDTH - PANEL_GAP));
 }
 
-export default function ClientMarkupPopover() {
+export default function ClientMarkupPopover({ onApply }) {
   const dispatch = useDispatch();
   const settings = useSelector((state) => state.clientMarkup);
   const [open, setOpen] = useState(false);
@@ -85,6 +85,7 @@ export default function ClientMarkupPopover() {
       displayMode,
       showPurchaseInCart,
     }));
+    onApply?.(value);
     setOpen(false);
   };
 

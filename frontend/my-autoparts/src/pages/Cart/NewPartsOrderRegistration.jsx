@@ -39,6 +39,7 @@ import {
 } from '../../utils/newPartsCheckoutDelivery';
 import DeliveryFastIcon from '../../components/icons/DeliveryFastIcon';
 import PickupIcon from '../../components/icons/PickupIcon';
+import { PageHeader } from '../../components/UI/SectionHeader';
 
 function formatApiErrorDetail(detail) {
   if (!detail) return 'Ошибка при оформлении заказа. Попробуйте ещё раз.';
@@ -49,19 +50,19 @@ function formatApiErrorDetail(detail) {
 const formatMoney = (value) => formatNewPartMoney(value);
 
 const inputClass = (hasError) =>
-  `block w-full rounded-xl border px-3 py-2.5 text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 ${
-    hasError ? 'border-red-400 bg-red-50/40' : 'border-gray-300 bg-white'
+  `block w-full rounded-sg border px-3 py-2.5 text-sm shadow-sg-sm outline-none transition focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 ${
+    hasError ? 'border-danger-400 bg-danger-50/40' : 'border-line bg-surface'
   }`;
 
 function SectionCard({ title, subtitle, children, className = '' }) {
   return (
     <section
-      className={`rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm sm:p-6 ${className}`}
+      className={`rounded-sg border border-line bg-surface p-4 shadow-sg-sm sm:p-6 ${className}`}
     >
       {(title || subtitle) && (
-        <header className="mb-4 border-b border-gray-100 pb-3">
-          {title && <h2 className="text-base font-semibold text-gray-900 sm:text-lg">{title}</h2>}
-          {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+        <header className="mb-4 border-b border-line pb-3">
+          {title && <h2 className="text-base font-semibold text-ink sm:text-lg">{title}</h2>}
+          {subtitle && <p className="mt-1 text-sm text-ink-muted">{subtitle}</p>}
         </header>
       )}
       {children}
@@ -74,26 +75,26 @@ function ChoiceTile({ selected, onClick, title, description, icon }) {
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-start gap-3 rounded-xl border-2 p-4 text-left transition ${
+      className={`flex w-full items-start gap-3 rounded-sg border-2 p-4 text-left transition ${
         selected
-          ? 'border-indigo-600 bg-indigo-50/80 ring-1 ring-indigo-600/20'
-          : 'border-gray-200 bg-gray-50/50 hover:border-indigo-300 hover:bg-white'
+          ? 'border-brand-600 bg-brand-50/80 ring-1 ring-brand-600/20'
+          : 'border-line bg-surface-muted/40 hover:border-brand-300 hover:bg-surface'
       }`}
     >
       <span
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-          selected ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600 shadow-sm'
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-sg ${
+          selected ? 'bg-brand-600 text-white' : 'bg-surface text-ink-muted shadow-sg-sm'
         }`}
       >
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold text-gray-900">{title}</span>
-        {description && <span className="mt-0.5 block text-sm text-gray-500">{description}</span>}
+        <span className="block font-semibold text-ink">{title}</span>
+        {description && <span className="mt-0.5 block text-sm text-ink-muted">{description}</span>}
       </span>
       <span
         className={`mt-1 h-5 w-5 shrink-0 rounded-full border-2 ${
-          selected ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300 bg-white'
+          selected ? 'border-brand-600 bg-brand-600' : 'border-line bg-surface'
         }`}
         aria-hidden
       >
@@ -110,10 +111,10 @@ function SelectChip({ selected, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+      className={`rounded-sg border px-3 py-2.5 text-sm font-medium transition ${
         selected
-          ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-          : 'border-gray-200 bg-white text-gray-800 hover:border-indigo-300 hover:bg-indigo-50/50'
+          ? 'border-brand-600 bg-brand-600 text-white shadow-sg-sm'
+          : 'border-line bg-surface text-ink-soft hover:border-brand-300 hover:bg-brand-50/50'
       }`}
     >
       {children}
@@ -178,7 +179,9 @@ export default function NewPartsOrderRegistration() {
       brand: item.brand,
       partnumber: item.partnumber,
       name: formatProductDisplayTitle(item.brand, item.partnumber, item.name),
-      price: truncateRubles(Number(item.price)),
+      price: truncateRubles(Number(item.purchase_price) > 0
+        ? Number(item.purchase_price)
+        : Number(item.price)),
       quantity: item.quantity,
     }));
     if (checkoutItemIds?.size) {
@@ -428,19 +431,17 @@ export default function NewPartsOrderRegistration() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6 pb-16 sm:py-8">
-      <div className="mb-6">
-        <Link
-          to="/cart"
-          className="inline-flex items-center gap-1 text-sm text-gray-500 transition hover:text-indigo-600"
-        >
-          ← Корзина
-        </Link>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Оформление заказа</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {selectedItems.length} {selectedItems.length === 1 ? 'позиция' : 'позиций'} · {totalQty} шт. ·{' '}
-          {formatMoney(orderTotal)}
-        </p>
-      </div>
+      <Link
+        to="/cart"
+        className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted transition hover:text-brand-600"
+      >
+        ← Корзина
+      </Link>
+      <PageHeader
+        title="Оформление заказа"
+        subtitle={`${selectedItems.length} ${selectedItems.length === 1 ? 'позиция' : 'позиций'} · ${totalQty} шт. · ${formatMoney(orderTotal)}`}
+        className="mb-2"
+      />
 
       {notification?.type === 'error' && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -643,7 +644,7 @@ export default function NewPartsOrderRegistration() {
             type="button"
             onClick={handlePay}
             disabled={submitting}
-            className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3.5 text-base font-semibold text-white shadow-md transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-3.5 text-base font-semibold text-white shadow-md transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? 'Переход к оплате…' : `Оплатить ${formatMoney(orderTotal)}`}
           </button>

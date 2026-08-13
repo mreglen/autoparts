@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import ClientMarkupPopover from '../../../components/NewParts/ClientMarkupPopover';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../../redux/slices/ClientMarkupSlice';
-import { computeClientPrices, isOrganizationStaff } from '../../../utils/clientMarkupUtils';
+import { canUseClientMarkup, computeClientPrices } from '../../../utils/clientMarkupUtils';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import { mapPartToStocksData } from '../NewParts/rosskoHelpers';
@@ -205,13 +205,10 @@ function StockOfferRow({
       brand,
       partnumber: number,
       quantity: quantityToAdd,
-      price: clientPrice,
+      price: purchasePrice,
       stock_id: String(stock.stock_id || '').trim(),
       max_quantity: maxQty,
     };
-    if (purchasePrice > 0 && Math.abs(purchasePrice - clientPrice) > 0.009) {
-      item.purchase_price = purchasePrice;
-    }
     if (name) item.name = name;
     if (part?.guid) item.guid = String(part.guid);
     if (stock.delivery_start) {
@@ -414,7 +411,7 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
   const siteMarkupPercent = useNewPartsMarkupPercent('auto');
   const user = useSelector((state) => state.auth.user);
   const clientMarkup = useSelector((state) => state.clientMarkup);
-  const showStaffMarkup = isOrganizationStaff(user);
+  const showStaffMarkup = canUseClientMarkup(user);
   const clientMarkupPercent = showStaffMarkup ? (Number(clientMarkup.percent) || 0) : 0;
   const showBothPrices = showStaffMarkup && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH;
 

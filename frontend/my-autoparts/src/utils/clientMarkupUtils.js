@@ -15,3 +15,7 @@ export function isOrganizationStaff(user) {
     || (user.is_admin && user.organization_id),
   );
 }
+
+export function canUseClientMarkup(user) {
+  return isOrganizationStaff(user) && user?.organization_is_autoservice === true;
+}

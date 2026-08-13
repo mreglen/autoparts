@@ -18,6 +18,7 @@ from app.models.yookassa_payment import YookassaPayment
 from app.schemas.rossko_settings import NewPartsOrderCreateIn
 from app.services.audit_service import log_audit
 from app.services.new_parts_order_fulfillment import (
+    cart_item_checkout_price,
     fulfill_new_parts_order,
     parse_cart_snapshot,
 )
@@ -47,7 +48,7 @@ def _serialize_cart_item(item: NewPartsCart) -> dict[str, Any]:
         "partnumber": item.partnumber,
         "name": item.name,
         "quantity": int(item.quantity),
-        "price": float(item.price),
+        "price": cart_item_checkout_price(item),
         "stock_id": str(item.stock_id),
     }
 
@@ -147,7 +148,7 @@ async def create_checkout_session(
             detail="В корзине нет новых запчастей",
         )
 
-    total = sum(float(i.price) * int(i.quantity) for i in cart_items)
+    total = sum(cart_item_checkout_price(i) * int(i.quantity) for i in cart_items)
     if total <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -25,8 +25,10 @@ import EmptyState from '../../components/UI/EmptyState';
 import { FieldLabel, Input } from '../../components/UI/Field';
 import { PageHeader } from '../../components/UI/SectionHeader';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../redux/slices/ClientMarkupSlice';
-import { isOrganizationStaff } from '../../utils/clientMarkupUtils';
+import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
+import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import {
+  applyMarkup,
   formatDeliveryParts,
   formatNewPartMoney,
   truncateRubles,
@@ -36,6 +38,16 @@ const formatNewPartPrice = (price) => formatNewPartMoney(price);
 
 const formatUsedPrice = (price) =>
   new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price || 0);
+
+function checkoutPrice(item) {
+  const legacyPurchase = Number(item?.purchasePrice);
+  if (Number.isFinite(legacyPurchase) && legacyPurchase > 0) return legacyPurchase;
+  return Number(item?.price) || 0;
+}
+
+function clientPrice(item, markupPercent) {
+  return applyMarkup(checkoutPrice(item), markupPercent);
+}
 
 function DeliveryCell({ deliveryStart, deliveryEnd, deliveryFallback }) {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
@@ -103,16 +115,22 @@ function CartTableRow({
   onQuantityChange,
   onRemove,
   showDeliveryColumn,
-  showPurchasePrice,
+  clientMarkupEnabled,
+  clientMarkupPercent,
+  showBothPrices,
   formatItemPrice,
   quantityBusy = false,
 }) {
   const maxQty = getMaxAllowedQuantity(item);
   const quantity = Math.min(Math.max(1, Number(item.quantity) || 1), maxQty);
-  const lineTotal = item.price * quantity;
-  const showPurchase = showPurchasePrice
-    && item.purchasePrice > 0
-    && Math.abs(item.price - item.purchasePrice) > 0.009;
+  const basePrice = checkoutPrice(item);
+  const displayedPrice = clientMarkupEnabled
+    ? clientPrice(item, clientMarkupPercent)
+    : basePrice;
+  const lineTotal = displayedPrice * quantity;
+  const showPurchase = clientMarkupEnabled
+    && showBothPrices
+    && Math.abs(displayedPrice - basePrice) > 0.009;
 
   return (
     <tr className="border-b border-line last:border-b-0 hover:bg-surface-muted/40">
@@ -142,9 +160,9 @@ function CartTableRow({
         </td>
       ) : null}
       <td className="min-w-[5rem] whitespace-nowrap px-2 py-2.5 align-middle text-right">
-        <p className="text-sm font-semibold text-brand-600">{formatItemPrice(item.price)}</p>
+        <p className="text-sm font-semibold text-brand-600">{formatItemPrice(displayedPrice)}</p>
         {showPurchase ? (
-          <p className="text-xs text-ink-muted">{formatItemPrice(item.purchasePrice)}</p>
+          <p className="text-xs text-ink-muted">{formatItemPrice(basePrice)}</p>
         ) : null}
       </td>
       <td className="w-[5.5rem] px-2 py-2.5 align-middle">
@@ -190,7 +208,10 @@ function CartTableBlock({
   onRename,
   canRename = false,
   showDeliveryColumn = true,
-  showPurchasePrice = false,
+  clientMarkupEnabled = false,
+  clientMarkupPercent = 0,
+  showBothPrices = false,
+  showClientMarkupControl = false,
   formatItemPrice = formatNewPartPrice,
   checkoutLabel = 'Оформить заказ',
   quantityUpdatingIds = [],
@@ -198,10 +219,16 @@ function CartTableBlock({
   const allSelected = items.length > 0 && items.every((item) => selectedItems.has(item.id));
   const someSelected = items.some((item) => selectedItems.has(item.id));
   const selectedCount = items.filter((item) => selectedItems.has(item.id)).length;
-  const blockTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const displayedUnitPrice = (item) => (
+    clientMarkupEnabled ? clientPrice(item, clientMarkupPercent) : checkoutPrice(item)
+  );
+  const blockTotal = items.reduce(
+    (sum, item) => sum + displayedUnitPrice(item) * item.quantity,
+    0,
+  );
   const selectedTotal = items
     .filter((item) => selectedItems.has(item.id))
-    .reduce((sum, item) => sum + item.price * item.quantity, 0);
+    .reduce((sum, item) => sum + displayedUnitPrice(item) * item.quantity, 0);
   const displayTotal = someSelected ? selectedTotal : blockTotal;
 
   if (!items.length) return null;
@@ -269,7 +296,12 @@ function CartTableBlock({
               <th className="px-2 py-2.5">Запчасть</th>
               <th className="px-2 py-2.5">Наименование</th>
               {showDeliveryColumn ? <th className="px-2 py-2.5">Доставка</th> : null}
-              <th className="px-2 py-2.5 text-right">Цена, ₽</th>
+              <th className="px-2 py-2.5 text-right">
+                <span className="inline-flex items-center justify-end gap-1.5">
+                  {showClientMarkupControl ? <ClientMarkupPopover /> : null}
+                  <span>Цена, ₽</span>
+                </span>
+              </th>
               <th className="px-2 py-2.5">Кол-во</th>
               <th className="px-2 py-2.5 text-right">Стоимость, ₽</th>
               <th className="w-10 px-2 py-2.5" aria-hidden />
@@ -285,7 +317,9 @@ function CartTableBlock({
                 onQuantityChange={onQuantityChange}
                 onRemove={onRemove}
                 showDeliveryColumn={showDeliveryColumn}
-                showPurchasePrice={showPurchasePrice}
+                clientMarkupEnabled={clientMarkupEnabled}
+                clientMarkupPercent={clientMarkupPercent}
+                showBothPrices={showBothPrices}
                 formatItemPrice={formatItemPrice}
                 quantityBusy={quantityUpdatingIds.includes(item.id)}
               />
@@ -309,7 +343,9 @@ export default function CartPage() {
   const isAuthorized = useSelector((state) => Boolean(state.auth.token));
   const user = useSelector((state) => state.auth.user);
   const clientMarkup = useSelector((state) => state.clientMarkup);
-  const showPurchaseInCart = isOrganizationStaff(user)
+  const clientMarkupEnabled = canUseClientMarkup(user);
+  const clientMarkupPercent = clientMarkupEnabled ? (Number(clientMarkup.percent) || 0) : 0;
+  const showPurchaseInCart = clientMarkupEnabled
     && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH
     && clientMarkup.showPurchaseInCart;
 
@@ -417,8 +453,13 @@ export default function CartPage() {
   );
 
   const grandTotal = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [cartItems],
+    () => cartItems.reduce((sum, item) => {
+      const unit = item.type === 'new' && clientMarkupEnabled
+        ? clientPrice(item, clientMarkupPercent)
+        : Number(item.price) || 0;
+      return sum + unit * item.quantity;
+    }, 0),
+    [cartItems, clientMarkupEnabled, clientMarkupPercent],
   );
 
   const grandQty = useMemo(
@@ -698,7 +739,10 @@ export default function CartPage() {
                 onRename={() => openRenameModal(basket)}
                 canRename={!basket.is_default}
                 showDeliveryColumn
-                showPurchasePrice={showPurchaseInCart}
+                clientMarkupEnabled={clientMarkupEnabled}
+                clientMarkupPercent={clientMarkupPercent}
+                showBothPrices={showPurchaseInCart}
+                showClientMarkupControl={clientMarkupEnabled}
                 formatItemPrice={formatNewPartPrice}
                 quantityUpdatingIds={quantityUpdatingIds}
               />
@@ -729,7 +773,7 @@ export default function CartPage() {
               onCheckout={() => saveUsedOrderAndNavigate(items, seller)}
               onCheckoutSelected={() => {
                 const selected = items.filter((item) => selectedItems.has(item.id));
-                saveUsedOrderAndNavigate(selected, seller);
+                if (selected.length) saveUsedOrderAndNavigate(selected, seller);
               }}
               onClearAll={() => handleClearUsedBasket(items)}
               showDeliveryColumn={false}

@@ -48,6 +48,16 @@ class SnapshotCartItem:
         )
 
 
+def cart_item_checkout_price(item: SnapshotCartItem | NewPartsCart) -> float:
+    """Price charged to the buyer, excluding the local client-quote overlay."""
+    legacy_purchase_price = getattr(item, "purchase_price", None)
+    if legacy_purchase_price is not None:
+        value = float(legacy_purchase_price)
+        if value > 0:
+            return value
+    return float(item.price)
+
+
 def parse_cart_snapshot(raw: str) -> list[SnapshotCartItem]:
     try:
         data = json.loads(raw or "[]")
@@ -116,7 +126,7 @@ async def fulfill_new_parts_order(
             raise
 
         rossko_order_id = extract_rossko_order_id(rossko_response)
-        total_amount = sum(float(item.price) * int(item.quantity) for item in cart_items)
+        total_amount = sum(cart_item_checkout_price(item) * int(item.quantity) for item in cart_items)
 
         delivery_type = (payload.delivery_type or "transport").strip() or "transport"
         delivery_address = payload.delivery_address
@@ -159,7 +169,7 @@ async def fulfill_new_parts_order(
                     brand=item.brand,
                     partnumber=item.partnumber,
                     quantity=int(item.quantity),
-                    price=float(item.price),
+                    price=cart_item_checkout_price(item),
                     status_code="new_waiting_confirmation",
                     seo_card_id=card.id if card else None,
                 )

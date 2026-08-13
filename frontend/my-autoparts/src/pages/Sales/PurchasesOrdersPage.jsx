@@ -1,16 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
 import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus, getGarageStatusColor, getGarageStatusName, getUsedOrderBuyerHint, getNewOrderBuyerHint } from '../../utils/garageOrderUi';
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import { isUsedOrderReturnEligible, TERMINAL_RETURN_STATUSES } from '../../utils/returnStatusUi';
 import { openOrderItemProductFlow } from '../../utils/avitoProductFlow';
 import { subscribeToPushNotifications } from '../../redux/slices/ChatSlice';
+import { isOrganizationStaff } from '../../utils/clientMarkupUtils';
+import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
+import {
+  groupPurchaseSelections,
+  purchaseSelectionKey,
+  readLinkedRepairOrder,
+  saveLinkedRepairOrder,
+} from '../../utils/repairOrderPurchaseDraft';
 import {
   warehousePageClass,
   warehousePillControlClass,
@@ -92,6 +101,8 @@ export default function PurchasesOrdersPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { isReady, isAuthenticated } = useAuthReady();
+  const user = useSelector((state) => state.auth.user);
+  const canLinkRepairOrder = isOrganizationStaff(user) && userHasAutoserviceOrganization(user);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,6 +114,9 @@ export default function PurchasesOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeReturnOrderIds, setActiveReturnOrderIds] = useState(new Set());
+  const [selectedItemKeys, setSelectedItemKeys] = useState(new Set());
+  const [repairPickerOpen, setRepairPickerOpen] = useState(false);
+  const [linkedRepairOrder, setLinkedRepairOrder] = useState(() => readLinkedRepairOrder());
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
@@ -248,6 +262,70 @@ export default function PurchasesOrdersPage() {
     setExpandedOrderKey((prev) => (prev === key ? null : key));
   };
 
+  const [pickerGroups, setPickerGroups] = useState([]);
+
+  const buildEntriesForOrder = useCallback((orderType, orderId, items) => {
+    const entries = [];
+    (items || []).forEach((item) => {
+      const key = purchaseSelectionKey(orderType, orderId, item.id);
+      if (!selectedItemKeys.has(key)) return;
+      entries.push({
+        orderType,
+        orderId,
+        itemId: item.id,
+        brand: item.brand || '',
+        partnumber: item.partnumber || '',
+        name: item.name || item.product_name || '',
+        quantity: item.quantity || 1,
+        price: item.price || 0,
+        product_id: item.product_id || null,
+      });
+    });
+    return entries;
+  }, [selectedItemKeys]);
+
+  const handleTogglePurchaseItem = (orderType, orderId, item) => {
+    const key = purchaseSelectionKey(orderType, orderId, item.id);
+    setSelectedItemKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const handleToggleAllPurchaseItems = (orderType, orderId, items) => {
+    const keys = items.map((item) => purchaseSelectionKey(orderType, orderId, item.id));
+    const allSelected = keys.length > 0 && keys.every((key) => selectedItemKeys.has(key));
+    setSelectedItemKeys((prev) => {
+      const next = new Set(prev);
+      if (allSelected) keys.forEach((key) => next.delete(key));
+      else keys.forEach((key) => next.add(key));
+      return next;
+    });
+  };
+
+  const handleAddToRepairOrder = (orderType, orderId, items) => {
+    const groups = groupPurchaseSelections(buildEntriesForOrder(orderType, orderId, items));
+    if (!groups.length) return;
+    setPickerGroups(groups);
+    setRepairPickerOpen(true);
+  };
+
+  const handleRepairImported = (order) => {
+    if (order?.id) {
+      saveLinkedRepairOrder(order);
+      setLinkedRepairOrder(readLinkedRepairOrder());
+    }
+    setSelectedItemKeys(new Set());
+    setPickerGroups([]);
+    setRepairPickerOpen(false);
+  };
+
+  const repairOrderActionLabel = linkedRepairOrder
+    ? 'Изменить заказ-наряд'
+    : 'Добавить к заказ-наряду';
+
   if (!isReady || !isAuthenticated) {
     return <AuthLoadingScreen className="min-h-[16rem]" />;
   }
@@ -362,6 +440,12 @@ export default function PurchasesOrdersPage() {
                     && !activeReturnOrderIds.has(order.id)
                   }
                   onReturnRequest={(o) => navigate(`/purchases/returns?create=1&orderId=${o.id}`)}
+                  selectable={canLinkRepairOrder}
+                  selectedItemKeys={selectedItemKeys}
+                  onToggleItem={handleTogglePurchaseItem}
+                  onToggleAllItems={handleToggleAllPurchaseItems}
+                  repairOrderActionLabel={repairOrderActionLabel}
+                  onAddToRepairOrder={handleAddToRepairOrder}
                 />
               );
             })}
@@ -372,6 +456,17 @@ export default function PurchasesOrdersPage() {
           )}
         </>
       )}
+
+      <RepairOrderPickerModal
+        open={repairPickerOpen}
+        onClose={() => {
+          setRepairPickerOpen(false);
+          setPickerGroups([]);
+        }}
+        groups={pickerGroups}
+        linkedRepairOrder={linkedRepairOrder}
+        onImported={handleRepairImported}
+      />
     </div>
   );
 }

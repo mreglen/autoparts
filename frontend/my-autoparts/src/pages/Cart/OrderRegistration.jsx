@@ -18,6 +18,8 @@ import {
 } from '../../utils/contactValidation';
 import { trackFormField, trackFormSubmit, trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 import CheckoutPaymentAndOffer from '../../components/Legal/CheckoutPaymentAndOffer';
+import { PageHeader } from '../../components/UI/SectionHeader';
+import Button from '../../components/UI/Button';
 
 function formatApiErrorDetail(detail) {
   if (!detail) return 'Ошибка при оформлении заказа. Попробуйте еще раз.';
@@ -44,25 +46,25 @@ function buildSuccessMessage(data) {
 }
 
 const inputClass = (hasError) =>
-  `block w-full rounded-lg border px-3 py-2.5 text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-    hasError ? 'border-red-400 bg-red-50/40' : 'border-gray-300 bg-white'
+  `block w-full rounded-sg border px-3 py-2.5 text-sm shadow-sg-sm outline-none transition focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 ${
+    hasError ? 'border-danger-400 bg-danger-50/40' : 'border-line bg-surface'
   }`;
 
 function SectionCard({ step, title, subtitle, children, className = '' }) {
   return (
     <section
-      className={`overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm ${className}`.trim()}
+      className={`overflow-hidden rounded-sg border border-line bg-surface shadow-sg-sm ${className}`.trim()}
     >
-      <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-4 py-4 sm:px-6">
+      <div className="border-b border-line bg-surface-muted/50 px-4 py-4 sm:px-6">
         <div className="flex items-start gap-3">
           {step != null && (
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">
               {step}
             </span>
           )}
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-            {subtitle ? <p className="mt-0.5 text-sm text-gray-500">{subtitle}</p> : null}
+            <h2 className="text-lg font-semibold text-ink">{title}</h2>
+            {subtitle ? <p className="mt-0.5 text-sm text-ink-muted">{subtitle}</p> : null}
           </div>
         </div>
       </div>
@@ -77,7 +79,7 @@ function DeliveryOption({ id, checked, onChange, title, description, icon, value
       htmlFor={id}
       className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition ${
         checked
-          ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600/20'
+          ? 'border-brand-600 bg-brand-50/50 ring-1 ring-brand-600/20'
           : 'border-gray-200 bg-white hover:border-gray-300'
       }`}
     >
@@ -88,12 +90,12 @@ function DeliveryOption({ id, checked, onChange, title, description, icon, value
         value={value || id}
         checked={checked}
         onChange={onChange}
-        className="mt-1 h-4 w-4 shrink-0 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+        className="mt-1 h-4 w-4 shrink-0 border-gray-300 text-brand-600 focus:ring-brand-500"
       />
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <span
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-            checked ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'
+            checked ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600'
           }`}
         >
           {icon}
@@ -478,15 +480,15 @@ export default function OrderRegistration() {
             <h3 className="text-sm font-semibold text-gray-900">Что дальше</h3>
             <ol className="mt-3 space-y-3">
               <li className="flex gap-3 text-sm text-gray-700">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">1</span>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">1</span>
                 <span>Продавец подтвердит наличие товара</span>
               </li>
               <li className="flex gap-3 text-sm text-gray-700">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">2</span>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">2</span>
                 <span>Статус заказа можно отслеживать в разделе «Мои покупки»</span>
               </li>
               <li className="flex gap-3 text-sm text-gray-700">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">3</span>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">3</span>
                 <span>При вопросах напишите продавцу в чат со страницы заказа</span>
               </li>
             </ol>
@@ -494,7 +496,7 @@ export default function OrderRegistration() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               to="/purchases/orders"
-              className="inline-flex flex-1 items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="inline-flex flex-1 items-center justify-center rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700"
             >
               Перейти в мои покупки
             </Link>
@@ -573,7 +575,7 @@ export default function OrderRegistration() {
           type="button"
           onClick={handleSubmitOrder}
           disabled={submitting || !isFormValid}
-          className="hidden md:flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="hidden md:flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? (
             <>
@@ -604,27 +606,18 @@ export default function OrderRegistration() {
   return (
     <div className="max-md:mt-0 mt-5 pb-28 md:pb-8">
       {!orderSuccess && (
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-indigo-600">Оформление заказа</p>
-          <h1 className="max-md:text-xl text-2xl font-bold text-gray-900 sm:text-3xl">
-            <span className="md:hidden">Заказ</span>
-            <span className="max-md:hidden">Заказ у {seller}</span>
-          </h1>
-          {deliverInParts && (
-            <p className="mt-1 text-sm text-gray-500">Доставка частями по готовности позиций</p>
-          )}
+          <p className="text-sm font-medium text-brand-600">Оформление заказа</p>
+          <PageHeader
+            title={seller ? `Заказ у ${seller}` : 'Заказ'}
+            subtitle={deliverInParts ? 'Доставка частями по готовности позиций' : undefined}
+            className="mb-0 mt-1"
+          />
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('/cart')}
-          className="inline-flex items-center self-start rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-        >
-          <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          В корзину
-        </button>
+        <Button variant="secondary" size="sm" onClick={() => navigate('/cart')}>
+          ← В корзину
+        </Button>
       </div>
       )}
 
@@ -662,7 +655,7 @@ export default function OrderRegistration() {
             <button
               type="button"
               onClick={() => setItemsExpanded((v) => !v)}
-              className="mb-3 flex w-full items-center justify-between text-sm font-medium text-indigo-600 md:hidden"
+              className="mb-3 flex w-full items-center justify-between text-sm font-medium text-brand-600 md:hidden"
             >
               {itemsExpanded ? 'Скрыть товары' : 'Показать товары'}
               <svg
@@ -795,7 +788,7 @@ export default function OrderRegistration() {
             ) : deliveryOptions.length === 0 ? (
               <p className="text-sm text-red-600">
                 Способы доставки не настроены. Смотрите{' '}
-                <Link to="/delivery" className="text-indigo-600 underline">страницу доставки</Link>.
+                <Link to="/delivery" className="text-brand-600 underline">страницу доставки</Link>.
               </p>
             ) : (
               <div className="space-y-4">
@@ -840,8 +833,8 @@ export default function OrderRegistration() {
                 </div>
 
                 {selectedDeliveryOption?.delivery_type === 'pickup' && (
-                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 px-4 py-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">
+                  <div className="rounded-xl border border-brand-100 bg-brand-50/40 px-4 py-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-brand-700">
                       Адрес самовывоза
                     </p>
                     <p className="mt-1 text-sm text-gray-900">{pickupAddress}</p>
@@ -886,7 +879,7 @@ export default function OrderRegistration() {
 
                 <p className="text-xs text-gray-500">
                   Подробные условия — на странице{' '}
-                  <Link to="/delivery" className="text-indigo-600 underline">Доставка</Link>.
+                  <Link to="/delivery" className="text-brand-600 underline">Доставка</Link>.
                 </p>
               </div>
             )}
@@ -931,7 +924,7 @@ export default function OrderRegistration() {
               type="button"
               onClick={handleSubmitOrder}
               disabled={submitting || !isFormValid}
-              className="shrink-0 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              className="shrink-0 rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
             >
               {submitting ? '...' : 'Оформить'}
             </button>

@@ -38,6 +38,8 @@ from app.db.schema_patches import (
     ensure_repair_orders_tables,
     ensure_repair_order_lines_tables,
     ensure_repair_order_shop_parts_table,
+    ensure_repair_order_shop_parts_extended,
+    ensure_repair_order_client_parts_unit,
     ensure_repair_order_stage10,
     ensure_repair_order_numbers_per_org,
     ensure_autoservice_lifts_tables,
@@ -228,6 +230,8 @@ try:
     ensure_repair_orders_tables()
     ensure_repair_order_lines_tables()
     ensure_repair_order_shop_parts_table()
+    ensure_repair_order_shop_parts_extended()
+    ensure_repair_order_client_parts_unit()
     ensure_repair_order_stage10()
     ensure_repair_order_numbers_per_org()
     ensure_autoservice_lifts_tables()
