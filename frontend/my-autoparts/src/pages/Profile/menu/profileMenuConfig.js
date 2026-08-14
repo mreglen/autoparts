@@ -134,9 +134,14 @@ const buildAutoserviceStaffTab = (user, options) => {
     const submenu = [
         { id: 'autoservice-planner', label: 'Планировщик' },
         { id: 'autoservice-orders', label: 'Заказ-наряд' },
-        { id: 'autoservice-warehouse', label: 'Склад автосервиса' },
-        { id: 'autoservice-warehouse-receipts', label: 'Поступления' },
-        { id: 'autoservice-warehouse-expenses', label: 'Расходы' },
+        {
+            id: 'autoservice-warehouse',
+            label: 'Склад автосервиса',
+            submenu: [
+                { id: 'autoservice-warehouse-receipts', label: 'Поступления' },
+                { id: 'autoservice-warehouse-expenses', label: 'Расходы' },
+            ],
+        },
         { id: 'autoservice-finance', label: 'Финансы' },
         { id: 'autoservice-clients', label: 'Клиенты' },
         { id: 'autoservice-inspections', label: 'Записи' },

@@ -264,12 +264,23 @@ const getMenuIcon = (menuId) => {
     );
 };
 
+const nestedItemIsActive = (item, activeTab) => {
+    if (!item) return false;
+    if (item.id === activeTab) return true;
+    return item.submenu?.some((child) => nestedItemIsActive(child, activeTab)) === true;
+};
+
 const getInitialExpandedMenus = (tabs, activeTab) => {
     const expanded = {};
     tabs.forEach((tab) => {
-        if (tab.submenu?.some((sub) => sub.id === activeTab)) {
+        if (tab.submenu?.some((sub) => nestedItemIsActive(sub, activeTab))) {
             expanded[tab.id] = true;
         }
+        tab.submenu?.forEach((sub) => {
+            if (sub.submenu && nestedItemIsActive(sub, activeTab)) {
+                expanded[sub.id] = true;
+            }
+        });
     });
     return expanded;
 };
@@ -316,15 +327,10 @@ export default function ProfileMenuTabs({
     );
 
     useEffect(() => {
-        setExpandedMenus((prev) => {
-            const next = { ...prev };
-            tabs.forEach((tab) => {
-                if (tab.submenu?.some((sub) => sub.id === activeTab)) {
-                    next[tab.id] = true;
-                }
-            });
-            return next;
-        });
+        setExpandedMenus((prev) => ({
+            ...prev,
+            ...getInitialExpandedMenus(tabs, activeTab),
+        }));
     }, [activeTab, tabs]);
 
     const toggleSubmenu = (menuId) => {
@@ -389,10 +395,39 @@ export default function ProfileMenuTabs({
         ? 'min-h-[40px] w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors flex items-center gap-3 ml-2'
         : 'mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl py-2 pl-11 pr-3 text-left text-sm transition-colors';
 
+    const nestedSubmenuItemBase = isDrawer
+        ? 'min-h-[40px] w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors flex items-center gap-3 ml-6'
+        : 'mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl py-2 pl-16 pr-3 text-left text-sm transition-colors';
+
+    const renderSubmenuLink = (item, className) => (
+        <a
+            key={item.id}
+            href={getPathForTab(item.id) || '#'}
+            onClick={(event) => handleSidebarItemClick(event, item.id)}
+            className={`${className} ${
+                activeTab === item.id ? itemActive : itemInactive
+            } ${activeTab === item.id ? 'font-medium' : 'font-normal text-gray-700'}`}
+        >
+            {!isDrawer ? null : (
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-700">
+                    {getMenuIcon(item.id)}
+                </div>
+            )}
+            <span
+                className={`min-w-0 flex-1 ${
+                    isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
+                }`}
+            >
+                {item.label}
+            </span>
+            <MenuBadge count={badgeCounts[item.id]} />
+        </a>
+    );
+
     const renderMenuItem = (tab) => {
         if (tab.submenu) {
             const isExpanded = expandedMenus[tab.id];
-            const hasActiveSubmenu = tab.submenu.some((subTab) => activeTab === subTab.id);
+            const hasActiveSubmenu = tab.submenu.some((subTab) => nestedItemIsActive(subTab, activeTab));
 
             return (
                 <div key={tab.id} className={isDrawer ? 'mb-1' : ''}>
@@ -416,30 +451,48 @@ export default function ProfileMenuTabs({
                     </button>
                     {isExpanded && (
                         <div className={isDrawer ? 'mt-1 space-y-0.5 pl-2' : 'mt-0.5 space-y-0.5'}>
-                            {tab.submenu.map((subTab) => (
-                                <a
-                                    key={subTab.id}
-                                    href={getPathForTab(subTab.id) || '#'}
-                                    onClick={(event) => handleSidebarItemClick(event, subTab.id)}
-                                    className={`${submenuItemBase} ${
-                                        activeTab === subTab.id ? itemActive : itemInactive
-                                    } ${activeTab === subTab.id ? 'font-medium' : 'font-normal text-gray-700'}`}
-                                >
-                                    {!isDrawer ? null : (
-                                        <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-700">
-                                            {getMenuIcon(subTab.id)}
-                                        </div>
-                                    )}
-                                    <span
-                                        className={`min-w-0 flex-1 ${
-                                            isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
-                                        }`}
-                                    >
-                                        {subTab.label}
-                                    </span>
-                                    <MenuBadge count={badgeCounts[subTab.id]} />
-                                </a>
-                            ))}
+                            {tab.submenu.map((subTab) => {
+                                if (!subTab.submenu) {
+                                    return renderSubmenuLink(subTab, submenuItemBase);
+                                }
+
+                                const nestedExpanded =
+                                    expandedMenus[subTab.id] || nestedItemIsActive(subTab, activeTab);
+
+                                return (
+                                    <div key={subTab.id}>
+                                        <a
+                                            href={getPathForTab(subTab.id) || '#'}
+                                            onClick={(event) => {
+                                                handleSidebarItemClick(event, subTab.id);
+                                                setExpandedMenus((prev) => ({ ...prev, [subTab.id]: true }));
+                                            }}
+                                            className={`${submenuItemBase} ${
+                                                activeTab === subTab.id ? itemActive : itemInactive
+                                            } ${activeTab === subTab.id ? 'font-medium' : 'font-normal text-gray-700'}`}
+                                        >
+                                            {!isDrawer ? null : (
+                                                <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-700">
+                                                    {getMenuIcon(subTab.id)}
+                                                </div>
+                                            )}
+                                            <span
+                                                className={`min-w-0 flex-1 ${
+                                                    isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
+                                                }`}
+                                            >
+                                                {subTab.label}
+                                            </span>
+                                            <MenuBadge count={badgeCounts[subTab.id]} />
+                                        </a>
+                                        {nestedExpanded
+                                            ? subTab.submenu.map((nestedTab) =>
+                                                  renderSubmenuLink(nestedTab, nestedSubmenuItemBase),
+                                              )
+                                            : null}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
