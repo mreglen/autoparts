@@ -41,6 +41,7 @@ import {
 import DeliveryFastIcon from '../../components/icons/DeliveryFastIcon';
 import PickupIcon from '../../components/icons/PickupIcon';
 import { PageHeader } from '../../components/UI/SectionHeader';
+import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 
 function formatApiErrorDetail(detail) {
   if (!detail) return 'Ошибка при оформлении заказа. Попробуйте ещё раз.';
@@ -152,6 +153,7 @@ export default function NewPartsOrderRegistration() {
   const [notification, setNotification] = useState(null);
   const [allowUnpaidCheckout, setAllowUnpaidCheckout] = useState(false);
   const [placedOrder, setPlacedOrder] = useState(null);
+  const [unpaidConfirmOpen, setUnpaidConfirmOpen] = useState(false);
   const skipEmptyCartRedirectRef = useRef(false);
 
   useEffect(() => {
@@ -451,23 +453,35 @@ export default function NewPartsOrderRegistration() {
     }
   };
 
-  const handleUnpaidCheckout = async () => {
+  const handleUnpaidCheckoutClick = () => {
     if (submitting) return;
     if (!validateBeforeSubmit()) return;
     setShowOfferError(false);
     setNotification(null);
+    setUnpaidConfirmOpen(true);
+  };
+
+  const closeUnpaidConfirm = () => {
+    if (submitting) return;
+    setUnpaidConfirmOpen(false);
+  };
+
+  const handleUnpaidCheckout = async () => {
+    if (submitting) return;
     setSubmitMode('unpaid');
     setSubmitting(true);
     skipEmptyCartRedirectRef.current = true;
     try {
       const result = await dispatch(createNewPartsOrder(buildOrderPayload())).unwrap();
       clearNewPartsCheckoutItemIds();
+      setUnpaidConfirmOpen(false);
       setPlacedOrder({
         orderId: result.order_id,
         message: result.message || `Заказ №${result.order_id} оформлен`,
       });
     } catch (err) {
       skipEmptyCartRedirectRef.current = false;
+      setUnpaidConfirmOpen(false);
       setNotification({ type: 'error', message: formatApiErrorDetail(err) });
     } finally {
       setSubmitting(false);
@@ -728,7 +742,7 @@ export default function NewPartsOrderRegistration() {
           {allowUnpaidCheckout && (
             <button
               type="button"
-              onClick={handleUnpaidCheckout}
+              onClick={handleUnpaidCheckoutClick}
               disabled={submitting}
               className="mt-3 w-full rounded-xl border border-line bg-surface px-4 py-3.5 text-base font-semibold text-ink shadow-sg-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -737,6 +751,17 @@ export default function NewPartsOrderRegistration() {
           )}
         </section>
       </div>
+
+      <ConfirmationModal
+        isOpen={unpaidConfirmOpen}
+        onClose={closeUnpaidConfirm}
+        onConfirm={handleUnpaidCheckout}
+        title="Предупреждение"
+        message="Вы уверены, что хотите оформить заказ?"
+        confirmText="Да"
+        cancelText="Отмена"
+        isLoading={submitting && submitMode === 'unpaid'}
+      />
     </div>
   );
 }
