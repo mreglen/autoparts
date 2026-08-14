@@ -92,6 +92,7 @@ const AUTOSERVICE_STAFF_PATH_PREFIXES = [
   '/autoservice/settings',
   '/autoservice/inspections',
   '/autoservice/finance',
+  '/autoservice/reports',
   '/autoservice/warehouse',
 ];
 

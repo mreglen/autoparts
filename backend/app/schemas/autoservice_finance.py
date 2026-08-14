@@ -33,3 +33,19 @@ class AutoserviceFinanceReceiptsResponse(BaseModel):
     total_amount: Decimal = Decimal("0.00")
     count: int = 0
     items: list[AutoserviceFinanceReceiptRow] = Field(default_factory=list)
+
+
+class AutoservicePayrollReportEmployeeRow(BaseModel):
+    employee_id: int
+    name: str
+    completed_orders: int = 0
+    from_works: Decimal = Decimal("0.00")
+    from_daily: Decimal = Decimal("0.00")
+    total: Decimal = Decimal("0.00")
+
+
+class AutoservicePayrollReportResponse(BaseModel):
+    year: int
+    month: int
+    total: Decimal = Decimal("0.00")
+    employees: list[AutoservicePayrollReportEmployeeRow] = Field(default_factory=list)

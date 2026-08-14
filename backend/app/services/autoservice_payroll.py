@@ -142,3 +142,86 @@ def compute_employee_stats(
         "from_fixed": _money(from_fixed),
         "completed_orders": len(order_ids),
     }
+
+
+def month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
+    start = datetime(year, month, 1)
+    if month == 12:
+        return start, datetime(year + 1, 1, 1)
+    return start, datetime(year, month + 1, 1)
+
+
+def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int) -> dict:
+    start, end = month_bounds(year, month)
+    employees = (
+        db.query(AutoserviceServiceEmployee)
+        .filter(AutoserviceServiceEmployee.organization_id == org_id)
+        .order_by(AutoserviceServiceEmployee.name.asc())
+        .all()
+    )
+    accruals = (
+        db.query(AutoservicePayrollAccrual)
+        .filter(
+            AutoservicePayrollAccrual.organization_id == org_id,
+            AutoservicePayrollAccrual.accrued_at >= start,
+            AutoservicePayrollAccrual.accrued_at < end,
+        )
+        .all()
+    )
+
+    by_emp: dict[int, dict] = {}
+    for emp in employees:
+        if not emp.is_active:
+            continue
+        by_emp[emp.id] = {
+            "employee_id": emp.id,
+            "name": emp.name,
+            "order_ids": set(),
+            "from_works": Decimal("0.00"),
+            "from_daily": Decimal("0.00"),
+        }
+
+    employees_by_id = {emp.id: emp for emp in employees}
+    for accrual in accruals:
+        bucket = by_emp.get(accrual.employee_id)
+        if bucket is None:
+            emp = employees_by_id.get(accrual.employee_id)
+            bucket = {
+                "employee_id": accrual.employee_id,
+                "name": emp.name if emp else f"#{accrual.employee_id}",
+                "order_ids": set(),
+                "from_works": Decimal("0.00"),
+                "from_daily": Decimal("0.00"),
+            }
+            by_emp[accrual.employee_id] = bucket
+        if accrual.order_id:
+            bucket["order_ids"].add(accrual.order_id)
+        amount = _money(accrual.amount)
+        if accrual.accrual_type == "work_percent":
+            bucket["from_works"] += amount
+        elif accrual.accrual_type == "daily_rate":
+            bucket["from_daily"] += amount
+
+    rows = []
+    total = Decimal("0.00")
+    for bucket in sorted(by_emp.values(), key=lambda item: item["name"].lower()):
+        from_works = _money(bucket["from_works"])
+        from_daily = _money(bucket["from_daily"])
+        row_total = _money(from_works + from_daily)
+        total += row_total
+        rows.append(
+            {
+                "employee_id": bucket["employee_id"],
+                "name": bucket["name"],
+                "completed_orders": len(bucket["order_ids"]),
+                "from_works": from_works,
+                "from_daily": from_daily,
+                "total": row_total,
+            }
+        )
+    return {
+        "year": year,
+        "month": month,
+        "total": _money(total),
+        "employees": rows,
+    }

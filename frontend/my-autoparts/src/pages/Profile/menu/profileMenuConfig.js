@@ -51,6 +51,7 @@ export const TAB_PATH_MAP = {
     'autoservice-clients': '/autoservice/clients',
     'autoservice-orders': '/autoservice/orders',
     'autoservice-finance': '/autoservice/finance',
+    'autoservice-reports': '/autoservice/reports',
     'autoservice-inspections': '/autoservice/inspections',
     'autoservice-settings': '/autoservice/settings',
     'autoservice-warehouse': '/autoservice/warehouse',
@@ -136,6 +137,7 @@ const buildAutoserviceStaffTab = (user, options) => {
             ],
         },
         { id: 'autoservice-finance', label: 'Финансы' },
+        { id: 'autoservice-reports', label: 'Отчёты' },
         { id: 'autoservice-clients', label: 'Клиенты' },
         { id: 'autoservice-inspections', label: 'Записи' },
     ];
@@ -320,6 +322,7 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/autoservice/warehouse/expenses')) return 'autoservice-warehouse-expenses';
     if (path.startsWith('/autoservice/warehouse')) return 'autoservice-warehouse';
     if (path.startsWith('/autoservice/finance')) return 'autoservice-finance';
+    if (path.startsWith('/autoservice/reports')) return 'autoservice-reports';
     if (path.startsWith('/autoservice/inspections')) return 'autoservice-inspections';
     if (path.startsWith('/autoservice/settings')) return 'autoservice-settings';
     return PATH_TAB_MAP[path] || (user?.is_seller ? 'dashboard' : 'profile');

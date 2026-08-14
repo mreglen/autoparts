@@ -2,7 +2,7 @@ function cx(...parts) {
   return parts.filter(Boolean).join(' ');
 }
 
-export function DataTable({ columns = [], rows = [], empty, className = '' }) {
+export function DataTable({ columns = [], rows = [], empty, footer, className = '' }) {
   if (!rows.length) {
     return empty || null;
   }
@@ -30,6 +30,17 @@ export function DataTable({ columns = [], rows = [], empty, className = '' }) {
             </tr>
           ))}
         </tbody>
+        {footer ? (
+          <tfoot className="border-t border-line bg-surface-muted/60">
+            <tr>
+              {columns.map((col) => (
+                <td key={col.key || col.label} className="px-4 py-3 font-semibold text-ink">
+                  {col.render ? col.render(footer) : footer[col.key]}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        ) : null}
       </table>
     </div>
   );
