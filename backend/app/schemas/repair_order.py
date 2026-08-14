@@ -5,7 +5,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-ACTIVE_STATUSES = ("pending", "in_progress")
+ACTIVE_STATUSES = ("pending", "in_progress", "done")
 HISTORY_STATUSES = ("completed", "cancelled")
 ALL_STATUSES = ACTIVE_STATUSES + HISTORY_STATUSES
 # Legacy aliases kept for migration/display
@@ -200,7 +200,7 @@ class RepairOrderUpdate(BaseModel):
 
 
 class RepairOrderStatusPatch(BaseModel):
-    status: Literal["pending", "in_progress", "completed", "cancelled"]
+    status: Literal["pending", "in_progress", "done", "completed", "cancelled"]
 
 
 class RepairOrderAutoserviceStockItemIn(BaseModel):

@@ -230,10 +230,12 @@ export default function AutoserviceOrdersPage() {
         ? [
             { value: 'pending', label: 'Ожидание' },
             { value: 'in_progress', label: 'В работу' },
+            { value: 'done', label: 'Выполнен' },
           ]
         : [
             { value: 'pending', label: 'Ожидание' },
             { value: 'in_progress', label: 'В работу' },
+            { value: 'done', label: 'Выполнен' },
             { value: 'completed', label: 'Завершить' },
             { value: 'cancelled', label: 'Отменить' },
           ],

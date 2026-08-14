@@ -17,6 +17,7 @@ const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const ORDER_STATUS_STYLES = {
   pending: 'bg-sky-500 text-white hover:bg-sky-600',
   in_progress: 'bg-emerald-500 text-white hover:bg-emerald-600',
+  done: 'bg-violet-500 text-white hover:bg-violet-600',
   completed: 'bg-gray-400 text-white hover:bg-gray-500',
   cancelled: 'bg-gray-300 text-gray-700 line-through hover:bg-gray-400',
 };

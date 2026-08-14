@@ -15,6 +15,7 @@ import {
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
   in_progress: 'В работе',
+  done: 'Выполнен',
   completed: 'Завершён',
   cancelled: 'Отменён',
   accepted: 'Ожидание',
@@ -26,6 +27,7 @@ export const REPAIR_ORDER_STATUS_LABELS = {
 const STATUS_STYLES = {
   pending: 'bg-amber-50 text-amber-800 ring-amber-200',
   in_progress: 'bg-sky-50 text-sky-800 ring-sky-200',
+  done: 'bg-violet-50 text-violet-800 ring-violet-200',
   completed: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
   cancelled: 'bg-gray-100 text-gray-600 ring-gray-200',
   accepted: 'bg-amber-50 text-amber-800 ring-amber-200',

@@ -456,35 +456,61 @@ export default function ProfileMenuTabs({
                                     return renderSubmenuLink(subTab, submenuItemBase);
                                 }
 
-                                const nestedExpanded =
-                                    expandedMenus[subTab.id] || nestedItemIsActive(subTab, activeTab);
+                                const nestedExpanded = Boolean(expandedMenus[subTab.id]);
+                                const nestedPath = getPathForTab(subTab.id);
+                                const nestedHighlight = nestedItemIsActive(subTab, activeTab);
 
                                 return (
                                     <div key={subTab.id}>
-                                        <a
-                                            href={getPathForTab(subTab.id) || '#'}
-                                            onClick={(event) => {
-                                                handleSidebarItemClick(event, subTab.id);
-                                                setExpandedMenus((prev) => ({ ...prev, [subTab.id]: true }));
-                                            }}
-                                            className={`${submenuItemBase} ${
-                                                activeTab === subTab.id ? itemActive : itemInactive
-                                            } ${activeTab === subTab.id ? 'font-medium' : 'font-normal text-gray-700'}`}
-                                        >
-                                            {!isDrawer ? null : (
-                                                <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-700">
-                                                    {getMenuIcon(subTab.id)}
-                                                </div>
-                                            )}
-                                            <span
-                                                className={`min-w-0 flex-1 ${
-                                                    isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
-                                                }`}
+                                        {nestedPath ? (
+                                            <a
+                                                href={nestedPath}
+                                                onClick={(event) => {
+                                                    handleSidebarItemClick(event, subTab.id);
+                                                    setExpandedMenus((prev) => ({ ...prev, [subTab.id]: true }));
+                                                }}
+                                                className={`${submenuItemBase} ${
+                                                    activeTab === subTab.id ? itemActive : itemInactive
+                                                } ${activeTab === subTab.id ? 'font-medium' : 'font-normal text-gray-700'}`}
                                             >
-                                                {subTab.label}
-                                            </span>
-                                            <MenuBadge count={badgeCounts[subTab.id]} />
-                                        </a>
+                                                {!isDrawer ? null : (
+                                                    <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-700">
+                                                        {getMenuIcon(subTab.id)}
+                                                    </div>
+                                                )}
+                                                <span
+                                                    className={`min-w-0 flex-1 ${
+                                                        isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
+                                                    }`}
+                                                >
+                                                    {subTab.label}
+                                                </span>
+                                                <MenuBadge count={badgeCounts[subTab.id]} />
+                                            </a>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleSubmenu(subTab.id)}
+                                                className={`${submenuItemBase} ${nestedHighlight ? itemActive : itemInactive}`}
+                                            >
+                                                {!isDrawer ? (
+                                                    <span className="min-w-0 flex-1 whitespace-normal leading-snug">
+                                                        {subTab.label}
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-700">
+                                                            {getMenuIcon(subTab.id)}
+                                                        </div>
+                                                        <span className="min-w-0 flex-1 break-words whitespace-normal">
+                                                            {subTab.label}
+                                                        </span>
+                                                    </>
+                                                )}
+                                                <MenuBadge count={badgeCounts[subTab.id]} className="mr-1" />
+                                                <MenuChevron expanded={nestedExpanded} />
+                                            </button>
+                                        )}
                                         {nestedExpanded
                                             ? subTab.submenu.map((nestedTab) =>
                                                   renderSubmenuLink(nestedTab, nestedSubmenuItemBase),
