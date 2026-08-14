@@ -993,10 +993,6 @@ export default function AutoserviceOrderFormPage() {
     setShopParts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
 
-  const updateShopPart = (index, patch) => {
-    setShopParts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
-  };
-
   const handleManualShopPartAdd = (values) => {
     setShopParts((prev) => [...prev, makeEmptyShopPart({
       title: values.name,
