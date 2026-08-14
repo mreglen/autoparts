@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateOrganization } from '../../redux/slices/OrganizationSlice';
-import { SettingsCard, SettingsSectionHeader } from './settingsUi';
+import { Card } from '../../components/UI';
 
 const OPTIONS = [
   {
@@ -56,20 +56,16 @@ const WatermarksSection = ({ org }) => {
   };
 
   return (
-    <SettingsCard>
-      <SettingsSectionHeader
-        title="Водяные знаки"
-        subtitle="Наложение на фото товаров"
-        icon={
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        }
-        action={isUpdating ? <span className="text-xs text-ink-muted">Сохранение…</span> : null}
-      />
+    <Card>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Водяные знаки</h3>
+          <p className="mt-0.5 text-sm text-gray-500">Наложение на фото товаров</p>
+        </div>
+        {isUpdating ? <span className="text-xs text-gray-500">Сохранение…</span> : null}
+      </div>
 
-      <div className="grid gap-2">
+      <div className="space-y-2 rounded-xl bg-gray-100 p-2">
         {OPTIONS.map((option) => {
           const active = selected === option.value;
           return (
@@ -78,28 +74,26 @@ const WatermarksSection = ({ org }) => {
               type="button"
               disabled={isUpdating}
               onClick={() => handleSelect(option.value)}
-              className={`flex w-full items-start gap-3 rounded-sg border px-4 py-3.5 text-left transition-colors disabled:opacity-60 ${
-                active
-                  ? 'border-brand-200 bg-brand-50/70 ring-1 ring-brand-100'
-                  : 'border-line bg-white hover:border-brand-200'
+              className={`flex w-full items-start gap-3 rounded-xl px-4 py-3.5 text-left transition disabled:opacity-60 ${
+                active ? 'bg-white' : 'bg-transparent hover:bg-white/70'
               }`}
             >
               <span
                 className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                  active ? 'border-brand-600 bg-brand-600' : 'border-line bg-white'
+                  active ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300 bg-white'
                 }`}
               >
                 {active ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
               </span>
               <span>
-                <span className="block text-sm font-medium text-ink">{option.title}</span>
-                <span className="mt-0.5 block text-sm text-ink-muted">{option.description}</span>
+                <span className="block text-sm font-medium text-gray-900">{option.title}</span>
+                <span className="mt-0.5 block text-sm text-gray-500">{option.description}</span>
               </span>
             </button>
           );
         })}
       </div>
-    </SettingsCard>
+    </Card>
   );
 };
 

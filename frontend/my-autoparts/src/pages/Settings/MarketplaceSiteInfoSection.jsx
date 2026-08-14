@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateOrganization } from '../../redux/slices/OrganizationSlice';
-import { SettingsCard, SettingsSectionHeader, SettingsToggle } from './settingsUi';
+import { Card } from '../../components/UI';
+import { SettingsToggle } from './settingsUi';
 
 export default function MarketplaceSiteInfoSection({ org }) {
   const dispatch = useDispatch();
@@ -34,21 +35,10 @@ export default function MarketplaceSiteInfoSection({ org }) {
   };
 
   return (
-    <SettingsCard>
-      <SettingsSectionHeader
-        title="Описание на площадках"
-        subtitle="Авито и Дром"
-        icon={
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-            />
-          </svg>
-        }
-      />
-      <p className="mb-4 text-sm leading-relaxed text-ink-muted">
+    <Card>
+      <h3 className="text-sm font-semibold text-gray-900">Описание на площадках</h3>
+      <p className="mt-0.5 mb-4 text-sm text-gray-500">Авито и Дром</p>
+      <p className="mb-4 text-sm leading-relaxed text-gray-600">
         При выгрузке в Авито и Дром в конец описания добавляется блок со ссылкой на карточку
         товара на сайте Свой Гараж, чтобы покупатели могли открыть объявление у нас.
       </p>
@@ -59,6 +49,6 @@ export default function MarketplaceSiteInfoSection({ org }) {
         label="Добавлять ссылку на Свой Гараж"
         description="Только в выгрузке: описание карточки на сайте не меняется"
       />
-    </SettingsCard>
+    </Card>
   );
 }

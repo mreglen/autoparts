@@ -6,7 +6,8 @@ import {
     assignPaymentMethod,
     removePaymentMethod,
 } from '../../redux/slices/OrganizationSlice';
-import { SettingsCard, SettingsSectionHeader, SettingsToggle } from './settingsUi';
+import { Card, EmptyState, Skeleton } from '../../components/UI';
+import { SettingsToggle } from './settingsUi';
 
 const PaymentMethodsSection = ({ orgId }) => {
     const dispatch = useDispatch();
@@ -39,30 +40,17 @@ const PaymentMethodsSection = ({ orgId }) => {
     };
 
     return (
-        <SettingsCard>
-            <SettingsSectionHeader
-                title="Способы оплаты"
-                subtitle="Варианты при подтверждении заказа"
-                icon={
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                        />
-                    </svg>
-                }
-            />
+        <Card>
+            <h3 className="text-sm font-semibold text-gray-900">Способы оплаты</h3>
+            <p className="mt-0.5 mb-4 text-sm text-gray-500">Варианты при подтверждении заказа</p>
 
             {loading ? (
-                <div className="animate-pulse space-y-2">
-                    <div className="h-14 rounded-sg bg-surface-subtle" />
-                    <div className="h-14 rounded-sg bg-surface-subtle" />
+                <div className="space-y-2">
+                    <Skeleton className="h-14 w-full rounded-xl" />
+                    <Skeleton className="h-14 w-full rounded-xl" />
                 </div>
             ) : error ? (
-                <p className="rounded-sg border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700">
-                    {error}
-                </p>
+                <EmptyState illustration="error" title="Не удалось загрузить" description={error} />
             ) : allPaymentMethods && allPaymentMethods.length > 0 ? (
                 <div className="space-y-2">
                     {allPaymentMethods.map((method) => {
@@ -80,11 +68,9 @@ const PaymentMethodsSection = ({ orgId }) => {
                     })}
                 </div>
             ) : (
-                <p className="rounded-sg border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted">
-                    Нет доступных способов оплаты
-                </p>
+                <p className="py-4 text-sm text-gray-500">Нет доступных способов оплаты</p>
             )}
-        </SettingsCard>
+        </Card>
     );
 };
 

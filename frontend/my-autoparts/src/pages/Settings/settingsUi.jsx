@@ -87,14 +87,14 @@ export function SettingsToggle({ checked, onChange, disabled, label, description
     return (
         <label
             className={cx(
-                'flex cursor-pointer items-center justify-between gap-4 rounded-sg border px-4 py-3.5 transition-colors',
-                checked ? 'border-brand-200 bg-brand-50/50' : 'border-line bg-white hover:border-brand-200',
+                'flex cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-3.5 transition',
+                checked ? 'bg-white ring-2 ring-indigo-400/70' : 'bg-gray-100 hover:bg-gray-200/80',
                 disabled ? 'cursor-not-allowed opacity-60' : '',
             )}
         >
             <span className="min-w-0">
-                <span className="block text-sm font-medium text-ink">{label}</span>
-                {description ? <span className="mt-0.5 block text-sm text-ink-muted">{description}</span> : null}
+                <span className="block text-sm font-medium text-gray-900">{label}</span>
+                {description ? <span className="mt-0.5 block text-sm text-gray-500">{description}</span> : null}
             </span>
             <span className="relative shrink-0">
                 <input
@@ -104,7 +104,7 @@ export function SettingsToggle({ checked, onChange, disabled, label, description
                     disabled={disabled}
                     onChange={onChange}
                 />
-                <span className="block relative h-6 w-11 rounded-full bg-surface-muted transition-colors peer-checked:bg-brand-600 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/30 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sg-sm after:transition-transform peer-checked:after:translate-x-5" />
+                <span className="relative block h-6 w-11 rounded-full bg-gray-200 transition-colors peer-checked:bg-indigo-600 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-400/70 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-5" />
             </span>
         </label>
     );
