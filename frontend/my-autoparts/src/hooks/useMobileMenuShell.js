@@ -10,24 +10,126 @@ import { selectShowWarehouseInventory } from '../utils/siteReviewsPublic';
 import {
     selectShowAutoservice,
     selectAutoserviceOrganizationId,
-    isAutoserviceClientPath,
-    isAutoserviceStaffPath,
+    isPathAllowedInCabinet,
 } from '../utils/autoservicePublic';
 import {
-    ADMIN_MENU_MODE_ADMIN,
-    ADMIN_MENU_MODE_USER,
-    getAdminMenuMode,
-    isAdminOnlyPath,
-    setAdminMenuMode as persistAdminMenuMode,
-} from '../utils/adminMenuMode';
-import {
-    SELLER_AUTOSERVICE_MODE_AUTOSERVICE,
-    SELLER_AUTOSERVICE_MODE_SELLER,
-    getSellerAutoserviceMode,
-    setSellerAutoserviceMode as persistSellerAutoserviceMode,
-    showSellerAutoserviceSwitch,
-} from '../utils/sellerAutoserviceMode';
+    CABINET_MODE_ADMIN,
+    CABINET_MODE_AUTOSERVICE,
+    CABINET_MODE_BUYER,
+    CABINET_MODE_SELLER,
+    getAvailableCabinetModes,
+    getDefaultPathForCabinetMode,
+    getCabinetMode,
+    resolveCabinetMode,
+    setCabinetMode as persistCabinetMode,
+    showCabinetModeSwitch,
+} from '../utils/cabinetMode';
 import { selectIsAutoserviceClient } from '../redux/slices/AutoserviceClientSlice';
+
+function resolveRedirectOnCabinetChange(pathname, nextMode, user) {
+    if (!user) return null;
+
+    if (user.is_admin && !isPathAllowedInCabinet(pathname, nextMode, user)) {
+        return getDefaultPathForCabinetMode(nextMode);
+    }
+
+    if (nextMode === CABINET_MODE_ADMIN) {
+        if (
+            pathname.startsWith('/dashboard') ||
+            pathname.startsWith('/sales') ||
+            pathname.startsWith('/purchases') ||
+            pathname.startsWith('/finance') ||
+            pathname.startsWith('/clients') ||
+            pathname.startsWith('/my-parts') ||
+            pathname.startsWith('/vehicles') ||
+            pathname.startsWith('/stock-') ||
+            pathname.startsWith('/warehouse-sales') ||
+            pathname.startsWith('/warehouse/') ||
+            pathname.startsWith('/chats') ||
+            pathname.startsWith('/garage') ||
+            pathname.startsWith('/autoservice/welcome') ||
+            pathname.startsWith('/autoservice/repair-booking')
+        ) {
+            return '/sellers';
+        }
+    }
+
+    if (nextMode === CABINET_MODE_BUYER) {
+        if (
+            pathname.startsWith('/sellers') ||
+            pathname.startsWith('/moderation/') ||
+            pathname.startsWith('/admin/') ||
+            pathname.startsWith('/admin-settings') ||
+            pathname.startsWith('/design-system') ||
+            pathname.startsWith('/autoservice/planner') ||
+            pathname.startsWith('/autoservice/clients') ||
+            pathname.startsWith('/autoservice/orders') ||
+            pathname.startsWith('/autoservice/settings') ||
+            pathname.startsWith('/autoservice/inspections') ||
+            pathname.startsWith('/autoservice/finance') ||
+            pathname.startsWith('/autoservice/warehouse') ||
+            pathname.startsWith('/dashboard') ||
+            pathname.startsWith('/sales') ||
+            pathname.startsWith('/finance') ||
+            pathname.startsWith('/clients') ||
+            pathname.startsWith('/my-parts') ||
+            pathname.startsWith('/vehicles') ||
+            pathname.startsWith('/stock-') ||
+            pathname.startsWith('/warehouse-sales') ||
+            pathname.startsWith('/warehouse/inventory')
+        ) {
+            return '/purchases/orders';
+        }
+    }
+
+    if (nextMode === CABINET_MODE_SELLER) {
+        if (
+            pathname.startsWith('/sellers') ||
+            pathname.startsWith('/moderation/') ||
+            pathname.startsWith('/admin/') ||
+            pathname.startsWith('/admin-settings') ||
+            pathname.startsWith('/design-system') ||
+            pathname.startsWith('/autoservice/planner') ||
+            pathname.startsWith('/autoservice/clients') ||
+            pathname.startsWith('/autoservice/orders') ||
+            pathname.startsWith('/autoservice/settings') ||
+            pathname.startsWith('/autoservice/inspections') ||
+            pathname.startsWith('/autoservice/finance') ||
+            pathname.startsWith('/autoservice/warehouse') ||
+            pathname.startsWith('/garage') ||
+            pathname.startsWith('/autoservice/welcome') ||
+            pathname.startsWith('/autoservice/repair-booking')
+        ) {
+            return '/dashboard';
+        }
+    }
+
+    if (nextMode === CABINET_MODE_AUTOSERVICE) {
+        if (
+            pathname.startsWith('/sellers') ||
+            pathname.startsWith('/moderation/') ||
+            pathname.startsWith('/admin/') ||
+            pathname.startsWith('/admin-settings') ||
+            pathname.startsWith('/design-system') ||
+            pathname.startsWith('/garage') ||
+            pathname.startsWith('/autoservice/welcome') ||
+            pathname.startsWith('/autoservice/repair-booking') ||
+            pathname.startsWith('/sales') ||
+            pathname.startsWith('/finance') ||
+            pathname.startsWith('/clients') ||
+            pathname.startsWith('/my-parts') ||
+            pathname.startsWith('/vehicles') ||
+            pathname.startsWith('/stock-') ||
+            pathname.startsWith('/warehouse-sales') ||
+            pathname.startsWith('/warehouse/inventory') ||
+            pathname.startsWith('/chats')
+        ) {
+            return '/autoservice/planner';
+        }
+    }
+
+    return null;
+}
 
 export function useMobileMenuShell(userOverride) {
     const location = useLocation();
@@ -39,18 +141,32 @@ export function useMobileMenuShell(userOverride) {
     const isAutoserviceClient = useSelector(selectIsAutoserviceClient);
     const user = userOverride ?? authUser;
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [adminMenuMode, setAdminMenuModeState] = useState(getAdminMenuMode);
-    const [sellerAutoserviceMode, setSellerAutoserviceModeState] = useState(getSellerAutoserviceMode);
+
+    const cabinetOptions = useMemo(
+        () => ({ autoserviceOrganizationId }),
+        [autoserviceOrganizationId],
+    );
+
+    const [cabinetMode, setCabinetModeState] = useState(() =>
+        getCabinetMode(user, cabinetOptions),
+    );
+    const [availableCabinetModes, setAvailableCabinetModes] = useState(() =>
+        getAvailableCabinetModes(user, cabinetOptions),
+    );
 
     useEffect(() => {
-        if (!user?.is_admin) return;
-        setAdminMenuModeState(getAdminMenuMode());
-    }, [user?.id, user?.is_admin]);
-
-    useEffect(() => {
-        if (!showSellerAutoserviceSwitch(user)) return;
-        setSellerAutoserviceModeState(getSellerAutoserviceMode());
-    }, [user?.id, user?.organization_is_autoservice]);
+        if (!user) return;
+        const modes = getAvailableCabinetModes(user, cabinetOptions);
+        setAvailableCabinetModes(modes);
+        setCabinetModeState(resolveCabinetMode(user, cabinetOptions));
+    }, [
+        user?.id,
+        user?.is_admin,
+        user?.is_seller,
+        user?.is_employee,
+        user?.organization_is_autoservice,
+        cabinetOptions,
+    ]);
 
     const activeTab = getActiveTabFromPath(location.pathname, user);
     const tabs = getAvailableTabs(user, permissionCodes, {
@@ -58,47 +174,25 @@ export function useMobileMenuShell(userOverride) {
         showAutoservice,
         autoserviceOrganizationId,
         isAutoserviceClient,
-        adminMenuMode: user?.is_admin ? adminMenuMode : undefined,
+        cabinetMode,
         organizationIsAutoservice: Boolean(user?.organization_is_autoservice),
-        sellerAutoserviceMode: showSellerAutoserviceSwitch(user) ? sellerAutoserviceMode : undefined,
     });
 
-    const setAdminMenuMode = useCallback(
+    const setCabinetMode = useCallback(
         (mode) => {
-            if (!user?.is_admin) return;
-            const nextMode = mode === ADMIN_MENU_MODE_ADMIN ? ADMIN_MENU_MODE_ADMIN : ADMIN_MENU_MODE_USER;
-            persistAdminMenuMode(nextMode);
-            setAdminMenuModeState(nextMode);
-            if (nextMode === ADMIN_MENU_MODE_USER && isAdminOnlyPath(location.pathname)) {
-                navigate('/dashboard', { replace: true });
-            } else if (nextMode === ADMIN_MENU_MODE_USER && isAutoserviceStaffPath(location.pathname)) {
-                navigate('/garage', { replace: true });
-            } else if (nextMode === ADMIN_MENU_MODE_ADMIN && isAutoserviceClientPath(location.pathname)) {
-                navigate('/autoservice/planner', { replace: true });
-            }
-        },
-        [user?.is_admin, location.pathname, navigate],
-    );
+            if (!user) return;
+            const modes = getAvailableCabinetModes(user, cabinetOptions);
+            if (!modes.includes(mode)) return;
 
-    const setSellerAutoserviceMode = useCallback(
-        (mode) => {
-            if (!showSellerAutoserviceSwitch(user)) return;
-            const nextMode =
-                mode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE
-                    ? SELLER_AUTOSERVICE_MODE_AUTOSERVICE
-                    : SELLER_AUTOSERVICE_MODE_SELLER;
-            persistSellerAutoserviceMode(nextMode);
-            setSellerAutoserviceModeState(nextMode);
-            if (nextMode === SELLER_AUTOSERVICE_MODE_SELLER && isAutoserviceStaffPath(location.pathname)) {
-                navigate('/dashboard', { replace: true });
-            } else if (
-                nextMode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE &&
-                isAutoserviceClientPath(location.pathname)
-            ) {
-                navigate('/autoservice/planner', { replace: true });
+            persistCabinetMode(mode);
+            setCabinetModeState(mode);
+
+            const redirect = resolveRedirectOnCabinetChange(location.pathname, mode, user);
+            if (redirect) {
+                navigate(redirect, { replace: true });
             }
         },
-        [user, location.pathname, navigate],
+        [user, cabinetOptions, location.pathname, navigate],
     );
 
     useEffect(() => {
@@ -158,12 +252,10 @@ export function useMobileMenuShell(userOverride) {
         closeMenu,
         handleTabChange,
         guestContent,
-        adminMenuMode,
-        setAdminMenuMode,
-        showAdminMenuSwitch: Boolean(user?.is_admin),
-        sellerAutoserviceMode,
-        setSellerAutoserviceMode,
-        showSellerAutoserviceSwitch: showSellerAutoserviceSwitch(user),
+        cabinetMode,
+        setCabinetMode,
+        availableCabinetModes,
+        showCabinetModeSwitch: showCabinetModeSwitch(user, cabinetOptions),
     };
 }
 
@@ -177,7 +269,7 @@ export function getPageTitle(pathname) {
         '/organizations': 'Организации',
         '/reviews': 'Отзывы',
         '/cart': 'Корзина',
-        '/dashboard': 'Обзор',
+        '/dashboard': 'Сводка',
         '/profile': 'Профиль',
         '/profile/favorites': 'Избранное',
         '/profile/views': 'Просмотры',
@@ -214,9 +306,6 @@ export function getPageTitle(pathname) {
         '/autoservice/planner': 'Планировщик',
         '/autoservice/clients': 'Клиенты автосервиса',
         '/autoservice/orders': 'Заказ-наряды',
-        '/autoservice/warehouse': 'Склад автосервиса',
-        '/autoservice/warehouse/receipts': 'Поступления',
-        '/autoservice/warehouse/expenses': 'Расходы',
         '/autoservice/inspections': 'Записи',
         '/autoservice/settings': 'Настройки автосервиса',
         '/garage': 'Мои авто',

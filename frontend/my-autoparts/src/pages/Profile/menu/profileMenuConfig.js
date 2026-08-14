@@ -1,9 +1,14 @@
 import {
-    canAccessAutoserviceStaffMenu,
     canAccessAutoserviceSettings,
     canAccessAutoserviceClientMenu,
 } from '../../../utils/autoservicePublic';
-import { resolveMenuUser } from '../../../utils/adminMenuMode';
+import {
+    CABINET_MODE_ADMIN,
+    CABINET_MODE_AUTOSERVICE,
+    CABINET_MODE_BUYER,
+    CABINET_MODE_SELLER,
+    resolveCabinetMode,
+} from '../../../utils/cabinetMode';
 
 export const TAB_PATH_MAP = {
     dashboard: '/dashboard',
@@ -58,11 +63,17 @@ const buildPurchasesSubmenu = () => [
     { id: 'purchases-returns', label: 'Возвраты' },
 ];
 
-const buildGlobalSettingsTab = (menuUser, hasPermission) => {
+const buildGlobalSettingsTab = (menuUser, hasPermission, cabinetMode) => {
+    if (cabinetMode === CABINET_MODE_ADMIN || cabinetMode === CABINET_MODE_BUYER) {
+        return {
+            id: 'settings',
+            label: 'Настройки',
+            submenu: [{ id: 'profile', label: 'Профиль' }],
+        };
+    }
+
     if (menuUser.is_employee && !menuUser.is_admin) {
-        const settingsSubmenu = [
-            { id: 'profile', label: 'Профиль' },
-        ];
+        const settingsSubmenu = [{ id: 'profile', label: 'Профиль' }];
         if (hasPermission('storage-addresses')) {
             settingsSubmenu.push({ id: 'settings-storage-addresses', label: 'Адресное хранение' });
         }
@@ -88,10 +99,8 @@ const buildGlobalSettingsTab = (menuUser, hasPermission) => {
             ],
         };
     }
-    if (menuUser.is_seller) {
-        const settingsSubmenu = [
-            { id: 'profile', label: 'Профиль' },
-        ];
+    if (menuUser.is_seller || menuUser.is_admin) {
+        const settingsSubmenu = [{ id: 'profile', label: 'Профиль' }];
         if (menuUser.organization_id) {
             settingsSubmenu.push({ id: 'settings-organization', label: 'Организация' });
             settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
@@ -99,21 +108,10 @@ const buildGlobalSettingsTab = (menuUser, hasPermission) => {
         }
         return { id: 'settings', label: 'Настройки', submenu: settingsSubmenu };
     }
-    if (menuUser.is_admin) {
-        return {
-            id: 'settings',
-            label: 'Настройки',
-            submenu: [
-                { id: 'profile', label: 'Профиль' },
-            ],
-        };
-    }
     return {
         id: 'settings',
         label: 'Настройки',
-        submenu: [
-            { id: 'profile', label: 'Профиль' },
-        ],
+        submenu: [{ id: 'profile', label: 'Профиль' }],
     };
 };
 
@@ -147,6 +145,145 @@ const buildAutoserviceStaffTab = (user, options) => {
         submenu.push({ id: 'autoservice-settings', label: 'Настройки' });
     }
     return { id: 'autoservice-staff', label: 'Сервис', submenu };
+};
+
+const buildSalesSubmenu = (menuUser, hasPermission) => {
+    const salesSubmenu = [];
+    if (menuUser.is_seller || menuUser.is_admin || hasPermission('sales.orders')) {
+        salesSubmenu.push({ id: 'sales-orders', label: 'Заказы покупателей' });
+    }
+    if (menuUser.is_seller || menuUser.is_admin || hasPermission('sales.returns')) {
+        salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты покупателей' });
+    }
+    if (menuUser.is_seller || menuUser.is_admin || hasPermission('warehouse-sales')) {
+        salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
+    }
+    return salesSubmenu;
+};
+
+const buildWarehouseSubmenu = (menuUser, hasPermission, showWarehouseInventory) => {
+    const warehouseSubmenu = [];
+    if (menuUser.is_seller || menuUser.is_admin || hasPermission('my-parts')) {
+        warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
+    }
+    if (
+        menuUser.is_seller ||
+        menuUser.is_admin ||
+        hasPermission('vehicles') ||
+        hasPermission('my-parts') ||
+        hasPermission('stock-in')
+    ) {
+        warehouseSubmenu.push({ id: 'vehicles', label: 'Автомобили' });
+    }
+    if (menuUser.is_seller || menuUser.is_admin || hasPermission('stock-in')) {
+        warehouseSubmenu.push({ id: 'receipts', label: 'Поступление' });
+    }
+    if (menuUser.is_seller || menuUser.is_admin || hasPermission('stock-out')) {
+        warehouseSubmenu.push({ id: 'expenses', label: 'Расходы' });
+    }
+    if (
+        showWarehouseInventory &&
+        (menuUser.is_seller || menuUser.is_admin || menuUser.is_director || hasPermission('inventory.view'))
+    ) {
+        warehouseSubmenu.push({ id: 'warehouse-inventory', label: 'Инвентаризация' });
+    }
+    return warehouseSubmenu;
+};
+
+const buildBuyerTabs = (user, hasPermission, options) => {
+    const tabs = [
+        {
+            id: 'purchases',
+            label: 'Покупки',
+            submenu: buildPurchasesSubmenu(),
+        },
+        { id: 'chats', label: 'Сообщения' },
+    ];
+
+    if (canAccessAutoserviceClientMenu(user, options)) {
+        tabs.push(buildAutoserviceClientTab(options.isAutoserviceClient === true));
+    }
+
+    tabs.push(buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_BUYER));
+    return tabs;
+};
+
+const buildSellerTabs = (user, hasPermission, options) => {
+    const showWarehouseInventory = options.showWarehouseInventory === true;
+    const tabs = [
+        { id: 'dashboard', label: 'Сводка' },
+        {
+            id: 'purchases',
+            label: 'Покупки',
+            submenu: buildPurchasesSubmenu(),
+        },
+    ];
+
+    const salesSubmenu = buildSalesSubmenu(user, hasPermission);
+    if (salesSubmenu.length > 0) {
+        tabs.push({ id: 'sales', label: 'Продажи', submenu: salesSubmenu });
+    }
+
+    if (user.is_seller || user.is_admin) {
+        tabs.push({ id: 'clients', label: 'Клиенты' });
+    }
+
+    if (user.is_seller || user.is_admin || hasPermission('finance.reports')) {
+        tabs.push({ id: 'finance', label: 'Финансы' });
+    }
+
+    const warehouseSubmenu = buildWarehouseSubmenu(user, hasPermission, showWarehouseInventory);
+    if (warehouseSubmenu.length > 0) {
+        tabs.push({ id: 'warehouse', label: 'Склад', submenu: warehouseSubmenu });
+    }
+
+    if (user.is_seller || user.is_admin) {
+        tabs.push({ id: 'chats', label: 'Сообщения' });
+    }
+
+    tabs.push(buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_SELLER));
+    return tabs;
+};
+
+const buildAutoserviceTabs = (user, hasPermission, options) => {
+    const tabs = [
+        { id: 'dashboard', label: 'Сводка' },
+        {
+            id: 'purchases',
+            label: 'Покупки',
+            submenu: buildPurchasesSubmenu(),
+        },
+        buildAutoserviceStaffTab(user, options),
+    ];
+
+    tabs.push(buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_AUTOSERVICE));
+    return tabs;
+};
+
+const buildAdminTabs = (user, hasPermission) => {
+    const tabs = [
+        { id: 'sellers', label: 'Продавцы' },
+        { id: 'pending-sellers', label: 'Регистрация продавцов' },
+        { id: 'autoservice-applications', label: 'Регистрация автосервиса' },
+        { id: 'product-moderation', label: 'Проверка запчастей' },
+        { id: 'analytics', label: 'Аналитика' },
+        { id: 'admin-panel', label: 'Настройки' },
+        { id: 'design-system', label: 'Дизайн-система' },
+        { id: 'admin-users', label: 'Пользователи' },
+        { id: 'admin-rossko', label: 'Rossko' },
+        { id: 'site-payments', label: 'Оплата сайта' },
+        { id: 'audit-log', label: 'Журнал событий' },
+    ];
+
+    if (!user.is_admin && hasPermission('admin.audit')) {
+        return [
+            { id: 'audit-log', label: 'Журнал событий' },
+            buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_ADMIN),
+        ];
+    }
+
+    tabs.push(buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_ADMIN));
+    return tabs;
 };
 
 const PATH_TAB_MAP = Object.fromEntries(
@@ -191,194 +328,38 @@ export const getActiveTabFromPath = (path, user) => {
 };
 
 export const getAvailableTabs = (user, permissionCodes, options = {}) => {
-    const menuUser = resolveMenuUser(user, options.adminMenuMode);
     const hasPermission = (code) => permissionCodes && permissionCodes.includes(code);
     const showWarehouseInventory = options.showWarehouseInventory === true;
     const showAutoservice = options.showAutoservice === true;
     const autoserviceOrganizationId = options.autoserviceOrganizationId || null;
+    const cabinetMode = options.cabinetMode || resolveCabinetMode(user, { autoserviceOrganizationId });
+
     const autoserviceAccessOptions = {
         showAutoservice,
         autoserviceOrganizationId,
-        adminMenuMode: options.adminMenuMode,
+        cabinetMode,
         organizationIsAutoservice: options.organizationIsAutoservice === true,
-        sellerAutoserviceMode: options.sellerAutoserviceMode,
     };
 
-    if (!menuUser) return [];
+    if (!user) return [];
 
-    let baseTabs = [];
-
-    if (menuUser.is_admin) {
-        baseTabs = [
-            { id: 'dashboard', label: 'Главная' },
-            { id: 'clients', label: 'Клиенты' },
-            { id: 'chats', label: 'Сообщения' },
-            {
-                id: 'purchases',
-                label: 'Покупки',
-                submenu: buildPurchasesSubmenu(),
-            },
-        ];
-    } else if (menuUser.is_seller) {
-        baseTabs = [
-            { id: 'dashboard', label: 'Главная' },
-            { id: 'clients', label: 'Клиенты' },
-            { id: 'chats', label: 'Сообщения' },
-            {
-                id: 'purchases',
-                label: 'Покупки',
-                submenu: buildPurchasesSubmenu(),
-            },
-        ];
-    } else {
-        baseTabs = [
-            {
-                id: 'purchases',
-                label: 'Покупки',
-                submenu: buildPurchasesSubmenu(),
-            },
-            { id: 'chats', label: 'Сообщения' },
-        ];
+    switch (cabinetMode) {
+        case CABINET_MODE_SELLER:
+            return buildSellerTabs(user, hasPermission, {
+                showWarehouseInventory,
+                ...autoserviceAccessOptions,
+            });
+        case CABINET_MODE_AUTOSERVICE:
+            return buildAutoserviceTabs(user, hasPermission, autoserviceAccessOptions);
+        case CABINET_MODE_ADMIN:
+            return buildAdminTabs(user, hasPermission);
+        case CABINET_MODE_BUYER:
+        default:
+            return buildBuyerTabs(user, hasPermission, {
+                ...autoserviceAccessOptions,
+                isAutoserviceClient: options.isAutoserviceClient === true,
+            });
     }
-
-    if (menuUser.is_seller || menuUser.is_admin || menuUser.is_employee) {
-        const salesSubmenu = [];
-
-        if (menuUser.is_seller || menuUser.is_admin || hasPermission('sales.orders')) {
-            salesSubmenu.push({ id: 'sales-orders', label: 'Заказы покупателей' });
-        }
-        if (menuUser.is_seller || menuUser.is_admin || hasPermission('sales.returns')) {
-            salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты покупателей' });
-        }
-        if (menuUser.is_seller || menuUser.is_admin || hasPermission('warehouse-sales')) {
-            salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
-        }
-
-        if (salesSubmenu.length > 0) {
-            baseTabs.push({ id: 'sales', label: 'Продажи', submenu: salesSubmenu });
-        }
-    }
-
-    if (menuUser.is_seller || menuUser.is_admin || hasPermission('finance.reports')) {
-        baseTabs.push({ id: 'finance', label: 'Финансы' });
-    }
-
-    if (menuUser.is_seller || menuUser.is_admin || menuUser.is_employee) {
-        const warehouseSubmenu = [];
-
-        if (menuUser.is_seller || menuUser.is_admin || hasPermission('my-parts')) {
-            warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
-        }
-        if (
-            menuUser.is_seller ||
-            menuUser.is_admin ||
-            hasPermission('vehicles') ||
-            hasPermission('my-parts') ||
-            hasPermission('stock-in')
-        ) {
-            warehouseSubmenu.push({ id: 'vehicles', label: 'Автомобили' });
-        }
-        if (menuUser.is_seller || menuUser.is_admin || hasPermission('stock-in')) {
-            warehouseSubmenu.push({ id: 'receipts', label: 'Поступление' });
-        }
-        if (menuUser.is_seller || menuUser.is_admin || hasPermission('stock-out')) {
-            warehouseSubmenu.push({ id: 'expenses', label: 'Расходы' });
-        }
-        if (
-            showWarehouseInventory &&
-            (menuUser.is_seller || menuUser.is_admin || menuUser.is_director || hasPermission('inventory.view'))
-        ) {
-            warehouseSubmenu.push({ id: 'warehouse-inventory', label: 'Инвентаризация' });
-        }
-
-        if (warehouseSubmenu.length > 0) {
-            baseTabs.push({ id: 'warehouse', label: 'Склад', submenu: warehouseSubmenu });
-        }
-    }
-
-    if (menuUser.is_employee && !menuUser.is_admin) {
-        baseTabs = [
-            { id: 'dashboard', label: 'Главная' },
-            {
-                id: 'purchases',
-                label: 'Покупки',
-                submenu: buildPurchasesSubmenu(),
-            },
-        ];
-
-        const salesSubmenu = [];
-        if (hasPermission('sales.orders')) {
-            salesSubmenu.push({ id: 'sales-orders', label: 'Заказы покупателей' });
-        }
-        if (hasPermission('sales.returns')) {
-            salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты покупателей' });
-        }
-        if (hasPermission('warehouse-sales')) {
-            salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
-        }
-        if (salesSubmenu.length > 0) {
-            baseTabs.push({ id: 'sales', label: 'Продажи', submenu: salesSubmenu });
-        }
-
-        const warehouseSubmenu = [];
-        if (hasPermission('my-parts')) {
-            warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
-        }
-        if (hasPermission('vehicles') || hasPermission('my-parts') || hasPermission('stock-in')) {
-            warehouseSubmenu.push({ id: 'vehicles', label: 'Автомобили' });
-        }
-        if (hasPermission('stock-in')) {
-            warehouseSubmenu.push({ id: 'receipts', label: 'Поступление' });
-        }
-        if (hasPermission('stock-out')) {
-            warehouseSubmenu.push({ id: 'expenses', label: 'Расходы' });
-        }
-        if (showWarehouseInventory && hasPermission('inventory.view')) {
-            warehouseSubmenu.push({ id: 'warehouse-inventory', label: 'Инвентаризация' });
-        }
-        if (warehouseSubmenu.length > 0) {
-            baseTabs.push({ id: 'warehouse', label: 'Склад', submenu: warehouseSubmenu });
-        }
-    }
-
-    if (canAccessAutoserviceClientMenu(user, autoserviceAccessOptions)) {
-        baseTabs.push(buildAutoserviceClientTab(options.isAutoserviceClient === true));
-    }
-
-    if (canAccessAutoserviceStaffMenu(user, autoserviceAccessOptions)) {
-        baseTabs.push(buildAutoserviceStaffTab(user, autoserviceAccessOptions));
-    }
-
-    const auditSubmenuItem = { id: 'audit-log', label: 'Журнал событий' };
-    if (menuUser.is_admin) {
-        baseTabs.push({
-            id: 'administration',
-            label: 'Админка',
-            submenu: [
-                { id: 'sellers', label: 'Продавцы' },
-                { id: 'pending-sellers', label: 'Регистрация продавцов' },
-                { id: 'autoservice-applications', label: 'Регистрация автосервиса' },
-                { id: 'product-moderation', label: 'Проверка запчастей' },
-                { id: 'analytics', label: 'Аналитика' },
-                { id: 'admin-panel', label: 'Настройки' },
-                { id: 'design-system', label: 'Дизайн-система' },
-                { id: 'admin-users', label: 'Пользователи' },
-                { id: 'admin-rossko', label: 'Rossko' },
-                { id: 'site-payments', label: 'Оплата сайта' },
-                auditSubmenuItem,
-            ],
-        });
-    } else if (hasPermission('admin.audit')) {
-        baseTabs.push({
-            id: 'administration',
-            label: 'Админка',
-            submenu: [auditSubmenuItem],
-        });
-    }
-
-    baseTabs.push(buildGlobalSettingsTab(menuUser, hasPermission));
-
-    return baseTabs;
 };
 
 export const getPathForTab = (tabId) => TAB_PATH_MAP[tabId] || null;

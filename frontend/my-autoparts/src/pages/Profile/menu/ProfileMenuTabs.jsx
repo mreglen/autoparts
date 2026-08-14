@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PublicSiteMenuLinks from '../../../components/MobileSideMenu/PublicSiteMenuLinks';
-import AdminMenuModeSwitch from '../../../components/AdminMenuModeSwitch/AdminMenuModeSwitch';
-import SellerAutoserviceModeSwitch from '../../../components/SellerAutoserviceModeSwitch/SellerAutoserviceModeSwitch';
+import CabinetModeSwitch from '../../../components/CabinetModeSwitch/CabinetModeSwitch';
 import { getPathForTab } from './profileMenuConfig';
 
 // Icon mapping for menu items
@@ -306,12 +305,10 @@ export default function ProfileMenuTabs({
     onTabChange,
     badgeCounts = {},
     variant = 'sidebar',
-    showAdminMenuSwitch = false,
-    adminMenuMode,
-    onAdminMenuModeChange,
-    showSellerAutoserviceSwitch = false,
-    sellerAutoserviceMode,
-    onSellerAutoserviceModeChange,
+    showCabinetModeSwitch = false,
+    cabinetMode,
+    availableCabinetModes = [],
+    onCabinetModeChange,
 }) {
     const isDrawer = variant === 'drawer';
     const [expandedMenus, setExpandedMenus] = useState(() =>
@@ -474,18 +471,12 @@ export default function ProfileMenuTabs({
     if (isDrawer) {
         return (
             <div className="flex flex-col gap-0.5 pb-20">
-                {showAdminMenuSwitch ? (
-                    <AdminMenuModeSwitch
+                {showCabinetModeSwitch ? (
+                    <CabinetModeSwitch
                         variant="drawer"
-                        mode={adminMenuMode}
-                        onChange={onAdminMenuModeChange}
-                    />
-                ) : null}
-                {showSellerAutoserviceSwitch ? (
-                    <SellerAutoserviceModeSwitch
-                        variant="drawer"
-                        mode={sellerAutoserviceMode}
-                        onChange={onSellerAutoserviceModeChange}
+                        mode={cabinetMode}
+                        modes={availableCabinetModes}
+                        onChange={onCabinetModeChange}
                     />
                 ) : null}
                 {tabs.map(renderMenuItem)}
@@ -498,18 +489,12 @@ export default function ProfileMenuTabs({
             className="sticky top-[calc(var(--sg-desktop-header-h)+1rem)] max-h-[calc(100dvh-var(--sg-desktop-header-h)-2rem)] w-full min-w-[15.5rem] overflow-y-auto overscroll-contain scroll-pb-32 bg-white [&::-webkit-scrollbar]:hidden"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-            {showAdminMenuSwitch ? (
-                <AdminMenuModeSwitch
+            {showCabinetModeSwitch ? (
+                <CabinetModeSwitch
                     variant="sidebar"
-                    mode={adminMenuMode}
-                    onChange={onAdminMenuModeChange}
-                />
-            ) : null}
-            {showSellerAutoserviceSwitch ? (
-                <SellerAutoserviceModeSwitch
-                    variant="sidebar"
-                    mode={sellerAutoserviceMode}
-                    onChange={onSellerAutoserviceModeChange}
+                    mode={cabinetMode}
+                    modes={availableCabinetModes}
+                    onChange={onCabinetModeChange}
                 />
             ) : null}
             <nav className="flex flex-col gap-0.5 py-2">{tabs.map(renderMenuItem)}</nav>

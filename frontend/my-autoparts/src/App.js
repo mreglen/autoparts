@@ -19,8 +19,12 @@ import {
   useAutoserviceOrganizationId,
   canAccessAutoserviceStaffMenu,
   canAccessAutoserviceSettings,
+  canAccessAutoserviceClientMenu,
 } from './utils/autoservicePublic';
-import { getAdminMenuMode } from './utils/adminMenuMode';
+import {
+  getCabinetMode,
+  getDefaultPathForCabinetMode,
+} from './utils/cabinetMode';
 import { buildAutopartsRedirectSeo, PageSeoHelmet } from './utils/pageSeo';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
 import { isPwaStandalone, PWA_START_PATH } from './utils/pwaStandalone';
@@ -249,9 +253,21 @@ function AutoservicePublicRoute() {
 
 function AutoserviceClientRoute({ children }) {
   const showAutoservice = useShowAutoservice();
+  const autoserviceOrganizationId = useAutoserviceOrganizationId();
   const user = useSelector((state) => state.auth.user);
+  const cabinetMode = getCabinetMode(user, { autoserviceOrganizationId });
+  const accessOptions = {
+    showAutoservice,
+    autoserviceOrganizationId,
+    cabinetMode,
+    organizationIsAutoservice: Boolean(user?.organization_is_autoservice),
+  };
+
   if (!showAutoservice && !user?.is_admin) {
     return <Navigate to="/" replace />;
+  }
+  if (!canAccessAutoserviceClientMenu(user, accessOptions)) {
+    return <Navigate to={getDefaultPathForCabinetMode(cabinetMode)} replace />;
   }
   return (
     <RequireAuth>
@@ -266,8 +282,13 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
   const showAutoservice = useShowAutoservice();
   const autoserviceOrganizationId = useAutoserviceOrganizationId();
   const user = useSelector((state) => state.auth.user);
-  const adminMenuMode = getAdminMenuMode();
-  const accessOptions = { showAutoservice, autoserviceOrganizationId, adminMenuMode };
+  const cabinetMode = getCabinetMode(user, { autoserviceOrganizationId });
+  const accessOptions = {
+    showAutoservice,
+    autoserviceOrganizationId,
+    cabinetMode,
+    organizationIsAutoservice: Boolean(user?.organization_is_autoservice),
+  };
 
   if (!showAutoservice && !user?.is_admin) {
     return <Navigate to="/" replace />;

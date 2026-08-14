@@ -1,9 +1,10 @@
 import { useSelector } from 'react-redux';
-import { ADMIN_MENU_MODE_USER } from './adminMenuMode';
 import {
-  SELLER_AUTOSERVICE_MODE_AUTOSERVICE,
-  SELLER_AUTOSERVICE_MODE_SELLER,
-} from './sellerAutoserviceMode';
+  CABINET_MODE_ADMIN,
+  CABINET_MODE_AUTOSERVICE,
+  CABINET_MODE_BUYER,
+  CABINET_MODE_SELLER,
+} from './cabinetMode';
 
 export function selectShowAutoservice(state) {
   return state.publicInfo.showAutoservice === true;
@@ -23,20 +24,26 @@ export function useAutoserviceOrganizationId() {
 
 /**
  * Staff menu / routes for autoservice org employees.
- * Admins bypass the org check, but only while the menu is in «Админ» mode.
- * Sellers with connected autoservice use sellerAutoserviceMode.
+ * Admins: staff in «Автосервис» or «Админ» cabinet.
+ * Org-autoservice staff: routes by org role (not cabinet switch).
  */
 export function canAccessAutoserviceStaffMenu(user, options = {}) {
   if (!user) return false;
   const orgIsAutoservice = options.organizationIsAutoservice === true;
+  const cabinetMode = options.cabinetMode;
 
   if (user.is_admin) {
-    if (options.adminMenuMode === ADMIN_MENU_MODE_USER) return false;
+    if (
+      cabinetMode &&
+      cabinetMode !== CABINET_MODE_AUTOSERVICE &&
+      cabinetMode !== CABINET_MODE_ADMIN
+    ) {
+      return false;
+    }
     return Boolean(options.autoserviceOrganizationId);
   }
 
   if (orgIsAutoservice) {
-    if (options.sellerAutoserviceMode !== SELLER_AUTOSERVICE_MODE_AUTOSERVICE) return false;
     return Boolean(user.is_director || user.is_seller || user.is_employee);
   }
 
@@ -49,19 +56,18 @@ export function canAccessAutoserviceStaffMenu(user, options = {}) {
 
 /**
  * Client-facing autoservice menu (my cars / booking / repair history).
+ * Shown only in «Покупатель» cabinet.
  */
 export function canAccessAutoserviceClientMenu(user, options = {}) {
   if (!user) return false;
-  if (user.is_admin) {
-    return options.adminMenuMode === ADMIN_MENU_MODE_USER;
-  }
+  const cabinetMode = options.cabinetMode;
 
-  const orgIsAutoservice = options.organizationIsAutoservice === true;
-  if (orgIsAutoservice && options.sellerAutoserviceMode === SELLER_AUTOSERVICE_MODE_AUTOSERVICE) {
+  if (cabinetMode && cabinetMode !== CABINET_MODE_BUYER) {
     return false;
   }
-  if (orgIsAutoservice && options.sellerAutoserviceMode === SELLER_AUTOSERVICE_MODE_SELLER) {
-    return options.showAutoservice === true;
+
+  if (user.is_admin) {
+    return true;
   }
 
   return options.showAutoservice === true;
@@ -73,7 +79,7 @@ const AUTOSERVICE_CLIENT_PATH_PREFIXES = [
   '/autoservice/repair-booking',
 ];
 
-/** Client autoservice routes hidden from admin menu in «Админ» mode. */
+/** Client autoservice routes not available in seller/autoservice/admin cabinets (admin). */
 export function isAutoserviceClientPath(pathname) {
   if (pathname === '/autoservice' || pathname === '/autoservice/') return true;
   return AUTOSERVICE_CLIENT_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
@@ -85,9 +91,11 @@ const AUTOSERVICE_STAFF_PATH_PREFIXES = [
   '/autoservice/orders',
   '/autoservice/settings',
   '/autoservice/inspections',
+  '/autoservice/finance',
+  '/autoservice/warehouse',
 ];
 
-/** Staff autoservice routes hidden from admin menu in «Пользователь» mode. */
+/** Staff autoservice routes hidden from buyer/seller cabinets (admin route guard). */
 export function isAutoserviceStaffPath(pathname) {
   return AUTOSERVICE_STAFF_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
@@ -100,3 +108,44 @@ export function canAccessAutoserviceSettings(user, options = {}) {
 
 export const BECOME_CLIENT_CONFIRM = (publicName) =>
   `Вы точно хотите стать клиентом автосервиса ${publicName}?`;
+
+const ADMIN_ONLY_PATH_PREFIXES = [
+  '/sellers',
+  '/moderation/',
+  '/admin/',
+  '/admin-settings',
+];
+
+export function isAdminOnlyPathForCabinet(pathname) {
+  return ADMIN_ONLY_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+/** Whether current path is allowed in the given cabinet (admin autoservice split). */
+export function isPathAllowedInCabinet(pathname, cabinetMode, user) {
+  if (!user?.is_admin) return true;
+
+  if (cabinetMode === CABINET_MODE_ADMIN) {
+    if (isAutoserviceClientPath(pathname)) return false;
+    return true;
+  }
+
+  if (cabinetMode === CABINET_MODE_BUYER) {
+    if (isAutoserviceStaffPath(pathname)) return false;
+    return true;
+  }
+
+  if (cabinetMode === CABINET_MODE_SELLER) {
+    if (isAdminOnlyPathForCabinet(pathname)) return false;
+    if (isAutoserviceStaffPath(pathname)) return false;
+    if (isAutoserviceClientPath(pathname)) return false;
+    return true;
+  }
+
+  if (cabinetMode === CABINET_MODE_AUTOSERVICE) {
+    if (isAdminOnlyPathForCabinet(pathname)) return false;
+    if (isAutoserviceClientPath(pathname)) return false;
+    return true;
+  }
+
+  return true;
+}

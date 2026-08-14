@@ -137,12 +137,10 @@ export default function ProfileWithMenuLayout() {
         openMenu,
         closeMenu,
         handleTabChange,
-        adminMenuMode,
-        setAdminMenuMode,
-        showAdminMenuSwitch,
-        sellerAutoserviceMode,
-        setSellerAutoserviceMode,
-        showSellerAutoserviceSwitch,
+        cabinetMode,
+        setCabinetMode,
+        availableCabinetModes,
+        showCabinetModeSwitch,
     } = useMobileMenuShell(user);
 
     useEffect(() => {
@@ -202,12 +200,10 @@ export default function ProfileWithMenuLayout() {
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 badgeCounts={badgeCounts}
-                showAdminMenuSwitch={showAdminMenuSwitch}
-                adminMenuMode={adminMenuMode}
-                onAdminMenuModeChange={setAdminMenuMode}
-                showSellerAutoserviceSwitch={showSellerAutoserviceSwitch}
-                sellerAutoserviceMode={sellerAutoserviceMode}
-                onSellerAutoserviceModeChange={setSellerAutoserviceMode}
+                showCabinetModeSwitch={showCabinetModeSwitch}
+                cabinetMode={cabinetMode}
+                availableCabinetModes={availableCabinetModes}
+                onCabinetModeChange={setCabinetMode}
             />
 
             <main
@@ -230,12 +226,10 @@ export default function ProfileWithMenuLayout() {
                             activeTab={activeTab}
                             onTabChange={handleTabChange}
                             badgeCounts={badgeCounts}
-                            showAdminMenuSwitch={showAdminMenuSwitch}
-                            adminMenuMode={adminMenuMode}
-                            onAdminMenuModeChange={setAdminMenuMode}
-                            showSellerAutoserviceSwitch={showSellerAutoserviceSwitch}
-                            sellerAutoserviceMode={sellerAutoserviceMode}
-                            onSellerAutoserviceModeChange={setSellerAutoserviceMode}
+                            showCabinetModeSwitch={showCabinetModeSwitch}
+                            cabinetMode={cabinetMode}
+                            availableCabinetModes={availableCabinetModes}
+                            onCabinetModeChange={setCabinetMode}
                         />
                     </div>
 

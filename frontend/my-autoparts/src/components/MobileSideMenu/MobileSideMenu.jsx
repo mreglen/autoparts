@@ -15,12 +15,10 @@ export default function MobileSideMenu({
     onTabChange,
     badgeCounts = {},
     guestContent = null,
-    showAdminMenuSwitch = false,
-    adminMenuMode,
-    onAdminMenuModeChange,
-    showSellerAutoserviceSwitch = false,
-    sellerAutoserviceMode,
-    onSellerAutoserviceModeChange,
+    showCabinetModeSwitch = false,
+    cabinetMode,
+    availableCabinetModes = [],
+    onCabinetModeChange,
 }) {
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -146,12 +144,10 @@ export default function MobileSideMenu({
                             activeTab={activeTab}
                             onTabChange={onTabChange}
                             badgeCounts={badgeCounts}
-                            showAdminMenuSwitch={showAdminMenuSwitch}
-                            adminMenuMode={adminMenuMode}
-                            onAdminMenuModeChange={onAdminMenuModeChange}
-                            showSellerAutoserviceSwitch={showSellerAutoserviceSwitch}
-                            sellerAutoserviceMode={sellerAutoserviceMode}
-                            onSellerAutoserviceModeChange={onSellerAutoserviceModeChange}
+                            showCabinetModeSwitch={showCabinetModeSwitch}
+                            cabinetMode={cabinetMode}
+                            availableCabinetModes={availableCabinetModes}
+                            onCabinetModeChange={onCabinetModeChange}
                         />
                     )}
                     <PublicSiteMenuLinks variant="drawer" onNavigate={requestClose} />

@@ -47,12 +47,10 @@ export default function MainLayout() {
         closeMenu,
         handleTabChange,
         guestContent,
-        adminMenuMode,
-        setAdminMenuMode,
-        showAdminMenuSwitch,
-        sellerAutoserviceMode,
-        setSellerAutoserviceMode,
-        showSellerAutoserviceSwitch,
+        cabinetMode,
+        setCabinetMode,
+        availableCabinetModes,
+        showCabinetModeSwitch,
     } = useMobileMenuShell(user);
 
     useEffect(() => {
@@ -83,12 +81,10 @@ export default function MainLayout() {
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 guestContent={token ? null : guestContent}
-                showAdminMenuSwitch={showAdminMenuSwitch}
-                adminMenuMode={adminMenuMode}
-                onAdminMenuModeChange={setAdminMenuMode}
-                showSellerAutoserviceSwitch={showSellerAutoserviceSwitch}
-                sellerAutoserviceMode={sellerAutoserviceMode}
-                onSellerAutoserviceModeChange={setSellerAutoserviceMode}
+                showCabinetModeSwitch={showCabinetModeSwitch}
+                cabinetMode={cabinetMode}
+                availableCabinetModes={availableCabinetModes}
+                onCabinetModeChange={setCabinetMode}
             />
 
             <main
