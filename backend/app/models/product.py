@@ -16,6 +16,7 @@ class Product(Base):
     is_new = Column(Boolean, default=True)
     price = Column(Numeric(12, 2))
     quantity = Column(Integer)
+    reserved_qty = Column(Integer, nullable=False, default=0)
     organization_id = Column(String, ForeignKey("organizations.id"))
     organization = relationship("Organization", back_populates="products")
     storage_location_id = Column(Integer, ForeignKey("storage_locations.id"))

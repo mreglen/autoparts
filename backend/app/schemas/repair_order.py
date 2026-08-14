@@ -15,7 +15,7 @@ LEGACY_STATUS_MAP = {
     "issued": "completed",
     "open": "pending",
 }
-SHOP_PART_SOURCES = ("manual", "warehouse", "rossko")
+SHOP_PART_SOURCES = ("manual", "warehouse", "rossko", "autoservice_stock")
 SHOP_PART_UNITS = ("pcs", "l", "kg")
 
 
@@ -87,8 +87,9 @@ class RepairOrderShopPartIn(BaseModel):
     unit_price: Decimal = Field(ge=0)
     markup_percent: Decimal = Field(default=Decimal("5"), ge=0)
     client_unit_price_override: Optional[Decimal] = Field(None, ge=0)
-    source: Literal["manual", "warehouse", "rossko"] = "manual"
+    source: Literal["manual", "warehouse", "rossko", "autoservice_stock"] = "manual"
     product_id: Optional[int] = None
+    autoservice_stock_item_id: Optional[int] = None
     brand: Optional[str] = Field(None, max_length=120)
     partnumber: Optional[str] = Field(None, max_length=120)
     rossko_brand: Optional[str] = Field(None, max_length=120)
@@ -148,11 +149,13 @@ class RepairOrderShopPartView(BaseModel):
     line_sum: Decimal
     source: str
     product_id: Optional[int] = None
+    autoservice_stock_item_id: Optional[int] = None
     brand: Optional[str] = None
     partnumber: Optional[str] = None
     rossko_brand: Optional[str] = None
     rossko_partnumber: Optional[str] = None
     is_imported: bool = False
+    stock_max_qty: Optional[int] = None
 
 
 class RepairOrderClientShopPartView(BaseModel):
@@ -198,6 +201,16 @@ class RepairOrderUpdate(BaseModel):
 
 class RepairOrderStatusPatch(BaseModel):
     status: Literal["pending", "in_progress", "completed", "cancelled"]
+
+
+class RepairOrderAutoserviceStockItemIn(BaseModel):
+    item_id: int
+    qty: int = Field(ge=1)
+
+
+class RepairOrderAutoserviceStockImportIn(BaseModel):
+    items: list[RepairOrderAutoserviceStockItemIn] = Field(min_length=1)
+    markup_percent: Decimal = Field(default=Decimal("0"), ge=0, le=500)
 
 
 class RepairOrderStaffView(BaseModel):
@@ -271,4 +284,6 @@ class WarehouseProductOption(BaseModel):
     title: str
     price: Decimal
     article: Optional[str] = None
+    brand: Optional[str] = None
     internal_code: Optional[str] = None
+    available_qty: int = 0

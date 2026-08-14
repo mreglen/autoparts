@@ -182,6 +182,22 @@ export async function importPurchaseGroupsToRepairOrder(
   return lastUpdated;
 }
 
+export async function importPurchaseGroupsToAutoserviceWarehouse(apiRequest, groups) {
+  const payloadGroups = (groups || [])
+    .filter((group) => group.itemIds?.length)
+    .map((group) => ({
+      order_type: group.orderType,
+      item_ids: group.itemIds,
+    }));
+  if (!payloadGroups.length) {
+    return { added_items: 0, skipped_items: 0 };
+  }
+  return apiRequest('/autoservice/warehouse/from-purchases', {
+    method: 'POST',
+    body: JSON.stringify({ groups: payloadGroups }),
+  });
+}
+
 export function linkedRepairOrderFromItems(items) {
   const linked = (items || []).find((item) => item.repairOrderId || item.repair_order_id);
   if (!linked) return null;

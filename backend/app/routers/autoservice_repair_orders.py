@@ -22,11 +22,13 @@ from app.models.repair_order import (
     RepairOrderWorkExecutor,
 )
 from app.models.product import Product
+from app.models.autoservice_warehouse import AutoserviceWarehouseItem
 from app.models.user import User
 from app.schemas.repair_order import (
     ACTIVE_STATUSES,
     ALL_STATUSES,
     HISTORY_STATUSES,
+    RepairOrderAutoserviceStockImportIn,
     RepairOrderClientBrief,
     RepairOrderClientPartIn,
     RepairOrderClientPartView,
@@ -72,6 +74,17 @@ from app.services.repair_order_cart_import import shop_part_display_name
 from app.services.repair_order_purchase_import import (
     append_purchase_items_to_repair_order,
     shop_part_is_imported,
+)
+from app.services.repair_order_stock_reserve import (
+    append_autoservice_stock_to_repair_order,
+    apply_shop_part_reservation,
+    release_order_reservations,
+    release_shop_part_reservation,
+    shop_part_stock_max_qty,
+)
+from app.services.autoservice_warehouse_service import (
+    fulfill_autoservice_stock_on_order_complete,
+    product_available_qty,
 )
 from app.services.autoservice_work_zone_helpers import (
     normalize_dt as _normalize_dt,
@@ -212,7 +225,12 @@ def _client_part_view(part: RepairOrderClientPart) -> RepairOrderClientPartView:
     )
 
 
-def _shop_part_view(part: RepairOrderShopPart) -> RepairOrderShopPartView:
+def _shop_part_view(
+    part: RepairOrderShopPart,
+    *,
+    db: Session | None = None,
+    org_id: str | None = None,
+) -> RepairOrderShopPartView:
     unit = _money(part.unit_price)
     markup = _money(part.markup_percent)
     price_marked = _effective_shop_unit_price(part)
@@ -242,11 +260,17 @@ def _shop_part_view(part: RepairOrderShopPart) -> RepairOrderShopPartView:
         line_sum=_shop_line_sum(qty, price_marked),
         source=part.source,
         product_id=part.product_id,
+        autoservice_stock_item_id=getattr(part, "autoservice_stock_item_id", None),
         brand=part.brand,
         partnumber=part.partnumber,
         rossko_brand=part.rossko_brand,
         rossko_partnumber=part.rossko_partnumber,
         is_imported=shop_part_is_imported(part),
+        stock_max_qty=(
+            shop_part_stock_max_qty(db, org_id, part)
+            if db is not None and org_id
+            else None
+        ),
     )
 
 
@@ -296,7 +320,10 @@ def _to_staff_view(
 ) -> RepairOrderStaffView:
     works = [_work_view(w) for w in _sorted_works(row)]
     parts = [_client_part_view(p) for p in _sorted_client_parts(row)]
-    shop = [_shop_part_view(p) for p in _sorted_shop_parts(row)]
+    shop = [
+        _shop_part_view(p, db=db, org_id=row.organization_id)
+        for p in _sorted_shop_parts(row)
+    ]
     works_total = _money(sum((w.line_sum for w in works), Decimal("0.00")))
     shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
     grand_total = _money(works_total + shop_total)
@@ -615,6 +642,35 @@ def _validate_shop_part_product(
     return product.id
 
 
+def _validate_autoservice_stock_item(
+    db: Session,
+    org_id: str,
+    source: str,
+    autoservice_stock_item_id: int | None,
+) -> int | None:
+    if source != "autoservice_stock":
+        return None
+    if not autoservice_stock_item_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Для позиции со склада автосервиса нужен autoservice_stock_item_id",
+        )
+    item = (
+        db.query(AutoserviceWarehouseItem)
+        .filter(
+            AutoserviceWarehouseItem.id == autoservice_stock_item_id,
+            AutoserviceWarehouseItem.organization_id == org_id,
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Позиция склада автосервиса не найдена",
+        )
+    return item.id
+
+
 def _replace_shop_parts(
     db: Session,
     order: RepairOrder,
@@ -639,6 +695,14 @@ def _replace_shop_parts(
         else:
             manual_items.append(item)
 
+    removed_parts = [
+        part for part in (order.shop_parts or [])
+        if not shop_part_is_imported(part)
+    ]
+    for part in removed_parts:
+        if part.source in ("warehouse", "autoservice_stock"):
+            release_shop_part_reservation(db, part)
+
     order.shop_parts[:] = [
         part for part in (order.shop_parts or [])
         if shop_part_is_imported(part)
@@ -653,6 +717,9 @@ def _replace_shop_parts(
                 detail="Название запчасти исполнителя не может быть пустым",
             )
         product_id = _validate_shop_part_product(db, org_id, item.source, item.product_id)
+        autoservice_stock_item_id = _validate_autoservice_stock_item(
+            db, org_id, item.source, item.autoservice_stock_item_id
+        )
         brand = (item.brand or item.rossko_brand or "").strip() or None
         partnumber = (item.partnumber or item.rossko_partnumber or "").strip() or None
         rossko_brand = (item.rossko_brand or "").strip() or None
@@ -661,27 +728,29 @@ def _replace_shop_parts(
             rossko_brand = None
             rossko_partnumber = None
         unit = item.unit if item.unit in ("pcs", "l", "kg") else "pcs"
-        order.shop_parts.append(
-            RepairOrderShopPart(
-                position=1,
-                title=title[:255],
-                brand=brand[:120] if brand else None,
-                partnumber=partnumber[:120] if partnumber else None,
-                qty=_qty(item.qty),
-                unit=unit,
-                unit_price=_money(item.unit_price),
-                markup_percent=_money(item.markup_percent),
-                client_unit_price_override=(
-                    _money(item.client_unit_price_override)
-                    if item.client_unit_price_override is not None
-                    else None
-                ),
-                source=item.source,
-                product_id=product_id,
-                rossko_brand=rossko_brand[:120] if rossko_brand else None,
-                rossko_partnumber=rossko_partnumber[:120] if rossko_partnumber else None,
-            )
+        new_part = RepairOrderShopPart(
+            position=1,
+            title=title[:255],
+            brand=brand[:120] if brand else None,
+            partnumber=partnumber[:120] if partnumber else None,
+            qty=_qty(item.qty),
+            unit=unit,
+            unit_price=_money(item.unit_price),
+            markup_percent=_money(item.markup_percent),
+            client_unit_price_override=(
+                _money(item.client_unit_price_override)
+                if item.client_unit_price_override is not None
+                else None
+            ),
+            source=item.source,
+            product_id=product_id,
+            autoservice_stock_item_id=autoservice_stock_item_id,
+            rossko_brand=rossko_brand[:120] if rossko_brand else None,
+            rossko_partnumber=rossko_partnumber[:120] if rossko_partnumber else None,
         )
+        if item.source in ("warehouse", "autoservice_stock"):
+            apply_shop_part_reservation(db, new_part)
+        order.shop_parts.append(new_part)
 
     for idx, part in enumerate(order.shop_parts or [], start=1):
         part.position = idx
@@ -763,9 +832,12 @@ def search_warehouse_products(
             title=(p.name or p.article or p.internal_code or f"Товар {p.id}")[:255],
             price=_money(p.price or 0),
             article=p.article,
+            brand=p.brand,
             internal_code=p.internal_code,
+            available_qty=product_available_qty(p),
         )
         for p in rows
+        if product_available_qty(p) > 0
     ]
 
 
@@ -1036,6 +1108,35 @@ def import_repair_order_purchase_items(
     return _to_staff_view(db, row)
 
 
+@router.post(
+    "/autoservice/repair-orders/{order_id}/autoservice-stock",
+    response_model=RepairOrderStaffView,
+)
+def import_autoservice_stock_to_repair_order(
+    order_id: int,
+    payload: RepairOrderAutoserviceStockImportIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    row = _get_org_order_or_404(db, org_id, order_id)
+    if row.status in HISTORY_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя добавлять запчасти в завершённый или отменённый заказ-наряд",
+        )
+    append_autoservice_stock_to_repair_order(
+        db,
+        order=row,
+        org_id=org_id,
+        items=[(entry.item_id, entry.qty) for entry in payload.items],
+        markup_percent=payload.markup_percent,
+    )
+    db.commit()
+    row = _get_org_order_or_404(db, org_id, order_id)
+    return _to_staff_view(db, row)
+
+
 @router.patch(
     "/autoservice/repair-orders/{order_id}/status",
     response_model=RepairOrderStaffView,
@@ -1056,12 +1157,20 @@ def patch_repair_order_status(
     prev_status = row.status
     if payload.status == "completed" and prev_status != "completed":
         ensure_order_fully_paid(db, row, _order_grand_total(row))
+    if payload.status == "cancelled" and prev_status not in ("cancelled", "completed"):
+        release_order_reservations(db, row)
     row.status = payload.status
     if prev_status == "completed" and payload.status != "completed":
         clear_order_accruals(db, row.id)
     if payload.status == "completed" and prev_status != "completed":
         db.flush()
         accrue_order_payroll(db, row)
+        fulfill_autoservice_stock_on_order_complete(
+            db,
+            order=row,
+            org_id=org_id,
+            user_id=current_user.id,
+        )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
     return _to_staff_view(db, row)

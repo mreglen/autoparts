@@ -48,6 +48,9 @@ from app.db.schema_patches import (
     ensure_autoservice_works_and_employees_tables,
     ensure_autoservice_digest_log_table,
     ensure_autoservice_payments_table,
+    ensure_autoservice_warehouse_tables,
+    ensure_product_reserved_qty_column,
+    ensure_repair_order_shop_parts_autoservice_stock,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
@@ -152,6 +155,7 @@ import app.models.site_laximo_cat_integration  # noqa: F401 — Laximo.CAT integ
 import app.models.organization_ai_description_access  # noqa: F401 — AI description org allowlist
 import app.models.product_draft  # noqa: F401 — product drafts
 import app.models.user_engagement  # noqa: F401 — favorites, views, subscriptions
+import app.models.autoservice_warehouse  # noqa: F401 — autoservice warehouse
 import app.models.payment_method  # noqa: F401 — org payment methods
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
@@ -242,6 +246,9 @@ try:
     ensure_autoservice_works_and_employees_tables()
     ensure_autoservice_digest_log_table()
     ensure_autoservice_payments_table()
+    ensure_autoservice_warehouse_tables()
+    ensure_product_reserved_qty_column()
+    ensure_repair_order_shop_parts_autoservice_stock()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
     ensure_group_chat_columns()

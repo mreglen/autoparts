@@ -111,6 +111,9 @@ const AutoserviceRepairBookingPage = lazy(() => import('./pages/Autoservice/Auto
 const AutoservicePlannerPage = lazy(() => import('./pages/Autoservice/AutoservicePlannerPage'));
 const AutoserviceFinancePage = lazy(() => import('./pages/Autoservice/AutoserviceFinancePage'));
 const AutoserviceInspectionsPage = lazy(() => import('./pages/Autoservice/AutoserviceInspectionsPage'));
+const AutoserviceWarehousePage = lazy(() => import('./pages/Autoservice/AutoserviceWarehousePage'));
+const AutoserviceWarehouseReceiptsPage = lazy(() => import('./pages/Autoservice/AutoserviceWarehouseReceiptsPage'));
+const AutoserviceWarehouseExpensesPage = lazy(() => import('./pages/Autoservice/AutoserviceWarehouseExpensesPage'));
 const GaragePage = lazy(() => import('./pages/Garage/GaragePage'));
 const GarageRepairHistoryPage = lazy(() => import('./pages/Garage/GarageRepairHistoryPage'));
 const LaximoCatalogSandboxPage = lazy(() => import('./pages/Laximo/LaximoCatalogSandboxPage'));
@@ -321,6 +324,27 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
     return (
       <LazyRoute>
         <AutoserviceFinancePage />
+      </LazyRoute>
+    );
+  }
+  if (section === 'warehouse') {
+    return (
+      <LazyRoute>
+        <AutoserviceWarehousePage />
+      </LazyRoute>
+    );
+  }
+  if (section === 'warehouse-receipts') {
+    return (
+      <LazyRoute>
+        <AutoserviceWarehouseReceiptsPage />
+      </LazyRoute>
+    );
+  }
+  if (section === 'warehouse-expenses') {
+    return (
+      <LazyRoute>
+        <AutoserviceWarehouseExpensesPage />
       </LazyRoute>
     );
   }
@@ -979,6 +1003,18 @@ function App() {
           <Route
             path="/autoservice/finance"
             element={<AutoserviceStaffRoute section="finance" />}
+          />
+          <Route
+            path="/autoservice/warehouse"
+            element={<AutoserviceStaffRoute section="warehouse" />}
+          />
+          <Route
+            path="/autoservice/warehouse/receipts"
+            element={<AutoserviceStaffRoute section="warehouse-receipts" />}
+          />
+          <Route
+            path="/autoservice/warehouse/expenses"
+            element={<AutoserviceStaffRoute section="warehouse-expenses" />}
           />
           <Route
             path="/autoservice/settings"

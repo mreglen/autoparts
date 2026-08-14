@@ -48,6 +48,9 @@ export const TAB_PATH_MAP = {
     'autoservice-finance': '/autoservice/finance',
     'autoservice-inspections': '/autoservice/inspections',
     'autoservice-settings': '/autoservice/settings',
+    'autoservice-warehouse': '/autoservice/warehouse',
+    'autoservice-warehouse-receipts': '/autoservice/warehouse/receipts',
+    'autoservice-warehouse-expenses': '/autoservice/warehouse/expenses',
 };
 
 const buildPurchasesSubmenu = () => [
@@ -133,6 +136,9 @@ const buildAutoserviceStaffTab = (user, options) => {
     const submenu = [
         { id: 'autoservice-planner', label: 'Планировщик' },
         { id: 'autoservice-orders', label: 'Заказ-наряд' },
+        { id: 'autoservice-warehouse', label: 'Склад автосервиса' },
+        { id: 'autoservice-warehouse-receipts', label: 'Поступления' },
+        { id: 'autoservice-warehouse-expenses', label: 'Расходы' },
         { id: 'autoservice-finance', label: 'Финансы' },
         { id: 'autoservice-clients', label: 'Клиенты' },
         { id: 'autoservice-inspections', label: 'Записи' },
@@ -175,6 +181,9 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/autoservice/planner')) return 'autoservice-planner';
     if (path.startsWith('/autoservice/clients')) return 'autoservice-clients';
     if (path.startsWith('/autoservice/orders')) return 'autoservice-orders';
+    if (path.startsWith('/autoservice/warehouse/receipts')) return 'autoservice-warehouse-receipts';
+    if (path.startsWith('/autoservice/warehouse/expenses')) return 'autoservice-warehouse-expenses';
+    if (path.startsWith('/autoservice/warehouse')) return 'autoservice-warehouse';
     if (path.startsWith('/autoservice/finance')) return 'autoservice-finance';
     if (path.startsWith('/autoservice/inspections')) return 'autoservice-inspections';
     if (path.startsWith('/autoservice/settings')) return 'autoservice-settings';

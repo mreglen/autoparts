@@ -73,7 +73,7 @@ def _validate_stock(products_by_id: dict[int, Product], items: list[UsedOrderIte
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"У товара id={product_id} не указана организация продавца",
             )
-        available = product.quantity
+        available = int(product.quantity or 0) - int(getattr(product, "reserved_qty", 0) or 0)
         if available is None or available < requested_qty:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

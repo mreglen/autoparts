@@ -10,11 +10,16 @@ from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
 from app.models.product import Product
 from app.models.repair_order import RepairOrder, RepairOrderShopPart
 from app.schemas.repair_order import RepairOrderPurchaseImportIn
+from app.services.autoservice_warehouse_service import receipt_purchase_line
 from app.services.repair_order_cart_import import (
     _derive_prices,
     _money,
     _next_position,
     _qty,
+)
+from app.services.repair_order_stock_reserve import (
+    release_shop_part_reservation,
+    reserve_autoservice_item_for_repair,
 )
 
 _TWOPLACES = Decimal("0.01")
@@ -79,6 +84,7 @@ def detach_purchase_items_from_other_orders(
 
     affected_order_ids = {part.order_id for part in stale_parts}
     for part in stale_parts:
+        release_shop_part_reservation(db, part)
         db.delete(part)
     db.flush()
     for order_id in affected_order_ids:
@@ -135,6 +141,22 @@ def append_purchase_items_to_repair_order(
             title = (row.name or "").strip() or partnumber or brand or "Запчасть"
             unit_price, _ = _derive_prices(row.price, None)
             markup_percent = _money(payload.markup_percent)
+            qty = _qty(row.quantity or 1)
+
+            stock_item, _, _ = receipt_purchase_line(
+                db,
+                org_id=org_id,
+                user_id=user_id,
+                cart_item_type="new",
+                cart_item_id=row.id,
+                brand=brand,
+                article=partnumber,
+                name=title,
+                quantity=int(qty),
+                unit_price=unit_price,
+                repair_order_id=order.id,
+            )
+            reserve_autoservice_item_for_repair(db, item=stock_item, qty=int(qty))
 
             order.shop_parts.append(
                 RepairOrderShopPart(
@@ -142,13 +164,14 @@ def append_purchase_items_to_repair_order(
                     title=title[:255],
                     brand=brand[:120] or None,
                     partnumber=partnumber[:120] or None,
-                    qty=_qty(row.quantity or 1),
+                    qty=qty,
                     unit="pcs",
                     unit_price=unit_price,
                     markup_percent=markup_percent,
                     client_unit_price_override=_item_price_override(payload, row.id),
-                    source="rossko",
+                    source="autoservice_stock",
                     product_id=None,
+                    autoservice_stock_item_id=stock_item.id,
                     rossko_brand=brand[:120] or None,
                     rossko_partnumber=partnumber[:120] or None,
                     cart_item_type="new",
@@ -207,14 +230,30 @@ def append_purchase_items_to_repair_order(
             ).strip()
 
             if product and product.organization_id == org_id:
-                source = "warehouse"
-                product_id = product.id
+                source = "autoservice_stock"
+                product_id = None
             else:
-                source = "manual"
+                source = "autoservice_stock"
                 product_id = None
 
             unit_price, _ = _derive_prices(row.price or 0, None)
             markup_percent = _money(payload.markup_percent)
+            qty = _qty(row.quantity or 1)
+
+            stock_item, _, _ = receipt_purchase_line(
+                db,
+                org_id=org_id,
+                user_id=user_id,
+                cart_item_type="used",
+                cart_item_id=row.id,
+                brand=brand,
+                article=partnumber,
+                name=title,
+                quantity=int(qty),
+                unit_price=unit_price,
+                repair_order_id=order.id,
+            )
+            reserve_autoservice_item_for_repair(db, item=stock_item, qty=int(qty))
 
             order.shop_parts.append(
                 RepairOrderShopPart(
@@ -222,13 +261,14 @@ def append_purchase_items_to_repair_order(
                     title=title[:255],
                     brand=brand[:120] or None,
                     partnumber=partnumber[:120] or None,
-                    qty=_qty(row.quantity or 1),
+                    qty=qty,
                     unit="pcs",
                     unit_price=unit_price,
                     markup_percent=markup_percent,
                     client_unit_price_override=_item_price_override(payload, row.id),
                     source=source,
                     product_id=product_id,
+                    autoservice_stock_item_id=stock_item.id,
                     rossko_brand=None,
                     rossko_partnumber=None,
                     cart_item_type="used",

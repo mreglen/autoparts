@@ -109,6 +109,9 @@ export default function PurchaseOrderCard({
   onToggleAllItems,
   repairOrderActionLabel = 'Добавить к заказ-наряду',
   onAddToRepairOrder,
+  onAddToAutoserviceWarehouse,
+  warehouseActionLabel = 'Добавить на склад автосервиса',
+  warehouseActionLoading = false,
 }) {
   const items = order.items || [];
   const isUsed = orderType === 'used';
@@ -272,14 +275,28 @@ export default function PurchaseOrderCard({
                 Выбрать всё
               </label>
               {items.some((item) => selectedItemKeys.has(`${orderType}:${order.id}:${item.id}`))
-                && onAddToRepairOrder ? (
-                <button
-                  type="button"
-                  onClick={() => onAddToRepairOrder(orderType, order.id, items)}
-                  className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-700"
-                >
-                  {repairOrderActionLabel}
-                </button>
+                && (onAddToRepairOrder || onAddToAutoserviceWarehouse) ? (
+                <div className="flex flex-wrap gap-2">
+                  {onAddToAutoserviceWarehouse ? (
+                    <button
+                      type="button"
+                      onClick={() => onAddToAutoserviceWarehouse(orderType, order.id, items)}
+                      disabled={warehouseActionLoading}
+                      className="inline-flex items-center rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 shadow-sm transition hover:bg-indigo-50 disabled:opacity-60"
+                    >
+                      {warehouseActionLabel}
+                    </button>
+                  ) : null}
+                  {onAddToRepairOrder ? (
+                    <button
+                      type="button"
+                      onClick={() => onAddToRepairOrder(orderType, order.id, items)}
+                      className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-700"
+                    >
+                      {repairOrderActionLabel}
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}

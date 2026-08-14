@@ -122,7 +122,8 @@ def fulfill_stock_out(
     if not product:
         raise HTTPException(status_code=400, detail="Продукт не найден или недоступен")
 
-    if (product.quantity or 0) < request.quantity:
+    available = int(product.quantity or 0) - int(getattr(product, "reserved_qty", 0) or 0)
+    if request.quantity > available:
         raise HTTPException(status_code=400, detail="Недостаточно товара на складе")
 
     previous_quantity = int(product.quantity or 0)

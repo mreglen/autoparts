@@ -83,10 +83,10 @@ def _cap_to_max(quantity: int, max_qty: int | None) -> int:
 def _product_max_quantity(product: Product | None) -> int:
     if not product:
         return 1
-    qty = product.quantity
-    if qty is None or qty < 1:
-        return 1
-    return int(qty)
+    qty = int(product.quantity or 0) - int(getattr(product, "reserved_qty", 0) or 0)
+    if qty < 1:
+        return 0
+    return qty
 
 
 def _new_parts_cart_item_response(cart_item) -> CartItemResponse:

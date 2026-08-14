@@ -226,6 +226,12 @@ class RepairOrderShopPart(Base):
         nullable=True,
         index=True,
     )
+    autoservice_stock_item_id = Column(
+        Integer,
+        ForeignKey("autoservice_warehouse_items.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     brand = Column(String(120), nullable=True)
     partnumber = Column(String(120), nullable=True)
     rossko_brand = Column(String(120), nullable=True)
@@ -235,3 +241,7 @@ class RepairOrderShopPart(Base):
 
     order = relationship("RepairOrder", back_populates="shop_parts")
     product = relationship("Product", foreign_keys=[product_id])
+    autoservice_stock_item = relationship(
+        "AutoserviceWarehouseItem",
+        foreign_keys=[autoservice_stock_item_id],
+    )

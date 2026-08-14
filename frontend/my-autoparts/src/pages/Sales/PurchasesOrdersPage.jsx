@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { apiAxios } from '../../utils/apiClient';
+import { apiAxios, apiRequest } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -16,6 +16,7 @@ import { isOrganizationStaff } from '../../utils/clientMarkupUtils';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import {
   groupPurchaseSelections,
+  importPurchaseGroupsToAutoserviceWarehouse,
   linkedRepairOrderFromItems,
   purchaseSelectionKey,
   saveLinkedRepairOrder,
@@ -117,6 +118,8 @@ export default function PurchasesOrdersPage() {
   const [activeReturnOrderIds, setActiveReturnOrderIds] = useState(new Set());
   const [selectedItemKeys, setSelectedItemKeys] = useState(new Set());
   const [repairPickerOpen, setRepairPickerOpen] = useState(false);
+  const [warehouseImportLoading, setWarehouseImportLoading] = useState(false);
+  const [warehouseMessage, setWarehouseMessage] = useState('');
   const [pickerLinkedOrder, setPickerLinkedOrder] = useState(null);
 
   useEffect(() => {
@@ -326,6 +329,31 @@ export default function PurchasesOrdersPage() {
     setRepairPickerOpen(true);
   };
 
+  const handleAddToAutoserviceWarehouse = async (orderType, orderId, items) => {
+    const entries = buildEntriesForOrder(orderType, orderId, items);
+    const groups = groupPurchaseSelections(entries);
+    if (!groups.length) return;
+    setWarehouseImportLoading(true);
+    setWarehouseMessage('');
+    try {
+      const result = await importPurchaseGroupsToAutoserviceWarehouse(apiRequest, groups);
+      const added = Number(result?.added_items || 0);
+      const skipped = Number(result?.skipped_items || 0);
+      if (added > 0 && skipped > 0) {
+        setWarehouseMessage(`Добавлено позиций: ${added}. Пропущено (уже на складе): ${skipped}.`);
+      } else if (added > 0) {
+        setWarehouseMessage(`Добавлено на склад автосервиса: ${added} поз.`);
+      } else {
+        setWarehouseMessage('Выбранные позиции уже были на складе автосервиса.');
+      }
+      setSelectedItemKeys(new Set());
+    } catch (err) {
+      setWarehouseMessage(err?.message || 'Не удалось добавить на склад автосервиса');
+    } finally {
+      setWarehouseImportLoading(false);
+    }
+  };
+
   const handleRepairImported = (order) => {
     if (order?.id) {
       saveLinkedRepairOrder(order);
@@ -408,6 +436,12 @@ export default function PurchasesOrdersPage() {
         </div>
       )}
 
+      {warehouseMessage ? (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+          {warehouseMessage}
+        </div>
+      ) : null}
+
       {!loading && !error && (
         <>
           {stats.total > 0 && filteredUnifiedOrders.length !== stats.total && (
@@ -459,7 +493,9 @@ export default function PurchasesOrdersPage() {
                   onToggleItem={handleTogglePurchaseItem}
                   onToggleAllItems={handleToggleAllPurchaseItems}
                   repairOrderActionLabel={repairOrderActionLabel}
-                  onAddToRepairOrder={handleAddToRepairOrder}
+                  onAddToRepairOrder={canLinkRepairOrder ? handleAddToRepairOrder : undefined}
+                  onAddToAutoserviceWarehouse={canLinkRepairOrder ? handleAddToAutoserviceWarehouse : undefined}
+                  warehouseActionLoading={warehouseImportLoading}
                 />
               );
             })}

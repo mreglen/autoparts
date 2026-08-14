@@ -26,6 +26,9 @@ export default function RepairOrderPickerModal({
   groups = [],
   linkedRepairOrder = null,
   onImported,
+  onPickOrder,
+  title,
+  showCreateNew = true,
 }) {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
@@ -90,6 +93,19 @@ export default function RepairOrderPickerModal({
   }, [orders, search, linkedRepairOrder]);
 
   const handleImport = async (orderId) => {
+    if (onPickOrder) {
+      setImportingId(orderId);
+      setError('');
+      try {
+        await onPickOrder(orderId);
+        onClose();
+      } catch (err) {
+        setError(err?.message || 'Не удалось добавить позиции в заказ-наряд');
+      } finally {
+        setImportingId(null);
+      }
+      return;
+    }
     if (purchaseItemsAlreadyOnRepairOrder(groups, orderId)) {
       onClose();
       return;
@@ -129,7 +145,8 @@ export default function RepairOrderPickerModal({
     });
   };
 
-  const modalTitle = linkedRepairOrder ? 'Изменить заказ-наряд' : 'Добавить к заказ-наряду';
+  const modalTitle = title
+    || (linkedRepairOrder ? 'Изменить заказ-наряд' : 'Добавить к заказ-наряду');
 
   return (
     <Modal
@@ -142,9 +159,11 @@ export default function RepairOrderPickerModal({
           <Button variant="secondary" onClick={onClose}>
             Отмена
           </Button>
-          <Button onClick={handleCreateNew}>
-            Создать новый заказ-наряд
-          </Button>
+          {showCreateNew ? (
+            <Button onClick={handleCreateNew}>
+              Создать новый заказ-наряд
+            </Button>
+          ) : null}
         </div>
       )}
     >

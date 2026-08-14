@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
@@ -135,6 +135,7 @@ function OrderMobileCard({
 export default function AutoserviceOrdersPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const viewHistory = searchParams.get('view') === 'history';
 
@@ -174,6 +175,32 @@ export default function AutoserviceOrdersPage() {
     prevScopeKeyRef.current = scopeKey;
     load({ silent });
   }, [isReady, isAuthenticated, load, scope, historyStatus, qApplied]);
+
+  useEffect(() => {
+    const openOrderId = location.state?.openOrderId;
+    const openOrder = location.state?.openOrder;
+    if (!openOrderId && !openOrder?.id) return undefined;
+
+    let cancelled = false;
+    const openSavedOrder = async () => {
+      navigate('.', { replace: true, state: {} });
+      if (openOrder?.id && Array.isArray(openOrder.works)) {
+        if (!cancelled) setViewOrder(openOrder);
+        return;
+      }
+      const id = openOrderId || openOrder.id;
+      try {
+        const data = await apiRequest(`/autoservice/repair-orders/${id}`);
+        if (!cancelled) setViewOrder(data);
+      } catch (e) {
+        if (!cancelled) setError(e?.message || 'Не удалось открыть заказ-наряд');
+      }
+    };
+    openSavedOrder();
+    return () => {
+      cancelled = true;
+    };
+  }, [location.state, navigate]);
 
   const setHistoryMode = (on) => {
     if (on) setSearchParams({ view: 'history' });

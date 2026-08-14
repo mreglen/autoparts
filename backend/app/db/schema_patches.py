@@ -5098,3 +5098,172 @@ def ensure_autoservice_payments_table() -> None:
 
     logger.info("Applied autoservice_payments table patch")
 
+
+def ensure_product_reserved_qty_column() -> None:
+    """Add reserved_qty to products for repair-order stock reservations."""
+    inspector = inspect(engine)
+    if "products" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("products")}
+    if "reserved_qty" in columns:
+        return
+    default = "0"
+    if engine.dialect.name == "postgresql":
+        stmt = (
+            "ALTER TABLE products ADD COLUMN reserved_qty INTEGER NOT NULL DEFAULT 0"
+        )
+    else:
+        stmt = f"ALTER TABLE products ADD COLUMN reserved_qty INTEGER NOT NULL DEFAULT {default}"
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+    logger.info("Applied products.reserved_qty column patch")
+
+
+def ensure_repair_order_shop_parts_autoservice_stock() -> None:
+    """Add autoservice_stock_item_id to repair_order_shop_parts."""
+    inspector = inspect(engine)
+    if "repair_order_shop_parts" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("repair_order_shop_parts")}
+    if "autoservice_stock_item_id" in columns:
+        return
+    if engine.dialect.name == "postgresql":
+        stmt = (
+            "ALTER TABLE repair_order_shop_parts "
+            "ADD COLUMN autoservice_stock_item_id INTEGER "
+            "REFERENCES autoservice_warehouse_items(id) ON DELETE SET NULL"
+        )
+    else:
+        stmt = (
+            "ALTER TABLE repair_order_shop_parts "
+            "ADD COLUMN autoservice_stock_item_id INTEGER "
+            "REFERENCES autoservice_warehouse_items(id) ON DELETE SET NULL"
+        )
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+        try:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_repair_order_shop_parts_autoservice_stock_item_id "
+                    "ON repair_order_shop_parts (autoservice_stock_item_id)"
+                )
+            )
+        except Exception:
+            pass
+    logger.info("Applied repair_order_shop_parts.autoservice_stock_item_id patch")
+
+
+def ensure_autoservice_warehouse_tables() -> None:
+    """Create autoservice warehouse items, receipts, expenses tables."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "autoservice_warehouse_items" in tables:
+        return
+
+    if engine.dialect.name == "postgresql":
+        items_ddl = """
+        CREATE TABLE autoservice_warehouse_items (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+            brand VARCHAR(120) NOT NULL DEFAULT '',
+            article VARCHAR(120) NOT NULL DEFAULT '',
+            name VARCHAR(255) NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            reserved_qty INTEGER NOT NULL DEFAULT 0,
+            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_autoservice_wh_item_org_brand_article
+                UNIQUE (organization_id, brand, article)
+        )
+        """
+        receipts_ddl = """
+        CREATE TABLE autoservice_warehouse_receipts (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+            item_id INTEGER NOT NULL REFERENCES autoservice_warehouse_items(id) ON DELETE CASCADE,
+            quantity INTEGER NOT NULL,
+            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            cart_item_type VARCHAR(16),
+            cart_item_id INTEGER,
+            repair_order_id INTEGER REFERENCES repair_orders(id) ON DELETE SET NULL,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at DATE NOT NULL DEFAULT CURRENT_DATE
+        )
+        """
+        expenses_ddl = """
+        CREATE TABLE autoservice_warehouse_expenses (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+            item_id INTEGER NOT NULL REFERENCES autoservice_warehouse_items(id) ON DELETE CASCADE,
+            quantity INTEGER NOT NULL,
+            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            reason VARCHAR(255),
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at DATE NOT NULL DEFAULT CURRENT_DATE
+        )
+        """
+    else:
+        items_ddl = """
+        CREATE TABLE autoservice_warehouse_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+            brand VARCHAR(120) NOT NULL DEFAULT '',
+            article VARCHAR(120) NOT NULL DEFAULT '',
+            name VARCHAR(255) NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            reserved_qty INTEGER NOT NULL DEFAULT 0,
+            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (organization_id, brand, article)
+        )
+        """
+        receipts_ddl = """
+        CREATE TABLE autoservice_warehouse_receipts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+            item_id INTEGER NOT NULL REFERENCES autoservice_warehouse_items(id) ON DELETE CASCADE,
+            quantity INTEGER NOT NULL,
+            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            cart_item_type VARCHAR(16),
+            cart_item_id INTEGER,
+            repair_order_id INTEGER REFERENCES repair_orders(id) ON DELETE SET NULL,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at DATE NOT NULL DEFAULT CURRENT_DATE
+        )
+        """
+        expenses_ddl = """
+        CREATE TABLE autoservice_warehouse_expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+            item_id INTEGER NOT NULL REFERENCES autoservice_warehouse_items(id) ON DELETE CASCADE,
+            quantity INTEGER NOT NULL,
+            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            reason VARCHAR(255),
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at DATE NOT NULL DEFAULT CURRENT_DATE
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(items_ddl))
+        conn.execute(text(receipts_ddl))
+        conn.execute(text(expenses_ddl))
+        for idx_stmt in (
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_items_org "
+            "ON autoservice_warehouse_items (organization_id)",
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_receipts_item "
+            "ON autoservice_warehouse_receipts (item_id)",
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_receipts_cart "
+            "ON autoservice_warehouse_receipts (cart_item_type, cart_item_id)",
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_expenses_item "
+            "ON autoservice_warehouse_expenses (item_id)",
+        ):
+            try:
+                conn.execute(text(idx_stmt))
+            except Exception:
+                pass
+
+    logger.info("Applied autoservice warehouse tables patch")
+

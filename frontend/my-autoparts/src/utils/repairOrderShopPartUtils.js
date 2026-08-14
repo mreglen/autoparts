@@ -64,3 +64,28 @@ export function isValidShopPartQty(qty, unit = 'pcs') {
   if (unit === 'pcs') return Number.isInteger(n) && n >= 1;
   return n >= 0.001;
 }
+
+export function isWarehouseLinkedShopPart(part) {
+  return part?.source === 'warehouse' || part?.source === 'autoservice_stock';
+}
+
+export function clampWarehouseShopPartQty(raw, part) {
+  const unit = part?.unit || 'pcs';
+  if (raw === '' || raw == null) return '';
+  let value = unit === 'pcs' ? Math.round(Number(raw) || 0) : raw;
+  const maxQty = Number(part?.stock_max_qty);
+  if (Number.isFinite(maxQty) && maxQty > 0 && Number(value) > maxQty) {
+    value = maxQty;
+  }
+  return value;
+}
+
+export function warehouseStockKey(part) {
+  if (part?.source === 'warehouse' && part?.product_id) {
+    return `warehouse:${part.product_id}`;
+  }
+  if (part?.source === 'autoservice_stock' && part?.autoservice_stock_item_id) {
+    return `autoservice:${part.autoservice_stock_item_id}`;
+  }
+  return null;
+}

@@ -18,6 +18,7 @@ import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../.
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItemsPickerModal';
+import RepairOrderStockPickerModal from '../../components/Autoservice/RepairOrderStockPickerModal';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import {
   clearRepairOrderPurchaseDraft,
@@ -27,11 +28,14 @@ import {
   saveLinkedRepairOrder,
 } from '../../utils/repairOrderPurchaseDraft';
 import {
+  clampWarehouseShopPartQty,
   isValidShopPartQty,
+  isWarehouseLinkedShopPart,
   priceWithMarkup,
   shopLineSum,
   shopPartDisplayName,
   shopPartPricingOptions,
+  warehouseStockKey,
 } from '../../utils/repairOrderShopPartUtils';
 
 const pillInputClass =
@@ -131,6 +135,8 @@ function emptyShopPart(overrides = {}, defaultMarkupPercent = 0) {
     client_unit_price_override: '',
     source: 'manual',
     product_id: null,
+    autoservice_stock_item_id: null,
+    stock_max_qty: null,
     rossko_brand: '',
     rossko_partnumber: '',
     ...overrides,
@@ -138,6 +144,10 @@ function emptyShopPart(overrides = {}, defaultMarkupPercent = 0) {
 }
 
 function shopPartLineValue(part) {
+  const hasBrandOrArticle = Boolean(
+    part?.brand || part?.partnumber || part?.rossko_brand || part?.rossko_partnumber,
+  );
+  if (!hasBrandOrArticle) return part?.title ?? '';
   return shopPartDisplayName(part) === '—' ? (part?.title || '') : shopPartDisplayName(part);
 }
 
@@ -650,6 +660,8 @@ function mapOrderToFormState(order) {
             : String(p.client_unit_price_override),
           source: p.source || 'manual',
           product_id: p.product_id || null,
+          autoservice_stock_item_id: p.autoservice_stock_item_id || null,
+          stock_max_qty: p.stock_max_qty ?? null,
           rossko_brand: p.rossko_brand || '',
           rossko_partnumber: p.rossko_partnumber || '',
           is_imported: Boolean(p.is_imported),
@@ -705,6 +717,8 @@ export default function AutoserviceOrderFormPage() {
   const [pendingPurchaseGroups, setPendingPurchaseGroups] = useState([]);
   const [shopPartAddMenuOpen, setShopPartAddMenuOpen] = useState(false);
   const [purchasePickerOpen, setPurchasePickerOpen] = useState(false);
+  const [myPartsPickerOpen, setMyPartsPickerOpen] = useState(false);
+  const [autoserviceStockPickerOpen, setAutoserviceStockPickerOpen] = useState(false);
 
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
@@ -981,6 +995,52 @@ export default function AutoserviceOrderFormPage() {
     setShopParts((prev) => [...prev, makeEmptyShopPart()]);
   };
 
+  const handleMyPartsStockSelect = (item, quantity) => {
+    setShopParts((prev) => {
+      const stockKey = `warehouse:${item.id}`;
+      const usedQty = prev
+        .filter((p) => warehouseStockKey(p) === stockKey)
+        .reduce((sum, p) => sum + (Number(p.qty) || 0), 0);
+      const available = Math.max(0, (Number(item.available_qty) || 0) - usedQty);
+      const qty = Math.min(quantity, available);
+      if (qty < 1) return prev;
+      return [...prev, makeEmptyShopPart({
+        title: item.title || item.name || item.article || 'Запчасть',
+        brand: item.brand || '',
+        partnumber: item.article || item.internal_code || '',
+        qty,
+        unit: 'pcs',
+        unit_price: String(item.price ?? 0),
+        source: 'warehouse',
+        product_id: item.id,
+        stock_max_qty: available,
+      })];
+    });
+  };
+
+  const handleAutoserviceStockSelect = (item, quantity) => {
+    setShopParts((prev) => {
+      const stockKey = `autoservice:${item.id}`;
+      const usedQty = prev
+        .filter((p) => warehouseStockKey(p) === stockKey)
+        .reduce((sum, p) => sum + (Number(p.qty) || 0), 0);
+      const available = Math.max(0, (Number(item.available_qty) || 0) - usedQty);
+      const qty = Math.min(quantity, available);
+      if (qty < 1) return prev;
+      return [...prev, makeEmptyShopPart({
+        title: item.name || item.article || 'Запчасть',
+        brand: item.brand || '',
+        partnumber: item.article || '',
+        qty,
+        unit: 'pcs',
+        unit_price: String(item.unit_price ?? 0),
+        source: 'autoservice_stock',
+        autoservice_stock_item_id: item.id,
+        stock_max_qty: available,
+      })];
+    });
+  };
+
   const applyShopPartsMarkup = (percent) => {
     setShopParts((prev) => prev.map((part) => ({
       ...part,
@@ -1080,6 +1140,9 @@ export default function AutoserviceOrderFormPage() {
           : Number(p.client_unit_price_override),
         source: p.source || 'manual',
         product_id: p.source === 'warehouse' ? p.product_id : null,
+        autoservice_stock_item_id: p.source === 'autoservice_stock'
+          ? p.autoservice_stock_item_id
+          : null,
         rossko_brand: p.source === 'rossko' ? (p.rossko_brand || p.brand || null) : null,
         rossko_partnumber: p.source === 'rossko' ? (p.rossko_partnumber || p.partnumber || null) : null,
       })),
@@ -1128,6 +1191,13 @@ export default function AutoserviceOrderFormPage() {
           ? 'Количество ЗЧ исполнителя должно быть целым числом ≥ 1'
           : 'Количество ЗЧ исполнителя должно быть ≥ 0,001';
       }
+      if (
+        isWarehouseLinkedShopPart(p)
+        && p.stock_max_qty != null
+        && Number(p.qty) > Number(p.stock_max_qty)
+      ) {
+        return `Количество «${shopPartDisplayName(p)}» не может превышать ${p.stock_max_qty} шт.`;
+      }
       if (Number.isNaN(Number(p.unit_price)) || Number(p.unit_price) < 0) {
         return 'Цена ЗЧ исполнителя должна быть ≥ 0';
       }
@@ -1162,17 +1232,28 @@ export default function AutoserviceOrderFormPage() {
           })
           .filter((group) => group.itemIds.length > 0)
         : [];
+      const goToSavedOrder = (saved) => {
+        const openOrderId = saved?.id || Number(orderId) || null;
+        navigate('/autoservice/orders', {
+          state: {
+            openOrderId,
+            openOrder: saved?.id ? saved : null,
+          },
+        });
+      };
+
       if (isEdit) {
-        await apiRequest(`/autoservice/repair-orders/${orderId}`, {
+        const updated = await apiRequest(`/autoservice/repair-orders/${orderId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        navigate('/autoservice/orders');
+        goToSavedOrder(updated);
       } else {
         const created = await apiRequest('/autoservice/repair-orders', {
           method: 'POST',
           body: JSON.stringify(body),
         });
+        let saved = created;
         if (created?.id && groupsToImport.length) {
           saveLinkedRepairOrder(created);
           try {
@@ -1196,7 +1277,8 @@ export default function AutoserviceOrderFormPage() {
               clientMarkupPercent,
               itemPriceOverrides,
             );
-            saveLinkedRepairOrder(updated || created);
+            saved = updated || created;
+            saveLinkedRepairOrder(saved);
           } catch (importErr) {
             setError(importErr?.message || 'Заказ-наряд создан, но импорт из заказов не удался');
             clearRepairOrderPurchaseDraft();
@@ -1205,7 +1287,7 @@ export default function AutoserviceOrderFormPage() {
           }
           clearRepairOrderPurchaseDraft();
         }
-        navigate('/autoservice/orders');
+        goToSavedOrder(saved);
       }
     } catch (err) {
       setError(err?.message || 'Не удалось сохранить');
@@ -1610,21 +1692,27 @@ export default function AutoserviceOrderFormPage() {
                     const qtyStep = p.unit === 'pcs' ? 1 : 0.001;
                     const qtyMin = p.unit === 'pcs' ? 1 : 0.001;
                     const isImported = Boolean(p.is_imported || p.pending_import);
+                    const isWarehouseLinked = isWarehouseLinkedShopPart(p);
+                    const isNameLocked = isImported || isWarehouseLinked;
+                    const isQtyLocked = isImported;
+                    const isUnitLocked = isImported || isWarehouseLinked;
                     const qtyValue = (p.unit || 'pcs') === 'pcs'
                       ? (Number.isFinite(Number(p.qty)) ? Math.round(Number(p.qty)) : '')
                       : p.qty;
-                    const inputClass = `${pillInputSmClass}${isImported ? ' cursor-not-allowed opacity-80' : ''}`;
-                    const selectClass = `${pillSelectSmClass}${isImported ? ' cursor-not-allowed opacity-80' : ''}`;
+                    const nameInputClass = `${pillInputSmClass}${isNameLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-90' : ''}`;
+                    const lockedFieldClass = `${pillInputSmClass} cursor-not-allowed bg-surface-muted/80 opacity-80`;
+                    const qtyInputClass = isQtyLocked ? lockedFieldClass : pillInputSmClass;
+                    const selectClass = `${pillSelectSmClass}${isUnitLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`;
                     return (
                       <tr key={p.id || `shop-part-${index}`} className="align-top">
                         <td className="px-2 py-2.5 tabular-nums text-ink-muted">{index + 1}</td>
                         <td className="px-2 py-2.5">
                           <input
-                            className={`w-full min-w-[18rem] ${inputClass}`}
+                            className={`w-full min-w-[18rem] ${nameInputClass}`}
                             placeholder="Бренд, артикул, наименование"
                             value={shopPartLineValue(p)}
-                            readOnly={isImported}
-                            disabled={isImported}
+                            readOnly={isNameLocked}
+                            disabled={isNameLocked}
                             onChange={(e) => updateShopPart(index, {
                               title: e.target.value,
                               brand: '',
@@ -1638,19 +1726,31 @@ export default function AutoserviceOrderFormPage() {
                           <input
                             type="number"
                             min={qtyMin}
+                            max={isWarehouseLinked && p.stock_max_qty != null ? p.stock_max_qty : undefined}
                             step={qtyStep}
-                            className={`w-full min-w-[4rem] ${inputClass}`}
+                            className={`w-full min-w-[4rem] ${qtyInputClass}`}
                             value={qtyValue}
-                            readOnly={isImported}
-                            disabled={isImported}
+                            readOnly={isQtyLocked}
+                            disabled={isQtyLocked}
+                            title={
+                              isWarehouseLinked && p.stock_max_qty != null
+                                ? `Доступно не более ${p.stock_max_qty} шт.`
+                                : undefined
+                            }
                             onChange={(e) => {
                               const raw = e.target.value;
+                              if (isQtyLocked) return;
                               if ((p.unit || 'pcs') === 'pcs') {
                                 updateShopPart(index, {
-                                  qty: raw === '' ? '' : Math.round(Number(raw) || 0),
+                                  qty: clampWarehouseShopPartQty(
+                                    raw === '' ? '' : Math.round(Number(raw) || 0),
+                                    p,
+                                  ),
                                 });
                               } else {
-                                updateShopPart(index, { qty: raw });
+                                updateShopPart(index, {
+                                  qty: clampWarehouseShopPartQty(raw, p),
+                                });
                               }
                             }}
                           />
@@ -1659,7 +1759,7 @@ export default function AutoserviceOrderFormPage() {
                           <select
                             className={`w-full min-w-[3.5rem] ${selectClass}`}
                             value={p.unit || 'pcs'}
-                            disabled={isImported}
+                            disabled={isUnitLocked}
                             onChange={(e) => updateShopPart(index, { unit: e.target.value })}
                           >
                             <option value="pcs">шт.</option>
@@ -1766,6 +1866,26 @@ export default function AutoserviceOrderFormPage() {
             </button>
             <button
               type="button"
+              className={`${btnSecondaryClass} w-full`}
+              onClick={() => {
+                setShopPartAddMenuOpen(false);
+                setMyPartsPickerOpen(true);
+              }}
+            >
+              Добавить из склада «Мои запчасти»
+            </button>
+            <button
+              type="button"
+              className={`${btnSecondaryClass} w-full`}
+              onClick={() => {
+                setShopPartAddMenuOpen(false);
+                setAutoserviceStockPickerOpen(true);
+              }}
+            >
+              Добавить со склада автосервиса
+            </button>
+            <button
+              type="button"
               className={`${btnPrimaryClass} w-full`}
               onClick={() => {
                 setShopPartAddMenuOpen(false);
@@ -1782,6 +1902,24 @@ export default function AutoserviceOrderFormPage() {
         open={purchasePickerOpen}
         onClose={() => setPurchasePickerOpen(false)}
         onConfirm={handlePurchaseGroupsConfirm}
+      />
+
+      <RepairOrderStockPickerModal
+        open={myPartsPickerOpen}
+        onClose={() => setMyPartsPickerOpen(false)}
+        title="Добавить из склада «Мои запчасти»"
+        endpoint="/autoservice/repair-orders/warehouse-products"
+        mapSelection={(item, quantity) => ({ item, quantity })}
+        onSelect={({ item, quantity }) => handleMyPartsStockSelect(item, quantity)}
+      />
+
+      <RepairOrderStockPickerModal
+        open={autoserviceStockPickerOpen}
+        onClose={() => setAutoserviceStockPickerOpen(false)}
+        title="Добавить со склада автосервиса"
+        endpoint="/autoservice/warehouse/items"
+        mapSelection={(item, quantity) => ({ item, quantity })}
+        onSelect={({ item, quantity }) => handleAutoserviceStockSelect(item, quantity)}
       />
     </div>
     </div>
