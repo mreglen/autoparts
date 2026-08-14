@@ -147,6 +147,62 @@ def receipt_purchase_line(
     return item, receipt, True
 
 
+def receipt_manual_line(
+    db: Session,
+    *,
+    org_id: str,
+    user_id: int,
+    brand: str,
+    article: str,
+    name: str,
+    quantity: int,
+    unit_price: Decimal,
+    repair_order_id: int | None = None,
+) -> tuple[AutoserviceWarehouseItem, AutoserviceWarehouseReceipt, bool]:
+    """Create a manual warehouse receipt (no purchase cart line)."""
+    qty = int(quantity or 0)
+    if qty <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Количество должно быть больше 0",
+        )
+
+    name_norm = (name or "").strip()[:255]
+    brand_norm = _normalize_brand(brand)
+    article_norm = _normalize_article(article) or name_norm[:120]
+    if not name_norm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите наименование запчасти",
+        )
+
+    item = _get_or_create_item(
+        db,
+        org_id=org_id,
+        brand=brand_norm,
+        article=article_norm,
+        name=name_norm,
+        unit_price=unit_price,
+    )
+    item.quantity = int(item.quantity or 0) + qty
+    if _money(unit_price) > 0:
+        item.unit_price = _money(unit_price)
+
+    receipt = AutoserviceWarehouseReceipt(
+        organization_id=org_id,
+        item_id=item.id,
+        quantity=qty,
+        unit_price=_money(unit_price),
+        cart_item_type="manual",
+        cart_item_id=None,
+        repair_order_id=repair_order_id,
+        created_by=user_id,
+    )
+    db.add(receipt)
+    db.flush()
+    return item, receipt, True
+
+
 def import_purchase_groups_to_warehouse(
     db: Session,
     *,

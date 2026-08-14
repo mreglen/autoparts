@@ -61,6 +61,14 @@ class AutoserviceWarehouseExpenseCreate(BaseModel):
     reason: Optional[str] = Field(None, max_length=255)
 
 
+class AutoserviceWarehouseManualReceiptIn(BaseModel):
+    brand: str = Field("", max_length=120)
+    article: str = Field("", max_length=120)
+    name: str = Field(min_length=1, max_length=255)
+    quantity: int = Field(ge=1)
+    unit_price: Decimal = Field(ge=0)
+
+
 class AutoserviceWarehouseImportResult(BaseModel):
     added_items: int
     skipped_items: int

@@ -16,6 +16,7 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseExpenseView,
     AutoserviceWarehouseImportResult,
     AutoserviceWarehouseItemView,
+    AutoserviceWarehouseManualReceiptIn,
     AutoserviceWarehouseReceiptView,
     PurchaseWarehouseImportIn,
 )
@@ -23,6 +24,7 @@ from app.services.autoservice_warehouse_service import (
     autoservice_item_available_qty,
     create_autoservice_expense,
     import_purchase_groups_to_warehouse,
+    receipt_manual_line,
 )
 from app.utils.autoservice_access import require_autoservice_staff
 
@@ -188,6 +190,45 @@ def import_purchases_to_autoservice_warehouse(
     )
     db.commit()
     return AutoserviceWarehouseImportResult(added_items=added, skipped_items=skipped)
+
+
+@router.post(
+    "/autoservice/warehouse/receipts",
+    response_model=AutoserviceWarehouseReceiptView,
+)
+def create_autoservice_warehouse_receipt(
+    payload: AutoserviceWarehouseManualReceiptIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    item, receipt, _created = receipt_manual_line(
+        db,
+        org_id=org_id,
+        user_id=current_user.id,
+        brand=payload.brand,
+        article=payload.article,
+        name=payload.name,
+        quantity=payload.quantity,
+        unit_price=payload.unit_price,
+    )
+    db.commit()
+    db.refresh(receipt)
+    db.refresh(item)
+    return AutoserviceWarehouseReceiptView(
+        id=receipt.id,
+        item_id=receipt.item_id,
+        brand=item.brand or "",
+        article=item.article or "",
+        name=item.name,
+        quantity=int(receipt.quantity or 0),
+        unit_price=receipt.unit_price,
+        cart_item_type=receipt.cart_item_type,
+        cart_item_id=receipt.cart_item_id,
+        repair_order_id=receipt.repair_order_id,
+        created_at=receipt.created_at,
+        creator_name=_creator_name(current_user),
+    )
 
 
 @router.post(

@@ -19,6 +19,7 @@ import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItemsPickerModal';
 import RepairOrderStockPickerModal from '../../components/Autoservice/RepairOrderStockPickerModal';
+import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import {
   clearRepairOrderPurchaseDraft,
@@ -719,6 +720,7 @@ export default function AutoserviceOrderFormPage() {
   const [purchasePickerOpen, setPurchasePickerOpen] = useState(false);
   const [myPartsPickerOpen, setMyPartsPickerOpen] = useState(false);
   const [autoserviceStockPickerOpen, setAutoserviceStockPickerOpen] = useState(false);
+  const [shopPartManualOpen, setShopPartManualOpen] = useState(false);
 
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
@@ -991,8 +993,21 @@ export default function AutoserviceOrderFormPage() {
     setShopParts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
 
-  const addShopPart = () => {
-    setShopParts((prev) => [...prev, makeEmptyShopPart()]);
+  const updateShopPart = (index, patch) => {
+    setShopParts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
+  };
+
+  const handleManualShopPartAdd = (values) => {
+    setShopParts((prev) => [...prev, makeEmptyShopPart({
+      title: values.name,
+      brand: values.brand || '',
+      partnumber: values.article || '',
+      qty: values.quantity,
+      unit: 'pcs',
+      unit_price: String(values.unit_price ?? 0),
+      source: 'manual',
+    })]);
+    setShopPartManualOpen(false);
   };
 
   const handleMyPartsStockSelect = (item, quantity) => {
@@ -1889,7 +1904,7 @@ export default function AutoserviceOrderFormPage() {
               className={`${btnPrimaryClass} w-full`}
               onClick={() => {
                 setShopPartAddMenuOpen(false);
-                addShopPart();
+                setShopPartManualOpen(true);
               }}
             >
               Добавить вручную
@@ -1920,6 +1935,14 @@ export default function AutoserviceOrderFormPage() {
         endpoint="/autoservice/warehouse/items"
         mapSelection={(item, quantity) => ({ item, quantity })}
         onSelect={({ item, quantity }) => handleAutoserviceStockSelect(item, quantity)}
+      />
+
+      <AutoserviceWarehouseAddModal
+        open={shopPartManualOpen}
+        onClose={() => setShopPartManualOpen(false)}
+        onSubmit={handleManualShopPartAdd}
+        title="Добавить запчасть вручную"
+        submitLabel="Добавить в заказ-наряд"
       />
     </div>
     </div>

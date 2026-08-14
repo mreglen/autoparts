@@ -7,6 +7,7 @@ import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDr
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
+import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import useNewPartsMarkupPercent from '../../hooks/useNewPartsMarkupPercent';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
@@ -50,6 +51,7 @@ export default function AutoserviceWarehousePage() {
   const [orderPickerOpen, setOrderPickerOpen] = useState(false);
   const [pendingOrderItems, setPendingOrderItems] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -120,6 +122,24 @@ export default function AutoserviceWarehousePage() {
     }
   };
 
+  const handleAddManual = async (values) => {
+    setSubmitting(true);
+    setError('');
+    try {
+      await apiRequest('/autoservice/warehouse/receipts', {
+        method: 'POST',
+        body: JSON.stringify(values),
+      });
+      setAddOpen(false);
+      await loadItems();
+    } catch (err) {
+      setError(err?.message || 'Не удалось добавить запчасть');
+      throw err;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const confirmOrderQty = () => {
     if (!orderQtyItem) return;
     const qty = Math.max(1, Math.min(Number(orderQty) || 1, Number(orderQtyItem.available_qty) || 1));
@@ -156,13 +176,25 @@ export default function AutoserviceWarehousePage() {
           <h1 className="text-xl font-semibold text-gray-900">Склад автосервиса</h1>
           <p className="mt-1 text-sm text-gray-500">Остатки запчастей автосервиса</p>
         </div>
-        <button
-          type="button"
-          onClick={loadItems}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Обновить
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setError('');
+              setAddOpen(true);
+            }}
+            className={warehousePrimaryButtonClass}
+          >
+            Добавить
+          </button>
+          <button
+            type="button"
+            onClick={loadItems}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Обновить
+          </button>
+        </div>
       </div>
 
       <div className={`${warehouseToolbarClass} mb-4`}>
@@ -386,6 +418,13 @@ export default function AutoserviceWarehousePage() {
           </div>
         ) : null}
       </Modal>
+
+      <AutoserviceWarehouseAddModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSubmit={handleAddManual}
+        submitting={submitting}
+      />
 
       <RepairOrderPickerModal
         open={orderPickerOpen}
