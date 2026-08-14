@@ -9,10 +9,9 @@ import {
   DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
   fetchPublicSiteConfig,
 } from '../../redux/slices/PublicInfoSlice';
-import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import { Badge } from '../../components/UI/Badge';
-import { settingsInputClass } from './settingsUi';
+import { SettingsCard, settingsInputClass } from './settingsUi';
 
 function formatMoney(value) {
   return new Intl.NumberFormat('ru-RU').format(Number(value) || 0);
@@ -90,7 +89,7 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
   if (!user?.organization_id) return null;
 
   return (
-    <Card className="border-brand-100 bg-gradient-to-br from-brand-50/70 to-surface">
+    <SettingsCard className="border-brand-100 bg-gradient-to-br from-brand-50/70 to-surface">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -143,7 +142,7 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
       </ul>
 
       {connected ? (
-        <p className="mt-5 rounded-sg-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-800">
+        <p className="mt-5 rounded-sg-lg border border-success-100 bg-success-50 px-4 py-3 text-sm text-success-700">
           Автосервис подключён. Используйте переключатель «Продавец / Автосервис» в меню слева.
         </p>
       ) : null}
@@ -184,8 +183,8 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
             <div
               className={`rounded-sg-lg border px-4 py-3 text-sm ${
                 notice?.type === 'success'
-                  ? 'border-success-200 bg-success-50 text-success-800'
-                  : 'border-danger-200 bg-danger-50 text-danger-800'
+                  ? 'border-success-100 bg-success-50 text-success-700'
+                  : 'border-danger-100 bg-danger-50 text-danger-700'
               }`}
             >
               {notice?.message || myError}
@@ -198,14 +197,14 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
       ) : null}
 
       {!connected && application?.status === 'pending' ? (
-        <p className="mt-5 rounded-sg-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
+        <p className="mt-5 rounded-sg-lg border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700">
           Заявка отправлена {application.created_at ? new Date(application.created_at).toLocaleString('ru-RU') : ''}.
           После одобрения администратором автосервис появится в меню.
         </p>
       ) : null}
 
       {!connected && application?.status === 'rejected' ? (
-        <p className="mt-5 rounded-sg-lg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800">
+        <p className="mt-5 rounded-sg-lg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700">
           Заявка отклонена{application.rejection_reason ? `: ${application.rejection_reason}` : ''}. Вы можете отправить новую заявку.
         </p>
       ) : null}
@@ -213,6 +212,6 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
       {!isDirector && !connected ? (
         <p className="mt-5 text-sm text-ink-muted">Отправить заявку может директор организации.</p>
       ) : null}
-    </Card>
+    </SettingsCard>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateOrganization } from '../../redux/slices/OrganizationSlice';
-import { SettingsCard, SettingsSectionHeader } from './settingsUi';
+import { SettingsCard, SettingsSectionHeader, SettingsToggle } from './settingsUi';
 
 export default function MarketplaceSiteInfoSection({ org }) {
   const dispatch = useDispatch();
@@ -48,26 +48,17 @@ export default function MarketplaceSiteInfoSection({ org }) {
           </svg>
         }
       />
-      <p className="mb-4 text-sm text-gray-600">
+      <p className="mb-4 text-sm leading-relaxed text-ink-muted">
         При выгрузке в Авито и Дром в конец описания добавляется блок со ссылкой на карточку
         товара на сайте Свой Гараж, чтобы покупатели могли открыть объявление у нас.
       </p>
-      <label className="flex cursor-pointer items-start gap-3">
-        <input
-          type="checkbox"
-          className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-          checked={enabled}
-          disabled={isUpdating || !user?.is_director}
-          onChange={handleToggle}
-        />
-        <span className="text-sm text-gray-800">
-          <span className="font-medium">Добавлять информацию о площадке в конце описания</span>
-          <span className="mt-0.5 block text-gray-500">
-            Текст со ссылкой на товар на Свой Гараж добавляется только в выгрузку, описание в
-            карточке на сайте не меняется.
-          </span>
-        </span>
-      </label>
+      <SettingsToggle
+        checked={enabled}
+        disabled={isUpdating || !user?.is_director}
+        onChange={handleToggle}
+        label="Добавлять ссылку на Свой Гараж"
+        description="Только в выгрузке: описание карточки на сайте не меняется"
+      />
     </SettingsCard>
   );
 }

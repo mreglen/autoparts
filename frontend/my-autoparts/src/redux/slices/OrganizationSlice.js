@@ -72,7 +72,7 @@ export const createStorageLocation = createAsyncThunk(
             });
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка создания склада');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка создания склада');
         }
     }
 );
@@ -85,7 +85,7 @@ export const fetchStorageLocations = createAsyncThunk(
             const result = await apiRequest(`/storage-locations/?organization_id=${orgId}`);
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка загрузки складов');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка загрузки складов');
         }
     }
 );
@@ -100,7 +100,7 @@ export const updateStorageLocation = createAsyncThunk(
             });
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка обновления склада');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка обновления склада');
         }
     }
 );
@@ -115,7 +115,7 @@ export const deleteStorageLocation = createAsyncThunk(
             });
             return id;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка удаления склада');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка удаления склада');
         }
     }
 );
@@ -329,15 +329,33 @@ const organizationSlice = createSlice({
                 state.loadingEmployees = false;
                 state.employeesError = action.payload;
             })
+            .addCase(createStorageLocation.pending, (state) => {
+                state.locationsError = null;
+            })
             .addCase(createStorageLocation.fulfilled, (state, action) => {
-                state.storageLocations.push(action.payload);
+                const created = action.payload;
+                if (created?.id && !state.storageLocations.some((loc) => loc.id === created.id)) {
+                    state.storageLocations.push(created);
+                }
+                state.locationsError = null;
+            })
+            .addCase(createStorageLocation.rejected, (state, action) => {
+                state.locationsError = action.payload;
             })
             .addCase(updateStorageLocation.fulfilled, (state, action) => {
                 const index = state.storageLocations.findIndex(loc => loc.id === action.payload.id);
                 if (index !== -1) state.storageLocations[index] = action.payload;
+                state.locationsError = null;
+            })
+            .addCase(updateStorageLocation.rejected, (state, action) => {
+                state.locationsError = action.payload;
             })
             .addCase(deleteStorageLocation.fulfilled, (state, action) => {
                 state.storageLocations = state.storageLocations.filter(loc => loc.id !== action.payload);
+                state.locationsError = null;
+            })
+            .addCase(deleteStorageLocation.rejected, (state, action) => {
+                state.locationsError = action.payload;
             })
             .addCase(fetchOrganization.pending, (state) => {
                 state.loading = true;

@@ -3,69 +3,53 @@ import { useSelector, useDispatch } from 'react-redux';
 import { updateOrganization } from '../../redux/slices/OrganizationSlice';
 import { SettingsCard, SettingsSectionHeader } from './settingsUi';
 
+const OPTIONS = [
+  {
+    value: 0,
+    title: 'Без знака',
+    description: 'Фото товаров без наложения',
+  },
+  {
+    value: 1,
+    title: '«Свой Гараж»',
+    description: 'Логотип площадки на фото',
+  },
+  {
+    value: 2,
+    title: 'Логотип компании',
+    description: 'Ваш логотип на фото',
+  },
+];
+
 const WatermarksSection = ({ org }) => {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
-  
-  // Get current watermark value from organization
   const currentWatermark = org?.watermark || 0;
-  
-  // Local state for checkboxes
-  const [watermarks, setWatermarks] = useState({
-    ownGarage: false,  // "Свой Гараж" logo - watermark = 1
-    companyLogo: false // Company logo - watermark = 2
-  });
-  
+  const [selected, setSelected] = useState(0);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Update checkboxes based on organization watermark value
   useEffect(() => {
     if (org && org.watermark !== undefined) {
-      setWatermarks({
-        ownGarage: org.watermark === 1,
-        companyLogo: org.watermark === 2
-      });
+      setSelected(org.watermark || 0);
     }
   }, [org]);
 
-  // Handle checkbox changes
-  const handleWatermarkChange = async (type) => {
-    if (isUpdating || !user?.organization_id) return;
-    
+  const handleSelect = async (value) => {
+    if (isUpdating || !user?.organization_id || value === selected) return;
+
     setIsUpdating(true);
-    
-    let newWatermarkValue;
-    
-    if (type === 'ownGarage') {
-      // If clicking already checked checkbox, uncheck it (set to 0)
-      // If clicking unchecked checkbox, set to 1 and uncheck companyLogo
-      newWatermarkValue = watermarks.ownGarage ? 0 : 1;
-    } else if (type === 'companyLogo') {
-      // If clicking already checked checkbox, uncheck it (set to 0)
-      // If clicking unchecked checkbox, set to 2 and uncheck ownGarage
-      newWatermarkValue = watermarks.companyLogo ? 0 : 2;
-    }
-    
-    // Optimistic UI update
-    const newWatermarks = {
-      ownGarage: newWatermarkValue === 1,
-      companyLogo: newWatermarkValue === 2
-    };
-    setWatermarks(newWatermarks);
-    
+    setSelected(value);
+
     try {
-      // Update organization with new watermark value
-      await dispatch(updateOrganization({
-        id: user.organization_id,
-        watermark: newWatermarkValue
-      })).unwrap();
+      await dispatch(
+        updateOrganization({
+          id: user.organization_id,
+          watermark: value,
+        }),
+      ).unwrap();
     } catch (error) {
       console.error('Error updating watermark:', error);
-      // Revert back on error
-      setWatermarks({
-        ownGarage: currentWatermark === 1,
-        companyLogo: currentWatermark === 2
-      });
+      setSelected(currentWatermark);
     } finally {
       setIsUpdating(false);
     }
@@ -82,30 +66,38 @@ const WatermarksSection = ({ org }) => {
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         }
-        action={isUpdating ? <span className="text-xs text-gray-500">Сохранение...</span> : null}
+        action={isUpdating ? <span className="text-xs text-ink-muted">Сохранение…</span> : null}
       />
 
-      <div className="space-y-3">
-        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3 transition-colors hover:bg-gray-50">
-          <input
-            type="checkbox"
-            checked={watermarks.ownGarage}
-            onChange={() => handleWatermarkChange('ownGarage')}
-            disabled={isUpdating}
-            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
-          />
-          <span className="text-sm font-medium text-gray-800">Логотип «Свой Гараж»</span>
-        </label>
-        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3 transition-colors hover:bg-gray-50">
-          <input
-            type="checkbox"
-            checked={watermarks.companyLogo}
-            onChange={() => handleWatermarkChange('companyLogo')}
-            disabled={isUpdating}
-            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
-          />
-          <span className="text-sm font-medium text-gray-800">Логотип компании</span>
-        </label>
+      <div className="grid gap-2">
+        {OPTIONS.map((option) => {
+          const active = selected === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              disabled={isUpdating}
+              onClick={() => handleSelect(option.value)}
+              className={`flex w-full items-start gap-3 rounded-sg border px-4 py-3.5 text-left transition-colors disabled:opacity-60 ${
+                active
+                  ? 'border-brand-200 bg-brand-50/70 ring-1 ring-brand-100'
+                  : 'border-line bg-white hover:border-brand-200'
+              }`}
+            >
+              <span
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                  active ? 'border-brand-600 bg-brand-600' : 'border-line bg-white'
+                }`}
+              >
+                {active ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
+              </span>
+              <span>
+                <span className="block text-sm font-medium text-ink">{option.title}</span>
+                <span className="mt-0.5 block text-sm text-ink-muted">{option.description}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </SettingsCard>
   );

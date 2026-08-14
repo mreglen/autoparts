@@ -6,7 +6,7 @@ import {
     assignPaymentMethod,
     removePaymentMethod,
 } from '../../redux/slices/OrganizationSlice';
-import { SettingsCard, SettingsSectionHeader } from './settingsUi';
+import { SettingsCard, SettingsSectionHeader, SettingsToggle } from './settingsUi';
 
 const PaymentMethodsSection = ({ orgId }) => {
     const dispatch = useDispatch();
@@ -39,10 +39,10 @@ const PaymentMethodsSection = ({ orgId }) => {
     };
 
     return (
-        <SettingsCard className="min-h-[400px]">
+        <SettingsCard>
             <SettingsSectionHeader
                 title="Способы оплаты"
-                subtitle="Доступные варианты при подтверждении оплаты заказа"
+                subtitle="Варианты при подтверждении заказа"
                 icon={
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path
@@ -56,49 +56,33 @@ const PaymentMethodsSection = ({ orgId }) => {
 
             {loading ? (
                 <div className="animate-pulse space-y-2">
-                    <div className="h-12 rounded-xl bg-gray-100" />
-                    <div className="h-12 rounded-xl bg-gray-100" />
+                    <div className="h-14 rounded-sg bg-surface-subtle" />
+                    <div className="h-14 rounded-sg bg-surface-subtle" />
                 </div>
             ) : error ? (
-                <div className="text-sm text-red-600">Ошибка: {error}</div>
-            ) : (
+                <p className="rounded-sg border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700">
+                    {error}
+                </p>
+            ) : allPaymentMethods && allPaymentMethods.length > 0 ? (
                 <div className="space-y-2">
-                    {allPaymentMethods && allPaymentMethods.length > 0 ? (
-                        allPaymentMethods.map((method) => {
-                            const isChecked = orgPaymentMethods.some((orgMethod) => orgMethod.id === method.id);
-                            return (
-                                <div
-                                    key={method.id}
-                                    className="flex min-h-[52px] items-center justify-between rounded-xl border border-gray-100 bg-gray-50/60 p-3"
-                                >
-                                    <div className="min-w-0 truncate pr-2">
-                                        <span className="text-sm font-medium text-gray-900">{method.name}</span>
-                                        {method.description && (
-                                            <span className="ml-2 text-sm text-gray-500">— {method.description}</span>
-                                        )}
-                                    </div>
-                                    <label className="inline-flex shrink-0 cursor-pointer items-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={isChecked}
-                                            onChange={(e) => {
-                                                e.stopPropagation();
-                                                handleCheckboxChange(method.id, e.target.checked);
-                                            }}
-                                            className="sr-only peer"
-                                            disabled={loading}
-                                        />
-                                        <div
-                                            className={`relative h-6 w-11 rounded-full bg-gray-200 transition-colors peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-500/30 peer-checked:bg-indigo-600 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:after:translate-x-full ${loading ? 'opacity-50' : ''}`}
-                                        />
-                                    </label>
-                                </div>
-                            );
-                        })
-                    ) : (
-                        <p className="text-sm text-gray-500">Нет доступных способов оплаты</p>
-                    )}
+                    {allPaymentMethods.map((method) => {
+                        const isChecked = orgPaymentMethods.some((orgMethod) => orgMethod.id === method.id);
+                        return (
+                            <SettingsToggle
+                                key={method.id}
+                                checked={isChecked}
+                                disabled={loading}
+                                label={method.name}
+                                description={method.description}
+                                onChange={(e) => handleCheckboxChange(method.id, e.target.checked)}
+                            />
+                        );
+                    })}
                 </div>
+            ) : (
+                <p className="rounded-sg border border-dashed border-line px-4 py-6 text-center text-sm text-ink-muted">
+                    Нет доступных способов оплаты
+                </p>
             )}
         </SettingsCard>
     );
