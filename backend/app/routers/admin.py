@@ -1041,6 +1041,95 @@ def update_organization_admin(
     return org
 
 
+class UnpaidCheckoutOrgView(BaseModel):
+    id: str
+    name: Optional[str] = None
+    allow_unpaid_checkout: bool = False
+
+
+class UnpaidCheckoutOrgPatch(BaseModel):
+    is_enabled: bool
+
+
+class UnpaidCheckoutBulkPayload(BaseModel):
+    organization_ids: list[str] = Field(..., min_length=1)
+    is_enabled: bool
+
+
+def _unpaid_checkout_org_view(org: Organization) -> UnpaidCheckoutOrgView:
+    return UnpaidCheckoutOrgView(
+        id=org.id,
+        name=org.name,
+        allow_unpaid_checkout=bool(org.allow_unpaid_checkout),
+    )
+
+
+@router.get("/unpaid-checkout/organizations", response_model=List[UnpaidCheckoutOrgView])
+def list_unpaid_checkout_organizations(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    orgs = db.query(Organization).order_by(Organization.name.asc()).all()
+    return [_unpaid_checkout_org_view(org) for org in orgs]
+
+
+@router.put("/unpaid-checkout/organizations/{org_id}", response_model=UnpaidCheckoutOrgView)
+def set_unpaid_checkout_organization(
+    org_id: str,
+    payload: UnpaidCheckoutOrgPatch,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if org is None:
+        raise HTTPException(status_code=404, detail="Организация не найдена")
+
+    org.allow_unpaid_checkout = bool(payload.is_enabled)
+    db.commit()
+    db.refresh(org)
+    log_audit(
+        db,
+        event_type="unpaid_checkout_org_updated",
+        category="settings",
+        summary=f"Оформление без оплаты для org {org_id}: {'вкл' if org.allow_unpaid_checkout else 'выкл'}",
+        user=current_user,
+        organization_id=org_id,
+        details={"organization_id": org_id, "is_enabled": org.allow_unpaid_checkout},
+        entity_type="organization",
+        entity_id=org_id,
+    )
+    return _unpaid_checkout_org_view(org)
+
+
+@router.post("/unpaid-checkout/organizations/bulk", response_model=List[UnpaidCheckoutOrgView])
+def bulk_set_unpaid_checkout_organizations(
+    payload: UnpaidCheckoutBulkPayload,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org_ids = [oid.strip() for oid in payload.organization_ids if oid and oid.strip()]
+    if not org_ids:
+        raise HTTPException(status_code=400, detail="Список организаций пуст")
+
+    orgs = db.query(Organization).filter(Organization.id.in_(org_ids)).all()
+    results: list[UnpaidCheckoutOrgView] = []
+    for org in orgs:
+        org.allow_unpaid_checkout = bool(payload.is_enabled)
+        results.append(_unpaid_checkout_org_view(org))
+
+    db.commit()
+    log_audit(
+        db,
+        event_type="unpaid_checkout_org_bulk",
+        category="settings",
+        summary=f"Массовое обновление оформления без оплаты: {len(results)} org",
+        user=current_user,
+        details={"organization_ids": [row.id for row in results], "is_enabled": payload.is_enabled},
+    )
+    return results
+
+
 @router.get("/pending-sellers")
 def get_pending_sellers(
     current_user: User = Depends(get_current_admin_user),

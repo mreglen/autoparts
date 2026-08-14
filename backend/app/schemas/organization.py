@@ -32,6 +32,7 @@ class OrganizationUpdate(BaseModel):
 
 class Organization(OrganizationBase):
     id: str
+    allow_unpaid_checkout: Optional[bool] = False
 
     class Config:
         from_attributes = True

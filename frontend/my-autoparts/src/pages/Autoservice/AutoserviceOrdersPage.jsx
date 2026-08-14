@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
+import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import RepairOrderViewModal, { OrderStatusBadge, vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
@@ -8,9 +10,6 @@ import { Skeleton, UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
-
-const pillControlClass =
-  'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0';
 
 function formatDateTime(value) {
   return formatServerDateTime(value);
@@ -143,15 +142,16 @@ export default function AutoserviceOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
-  const [qApplied, setQApplied] = useState('');
+  const qApplied = useDebouncedValue(q);
   const [historyStatus, setHistoryStatus] = useState('');
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
+  const prevScopeKeyRef = useRef(null);
 
   const scope = viewHistory ? 'history' : 'active';
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams({ scope });
@@ -163,15 +163,17 @@ export default function AutoserviceOrdersPage() {
       setError(e?.message || 'Не удалось загрузить записи');
       setRows([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [scope, qApplied, viewHistory, historyStatus]);
 
   useEffect(() => {
-    if (isReady && isAuthenticated) {
-      load();
-    }
-  }, [isReady, isAuthenticated, load]);
+    if (!isReady || !isAuthenticated) return;
+    const scopeKey = `${scope}|${historyStatus}`;
+    const silent = prevScopeKeyRef.current === scopeKey;
+    prevScopeKeyRef.current = scopeKey;
+    load({ silent });
+  }, [isReady, isAuthenticated, load, scope, historyStatus, qApplied]);
 
   const setHistoryMode = (on) => {
     if (on) setSearchParams({ view: 'history' });
@@ -281,34 +283,13 @@ export default function AutoserviceOrdersPage() {
         onChange={(id) => setHistoryMode(id === 'history')}
       />
 
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1">
-          <input
-            className={`${pillControlClass} pr-10`}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Номер, клиент, авто, VIN или госномер"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') setQApplied(q);
-            }}
-            aria-label="Поиск заказ-нарядов"
-          />
-          {q ? (
-            <button
-              type="button"
-              onClick={() => {
-                setQ('');
-                setQApplied('');
-              }}
-              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
-              aria-label="Очистить поиск"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          ) : null}
-        </div>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <AutoserviceLiveSearchField
+          value={q}
+          onChange={setQ}
+          placeholder="Номер, клиент, авто, VIN или госномер"
+          ariaLabel="Поиск заказ-нарядов"
+        />
 
         {viewHistory ? (
           <select
@@ -325,14 +306,7 @@ export default function AutoserviceOrdersPage() {
 
         <button
           type="button"
-          onClick={() => setQApplied(q)}
-          className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-gray-900 px-5 text-sm font-medium text-white transition hover:bg-gray-800"
-        >
-          Найти
-        </button>
-        <button
-          type="button"
-          onClick={load}
+          onClick={() => load()}
           className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
           title="Обновить"
           aria-label="Обновить"

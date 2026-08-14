@@ -54,6 +54,7 @@ class RosskoSettingsResponse(BaseModel):
     requires_requisite: Optional[bool] = None
     configured: bool = False
     updated_at: Optional[datetime] = None
+    allow_unpaid_checkout: bool = False
 
 
 class RosskoSettingsUpdate(BaseModel):

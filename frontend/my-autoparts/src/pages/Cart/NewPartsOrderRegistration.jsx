@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -6,6 +6,7 @@ import {
   selectCartLoading,
   fetchCart,
   createNewPartsPaymentSession,
+  createNewPartsOrder,
   selectActiveNewPartsBasketId,
 } from '../../redux/slices/CartSlice';
 import { apiAxios, apiAxiosUnauth } from '../../utils/apiClient';
@@ -147,7 +148,11 @@ export default function NewPartsOrderRegistration() {
   const [acceptedOffer, setAcceptedOffer] = useState(false);
   const [showOfferError, setShowOfferError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitMode, setSubmitMode] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [allowUnpaidCheckout, setAllowUnpaidCheckout] = useState(false);
+  const [placedOrder, setPlacedOrder] = useState(null);
+  const skipEmptyCartRedirectRef = useRef(false);
 
   useEffect(() => {
     if (!isReady) return;
@@ -201,10 +206,11 @@ export default function NewPartsOrderRegistration() {
   );
 
   useEffect(() => {
+    if (placedOrder || skipEmptyCartRedirectRef.current) return;
     if (!cartLoading && selectedItems.length === 0) {
       navigate('/cart', { replace: true });
     }
-  }, [cartLoading, selectedItems.length, navigate]);
+  }, [cartLoading, selectedItems.length, navigate, placedOrder]);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,6 +251,24 @@ export default function NewPartsOrderRegistration() {
       cancelled = true;
     };
   }, [pickupAddress]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiAxios.get('/orders/new-parts/config');
+        if (!cancelled) {
+          setAllowUnpaidCheckout(Boolean(res.data?.allow_unpaid_checkout));
+        }
+      } catch {
+        if (!cancelled) setAllowUnpaidCheckout(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!isReady || !user) return;
@@ -414,6 +438,7 @@ export default function NewPartsOrderRegistration() {
     if (!validateBeforeSubmit()) return;
     setShowOfferError(false);
     setNotification(null);
+    setSubmitMode('pay');
     setSubmitting(true);
     try {
       const result = await dispatch(createNewPartsPaymentSession(buildOrderPayload())).unwrap();
@@ -422,8 +447,58 @@ export default function NewPartsOrderRegistration() {
       setNotification({ type: 'error', message: formatApiErrorDetail(err) });
     } finally {
       setSubmitting(false);
+      setSubmitMode(null);
     }
   };
+
+  const handleUnpaidCheckout = async () => {
+    if (submitting) return;
+    if (!validateBeforeSubmit()) return;
+    setShowOfferError(false);
+    setNotification(null);
+    setSubmitMode('unpaid');
+    setSubmitting(true);
+    skipEmptyCartRedirectRef.current = true;
+    try {
+      const result = await dispatch(createNewPartsOrder(buildOrderPayload())).unwrap();
+      clearNewPartsCheckoutItemIds();
+      setPlacedOrder({
+        orderId: result.order_id,
+        message: result.message || `Заказ №${result.order_id} оформлен`,
+      });
+    } catch (err) {
+      skipEmptyCartRedirectRef.current = false;
+      setNotification({ type: 'error', message: formatApiErrorDetail(err) });
+    } finally {
+      setSubmitting(false);
+      setSubmitMode(null);
+    }
+  };
+
+  if (placedOrder) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16">
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center">
+          <h1 className="text-xl font-bold text-gray-900">Заказ оформлен</h1>
+          <p className="mt-2 text-sm text-gray-700">{placedOrder.message}</p>
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Link
+              to="/purchases/orders"
+              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Мои заказы
+            </Link>
+            <Link
+              to="/autoparts/new"
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              В каталог
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isReady || cartLoading) {
     return <div className="py-16 text-center text-gray-600">Загрузка…</div>;
@@ -646,8 +721,20 @@ export default function NewPartsOrderRegistration() {
             disabled={submitting}
             className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-3.5 text-base font-semibold text-white shadow-md transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? 'Переход к оплате…' : `Оплатить ${formatMoney(orderTotal)}`}
+            {submitting && submitMode === 'pay'
+              ? 'Переход к оплате…'
+              : `Оплатить ${formatMoney(orderTotal)}`}
           </button>
+          {allowUnpaidCheckout && (
+            <button
+              type="button"
+              onClick={handleUnpaidCheckout}
+              disabled={submitting}
+              className="mt-3 w-full rounded-xl border border-line bg-surface px-4 py-3.5 text-base font-semibold text-ink shadow-sg-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitting && submitMode === 'unpaid' ? 'Оформление…' : 'Оформить без оплаты'}
+            </button>
+          )}
         </section>
       </div>
     </div>

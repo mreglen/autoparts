@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Returns a stable debounced wrapper around `callback`.
@@ -19,4 +19,14 @@ export function useDebouncedCallback(callback, delayMs = 350) {
       callbackRef.current(...args);
     }, delayMs);
   }, [delayMs]);
+}
+
+/** Value that lags behind `value` by `delayMs` — keeps typing snappy without remounting inputs. */
+export function useDebouncedValue(value, delayMs = 280) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
 }

@@ -16,6 +16,7 @@ from app.schemas.rossko_settings import (
     RosskoSettingsResponse,
 )
 from app.utils.rossko_settings_db import get_rossko_settings, rossko_settings_configured
+from app.utils.unpaid_checkout import user_allows_unpaid_checkout
 from app.services.new_parts_order_fulfillment import fulfill_new_parts_order
 from app.services.push_notifications import notify_sellers_new_order
 from app.services.rossko_order_service import extract_rossko_notice_message
@@ -25,7 +26,7 @@ from app.utils.cart_baskets import load_user_basket_items
 router = APIRouter(prefix="/orders", tags=["Orders New Parts"])
 
 
-def _settings_to_public(row) -> RosskoSettingsResponse:
+def _settings_to_public(row, *, allow_unpaid_checkout: bool = False) -> RosskoSettingsResponse:
     return RosskoSettingsResponse(
         delivery_id=row.delivery_id,
         address_id=row.address_id,
@@ -44,6 +45,7 @@ def _settings_to_public(row) -> RosskoSettingsResponse:
         requires_requisite=row.requires_requisite,
         configured=rossko_settings_configured(row),
         updated_at=row.updated_at,
+        allow_unpaid_checkout=bool(allow_unpaid_checkout),
     )
 
 
@@ -53,7 +55,10 @@ def get_new_parts_checkout_config(
     current_user: UserModel = Depends(get_current_user),
 ):
     row = get_rossko_settings(db)
-    return _settings_to_public(row)
+    return _settings_to_public(
+        row,
+        allow_unpaid_checkout=user_allows_unpaid_checkout(db, current_user),
+    )
 
 
 @router.post("/new-parts", response_model=NewPartsOrderCreateOut)
@@ -62,6 +67,12 @@ async def create_new_parts_order(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
+    if not user_allows_unpaid_checkout(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Оформление без оплаты недоступно для вашей организации",
+        )
+
     payload = payload or NewPartsOrderCreateIn()
 
     if not (payload.recipient_name or "").strip():

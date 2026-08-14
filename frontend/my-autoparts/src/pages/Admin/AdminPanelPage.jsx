@@ -19,6 +19,7 @@ import { USED_PURCHASE_MODE_OPTIONS } from '../../utils/usedPurchaseMode';
 import ServerStatsPanel from './ServerStatsPanel';
 import DeployUpdateSection from './DeployUpdateSection';
 import OpenRouterSection from './OpenRouterSection';
+import UnpaidCheckoutSection from './UnpaidCheckoutSection';
 import LaximoCatSection from './LaximoCatSection';
 import BackupSection from './BackupSection';
 import AvitoPhotoLocalizationSection from './AvitoPhotoLocalizationSection';
@@ -31,6 +32,7 @@ const ADMIN_TOC = [
   { id: 'admin-backups', label: 'Копии' },
   { id: 'admin-features', label: 'Сайт' },
   { id: 'admin-openrouter', label: 'OpenRouter' },
+  { id: 'admin-unpaid-checkout', label: 'Без оплаты' },
   { id: 'admin-laximo', label: 'Laximo' },
   { id: 'admin-quick-links', label: 'Ссылки' },
   { id: 'admin-photo-thumbs', label: 'Превью' },
@@ -528,6 +530,10 @@ function AdminPanelPage() {
 
         <section id="admin-openrouter" className="scroll-mt-24 space-y-6">
           <OpenRouterSection />
+        </section>
+
+        <section id="admin-unpaid-checkout" className="scroll-mt-24 space-y-6">
+          <UnpaidCheckoutSection />
         </section>
 
         <section id="admin-laximo" className="scroll-mt-24 space-y-6">

@@ -20,6 +20,7 @@ class Organization(Base):
     append_marketplace_site_info = Column(Boolean, nullable=False, default=False)
     is_autoservice = Column(Boolean, nullable=False, default=False)
     autoservice_paused = Column(Boolean, nullable=False, default=False)
+    allow_unpaid_checkout = Column(Boolean, nullable=False, default=False)
     users = relationship("User", back_populates="organization")
     avito_integration = relationship(
         "OrganizationAvitoIntegration",

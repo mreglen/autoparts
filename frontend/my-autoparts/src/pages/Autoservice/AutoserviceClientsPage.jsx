@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
+import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
-
-const pillControlClass =
-  'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
@@ -450,7 +449,7 @@ export default function AutoserviceClientsPage() {
   const [error, setError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [q, setQ] = useState('');
-  const [qApplied, setQApplied] = useState('');
+  const qApplied = useDebouncedValue(q);
   const [vehiclesModalClient, setVehiclesModalClient] = useState(null);
   const [clientVehicles, setClientVehicles] = useState({});
   const [vehiclesLoadingId, setVehiclesLoadingId] = useState(null);
@@ -539,41 +538,13 @@ export default function AutoserviceClientsPage() {
         </button>
       </div>
 
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1">
-          <input
-            className={`${pillControlClass} pr-10`}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Имя или телефон"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') setQApplied(q);
-            }}
-            aria-label="Поиск клиентов"
-          />
-          {q ? (
-            <button
-              type="button"
-              onClick={() => {
-                setQ('');
-                setQApplied('');
-              }}
-              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
-              aria-label="Очистить поиск"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={() => setQApplied(q)}
-          className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-gray-900 px-5 text-sm font-medium text-white transition hover:bg-gray-800"
-        >
-          Найти
-        </button>
+      <div className="mb-4 flex items-center gap-2">
+        <AutoserviceLiveSearchField
+          value={q}
+          onChange={setQ}
+          placeholder="Имя или телефон"
+          ariaLabel="Поиск клиентов"
+        />
         <button
           type="button"
           onClick={load}
