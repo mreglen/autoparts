@@ -13,7 +13,6 @@ import AvitoProExpiredBanner from '../components/AvitoProExpiredBanner/AvitoProE
 import { useAvitoAccountStatus } from '../hooks/useAvitoAccountStatus';
 import useCartSync from '../hooks/useCartSync';
 import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
-import NotificationsBanner from '../components/NotificationsBanner/NotificationsBanner';
 import { getPublicLayoutProfile } from '../utils/layoutProfiles';
 
 export default function MainLayout() {
@@ -71,8 +70,6 @@ export default function MainLayout() {
                 className={`lg:hidden h-[var(--sg-mobile-header-h)] shrink-0 ${isMobileActiveChat || isPartPage ? 'hidden' : ''}`}
                 aria-hidden="true"
             />
-
-            {!isMobileActiveChat && !isPartPage ? <NotificationsBanner /> : null}
 
             <MobileSideMenu
                 isOpen={isMobileMenuOpen}

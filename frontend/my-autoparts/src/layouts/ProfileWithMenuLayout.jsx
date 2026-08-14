@@ -191,7 +191,7 @@ export default function ProfileWithMenuLayout() {
             <div className="hidden lg:block h-[var(--sg-desktop-header-h)] shrink-0" aria-hidden="true" />
             <div className="lg:hidden h-[var(--sg-mobile-header-h)] shrink-0" aria-hidden="true" />
 
-            <NotificationsBanner />
+            {location.pathname === '/profile' ? <NotificationsBanner /> : null}
 
             <MobileSideMenu
                 isOpen={isMobileMenuOpen}

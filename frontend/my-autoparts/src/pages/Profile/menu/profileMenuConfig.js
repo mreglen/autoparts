@@ -63,15 +63,7 @@ const buildPurchasesSubmenu = () => [
     { id: 'purchases-returns', label: 'Возвраты' },
 ];
 
-const buildGlobalSettingsTab = (menuUser, hasPermission, cabinetMode) => {
-    if (cabinetMode === CABINET_MODE_ADMIN || cabinetMode === CABINET_MODE_BUYER) {
-        return {
-            id: 'settings',
-            label: 'Настройки',
-            submenu: [{ id: 'profile', label: 'Профиль' }],
-        };
-    }
-
+const buildGlobalSettingsTab = (menuUser, hasPermission) => {
     if (menuUser.is_employee && !menuUser.is_admin) {
         const settingsSubmenu = [{ id: 'profile', label: 'Профиль' }];
         if (hasPermission('storage-addresses')) {
@@ -210,7 +202,7 @@ const buildBuyerTabs = (user, hasPermission, options) => {
         tabs.push(buildAutoserviceClientTab(options.isAutoserviceClient === true));
     }
 
-    tabs.push(buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_BUYER));
+    tabs.push({ id: 'profile', label: 'Профиль' });
     return tabs;
 };
 
@@ -247,7 +239,7 @@ const buildSellerTabs = (user, hasPermission, options) => {
         tabs.push({ id: 'chats', label: 'Сообщения' });
     }
 
-    tabs.push(buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_SELLER));
+    tabs.push(buildGlobalSettingsTab(user, hasPermission));
     return tabs;
 };
 
@@ -262,7 +254,7 @@ const buildAutoserviceTabs = (user, hasPermission, options) => {
         buildAutoserviceStaffTab(user, options),
     ];
 
-    tabs.push(buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_AUTOSERVICE));
+    tabs.push(buildGlobalSettingsTab(user, hasPermission));
     return tabs;
 };
 
@@ -284,11 +276,11 @@ const buildAdminTabs = (user, hasPermission) => {
     if (!user.is_admin && hasPermission('admin.audit')) {
         return [
             { id: 'audit-log', label: 'Журнал событий' },
-            buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_ADMIN),
+            { id: 'profile', label: 'Профиль' },
         ];
     }
 
-    tabs.push(buildGlobalSettingsTab(user, hasPermission, CABINET_MODE_ADMIN));
+    tabs.push({ id: 'profile', label: 'Профиль' });
     return tabs;
 };
 
@@ -333,6 +325,37 @@ export const getActiveTabFromPath = (path, user) => {
     return PATH_TAB_MAP[path] || (user?.is_seller ? 'dashboard' : 'profile');
 };
 
+export const flattenSettingsProfile = (tabs) => {
+    if (!Array.isArray(tabs)) return tabs;
+    const next = [];
+    let hasProfile = false;
+
+    tabs.forEach((tab) => {
+        if (!tab) return;
+        if (tab.id === 'profile') {
+            if (!hasProfile) {
+                next.push({ id: 'profile', label: tab.label || 'Профиль' });
+                hasProfile = true;
+            }
+            return;
+        }
+        if (tab.id === 'settings' && Array.isArray(tab.submenu)) {
+            const rest = tab.submenu.filter((item) => item.id !== 'profile');
+            if (tab.submenu.some((item) => item.id === 'profile') && !hasProfile) {
+                next.push({ id: 'profile', label: 'Профиль' });
+                hasProfile = true;
+            }
+            if (rest.length > 0) {
+                next.push({ ...tab, submenu: rest });
+            }
+            return;
+        }
+        next.push(tab);
+    });
+
+    return next;
+};
+
 export const getAvailableTabs = (user, permissionCodes, options = {}) => {
     const hasPermission = (code) => permissionCodes && permissionCodes.includes(code);
     const showWarehouseInventory = options.showWarehouseInventory === true;
@@ -358,7 +381,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
         case CABINET_MODE_AUTOSERVICE:
             return buildAutoserviceTabs(user, hasPermission, autoserviceAccessOptions);
         case CABINET_MODE_ADMIN:
-            return buildAdminTabs(user, hasPermission);
+            return flattenSettingsProfile(buildAdminTabs(user, hasPermission));
         case CABINET_MODE_BUYER:
         default:
             return buildBuyerTabs(user, hasPermission, {
