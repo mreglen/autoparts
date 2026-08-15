@@ -59,6 +59,7 @@ from app.models.laximo_oem_fitment import (
     LaximoOemCatalogScan,
     LaximoOemVehicleLink,
 )
+from app.models.laximo_snapshot import LaximoSnapshot, LaximoSnapshotAsset
 
 
 from sqlalchemy.orm import relationship

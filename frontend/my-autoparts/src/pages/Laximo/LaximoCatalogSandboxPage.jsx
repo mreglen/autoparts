@@ -52,6 +52,8 @@ export default function LaximoCatalogSandboxPage() {
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [details, setDetails] = useState([]);
   const [unitInfo, setUnitInfo] = useState(null);
+  const [fromSnapshot, setFromSnapshot] = useState(false);
+  const [snapshotFetchedAt, setSnapshotFetchedAt] = useState(null);
 
   const resetBrowse = () => {
     setQuickGroups([]);
@@ -63,6 +65,13 @@ export default function LaximoCatalogSandboxPage() {
     setUnitInfo(null);
     setBrowseError(null);
     setNotice(null);
+  };
+
+  const noteSnapshot = (result) => {
+    if (result?.from_snapshot) {
+      setFromSnapshot(true);
+      setSnapshotFetchedAt(result.snapshot_fetched_at || null);
+    }
   };
 
   const handleSoftFail = (result) => {
@@ -83,6 +92,7 @@ export default function LaximoCatalogSandboxPage() {
         `/laximo/catalog/features?${qs({ catalog: ctx.catalog })}`
       );
       if (handleSoftFail(feat)) return;
+      noteSnapshot(feat);
       const qg = Boolean(feat?.has_quickgroups);
       setHasQuickgroups(qg);
       const nextMode = qg ? 'quick' : 'oem';
@@ -90,12 +100,14 @@ export default function LaximoCatalogSandboxPage() {
       if (qg) {
         const groups = await apiRequest(`/laximo/quick-groups?${qs(ctx)}`);
         if (handleSoftFail(groups)) return;
+        noteSnapshot(groups);
         setQuickGroups(Array.isArray(groups?.quick_groups) ? groups.quick_groups : []);
       } else {
         const cats = await apiRequest(
           `/laximo/categories?${qs({ ...ctx, category_id: '-1' })}`
         );
         if (handleSoftFail(cats)) return;
+        noteSnapshot(cats);
         setCategories(Array.isArray(cats?.categories) ? cats.categories : []);
         setCategoryStack([]);
       }
@@ -124,10 +136,12 @@ export default function LaximoCatalogSandboxPage() {
       });
       const list = Array.isArray(result?.candidates) ? result.candidates : [];
       if (result?.ok && list.length === 1) {
+        noteSnapshot(result);
         await startBrowse(list[0]);
         return;
       }
       if (result?.ok && list.length > 1) {
+        noteSnapshot(result);
         setCandidates(list);
         setStep('pick');
         return;
@@ -155,6 +169,7 @@ export default function LaximoCatalogSandboxPage() {
         `/laximo/categories?${qs({ ...vehicleCtx(vehicle), category_id: '-1' })}`
       );
       if (handleSoftFail(cats)) return;
+      noteSnapshot(cats);
       setCategories(Array.isArray(cats?.categories) ? cats.categories : []);
       setCategoryStack([]);
     } catch (err) {
@@ -309,6 +324,8 @@ export default function LaximoCatalogSandboxPage() {
     setStep('vin');
     setVehicle(null);
     setCandidates([]);
+    setFromSnapshot(false);
+    setSnapshotFetchedAt(null);
     resetBrowse();
   };
 
@@ -352,6 +369,14 @@ export default function LaximoCatalogSandboxPage() {
             variant={notice}
             onRetry={notice === 'unavailable' || notice === 'not_found' ? backToVin : undefined}
           />
+        </div>
+      ) : null}
+
+      {fromSnapshot ? (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Данные из сохранённого снимка
+          {snapshotFetchedAt ? ` (загружено ${snapshotFetchedAt})` : ''}. Laximo API недоступен или
+          ответ отдан из локального хранилища.
         </div>
       ) : null}
 

@@ -23,6 +23,26 @@ from app.services.laximo.gate import (
     laximo_cat_ready,
     public_message_for_reason,
 )
+from app.services.laximo.snapshots import (
+    KIND_CATALOG_FEATURES,
+    KIND_CATEGORIES,
+    KIND_IMAGE_MAP,
+    KIND_QUICK_GROUP_DETAILS,
+    KIND_QUICK_GROUPS,
+    KIND_UNIT_DETAILS,
+    KIND_UNITS,
+    format_fetched_at,
+    get_snapshot_payload,
+    make_catalog_features_key,
+    make_categories_key,
+    make_image_map_key,
+    make_quick_group_details_key,
+    make_quick_groups_key,
+    make_unit_details_key,
+    make_units_key,
+    try_load_snapshot_envelope_fields,
+    upsert_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +63,18 @@ class SoftEnvelope:
     reason: str
     message: Optional[str] = None
     payload: dict[str, Any] = field(default_factory=dict)
+    from_snapshot: bool = False
+    snapshot_fetched_at: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         out = {
             "ok": self.ok,
             "reason": self.reason,
             "message": self.message,
+            "from_snapshot": self.from_snapshot,
         }
+        if self.snapshot_fetched_at is not None:
+            out["snapshot_fetched_at"] = self.snapshot_fetched_at
         out.update(self.payload)
         return out
 
@@ -79,6 +104,54 @@ def _session_expired() -> SoftEnvelope:
 
 def _ok(**payload: Any) -> SoftEnvelope:
     return SoftEnvelope(ok=True, reason=PUBLIC_OK, message=None, payload=dict(payload))
+
+
+def _ok_from_snapshot(payload: dict[str, Any], fetched_at: Any) -> SoftEnvelope:
+    return SoftEnvelope(
+        ok=True,
+        reason=PUBLIC_OK,
+        message=None,
+        payload=dict(payload),
+        from_snapshot=True,
+        snapshot_fetched_at=format_fetched_at(fetched_at),
+    )
+
+
+def _try_snapshot(
+    db: Session,
+    kind: str,
+    resource_key: str,
+) -> Optional[SoftEnvelope]:
+    loaded = try_load_snapshot_envelope_fields(db, kind, resource_key)
+    if not loaded:
+        return None
+    payload, fetched_at = loaded
+    return _ok_from_snapshot(payload, fetched_at)
+
+
+def _persist_tree_snapshot(
+    db: Session,
+    *,
+    kind: str,
+    resource_key: str,
+    payload: dict[str, Any],
+    catalog: Optional[str] = None,
+    vehicle_id: Optional[str] = None,
+    materialize_images: bool = False,
+) -> None:
+    try:
+        upsert_snapshot(
+            db,
+            kind=kind,
+            resource_key=resource_key,
+            payload=payload,
+            catalog=catalog,
+            vehicle_id=vehicle_id,
+            materialize_images=materialize_images,
+            commit=True,
+        )
+    except Exception:
+        logger.exception("Failed to persist catalog snapshot kind=%s", kind)
 
 
 def _norm_ctx(
@@ -412,14 +485,35 @@ def normalize_unit_info(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _require_vehicle_identity(
+    catalog: Optional[str],
+    vehicle_id: Optional[str],
+) -> tuple[Optional[SoftEnvelope], Optional[tuple[str, str]]]:
+    c, v, _ = _norm_ctx(catalog, vehicle_id, None)
+    if not c or not v:
+        return _session_expired(), None
+    return None, (c, v)
+
+
 def _execute(
     db: Session,
     *,
     cache_key: Optional[str],
     call: Callable[[], Any],
     build_payload: Callable[[Any], dict[str, Any]],
+    snapshot_kind: Optional[str] = None,
+    snapshot_key: Optional[str] = None,
+    snapshot_catalog: Optional[str] = None,
+    snapshot_vehicle_id: Optional[str] = None,
+    materialize_images: bool = False,
 ) -> SoftEnvelope:
-    if not laximo_cat_ready(db):
+    ready = laximo_cat_ready(db)
+
+    if not ready:
+        if snapshot_kind and snapshot_key:
+            snap = _try_snapshot(db, snapshot_kind, snapshot_key)
+            if snap is not None:
+                return snap
         return _unavailable()
 
     if cache_key:
@@ -431,39 +525,83 @@ def _execute(
         raw = call()
     except LaximoCatError:
         logger.exception("Laximo catalog call failed")
+        if snapshot_kind and snapshot_key:
+            snap = _try_snapshot(db, snapshot_kind, snapshot_key)
+            if snap is not None:
+                return snap
         return _unavailable()
     except Exception:
         logger.exception("Unexpected Laximo catalog error")
+        if snapshot_kind and snapshot_key:
+            snap = _try_snapshot(db, snapshot_kind, snapshot_key)
+            if snap is not None:
+                return snap
         return _unavailable()
 
     payload = build_payload(raw)
     if cache_key:
         _cache_set(cache_key, payload)
+    if snapshot_kind and snapshot_key:
+        _persist_tree_snapshot(
+            db,
+            kind=snapshot_kind,
+            resource_key=snapshot_key,
+            payload=payload,
+            catalog=snapshot_catalog,
+            vehicle_id=snapshot_vehicle_id,
+            materialize_images=materialize_images,
+        )
+        if materialize_images:
+            loaded = get_snapshot_payload(db, snapshot_kind, snapshot_key)
+            if loaded:
+                stored_payload, _ = loaded
+                return _ok(**stored_payload)
     return _ok(**payload)
 
 
 def get_features(db: Session, catalog: str) -> SoftEnvelope:
-    if not laximo_cat_ready(db):
-        return _unavailable()
     code = (catalog or "").strip()
     if not code:
         return _session_expired()
+    snap_key = make_catalog_features_key(code)
+
+    if not laximo_cat_ready(db):
+        snap = _try_snapshot(db, KIND_CATALOG_FEATURES, snap_key)
+        if snap is not None:
+            return snap
+        return _unavailable()
+
     try:
         features = sorted(get_catalog_features(db, code))
         qg = "quickgroups" in features
         fts = "fulltextsearch" in features
     except LaximoCatError:
         logger.exception("Failed to load catalog features")
+        snap = _try_snapshot(db, KIND_CATALOG_FEATURES, snap_key)
+        if snap is not None:
+            return snap
         return _unavailable()
     except Exception:
         logger.exception("Unexpected features error")
+        snap = _try_snapshot(db, KIND_CATALOG_FEATURES, snap_key)
+        if snap is not None:
+            return snap
         return _unavailable()
-    return _ok(
-        features=features,
-        has_quickgroups=qg,
-        has_fulltextsearch=fts,
+
+    payload = {
+        "features": features,
+        "has_quickgroups": qg,
+        "has_fulltextsearch": fts,
+        "catalog": code,
+    }
+    _persist_tree_snapshot(
+        db,
+        kind=KIND_CATALOG_FEATURES,
+        resource_key=snap_key,
+        payload=payload,
         catalog=code,
     )
+    return _ok(**payload)
 
 
 def get_categories(
@@ -474,11 +612,22 @@ def get_categories(
     ssd: str,
     category_id: str = "-1",
 ) -> SoftEnvelope:
-    err, ctx = _require_vehicle_ctx(catalog, vehicle_id, ssd)
+    err, ident = _require_vehicle_identity(catalog, vehicle_id)
     if err:
         return err
-    c, v, s = ctx  # type: ignore[misc]
+    c, v = ident  # type: ignore[misc]
     cat_id = (category_id or "-1").strip() or "-1"
+    snap_key = make_categories_key(c, v, cat_id)
+    _, _, s = _norm_ctx(catalog, vehicle_id, ssd)
+
+    if not laximo_cat_ready(db) or not s:
+        snap = _try_snapshot(db, KIND_CATEGORIES, snap_key)
+        if snap is not None:
+            return snap
+        if not s:
+            return _session_expired()
+        return _unavailable()
+
     cache_key = f"cat:{c}:{v}:{_ssd_hash(s)}:{cat_id}"
 
     def call():
@@ -499,6 +648,10 @@ def get_categories(
             "categories": [normalize_category(r) for r in rows],
             "category_id": cat_id,
         },
+        snapshot_kind=KIND_CATEGORIES,
+        snapshot_key=snap_key,
+        snapshot_catalog=c,
+        snapshot_vehicle_id=v,
     )
 
 
@@ -510,13 +663,24 @@ def get_units(
     ssd: str,
     category_id: str,
 ) -> SoftEnvelope:
-    err, ctx = _require_vehicle_ctx(catalog, vehicle_id, ssd)
+    err, ident = _require_vehicle_identity(catalog, vehicle_id)
     if err:
         return err
-    c, v, s = ctx  # type: ignore[misc]
+    c, v = ident  # type: ignore[misc]
     cat_id = (category_id or "").strip()
     if not cat_id:
         return _session_expired()
+    snap_key = make_units_key(c, v, cat_id)
+    _, _, s = _norm_ctx(catalog, vehicle_id, ssd)
+
+    if not laximo_cat_ready(db) or not s:
+        snap = _try_snapshot(db, KIND_UNITS, snap_key)
+        if snap is not None:
+            return snap
+        if not s:
+            return _session_expired()
+        return _unavailable()
+
     cache_key = f"units:{c}:{v}:{_ssd_hash(s)}:{cat_id}"
 
     def call():
@@ -537,6 +701,11 @@ def get_units(
             "units": [normalize_unit(r) for r in rows],
             "category_id": cat_id,
         },
+        snapshot_kind=KIND_UNITS,
+        snapshot_key=snap_key,
+        snapshot_catalog=c,
+        snapshot_vehicle_id=v,
+        materialize_images=True,
     )
 
 
@@ -548,13 +717,24 @@ def get_unit_with_details(
     ssd: str,
     unit_id: str,
 ) -> SoftEnvelope:
-    err, ctx = _require_vehicle_ctx(catalog, vehicle_id, ssd)
+    err, ident = _require_vehicle_identity(catalog, vehicle_id)
     if err:
         return err
-    c, v, s = ctx  # type: ignore[misc]
+    c, v = ident  # type: ignore[misc]
     uid = (unit_id or "").strip()
     if not uid:
         return _session_expired()
+    snap_key = make_unit_details_key(c, v, uid)
+    _, _, s = _norm_ctx(catalog, vehicle_id, ssd)
+
+    if not laximo_cat_ready(db) or not s:
+        snap = _try_snapshot(db, KIND_UNIT_DETAILS, snap_key)
+        if snap is not None:
+            return snap
+        if not s:
+            return _session_expired()
+        return _unavailable()
+
     cache_key = f"unit:{c}:{v}:{_ssd_hash(s)}:{uid}"
 
     def call():
@@ -584,7 +764,17 @@ def get_unit_with_details(
             "details": [normalize_detail(r) for r in detail_rows],
         }
 
-    return _execute(db, cache_key=cache_key, call=call, build_payload=build)
+    return _execute(
+        db,
+        cache_key=cache_key,
+        call=call,
+        build_payload=build,
+        snapshot_kind=KIND_UNIT_DETAILS,
+        snapshot_key=snap_key,
+        snapshot_catalog=c,
+        snapshot_vehicle_id=v,
+        materialize_images=True,
+    )
 
 
 def get_unit_image_map(
@@ -595,13 +785,24 @@ def get_unit_image_map(
     ssd: str,
     unit_id: str,
 ) -> SoftEnvelope:
-    err, ctx = _require_vehicle_ctx(catalog, vehicle_id, ssd)
+    err, ident = _require_vehicle_identity(catalog, vehicle_id)
     if err:
         return err
-    c, v, s = ctx  # type: ignore[misc]
+    c, v = ident  # type: ignore[misc]
     uid = (unit_id or "").strip()
     if not uid:
         return _session_expired()
+    snap_key = make_image_map_key(c, v, uid)
+    _, _, s = _norm_ctx(catalog, vehicle_id, ssd)
+
+    if not laximo_cat_ready(db) or not s:
+        snap = _try_snapshot(db, KIND_IMAGE_MAP, snap_key)
+        if snap is not None:
+            return snap
+        if not s:
+            return _session_expired()
+        return _unavailable()
+
     cache_key = f"imap:{c}:{v}:{_ssd_hash(s)}:{uid}"
 
     def call():
@@ -622,6 +823,10 @@ def get_unit_image_map(
             "image_map": [normalize_image_map(r) for r in rows],
             "unit_id": uid,
         },
+        snapshot_kind=KIND_IMAGE_MAP,
+        snapshot_key=snap_key,
+        snapshot_catalog=c,
+        snapshot_vehicle_id=v,
     )
 
 
@@ -632,21 +837,40 @@ def get_quick_groups(
     vehicle_id: str,
     ssd: str,
 ) -> SoftEnvelope:
-    err, ctx = _require_vehicle_ctx(catalog, vehicle_id, ssd)
+    err, ident = _require_vehicle_identity(catalog, vehicle_id)
     if err:
         return err
-    c, v, s = ctx  # type: ignore[misc]
+    c, v = ident  # type: ignore[misc]
+    snap_key = make_quick_groups_key(c, v)
+    _, _, s = _norm_ctx(catalog, vehicle_id, ssd)
 
-    if not laximo_cat_ready(db):
+    if not laximo_cat_ready(db) or not s:
+        snap = _try_snapshot(db, KIND_QUICK_GROUPS, snap_key)
+        if snap is not None:
+            return snap
+        if not s:
+            return _session_expired()
         return _unavailable()
 
     try:
         qg = has_quickgroups(db, c)
     except LaximoCatError:
+        snap = _try_snapshot(db, KIND_QUICK_GROUPS, snap_key)
+        if snap is not None:
+            return snap
         return _unavailable()
 
     if not qg:
-        return _ok(quick_groups=[], has_quickgroups=False)
+        payload = {"quick_groups": [], "has_quickgroups": False}
+        _persist_tree_snapshot(
+            db,
+            kind=KIND_QUICK_GROUPS,
+            resource_key=snap_key,
+            payload=payload,
+            catalog=c,
+            vehicle_id=v,
+        )
+        return _ok(**payload)
 
     cache_key = f"qg:{c}:{v}:{_ssd_hash(s)}"
 
@@ -667,6 +891,10 @@ def get_quick_groups(
             "quick_groups": flatten_quick_groups(rows),
             "has_quickgroups": True,
         },
+        snapshot_kind=KIND_QUICK_GROUPS,
+        snapshot_key=snap_key,
+        snapshot_catalog=c,
+        snapshot_vehicle_id=v,
     )
 
 
@@ -678,13 +906,24 @@ def get_quick_group_details(
     ssd: str,
     quick_group_id: str,
 ) -> SoftEnvelope:
-    err, ctx = _require_vehicle_ctx(catalog, vehicle_id, ssd)
+    err, ident = _require_vehicle_identity(catalog, vehicle_id)
     if err:
         return err
-    c, v, s = ctx  # type: ignore[misc]
+    c, v = ident  # type: ignore[misc]
     qid = (quick_group_id or "").strip()
     if not qid:
         return _session_expired()
+    snap_key = make_quick_group_details_key(c, v, qid)
+    _, _, s = _norm_ctx(catalog, vehicle_id, ssd)
+
+    if not laximo_cat_ready(db) or not s:
+        snap = _try_snapshot(db, KIND_QUICK_GROUP_DETAILS, snap_key)
+        if snap is not None:
+            return snap
+        if not s:
+            return _session_expired()
+        return _unavailable()
+
     cache_key = f"qgd:{c}:{v}:{_ssd_hash(s)}:{qid}"
 
     def call():
@@ -713,6 +952,11 @@ def get_quick_group_details(
         cache_key=cache_key,
         call=call,
         build_payload=build,
+        snapshot_kind=KIND_QUICK_GROUP_DETAILS,
+        snapshot_key=snap_key,
+        snapshot_catalog=c,
+        snapshot_vehicle_id=v,
+        materialize_images=True,
     )
 
 

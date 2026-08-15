@@ -44,5 +44,6 @@ class SiteLaximoCatIntegration(Base):
     doc_quota_exhausted_at = Column(DateTime, nullable=True)
     doc_last_upstream_error_at = Column(DateTime, nullable=True)
     doc_last_upstream_error = Column(Text, nullable=True)
+    snapshots_fallback_enabled = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

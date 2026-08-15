@@ -41,6 +41,8 @@ class ByVinResponse(BaseModel):
     reason: Literal["ok", "not_found", "temporarily_unavailable"]
     message: Optional[str] = None
     candidates: list[NormalizedVehicleCandidateOut] = Field(default_factory=list)
+    from_snapshot: bool = False
+    snapshot_fetched_at: Optional[str] = None
 
 
 class ByPlateResponse(BaseModel):

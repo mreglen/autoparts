@@ -2444,6 +2444,103 @@ def ensure_laximo_cat_tables() -> None:
     ensure_laximo_doc_columns()
     ensure_laximo_product_card_quota_columns()
     ensure_laximo_oem_fitment_tables()
+    ensure_laximo_snapshot_tables()
+    ensure_laximo_snapshots_fallback_column()
+
+
+def ensure_laximo_snapshots_fallback_column() -> None:
+    """Toggle for serving durable snapshots when CAT is unavailable."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "site_laximo_cat_integration" not in table_names:
+        return
+    columns = {col["name"] for col in inspector.get_columns("site_laximo_cat_integration")}
+    if "snapshots_fallback_enabled" in columns:
+        return
+    is_pg = engine.dialect.name == "postgresql"
+    bool_true = "TRUE" if is_pg else "1"
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE site_laximo_cat_integration "
+                f"ADD COLUMN snapshots_fallback_enabled BOOLEAN NOT NULL DEFAULT {bool_true}"
+            )
+        )
+    logger.info("Applied Laximo snapshots_fallback_enabled column patch")
+
+
+def ensure_laximo_snapshot_tables() -> None:
+    """Durable VIN/node snapshots + local schema assets for offline CAT browse."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    is_pg = engine.dialect.name == "postgresql"
+    ts = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    json_type = "JSONB" if is_pg else "TEXT"
+
+    if "laximo_snapshots" not in table_names:
+        ddl = f"""
+        CREATE TABLE laximo_snapshots (
+            id INTEGER PRIMARY KEY{' AUTOINCREMENT' if not is_pg else ''},
+            kind VARCHAR(64) NOT NULL,
+            resource_key VARCHAR(512) NOT NULL,
+            catalog VARCHAR(64),
+            vehicle_id VARCHAR(64),
+            vin VARCHAR(17),
+            payload {json_type} NOT NULL,
+            payload_version INTEGER NOT NULL DEFAULT 1,
+            source VARCHAR(32) NOT NULL DEFAULT 'live',
+            fetched_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'},
+            created_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'},
+            updated_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'},
+            UNIQUE (kind, resource_key)
+        )
+        """
+        with engine.begin() as conn:
+            if is_pg:
+                conn.execute(
+                    text(ddl.replace("INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY"))
+                )
+            else:
+                conn.execute(text(ddl))
+            for idx_sql in (
+                "CREATE INDEX IF NOT EXISTS ix_laximo_snapshots_kind ON laximo_snapshots (kind)",
+                "CREATE INDEX IF NOT EXISTS ix_laximo_snapshots_vin ON laximo_snapshots (vin)",
+                "CREATE INDEX IF NOT EXISTS ix_laximo_snapshots_catalog_vehicle "
+                "ON laximo_snapshots (catalog, vehicle_id)",
+                "CREATE INDEX IF NOT EXISTS ix_laximo_snapshots_kind_updated "
+                "ON laximo_snapshots (kind, updated_at)",
+            ):
+                conn.execute(text(idx_sql))
+        logger.info("Applied laximo_snapshots table patch")
+        table_names.add("laximo_snapshots")
+
+    if "laximo_snapshot_assets" not in table_names:
+        ddl = f"""
+        CREATE TABLE laximo_snapshot_assets (
+            id INTEGER PRIMARY KEY{' AUTOINCREMENT' if not is_pg else ''},
+            url_hash VARCHAR(64) NOT NULL UNIQUE,
+            source_url TEXT NOT NULL,
+            local_path VARCHAR(512) NOT NULL,
+            content_type VARCHAR(128),
+            bytes INTEGER,
+            fetched_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'},
+            created_at {ts} NOT NULL DEFAULT {'NOW()' if is_pg else 'CURRENT_TIMESTAMP'}
+        )
+        """
+        with engine.begin() as conn:
+            if is_pg:
+                conn.execute(
+                    text(ddl.replace("INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY"))
+                )
+            else:
+                conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_laximo_snapshot_assets_url_hash "
+                    "ON laximo_snapshot_assets (url_hash)"
+                )
+            )
+        logger.info("Applied laximo_snapshot_assets table patch")
 
 
 def ensure_laximo_product_card_quota_columns() -> None:

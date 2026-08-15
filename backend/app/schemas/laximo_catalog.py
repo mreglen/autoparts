@@ -9,6 +9,8 @@ class CatalogSoftBase(BaseModel):
     ok: bool
     reason: Literal["ok", "not_found", "temporarily_unavailable", "session_expired"]
     message: Optional[str] = None
+    from_snapshot: bool = False
+    snapshot_fetched_at: Optional[str] = None
 
 
 class CatalogFeaturesResponse(CatalogSoftBase):

@@ -38,6 +38,7 @@ from app.services.laximo.gate import (
 )
 from app.utils.laximo_cat_integration_db import get_or_create_laximo_cat_integration
 from app.utils.laximo_crypto import encrypt_laximo_secret
+from app.services.laximo.snapshots import snapshot_counts
 
 router = APIRouter(prefix="/admin/laximo-cat", tags=["Admin Laximo.CAT"])
 
@@ -54,6 +55,7 @@ class LaximoSettingsPatch(BaseModel):
     product_card_daily_request_limit: Optional[int] = Field(None, ge=0, le=1_000_000)
     doc_is_enabled: Optional[bool] = None
     doc_base_url: Optional[str] = Field(None, min_length=8, max_length=512)
+    snapshots_fallback_enabled: Optional[bool] = None
 
 
 class LaximoIntegrationView(BaseModel):
@@ -89,6 +91,11 @@ class LaximoIntegrationView(BaseModel):
     product_card_requests_today: int = 0
     product_card_requests_remaining: Optional[int] = None
     product_card_quota_exhausted: bool = False
+    snapshots_fallback_enabled: bool = True
+    snapshots_total: int = 0
+    snapshots_vin: int = 0
+    snapshots_nodes: int = 0
+    snapshot_assets: int = 0
 
 
 class LaximoTestResult(BaseModel):
@@ -107,6 +114,7 @@ class LaximoDocTestResult(BaseModel):
 
 def _integration_view(db: Session, row: SiteLaximoCatIntegration) -> LaximoIntegrationView:
     reset_daily_counter_if_needed(row)
+    counts = snapshot_counts(db)
     return LaximoIntegrationView(
         login_configured=bool((row.login_encrypted or "").strip()),
         password_configured=bool((row.password_encrypted or "").strip()),
@@ -143,6 +151,11 @@ def _integration_view(db: Session, row: SiteLaximoCatIntegration) -> LaximoInteg
         product_card_requests_today=int(getattr(row, "product_card_requests_today", 0) or 0),
         product_card_requests_remaining=product_card_requests_remaining(row),
         product_card_quota_exhausted=product_card_quota_exhausted(row),
+        snapshots_fallback_enabled=bool(getattr(row, "snapshots_fallback_enabled", True)),
+        snapshots_total=counts["snapshots_total"],
+        snapshots_vin=counts["snapshots_vin"],
+        snapshots_nodes=counts["snapshots_nodes"],
+        snapshot_assets=counts["snapshot_assets"],
     )
 
 
@@ -240,6 +253,9 @@ def patch_laximo_settings(
             if doc_quota_exhausted(row):
                 raise HTTPException(status_code=400, detail="Дневной лимит запросов DOC исчерпан")
         row.doc_is_enabled = want_doc
+
+    if "snapshots_fallback_enabled" in data:
+        row.snapshots_fallback_enabled = bool(data["snapshots_fallback_enabled"])
 
     db.add(row)
     db.commit()

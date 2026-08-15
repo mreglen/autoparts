@@ -22,6 +22,14 @@ from app.services.laximo.gate import (
     public_message_for_reason,
 )
 from app.services.laximo.plate import normalize_plate_or_raise
+from app.services.laximo.vin import looks_like_vin, normalize_vin_or_none, normalize_vin_or_raise
+from app.services.laximo.snapshots import (
+    KIND_VIN_LOOKUP,
+    format_fetched_at,
+    make_vin_key,
+    try_load_snapshot_envelope_fields,
+    upsert_snapshot,
+)
 from app.services.laximo.vehicle_normalize import (
     NormalizedVehicleCandidate,
     dedupe_vehicle_candidates,
@@ -29,7 +37,6 @@ from app.services.laximo.vehicle_normalize import (
     normalize_find_vehicle_row,
     normalize_plate_full_card,
 )
-from app.services.laximo.vin import looks_like_vin, normalize_vin_or_none, normalize_vin_or_raise
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +58,20 @@ class ByVinResult:
     reason: str
     message: Optional[str] = None
     candidates: list[NormalizedVehicleCandidate] = field(default_factory=list)
+    from_snapshot: bool = False
+    snapshot_fetched_at: Optional[str] = None
 
     def to_response_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "ok": self.ok,
             "reason": self.reason,
             "message": self.message,
             "candidates": [c.to_dict() for c in self.candidates],
+            "from_snapshot": self.from_snapshot,
         }
+        if self.snapshot_fetched_at is not None:
+            out["snapshot_fetched_at"] = self.snapshot_fetched_at
+        return out
 
 
 @dataclass
@@ -189,14 +202,80 @@ def _plate_cache_set(key: str, payload: dict[str, Any]) -> None:
     _plate_lookup_cache[key] = (time.monotonic() + CACHE_TTL_SEC, payload)
 
 
+def _candidates_from_snapshot_payload(payload: dict[str, Any]) -> list[NormalizedVehicleCandidate]:
+    raw_list = payload.get("candidates")
+    if not isinstance(raw_list, list):
+        return []
+    out: list[NormalizedVehicleCandidate] = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        out.append(
+            NormalizedVehicleCandidate(
+                make=item.get("make"),
+                model=item.get("model"),
+                year=item.get("year"),
+                engine=item.get("engine"),
+                transmission=item.get("transmission"),
+                body=item.get("body"),
+                color=item.get("color"),
+                display_name=item.get("display_name"),
+                catalog=item.get("catalog"),
+                vehicle_id=item.get("vehicle_id"),
+                ssd=item.get("ssd"),
+                filter_level=item.get("filter_level"),
+                attributes_raw=list(item.get("attributes_raw") or []),
+            )
+        )
+    return out
+
+
+def _from_vin_snapshot(db: Session, normalized_vin: str) -> Optional[ByVinResult]:
+    loaded = try_load_snapshot_envelope_fields(db, KIND_VIN_LOOKUP, make_vin_key(normalized_vin))
+    if not loaded:
+        return None
+    payload, fetched_at = loaded
+    candidates = _candidates_from_snapshot_payload(payload)
+    if not candidates:
+        return None
+    return ByVinResult(
+        ok=True,
+        reason=PUBLIC_OK,
+        message=None,
+        candidates=candidates,
+        from_snapshot=True,
+        snapshot_fetched_at=format_fetched_at(fetched_at),
+    )
+
+
+def _persist_vin_snapshot(db: Session, normalized_vin: str, rows: list[dict[str, Any]]) -> None:
+    candidates = [normalize_find_vehicle_row(row).to_dict() for row in rows]
+    try:
+        upsert_snapshot(
+            db,
+            kind=KIND_VIN_LOOKUP,
+            resource_key=make_vin_key(normalized_vin),
+            payload={"candidates": candidates},
+            vin=normalized_vin,
+            materialize_images=False,
+            commit=True,
+        )
+    except Exception:
+        logger.exception("Failed to persist VIN snapshot for %s", normalized_vin)
+
+
 def lookup_by_vin(db: Session, vin: str) -> ByVinResult:
     """
     Gate → cache → FindVehicle → normalize.
     Soft-fails never expose quota / Laximo / upstream details.
+    Falls back to durable snapshot when CAT is unavailable.
     """
     normalized_vin = normalize_vin_or_raise(vin)
 
     if not laximo_cat_ready(db):
+        snap = _from_vin_snapshot(db, normalized_vin)
+        if snap is not None:
+            return snap
         return _soft_unavailable()
 
     cached = _cache_get(normalized_vin)
@@ -212,15 +291,22 @@ def lookup_by_vin(db: Session, vin: str) -> ByVinResult:
         rows = find_vehicle(db, normalized_vin, count_toward_quota=True)
     except LaximoCatError:
         logger.exception("Laximo FindVehicle failed for VIN lookup")
+        snap = _from_vin_snapshot(db, normalized_vin)
+        if snap is not None:
+            return snap
         return _soft_unavailable()
     except Exception:
         logger.exception("Unexpected error during Laximo FindVehicle")
+        snap = _from_vin_snapshot(db, normalized_vin)
+        if snap is not None:
+            return snap
         return _soft_unavailable()
 
     if not rows:
         return _not_found()
 
     _cache_set(normalized_vin, rows)
+    _persist_vin_snapshot(db, normalized_vin, rows)
     return ByVinResult(
         ok=True,
         reason=PUBLIC_OK,
@@ -237,6 +323,12 @@ def _lookup_vin_soft(db: Session, vin: str) -> ByVinResult:
     if not normalized:
         return _not_found()
 
+    if not laximo_cat_ready(db):
+        snap = _from_vin_snapshot(db, normalized)
+        if snap is not None:
+            return snap
+        return _soft_unavailable()
+
     cached = _cache_get(normalized)
     if cached is not None:
         return ByVinResult(
@@ -250,15 +342,22 @@ def _lookup_vin_soft(db: Session, vin: str) -> ByVinResult:
         rows = find_vehicle(db, normalized, count_toward_quota=True)
     except LaximoCatError:
         logger.info("FindVehicle soft-fail after plate identify for vin=%r", normalized)
+        snap = _from_vin_snapshot(db, normalized)
+        if snap is not None:
+            return snap
         return _soft_unavailable()
     except Exception:
         logger.exception("Unexpected FindVehicle error after plate")
+        snap = _from_vin_snapshot(db, normalized)
+        if snap is not None:
+            return snap
         return _soft_unavailable()
 
     if not rows:
         return _not_found()
 
     _cache_set(normalized, rows)
+    _persist_vin_snapshot(db, normalized, rows)
     return ByVinResult(
         ok=True,
         reason=PUBLIC_OK,

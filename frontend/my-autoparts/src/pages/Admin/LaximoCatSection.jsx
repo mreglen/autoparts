@@ -73,6 +73,7 @@ export default function LaximoCatSection() {
   const [docPassword, setDocPassword] = useState('');
   const [docBaseUrl, setDocBaseUrl] = useState('https://ws.laximo.ru/restApi/v1');
   const [docIsEnabled, setDocIsEnabled] = useState(false);
+  const [snapshotsFallbackEnabled, setSnapshotsFallbackEnabled] = useState(true);
 
   const loadData = useCallback(async () => {
     const data = await apiRequest('/admin/laximo-cat/integration');
@@ -83,6 +84,7 @@ export default function LaximoCatSection() {
     setIsEnabled(Boolean(data?.is_enabled));
     setDocBaseUrl(data?.doc_base_url || 'https://ws.laximo.ru/restApi/v1');
     setDocIsEnabled(Boolean(data?.doc_is_enabled));
+    setSnapshotsFallbackEnabled(data?.snapshots_fallback_enabled !== false);
   }, []);
 
   useEffect(() => {
@@ -157,11 +159,13 @@ export default function LaximoCatSection() {
           is_enabled: isEnabled,
           doc_base_url: docBaseUrl.trim(),
           doc_is_enabled: docIsEnabled,
+          snapshots_fallback_enabled: snapshotsFallbackEnabled,
         }),
       });
       setIntegration(data);
       setIsEnabled(Boolean(data?.is_enabled));
       setDocIsEnabled(Boolean(data?.doc_is_enabled));
+      setSnapshotsFallbackEnabled(data?.snapshots_fallback_enabled !== false);
       clearPublicSiteConfigCache();
       setNotice('Настройки сохранены');
     } catch (e) {
@@ -496,6 +500,33 @@ export default function LaximoCatSection() {
             >
               Сбросить счётчик карточек
             </button>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium text-gray-900">Снимки каталога (offline)</span>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300"
+                  checked={snapshotsFallbackEnabled}
+                  onChange={(e) => setSnapshotsFallbackEnabled(e.target.checked)}
+                />
+                Fallback без API
+              </label>
+            </div>
+            <p className="text-sm text-gray-700">
+              VIN: <strong>{Number(integration?.snapshots_vin) || 0}</strong>
+              {' · '}
+              узлы: <strong>{Number(integration?.snapshots_nodes) || 0}</strong>
+              {' · '}
+              всего: <strong>{Number(integration?.snapshots_total) || 0}</strong>
+              {' · '}
+              схемы: <strong>{Number(integration?.snapshot_assets) || 0}</strong>
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              Сохраняются только уже открытые VIN и узлы. При отключении Laximo отдаются из снимков.
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
