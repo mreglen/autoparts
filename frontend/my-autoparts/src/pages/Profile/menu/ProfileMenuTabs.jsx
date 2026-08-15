@@ -1,8 +1,92 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import PublicSiteMenuLinks from '../../../components/MobileSideMenu/PublicSiteMenuLinks';
 import CabinetModeSwitch from '../../../components/CabinetModeSwitch/CabinetModeSwitch';
 import { CABINET_MODE_ADMIN, CABINET_MODE_BUYER } from '../../../utils/cabinetMode';
 import { flattenSettingsProfile, getPathForTab } from './profileMenuConfig';
+
+const SIDEBAR_SCROLL_CLASS =
+    'z-20 w-full min-w-[15.5rem] overflow-y-auto overscroll-contain scroll-pb-32 bg-white [&::-webkit-scrollbar]:hidden';
+
+/** Keeps the profile sidebar scroll independent of the page scroll. */
+function useFixedSidebarMetrics(enabled) {
+    const anchorRef = useRef(null);
+    const panelRef = useRef(null);
+    const [metrics, setMetrics] = useState({ left: 0, width: 0, ready: false });
+
+    const updateMetrics = useCallback(() => {
+        if (!enabled) return;
+        const anchor = anchorRef.current;
+        if (!anchor) return;
+        const rect = anchor.getBoundingClientRect();
+        const width = rect.width;
+        if (width <= 0) return;
+        setMetrics((prev) => {
+            const left = rect.left;
+            if (
+                prev.ready &&
+                Math.abs(prev.left - left) < 0.5 &&
+                Math.abs(prev.width - width) < 0.5
+            ) {
+                return prev;
+            }
+            return { left, width, ready: true };
+        });
+    }, [enabled]);
+
+    useLayoutEffect(() => {
+        if (!enabled) {
+            setMetrics({ left: 0, width: 0, ready: false });
+            return undefined;
+        }
+
+        updateMetrics();
+        const anchor = anchorRef.current;
+        if (!anchor || typeof ResizeObserver === 'undefined') return undefined;
+
+        const ro = new ResizeObserver(() => updateMetrics());
+        ro.observe(anchor);
+        if (anchor.parentElement) ro.observe(anchor.parentElement);
+
+        window.addEventListener('resize', updateMetrics);
+        // Layout can shift when the page scrollbar appears/disappears.
+        window.addEventListener('scroll', updateMetrics, { passive: true });
+
+        return () => {
+            ro.disconnect();
+            window.removeEventListener('resize', updateMetrics);
+            window.removeEventListener('scroll', updateMetrics);
+        };
+    }, [enabled, updateMetrics]);
+
+    // Wheel on the panel must scroll the panel, not the document, until edges.
+    useEffect(() => {
+        if (!enabled || !metrics.ready) return undefined;
+        const panel = panelRef.current;
+        if (!panel) return undefined;
+
+        const onWheel = (event) => {
+            if (panel.scrollHeight <= panel.clientHeight + 1) return;
+
+            const delta = event.deltaY;
+            if (delta === 0) return;
+
+            const maxScroll = panel.scrollHeight - panel.clientHeight;
+            const atTop = panel.scrollTop <= 0;
+            const atBottom = panel.scrollTop >= maxScroll - 1;
+
+            if ((delta < 0 && !atTop) || (delta > 0 && !atBottom)) {
+                panel.scrollTop = Math.min(maxScroll, Math.max(0, panel.scrollTop + delta));
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+
+        panel.addEventListener('wheel', onWheel, { passive: false });
+        return () => panel.removeEventListener('wheel', onWheel);
+    }, [enabled, metrics.ready]);
+
+    return { anchorRef, panelRef, metrics };
+}
 
 // Icon mapping for menu items
 const getMenuIcon = (menuId) => {
@@ -328,6 +412,7 @@ export default function ProfileMenuTabs({
     onCabinetModeChange,
 }) {
     const isDrawer = variant === 'drawer';
+    const { anchorRef, panelRef, metrics: sidebarMetrics } = useFixedSidebarMetrics(!isDrawer);
     const menuTabs = useMemo(() => {
         if (cabinetMode !== CABINET_MODE_ADMIN && cabinetMode !== CABINET_MODE_BUYER) {
             return tabs;
@@ -576,21 +661,47 @@ export default function ProfileMenuTabs({
         );
     }
 
+    const sidebarPanelStyle = {
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+        top: 'calc(var(--sg-desktop-header-h) + 1rem)',
+        maxHeight: 'calc(100dvh - var(--sg-desktop-header-h) - 2rem)',
+        ...(sidebarMetrics.ready
+            ? {
+                  position: 'fixed',
+                  left: sidebarMetrics.left,
+                  width: sidebarMetrics.width,
+              }
+            : {
+                  position: 'sticky',
+              }),
+    };
+
     return (
-        <div
-            className="sticky top-[calc(var(--sg-desktop-header-h)+1rem)] max-h-[calc(100dvh-var(--sg-desktop-header-h)-2rem)] w-full min-w-[15.5rem] overflow-y-auto overscroll-contain scroll-pb-32 bg-white [&::-webkit-scrollbar]:hidden"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-            {showCabinetModeSwitch ? (
-                <CabinetModeSwitch
-                    variant="sidebar"
-                    mode={cabinetMode}
-                    modes={availableCabinetModes}
-                    onChange={onCabinetModeChange}
-                />
-            ) : null}
-            <nav className="flex flex-col gap-0.5 py-2">{menuTabs.map(renderMenuItem)}</nav>
-            <PublicSiteMenuLinks variant="sidebar" />
-        </div>
+        <>
+            {/* Reserves grid column width; panel is fixed so page scroll never clips the menu. */}
+            <div
+                ref={anchorRef}
+                className="w-full min-w-[15.5rem]"
+                style={{ height: 1 }}
+                aria-hidden="true"
+            />
+            <div
+                ref={panelRef}
+                className={SIDEBAR_SCROLL_CLASS}
+                style={sidebarPanelStyle}
+            >
+                {showCabinetModeSwitch ? (
+                    <CabinetModeSwitch
+                        variant="sidebar"
+                        mode={cabinetMode}
+                        modes={availableCabinetModes}
+                        onChange={onCabinetModeChange}
+                    />
+                ) : null}
+                <nav className="flex flex-col gap-0.5 py-2">{menuTabs.map(renderMenuItem)}</nav>
+                <PublicSiteMenuLinks variant="sidebar" />
+            </div>
+        </>
     );
 }
