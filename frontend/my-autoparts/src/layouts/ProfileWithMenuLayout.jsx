@@ -52,6 +52,7 @@ export default function ProfileWithMenuLayout() {
   const [purchasesMenuCounts, setPurchasesMenuCounts] = useState({ orders: 0, returns: 0 });
 
     const isChatsPage = location.pathname.startsWith('/chats');
+    const isPrintPage = /\/print\/?$/.test(location.pathname);
 
     const canFetchSalesCounts = useMemo(() => {
         if (!user) return false;
@@ -175,6 +176,14 @@ export default function ProfileWithMenuLayout() {
                 <main className="mx-auto w-full max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 py-12 sm:px-6 lg:px-8">
                     <AuthLoadingScreen className="h-48" />
                 </main>
+            </div>
+        );
+    }
+
+    if (isPrintPage) {
+        return (
+            <div className="min-h-screen max-w-full overflow-x-hidden bg-white">
+                <Outlet key={location.pathname} />
             </div>
         );
     }

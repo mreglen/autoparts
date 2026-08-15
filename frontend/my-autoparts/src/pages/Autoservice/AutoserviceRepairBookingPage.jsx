@@ -271,7 +271,6 @@ export default function AutoserviceRepairBookingPage() {
   const formBlock = (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Контакты</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <MobileFormField label="Имя" htmlFor="booking-name">
             <input
@@ -301,7 +300,6 @@ export default function AutoserviceRepairBookingPage() {
       </div>
 
       <div className="space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Авто и дата</p>
         <MobileFormField label="Автомобиль" htmlFor="booking-vehicle">
           <SearchablePillSelect
             id="booking-vehicle"

@@ -1,27 +1,56 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { apiRequest, apiRequestFormData, BACKEND_BASE, normalizeImageUrl } from '../../utils/apiClient';
+import { apiRequest, normalizeImageUrl } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import PageIntro from '../../components/PageIntro/PageIntro';
+import {
+  Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  FieldLabel,
+  Input,
+  Modal,
+  Select,
+  Skeleton,
+} from '../../components/UI';
+import {
+  warehouseListShellClass,
+  warehousePageClass,
+  warehouseToolbarClass,
+} from '../../utils/warehouseListUi';
 import { canAccessAvitoIntegration } from './integrationAccess';
 import { useAvitoAccountStatus } from '../../hooks/useAvitoAccountStatus';
 import { canUseAvitoProFeatures } from '../../utils/avitoProAccess';
 import AvitoProExpiredBanner from '../../components/AvitoProExpiredBanner/AvitoProExpiredBanner';
 
-const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
-const AD_TYPE_OPTIONS = [
-  { value: AD_TYPE_NOT_SPECIFIED, label: 'Не указано' },
-  { value: 'Товар приобретен на продажу', label: 'Товар приобретен на продажу' },
-  { value: 'Товар от производителя', label: 'Товар от производителя' },
-];
+function InlineNotice({ tone = 'success', children, onClose }) {
+  const tones = {
+    success: 'border-success-100 bg-success-50 text-success-700',
+    error: 'border-danger-100 bg-danger-50 text-danger-700',
+    warning: 'border-warning-100 bg-warning-50 text-warning-700',
+    info: 'border-line bg-surface-subtle text-ink-soft',
+  };
+  return (
+    <div
+      className={`flex items-start justify-between gap-3 rounded-sg border px-4 py-3 ${tones[tone] || tones.info}`}
+      role="status"
+    >
+      <div className="min-w-0 flex-1 text-sm">{children}</div>
+      {onClose ? (
+        <button type="button" onClick={onClose} className="shrink-0 rounded-md p-1 opacity-70 hover:opacity-100" aria-label="Закрыть">
+          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
-function CategoryPickerModal({
-  open,
-  orgId,
-  onClose,
-  onPick,
-}) {
+function CategoryPickerModal({ open, orgId, onClose, onPick }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [tree, setTree] = useState([]);
@@ -38,15 +67,14 @@ function CategoryPickerModal({
   };
 
   useEffect(() => {
-    if (!open || !orgId) return;
+    if (!open || !orgId) return undefined;
     let active = true;
     setLoading(true);
     setError(null);
     apiRequest(`/organizations/${orgId}/avito/autoload/category-tree`, { method: 'GET' })
       .then((data) => {
         if (!active) return;
-        const t = Array.isArray(data?.tree) ? data.tree : [];
-        setTree(t);
+        setTree(Array.isArray(data?.tree) ? data.tree : []);
       })
       .catch((e) => {
         if (active) setError(e?.message || String(e));
@@ -101,27 +129,25 @@ function CategoryPickerModal({
                     type="button"
                     onClick={() => toggle(key)}
                     disabled={!!q}
-                    className="w-6 h-6 inline-flex items-center justify-center border border-gray-300 rounded text-xs bg-white hover:bg-gray-50"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-line bg-white text-xs text-ink-soft hover:bg-surface-muted disabled:opacity-50"
                     aria-label={isExpanded ? 'Свернуть' : 'Развернуть'}
                   >
-                    {isExpanded ? '-' : '+'}
+                    {isExpanded ? '−' : '+'}
                   </button>
                 ) : (
-                  <span className="w-6 h-6 inline-flex items-center justify-center text-gray-300">•</span>
+                  <span className="inline-flex h-6 w-6 items-center justify-center text-ink-faint">•</span>
                 )}
                 <button
                   type="button"
                   onClick={() => onPick(title)}
-                  className="text-sm text-blue-700 hover:underline text-left"
+                  className="text-left text-sm font-medium text-brand-700 hover:text-brand-800"
                 >
                   {title || '(без названия)'}
                 </button>
               </div>
-              {hasChildren && isExpanded && (
-                <div className="ml-8 mt-1">
-                  {renderNodes(children, key)}
-                </div>
-              )}
+              {hasChildren && isExpanded ? (
+                <div className="ml-8 mt-1">{renderNodes(children, key)}</div>
+              ) : null}
             </li>
           );
         })}
@@ -129,92 +155,32 @@ function CategoryPickerModal({
     );
   };
 
-  if (!open) return null;
   return (
-    <div
-      className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full max-w-3xl max-h-[85vh] rounded-lg shadow-lg flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 gap-4">
-          <h3 className="text-lg font-semibold text-gray-900">Выбор категории</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
-          >
-            Закрыть
-          </button>
-        </div>
-        <div className="p-4 overflow-auto">
-          <div className="flex items-center gap-2 mb-3">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск по дереву…"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            />
-          </div>
-          {loading ? (
-            <p className="text-sm text-gray-500">Загрузка дерева категорий…</p>
-          ) : error ? (
-            <p className="text-sm text-red-700 whitespace-pre-wrap">{error}</p>
-          ) : filteredTree.length === 0 ? (
-            <p className="text-sm text-gray-500">Ничего не найдено.</p>
-          ) : (
-            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-              {renderNodes(filteredTree, 'root')}
-            </div>
-          )}
-        </div>
+    <Modal open={open} onClose={onClose} title="Выбор категории" size="lg">
+      <div className="mb-3">
+        <Input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск по дереву…"
+        />
       </div>
-    </div>
+      {loading ? (
+        <Skeleton className="h-40 w-full" />
+      ) : error ? (
+        <p className="whitespace-pre-wrap text-sm text-danger-600">{error}</p>
+      ) : filteredTree.length === 0 ? (
+        <p className="text-sm text-ink-muted">Ничего не найдено.</p>
+      ) : (
+        <div className="rounded-sg border border-line bg-surface-subtle/50 p-3">
+          {renderNodes(filteredTree, 'root')}
+        </div>
+      )}
+    </Modal>
   );
 }
 
-function formatErrorMessage(err) {
-  const msg = err?.message || String(err);
-  return msg;
-}
-
-function shouldShowResultCard(result) {
-  if (!result || typeof result !== 'object') return false;
-  if ((result.local_errors || []).length > 0) return true;
-  if (result.avito_report != null) return true;
-  if (result.avito_token_error) return true;
-  return false;
-}
-
-function mapLastAutoloadToState(last) {
-  if (!last || typeof last !== 'object') {
-    return { items: [], uploadResult: null, savedPath: '' };
-  }
-  const items = Array.isArray(last.items) ? last.items : [];
-  const uploadResult = {
-    local_validation_ok: last.local_validation_ok,
-    local_errors: last.local_errors || [],
-    avito_report: last.avito_report,
-    avito_token_error: last.avito_token_error,
-    updated_at: last.updated_at,
-  };
-  return {
-    items,
-    uploadResult: shouldShowResultCard(uploadResult) ? uploadResult : null,
-    savedPath: last.saved_path || '',
-  };
-}
-
-function ImportModal({
-  open,
-  orgId,
-  selectedRows,
-  onClose,
-  onImport,
-}) {
+function ImportModal({ open, orgId, selectedRows, onClose, onImport }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [storageLocations, setStorageLocations] = useState([]);
@@ -227,7 +193,7 @@ function ImportModal({
   });
 
   useEffect(() => {
-    if (!open || !orgId) return;
+    if (!open || !orgId) return undefined;
     let active = true;
     setLoadingStorageLocations(true);
     setError(null);
@@ -236,8 +202,12 @@ function ImportModal({
         if (!active) return;
         const locations = Array.isArray(data) ? data : [];
         setStorageLocations(locations);
-        if (locations.length > 0 && !importParams.storage_location_id) {
-          setImportParams(prev => ({ ...prev, storage_location_id: locations[0].id }));
+        if (locations.length > 0) {
+          setImportParams((prev) =>
+            prev.storage_location_id
+              ? prev
+              : { ...prev, storage_location_id: locations[0].id },
+          );
         }
       })
       .catch((e) => {
@@ -271,135 +241,150 @@ function ImportModal({
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full max-w-2xl max-h-[90vh] rounded-lg shadow-lg flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Импорт товаров из Авито</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded hover:bg-gray-50"
-          >
-            Закрыть
-          </button>
-        </div>
-        
-        <div className="p-6 overflow-auto">
-          {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Склад <span className="text-red-500">*</span>
-              </label>
-              {loadingStorageLocations ? (
-                <div className="text-sm text-gray-500">Загрузка складов...</div>
-              ) : (
-                <select
-                  value={importParams.storage_location_id}
-                  onChange={(e) => setImportParams(prev => ({ ...prev, storage_location_id: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Выберите склад</option>
-                  {storageLocations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.address || `Склад #${loc.id}`}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Количество
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={importParams.quantity}
-                onChange={(e) => setImportParams(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="use_file_price"
-                checked={importParams.use_file_price}
-                onChange={(e) => setImportParams(prev => ({ ...prev, use_file_price: e.target.checked }))}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="use_file_price" className="text-sm text-gray-700">
-                Использовать цену из файла
-              </label>
-            </div>
-
-            {!importParams.use_file_price && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Цена прихода <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={importParams.sale_price || ''}
-                  onChange={(e) => setImportParams(prev => ({ ...prev, sale_price: parseFloat(e.target.value) || null }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Введите цену"
-                  required
-                />
-              </div>
-            )}
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Будет импортировано строк:</strong> {selectedRows.length}
-              </p>
-              <p className="text-xs text-blue-600 mt-2">
-                Товары будут созданы или обновлены в базе данных. Для каждого товара будет создана запись о поступлении на склад.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-          >
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Импорт товаров из Авито"
+      size="md"
+      footer={(
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
             Отмена
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleSubmit}
             disabled={loading || selectedRows.length === 0}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+            loading={loading}
           >
-            {loading ? 'Импорт...' : 'Импортировать'}
-          </button>
+            {loading ? 'Импорт…' : 'Импортировать'}
+          </Button>
+        </div>
+      )}
+    >
+      {error ? (
+        <div className="mb-4">
+          <InlineNotice tone="error">{error}</InlineNotice>
+        </div>
+      ) : null}
+
+      <div className="space-y-4">
+        <div>
+          <FieldLabel htmlFor="import-warehouse" required>
+            Склад
+          </FieldLabel>
+          {loadingStorageLocations ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <Select
+              id="import-warehouse"
+              value={importParams.storage_location_id}
+              onChange={(e) =>
+                setImportParams((prev) => ({ ...prev, storage_location_id: e.target.value }))
+              }
+              required
+            >
+              <option value="">Выберите склад</option>
+              {storageLocations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.address || `Склад #${loc.id}`}
+                </option>
+              ))}
+            </Select>
+          )}
+        </div>
+
+        <div>
+          <FieldLabel htmlFor="import-qty">Количество</FieldLabel>
+          <Input
+            id="import-qty"
+            type="number"
+            min="1"
+            value={importParams.quantity}
+            onChange={(e) =>
+              setImportParams((prev) => ({
+                ...prev,
+                quantity: parseInt(e.target.value, 10) || 1,
+              }))
+            }
+          />
+        </div>
+
+        <Checkbox
+          id="use_file_price"
+          checked={importParams.use_file_price}
+          onChange={(e) =>
+            setImportParams((prev) => ({ ...prev, use_file_price: e.target.checked }))
+          }
+          label="Использовать цену из файла"
+        />
+
+        {!importParams.use_file_price ? (
+          <div>
+            <FieldLabel htmlFor="import-price" required>
+              Цена прихода
+            </FieldLabel>
+            <Input
+              id="import-price"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={importParams.sale_price || ''}
+              onChange={(e) =>
+                setImportParams((prev) => ({
+                  ...prev,
+                  sale_price: parseFloat(e.target.value) || null,
+                }))
+              }
+              placeholder="Введите цену"
+              required
+            />
+          </div>
+        ) : null}
+
+        <div className="rounded-sg border border-line bg-brand-50/40 px-4 py-3">
+          <p className="text-sm text-ink">
+            <span className="font-semibold">Будет импортировано строк:</span> {selectedRows.length}
+          </p>
+          <p className="mt-1 text-xs text-ink-muted">
+            Товары будут созданы или обновлены. Для каждого создастся поступление на склад.
+          </p>
         </div>
       </div>
-    </div>
+    </Modal>
   );
+}
+
+function formatErrorMessage(err) {
+  return err?.message || String(err);
+}
+
+function shouldShowResultCard(result) {
+  if (!result || typeof result !== 'object') return false;
+  if ((result.local_errors || []).length > 0) return true;
+  if (result.avito_report != null) return true;
+  if (result.avito_token_error) return true;
+  return false;
+}
+
+function mapLastAutoloadToState(last) {
+  if (!last || typeof last !== 'object') {
+    return { items: [], uploadResult: null, savedPath: '' };
+  }
+  const items = Array.isArray(last.items) ? last.items : [];
+  const uploadResult = {
+    local_validation_ok: last.local_validation_ok,
+    local_errors: last.local_errors || [],
+    avito_report: last.avito_report,
+    avito_token_error: last.avito_token_error,
+    updated_at: last.updated_at,
+  };
+  return {
+    items,
+    uploadResult: shouldShowResultCard(uploadResult) ? uploadResult : null,
+    savedPath: last.saved_path || '',
+  };
 }
 
 export default function AvitoNomenclaturePage() {
@@ -722,354 +707,376 @@ export default function AvitoNomenclaturePage() {
 
   if (!orgId) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
-        Интеграция Авито доступна для аккаунтов с привязкой к организации.
+      <div className={`${warehousePageClass} min-w-0`}>
+        <EmptyState
+          illustration="empty"
+          title="Нет организации"
+          description="Интеграция Авито доступна для аккаунтов с привязкой к организации."
+        />
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
+    <div className={`${warehousePageClass} min-w-0 space-y-4`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <PageIntro
+          title="Номенклатура Авито"
+          description="Объявления из файла автозагрузки"
+          className="mb-0"
+        />
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             to="/settings/integration/avito"
-            className="text-sm text-blue-600 hover:underline mb-2 inline-block"
+            className="text-sm font-medium text-brand-700 hover:text-brand-800"
           >
-            ← Назад к интеграции
+            ← К интеграции
           </Link>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Номенклатура Авито</h1>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={loadCredentials}
+            disabled={loading}
+            loading={loading}
+            title="Обновить данные"
+          >
+            {loading ? 'Загрузка…' : 'Обновить'}
+          </Button>
         </div>
-        <button
-          type="button"
-          onClick={loadCredentials}
-          disabled={loading}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          title="Обновить данные"
-        >
-          <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span>{loading ? 'Загрузка...' : 'Обновить'}</span>
-        </button>
       </div>
 
       <AvitoProExpiredBanner status={avitoAccountStatus} />
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm whitespace-pre-wrap">
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-900 text-sm">
-          {notice}
-        </div>
-      )}
-      {warnings && warnings.length > 0 && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-          <div className="flex items-start gap-2">
-            <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-            </svg>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800 mb-1">Предупреждения</p>
-              <ul className="text-sm text-amber-700 space-y-1">
-                {warnings.map((w, idx) => (
-                  <li key={idx}>• {w}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
+      {error ? (
+        <InlineNotice tone="error" onClose={() => setError(null)}>
+          <p className="whitespace-pre-wrap">{error}</p>
+        </InlineNotice>
+      ) : null}
+      {notice ? (
+        <InlineNotice tone="success" onClose={() => setNotice(null)}>
+          <p>{notice}</p>
+        </InlineNotice>
+      ) : null}
+      {warnings?.length > 0 ? (
+        <InlineNotice tone="warning">
+          <p className="mb-1 font-medium">Предупреждения</p>
+          <ul className="space-y-1">
+            {warnings.map((w, idx) => (
+              <li key={idx}>• {w}</li>
+            ))}
+          </ul>
+        </InlineNotice>
+      ) : null}
 
       {loading ? (
-        <div className="text-center py-16 px-6">
-          <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <svg className="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          </div>
-          <h2 className="text-xl font-medium text-gray-900 mb-2">Загрузка номенклатуры...</h2>
-          <p className="text-gray-600 text-base">Пожалуйста, подождите</p>
+        <div className="space-y-4">
+          <Skeleton className="h-28 w-full rounded-sg-lg" />
+          <Skeleton className="h-40 w-full rounded-sg-lg" />
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-          <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          <p className="text-sm text-gray-500 mb-2">Нет данных для отображения</p>
-          <p className="text-xs text-gray-400 mb-4">
-            Возможные причины: файл не загружен, XLSX не содержит товаров, или формат файла не распознан
-          </p>
-          <Link
-            to="/settings/integration/avito"
-            className="inline-block text-sm text-blue-600 hover:underline"
-          >
-            ← Вернуться к странице интеграции и загрузить XLSX
-          </Link>
-        </div>
+        <EmptyState
+          illustration="empty"
+          title="Нет данных для отображения"
+          description="Файл не загружен, XLSX не содержит товаров, или формат файла не распознан."
+          actionLabel="К интеграции и загрузке XLSX"
+          actionHref="/settings/integration/avito"
+        />
       ) : (
         <>
-          {/* Filters in white block */}
-          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 mb-4">
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 text-xs sm:text-sm text-gray-800">
-              <div className="flex flex-col gap-1">
-                <span className="font-medium">Действия</span>
-                <div className="flex flex-col gap-1">
-                  <label className="inline-flex items-center gap-1">
+          <div className={warehouseToolbarClass}>
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:gap-6 text-sm text-ink">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                  Действия
+                </span>
+                <div className="flex flex-col gap-1.5">
+                  <label className="inline-flex items-center gap-2">
                     <input
                       type="radio"
                       name="avito-bulk-action"
                       checked={bulkAction === 'publish'}
                       onChange={() => setBulkAction('publish')}
+                      className="accent-brand-700"
                     />
                     <span>Опубликовать объявление</span>
                   </label>
-                  <label className="inline-flex items-center gap-1">
+                  <label className="inline-flex items-center gap-2">
                     <input
                       type="radio"
                       name="avito-bulk-action"
                       checked={bulkAction === 'unpublish'}
                       onChange={() => setBulkAction('unpublish')}
+                      className="accent-brand-700"
                     />
                     <span>Снять с публикации</span>
                   </label>
-                  <label className="inline-flex items-center gap-1">
+                  <label className="inline-flex items-center gap-2">
                     <input
                       type="radio"
                       name="avito-bulk-action"
                       checked={bulkAction === 'remove'}
                       onChange={() => setBulkAction('remove')}
+                      className="accent-brand-700"
                     />
                     <span>Удалить из таблицы</span>
                   </label>
-                  <label className="inline-flex items-center gap-1">
+                  <label className="inline-flex items-center gap-2">
                     <input
                       type="radio"
                       name="avito-bulk-action"
                       checked={bulkAction === 'import'}
                       onChange={() => setBulkAction('import')}
+                      className="accent-brand-700"
                     />
                     <span>Импортировать</span>
                   </label>
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="font-medium">Статусы</span>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                  Статусы
+                </span>
                 <div className="flex flex-wrap gap-2">
                   {statuses.length === 0 ? (
-                    <span className="text-gray-400">нет данных</span>
+                    <span className="text-ink-faint">нет данных</span>
                   ) : (
                     statuses.map((st) => (
-                      <label key={st} className="inline-flex items-center gap-1">
-                        <input
-                          type="checkbox"
-                          checked={selectedStatuses.includes(st)}
-                          onChange={() => handleToggleFilterStatus(st)}
-                        />
-                        <span>{st}</span>
-                      </label>
+                      <Checkbox
+                        key={st}
+                        checked={selectedStatuses.includes(st)}
+                        onChange={() => handleToggleFilterStatus(st)}
+                        label={st}
+                      />
                     ))
                   )}
                 </div>
               </div>
             </div>
-            {bulkAction && (
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
-                <p className="text-xs sm:text-sm text-gray-600">
-                  Выбрано строк: <span className="font-medium">{selectedRows.length}</span>
+            {bulkAction ? (
+              <div className="mt-1 flex w-full flex-col items-start justify-between gap-2 border-t border-line/60 pt-3 sm:flex-row sm:items-center">
+                <p className="text-sm text-ink-muted">
+                  Выбрано строк:{' '}
+                  <span className="font-semibold text-ink">{selectedRows.length}</span>
                 </p>
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   disabled={savingBulkAction || selectedRows.length === 0 || !avitoProActive}
+                  loading={savingBulkAction}
                   onClick={handleApplyBulkAction}
-                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
+                  className="w-full sm:w-auto"
                 >
-                  {savingBulkAction 
-                    ? 'Сохранение…' 
-                    : bulkAction === 'import' 
-                      ? 'Импортировать' 
+                  {savingBulkAction
+                    ? 'Сохранение…'
+                    : bulkAction === 'import'
+                      ? 'Импортировать'
                       : 'Сохранить'}
-                </button>
+                </Button>
               </div>
-            )}
+            ) : null}
           </div>
 
-          {/* Table separate from white block - Desktop */}
-          <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg">
-            <table className="min-w-full text-sm text-left">
-              <thead className="bg-gray-50 text-gray-700">
+          <div className={`hidden md:block ${warehouseListShellClass} overflow-x-auto`}>
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-line bg-surface-subtle/80 text-ink-soft">
                 <tr>
-                  <th className="px-3 py-2 font-medium">
+                  <th className="px-3 py-2.5 font-medium">
                     <input
                       type="checkbox"
                       checked={selectAll}
                       onChange={(e) => handleToggleSelectAll(e.target.checked)}
+                      className="accent-brand-700"
+                      aria-label="Выбрать все"
                     />
                   </th>
-                  <th className="px-3 py-2 font-medium">Номер детали (OEM)</th>
-                  <th className="px-3 py-2 font-medium">Производитель</th>
-                  <th className="px-3 py-2 font-medium">Состояние</th>
-                  <th className="px-3 py-2 font-medium">Цена</th>
-                  <th className="px-3 py-2 font-medium" style={{ maxWidth: '200px', width: '200px' }}>Название объявления</th>
-                  <th className="px-3 py-2 font-medium">Количество</th>
-                  <th className="px-3 py-2 font-medium">Авито статус</th>
-                  <th className="px-3 py-2 font-medium">Фото</th>
+                  <th className="px-3 py-2.5 font-medium">Номер детали (OEM)</th>
+                  <th className="px-3 py-2.5 font-medium">Производитель</th>
+                  <th className="px-3 py-2.5 font-medium">Состояние</th>
+                  <th className="px-3 py-2.5 font-medium">Цена</th>
+                  <th
+                    className="px-3 py-2.5 font-medium"
+                    style={{ maxWidth: '200px', width: '200px' }}
+                  >
+                    Название объявления
+                  </th>
+                  <th className="px-3 py-2.5 font-medium">Количество</th>
+                  <th className="px-3 py-2.5 font-medium">Авито статус</th>
+                  <th className="px-3 py-2.5 font-medium">Фото</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line">
                 {items.map((row, idx) => {
                   const key = makeRowKey(row, idx);
                   const checked = isRowChecked(row, idx);
-                  const photos = Array.isArray(row.photos) ? row.photos.map(p => normalizeImageUrl(p)) : [];
+                  const photos = Array.isArray(row.photos)
+                    ? row.photos.map((p) => normalizeImageUrl(p))
+                    : [];
                   const totalPhotos = photos.length;
-                  const photoIdx = Math.min(photoIndexes[key] || 0, Math.max(totalPhotos - 1, 0));
+                  const photoIdx = Math.min(
+                    photoIndexes[key] || 0,
+                    Math.max(totalPhotos - 1, 0),
+                  );
                   const currentPhoto = totalPhotos > 0 ? photos[photoIdx] : '';
                   const isExpanded = expandedRows[key];
                   return (
-                  <>
-                  <tr key={key} className="bg-white hover:bg-gray-50 cursor-pointer" onClick={() => toggleRowExpand(key)}>
-                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => handleToggleRow(row, idx)}
-                      />
-                    </td>
-                    <td className="px-3 py-2">{row.part_number}</td>
-                    <td className="px-3 py-2">{row.manufacturer}</td>
-                    <td className="px-3 py-2">{row.condition}</td>
-                    <td className="px-3 py-2">{row.price}</td>
-                    <td className="px-3 py-2" style={{ maxWidth: '200px', width: '200px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                      {row.title}
-                    </td>
-                    <td className="px-3 py-2">
-                      {(() => {
-                        const q = Number(row.quantity);
-                        return Number.isFinite(q) && q > 0 ? q : 1;
-                      })()}
-                    </td>
-                    <td className="px-3 py-2">{row.avito_status || '-'}</td>
-                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                      {currentPhoto ? (
-                        <div className="relative group w-20 h-20">
-                          <img
-                            src={currentPhoto}
-                            alt="Фото объявления"
-                            className="w-full h-full object-cover rounded border border-gray-200"
+                    <Fragment key={key}>
+                      <tr
+                        className="cursor-pointer bg-white hover:bg-surface-muted/40"
+                        onClick={() => toggleRowExpand(key)}
+                      >
+                        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => handleToggleRow(row, idx)}
+                            className="accent-brand-700"
                           />
-                          {totalPhotos > 1 && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handlePhotoPrev(key, totalPhotos)}
-                                className="absolute left-0 top-0 bottom-0 w-6 bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-sm"
-                                aria-label="Предыдущее фото"
-                              >
-                                {'<'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handlePhotoNext(key, totalPhotos)}
-                                className="absolute right-0 top-0 bottom-0 w-6 bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-sm"
-                                aria-label="Следующее фото"
-                              >
-                                {'>'}
-                              </button>
-                            </>
+                        </td>
+                        <td className="px-3 py-2 text-ink">{row.part_number}</td>
+                        <td className="px-3 py-2 text-ink">{row.manufacturer}</td>
+                        <td className="px-3 py-2 text-ink">{row.condition}</td>
+                        <td className="px-3 py-2 text-ink">{row.price}</td>
+                        <td
+                          className="px-3 py-2 text-ink"
+                          style={{
+                            maxWidth: '200px',
+                            width: '200px',
+                            whiteSpace: 'normal',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {row.title}
+                        </td>
+                        <td className="px-3 py-2 text-ink">
+                          {(() => {
+                            const q = Number(row.quantity);
+                            return Number.isFinite(q) && q > 0 ? q : 1;
+                          })()}
+                        </td>
+                        <td className="px-3 py-2 text-ink">{row.avito_status || '—'}</td>
+                        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                          {currentPhoto ? (
+                            <div className="group relative h-20 w-20">
+                              <img
+                                src={currentPhoto}
+                                alt="Фото объявления"
+                                className="h-full w-full rounded-sg border border-line object-cover"
+                              />
+                              {totalPhotos > 1 ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePhotoPrev(key, totalPhotos)}
+                                    className="absolute bottom-0 left-0 top-0 flex w-6 items-center justify-center bg-ink/50 text-sm text-white opacity-0 transition-opacity hover:bg-ink/70 group-hover:opacity-100"
+                                    aria-label="Предыдущее фото"
+                                  >
+                                    {'<'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePhotoNext(key, totalPhotos)}
+                                    className="absolute bottom-0 right-0 top-0 flex w-6 items-center justify-center bg-ink/50 text-sm text-white opacity-0 transition-opacity hover:bg-ink/70 group-hover:opacity-100"
+                                    aria-label="Следующее фото"
+                                  >
+                                    {'>'}
+                                  </button>
+                                </>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-ink-faint">нет фото</span>
                           )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-xs">нет фото</span>
-                      )}
-                    </td>
-                  </tr>
-                  {isExpanded && row.description && (
-                    <tr className="bg-gray-50">
-                      <td colSpan="9" className="px-6 py-4">
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900 mb-2">Описание:</div>
-                          <div className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-200">
-                            {row.description}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  </>
-                )})}
+                        </td>
+                      </tr>
+                      {isExpanded && row.description ? (
+                        <tr className="bg-surface-subtle/60">
+                          <td colSpan={9} className="px-6 py-4">
+                            <div className="text-sm">
+                              <div className="mb-2 font-medium text-ink">Описание:</div>
+                              <div className="whitespace-pre-wrap rounded-sg border border-line bg-white p-3 text-ink-soft">
+                                {row.description}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Mobile Card View */}
-          <div className="md:hidden space-y-3">
+          <div className="space-y-3 md:hidden">
             {items.map((row, idx) => {
               const key = makeRowKey(row, idx);
               const checked = isRowChecked(row, idx);
-              const photos = Array.isArray(row.photos) ? row.photos.map(p => normalizeImageUrl(p)) : [];
+              const photos = Array.isArray(row.photos)
+                ? row.photos.map((p) => normalizeImageUrl(p))
+                : [];
               const totalPhotos = photos.length;
-              const photoIdx = Math.min(photoIndexes[key] || 0, Math.max(totalPhotos - 1, 0));
+              const photoIdx = Math.min(
+                photoIndexes[key] || 0,
+                Math.max(totalPhotos - 1, 0),
+              );
               const currentPhoto = totalPhotos > 0 ? photos[photoIdx] : '';
               const isExpanded = expandedRows[key];
-              
+
               return (
-                <div key={key} className="bg-white border border-gray-200 rounded-lg">
-                  <div 
-                    className="p-4 cursor-pointer hover:bg-gray-50" 
+                <Card key={key} padding="none" className="overflow-hidden">
+                  <div
+                    className="cursor-pointer p-4 hover:bg-surface-muted/30"
                     onClick={() => toggleRowExpand(key)}
                   >
-                    <div className="flex items-start gap-3 mb-3">
+                    <div className="mb-3 flex items-start gap-3">
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={(e) => e.stopPropagation()}
+                        onChange={() => handleToggleRow(row, idx)}
                         onClick={(e) => e.stopPropagation()}
-                        className="mt-1"
+                        className="mt-1 accent-brand-700"
                       />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {row.part_number || '-'}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-ink">
+                          {row.part_number || '—'}
                         </p>
-                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                          {row.title || '-'}
+                        <p className="mt-1 line-clamp-2 text-xs text-ink-muted">
+                          {row.title || '—'}
                         </p>
                       </div>
-                      {currentPhoto && (
-                        <div className="relative flex-shrink-0">
+                      {currentPhoto ? (
+                        <div className="relative shrink-0">
                           <img
                             src={currentPhoto}
                             alt="Фото"
-                            className="w-16 h-16 object-cover rounded border border-gray-200"
+                            className="h-16 w-16 rounded-sg border border-line object-cover"
                           />
-                          {totalPhotos > 1 && (
-                            <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-xs px-1.5 py-0.5 rounded">
+                          {totalPhotos > 1 ? (
+                            <div className="absolute -bottom-1 -right-1 rounded bg-ink px-1.5 py-0.5 text-xs text-white">
                               {photoIdx + 1}/{totalPhotos}
                             </div>
-                          )}
+                          ) : null}
                         </div>
-                      )}
+                      ) : null}
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+
+                    <div className="mb-2 grid grid-cols-2 gap-2 text-sm">
                       <div>
-                        <p className="text-xs text-gray-500">Производитель</p>
-                        <p className="text-gray-900 truncate">{row.manufacturer || '-'}</p>
+                        <p className="text-xs text-ink-muted">Производитель</p>
+                        <p className="truncate text-ink">{row.manufacturer || '—'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Состояние</p>
-                        <p className="text-gray-900">{row.condition || '-'}</p>
+                        <p className="text-xs text-ink-muted">Состояние</p>
+                        <p className="text-ink">{row.condition || '—'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Цена</p>
-                        <p className="text-gray-900 font-medium">{row.price || '-'}</p>
+                        <p className="text-xs text-ink-muted">Цена</p>
+                        <p className="font-medium text-ink">{row.price || '—'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Количество</p>
-                        <p className="text-gray-900">
+                        <p className="text-xs text-ink-muted">Количество</p>
+                        <p className="text-ink">
                           {(() => {
                             const q = Number(row.quantity);
                             return Number.isFinite(q) && q > 0 ? q : 1;
@@ -1077,24 +1084,24 @@ export default function AvitoNomenclaturePage() {
                         </p>
                       </div>
                     </div>
-                    
-                    {row.avito_status && (
-                      <div className="pt-2 border-t border-gray-100">
-                        <p className="text-xs text-gray-500">Статус</p>
-                        <p className="text-sm text-gray-900">{row.avito_status}</p>
+
+                    {row.avito_status ? (
+                      <div className="border-t border-line pt-2">
+                        <p className="text-xs text-ink-muted">Статус</p>
+                        <p className="text-sm text-ink">{row.avito_status}</p>
                       </div>
-                    )}
-                    
-                    {isExpanded && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <p className="text-xs text-gray-500 mb-2">Описание:</p>
-                        <div className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">
+                    ) : null}
+
+                    {isExpanded ? (
+                      <div className="mt-3 border-t border-line pt-3">
+                        <p className="mb-2 text-xs text-ink-muted">Описание:</p>
+                        <div className="whitespace-pre-wrap rounded-sg border border-line bg-surface-subtle p-3 text-sm text-ink-soft">
                           {row.description || 'Нет описания'}
                         </div>
                       </div>
-                    )}
+                    ) : null}
                   </div>
-                </div>
+                </Card>
               );
             })}
           </div>

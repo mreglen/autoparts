@@ -472,6 +472,17 @@ export default function RepairOrderViewModal({
             </div>
             {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
             <div className="flex flex-wrap justify-end gap-2">
+              {order?.id && showExecutors ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.open(`/autoservice/orders/${order.id}/print`, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                >
+                  Печать (макет ещё в разработке)
+                </button>
+              ) : null}
               {onEdit && !payOpen ? (
                 <button
                   type="button"

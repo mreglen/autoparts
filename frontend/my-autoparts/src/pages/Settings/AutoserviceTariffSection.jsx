@@ -9,8 +9,15 @@ import {
   DEFAULT_AUTOSERVICE_MARKUP_PERCENT,
   fetchPublicSiteConfig,
 } from '../../redux/slices/PublicInfoSlice';
-import Button from '../../components/UI/Button';
-import { Badge, Card, FieldHint, FieldLabel, Input, Textarea } from '../../components/UI';
+import {
+  Badge,
+  Button,
+  Card,
+  FieldHint,
+  FieldLabel,
+  Input,
+  Textarea,
+} from '../../components/UI';
 
 function formatMoney(value) {
   return new Intl.NumberFormat('ru-RU').format(Number(value) || 0);
@@ -79,7 +86,10 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
         }),
       ).unwrap();
       dispatch(fetchProfile());
-      setNotice({ type: 'success', message: 'Заявка отправлена. Мы свяжемся с вами после проверки.' });
+      setNotice({
+        type: 'success',
+        message: 'Заявка отправлена. Мы свяжемся с вами после проверки.',
+      });
     } catch (err) {
       setNotice({ type: 'error', message: err || 'Не удалось отправить заявку' });
     }
@@ -91,40 +101,40 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">Подключить автосервис</h3>
-          <p className="mt-0.5 text-sm text-gray-500">Запись, заказ-наряды и клиентская база</p>
+          <h3 className="text-sm font-semibold text-ink">Подключить автосервис</h3>
+          <p className="mt-0.5 text-sm text-ink-muted">Запись, заказ-наряды и клиентская база</p>
         </div>
         {connected ? <Badge tone="success">Активен</Badge> : null}
         {statusMeta && !connected ? <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge> : null}
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <div className="rounded-xl bg-gray-100 px-4 py-3">
-          <p className="text-xs font-medium text-gray-500">Стоимость</p>
-          <p className="mt-1 text-xl font-bold tabular-nums text-gray-900">{formatMoney(priceRub)} ₽</p>
-          <p className="text-sm text-gray-500">в месяц</p>
+        <div className="rounded-sg border border-line bg-surface-subtle px-4 py-3">
+          <p className="text-xs font-medium text-ink-muted">Стоимость</p>
+          <p className="mt-1 text-xl font-bold tabular-nums text-ink">{formatMoney(priceRub)} ₽</p>
+          <p className="text-sm text-ink-muted">в месяц</p>
         </div>
-        <div className="rounded-xl bg-gray-100 px-4 py-3">
-          <p className="text-xs font-medium text-gray-500">Наценка на запчасти</p>
-          <p className="mt-1 text-xl font-bold tabular-nums text-gray-900">{markupPercent}%</p>
-          <p className="text-sm text-gray-500">по умолчанию в заказ-нарядах</p>
+        <div className="rounded-sg border border-line bg-surface-subtle px-4 py-3">
+          <p className="text-xs font-medium text-ink-muted">Наценка на запчасти</p>
+          <p className="mt-1 text-xl font-bold tabular-nums text-ink">{markupPercent}%</p>
+          <p className="text-sm text-ink-muted">по умолчанию в заказ-нарядах</p>
         </div>
       </div>
 
-      <ul className="mt-4 space-y-1.5 text-sm text-gray-600">
+      <ul className="mt-4 space-y-1.5 text-sm text-ink-soft">
         <li>Планировщик, клиенты, заказ-наряды и настройки сервиса</li>
         <li>Переключатель «Продавец / Автосервис» в меню после подключения</li>
         <li>Клиентский режим автосервиса — как у покупателей на сайте</li>
       </ul>
 
       {connected ? (
-        <p className="mt-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <p className="mt-5 rounded-sg border border-success-100 bg-success-50 px-4 py-3 text-sm text-success-700">
           Автосервис подключён. Используйте переключатель «Продавец / Автосервис» в меню слева.
         </p>
       ) : null}
 
       {!connected && isDirector && application?.status !== 'pending' ? (
-        <div className="mt-5 space-y-4 border-t border-gray-100 pt-5">
+        <div className="mt-5 space-y-4 border-t border-line pt-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <FieldLabel htmlFor="autoservice-contact-name">Контактное лицо</FieldLabel>
@@ -155,34 +165,44 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
               placeholder="Кратко опишите формат работы сервиса (необязательно)"
             />
           </div>
-          {(myError || notice) && (
-            notice?.type === 'success' ? (
-              <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice.message}</p>
+          {(myError || notice) &&
+            (notice?.type === 'success' ? (
+              <p className="rounded-sg border border-success-100 bg-success-50 px-4 py-3 text-sm text-success-700">
+                {notice.message}
+              </p>
             ) : (
               <FieldHint error>{notice?.message || myError}</FieldHint>
-            )
-          )}
-          <Button onClick={handleSubmit} disabled={!canSubmit || submitting || myLoading} loading={submitting}>
+            ))}
+          <Button
+            onClick={handleSubmit}
+            disabled={!canSubmit || submitting || myLoading}
+            loading={submitting}
+          >
             Отправить заявку
           </Button>
         </div>
       ) : null}
 
       {!connected && application?.status === 'pending' ? (
-        <p className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Заявка отправлена {application.created_at ? new Date(application.created_at).toLocaleString('ru-RU') : ''}.
-          После одобрения администратором автосервис появится в меню.
+        <p className="mt-5 rounded-sg border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-800">
+          Заявка отправлена{' '}
+          {application.created_at
+            ? new Date(application.created_at).toLocaleString('ru-RU')
+            : ''}
+          . После одобрения администратором автосервис появится в меню.
         </p>
       ) : null}
 
       {!connected && application?.status === 'rejected' ? (
-        <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
-          Заявка отклонена{application.rejection_reason ? `: ${application.rejection_reason}` : ''}. Вы можете отправить новую заявку.
+        <p className="mt-5 rounded-sg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+          Заявка отклонена
+          {application.rejection_reason ? `: ${application.rejection_reason}` : ''}. Вы можете
+          отправить новую заявку.
         </p>
       ) : null}
 
       {!isDirector && !connected ? (
-        <p className="mt-5 text-sm text-gray-500">Отправить заявку может директор организации.</p>
+        <p className="mt-5 text-sm text-ink-muted">Отправить заявку может директор организации.</p>
       ) : null}
     </Card>
   );

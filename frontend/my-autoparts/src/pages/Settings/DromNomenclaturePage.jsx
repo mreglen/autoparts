@@ -2,6 +2,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../../utils/apiClient';
+import PageIntro from '../../components/PageIntro/PageIntro';
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  Skeleton,
+} from '../../components/UI';
+import {
+  warehouseListShellClass,
+  warehousePageClass,
+  warehouseToolbarClass,
+} from '../../utils/warehouseListUi';
 
 function formatErrorMessage(err) {
   return err?.message || String(err);
@@ -16,6 +30,45 @@ function itemKey(item, idx) {
   return article ? `a:${article}` : `i:${idx}`;
 }
 
+function InlineNotice({ tone = 'success', children, onClose }) {
+  const tones = {
+    success: 'border-success-100 bg-success-50 text-success-700',
+    error: 'border-danger-100 bg-danger-50 text-danger-700',
+    warning: 'border-warning-100 bg-warning-50 text-warning-700',
+    info: 'border-line bg-surface-subtle text-ink-soft',
+  };
+  return (
+    <div
+      className={`flex items-start justify-between gap-3 rounded-sg border px-4 py-3 ${tones[tone] || tones.info}`}
+      role="status"
+    >
+      <div className="min-w-0 flex-1 text-sm">{children}</div>
+      {onClose ? (
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-md p-1 opacity-70 hover:opacity-100"
+          aria-label="Закрыть"
+        >
+          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+            <path
+              fillRule="evenodd"
+              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function AvailabilityBadge({ value }) {
+  const label = value || '—';
+  const inStock = label === 'В наличии';
+  return <Badge tone={inStock ? 'success' : 'warning'}>{label}</Badge>;
+}
+
 export default function DromNomenclaturePage() {
   const user = useSelector((state) => state.auth.user);
   const orgId = user?.organization_id;
@@ -26,6 +79,7 @@ export default function DromNomenclaturePage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
@@ -79,10 +133,6 @@ export default function DromNomenclaturePage() {
 
   const handleRemove = async () => {
     if (!orgId || selectedArticles.length === 0) return;
-    const ok = window.confirm(
-      `Удалить ${selectedArticles.length} поз. из прайс-листа Drom? Они пропадут из файла и из автообновления API (qty=0).`,
-    );
-    if (!ok) return;
 
     setRemoving(true);
     setError(null);
@@ -94,6 +144,7 @@ export default function DromNomenclaturePage() {
       });
       setItems(Array.isArray(data.items) ? data.items : []);
       setSelectedKeys([]);
+      setConfirmOpen(false);
       const syncSkipped = data?.sync?.skipped;
       const syncOk = data?.sync?.ok;
       let msg = `Удалено из номенклатуры: ${data.removed_count ?? selectedArticles.length}.`;
@@ -114,150 +165,149 @@ export default function DromNomenclaturePage() {
 
   if (!orgId) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
-        Интеграция Drom доступна для аккаунтов с привязкой к организации.
+      <div className={`${warehousePageClass} min-w-0`}>
+        <EmptyState
+          illustration="empty"
+          title="Нет организации"
+          description="Интеграция Drom доступна для аккаунтов с привязкой к организации."
+        />
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="mb-6">
-        <Link
-          to="/settings/integration/drom"
-          className="text-sm text-blue-600 hover:underline mb-2 inline-block"
+    <div className={`${warehousePageClass} min-w-0 space-y-4`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <Link
+            to="/settings/integration/drom"
+            className="mb-1 inline-block text-sm font-medium text-brand-700 hover:text-brand-800"
+          >
+            ← К интеграции
+          </Link>
+          <PageIntro
+            title="Номенклатура Drom"
+            description={
+              !loading && items.length > 0
+                ? `${items.length} позиций в файле автозагрузки`
+                : 'Товары в XLSX для Drom.ru'
+            }
+            className="mb-0"
+          />
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={loadData}
+          disabled={loading}
+          loading={loading}
         >
-          ← Назад к интеграции
-        </Link>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Номенклатура Drom XLSX</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Товары в файле автозагрузки для Drom.ru. Удаление убирает позицию из файла и из
-          автообновления прайс-листа через API.
-        </p>
+          {loading ? 'Загрузка…' : 'Обновить'}
+        </Button>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm whitespace-pre-wrap">
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800 text-sm whitespace-pre-wrap">
-          {notice}
-        </div>
-      )}
+      {error ? (
+        <InlineNotice tone="error" onClose={() => setError(null)}>
+          <p className="whitespace-pre-wrap">{error}</p>
+        </InlineNotice>
+      ) : null}
+      {notice ? (
+        <InlineNotice tone="success" onClose={() => setNotice(null)}>
+          <p className="whitespace-pre-wrap">{notice}</p>
+        </InlineNotice>
+      ) : null}
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="space-y-3">
+          <Skeleton className="h-16 w-full rounded-sg-lg" />
+          <Skeleton className="h-64 w-full rounded-sg-lg" />
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Нет товаров</h3>
-          <p className="mt-1 text-sm text-gray-500">Экспортируйте товары со страницы «Мои запчасти»</p>
-          <div className="mt-6">
-            <Link
-              to="/my-parts"
-              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Перейти к запчастям
-            </Link>
-          </div>
-        </div>
+        <EmptyState
+          illustration="empty"
+          title="Нет товаров"
+          description="Экспортируйте товары со страницы «Мои запчасти»."
+          actionLabel="Перейти к запчастям"
+          actionHref="/my-parts"
+        />
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+        <Card padding="none" className="overflow-hidden">
+          <div className={`${warehouseToolbarClass} justify-between rounded-none border-b border-line`}>
+            <label className="inline-flex items-center gap-2 text-sm text-ink-soft">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="rounded border-line text-brand-600 focus:ring-brand-500"
                 checked={allSelected}
                 onChange={(e) => toggleAll(e.target.checked)}
                 disabled={removing}
               />
               Выбрать все ({items.length})
             </label>
-            <button
+            <Button
               type="button"
-              onClick={handleRemove}
+              variant="danger"
+              size="sm"
+              onClick={() => setConfirmOpen(true)}
               disabled={removing || selectedArticles.length === 0}
-              className="inline-flex items-center rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              loading={removing}
             >
-              {removing ? 'Удаление…' : `Удалить из номенклатуры (${selectedArticles.length})`}
-            </button>
+              {removing
+                ? 'Удаление…'
+                : `Удалить (${selectedArticles.length})`}
+            </Button>
           </div>
 
-          <div className="hidden md:block overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className={`hidden md:block ${warehouseListShellClass} rounded-none border-0`}>
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-surface-subtle text-ink-soft">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10" />
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Артикул
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Наименование
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Состояние
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Производитель
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Кол-во
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Цена
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Наличие
-                  </th>
+                  <th className="w-10 px-4 py-2.5 font-medium" />
+                  <th className="px-4 py-2.5 font-medium">Артикул</th>
+                  <th className="px-4 py-2.5 font-medium">Наименование</th>
+                  <th className="px-4 py-2.5 font-medium">Состояние</th>
+                  <th className="px-4 py-2.5 font-medium">Производитель</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Кол-во</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Цена</th>
+                  <th className="px-4 py-2.5 font-medium">Наличие</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-line">
                 {items.map((item, idx) => {
                   const key = itemKey(item, idx);
                   return (
-                    <tr key={key} className="hover:bg-gray-50">
-                      <td className="px-4 py-4">
+                    <tr key={key} className="bg-surface hover:bg-surface-subtle/60">
+                      <td className="px-4 py-3">
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-line text-brand-600 focus:ring-brand-500"
                           checked={selectedKeys.includes(key)}
                           disabled={removing || !itemArticle(item)}
                           onChange={() => toggleRow(key)}
                         />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                        {item.Артикул || item.article || '-'}
+                      <td className="px-4 py-3 font-mono text-ink">
+                        {item.Артикул || item.article || '—'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                        {item['Наименование товара'] || item.name || '-'}
+                      <td className="max-w-xs truncate px-4 py-3 text-ink-soft">
+                        {item['Наименование товара'] || item.name || '—'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item['Новый/б.у.'] || item.condition || '-'}
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-soft">
+                        {item['Новый/б.у.'] || item.condition || '—'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {item.Производитель || item.brand || '-'}
+                      <td className="whitespace-nowrap px-4 py-3 text-ink-soft">
+                        {item.Производитель || item.brand || '—'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-ink">
                         {item['Кол-во'] ?? item.quantity ?? 0}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                        {item.Цена ?? item.price ? `${Number(item.Цена ?? item.price).toLocaleString('ru-RU')} ₽` : '-'}
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-ink">
+                        {item.Цена ?? item.price
+                          ? `${Number(item.Цена ?? item.price).toLocaleString('ru-RU')} ₽`
+                          : '—'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          (item.Наличие || item.availability) === 'В наличии'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {item.Наличие || item.availability || '-'}
-                        </span>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <AvailabilityBadge value={item.Наличие || item.availability} />
                       </td>
                     </tr>
                   );
@@ -266,54 +316,52 @@ export default function DromNomenclaturePage() {
             </table>
           </div>
 
-          <div className="md:hidden divide-y divide-gray-200">
+          <div className="divide-y divide-line md:hidden">
             {items.map((item, idx) => {
               const key = itemKey(item, idx);
               return (
-                <div key={key} className="p-4 space-y-3">
+                <div key={key} className="space-y-3 p-4">
                   <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      className="mt-1 rounded border-line text-brand-600 focus:ring-brand-500"
                       checked={selectedKeys.includes(key)}
                       disabled={removing || !itemArticle(item)}
                       onChange={() => toggleRow(key)}
                     />
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-mono font-semibold text-gray-900 truncate">
-                            {item.Артикул || item.article || '-'}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-mono text-sm font-semibold text-ink">
+                            {item.Артикул || item.article || '—'}
                           </p>
-                          <p className="text-sm text-gray-700 mt-1 line-clamp-2">
-                            {item['Наименование товара'] || item.name || '-'}
+                          <p className="mt-1 line-clamp-2 text-sm text-ink-soft">
+                            {item['Наименование товара'] || item.name || '—'}
                           </p>
                         </div>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
-                          (item.Наличие || item.availability) === 'В наличии'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {item.Наличие || item.availability || '-'}
-                        </span>
+                        <AvailabilityBadge value={item.Наличие || item.availability} />
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                         <div>
-                          <p className="text-xs text-gray-500">Производитель</p>
-                          <p className="text-gray-900 truncate">{item.Производитель || item.brand || '-'}</p>
+                          <p className="text-xs text-ink-muted">Производитель</p>
+                          <p className="truncate text-ink">
+                            {item.Производитель || item.brand || '—'}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Состояние</p>
-                          <p className="text-gray-900">{item['Новый/б.у.'] || item.condition || '-'}</p>
+                          <p className="text-xs text-ink-muted">Состояние</p>
+                          <p className="text-ink">{item['Новый/б.у.'] || item.condition || '—'}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Кол-во</p>
-                          <p className="text-gray-900">{item['Кол-во'] ?? item.quantity ?? 0}</p>
+                          <p className="text-xs text-ink-muted">Кол-во</p>
+                          <p className="text-ink">{item['Кол-во'] ?? item.quantity ?? 0}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Цена</p>
-                          <p className="text-gray-900 font-medium">
-                            {item.Цена ?? item.price ? `${Number(item.Цена ?? item.price).toLocaleString('ru-RU')} ₽` : '-'}
+                          <p className="text-xs text-ink-muted">Цена</p>
+                          <p className="font-medium text-ink">
+                            {item.Цена ?? item.price
+                              ? `${Number(item.Цена ?? item.price).toLocaleString('ru-RU')} ₽`
+                              : '—'}
                           </p>
                         </div>
                       </div>
@@ -324,19 +372,32 @@ export default function DromNomenclaturePage() {
             })}
           </div>
 
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              Всего товаров: <span className="font-semibold text-gray-900">{items.length}</span>
+          <div className="border-t border-line bg-surface-subtle/50 px-4 py-3 sm:px-6">
+            <p className="text-sm text-ink-muted">
+              Всего:{' '}
+              <span className="font-semibold text-ink">{items.length}</span>
               {selectedArticles.length > 0 ? (
                 <>
                   {' · '}
-                  Выбрано: <span className="font-semibold text-gray-900">{selectedArticles.length}</span>
+                  Выбрано:{' '}
+                  <span className="font-semibold text-ink">{selectedArticles.length}</span>
                 </>
               ) : null}
             </p>
           </div>
-        </div>
+        </Card>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleRemove}
+        title="Удалить из номенклатуры?"
+        message={`Удалить ${selectedArticles.length} поз. из прайс-листа Drom? Они пропадут из файла и из автообновления API (qty=0).`}
+        confirmLabel="Удалить"
+        danger
+        loading={removing}
+      />
     </div>
   );
 }

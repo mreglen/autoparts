@@ -12,16 +12,41 @@ import {
 import { buildOrganizationDetailSeo, buildOrganizationLoadingSeo } from './organizationSeo';
 import { PageSeoHelmet } from '../../utils/pageSeo';
 import OrganizationTrustStatsPanel from './OrganizationTrustStatsPanel';
+import { Badge, Button, Card, EmptyState, Skeleton } from '../../components/UI';
 
 function DetailSkeleton() {
   return (
-    <div className="animate-pulse space-y-6">
-      <div className="h-56 rounded-sg-lg bg-surface-subtle" />
+    <div className="space-y-5">
+      <Skeleton className="h-4 w-36" />
+      <Card padding="lg">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
+          <Skeleton className="h-28 w-28 rounded-sg-lg sm:h-32 sm:w-32" />
+          <div className="min-w-0 flex-1 space-y-3">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-9 w-2/3" />
+            <Skeleton className="h-4 w-full max-w-md" />
+          </div>
+        </div>
+      </Card>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="h-32 rounded-sg bg-surface-muted" />
-        <div className="h-32 rounded-sg bg-surface-muted" />
+        <Skeleton className="h-28 w-full rounded-sg-lg" />
+        <Skeleton className="h-28 w-full rounded-sg-lg" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Skeleton className="h-28 w-full rounded-sg-lg" />
+        <Skeleton className="h-28 w-full rounded-sg-lg" />
+        <Skeleton className="h-28 w-full rounded-sg-lg" />
       </div>
     </div>
+  );
+}
+
+function InfoTile({ label, children }) {
+  return (
+    <Card padding="md" className="bg-surface-subtle shadow-none">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
+      <div className="mt-2">{children}</div>
+    </Card>
   );
 }
 
@@ -96,8 +121,11 @@ export default function OrganizationPublicPage() {
     return (
       <>
         <PageSeoHelmet seo={seo} />
-        <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6">
-          <DetailSkeleton />
+        <div className="relative w-full pb-12">
+          <PageAmbientBackground />
+          <div className="relative mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+            <DetailSkeleton />
+          </div>
         </div>
       </>
     );
@@ -105,20 +133,23 @@ export default function OrganizationPublicPage() {
 
   if (error || !organization) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
+      <div className="relative w-full pb-12">
         <Helmet>
           <title>Организация не найдена — Свой Гараж</title>
           <meta name="robots" content="noindex, nofollow" />
         </Helmet>
-        <div className="rounded-sg-lg border border-danger-100 bg-danger-50 px-6 py-12 text-center">
-          <h1 className="text-xl font-semibold text-danger-700">Организация не найдена</h1>
-          <p className="mt-2 text-sm text-danger-600">{error || 'Проверьте ссылку или вернитесь к списку.'}</p>
-          <Link
-            to="/organizations"
-            className="mt-6 inline-flex rounded-sg border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-brand-600 shadow-sg-sm hover:bg-surface-muted"
-          >
-            Все организации
-          </Link>
+        <PageAmbientBackground />
+        <div className="relative mx-auto max-w-3xl space-y-4 px-4 py-10 sm:px-6">
+          <EmptyState
+            illustration="error"
+            title="Организация не найдена"
+            description={error || 'Проверьте ссылку или вернитесь к списку.'}
+          />
+          <div className="flex justify-center">
+            <Button as={Link} to="/organizations" variant="secondary">
+              Все организации
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -132,6 +163,7 @@ export default function OrganizationPublicPage() {
   const ogImage = organization.logo_organization
     ? normalizeImageUrl(organization.logo_organization)
     : seo.imageUrl;
+  const catalogHref = `/autoparts/used?organization_id=${encodeURIComponent(orgId)}`;
 
   return (
     <div className="relative w-full pb-12">
@@ -155,121 +187,141 @@ export default function OrganizationPublicPage() {
 
       <PageAmbientBackground />
 
-      <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
-        <article className="overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg">
-          <div className="border-b border-line bg-surface-muted px-6 py-10 sm:px-10 sm:py-12">
-            <Link
-              to="/organizations"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 transition hover:text-brand-700"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-              Все организации
-            </Link>
+      <div className="relative mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <Button
+          as={Link}
+          to="/organizations"
+          variant="ghost"
+          size="sm"
+          className="-ml-2 w-fit text-brand-700 hover:text-brand-800"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Все организации
+        </Button>
 
-            <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:items-end">
-              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sg sm:h-32 sm:w-32">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-3xl font-bold text-brand-600">{getOrganizationInitials(name)}</span>
-                )}
+        <Card padding="lg">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-end">
+            <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-sg-lg border border-line bg-surface-muted sm:h-32 sm:w-32">
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-3xl font-bold text-brand-600">
+                  {getOrganizationInitials(name)}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="brand">Продавец на «Свой Гараж»</Badge>
+                {organization.has_catalog_items ? (
+                  <Badge tone="success">Запчасти в каталоге</Badge>
+                ) : null}
+                {orgId != null ? (
+                  <span className="font-mono text-xs text-ink-faint" title="Идентификатор организации">
+                    ID {orgId}
+                  </span>
+                ) : null}
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-brand-700">Продавец на «Свой Гараж»</p>
-                <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight text-ink sm:text-4xl">{name}</h1>
-                {organization.address && (
-                  <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-muted sm:text-base">
-                    {organization.address}
-                  </p>
-                )}
+              <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-ink sm:text-4xl">
+                {name}
+              </h1>
+              {organization.address ? (
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-muted sm:text-base">
+                  {organization.address}
+                </p>
+              ) : null}
+              <div className="mt-5 flex flex-wrap gap-2">
+                {organization.has_catalog_items ? (
+                  <Button as={Link} to={catalogHref}>
+                    Смотреть запчасти
+                  </Button>
+                ) : null}
+                {phone && telHref ? (
+                  <Button as="a" href={telHref} variant="secondary">
+                    Позвонить
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>
+        </Card>
 
-          <div className="grid gap-4 p-6 sm:grid-cols-2 sm:p-8">
-            <div className="rounded-sg border border-line bg-surface-muted p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Телефон</p>
-              {phone && telHref ? (
-                <a href={telHref} className="mt-2 block text-lg font-semibold text-brand-600 hover:underline">
-                  {phone}
-                </a>
-              ) : (
-                <p className="mt-2 text-sm text-ink-muted">Не указан</p>
-              )}
-            </div>
-            <div className="rounded-sg border border-line bg-surface-muted p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Каталог запчастей</p>
-              {organization.has_catalog_items ? (
-                <Link
-                  to={`/autoparts/used?organization_id=${encodeURIComponent(orgId)}`}
-                  className="mt-2 inline-flex items-center gap-1 text-lg font-semibold text-brand-600 hover:text-brand-700"
-                >
-                  Перейти к поиску
-                  <span aria-hidden>→</span>
-                </Link>
-              ) : (
-                <p className="mt-2 text-sm text-ink-soft">Сейчас нет позиций в открытом каталоге</p>
-              )}
-            </div>
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <InfoTile label="Телефон">
+            {phone && telHref ? (
+              <a href={telHref} className="block text-lg font-semibold text-brand-600 hover:underline">
+                {phone}
+              </a>
+            ) : (
+              <p className="text-sm text-ink-muted">Не указан</p>
+            )}
+          </InfoTile>
+          <InfoTile label="Каталог запчастей">
+            {organization.has_catalog_items ? (
+              <Link
+                to={catalogHref}
+                className="inline-flex items-center gap-1 text-lg font-semibold text-brand-600 hover:text-brand-700"
+              >
+                Перейти к поиску
+                <span aria-hidden>→</span>
+              </Link>
+            ) : (
+              <p className="text-sm text-ink-soft">Сейчас нет позиций в открытом каталоге</p>
+            )}
+          </InfoTile>
+        </div>
 
-          <section className="border-t border-line px-6 py-8 sm:px-8">
+        {trustLoading || trustStats ? (
+          <Card padding="lg">
             <OrganizationTrustStatsPanel trustStats={trustStats} loading={trustLoading} />
-          </section>
+          </Card>
+        ) : null}
 
-          {catalogSummary?.brands?.length ? (
-            <section className="border-t border-line px-6 py-8 sm:px-8">
-              <h2 className="text-xl font-bold text-ink">Бренды в каталоге</h2>
-              <p className="mt-2 text-sm text-ink-muted">
-                {catalogSummary.total_count
-                  ? `${catalogSummary.total_count} позиций от ${name}`
-                  : 'Популярные бренды продавца'}
-              </p>
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                {catalogSummary.brands.map((brand) => (
-                  <Link
-                    key={brand.slug || brand.name}
-                    to={`/autoparts/used?organization_id=${encodeURIComponent(orgId)}&brand=${encodeURIComponent(brand.name)}`}
-                    className="flex min-h-[44px] items-center justify-center rounded-sg border border-line bg-surface px-3 py-2.5 text-center text-sm font-medium text-ink-soft transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
-                  >
-                    {brand.name}
-                    {brand.count ? ` (${brand.count})` : ''}
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : null}
+        {catalogSummary?.brands?.length ? (
+          <Card padding="lg">
+            <h2 className="text-xl font-bold text-ink">Бренды в каталоге</h2>
+            <p className="mt-2 text-sm text-ink-muted">
+              {catalogSummary.total_count
+                ? `${catalogSummary.total_count} позиций от ${name}`
+                : 'Популярные бренды продавца'}
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {catalogSummary.brands.map((brand) => (
+                <Link
+                  key={brand.slug || brand.name}
+                  to={`/autoparts/used?organization_id=${encodeURIComponent(orgId)}&brand=${encodeURIComponent(brand.name)}`}
+                  className="flex min-h-[44px] items-center justify-center rounded-sg border border-line bg-surface-subtle px-3 py-2.5 text-center text-sm font-medium text-ink-soft transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+                >
+                  {brand.name}
+                  {brand.count ? ` (${brand.count})` : ''}
+                </Link>
+              ))}
+            </div>
+          </Card>
+        ) : null}
 
-          {description && (
-            <section className="border-t border-line px-6 py-8 sm:px-8">
-              <h2 className="text-xl font-bold text-ink">О компании</h2>
-              <p className="mt-4 whitespace-pre-line text-base leading-8 text-ink-soft">{description}</p>
-            </section>
-          )}
+        {description ? (
+          <Card padding="lg">
+            <h2 className="text-xl font-bold text-ink">О компании</h2>
+            <p className="mt-4 whitespace-pre-line text-base leading-8 text-ink-soft">{description}</p>
+          </Card>
+        ) : null}
 
-          <footer className="flex flex-wrap gap-3 border-t border-line bg-surface-muted px-6 py-5 sm:px-8">
-            <Link
-              to="/organizations"
-              className="inline-flex items-center rounded-sg border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink-soft transition hover:border-brand-200 hover:text-brand-700"
-            >
+        <Card padding="md" className="bg-surface-subtle shadow-none">
+          <div className="flex flex-wrap gap-2">
+            <Button as={Link} to="/organizations" variant="secondary">
               ← К списку
-            </Link>
-            <Link
-              to="/catalog"
-              className="inline-flex items-center rounded-sg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-            >
+            </Button>
+            <Button as={Link} to="/catalog">
               Открыть каталог
-            </Link>
-            <Link
-              to="/about"
-              className="inline-flex items-center rounded-sg px-4 py-2.5 text-sm font-semibold text-ink-muted transition hover:text-brand-700"
-            >
+            </Button>
+            <Button as={Link} to="/about" variant="ghost">
               О платформе
-            </Link>
-          </footer>
-        </article>
+            </Button>
+          </div>
+        </Card>
       </div>
     </div>
   );

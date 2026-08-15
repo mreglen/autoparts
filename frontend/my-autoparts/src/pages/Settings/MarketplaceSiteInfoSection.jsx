@@ -36,9 +36,9 @@ export default function MarketplaceSiteInfoSection({ org }) {
 
   return (
     <Card>
-      <h3 className="text-sm font-semibold text-gray-900">Описание на площадках</h3>
-      <p className="mt-0.5 mb-4 text-sm text-gray-500">Авито и Дром</p>
-      <p className="mb-4 text-sm leading-relaxed text-gray-600">
+      <h3 className="text-sm font-semibold text-ink">Описание на площадках</h3>
+      <p className="mb-4 mt-0.5 text-sm text-ink-muted">Авито и Дром</p>
+      <p className="mb-4 text-sm leading-relaxed text-ink-soft">
         При выгрузке в Авито и Дром в конец описания добавляется блок со ссылкой на карточку
         товара на сайте Свой Гараж, чтобы покупатели могли открыть объявление у нас.
       </p>

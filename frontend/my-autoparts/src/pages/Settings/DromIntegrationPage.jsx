@@ -3,6 +3,19 @@ import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { apiRequest, apiRequestFormData, API_BASE } from '../../utils/apiClient';
 import { formatDromLocalError } from '../../utils/dromExport';
+import PageIntro from '../../components/PageIntro/PageIntro';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  FieldHint,
+  FieldLabel,
+  Input,
+  Skeleton,
+} from '../../components/UI';
+import { SettingsToggle } from './settingsUi';
+import { warehousePageClass } from '../../utils/warehouseListUi';
 
 function formatErrorMessage(err) {
   if (!err) return 'Ошибка';
@@ -11,6 +24,39 @@ function formatErrorMessage(err) {
     return err.map((item) => item?.msg || String(item)).join('; ');
   }
   return err?.message || String(err);
+}
+
+function InlineNotice({ tone = 'success', children, onClose }) {
+  const tones = {
+    success: 'border-success-100 bg-success-50 text-success-700',
+    error: 'border-danger-100 bg-danger-50 text-danger-700',
+    warning: 'border-warning-100 bg-warning-50 text-warning-700',
+    info: 'border-line bg-surface-subtle text-ink-soft',
+  };
+  return (
+    <div
+      className={`flex items-start justify-between gap-3 rounded-sg border px-4 py-3 ${tones[tone] || tones.info}`}
+      role="status"
+    >
+      <div className="min-w-0 flex-1 text-sm">{children}</div>
+      {onClose ? (
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-md p-1 opacity-70 hover:opacity-100"
+          aria-label="Закрыть"
+        >
+          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+            <path
+              fillRule="evenodd"
+              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 export default function DromIntegrationPage() {
@@ -144,7 +190,9 @@ export default function DromIntegrationPage() {
       }
       const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
       await navigator.clipboard.writeText(fullUrl);
-      setNotice('Ссылка на файл скопирована. Используйте её для полного обновления прайса в ЛК Drom (раз в 14–30 дней).');
+      setNotice(
+        'Ссылка на файл скопирована. Используйте её для полного обновления прайса в ЛК Drom (раз в 14–30 дней).',
+      );
     } catch (e) {
       setError(formatErrorMessage(e));
     }
@@ -232,217 +280,199 @@ export default function DromIntegrationPage() {
 
   if (!orgId) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
-        Интеграция Drom доступна для аккаунтов с привязкой к организации.
+      <div className={`${warehousePageClass} min-w-0`}>
+        <EmptyState
+          illustration="empty"
+          title="Нет организации"
+          description="Интеграция Drom доступна для аккаунтов с привязкой к организации."
+        />
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <Link
-          to="/settings/integration"
-          className="text-sm text-blue-600 hover:underline mb-2 inline-block"
-        >
-          ← Назад к интеграциям
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900 max-md:hidden">Drom — прайс по API</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Онлайн-обновление позиций через API Drom и файл XLSX для полного обновления прайса.
-        </p>
+    <div className={`${warehousePageClass} min-w-0 space-y-4`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <Link
+            to="/settings/integration"
+            className="mb-1 inline-block text-sm font-medium text-brand-700 hover:text-brand-800"
+          >
+            ← Все интеграции
+          </Link>
+          <PageIntro
+            title="Drom — прайс по API"
+            description="Онлайн-обновление позиций и файл XLSX для полного обновления прайса"
+            className="mb-0"
+          />
+        </div>
+        {loading ? <Skeleton className="h-6 w-24" /> : (
+          <Badge tone={isEnabled ? 'success' : 'neutral'}>
+            {isEnabled ? 'Включено' : 'Выключено'}
+          </Badge>
+        )}
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm whitespace-pre-wrap">
-          {error}
-        </div>
-      )}
+      {error ? (
+        <InlineNotice tone="error" onClose={() => setError(null)}>
+          <p className="whitespace-pre-wrap">{error}</p>
+        </InlineNotice>
+      ) : null}
+      {notice ? (
+        <InlineNotice tone="success" onClose={() => setNotice(null)}>
+          <p>{notice}</p>
+        </InlineNotice>
+      ) : null}
 
-      {notice && (
-        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800 text-sm">
-          {notice}
-        </div>
-      )}
-
-      <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-900 text-sm">
-        <p className="font-medium mb-1">Как подключить</p>
-        <ol className="list-decimal list-inside space-y-1 text-blue-800">
+      <InlineNotice tone="info">
+        <p className="mb-1 font-medium text-ink">Как подключить</p>
+        <ol className="list-inside list-decimal space-y-1 text-ink-soft">
           <li>
-            Запросите у менеджера Drom уникальный ключ кабинета для API и узнайте{' '}
+            Запросите у менеджера Drom ключ кабинета и узнайте{' '}
             <span className="font-medium">packetId</span> прайса (из URL{' '}
-            <code className="text-xs bg-blue-100 px-1 rounded">
-              …/packet/&#123;id&#125;/recurrent-update
-            </code>
+            <code className="rounded bg-white/70 px-1 text-xs">…/packet/{'{id}'}/recurrent-update</code>
             ).
           </li>
-          <li>
-            Исходный прайс в ЛК Drom должен быть в том же формате XLSX, что формирует система
-            (шаблон автозапчастей).
-          </li>
-          <li>
-            API обновляет позиции онлайн; полный прайс всё равно обновляйте по ссылке раз в 14–30
-            дней.
-          </li>
+          <li>Исходный прайс в ЛК Drom должен быть в том же формате XLSX, что формирует система.</li>
+          <li>API обновляет позиции онлайн; полный прайс обновляйте по ссылке раз в 14–30 дней.</li>
         </ol>
-      </div>
+      </InlineNotice>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-        <h2 className="text-base font-semibold text-gray-900 mb-4">Подключение</h2>
+      <Card>
+        <h2 className="text-base font-semibold text-ink">Подключение</h2>
+        <p className="mt-1 text-sm text-ink-muted">Ключи, packetId и режимы синхронизации</p>
 
-        <div className="flex max-md:flex-col max-md:items-stretch max-md:gap-3 items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isEnabled}
-                onChange={(e) => setIsEnabled(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
-            </label>
-            <div>
-              <p className="text-sm text-gray-700">
-                {isEnabled ? 'Интеграция включена' : 'Интеграция отключена'}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Кнопка «Экспорт Drom» в «Мои запчасти»
-              </p>
-            </div>
-          </div>
-        </div>
+        <div className="mt-4 space-y-3">
+          <SettingsToggle
+            checked={isEnabled}
+            onChange={(e) => setIsEnabled(e.target.checked)}
+            label={isEnabled ? 'Интеграция включена' : 'Интеграция отключена'}
+            description="Кнопка «Экспорт Drom» в «Мои запчасти»"
+          />
 
-        <div className="space-y-3 mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">packetId прайса</label>
-            <input
+            <FieldLabel htmlFor="drom-packet-id">packetId прайса</FieldLabel>
+            <Input
+              id="drom-packet-id"
               type="text"
               value={packetId}
               onChange={(e) => setPacketId(e.target.value)}
               placeholder="например 55359"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-md:min-h-11"
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ключ кабинета</label>
-            <input
+            <FieldLabel htmlFor="drom-api-key">Ключ кабинета</FieldLabel>
+            <Input
+              id="drom-api-key"
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={apiKeyConfigured ? 'Ключ сохранён — введите новый, чтобы заменить' : 'Ключ от менеджера Drom'}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 max-md:min-h-11"
+              placeholder={
+                apiKeyConfigured
+                  ? 'Ключ сохранён — введите новый, чтобы заменить'
+                  : 'Ключ от менеджера Drom'
+              }
               autoComplete="off"
             />
-            {apiKeyConfigured && (
-              <p className="text-xs text-emerald-700 mt-1">Ключ сохранён на сервере (шифрован).</p>
-            )}
+            {apiKeyConfigured ? (
+              <FieldHint>Ключ сохранён на сервере (шифрован).</FieldHint>
+            ) : null}
           </div>
-          <div className="flex items-center gap-3 pt-1">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoSyncEnabled}
-                onChange={(e) => setAutoSyncEnabled(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
-            </label>
-            <div>
-              <p className="text-sm text-gray-700">Автосинхронизация в API</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                После экспорта и при снятии проданных позиций
-              </p>
-            </div>
-          </div>
+
+          <SettingsToggle
+            checked={autoSyncEnabled}
+            onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+            label="Автосинхронизация в API"
+            description="После экспорта и при снятии проданных позиций"
+          />
         </div>
 
-        <button
-          type="button"
-          disabled={saving || loading}
-          onClick={handleSave}
-          className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors max-md:min-h-11"
-        >
-          {saving ? 'Сохранение…' : 'Сохранить'}
-        </button>
-      </div>
+        <div className="mt-4">
+          <Button
+            type="button"
+            className="w-full sm:w-auto"
+            disabled={saving || loading}
+            loading={saving}
+            onClick={handleSave}
+          >
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </Button>
+        </div>
+      </Card>
 
-      {isEnabled && (
+      {isEnabled ? (
         <>
-          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
-            <h2 className="text-base font-semibold text-gray-900 mb-4">Синхронизация API</h2>
+          <Card>
+            <h2 className="text-base font-semibold text-ink">Синхронизация API</h2>
+            <p className="mt-1 text-sm text-ink-muted">Отправка прайса и проверка доступа</p>
 
-            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm space-y-1">
+            <div className="mt-4 space-y-2 rounded-sg border border-line bg-surface-subtle/50 px-4 py-3 text-sm">
               <div className="flex justify-between gap-3">
-                <span className="text-gray-600">Последний sync</span>
-                <span className="text-gray-900">
+                <span className="text-ink-muted">Последний sync</span>
+                <span className="text-ink">
                   {lastSyncAt ? new Date(lastSyncAt).toLocaleString('ru-RU') : '—'}
                 </span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-gray-600">HTTP статус</span>
-                <span className="font-mono text-gray-900">{lastSyncStatus ?? '—'}</span>
+                <span className="text-ink-muted">HTTP статус</span>
+                <span className="font-mono text-ink">{lastSyncStatus ?? '—'}</span>
               </div>
-              {lastSyncError && (
-                <div className="mt-2 text-xs text-red-700 whitespace-pre-wrap">{lastSyncError}</div>
-              )}
-              {!lastSyncError && lastSyncStatus === 200 && (
-                <div className="mt-2 text-xs text-emerald-700">Последняя отправка успешна</div>
-              )}
+              {lastSyncError ? (
+                <p className="whitespace-pre-wrap text-xs text-danger-600">{lastSyncError}</p>
+              ) : null}
+              {!lastSyncError && lastSyncStatus === 200 ? (
+                <p className="text-xs text-success-700">Последняя отправка успешна</p>
+              ) : null}
             </div>
 
-            <div className="space-y-3">
-              <button
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button
                 type="button"
                 onClick={handleSyncNow}
                 disabled={syncing || testing || !packetId || !apiKeyConfigured}
-                className="block w-full px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors max-md:min-h-11"
+                loading={syncing}
               >
                 {syncing ? 'Отправка…' : 'Отправить прайс в Drom сейчас'}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={handleTestAuth}
                 disabled={testing || syncing || !packetId || !apiKeyConfigured}
-                className="block w-full px-4 py-3 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors max-md:min-h-11"
+                loading={testing}
               >
                 {testing ? 'Проверка…' : 'Проверить packetId и ключ'}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h2 className="text-base font-semibold text-gray-900 mb-1">Файл прайса</h2>
-            <p className="text-xs text-gray-500 mb-4">
-              Для полного обновления в ЛК Drom (раз в 14–30 дней) — скачайте файл или скопируйте
+          <Card>
+            <h2 className="text-base font-semibold text-ink">Файл прайса</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Для полного обновления в ЛК Drom (раз в 14–30 дней) скачайте файл или скопируйте
               публичную ссылку.
             </p>
 
-            <div className="space-y-3">
-              <Link
-                to="/settings/integration/drom/nomenclature"
-                className="block w-full px-4 py-3 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors text-center max-md:min-h-11"
-              >
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button as={Link} to="/settings/integration/drom/nomenclature" variant="secondary">
                 Просмотреть номенклатуру
-              </Link>
-
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={handleDownloadAutoload}
                 disabled={!lastAutoload?.saved_path}
-                className="block w-full px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors max-md:min-h-11"
               >
                 Скачать XLSX
-              </button>
-
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={handleCopyFileLink}
                 disabled={!lastAutoload?.saved_path}
-                className="block w-full px-4 py-3 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors max-md:min-h-11"
               >
-                Скопировать ссылку на файл
-              </button>
-
+                Скопировать ссылку
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -450,71 +480,74 @@ export default function DromIntegrationPage() {
                 className="hidden"
                 onChange={handleUploadFile}
               />
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="block w-full px-4 py-3 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors max-md:min-h-11"
+                loading={uploading}
               >
                 {uploading ? 'Загрузка…' : 'Загрузить XLSX вручную'}
-              </button>
+              </Button>
             </div>
 
-            {lastAutoload && lastAutoload.saved_path && (
-              <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Товаров в файле:</span>
-                  <span className="font-mono text-gray-900">{lastAutoload.items?.length || 0}</span>
+            {lastAutoload?.saved_path ? (
+              <div className="mt-4 rounded-sg border border-line bg-surface-subtle/50 px-4 py-3 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-ink-muted">Товаров в файле</span>
+                  <span className="font-mono text-ink">{lastAutoload.items?.length || 0}</span>
                 </div>
-                {lastAutoload.updated_at && (
-                  <div className="mt-1 text-xs text-gray-500">
+                {lastAutoload.updated_at ? (
+                  <p className="mt-1 text-xs text-ink-faint">
                     Обновлено: {new Date(lastAutoload.updated_at).toLocaleString('ru-RU')}
-                  </div>
-                )}
-                {lastAutoload.local_validation_ok === true && (
-                  <div className="mt-2 text-xs text-emerald-700">Локальная проверка пройдена</div>
-                )}
-              </div>
-            )}
-
-            {!lastAutoload?.saved_path && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-sm text-amber-800">
-                  Файл ещё не создан. Экспортируйте товары со страницы «Мои запчасти» или загрузите
-                  готовый XLSX.
-                </p>
-              </div>
-            )}
-
-            {hasValidationErrors && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm font-medium text-red-900 mb-2">Ошибки валидации XLSX</p>
-                <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
-                  {validationErrors.slice(0, 10).map((err, idx) => (
-                    <li key={idx}>{formatDromLocalError(err)}</li>
-                  ))}
-                </ul>
-                {validationErrors.length > 10 && (
-                  <p className="text-xs text-red-700 mt-2">
-                    И ещё {validationErrors.length - 10} ошибок…
                   </p>
-                )}
+                ) : null}
+                {lastAutoload.local_validation_ok === true ? (
+                  <p className="mt-2 text-xs text-success-700">Локальная проверка пройдена</p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-4">
+                <InlineNotice tone="warning">
+                  <p>
+                    Файл ещё не создан. Экспортируйте товары со страницы «Мои запчасти» или загрузите
+                    готовый XLSX.
+                  </p>
+                </InlineNotice>
               </div>
             )}
 
-            {lastAutoload?.warnings?.length > 0 && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-sm font-medium text-amber-900 mb-1">Предупреждения</p>
-                <ul className="text-sm text-amber-800 list-disc list-inside">
-                  {lastAutoload.warnings.map((w, idx) => (
-                    <li key={idx}>{typeof w === 'string' ? w : JSON.stringify(w)}</li>
-                  ))}
-                </ul>
+            {hasValidationErrors ? (
+              <div className="mt-4">
+                <InlineNotice tone="error">
+                  <p className="mb-2 font-medium">Ошибки валидации XLSX</p>
+                  <ul className="list-inside list-disc space-y-1">
+                    {validationErrors.slice(0, 10).map((err, idx) => (
+                      <li key={idx}>{formatDromLocalError(err)}</li>
+                    ))}
+                  </ul>
+                  {validationErrors.length > 10 ? (
+                    <p className="mt-2 text-xs">И ещё {validationErrors.length - 10} ошибок…</p>
+                  ) : null}
+                </InlineNotice>
               </div>
-            )}
-          </div>
+            ) : null}
+
+            {lastAutoload?.warnings?.length > 0 ? (
+              <div className="mt-4">
+                <InlineNotice tone="warning">
+                  <p className="mb-1 font-medium">Предупреждения</p>
+                  <ul className="list-inside list-disc space-y-1">
+                    {lastAutoload.warnings.map((w, idx) => (
+                      <li key={idx}>{typeof w === 'string' ? w : JSON.stringify(w)}</li>
+                    ))}
+                  </ul>
+                </InlineNotice>
+              </div>
+            ) : null}
+          </Card>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

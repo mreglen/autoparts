@@ -59,13 +59,13 @@ const WatermarksSection = ({ org }) => {
     <Card>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">Водяные знаки</h3>
-          <p className="mt-0.5 text-sm text-gray-500">Наложение на фото товаров</p>
+          <h3 className="text-sm font-semibold text-ink">Водяные знаки</h3>
+          <p className="mt-0.5 text-sm text-ink-muted">Наложение на фото товаров</p>
         </div>
-        {isUpdating ? <span className="text-xs text-gray-500">Сохранение…</span> : null}
+        {isUpdating ? <span className="text-xs text-ink-muted">Сохранение…</span> : null}
       </div>
 
-      <div className="space-y-2 rounded-xl bg-gray-100 p-2">
+      <div className="space-y-2 rounded-sg border border-line bg-surface-subtle p-2">
         {OPTIONS.map((option) => {
           const active = selected === option.value;
           return (
@@ -74,20 +74,24 @@ const WatermarksSection = ({ org }) => {
               type="button"
               disabled={isUpdating}
               onClick={() => handleSelect(option.value)}
-              className={`flex w-full items-start gap-3 rounded-xl px-4 py-3.5 text-left transition disabled:opacity-60 ${
-                active ? 'bg-white' : 'bg-transparent hover:bg-white/70'
+              className={`flex w-full items-start gap-3 rounded-sg px-4 py-3.5 text-left transition disabled:opacity-60 ${
+                active
+                  ? 'bg-surface shadow-sg-sm ring-1 ring-brand-100'
+                  : 'bg-transparent hover:bg-surface/70'
               }`}
             >
               <span
                 className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                  active ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300 bg-white'
+                  active
+                    ? 'border-brand-600 bg-brand-600'
+                    : 'border-line bg-surface'
                 }`}
               >
                 {active ? <span className="h-2 w-2 rounded-full bg-white" /> : null}
               </span>
               <span>
-                <span className="block text-sm font-medium text-gray-900">{option.title}</span>
-                <span className="mt-0.5 block text-sm text-gray-500">{option.description}</span>
+                <span className="block text-sm font-medium text-ink">{option.title}</span>
+                <span className="mt-0.5 block text-sm text-ink-muted">{option.description}</span>
               </span>
             </button>
           );

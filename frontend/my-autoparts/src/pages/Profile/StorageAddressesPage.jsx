@@ -1,569 +1,559 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { 
-  fetchLocationsWithCells, 
-  fetchStorageCells, 
-  createStorageCell, 
-  updateStorageCell, 
+import { Link, Navigate } from 'react-router-dom';
+import {
+  fetchLocationsWithCells,
+  fetchStorageCells,
+  createStorageCell,
+  updateStorageCell,
   deleteStorageCell,
-  fetchProductStorageCells
 } from '../../redux/slices/StorageCellsSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchMyProducts } from '../../redux/slices/ProductSlice';
-import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import { canViewInventory } from '../../utils/inventoryAccess';
 import { useShowWarehouseInventory } from '../../utils/siteReviewsPublic';
+import { useAuthReady } from '../../hooks/useAuthReady';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import PageIntro from '../../components/PageIntro/PageIntro';
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  FieldLabel,
+  Input,
+  Select,
+  Skeleton,
+  Textarea,
+} from '../../components/UI';
+import {
+  warehousePageClass,
+  warehousePrimaryButtonClass,
+} from '../../utils/warehouseListUi';
 
-const StorageAddressesPage = () => {
-  // All hooks must be called at the top level
-  const navigate = useNavigate();
+const iconBtnClass =
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-50';
+
+function cellsCountLabel(count) {
+  const n = Number(count) || 0;
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${n} адрес`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} адреса`;
+  return `${n} адресов`;
+}
+
+function InlineNotice({ notice, onClose }) {
+  if (!notice) return null;
+  const isSuccess = notice.type === 'success';
+  return (
+    <div
+      className={`flex items-start justify-between gap-3 rounded-sg border px-4 py-3 ${
+        isSuccess
+          ? 'border-success-100 bg-success-50 text-success-700'
+          : 'border-danger-100 bg-danger-50 text-danger-700'
+      }`}
+      role="status"
+    >
+      <p className="text-sm font-medium">{notice.message}</p>
+      <button
+        type="button"
+        onClick={onClose}
+        className="shrink-0 rounded-md p-1 opacity-70 transition hover:opacity-100"
+        aria-label="Закрыть"
+      >
+        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+          <path
+            fillRule="evenodd"
+            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+const emptyForm = {
+  name: '',
+  description: '',
+  storage_location_id: '',
+};
+
+export default function StorageAddressesPage() {
   const dispatch = useDispatch();
-  const user = useSelector(state => state.auth.user);
-  const permissionCodes = useSelector(state => state.auth.permissionCodes);
-  const { 
-    locationsWithCells, 
-    loading, 
-    error,
-    lastModified
-  } = useSelector(state => state.storageCells);
-  
-  const { storageLocations } = useSelector(state => state.organization);
-  
+  const { isReady, user } = useAuthReady();
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const { locationsWithCells, loading, error, lastModified } = useSelector(
+    (state) => state.storageCells,
+  );
+  const { storageLocations } = useSelector((state) => state.organization);
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    storage_location_id: ''
-  });
-  
-  // Delete confirmation modal state
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [formData, setFormData] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
   const [cellToDelete, setCellToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  
-  // Notification state
-  const [notification, setNotification] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [notice, setNotice] = useState(null);
 
-  // Check if user has permission to view this page
-  // Admin and sellers always have access
-  // Employees need 'storage-addresses' permission code
-  const hasPermission = user?.is_admin || user?.is_seller ||
-    (user?.is_employee && permissionCodes && permissionCodes.includes('storage-addresses'));
+  const hasPermission =
+    user?.is_admin ||
+    user?.is_seller ||
+    (user?.is_employee && permissionCodes?.includes('storage-addresses'));
+
   const showWarehouseInventory = useShowWarehouseInventory();
   const canOpenInventory = showWarehouseInventory && canViewInventory(user, permissionCodes);
 
-  // Fetch data - must be before any early returns
-  useEffect(() => {
-    if (authChecked && hasPermission && user?.organization_id) {
-      // Fetch seller's storage locations
-      dispatch(fetchStorageLocations(user.organization_id));
-      // Fetch all locations with cells (will be filtered on display)
-      dispatch(fetchLocationsWithCells());
-      // Fetch seller's storage cells
-      dispatch(fetchStorageCells());
-    }
-  }, [dispatch, user?.organization_id, authChecked, hasPermission]);
-
-  // Check auth - wait for user data to load
-  useEffect(() => {
-    if (user === undefined || user === null) {
-      const token = localStorage.getItem('token');
-      if (token) return;
-    }
-    setAuthChecked(true);
-    if (!hasPermission) navigate('/', { replace: true });
-  }, [user, permissionCodes, hasPermission, navigate]);
-
-  // Debug: Log state changes
-  useEffect(() => {
-    console.log('Storage cells state updated:', locationsWithCells);
-  }, [locationsWithCells]);
-  
-  // Refresh all storage-related data when storage cells are modified
-  useEffect(() => {
-    // This will trigger re-fetching of all storage-related data
-    if (user?.organization_id && lastModified) {
-      dispatch(fetchMyProducts({ page: 1, page_size: 500 }));
-      // Also refresh storage cell data
-      dispatch(fetchLocationsWithCells());
-      dispatch(fetchStorageCells());
-    }
-  }, [lastModified]); // Trigger when storage cells are modified
-
-  // Filter locations to show only seller's organization warehouses
-  const sellerLocations = storageLocations.filter(location => 
-    location.organization_id === user?.organization_id
-  );
-  
-  // Filter locationsWithCells to show only seller's organization
-  const sellerLocationsWithCells = locationsWithCells.filter(location => 
-    location.organization_id === user?.organization_id
+  const sellerLocations = useMemo(
+    () =>
+      (storageLocations || []).filter(
+        (location) => location.organization_id === user?.organization_id,
+      ),
+    [storageLocations, user?.organization_id],
   );
 
-  // Show loading while auth data is loading
-  if (!authChecked) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const sellerLocationsWithCells = useMemo(
+    () =>
+      (locationsWithCells || []).filter(
+        (location) => location.organization_id === user?.organization_id,
+      ),
+    [locationsWithCells, user?.organization_id],
+  );
 
-  // Redirect unauthorized users - this must come after all hooks
-  if (!user) return <Navigate to="/auth" replace />;
-  if (!hasPermission) return <Navigate to="/" replace />;
+  const totalCells = useMemo(
+    () =>
+      sellerLocationsWithCells.reduce(
+        (sum, location) => sum + (location.cells?.length || 0),
+        0,
+      ),
+    [sellerLocationsWithCells],
+  );
+
+  useEffect(() => {
+    if (!isReady || !hasPermission || !user?.organization_id) return;
+    dispatch(fetchStorageLocations(user.organization_id));
+    dispatch(fetchLocationsWithCells());
+    dispatch(fetchStorageCells());
+  }, [dispatch, user?.organization_id, isReady, hasPermission]);
+
+  useEffect(() => {
+    if (!user?.organization_id || !lastModified) return;
+    dispatch(fetchMyProducts({ page: 1, page_size: 500 }));
+    dispatch(fetchLocationsWithCells());
+    dispatch(fetchStorageCells());
+  }, [dispatch, lastModified, user?.organization_id]);
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => setNotice(null), notice.type === 'success' ? 3000 : 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  const resetForm = () => {
+    setEditingCell(null);
+    setShowAddForm(false);
+    setFormData(emptyForm);
+    setFormError('');
+  };
+
+  const openCreateForm = () => {
+    setEditingCell(null);
+    setFormData(emptyForm);
+    setFormError('');
+    setShowAddForm(true);
+  };
 
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (editingCell) {
-      // Update existing cell
-      await dispatch(updateStorageCell({
-        id: editingCell.id,
-        ...formData
-      }));
-      setEditingCell(null);
-    } else {
-      // Create new cell
-      await dispatch(createStorageCell(formData));
+    if (saving) return;
+
+    const name = formData.name.trim();
+    if (!name) {
+      setFormError('Укажите название ячейки');
+      return;
     }
-    
-    // Reset form
-    setFormData({
-      name: '',
-      description: '',
-      storage_location_id: ''
-    });
-    setShowAddForm(false);
+    if (!editingCell && !formData.storage_location_id) {
+      setFormError('Выберите склад');
+      return;
+    }
+
+    setSaving(true);
+    setFormError('');
+    try {
+      if (editingCell) {
+        await dispatch(
+          updateStorageCell({
+            id: editingCell.id,
+            name,
+            description: formData.description,
+            storage_location_id: formData.storage_location_id,
+          }),
+        ).unwrap();
+        setNotice({ type: 'success', message: `Адрес «${name}» обновлён` });
+      } else {
+        await dispatch(
+          createStorageCell({
+            name,
+            description: formData.description,
+            storage_location_id: formData.storage_location_id,
+          }),
+        ).unwrap();
+        setNotice({ type: 'success', message: `Адрес «${name}» создан` });
+      }
+      resetForm();
+    } catch (err) {
+      setFormError(typeof err === 'string' ? err : 'Не удалось сохранить адрес');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEdit = (cell) => {
     setEditingCell(cell);
     setFormData({
-      name: cell.name,
+      name: cell.name || '',
       description: cell.description || '',
-      storage_location_id: cell.storage_location_id ? cell.storage_location_id.toString() : ''
+      storage_location_id: cell.storage_location_id
+        ? String(cell.storage_location_id)
+        : '',
     });
+    setFormError('');
     setShowAddForm(true);
-    // Scroll to form
     setTimeout(() => {
-      const formElement = document.getElementById('storage-cell-form');
-      if (formElement) {
-        formElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }, 100);
-  };
-
-  const handleDeleteClick = (cell) => {
-    setCellToDelete(cell);
-    setShowDeleteModal(true);
+      document.getElementById('storage-cell-form')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }, 50);
   };
 
   const handleDeleteConfirm = async () => {
     if (!cellToDelete) return;
-    
-    console.log('=== DELETE OPERATION STARTED ===');
-    console.log('Deleting cell:', cellToDelete);
-    console.log('Current token exists:', !!localStorage.getItem('token'));
-    
     setDeleteLoading(true);
-    
     try {
-      // Dispatch the delete action
-      const resultAction = await dispatch(deleteStorageCell(cellToDelete.id));
-      console.log('Delete action result:', resultAction);
-      console.log('Result type:', resultAction.type);
-      
-      // Check if the action was fulfilled
-      if (deleteStorageCell.fulfilled.match(resultAction)) {
-        console.log('✅ Delete successful, removed cell ID:', resultAction.payload);
-        
-        // Close modal and reset state
-        setShowDeleteModal(false);
-        setCellToDelete(null);
-        
-        // Show success notification
-        setNotification({
-          type: 'success',
-          message: `Адрес "${cellToDelete.name}" успешно удален`
-        });
-        
-        // Auto-hide notification after 3 seconds
-        setTimeout(() => {
-          setNotification(null);
-        }, 3000);
-        
-        console.log('=== DELETE OPERATION COMPLETED SUCCESSFULLY ===');
-        
-      } else if (deleteStorageCell.rejected.match(resultAction)) {
-        // Handle rejection
-        console.error('❌ Delete rejected:', resultAction.payload);
-        console.error('Error details:', resultAction.error);
-        console.error('Full error object:', resultAction);
-        
-        // Check if it's an authentication error
-        const errorMessage = resultAction.payload || resultAction.error?.message;
-        if (errorMessage?.includes('401') || 
-            errorMessage?.includes('Unauthorized') ||
-            errorMessage?.includes('invalid') ||
-            errorMessage?.includes('expired')) {
-          throw new Error('Сессия истекла. Пожалуйста, войдите снова.');
-        }
-        
-        throw new Error(errorMessage || 'Не удалось удалить адрес');
-      }
-      
-    } catch (error) {
-      console.error('💥 Delete failed with exception:', error);
-      console.error('Error stack:', error.stack);
-      
-      // Show error notification
-      setNotification({
-        type: 'error',
-        message: error.message || 'Ошибка при удалении адреса'
+      await dispatch(deleteStorageCell(cellToDelete.id)).unwrap();
+      setNotice({
+        type: 'success',
+        message: `Адрес «${cellToDelete.name}» удалён`,
       });
-      
-      // Auto-hide notification after 5 seconds
-      setTimeout(() => {
-        setNotification(null);
-      }, 5000);
-      
-      console.log('=== DELETE OPERATION FAILED ===');
+      setCellToDelete(null);
+      if (editingCell?.id === cellToDelete.id) resetForm();
+    } catch (err) {
+      const message =
+        typeof err === 'string'
+          ? err
+          : err?.message || 'Не удалось удалить адрес';
+      setNotice({ type: 'error', message });
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  const handleDeleteCancel = () => {
-    setShowDeleteModal(false);
-    setCellToDelete(null);
-  };
+  if (!isReady) {
+    return <AuthLoadingScreen />;
+  }
 
-  const handleCancel = () => {
-    setEditingCell(null);
-    setShowAddForm(false);
-    setFormData({
-      name: '',
-      description: '',
-      storage_location_id: ''
-    });
-  };
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (!hasPermission) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Notification */}
-      {notification && (
-        <div className={`p-4 rounded-md ${notification.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                {notification.type === 'success' ? (
-                  <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                ) : (
-                  <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </div>
-              <div className="ml-3">
-                <p className={`text-sm font-medium ${notification.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
-                  {notification.message}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setNotification(null)}
-              className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${notification.type === 'success' ? 'text-green-500 hover:bg-green-100 focus:ring-green-600' : 'text-red-500 hover:bg-red-100 focus:ring-red-600'}`}
+    <div className={`${warehousePageClass} min-w-0 space-y-4`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <PageIntro
+          title="Адресное хранение"
+          description={
+            !loading && !error && totalCells > 0
+              ? cellsCountLabel(totalCells)
+              : 'Ячейки и адреса внутри складов организации'
+          }
+          className="mb-0"
+        />
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          {canOpenInventory ? (
+            <Link
+              to="/warehouse/inventory"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
             >
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-      {/* Header */}
-      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Адресное хранение</h1>
-            <p className="mt-1 text-gray-600">
-              Управление складскими ячейками и адресным хранением
-            </p>
-            {canOpenInventory && (
-              <Link
-                to="/warehouse/inventory"
-                className="inline-flex mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-800"
-              >
-                Перейти к инвентаризации →
-              </Link>
-            )}
-          </div>
+              Инвентаризация
+            </Link>
+          ) : null}
           <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+            type="button"
+            onClick={() => (showAddForm && !editingCell ? resetForm() : openCreateForm())}
+            className={`${warehousePrimaryButtonClass} w-full sm:w-auto`}
+            disabled={!sellerLocations.length && !showAddForm}
           >
-            {showAddForm ? 'Отмена' : '+ Добавить адрес'}
+            {showAddForm && !editingCell ? 'Отмена' : 'Добавить адрес'}
           </button>
         </div>
       </div>
 
-      {/* Add/Edit Form */}
-      {showAddForm && (
-        <div id="storage-cell-form" className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
-              {editingCell ? 'Редактировать адрес' : 'Добавить новую адрес'}
-            </h2>
-            {editingCell && (
-              <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                ID: {editingCell.id}
-              </span>
-            )}
+      <InlineNotice notice={notice} onClose={() => setNotice(null)} />
+
+      {showAddForm ? (
+        <Card id="storage-cell-form">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-ink">
+                {editingCell ? 'Редактировать адрес' : 'Новый адрес'}
+              </h2>
+              <p className="mt-0.5 text-sm text-ink-muted">
+                {editingCell
+                  ? 'Измените название или описание ячейки'
+                  : 'Выберите склад и укажите название ячейки'}
+              </p>
+            </div>
+            {editingCell ? (
+              <Badge tone="neutral">ID {editingCell.id}</Badge>
+            ) : null}
           </div>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {editingCell ? (
-              // Single column form when editing (warehouse hidden)
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Название ячейки *
-                </label>
-                <input
-                  type="text"
+                <FieldLabel htmlFor="cell-name" required>
+                  Название ячейки
+                </FieldLabel>
+                <Input
+                  id="cell-name"
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="Например: A1, Стеллаж 1, Полка 2"
                 />
               </div>
             ) : (
-              // Two column form when creating (with warehouse selection)
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Склад *
-                  </label>
-                  <select
+                  <FieldLabel htmlFor="cell-warehouse" required>
+                    Склад
+                  </FieldLabel>
+                  <Select
+                    id="cell-warehouse"
                     name="storage_location_id"
                     value={formData.storage_location_id}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="">Выберите склад</option>
-                    {sellerLocations.map(location => (
+                    {sellerLocations.map((location) => (
                       <option key={location.id} value={location.id}>
                         {location.address}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Название ячейки *
-                  </label>
-                  <input
-                    type="text"
+                  <FieldLabel htmlFor="cell-name" required>
+                    Название ячейки
+                  </FieldLabel>
+                  <Input
+                    id="cell-name"
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     placeholder="Например: A1, Стеллаж 1, Полка 2"
                   />
                 </div>
               </div>
             )}
-            
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Описание
-              </label>
-              <textarea
+              <FieldLabel htmlFor="cell-description">Описание</FieldLabel>
+              <Textarea
+                id="cell-description"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="Описание ячейки (необязательно)"
               />
             </div>
-            
-            <div className="flex gap-3 pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  loading 
-                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                }`}
-              >
-                {loading 
-                  ? 'Сохранение...' 
-                  : (editingCell ? 'Сохранить изменения' : 'Создать ячейку')
-                }
-              </button>
-              <button
+
+            {formError ? (
+              <p className="text-sm text-danger-600">{formError}</p>
+            ) : null}
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button type="submit" loading={saving} disabled={saving}>
+                {editingCell ? 'Сохранить' : 'Создать адрес'}
+              </Button>
+              <Button
                 type="button"
-                onClick={handleCancel}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                variant="secondary"
+                onClick={resetForm}
+                disabled={saving}
               >
                 Отмена
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
-      )}
+        </Card>
+      ) : null}
 
-      {/* Loading/Error */}
-      {loading && (
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            <span className="ml-3 text-gray-600">Загрузка данных...</span>
-          </div>
+      {loading ? (
+        <div className="space-y-4">
+          <Skeleton className="h-28 w-full rounded-sg-lg" />
+          <Skeleton className="h-40 w-full rounded-sg-lg" />
         </div>
-      )}
+      ) : null}
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Ошибка загрузки</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>{error}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {!loading && error ? (
+        <EmptyState
+          illustration="error"
+          title="Не удалось загрузить адреса"
+          description={typeof error === 'string' ? error : 'Попробуйте обновить страницу'}
+        />
+      ) : null}
 
-      {/* Storage Locations with Cells */}
-      {!loading && !error && (
-        <div className="space-y-6">
-          {sellerLocationsWithCells.map(location => (
-            <div key={location.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Склад #{location.id}</h3>
-                    <p className="text-gray-600 mt-1">{location.address}</p>
-                  </div>
-                  <div className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium">
-                    {location.cells.length} адрес
-                  </div>
+      {!loading && !error && sellerLocationsWithCells.length === 0 ? (
+        <EmptyState
+          illustration="empty"
+          title="Складов пока нет"
+          description={
+            user?.is_seller || user?.is_director
+              ? 'Сначала добавьте склад в настройках организации — затем создайте адреса ячеек.'
+              : 'Обратитесь к директору организации, чтобы добавить склады.'
+          }
+          actionLabel={
+            user?.is_seller || user?.is_director ? 'Перейти к организации' : undefined
+          }
+          actionHref={
+            user?.is_seller || user?.is_director ? '/settings/organization' : undefined
+          }
+        />
+      ) : null}
+
+      {!loading && !error
+        ? sellerLocationsWithCells.map((location) => (
+            <Card key={location.id} padding="none" className="overflow-hidden">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-subtle/60 px-5 py-4 sm:px-6">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                    Склад
+                  </p>
+                  <h3 className="mt-0.5 text-base font-semibold text-ink">
+                    {location.address || `Склад #${location.id}`}
+                  </h3>
                 </div>
+                <Badge tone="brand">{cellsCountLabel(location.cells?.length || 0)}</Badge>
               </div>
-              
-              <div className="p-6">
-                {location.cells.length === 0 ? (
-                  <div className="text-center py-8">
-                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">Нет адресов</h3>
-                    <p className="mt-1 text-sm text-gray-500">В этом складе пока нет созданных адресов.</p>
+
+              <div className="p-5 sm:p-6">
+                {!location.cells?.length ? (
+                  <div className="rounded-sg border border-dashed border-line bg-surface-subtle/40 px-4 py-8 text-center">
+                    <p className="text-sm font-medium text-ink">Нет адресов</p>
+                    <p className="mt-1 text-sm text-ink-muted">
+                      В этом складе ещё нет ячеек.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => {
+                        openCreateForm();
+                        setFormData((prev) => ({
+                          ...prev,
+                          storage_location_id: String(location.id),
+                        }));
+                      }}
+                    >
+                      Добавить адрес
+                    </Button>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
-                    {location.cells.map(cell => (
-                      <div key={cell.id} className="group w-full flex-shrink-0 rounded-lg border border-gray-200 p-3 transition-all duration-200 hover:border-indigo-300 hover:shadow-sm md:min-w-[200px] md:max-w-[250px]">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-gray-900 truncate text-base">{cell.name}</h4>
-                            {cell.description && (
-                              <p className="text-sm text-gray-600 truncate mt-1">{cell.description}</p>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-1 ml-3 opacity-60 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => handleDeleteClick(cell)}
-                              className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-all duration-200"
-                              title="Удалить ячейку"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleEdit(cell)}
-                              className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all duration-200"
-                              title="Редактировать ячейку"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                          </div>
+                  <ul className="divide-y divide-line">
+                    {location.cells.map((cell) => (
+                      <li
+                        key={cell.id}
+                        className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                      >
+                        <div className="min-w-0 flex-1 pt-0.5">
+                          <p className="text-sm font-semibold text-ink">{cell.name}</p>
+                          {cell.description ? (
+                            <p className="mt-0.5 text-sm text-ink-muted">
+                              {cell.description}
+                            </p>
+                          ) : null}
                         </div>
-                      </div>
+                        <div className="flex shrink-0">
+                          <button
+                            type="button"
+                            className={iconBtnClass}
+                            aria-label="Редактировать"
+                            title="Редактировать"
+                            onClick={() => handleEdit(cell)}
+                          >
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            className={`${iconBtnClass} hover:bg-danger-50 hover:text-danger-700`}
+                            aria-label="Удалить"
+                            title="Удалить"
+                            onClick={() => setCellToDelete(cell)}
+                          >
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            </Card>
+          ))
+        : null}
 
-      {/* Empty State */}
-      {!loading && !error && sellerLocationsWithCells.length === 0 && (
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-12">
-          <div className="text-center">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">Нет складов</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {user?.is_seller 
-                ? 'Для начала работы с адресным хранением необходимо создать склады в разделе "Склады".'
-                : 'Только продавцы могут работать с адресным хранением.'
-              }
-            </p>
-          </div>
-        </div>
-      )}
-      
-      {/* Delete Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showDeleteModal}
-        onClose={handleDeleteCancel}
+      <ConfirmDialog
+        open={Boolean(cellToDelete)}
+        onClose={() => setCellToDelete(null)}
         onConfirm={handleDeleteConfirm}
-        title="Удаление ячейки"
-        message={`Вы уверены, что хотите удалить адрес "${cellToDelete?.name}"?
-
-Будут также удалены все связи с товарами.
-
-Внимание: Это действие нельзя отменить.`}
-        confirmText="Удалить адрес"
-        cancelText="Отмена"
-        isLoading={deleteLoading}
-        danger={true}
+        title="Удалить адрес?"
+        message={`Адрес «${cellToDelete?.name || ''}» будет удалён вместе со связями с товарами. Это действие нельзя отменить.`}
+        confirmLabel="Удалить"
+        danger
+        loading={deleteLoading}
       />
     </div>
   );
-};
-
-export default StorageAddressesPage;
+}

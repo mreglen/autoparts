@@ -260,9 +260,16 @@ export default function ProfilePage() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-lg font-semibold text-gray-900 sm:text-xl">{displayName}</p>
               <p className="mt-0.5 truncate text-sm text-gray-500">{profileSubtitle}</p>
-              <span className="mt-2 inline-flex rounded-lg bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                {getRoleLabel(user)}
-              </span>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex rounded-lg bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                  {getRoleLabel(user)}
+                </span>
+                {user.id != null ? (
+                  <span className="font-mono text-xs text-gray-400" title="Идентификатор пользователя">
+                    ID {user.id}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
         </ProfileBlock>
