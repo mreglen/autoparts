@@ -41,10 +41,8 @@ function workExecutorName(work) {
   return work.executor?.name || '';
 }
 
-function padItems(items, minCount) {
-  const rows = [...(items || [])];
-  while (rows.length < minCount) rows.push(null);
-  return rows;
+function rowsOrEmpty(items) {
+  return items.length > 0 ? items : [null];
 }
 
 function Field({ label, children }) {
@@ -212,9 +210,9 @@ export default function RepairOrderPrintPage() {
     .filter(Boolean)
     .join('\n');
 
-  const workRows = padItems(works, 4);
-  const shopRows = padItems(shopParts, 2);
-  const clientRows = clientParts.length > 0 ? clientParts : [null];
+  const workRows = rowsOrEmpty(works);
+  const shopRows = rowsOrEmpty(shopParts);
+  const clientRows = rowsOrEmpty(clientParts);
 
   const workColumns = [
     { key: 'n', label: '№', className: 'w-7' },
@@ -239,7 +237,7 @@ export default function RepairOrderPrintPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 text-black print:min-h-0 print:bg-white">
+    <div className="repair-order-print-page min-h-screen bg-gray-100 text-black print:min-h-0 print:bg-white">
       <div className="repair-order-print-toolbar sticky top-0 z-10 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-[210mm] flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-ink">Заказ-наряд №{order.order_number}</p>
@@ -254,7 +252,7 @@ export default function RepairOrderPrintPage() {
         </div>
       </div>
 
-      <article className="repair-order-print-sheet mx-auto my-4 box-border w-[210mm] max-w-full bg-white px-[10mm] py-[8mm] shadow-sm print:my-0 print:w-full print:max-w-none print:px-0 print:py-0 print:shadow-none">
+      <article className="repair-order-print-sheet my-4 shadow-sm print:my-0 print:shadow-none">
         <header className="grid grid-cols-2 gap-x-8 gap-y-1 text-[11px]">
           <div className="space-y-0.5">
             <h1 className="mb-1 text-[15px] font-bold leading-none">
@@ -439,30 +437,6 @@ export default function RepairOrderPrintPage() {
           </div>
         </footer>
       </article>
-
-      <style>{`
-        @page { size: A4 portrait; margin: 10mm; }
-        @media print {
-          html, body, #root {
-            background: white !important;
-            height: auto !important;
-            min-height: 0 !important;
-            overflow: visible !important;
-          }
-          .repair-order-print-toolbar { display: none !important; }
-          .repair-order-print-sheet {
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            box-shadow: none !important;
-          }
-          .repair-order-print-sheet table {
-            width: 100% !important;
-            table-layout: fixed !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

@@ -237,6 +237,30 @@ input[type="password"] {
   }
 }
 
+/* Заказ-наряд: на экране — лист A4; при печати — 100% области печати */
+.repair-order-print-sheet {
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  max-width: min(210mm, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 8mm 10mm;
+  background: #fff;
+}
+
+.repair-order-print-sheet table {
+  table-layout: fixed;
+  width: 100%;
+  max-width: 100%;
+}
+
+.repair-order-print-sheet th,
+.repair-order-print-sheet td {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 @page {
   size: A4 portrait;
   margin: 10mm;
@@ -244,23 +268,19 @@ input[type="password"] {
 
 @media print {
   html.repair-order-print-root,
-  html.repair-order-print-root body {
-    width: auto !important;
-    max-width: none !important;
-    min-height: 0 !important;
-    height: auto !important;
-    overflow: visible !important;
+  html.repair-order-print-root body,
+  html.repair-order-print-root #root,
+  html.repair-order-print-root .repair-order-print-layout,
+  html.repair-order-print-root .repair-order-print-page {
     background: #fff !important;
     margin: 0 !important;
     padding: 0 !important;
-  }
-
-  html.repair-order-print-root #root,
-  html.repair-order-print-root .repair-order-print-layout {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
     min-height: 0 !important;
     height: auto !important;
     overflow: visible !important;
-    max-width: none !important;
   }
 
   html.repair-order-print-root .repair-order-print-toolbar {
@@ -270,9 +290,11 @@ input[type="password"] {
   html.repair-order-print-root .repair-order-print-sheet {
     width: 100% !important;
     max-width: 100% !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
-    overflow: visible !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
