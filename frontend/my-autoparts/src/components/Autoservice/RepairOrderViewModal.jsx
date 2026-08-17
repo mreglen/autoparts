@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import Modal, { ConfirmDialog } from '../UI/Modal';
+import Modal from '../UI/Modal';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
 import { Skeleton } from '../UI';
@@ -339,9 +339,6 @@ export default function RepairOrderViewModal({
   const [payError, setPayError] = useState('');
   const [completeSaving, setCompleteSaving] = useState(false);
   const [completeError, setCompleteError] = useState('');
-  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
-  const [cancelSaving, setCancelSaving] = useState(false);
-  const [cancelError, setCancelError] = useState('');
 
   useEffect(() => {
     setPayOpen(false);
@@ -349,8 +346,6 @@ export default function RepairOrderViewModal({
     setPayAmount('');
     setPayError('');
     setCompleteError('');
-    setCancelError('');
-    setCancelConfirmOpen(false);
   }, [order?.id]);
 
   const totals = order ? orderTotals(order) : null;
@@ -359,10 +354,6 @@ export default function RepairOrderViewModal({
   const canComplete =
     enablePayment &&
     payment?.isPaid &&
-    order?.status !== 'completed' &&
-    order?.status !== 'cancelled';
-  const canCancel =
-    showExecutors &&
     order?.status !== 'completed' &&
     order?.status !== 'cancelled';
 
@@ -416,32 +407,19 @@ export default function RepairOrderViewModal({
     }
   }, [order?.id, onOrderChange]);
 
-  const handleCancelOrder = useCallback(async () => {
-    if (!order?.id) return;
-    setCancelSaving(true);
-    setCancelError('');
-    try {
-      const updated = await apiRequest(`/autoservice/repair-orders/${order.id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'cancelled' }),
-      });
-      setCancelConfirmOpen(false);
-      onOrderChange?.(updated);
-    } catch (e) {
-      setCancelError(e?.message || 'Не удалось отменить заказ-наряд');
-    } finally {
-      setCancelSaving(false);
-    }
-  }, [order?.id, onOrderChange]);
-
   if (!order && !loading) return null;
 
   const clientLine = [order?.client?.name, order?.client?.phone].filter(Boolean).join(' · ') || '—';
   const hasClientComment = Boolean(order?.client_comment?.trim());
   const hasStaffComment = Boolean(order?.staff_comment?.trim());
+  const secondaryBtnClass =
+    'inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60 md:h-10';
+  const primaryBtnClass =
+    'inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60 md:h-10';
+  const successBtnClass =
+    'inline-flex h-11 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60 md:h-10';
 
   return (
-    <>
     <Modal
       open={!!order || loading}
       onClose={onClose}
@@ -499,38 +477,24 @@ export default function RepairOrderViewModal({
               ) : null}
             </div>
             {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
-            {cancelError ? <p className="text-xs text-red-600">{cancelError}</p> : null}
-            <div className="flex flex-wrap justify-end gap-2">
-              {canCancel && !payOpen ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCancelError('');
-                    setCancelConfirmOpen(true);
-                  }}
-                  disabled={cancelSaving || paySaving || completeSaving}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-red-200 bg-white px-4 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-60 md:hidden"
-                >
-                  Отменить
-                </button>
-              ) : null}
+            <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
+              <button type="button" onClick={onClose} className={secondaryBtnClass}>
+                Назад
+              </button>
               {order?.id && showExecutors ? (
                 <button
                   type="button"
                   onClick={() => {
                     window.open(`/autoservice/orders/${order.id}/print`, '_blank', 'noopener,noreferrer');
                   }}
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                  className={secondaryBtnClass}
                 >
-                  Печать (макет ещё в разработке)
+                  <span className="md:hidden">Печать</span>
+                  <span className="hidden md:inline">Печать (макет ещё в разработке)</span>
                 </button>
               ) : null}
               {onEdit && !payOpen ? (
-                <button
-                  type="button"
-                  onClick={() => onEdit(order)}
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                >
+                <button type="button" onClick={() => onEdit(order)} className={secondaryBtnClass}>
                   Изменить
                 </button>
               ) : null}
@@ -539,7 +503,7 @@ export default function RepairOrderViewModal({
                   type="button"
                   onClick={resetPaymentWizard}
                   disabled={paySaving}
-                  className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+                  className={secondaryBtnClass}
                 >
                   Подробности
                 </button>
@@ -549,7 +513,7 @@ export default function RepairOrderViewModal({
                   type="button"
                   onClick={handleStartPayment}
                   disabled={paySaving || completeSaving}
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+                  className={primaryBtnClass}
                 >
                   Оплата
                 </button>
@@ -559,7 +523,7 @@ export default function RepairOrderViewModal({
                   type="button"
                   onClick={handleCompleteOrder}
                   disabled={completeSaving || paySaving}
-                  className="inline-flex h-10 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                  className={successBtnClass}
                 >
                   {completeSaving ? 'Закрытие…' : 'Закрыть'}
                 </button>
@@ -647,20 +611,5 @@ export default function RepairOrderViewModal({
         </div>
       )}
     </Modal>
-    <ConfirmDialog
-      open={cancelConfirmOpen}
-      onClose={() => {
-        if (cancelSaving) return;
-        setCancelConfirmOpen(false);
-      }}
-      onConfirm={handleCancelOrder}
-      title="Отменить заказ-наряд?"
-      message="Заказ-наряд будет переведён в статус «Отменён». Резервы запчастей будут сняты."
-      confirmLabel="Отменить"
-      cancelLabel="Отмена"
-      danger
-      loading={cancelSaving}
-    />
-  </>
   );
 }
