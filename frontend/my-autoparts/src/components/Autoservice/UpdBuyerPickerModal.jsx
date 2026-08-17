@@ -10,8 +10,29 @@ const primaryBtnClass =
   'inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60 md:h-10';
 
 function buyerLabel(row) {
-  const inn = row.inn ? `ИНН ${row.inn}` : '';
-  return [row.name, inn].filter(Boolean).join(' · ');
+  const parts = [];
+  if (row.inn) parts.push(`ИНН ${row.inn}`);
+  if (row.kpp) parts.push(`КПП ${row.kpp}`);
+  if (row.address) parts.push(row.address);
+  return parts.join(' · ');
+}
+
+function emptyForm(name = '') {
+  return {
+    name: name || '',
+    address: '',
+    inn: '',
+    kpp: '',
+  };
+}
+
+function formFromBuyer(row) {
+  return {
+    name: row.name || '',
+    address: row.address || '',
+    inn: row.inn || '',
+    kpp: row.kpp || '',
+  };
 }
 
 export default function UpdBuyerPickerModal({
@@ -26,21 +47,12 @@ export default function UpdBuyerPickerModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    name: '',
-    address: '',
-    inn: '',
-    kpp: '',
-  });
+  const [formMode, setFormMode] = useState('list');
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm());
 
   const resetCreateForm = useCallback(() => {
-    setForm({
-      name: defaultName || '',
-      address: '',
-      inn: '',
-      kpp: '',
-    });
+    setForm(emptyForm(defaultName));
   }, [defaultName]);
 
   const loadBuyers = useCallback(async () => {
@@ -60,7 +72,8 @@ export default function UpdBuyerPickerModal({
   useEffect(() => {
     if (!open) return undefined;
     setQuery('');
-    setCreating(false);
+    setFormMode('list');
+    setEditingId(null);
     setError('');
     resetCreateForm();
     loadBuyers();
@@ -87,7 +100,27 @@ export default function UpdBuyerPickerModal({
     onClose?.();
   };
 
-  const handleCreate = async (e) => {
+  const payloadFromForm = (name) => ({
+    name,
+    address: form.address.trim() || null,
+    inn: form.inn.trim() || null,
+    kpp: form.kpp.trim() || null,
+  });
+
+  const backToList = () => {
+    setFormMode('list');
+    setEditingId(null);
+    setError('');
+  };
+
+  const startEdit = (row) => {
+    setForm(formFromBuyer(row));
+    setEditingId(row.id);
+    setFormMode('edit');
+    setError('');
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const name = form.name.trim();
     if (name.length < 2) {
@@ -97,14 +130,18 @@ export default function UpdBuyerPickerModal({
     setSaving(true);
     setError('');
     try {
+      if (formMode === 'edit' && editingId) {
+        const row = await apiRequest(`/autoservice/document-buyers/${editingId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payloadFromForm(name)),
+        });
+        setBuyers((prev) => prev.map((item) => (item.id === row.id ? row : item)));
+        backToList();
+        return;
+      }
       const row = await apiRequest('/autoservice/document-buyers', {
         method: 'POST',
-        body: JSON.stringify({
-          name,
-          address: form.address.trim() || null,
-          inn: form.inn.trim() || null,
-          kpp: form.kpp.trim() || null,
-        }),
+        body: JSON.stringify(payloadFromForm(name)),
       });
       openPrint(row.id);
     } catch (err) {
@@ -122,9 +159,13 @@ export default function UpdBuyerPickerModal({
       size="sm"
       wrapperClassName="z-[130]"
     >
-      {creating ? (
-        <form onSubmit={handleCreate} className="space-y-3">
-          <p className="text-sm text-gray-500">Новый покупатель сохранится в справочнике.</p>
+      {formMode !== 'list' ? (
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <p className="text-sm text-gray-500">
+            {formMode === 'edit'
+              ? 'Изменения сохранятся в справочнике.'
+              : 'Новый покупатель сохранится в справочнике.'}
+          </p>
           <div>
             <label className="block text-xs font-medium text-gray-600">Наименование</label>
             <input
@@ -176,15 +217,16 @@ export default function UpdBuyerPickerModal({
               type="button"
               className={secondaryBtnClass}
               disabled={saving}
-              onClick={() => {
-                setCreating(false);
-                setError('');
-              }}
+              onClick={backToList}
             >
               К списку
             </button>
             <button type="submit" className={primaryBtnClass} disabled={saving}>
-              {saving ? 'Сохранение…' : 'Сохранить и открыть'}
+              {saving
+                ? 'Сохранение…'
+                : formMode === 'edit'
+                  ? 'Сохранить'
+                  : 'Сохранить и открыть'}
             </button>
           </div>
         </form>
@@ -205,18 +247,30 @@ export default function UpdBuyerPickerModal({
             </p>
           ) : (
             <ul className="max-h-56 overflow-y-auto rounded-lg border border-gray-200">
-              {filtered.map((row) => (
-                <li key={row.id} className="border-b border-gray-100 last:border-b-0">
-                  <button
-                    type="button"
-                    className="block w-full px-3 py-2.5 text-left text-sm hover:bg-indigo-50"
-                    onClick={() => openPrint(row.id)}
-                  >
-                    <span className="block font-medium text-gray-900">{row.name}</span>
-                    <span className="mt-0.5 block text-xs text-gray-500">{buyerLabel(row)}</span>
-                  </button>
-                </li>
-              ))}
+              {filtered.map((row) => {
+                const details = buyerLabel(row);
+                return (
+                  <li key={row.id} className="flex items-stretch border-b border-gray-100 last:border-b-0">
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 px-3 py-2.5 text-left text-sm hover:bg-indigo-50"
+                      onClick={() => openPrint(row.id)}
+                    >
+                      <span className="block font-medium text-gray-900">{row.name}</span>
+                      {details ? (
+                        <span className="mt-0.5 block text-xs text-gray-500">{details}</span>
+                      ) : null}
+                    </button>
+                    <button
+                      type="button"
+                      className="shrink-0 border-l border-gray-100 px-3 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                      onClick={() => startEdit(row)}
+                    >
+                      Изменить
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <button
@@ -224,7 +278,8 @@ export default function UpdBuyerPickerModal({
             className={`${primaryBtnClass} w-full`}
             onClick={() => {
               resetCreateForm();
-              setCreating(true);
+              setEditingId(null);
+              setFormMode('create');
               setError('');
             }}
           >

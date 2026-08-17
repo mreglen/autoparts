@@ -262,26 +262,216 @@ input[type="password"] {
 }
 
 .upd-print-sheet {
+  --upd-rail: 36mm;
+  --upd-bar: 3.5px;
   box-sizing: border-box;
   width: 297mm;
   min-height: 210mm;
   max-width: min(297mm, 100%);
   margin-left: auto;
   margin-right: auto;
-  padding: 8mm 8mm;
+  padding: 5mm 6mm;
   background: #fff;
+  color: #000;
+  font-family: Arial, Helvetica, "Liberation Sans", sans-serif;
+  font-size: 8pt;
+  line-height: 1.15;
+}
+
+.upd-print-sheet h1,
+.upd-title {
+  margin: 0;
+  font-size: 9.5pt;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
 .upd-print-sheet table {
   table-layout: fixed;
   width: 100%;
   max-width: 100%;
+  font-size: 6.5pt;
+  line-height: 1.12;
+}
+
+.upd-print-sheet thead th {
+  font-size: 6pt;
+  font-weight: 600;
+}
+
+.upd-print-sheet tbody td {
+  font-size: 8pt;
 }
 
 .upd-print-sheet th,
 .upd-print-sheet td {
+  box-sizing: border-box;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.upd-l-body {
+  background-image: linear-gradient(#000, #000);
+  background-repeat: no-repeat;
+  background-position: var(--upd-rail) 0;
+  background-size: var(--upd-bar) 100%;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.upd-shell {
+  display: grid;
+  grid-template-columns: var(--upd-rail) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.upd-rail {
+  box-sizing: border-box;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.upd-main {
+  min-width: 0;
+  padding-left: 8px;
+}
+
+.upd-cite {
+  font-size: 6.5pt;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.upd-invoice {
+  font-size: 10pt;
+}
+
+.upd-invoice .upd-fn {
+  font-size: 7pt;
+}
+
+.upd-head-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 13.5rem;
+  gap: 0.5rem 0.75rem;
+  align-items: start;
+}
+
+.upd-status-wrap {
+  margin-top: 10px;
+  font-size: 6.5pt;
+  line-height: 1.2;
+}
+
+.upd-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.upd-status-box {
+  box-sizing: border-box;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #000;
+  font-size: 11pt;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.upd-col-a {
+  width: var(--upd-rail);
+}
+
+.upd-print-sheet thead th:first-child,
+.upd-print-sheet tbody td:first-child {
+  width: var(--upd-rail);
+}
+
+.upd-sheets {
+  padding-top: 2px;
+  font-size: 7.5pt;
+  line-height: 1.2;
+}
+
+.upd-fr,
+.upd-fw {
+  display: grid;
+  column-gap: 0.25rem;
+  align-items: end;
+  margin-top: 1px;
+}
+
+.upd-fr {
+  grid-template-columns: 8.6rem minmax(0, 1fr) 1.45rem 10.6rem minmax(0, 1fr) 1.45rem;
+}
+
+.upd-fw {
+  grid-template-columns: 8.6rem minmax(0, 1fr) 1.45rem;
+}
+
+.upd-fl {
+  padding-bottom: 1px;
+  font-size: 7pt;
+}
+
+.upd-uv {
+  display: block;
+  min-height: 1.15em;
+  border-bottom: 1px solid #000;
+  overflow-wrap: anywhere;
+  font-size: 9.5pt;
+}
+
+.upd-fn {
+  padding-bottom: 1px;
+  text-align: center;
+  font-size: 6.5pt;
+}
+
+.upd-hint {
+  font-size: 6.5pt;
+  line-height: 1.15;
+}
+
+.upd-foot {
+  position: relative;
+  margin-top: 0;
+  padding-top: 8px;
+}
+
+.upd-foot::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--upd-rail);
+  right: 0;
+  height: var(--upd-bar);
+  background: #000;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.upd-foot-top {
+  padding-bottom: 4px;
+}
+
+.upd-transfer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.upd-transfer > :first-child {
+  border-right: 2px solid #000;
+  padding: 6px 8px 4px 0;
+}
+
+.upd-transfer > :last-child {
+  padding: 6px 0 4px 8px;
 }
 
 @page {
@@ -302,8 +492,13 @@ input[type="password"] {
     min-width: 0 !important;
     max-width: none !important;
     min-height: 0 !important;
+    max-height: none !important;
     height: auto !important;
+    position: static !important;
+    inset: auto !important;
     overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
   }
 
   html.repair-order-print-root .repair-order-print-toolbar {
@@ -333,22 +528,60 @@ input[type="password"] {
     min-width: 0 !important;
     max-width: none !important;
     min-height: 0 !important;
+    max-height: none !important;
     height: auto !important;
+    position: static !important;
+    inset: auto !important;
     overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+
+  html.mobile-shell.upd-print-root,
+  html.pwa-standalone.upd-print-root,
+  html.mobile-shell.upd-print-root body,
+  html.pwa-standalone.upd-print-root body,
+  html.mobile-shell.upd-print-root #root,
+  html.pwa-standalone.upd-print-root #root {
+    position: static !important;
+    inset: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
   }
 
   html.upd-print-root .upd-print-toolbar {
     display: none !important;
   }
 
+  html.upd-print-root .upd-print-sheet,
+  html.upd-print-root .upd-l-body {
+    overflow: visible !important;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
   html.upd-print-root .upd-print-sheet {
+    --upd-bar: 1.5px;
     width: 100% !important;
     max-width: 100% !important;
     min-height: 0 !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 4mm !important;
     box-shadow: none !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  html.upd-print-root table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  html.upd-print-root tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }
