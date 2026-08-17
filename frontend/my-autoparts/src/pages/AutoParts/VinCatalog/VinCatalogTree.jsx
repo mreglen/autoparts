@@ -118,7 +118,7 @@ export default function VinCatalogTree({
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            Группы
+            Частые группы
           </button>
           <button
             type="button"
@@ -129,7 +129,7 @@ export default function VinCatalogTree({
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            OEM
+            Полный каталог
           </button>
         </div>
       ) : null}

@@ -1355,9 +1355,11 @@ const productSlice = createSlice({
                 const pageSize = action.payload?.page_size ?? state.myProductsPageSize ?? 30;
                 const beforeLen = state.items.length;
                 if (append) {
-                    const existingIds = new Set(state.items.map((p) => p.id));
+                    const existingIds = new Set(state.items.map((p) => Number(p.id)));
                     newItems.forEach((item) => {
-                        if (!existingIds.has(item.id)) {
+                        const itemId = Number(item.id);
+                        if (!existingIds.has(itemId)) {
+                            existingIds.add(itemId);
                             state.items.push(item);
                         }
                     });

@@ -25,6 +25,12 @@ import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopBut
 import PillDropdown from '../../components/PillDropdown/PillDropdown';
 import { UnderlineTabs } from '../../components/UI';
 import MyPartsOnboarding from './MyPartsOnboarding';
+import {
+  computeMyPartsHeaderStats,
+  idsToSelectionSet,
+  normalizePartId,
+  selectionHasPart,
+} from '../../utils/myPartsSelection';
 
 const CardPart = ({
   part,
@@ -1116,8 +1122,11 @@ function MyParts() {
       cellValue: activeFilters.cellValue || '',
       responsible: activeFilters.responsible || '',
       q: debouncedSearch.trim(),
+      sort: activeFilters.sort || 'date_desc',
+      stock: isModerationTab ? '' : stockFilter,
+      no_photo: isModerationTab ? false : noPhotoFilter,
     }),
-    [activeTab, activeFilters.storage, activeFilters.cell, activeFilters.cellValue, activeFilters.responsible, debouncedSearch],
+    [activeTab, activeFilters.storage, activeFilters.cell, activeFilters.cellValue, activeFilters.responsible, activeFilters.sort, debouncedSearch, isModerationTab, stockFilter, noPhotoFilter],
   );
 
   const responsibleOptions = useMemo(() => {
@@ -1391,21 +1400,17 @@ function MyParts() {
   ];
 
   const statsParts = isModerationTab ? sortedModerationParts : sortedDisplayParts;
-  const clientStatsValue = statsParts.reduce(
-    (sum, part) => sum + ((Number(part.price) || 0) * (Number(part.quantity) || 0)),
-    0,
-  );
-  const clientStatsQuantity = statsParts.reduce(
-    (sum, part) => sum + (Number(part.quantity) || 0),
-    0,
-  );
+  const clientStats = computeMyPartsHeaderStats({
+    selectedIds: new Set(),
+    products: statsParts,
+    totalCount: isModerationTab ? statsParts.length : myProductsTotal,
+    totalValue: isModerationTab ? 0 : myProductsTotalValue,
+    totalQuantity: isModerationTab ? 0 : myProductsTotalQuantity,
+    listFullyLoaded: isModerationTab || products.length >= myProductsTotal,
+  });
   const inStockListFullyLoaded = !isModerationTab && products.length >= myProductsTotal;
-  const totalValue = isModerationTab
-    ? clientStatsValue
-    : (inStockListFullyLoaded ? clientStatsValue : myProductsTotalValue);
-  const totalQuantity = isModerationTab
-    ? clientStatsQuantity
-    : (inStockListFullyLoaded ? clientStatsQuantity : myProductsTotalQuantity);
+  const totalValue = clientStats.value;
+  const totalQuantity = clientStats.quantity;
 
   const handleOpenModal = (part, type) => {
     setSelectedPart(part);
@@ -1528,14 +1533,12 @@ function MyParts() {
   };
 
   const handlePartSelect = (partId) => {
-    setSelectedParts(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(partId)) {
-        newSet.delete(partId);
-      } else {
-        newSet.add(partId);
-      }
-      return newSet;
+    const id = normalizePartId(partId);
+    setSelectedParts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   };
 
@@ -1545,36 +1548,24 @@ function MyParts() {
   const hasSelection = activeTab === 'in-stock' && selectedParts.size > 0;
 
   const selectedStats = useMemo(() => {
-    if (!hasSelection) return null;
-
-    if (allFilteredSelected) {
-      return {
-        value: inStockListFullyLoaded ? clientStatsValue : myProductsTotalValue,
-        quantity: inStockListFullyLoaded ? clientStatsQuantity : myProductsTotalQuantity,
-        count: myProductsTotal,
-      };
-    }
-
-    let value = 0;
-    let quantity = 0;
-    products.forEach((part) => {
-      if (!selectedParts.has(part.id)) return;
-      value += (Number(part.price) || 0) * (Number(part.quantity) || 0);
-      quantity += Number(part.quantity) || 0;
+    if (activeTab !== 'in-stock') return null;
+    if (!hasSelection && !selectAllLoading) return null;
+    return computeMyPartsHeaderStats({
+      selectedIds: selectedParts,
+      products,
+      totalCount: myProductsTotal,
+      totalValue: myProductsTotalValue,
+      totalQuantity: myProductsTotalQuantity,
+      listFullyLoaded: inStockListFullyLoaded,
+      selectAllPending: selectAllLoading && !allFilteredSelected,
     });
-
-    return {
-      value,
-      quantity,
-      count: selectedParts.size,
-    };
   }, [
+    activeTab,
     hasSelection,
+    selectAllLoading,
     allFilteredSelected,
     inStockListFullyLoaded,
-    clientStatsValue,
     myProductsTotalValue,
-    clientStatsQuantity,
     myProductsTotalQuantity,
     myProductsTotal,
     products,
@@ -1584,6 +1575,11 @@ function MyParts() {
   const displayValue = selectedStats ? selectedStats.value : totalValue;
   const displayQuantity = selectedStats ? selectedStats.quantity : totalQuantity;
   const displayPositionsCount = selectedStats ? selectedStats.count : myProductsTotal;
+  const headerScopeLabel = hasSelection || selectAllLoading
+    ? 'Выбрано'
+    : (activeFilters.storage
+      ? (isModerationTab ? 'По складу' : 'Склад')
+      : (isModerationTab ? 'На модерации' : 'Все склады'));
 
   useEffect(() => {
     if (selectAllCheckboxRef.current) {
@@ -1601,6 +1597,7 @@ function MyParts() {
       setSelectedParts(new Set());
       return;
     }
+    setSelectedParts(idsToSelectionSet(products.map((part) => part.id)));
     setSelectAllLoading(true);
     try {
       const params = new URLSearchParams();
@@ -1611,11 +1608,14 @@ function MyParts() {
       }
       if (inStockFilters.responsible) params.set('created_by', inStockFilters.responsible);
       if (inStockDebouncedSearch.trim()) params.set('q', inStockDebouncedSearch.trim());
+      if (stockFilter) params.set('stock', stockFilter);
+      if (noPhotoFilter) params.set('no_photo', 'true');
       params.set('sort', inStockFilters.sort || 'date_desc');
       const qs = params.toString();
       const data = await apiRequest(`/products/ids${qs ? `?${qs}` : ''}`);
-      setSelectedParts(new Set(data.ids || []));
-      if (data.truncated) {
+      const ids = idsToSelectionSet(data?.ids);
+      setSelectedParts(ids);
+      if (data?.truncated) {
         alert(`Выбрано ${(data.ids || []).length} из ${data.total}. Уточните фильтр для выбора всех позиций.`);
       }
     } catch (err) {
@@ -1868,6 +1868,9 @@ function MyParts() {
       }
     } else if (isDraftsTab) {
       params.set('tab', 'drafts');
+    } else {
+      if (stockFilter) params.set('stock', stockFilter);
+      if (noPhotoFilter) params.set('no_photo', '1');
     }
 
     const next = params.toString();
@@ -1891,6 +1894,8 @@ function MyParts() {
     moderationFilters.hideRejected,
     isModerationTab,
     isDraftsTab,
+    stockFilter,
+    noPhotoFilter,
     setSearchParams,
   ]);
 
@@ -2252,9 +2257,7 @@ function MyParts() {
                   {displayValue.toLocaleString('ru-RU')} ₽
                 </div>
                 <div className="text-[11px] text-gray-500">
-                  {activeFilters.storage
-                    ? (isModerationTab ? 'По складу' : 'Склад')
-                    : (isModerationTab ? 'На модерации' : 'Все склады')}
+                  {headerScopeLabel}
                 </div>
               </div>
               <div>
@@ -2642,7 +2645,7 @@ function MyParts() {
                     dromExporting={dromExporting}
                     onToggleExpand={() => toggleExpand(part.id)}
                     isExpanded={expandedPartId === part.id}
-                    isSelected={selectedParts.has(part.id)}
+                    isSelected={selectionHasPart(selectedParts, part.id)}
                     onSelect={() => handlePartSelect(part.id)}
                     onImageClick={handleOpenMediaModal}
                     productStorageCells={productStorageCells[part.id] || []}
@@ -2675,7 +2678,7 @@ function MyParts() {
                 dromExporting={dromExporting}
                 onToggleExpand={() => toggleExpand(part.id)}
                 isExpanded={expandedPartId === part.id}
-                isSelected={selectedParts.has(part.id)}
+                isSelected={selectionHasPart(selectedParts, part.id)}
                 onSelect={() => handlePartSelect(part.id)}
                 onImageClick={handleOpenMediaModal}
                 productStorageCells={productStorageCells[part.id] || []}

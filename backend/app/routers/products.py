@@ -9,8 +9,10 @@ from pydantic import BaseModel, Field
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
 from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
 from app.services.my_products_query_service import (
+    apply_my_products_availability as _apply_my_products_availability,
     apply_my_products_filters as _apply_my_products_filters,
     apply_my_products_sort as _apply_my_products_sort,
+    my_products_aggregates as _my_products_aggregates,
 )
 from app.models.product_vehicle import ProductVehicleAssociation
 from app.schemas.product import (
@@ -73,6 +75,8 @@ class MyProductIdsResponse(BaseModel):
     ids: List[int]
     total: int
     truncated: bool = False
+    total_quantity: int = 0
+    total_value: float = 0
 
 
 _MAX_MY_PRODUCT_IDS = 10000
@@ -352,6 +356,8 @@ def get_my_product_ids(
     storage_cell_value: Optional[str] = None,
     created_by: Optional[int] = None,
     q: Optional[str] = None,
+    stock: Optional[str] = Query(None, pattern="^(zero|low|in_stock)$"),
+    no_photo: bool = Query(False),
     sort: str = Query("date_desc", pattern="^(date_desc|date_asc|name_asc|name_desc|price_asc|price_desc)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -362,8 +368,8 @@ def get_my_product_ids(
 
     query = db.query(ProductModel).filter(
         ProductModel.organization_id == current_user.organization_id,
-        ProductModel.quantity > 0,
     )
+    query = _apply_my_products_availability(query, stock=stock, no_photo=no_photo)
     query = _apply_my_products_filters(
         query,
         storage_location_id,
@@ -373,7 +379,7 @@ def get_my_product_ids(
         q or "",
     )
 
-    total = query.order_by(None).count()
+    total, total_quantity, total_value = _my_products_aggregates(query)
     id_rows = (
         _apply_my_products_sort(query, sort)
         .with_entities(ProductModel.id)
@@ -381,7 +387,13 @@ def get_my_product_ids(
         .all()
     )
     ids = [int(row[0]) for row in id_rows]
-    return MyProductIdsResponse(ids=ids, total=total, truncated=total > len(ids))
+    return MyProductIdsResponse(
+        ids=ids,
+        total=total,
+        truncated=total > len(ids),
+        total_quantity=total_quantity,
+        total_value=total_value,
+    )
 
 
 @router.get("/storage-cell-values", response_model=List[str])
@@ -1413,19 +1425,7 @@ def get_products(
     ).filter(
         ProductModel.organization_id == current_user.organization_id,
     )
-
-    if stock == "zero":
-        query = query.filter(func.coalesce(ProductModel.quantity, 0) <= 0)
-    elif stock == "low":
-        query = query.filter(ProductModel.quantity > 0, ProductModel.quantity <= 2)
-    else:
-        query = query.filter(ProductModel.quantity > 0)
-
-    if no_photo:
-        query = query.outerjoin(ProductPhoto, ProductPhoto.product_id == ProductModel.id).filter(
-            ProductPhoto.id.is_(None)
-        )
-
+    query = _apply_my_products_availability(query, stock=stock, no_photo=no_photo)
     query = _apply_my_products_filters(
         query,
         storage_location_id,
@@ -1434,14 +1434,7 @@ def get_products(
         created_by,
         q or "",
     )
-    stats_query = query.order_by(None)
-    total = stats_query.count()
-    agg = stats_query.with_entities(
-        func.coalesce(func.sum(ProductModel.quantity), 0),
-        func.coalesce(func.sum(ProductModel.quantity * ProductModel.price), 0),
-    ).one()
-    total_quantity = int(agg[0] or 0)
-    total_value = float(agg[1] or 0)
+    total, total_quantity, total_value = _my_products_aggregates(query)
     products = (
         _apply_my_products_sort(query, sort)
         .offset((page - 1) * page_size)

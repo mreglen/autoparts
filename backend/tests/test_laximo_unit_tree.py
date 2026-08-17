@@ -75,6 +75,12 @@ class UnitTreeNormalizeTests(unittest.TestCase):
         self.assertEqual(out["code_on_image"], "12")
         self.assertEqual(out["filter"], "{'x': 1}")
 
+    def test_normalize_detail_name_falls_back_to_note(self):
+        out = normalize_detail({"oem": "X1", "name": "", "note": "Прокладка"})
+        self.assertEqual(out["name"], "Прокладка")
+        out2 = normalize_detail({"oem": "X2", "description": "Filter housing"})
+        self.assertEqual(out2["name"], "Filter housing")
+
     def test_flatten_quick_groups_nested_tree(self):
         raw = [
             {
@@ -144,6 +150,42 @@ class UnitTreeNormalizeTests(unittest.TestCase):
         self.assertEqual(details[0]["oem"], "059198405B")
         self.assertTrue(details[0]["match"])
         self.assertEqual(details[1]["oem"], "059115389AD")
+
+
+class AsDictListTests(unittest.TestCase):
+    def test_case_insensitive_wrapper_keys(self):
+        from app.services.laximo.cat_client import _as_dict_list
+
+        rows = _as_dict_list({"Categories": [{"name": "A"}]}, nested_keys=("categories",))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "A")
+
+    def test_quick_detail_unwraps_categories_wrapper(self):
+        from app.services.laximo.cat_client import _as_dict_list
+
+        data = {
+            "Categories": [
+                {
+                    "categoryId": "1",
+                    "units": [{"unitId": "u1", "details": [{"oem": "OEM9", "name": "Part"}]}],
+                }
+            ]
+        }
+        rows = _as_dict_list(
+            data,
+            nested_keys=(
+                "categories",
+                "quickDetails",
+                "details",
+                "units",
+                "rows",
+                "items",
+                "data",
+            ),
+        )
+        unit, details = parse_quick_detail_response(rows)
+        self.assertEqual(unit["unit_id"], "u1")
+        self.assertEqual(details[0]["oem"], "OEM9")
 
 
 class UnitTreeGateTests(unittest.TestCase):

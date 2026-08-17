@@ -281,9 +281,12 @@ def normalize_detail(row: dict[str, Any]) -> dict[str, Any]:
     filter_text = None
     if filter_raw is not None and filter_raw is not False:
         filter_text = str(filter_raw).strip() or None
+    name = _str_or_none(_pick(row, "name"))
+    if not name:
+        name = _str_or_none(_pick(row, "note", "description", "synonyms"))
     return {
         "oem": oem,
-        "name": _str_or_none(_pick(row, "name")),
+        "name": name,
         "code_on_image": _str_or_none(
             _pick(row, "codeOnImage", "codeonimage", "code_on_image")
         ),

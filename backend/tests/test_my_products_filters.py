@@ -9,8 +9,10 @@ import app.models.organization_drom_integration  # noqa: F401
 from app.models.product import Product
 from app.models.product_storage_cell import ProductStorageCell
 from app.services.my_products_query_service import (
+    apply_my_products_availability,
     apply_my_products_filters,
     apply_my_products_sort,
+    my_products_aggregates,
 )
 from app.utils.internal_code import build_internal_code
 
@@ -32,10 +34,12 @@ class MyProductsFiltersTests(unittest.TestCase):
                         is_new BOOLEAN,
                         price NUMERIC(12, 2),
                         quantity INTEGER,
+                        reserved_qty INTEGER NOT NULL DEFAULT 0,
                         organization_id VARCHAR,
                         storage_location_id INTEGER,
                         created_by INTEGER NOT NULL,
-                        part_type_id INTEGER NOT NULL
+                        part_type_id INTEGER NOT NULL,
+                        source_pending_id INTEGER
                     )
                     """
                 )
@@ -199,6 +203,31 @@ class MyProductsFiltersTests(unittest.TestCase):
         query = apply_my_products_filters(self._base_query(), None, None, None, 2, "")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [6])
+
+    def test_aggregates_count_each_product_once(self):
+        query = apply_my_products_filters(self._base_query(), None, None, None, None, "")
+        total, quantity, value = my_products_aggregates(query)
+        self.assertEqual(total, 3)
+        self.assertEqual(quantity, 15)
+        self.assertEqual(value, 5 * 300 + 5 * 100 + 5 * 200)
+
+    def test_low_stock_availability(self):
+        self.db.query(Product).filter(Product.id == 2).update({"quantity": 1})
+        self.db.commit()
+        query = apply_my_products_availability(self.db.query(Product).filter(
+            Product.organization_id == "org1",
+        ), stock="low")
+        ids = sorted(row.id for row in query.all())
+        self.assertEqual(ids, [2])
+
+    def test_cell_filter_does_not_inflate_aggregates(self):
+        self.db.add(ProductStorageCell(product_id=1, storage_cell_id=101, value="A-2"))
+        self.db.commit()
+        query = apply_my_products_filters(self._base_query(), None, 101, None, None, "")
+        total, quantity, value = my_products_aggregates(query)
+        self.assertEqual(total, 1)
+        self.assertEqual(quantity, 5)
+        self.assertEqual(value, 1500.0)
 
 
 if __name__ == "__main__":

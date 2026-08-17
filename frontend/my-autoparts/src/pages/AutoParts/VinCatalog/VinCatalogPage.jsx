@@ -404,31 +404,29 @@ export default function VinCatalogPage() {
     setImageMap([]);
     setAvailability({});
     try {
-      if (cat.has_children) {
-        const cats = await apiRequestUnauth(
-          `/public/laximo/categories?${qs({
-            catalog: ctx.catalog,
-            vehicle_id: ctx.vehicle_id,
-            ssd,
-            category_id: cat.category_id,
-          })}`
-        );
-        if (handleSoftFail(cats)) return;
-        setCategories(Array.isArray(cats?.categories) ? cats.categories : []);
-        setUnits([]);
-      } else {
-        const unitsRes = await apiRequestUnauth(
-          `/public/laximo/units?${qs({
-            catalog: ctx.catalog,
-            vehicle_id: ctx.vehicle_id,
-            ssd,
-            category_id: cat.category_id,
-          })}`
-        );
-        if (handleSoftFail(unitsRes)) return;
-        setUnits(Array.isArray(unitsRes?.units) ? unitsRes.units : []);
-        setCategories([]);
-      }
+      const unitsPromise = apiRequestUnauth(
+        `/public/laximo/units?${qs({
+          catalog: ctx.catalog,
+          vehicle_id: ctx.vehicle_id,
+          ssd,
+          category_id: cat.category_id,
+        })}`
+      );
+      const catsPromise = cat.has_children
+        ? apiRequestUnauth(
+            `/public/laximo/categories?${qs({
+              catalog: ctx.catalog,
+              vehicle_id: ctx.vehicle_id,
+              ssd,
+              category_id: cat.category_id,
+            })}`
+          )
+        : Promise.resolve(null);
+      const [unitsRes, cats] = await Promise.all([unitsPromise, catsPromise]);
+      if (handleSoftFail(unitsRes)) return;
+      if (cats && handleSoftFail(cats)) return;
+      setUnits(Array.isArray(unitsRes?.units) ? unitsRes.units : []);
+      setCategories(cats && Array.isArray(cats?.categories) ? cats.categories : []);
     } catch (err) {
       setNotice('unavailable');
       setError(err?.message || 'Не удалось открыть категорию');
@@ -798,11 +796,9 @@ export default function VinCatalogPage() {
     if (!q) return [];
     const params = new URLSearchParams({
       q,
-      has_photos: 'true',
-      page_size: '8',
+      page_size: '50',
       page: '1',
       sort: 'created_at_desc',
-      is_new: 'false',
     });
     const res = await apiRequestUnauth(`/catalog/products?${params}`);
     const items = Array.isArray(res?.items)
@@ -812,7 +808,7 @@ export default function VinCatalogPage() {
         : Array.isArray(res)
           ? res
           : [];
-    return items.filter((p) => p?.id).slice(0, 8);
+    return items.filter((p) => p?.id);
   }, []);
 
   return (

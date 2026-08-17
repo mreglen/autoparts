@@ -866,7 +866,16 @@ def list_quick_detail(
         count_toward_quota=count_toward_quota,
     )
     return _as_dict_list(
-        data, nested_keys=("details", "units", "rows", "items", "data", "quickDetails")
+        data,
+        nested_keys=(
+            "categories",
+            "quickDetails",
+            "details",
+            "units",
+            "rows",
+            "items",
+            "data",
+        ),
     )
 
 
@@ -880,10 +889,13 @@ def _as_dict_list(
     if isinstance(data, list):
         return [item for item in data if isinstance(item, dict)]
     if isinstance(data, dict):
+        lower_map = {str(k).lower(): v for k, v in data.items()}
         for key in nested_keys:
-            nested = data.get(key)
+            nested = lower_map.get(str(key).lower())
             if isinstance(nested, list):
                 return [item for item in nested if isinstance(item, dict)]
+            if isinstance(nested, dict):
+                return [nested]
         return [data]
     return []
 

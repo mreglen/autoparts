@@ -3,6 +3,7 @@ from typing import Optional
 from sqlalchemy import func, or_
 
 from app.models.product import Product as ProductModel
+from app.models.product import ProductPhoto
 from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
 from app.utils.partnumber import normalize_partnumber
 from app.utils.search_sql import get_sql_normalize
@@ -34,6 +35,43 @@ def apply_my_products_search(query, q: str):
         )
 
     return query.filter(or_(*conditions))
+
+
+def apply_my_products_availability(query, stock: Optional[str] = None, no_photo: bool = False):
+    """Same stock / photo constraints as GET /products/ (Мои запчасти)."""
+    if stock == "zero":
+        query = query.filter(func.coalesce(ProductModel.quantity, 0) <= 0)
+    elif stock == "low":
+        query = query.filter(ProductModel.quantity > 0, ProductModel.quantity <= 2)
+    else:
+        query = query.filter(ProductModel.quantity > 0)
+
+    if no_photo:
+        query = query.outerjoin(ProductPhoto, ProductPhoto.product_id == ProductModel.id).filter(
+            ProductPhoto.id.is_(None)
+        )
+    return query
+
+
+def my_products_aggregates(query) -> tuple[int, int, float]:
+    """Unique-product count, quantity and value for a filtered my-parts query."""
+    stats_query = query.enable_eagerloads(False).order_by(None)
+    subq = (
+        stats_query.with_entities(
+            ProductModel.id.label("id"),
+            ProductModel.quantity.label("quantity"),
+            ProductModel.price.label("price"),
+        )
+        .distinct()
+        .subquery()
+    )
+    session = query.session
+    total = int(session.query(func.count()).select_from(subq).scalar() or 0)
+    agg = session.query(
+        func.coalesce(func.sum(subq.c.quantity), 0),
+        func.coalesce(func.sum(subq.c.quantity * subq.c.price), 0),
+    ).one()
+    return total, int(agg[0] or 0), float(agg[1] or 0)
 
 
 def apply_my_products_filters(

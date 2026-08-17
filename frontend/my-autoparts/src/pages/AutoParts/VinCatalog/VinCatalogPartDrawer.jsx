@@ -11,6 +11,26 @@ import {
 import VinCatalogOffersTable from './VinCatalogOffersTable';
 
 const CLOSE_ANIMATION_MS = 200;
+const SECTION_PREVIEW_LIMIT = 5;
+
+function previewItems(items, expanded) {
+  if (!Array.isArray(items) || expanded) return items || [];
+  return items.slice(0, SECTION_PREVIEW_LIMIT);
+}
+
+function ShowMoreButton({ total, expanded, onToggle }) {
+  if (!total || total <= SECTION_PREVIEW_LIMIT) return null;
+  const hidden = total - SECTION_PREVIEW_LIMIT;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+    >
+      {expanded ? 'Скрыть' : `Показать больше (${hidden})`}
+    </button>
+  );
+}
 
 function productImage(p) {
   if (!p) return null;
@@ -91,6 +111,9 @@ export default function VinCatalogPartDrawer({
   const [similarParts, setSimilarParts] = useState([]);
   const [analogParts, setAnalogParts] = useState([]);
   const [usedItems, setUsedItems] = useState([]);
+  const [originalsExpanded, setOriginalsExpanded] = useState(false);
+  const [analogsExpanded, setAnalogsExpanded] = useState(false);
+  const [usedExpanded, setUsedExpanded] = useState(false);
 
   const oem = detail?.oem || '';
   const oemNorm = normalizeArticle(oem);
@@ -132,6 +155,9 @@ export default function VinCatalogPartDrawer({
     setSimilarParts([]);
     setAnalogParts([]);
     setUsedItems([]);
+    setOriginalsExpanded(false);
+    setAnalogsExpanded(false);
+    setUsedExpanded(false);
   }, [detail?.oem, detail?.detail_id]);
 
   useEffect(() => {
@@ -221,52 +247,22 @@ export default function VinCatalogPartDrawer({
             {rosskoLoading ? (
               <OfferSkeleton rows={3} />
             ) : similarParts.length ? (
-              <VinCatalogOffersTable
-                parts={similarParts}
-                sectionType="available"
-                vinBasketId={vinBasketId}
-                ensureVinBasket={ensureVinBasket}
-              />
+              <>
+                <VinCatalogOffersTable
+                  parts={previewItems(similarParts, originalsExpanded)}
+                  sectionType="available"
+                  vinBasketId={vinBasketId}
+                  ensureVinBasket={ensureVinBasket}
+                />
+                <ShowMoreButton
+                  total={similarParts.length}
+                  expanded={originalsExpanded}
+                  onToggle={() => setOriginalsExpanded((v) => !v)}
+                />
+              </>
             ) : (
               <p className="text-sm text-gray-500">Нет предложений</p>
             )}
-
-            <div className="mt-3">
-              {usedLoading ? (
-                <UsedSkeleton />
-              ) : usedItems.length ? (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {usedItems.map((p) => {
-                    const img = productImage(p);
-                    const href = buildPartDetailPath(p);
-                    const price = p.price ?? p.min_price;
-                    return (
-                      <a
-                        key={p.id || href}
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="overflow-hidden rounded-lg border border-gray-200 transition hover:border-indigo-300"
-                      >
-                        <div className="flex aspect-square items-center justify-center bg-gray-50">
-                          {img ? (
-                            <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
-                          ) : (
-                            <span className="text-xs text-gray-400">Нет фото</span>
-                          )}
-                        </div>
-                        <div className="p-2">
-                          <p className="truncate text-xs text-gray-700">{p.name || p.article || 'Товар'}</p>
-                          {price != null ? (
-                            <p className="mt-0.5 text-sm font-semibold text-gray-900">{formatPrice(price)} ₽</p>
-                          ) : null}
-                        </div>
-                      </a>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
           </section>
 
           <section>
@@ -279,16 +275,75 @@ export default function VinCatalogPartDrawer({
             {rosskoLoading ? (
               <OfferSkeleton rows={4} />
             ) : analogParts.length ? (
-              <VinCatalogOffersTable
-                parts={analogParts}
-                sectionType="analog"
-                vinBasketId={vinBasketId}
-                ensureVinBasket={ensureVinBasket}
-              />
+              <>
+                <VinCatalogOffersTable
+                  parts={previewItems(analogParts, analogsExpanded)}
+                  sectionType="analog"
+                  vinBasketId={vinBasketId}
+                  ensureVinBasket={ensureVinBasket}
+                />
+                <ShowMoreButton
+                  total={analogParts.length}
+                  expanded={analogsExpanded}
+                  onToggle={() => setAnalogsExpanded((v) => !v)}
+                />
+              </>
             ) : (
               <p className="text-sm text-gray-500">Нет аналогов</p>
             )}
           </section>
+
+          {usedLoading || usedItems.length ? (
+            <section>
+              <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                На складе
+                {!usedLoading && usedItems.length ? (
+                  <span className="ml-2 text-xs font-normal text-gray-500">{usedItems.length}</span>
+                ) : null}
+              </h4>
+              {usedLoading ? (
+                <UsedSkeleton count={5} />
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {previewItems(usedItems, usedExpanded).map((p) => {
+                      const img = productImage(p);
+                      const href = buildPartDetailPath(p);
+                      const price = p.price ?? p.min_price;
+                      return (
+                        <a
+                          key={p.id || href}
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="overflow-hidden rounded-lg border border-gray-200 transition hover:border-indigo-300"
+                        >
+                          <div className="flex aspect-square items-center justify-center bg-gray-50">
+                            {img ? (
+                              <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
+                            ) : (
+                              <span className="text-xs text-gray-400">Нет фото</span>
+                            )}
+                          </div>
+                          <div className="p-2">
+                            <p className="truncate text-xs text-gray-700">{p.name || p.article || 'Товар'}</p>
+                            {price != null ? (
+                              <p className="mt-0.5 text-sm font-semibold text-gray-900">{formatPrice(price)} ₽</p>
+                            ) : null}
+                          </div>
+                        </a>
+                      );
+                    })}
+                  </div>
+                  <ShowMoreButton
+                    total={usedItems.length}
+                    expanded={usedExpanded}
+                    onToggle={() => setUsedExpanded((v) => !v)}
+                  />
+                </>
+              )}
+            </section>
+          ) : null}
         </div>
       </div>
     </div>

@@ -193,12 +193,14 @@ export default function VinCatalogBrowse({
     setPanelMode('grid');
     if (mode === 'quick') {
       setGridNodes(buildQuickTree(quickGroups));
-    } else if (units?.length) {
-      setGridNodes(unitsToNodes(units));
-    } else if (panelCategories?.length) {
-      setGridNodes(categoriesToNodes(panelCategories));
     } else {
-      setGridNodes(categoriesToNodes(treeCategories));
+      const catNodes = panelCategories?.length ? categoriesToNodes(panelCategories) : [];
+      const unitNodes = units?.length ? unitsToNodes(units) : [];
+      if (catNodes.length || unitNodes.length) {
+        setGridNodes([...catNodes, ...unitNodes]);
+      } else {
+        setGridNodes(categoriesToNodes(treeCategories));
+      }
     }
   }, [mode, quickGroups, treeCategories, panelCategories, units, selectedUnit, unitInfo]);
 
@@ -252,22 +254,15 @@ export default function VinCatalogBrowse({
   // Sync fetched children into tree cache after category open
   useEffect(() => {
     if (!selectedNodeId || !selectedNodeId.startsWith('cat-')) return;
-    if (units?.length) {
-      const nodes = unitsToNodes(units);
-      setChildrenCache((prev) => ({ ...prev, [selectedNodeId]: nodes }));
-      setGridNodes(nodes);
-      setTreeOpenIds((prev) => new Set(prev).add(selectedNodeId));
-      return;
-    }
-    if (panelCategories?.length && mode === 'oem') {
-      const ids = new Set(panelCategories.map((c) => `cat-${c.category_id}`));
-      if (!ids.has(selectedNodeId)) {
-        const nodes = categoriesToNodes(panelCategories);
-        setChildrenCache((prev) => ({ ...prev, [selectedNodeId]: nodes }));
-        setGridNodes(nodes);
-        setTreeOpenIds((prev) => new Set(prev).add(selectedNodeId));
-      }
-    }
+    const panelIds = new Set((panelCategories || []).map((c) => `cat-${c.category_id}`));
+    const catsAreChildren = Boolean(panelCategories?.length) && !panelIds.has(selectedNodeId);
+    const catNodes = catsAreChildren ? categoriesToNodes(panelCategories) : [];
+    const unitNodes = units?.length ? unitsToNodes(units) : [];
+    if (!catNodes.length && !unitNodes.length) return;
+    const nodes = [...catNodes, ...unitNodes];
+    setChildrenCache((prev) => ({ ...prev, [selectedNodeId]: nodes }));
+    setGridNodes(nodes);
+    setTreeOpenIds((prev) => new Set(prev).add(selectedNodeId));
   }, [panelCategories, units, selectedNodeId, mode]);
 
   const treeNodesWithCache = useMemo(() => {
