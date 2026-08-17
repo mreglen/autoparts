@@ -49,6 +49,25 @@ export function innKpp(inn, kpp) {
   return a || '';
 }
 
+export function formatSurnameInitials(fullName) {
+  const parts = String(fullName || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return '';
+  const [surname, ...rest] = parts;
+  if (!rest.length) return surname;
+  const initials = rest
+    .flatMap((part) => part.split('.').filter(Boolean))
+    .map((token) => {
+      const letter = token.replace(/[^A-Za-zА-Яа-яЁё]/g, '').charAt(0);
+      return letter ? `${letter.toUpperCase()}.` : '';
+    })
+    .filter(Boolean)
+    .join('');
+  return initials ? `${surname} ${initials}` : surname;
+}
+
 export const UPD_UNIT_META = {
   pcs: { code: '796', label: 'шт' },
   l: { code: '112', label: 'л' },

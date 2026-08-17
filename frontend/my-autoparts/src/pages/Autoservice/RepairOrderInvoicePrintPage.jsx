@@ -15,6 +15,7 @@ import { downloadPrintSheetPdf } from '../../utils/downloadPrintPdf';
 import {
   UPD_UNIT_META,
   formatRublesInWords,
+  formatSurnameInitials,
   formatUpdMoney,
   innKpp,
   roundMoney,
@@ -74,8 +75,8 @@ const MODAL_FIELDS = [
   { key: 'buyerInn', label: 'ИНН покупателя' },
   { key: 'buyerKpp', label: 'КПП покупателя' },
   { key: 'purpose', label: 'Основание' },
-  { key: 'directorName', label: 'Руководитель (ф.и.о.)' },
-  { key: 'accountantName', label: 'Бухгалтер (ф.и.о.)' },
+  { key: 'directorName', label: 'Руководитель (фамилия и инициалы)' },
+  { key: 'accountantName', label: 'Бухгалтер (фамилия и инициалы)' },
 ];
 
 const BANK_KEYS = ['bankName', 'bik', 'checkingAccount', 'corrAccount'];
@@ -162,8 +163,8 @@ function buildAutoForm(order, org, buyer) {
     buyerInn: String(buyer?.inn || '').trim(),
     buyerKpp: String(buyer?.kpp || '').trim(),
     purpose: `Заказ-наряд № ${order.order_number} от ${shortDate}`,
-    directorName: org?.director_name || '',
-    accountantName: org?.accountant_name || '',
+    directorName: formatSurnameInitials(org?.director_name),
+    accountantName: formatSurnameInitials(org?.accountant_name),
     ...loadSavedBank(org?.id),
   };
 }
