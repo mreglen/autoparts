@@ -9,23 +9,93 @@ function safePdfName(name) {
 
 function flattenFormFields(root) {
   root.querySelectorAll('input, textarea, select').forEach((el) => {
-    const span = document.createElement(el.tagName === 'TEXTAREA' ? 'div' : 'span');
+    const isMultiline = el.tagName === 'TEXTAREA';
     const value =
       el.tagName === 'SELECT'
         ? el.options[el.selectedIndex]?.text || el.value || ''
         : el.value || '';
-    span.textContent = value || '\u00a0';
-    span.style.whiteSpace = el.tagName === 'TEXTAREA' ? 'pre-wrap' : 'pre-wrap';
-    span.style.color = '#000';
-    span.style.background = 'transparent';
-    span.style.border = '0';
-    span.style.borderBottom = el.tagName === 'TEXTAREA' ? '0' : '1px solid #000';
-    span.style.font = 'inherit';
-    span.style.lineHeight = 'inherit';
-    span.style.display = el.tagName === 'TEXTAREA' ? 'block' : 'inline';
-    span.style.minWidth = '1em';
-    el.replaceWith(span);
+
+    const text = document.createElement(isMultiline ? 'div' : 'span');
+    text.textContent = value || '\u00a0';
+    text.style.cssText = [
+      'display:block',
+      'margin:0',
+      'padding:0',
+      'border:0',
+      'background:transparent',
+      'color:#000',
+      'font:inherit',
+      'line-height:1.35',
+      'white-space:pre-wrap',
+      'text-decoration:none',
+    ].join(';');
+
+    if (isMultiline) {
+      el.replaceWith(text);
+      return;
+    }
+
+    const wrap = document.createElement('span');
+    wrap.style.cssText = [
+      'display:inline-block',
+      'vertical-align:baseline',
+      'box-sizing:border-box',
+      'margin:0',
+      'padding:0 2px 3px',
+      'border:0',
+      'border-bottom:1px solid #000',
+      'background:transparent',
+      'color:#000',
+      'font:inherit',
+      'line-height:1.35',
+      'min-width:1em',
+      'max-width:100%',
+      'text-decoration:none',
+    ].join(';');
+    wrap.appendChild(text);
+    el.replaceWith(wrap);
   });
+}
+
+function prepareSheetForPdf(clonedDoc, sheet) {
+  const style = clonedDoc.createElement('style');
+  style.textContent = `
+    [data-print-sheet="true"],
+    [data-print-sheet="true"] * {
+      text-decoration: none !important;
+      box-shadow: none !important;
+      text-underline-offset: 0 !important;
+    }
+    [data-print-sheet="true"] {
+      box-shadow: none !important;
+      margin: 0 !important;
+      background: #fff !important;
+    }
+    [data-print-sheet="true"] table {
+      border-collapse: separate !important;
+      border-spacing: 0 !important;
+    }
+    [data-print-sheet="true"] th,
+    [data-print-sheet="true"] td {
+      height: auto !important;
+      min-height: 0 !important;
+      line-height: 1.35 !important;
+      overflow: visible !important;
+      vertical-align: middle !important;
+    }
+  `;
+  clonedDoc.head.appendChild(style);
+
+  sheet.style.boxShadow = 'none';
+  sheet.style.margin = '0';
+  sheet.style.background = '#fff';
+
+  sheet.querySelectorAll('table').forEach((table) => {
+    table.style.borderCollapse = 'separate';
+    table.style.borderSpacing = '0';
+  });
+
+  flattenFormFields(sheet);
 }
 
 export async function downloadPrintSheetPdf({
@@ -47,8 +117,9 @@ export async function downloadPrintSheetPdf({
     useCORS: true,
     backgroundColor: '#ffffff',
     logging: false,
-    windowWidth: element.scrollWidth,
-    windowHeight: element.scrollHeight,
+    scrollX: 0,
+    scrollY: 0,
+    foreignObjectRendering: false,
     onclone: (clonedDoc) => {
       clonedDoc
         .querySelectorAll(
@@ -58,9 +129,7 @@ export async function downloadPrintSheetPdf({
           node.style.display = 'none';
         });
       const sheet = clonedDoc.querySelector('[data-print-sheet="true"]') || clonedDoc.body;
-      sheet.style.boxShadow = 'none';
-      sheet.style.margin = '0';
-      flattenFormFields(sheet);
+      prepareSheetForPdf(clonedDoc, sheet);
     },
   });
 
@@ -74,7 +143,7 @@ export async function downloadPrintSheetPdf({
   const pageHeight = pdf.internal.pageSize.getHeight();
   const imgWidth = pageWidth;
   const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  const imgData = canvas.toDataURL('image/jpeg', 0.92);
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
   if (imgHeight <= pageHeight) {
     pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
