@@ -52,7 +52,7 @@ export default function ProfileWithMenuLayout() {
   const [purchasesMenuCounts, setPurchasesMenuCounts] = useState({ orders: 0, returns: 0 });
 
     const isChatsPage = location.pathname.startsWith('/chats');
-    const isPrintPage = /\/print\/?$/.test(location.pathname);
+    const isPrintPage = /\/print(\/|$)/.test(location.pathname);
 
     const canFetchSalesCounts = useMemo(() => {
         if (!user) return false;

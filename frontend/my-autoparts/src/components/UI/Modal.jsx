@@ -14,6 +14,7 @@ export default function Modal({
   size = 'md',
   className = '',
   closeVariant = 'close',
+  wrapperClassName = '',
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -35,7 +36,7 @@ export default function Modal({
     size === 'sm' ? 'max-w-md' : size === 'lg' ? 'max-w-3xl' : size === 'xl' ? 'max-w-5xl' : 'max-w-xl';
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-end justify-center p-0 sm:items-center sm:p-4">
+    <div className={cx('fixed inset-0 flex items-end justify-center p-0 sm:items-center sm:p-4', wrapperClassName || 'z-[110]')}>
       <button
         type="button"
         className="absolute inset-0 bg-slate-900/40"

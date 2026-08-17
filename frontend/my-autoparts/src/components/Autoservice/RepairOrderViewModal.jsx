@@ -3,6 +3,7 @@ import Modal from '../UI/Modal';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
 import { Skeleton } from '../UI';
+import UpdBuyerPickerModal from './UpdBuyerPickerModal';
 import {
   formatShopPartQty,
   formatShopPartUnit,
@@ -160,9 +161,9 @@ export function OrderStatusBadge({ status, className = '' }) {
   );
 }
 
-function MetaItem({ label, children }) {
+function MetaItem({ label, children, className = '' }) {
   return (
-    <div className="min-w-0">
+    <div className={`min-w-0 ${className}`}>
       <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
       <dd className="mt-1 text-sm font-medium text-gray-900">{children}</dd>
     </div>
@@ -339,6 +340,8 @@ export default function RepairOrderViewModal({
   const [payError, setPayError] = useState('');
   const [completeSaving, setCompleteSaving] = useState(false);
   const [completeError, setCompleteError] = useState('');
+  const [printPickerOpen, setPrintPickerOpen] = useState(false);
+  const [updBuyerPickerOpen, setUpdBuyerPickerOpen] = useState(false);
 
   useEffect(() => {
     setPayOpen(false);
@@ -346,6 +349,8 @@ export default function RepairOrderViewModal({
     setPayAmount('');
     setPayError('');
     setCompleteError('');
+    setPrintPickerOpen(false);
+    setUpdBuyerPickerOpen(false);
   }, [order?.id]);
 
   const totals = order ? orderTotals(order) : null;
@@ -420,9 +425,14 @@ export default function RepairOrderViewModal({
     'inline-flex h-11 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60 md:h-10';
 
   return (
+    <>
     <Modal
       open={!!order || loading}
-      onClose={onClose}
+      onClose={() => {
+        setPrintPickerOpen(false);
+        setUpdBuyerPickerOpen(false);
+        onClose?.();
+      }}
       closeVariant="back"
       size="lg"
       title={
@@ -480,14 +490,13 @@ export default function RepairOrderViewModal({
             {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
             <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
               {order?.id && showExecutors ? (
-                <a
-                  href={`/autoservice/orders/${order.id}/print`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setPrintPickerOpen(true)}
                   className={secondaryBtnClass}
                 >
                   Печать
-                </a>
+                </button>
               ) : null}
               {onEdit && !payOpen ? (
                 <button type="button" onClick={() => onEdit(order)} className={secondaryBtnClass}>
@@ -574,8 +583,10 @@ export default function RepairOrderViewModal({
         />
       ) : (
         <div className="space-y-5">
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <MetaItem label="Клиент">{clientLine}</MetaItem>
+          <dl className="grid gap-4 sm:grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)]">
+            <MetaItem label="Клиент">
+              <span className="inline-block whitespace-nowrap">{clientLine}</span>
+            </MetaItem>
             <MetaItem label="Авто">{vehicleLabel(order.vehicle)}</MetaItem>
             <MetaItem label="Дата">{formatDateTime(order.scheduled_at) || '—'}</MetaItem>
             <MetaItem label="Рабочая зона">{order.work_zone?.name || '—'}</MetaItem>
@@ -607,5 +618,48 @@ export default function RepairOrderViewModal({
         </div>
       )}
     </Modal>
+    <Modal
+      open={printPickerOpen && Boolean(order?.id)}
+      onClose={() => setPrintPickerOpen(false)}
+      title="Какой документ распечатать?"
+      size="sm"
+      wrapperClassName="z-[120]"
+    >
+      <div className="flex flex-col gap-2">
+        <a
+          href={order?.id ? `/autoservice/orders/${order.id}/print` : '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${secondaryBtnClass} w-full`}
+          onClick={() => setPrintPickerOpen(false)}
+        >
+          Заказ-наряд
+        </a>
+        <button
+          type="button"
+          className={`${secondaryBtnClass} w-full`}
+          onClick={() => {
+            setPrintPickerOpen(false);
+            setUpdBuyerPickerOpen(true);
+          }}
+        >
+          УПД
+        </button>
+        <button type="button" disabled className={`${secondaryBtnClass} w-full cursor-not-allowed opacity-50`}>
+          ТОРГ-12
+        </button>
+        <button type="button" disabled className={`${secondaryBtnClass} w-full cursor-not-allowed opacity-50`}>
+          Счёт на оплату
+        </button>
+        <p className="pt-1 text-center text-xs text-gray-400">ТОРГ-12 и счёт появятся позже</p>
+      </div>
+    </Modal>
+    <UpdBuyerPickerModal
+      open={updBuyerPickerOpen && Boolean(order?.id)}
+      orderId={order?.id}
+      defaultName={order?.client?.name || ''}
+      onClose={() => setUpdBuyerPickerOpen(false)}
+    />
+    </>
   );
 }

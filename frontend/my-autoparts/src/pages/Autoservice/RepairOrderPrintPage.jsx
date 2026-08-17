@@ -100,7 +100,7 @@ function Cell({ children, className = '', align = 'left', ...props }) {
       className={`h-5 border border-black px-1 py-0.5 align-middle ${alignClass} ${className}`}
       {...props}
     >
-      {children || '{2E2A4540-3C30-409F-9D86-1D7F965ACEE1}.png'}
+      {children || '\u00a0'}
     </td>
   );
 }
@@ -267,8 +267,10 @@ export default function RepairOrderPrintPage() {
           </div>
           <div className="space-y-0.5">
             <Field label="Исполнитель" />
-            <p className="font-medium leading-tight">{dash(org?.name) || 'Автосервис'}</p>
-            <Field label="Адрес">{dash(org?.address)}</Field>
+            <p className="font-medium leading-tight">
+              {dash(org?.legal_name || org?.name) || 'Автосервис'}
+            </p>
+            <Field label="Адрес">{dash(org?.legal_address || org?.address)}</Field>
             <Field label="ИНН">{dash(org?.inn)}</Field>
             <Field label="Контактный телефон">{dash(org?.phone)}</Field>
           </div>

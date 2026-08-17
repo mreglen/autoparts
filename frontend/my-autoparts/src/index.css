@@ -261,6 +261,29 @@ input[type="password"] {
   word-break: break-word;
 }
 
+.upd-print-sheet {
+  box-sizing: border-box;
+  width: 297mm;
+  min-height: 210mm;
+  max-width: min(297mm, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 8mm 8mm;
+  background: #fff;
+}
+
+.upd-print-sheet table {
+  table-layout: fixed;
+  width: 100%;
+  max-width: 100%;
+}
+
+.upd-print-sheet th,
+.upd-print-sheet td {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 @page {
   size: A4 portrait;
   margin: 10mm;
@@ -288,6 +311,37 @@ input[type="password"] {
   }
 
   html.repair-order-print-root .repair-order-print-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  html.upd-print-root,
+  html.upd-print-root body,
+  html.upd-print-root #root,
+  html.upd-print-root .repair-order-print-layout,
+  html.upd-print-root .upd-print-page {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  html.upd-print-root .upd-print-toolbar {
+    display: none !important;
+  }
+
+  html.upd-print-root .upd-print-sheet {
     width: 100% !important;
     max-width: 100% !important;
     min-height: 0 !important;

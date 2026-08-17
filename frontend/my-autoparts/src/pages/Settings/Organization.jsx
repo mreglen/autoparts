@@ -91,6 +91,13 @@ export default function Organization() {
     name: '',
     address: '',
     phone: '',
+    legal_name: '',
+    legal_address: '',
+    inn: '',
+    kpp: '',
+    ogrn: '',
+    director_name: '',
+    accountant_name: '',
     description: '',
     logo: '',
   });
@@ -117,6 +124,13 @@ export default function Organization() {
       name: org.name || '',
       address: org.address || '',
       phone: org.phone || '',
+      legal_name: org.legal_name || '',
+      legal_address: org.legal_address || '',
+      inn: org.inn || '',
+      kpp: org.kpp || '',
+      ogrn: org.ogrn || '',
+      director_name: org.director_name || '',
+      accountant_name: org.accountant_name || '',
       description: org.description || '',
       logo: logoValue,
     });
@@ -138,6 +152,13 @@ export default function Organization() {
         name: org.name || '',
         address: org.address || '',
         phone: org.phone || '',
+        legal_name: org.legal_name || '',
+        legal_address: org.legal_address || '',
+        inn: org.inn || '',
+        kpp: org.kpp || '',
+        ogrn: org.ogrn || '',
+        director_name: org.director_name || '',
+        accountant_name: org.accountant_name || '',
         description: org.description || '',
         logo: logoValue,
       });
@@ -180,6 +201,13 @@ export default function Organization() {
           name: formData.name,
           address: formData.address,
           phone: formData.phone,
+          legal_name: formData.legal_name.trim() || null,
+          legal_address: formData.legal_address.trim() || null,
+          inn: formData.inn.trim() || null,
+          kpp: formData.kpp.trim() || null,
+          ogrn: formData.ogrn.trim() || null,
+          director_name: formData.director_name.trim() || null,
+          accountant_name: formData.accountant_name.trim() || null,
           description: formData.description,
           logo_organization: logoUrl,
         }),
@@ -311,13 +339,100 @@ export default function Organization() {
                   />
                 </div>
                 <div>
-                  <FieldLabel htmlFor="organization-phone">Телефон</FieldLabel>
+                  <FieldLabel htmlFor="organization-phone">Контактный телефон организации</FieldLabel>
                   <Input
                     id="organization-phone"
                     type="tel"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
+                    placeholder="+7 (___) ___-__-__"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <FieldLabel htmlFor="organization-legal-name">Юридическое название</FieldLabel>
+                  <Input
+                    id="organization-legal-name"
+                    name="legal_name"
+                    value={formData.legal_name}
+                    onChange={handleChange}
+                    placeholder="ООО «Компания»"
+                  />
+                  <FieldHint>Попадает в шапку заказ-наряда и других документов</FieldHint>
+                </div>
+                <div className="sm:col-span-2">
+                  <FieldLabel htmlFor="organization-legal-address">Юридический адрес</FieldLabel>
+                  <Input
+                    id="organization-legal-address"
+                    name="legal_address"
+                    value={formData.legal_address}
+                    onChange={handleChange}
+                    placeholder="Город, улица, дом"
+                  />
+                </div>
+                <div>
+                  <FieldLabel htmlFor="organization-inn">ИНН</FieldLabel>
+                  <Input
+                    id="organization-inn"
+                    name="inn"
+                    value={formData.inn}
+                    onChange={(e) => {
+                      const next = e.target.value.replace(/\D/g, '').slice(0, 12);
+                      setFormData((prev) => ({ ...prev, inn: next }));
+                    }}
+                    inputMode="numeric"
+                    maxLength={12}
+                    placeholder="10 или 12 цифр"
+                  />
+                </div>
+                <div>
+                  <FieldLabel htmlFor="organization-kpp">КПП</FieldLabel>
+                  <Input
+                    id="organization-kpp"
+                    name="kpp"
+                    value={formData.kpp}
+                    onChange={(e) => {
+                      const next = e.target.value.replace(/\D/g, '').slice(0, 9);
+                      setFormData((prev) => ({ ...prev, kpp: next }));
+                    }}
+                    inputMode="numeric"
+                    maxLength={9}
+                    placeholder="9 цифр"
+                  />
+                </div>
+                <div>
+                  <FieldLabel htmlFor="organization-ogrn">ОГРН / ОГРНИП</FieldLabel>
+                  <Input
+                    id="organization-ogrn"
+                    name="ogrn"
+                    value={formData.ogrn}
+                    onChange={(e) => {
+                      const next = e.target.value.replace(/\D/g, '').slice(0, 15);
+                      setFormData((prev) => ({ ...prev, ogrn: next }));
+                    }}
+                    inputMode="numeric"
+                    maxLength={15}
+                    placeholder="13 или 15 цифр"
+                  />
+                </div>
+                <div>
+                  <FieldLabel htmlFor="organization-director">Руководитель</FieldLabel>
+                  <Input
+                    id="organization-director"
+                    name="director_name"
+                    value={formData.director_name}
+                    onChange={handleChange}
+                    placeholder="ФИО для подписи в УПД"
+                  />
+                </div>
+                <div>
+                  <FieldLabel htmlFor="organization-accountant">Главный бухгалтер</FieldLabel>
+                  <Input
+                    id="organization-accountant"
+                    name="accountant_name"
+                    value={formData.accountant_name}
+                    onChange={handleChange}
+                    placeholder="ФИО для подписи в УПД"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -359,6 +474,36 @@ export default function Organization() {
               <h2 className="text-lg font-semibold text-ink">{org?.name || 'Организация'}</h2>
               <p className="mt-1 text-sm text-ink-muted">{org?.address || 'Адрес не указан'}</p>
               <p className="mt-0.5 text-sm text-ink-muted">{org?.phone || 'Телефон не указан'}</p>
+              <div className="mt-3 space-y-0.5 border-t border-line pt-3 text-sm text-ink-muted">
+                <p>
+                  <span className="font-medium text-ink-soft">Юридическое название: </span>
+                  {org?.legal_name || 'не указано'}
+                </p>
+                <p>
+                  <span className="font-medium text-ink-soft">Юридический адрес: </span>
+                  {org?.legal_address || 'не указан'}
+                </p>
+                <p>
+                  <span className="font-medium text-ink-soft">ИНН: </span>
+                  {org?.inn || 'не указан'}
+                </p>
+                <p>
+                  <span className="font-medium text-ink-soft">КПП: </span>
+                  {org?.kpp || 'не указан'}
+                </p>
+                <p>
+                  <span className="font-medium text-ink-soft">ОГРН / ОГРНИП: </span>
+                  {org?.ogrn || 'не указан'}
+                </p>
+                <p>
+                  <span className="font-medium text-ink-soft">Руководитель: </span>
+                  {org?.director_name || 'не указан'}
+                </p>
+                <p>
+                  <span className="font-medium text-ink-soft">Главный бухгалтер: </span>
+                  {org?.accountant_name || 'не указан'}
+                </p>
+              </div>
               {org?.description ? (
                 <p className="mt-3 max-w-2xl text-sm text-ink-soft">{org.description}</p>
               ) : (

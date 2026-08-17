@@ -12,6 +12,7 @@ from app.db.schema_patches import (
     ensure_organizations_autoservice_columns,
     ensure_organizations_autoservice_paused_columns,
     ensure_organizations_allow_unpaid_checkout_column,
+    ensure_organizations_legal_details_columns,
     ensure_site_settings_markup_tiers_columns,
     ensure_organization_drom_api_columns,
     ensure_stock_out_source_columns,
@@ -49,6 +50,7 @@ from app.db.schema_patches import (
     ensure_autoservice_digest_log_table,
     ensure_autoservice_payments_table,
     ensure_autoservice_warehouse_tables,
+    ensure_autoservice_document_buyers_table,
     ensure_product_reserved_qty_column,
     ensure_repair_order_shop_parts_autoservice_stock,
     ensure_group_chat_columns,
@@ -206,6 +208,7 @@ try:
     ensure_organizations_autoservice_columns()
     ensure_organizations_autoservice_paused_columns()
     ensure_organizations_allow_unpaid_checkout_column()
+    ensure_organizations_legal_details_columns()
     ensure_site_settings_markup_tiers_columns()
     ensure_organization_drom_api_columns()
     ensure_stock_out_source_columns()
@@ -247,6 +250,7 @@ try:
     ensure_autoservice_digest_log_table()
     ensure_autoservice_payments_table()
     ensure_autoservice_warehouse_tables()
+    ensure_autoservice_document_buyers_table()
     ensure_product_reserved_qty_column()
     ensure_repair_order_shop_parts_autoservice_stock()
     ensure_event_log_audit_columns()

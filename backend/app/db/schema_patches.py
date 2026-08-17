@@ -147,6 +147,39 @@ def ensure_organizations_allow_unpaid_checkout_column() -> None:
     logger.info("Applied organizations allow_unpaid_checkout column patch")
 
 
+def ensure_organizations_legal_details_columns() -> None:
+    """Add legal requisites used on printed documents."""
+    inspector = inspect(engine)
+    if "organizations" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("organizations")}
+    statements = []
+    if "legal_name" not in columns:
+        statements.append("ALTER TABLE organizations ADD COLUMN legal_name VARCHAR(255)")
+    if "legal_address" not in columns:
+        statements.append("ALTER TABLE organizations ADD COLUMN legal_address TEXT")
+    if "inn" not in columns:
+        statements.append("ALTER TABLE organizations ADD COLUMN inn VARCHAR(12)")
+    if "kpp" not in columns:
+        statements.append("ALTER TABLE organizations ADD COLUMN kpp VARCHAR(9)")
+    if "ogrn" not in columns:
+        statements.append("ALTER TABLE organizations ADD COLUMN ogrn VARCHAR(15)")
+    if "director_name" not in columns:
+        statements.append("ALTER TABLE organizations ADD COLUMN director_name VARCHAR(160)")
+    if "accountant_name" not in columns:
+        statements.append("ALTER TABLE organizations ADD COLUMN accountant_name VARCHAR(160)")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied organizations legal details column patches: %s", statements)
+
+
 def ensure_site_settings_markup_tiers_columns() -> None:
     """Add buyer and autoservice markup columns to site_settings."""
     inspector = inspect(engine)
@@ -5363,4 +5396,41 @@ def ensure_autoservice_warehouse_tables() -> None:
                 pass
 
     logger.info("Applied autoservice warehouse tables patch")
+
+
+def ensure_autoservice_document_buyers_table() -> None:
+    """Buyers (counterparties) for UPD and other closing documents."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "organizations" not in tables or "autoservice_document_buyers" in tables:
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    ts_type = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    ddl = f"""
+        CREATE TABLE autoservice_document_buyers (
+            id {pk},
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            name VARCHAR(255) NOT NULL,
+            address TEXT,
+            inn VARCHAR(12),
+            kpp VARCHAR(9),
+            created_at {ts_type} NOT NULL DEFAULT {"NOW()" if is_pg else "CURRENT_TIMESTAMP"},
+            updated_at {ts_type} NOT NULL DEFAULT {"NOW()" if is_pg else "CURRENT_TIMESTAMP"}
+        )
+    """
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        try:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_autoservice_document_buyers_org "
+                    "ON autoservice_document_buyers (organization_id)"
+                )
+            )
+        except Exception:
+            pass
+    logger.info("Applied autoservice_document_buyers table patch")
+
 

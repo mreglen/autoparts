@@ -1,10 +1,17 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional
 
 class OrganizationBase(BaseModel):
     name: str
     address: str
     phone: Optional[str] = None
+    legal_name: Optional[str] = None
+    legal_address: Optional[str] = None
+    inn: Optional[str] = None
+    kpp: Optional[str] = None
+    ogrn: Optional[str] = None
+    director_name: Optional[str] = None
+    accountant_name: Optional[str] = None
     logo_organization: Optional[str] = None
     description: Optional[str] = None
     watermark: Optional[int] = 1  # 1=my garage (default), 0=none, 2=my organization
@@ -21,6 +28,13 @@ class OrganizationUpdate(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
+    legal_name: Optional[str] = None
+    legal_address: Optional[str] = None
+    inn: Optional[str] = None
+    kpp: Optional[str] = None
+    ogrn: Optional[str] = None
+    director_name: Optional[str] = None
+    accountant_name: Optional[str] = None
     logo_organization: Optional[str] = None
     description: Optional[str] = None
     watermark: Optional[int] = None
