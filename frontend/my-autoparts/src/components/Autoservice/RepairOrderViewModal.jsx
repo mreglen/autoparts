@@ -423,6 +423,7 @@ export default function RepairOrderViewModal({
     <Modal
       open={!!order || loading}
       onClose={onClose}
+      closeVariant="back"
       size="lg"
       title={
         order ? (
@@ -478,9 +479,6 @@ export default function RepairOrderViewModal({
             </div>
             {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
             <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
-              <button type="button" onClick={onClose} className={secondaryBtnClass}>
-                Назад
-              </button>
               {order?.id && showExecutors ? (
                 <button
                   type="button"
@@ -513,7 +511,7 @@ export default function RepairOrderViewModal({
                   type="button"
                   onClick={handleStartPayment}
                   disabled={paySaving || completeSaving}
-                  className={primaryBtnClass}
+                  className={`${primaryBtnClass} col-span-2 md:col-auto`}
                 >
                   Оплата
                 </button>
@@ -523,7 +521,7 @@ export default function RepairOrderViewModal({
                   type="button"
                   onClick={handleCompleteOrder}
                   disabled={completeSaving || paySaving}
-                  className={successBtnClass}
+                  className={`${successBtnClass} col-span-2 md:col-auto`}
                 >
                   {completeSaving ? 'Закрытие…' : 'Закрыть'}
                 </button>

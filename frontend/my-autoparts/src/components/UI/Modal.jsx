@@ -13,6 +13,7 @@ export default function Modal({
   footer,
   size = 'md',
   className = '',
+  closeVariant = 'close',
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -52,15 +53,27 @@ export default function Modal({
         )}
       >
         {(title || onClose) && (
-          <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
-            <div className="min-w-0">
+          <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:gap-3 sm:px-5 sm:py-4">
+            {onClose && closeVariant === 'back' ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="-ml-1 shrink-0 rounded-sg p-1.5 text-ink hover:bg-surface-subtle"
+                aria-label="Назад"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            ) : null}
+            <div className="min-w-0 flex-1">
               {typeof title === 'string' ? (
                 <h2 className="text-base font-semibold text-ink">{title}</h2>
               ) : (
                 title
               )}
             </div>
-            {onClose ? (
+            {onClose && closeVariant !== 'back' ? (
               <button
                 type="button"
                 onClick={onClose}
