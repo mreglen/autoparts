@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
@@ -12,7 +12,66 @@ import {
   shopPartDisplayName,
   shopPartPricingOptions,
 } from '../../utils/repairOrderShopPartUtils';
-import { Button, EmptyState, Skeleton } from '../../components/UI';
+import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
+import { downloadPrintSheetPdf } from '../../utils/downloadPrintPdf';
+
+const EMPTY_FORM = {
+  orderNumber: '',
+  receivedDate: '',
+  completedDate: '',
+  warrantyNumber: '',
+  acceptedBy: '',
+  contractorName: '',
+  contractorAddress: '',
+  contractorInn: '',
+  contractorPhone: '',
+  clientName: '',
+  clientPhone: '',
+  vehicleMake: '',
+  vehicleModel: '',
+  vehiclePlate: '',
+  vehicleVin: '',
+  vehicleYear: '',
+  vehicleBodyNumber: '',
+  vehicleEngineNumber: '',
+  defectComment: '',
+  signDate: '',
+  clientSignName: '',
+  contractorSignName: '',
+};
+
+const REQUIRED_FIELDS = [
+  ['orderNumber', 'Номер заказ-наряда'],
+  ['receivedDate', 'Дата приема заказа'],
+  ['contractorName', 'Исполнитель'],
+  ['clientName', 'Заказчик'],
+];
+const REQUIRED_FIELD_KEYS = new Set(REQUIRED_FIELDS.map(([key]) => key));
+
+const MODAL_FIELDS = [
+  { key: 'orderNumber', label: 'Номер заказ-наряда' },
+  { key: 'receivedDate', label: 'Дата приема заказа' },
+  { key: 'completedDate', label: 'Дата выполнения заказа' },
+  { key: 'warrantyNumber', label: '№ гарантийного талона' },
+  { key: 'acceptedBy', label: 'Заказ принял' },
+  { key: 'contractorName', label: 'Исполнитель' },
+  { key: 'contractorAddress', label: 'Адрес исполнителя' },
+  { key: 'contractorInn', label: 'ИНН исполнителя' },
+  { key: 'contractorPhone', label: 'Телефон исполнителя' },
+  { key: 'clientName', label: 'Заказчик, ФИО' },
+  { key: 'clientPhone', label: 'Телефон заказчика' },
+  { key: 'vehicleMake', label: 'Марка' },
+  { key: 'vehicleModel', label: 'Модель' },
+  { key: 'vehicleYear', label: 'Год выпуска' },
+  { key: 'vehiclePlate', label: 'Гос. номер' },
+  { key: 'vehicleVin', label: 'VIN' },
+  { key: 'vehicleBodyNumber', label: 'Номер кузова' },
+  { key: 'vehicleEngineNumber', label: 'Номер двигателя' },
+  { key: 'defectComment', label: 'Описание дефектов / комментарий', multiline: true },
+  { key: 'signDate', label: 'Дата подписи' },
+  { key: 'clientSignName', label: 'Подпись заказчика (ф.и.о.)' },
+  { key: 'contractorSignName', label: 'Подпись исполнителя (ф.и.о.)' },
+];
 
 function formatMoney(value) {
   const n = Number(value);
@@ -24,11 +83,6 @@ function lineSum(qty, unitPrice) {
   const q = Number(qty) || 0;
   const p = Number(unitPrice) || 0;
   return Math.round(q * p * 100) / 100;
-}
-
-function dash(value) {
-  const text = value == null ? '' : String(value).trim();
-  return text;
 }
 
 function workExecutorName(work) {
@@ -105,16 +159,84 @@ function Cell({ children, className = '', align = 'left', ...props }) {
   );
 }
 
+function FieldEdit({ name, form, autoForm, onChange, className = '', multiline = false, ...rest }) {
+  const value = form[name] ?? '';
+  const auto = autoForm[name] ?? '';
+  const isManual = String(value).trim() !== String(auto).trim();
+  const cls = `upd-edit ${isManual ? 'is-manual' : ''} ${className}`;
+  if (multiline) {
+    return (
+      <textarea
+        className={`${cls} min-h-[2.6rem] w-full resize-none`}
+        value={value}
+        onChange={(e) => onChange(name, e.target.value)}
+        {...rest}
+      />
+    );
+  }
+  return (
+    <input
+      className={cls}
+      value={value}
+      onChange={(e) => onChange(name, e.target.value)}
+      {...rest}
+    />
+  );
+}
+
+function emptyDate(value) {
+  return !value || value === '—';
+}
+
+function buildAutoForm(order, org) {
+  const vehicle = order?.vehicle || {};
+  const completedDate =
+    order.status === 'completed' || order.status === 'done'
+      ? formatServerDate(order.updated_at || order.scheduled_end_at)
+      : formatServerDate(order.scheduled_end_at);
+  const defectComment = [order.client_comment, order.staff_comment]
+    .map((v) => (v || '').trim())
+    .filter(Boolean)
+    .join('\n');
+  return {
+    ...EMPTY_FORM,
+    orderNumber: String(order.order_number || ''),
+    receivedDate: formatServerDate(order.created_at || order.scheduled_at),
+    completedDate: emptyDate(completedDate) ? '' : completedDate,
+    acceptedBy: order.accepted_by?.name || '',
+    contractorName: org?.legal_name || org?.name || '',
+    contractorAddress: org?.legal_address || org?.address || '',
+    contractorInn: org?.inn || '',
+    contractorPhone: org?.phone || '',
+    clientName: order.client?.name || '',
+    clientPhone: order.client?.phone || '',
+    vehicleMake: vehicle.make || '',
+    vehicleModel: vehicle.model || '',
+    vehiclePlate: vehicle.plate || '',
+    vehicleVin: vehicle.vin || '',
+    vehicleYear: vehicle.year != null ? String(vehicle.year) : '',
+    defectComment,
+    contractorSignName: order.accepted_by?.name || org?.director_name || '',
+  };
+}
+
 export default function RepairOrderPrintPage() {
   const { orderId } = useParams();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
   const org = useSelector((state) => state.organization.data);
   const orgId = user?.organization_id;
+  const seeded = useRef(false);
+  const sheetRef = useRef(null);
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [autoForm, setAutoForm] = useState(EMPTY_FORM);
+  const [editOpen, setEditOpen] = useState(false);
+  const [printHint, setPrintHint] = useState('');
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   useEffect(() => {
     if (orgId) dispatch(fetchOrganization(orgId));
@@ -150,6 +272,15 @@ export default function RepairOrderPrintPage() {
     };
   }, [orderId]);
 
+  useEffect(() => {
+    if (!order || seeded.current) return;
+    if (orgId && !org) return;
+    const next = buildAutoForm(order, org);
+    setAutoForm(next);
+    setForm(next);
+    seeded.current = true;
+  }, [order, org, orgId]);
+
   const totals = useMemo(() => {
     if (!order) return { worksTotal: 0, shopTotal: 0, grand: 0 };
     const works = order.works || [];
@@ -168,6 +299,55 @@ export default function RepairOrderPrintPage() {
     const grand = order.grand_total ?? worksTotal + shopTotal;
     return { worksTotal, shopTotal, grand };
   }, [order]);
+
+  const missingRequired = REQUIRED_FIELDS.filter(([key]) => !String(form[key] || '').trim());
+  const canPrint = missingRequired.length === 0;
+
+  const setField = (name, value) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
+    setPrintHint('');
+  };
+
+  const handlePrint = () => {
+    if (!canPrint) {
+      setPrintHint(`Заполните: ${missingRequired.map(([, label]) => label).join(', ')}`);
+      setEditOpen(true);
+      return;
+    }
+    window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!canPrint) {
+      setPrintHint(`Заполните: ${missingRequired.map(([, label]) => label).join(', ')}`);
+      setEditOpen(true);
+      return;
+    }
+    setPdfBusy(true);
+    setPrintHint('');
+    try {
+      await downloadPrintSheetPdf({
+        element: sheetRef.current,
+        filename: `Заказ-наряд №${order.order_number}`,
+        orientation: 'portrait',
+      });
+    } catch (e) {
+      setPrintHint(e?.message || 'Не удалось сохранить PDF');
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
+  const editControl = (name, extraClass = '', extra = {}) => (
+    <FieldEdit
+      name={name}
+      form={form}
+      autoForm={autoForm}
+      onChange={setField}
+      className={extraClass}
+      {...extra}
+    />
+  );
 
   if (loading) {
     return (
@@ -196,20 +376,9 @@ export default function RepairOrderPrintPage() {
     );
   }
 
-  const vehicle = order.vehicle || {};
   const works = order.works || [];
   const shopParts = order.shop_parts || [];
   const clientParts = order.client_parts || [];
-  const receivedDate = formatServerDate(order.created_at || order.scheduled_at);
-  const completedDate =
-    order.status === 'completed' || order.status === 'done'
-      ? formatServerDate(order.updated_at || order.scheduled_end_at)
-      : formatServerDate(order.scheduled_end_at);
-  const defectComment = [order.client_comment, order.staff_comment]
-    .map((v) => (v || '').trim())
-    .filter(Boolean)
-    .join('\n');
-
   const workRows = rowsOrEmpty(works);
   const shopRows = rowsOrEmpty(shopParts);
   const clientRows = rowsOrEmpty(clientParts);
@@ -245,74 +414,115 @@ export default function RepairOrderPrintPage() {
             <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
               Закрыть
             </Button>
-            <Button type="button" size="sm" onClick={() => window.print()}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+              Редактировать
+            </Button>
+            <Button type="button" size="sm" disabled={!canPrint} onClick={handlePrint}>
               Печать
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={!canPrint || pdfBusy}
+              loading={pdfBusy}
+              onClick={handleDownloadPdf}
+            >
+              Скачать PDF
             </Button>
           </div>
         </div>
+        {!canPrint || printHint ? (
+          <p className="mx-auto mt-2 max-w-[210mm] text-xs text-red-600">
+            {printHint || 'Печать недоступна: заполните обязательные поля или нажмите «Редактировать».'}
+          </p>
+        ) : null}
       </div>
 
-      <article className="repair-order-print-sheet my-4 shadow-sm print:my-0 print:shadow-none">
+      <article
+        ref={sheetRef}
+        data-print-sheet="true"
+        className="repair-order-print-sheet my-4 shadow-sm print:my-0 print:shadow-none"
+      >
         <header className="grid grid-cols-2 gap-x-8 gap-y-1 text-[11px]">
           <div className="space-y-0.5">
             <h1 className="mb-1 text-[15px] font-bold leading-none">
-              Заказ-наряд №{order.order_number}
+              Заказ-наряд №{editControl('orderNumber', 'upd-edit-inline min-w-[3rem] font-bold')}
             </h1>
-            <Field label="Дата приема заказа">{receivedDate}</Field>
-            <Field label="Дата выполнения заказа">
-              {completedDate === '—' ? '' : completedDate}
+            <Field label="Дата приема заказа">
+              {editControl('receivedDate', 'upd-edit-inline min-w-[6rem]')}
             </Field>
-            <Field label="№ гарантийного талона" />
-            <Field label="Заказ принял">{dash(order.accepted_by?.name)}</Field>
+            <Field label="Дата выполнения заказа">
+              {editControl('completedDate', 'upd-edit-inline min-w-[6rem]')}
+            </Field>
+            <Field label="№ гарантийного талона">
+              {editControl('warrantyNumber', 'upd-edit-inline min-w-[6rem]')}
+            </Field>
+            <Field label="Заказ принял">
+              {editControl('acceptedBy', 'upd-edit-inline min-w-[8rem]')}
+            </Field>
           </div>
           <div className="space-y-0.5">
             <Field label="Исполнитель" />
             <p className="font-medium leading-tight">
-              {dash(org?.legal_name || org?.name) || 'Автосервис'}
+              {editControl('contractorName', 'upd-edit-inline min-w-[10rem] font-medium')}
             </p>
-            <Field label="Адрес">{dash(org?.legal_address || org?.address)}</Field>
-            <Field label="ИНН">{dash(org?.inn)}</Field>
-            <Field label="Контактный телефон">{dash(org?.phone)}</Field>
+            <Field label="Адрес">
+              {editControl('contractorAddress', 'upd-edit-inline min-w-[10rem]')}
+            </Field>
+            <Field label="ИНН">
+              {editControl('contractorInn', 'upd-edit-inline min-w-[6rem]')}
+            </Field>
+            <Field label="Контактный телефон">
+              {editControl('contractorPhone', 'upd-edit-inline min-w-[7rem]')}
+            </Field>
           </div>
         </header>
 
         <section className="mt-2 border-t border-black pt-1.5 text-[11px]">
           <p className="font-bold leading-tight">Заказчик</p>
-          <Field label="ФИО">{dash(order.client?.name)}</Field>
-          <Field label="Телефон">{dash(order.client?.phone)}</Field>
+          <Field label="ФИО">{editControl('clientName', 'upd-edit-inline min-w-[10rem]')}</Field>
+          <Field label="Телефон">{editControl('clientPhone', 'upd-edit-inline min-w-[8rem]')}</Field>
         </section>
 
         <table className="mt-2 w-full border-collapse text-[11px] leading-tight">
           <tbody>
             <tr>
               <Cell className="w-[33%]">
-                <span className="font-semibold">Марка</span> {dash(vehicle.make)}
+                <span className="font-semibold">Марка</span>{' '}
+                {editControl('vehicleMake', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
               <Cell className="w-[27%]">
-                <span className="font-semibold">Гос. номер</span> {dash(vehicle.plate)}
+                <span className="font-semibold">Гос. номер</span>{' '}
+                {editControl('vehiclePlate', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
               <Cell>
-                <span className="font-semibold">VIN</span> {dash(vehicle.vin)}
+                <span className="font-semibold">VIN</span>{' '}
+                {editControl('vehicleVin', 'upd-edit-inline min-w-[8rem]')}
               </Cell>
             </tr>
             <tr>
               <Cell>
-                <span className="font-semibold">Модель</span> {dash(vehicle.model)}
+                <span className="font-semibold">Модель</span>{' '}
+                {editControl('vehicleModel', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
               <Cell>
-                <span className="font-semibold">Номер кузова</span>
+                <span className="font-semibold">Номер кузова</span>{' '}
+                {editControl('vehicleBodyNumber', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
               <Cell rowSpan={2} className="align-top">
                 <p className="font-semibold">Описание дефектов / комментарий</p>
-                <p className="mt-0.5 min-h-[2.6rem] whitespace-pre-wrap">{defectComment}</p>
+                {editControl('defectComment', 'mt-0.5', { multiline: true })}
               </Cell>
             </tr>
             <tr>
               <Cell>
-                <span className="font-semibold">Год выпуска</span> {dash(vehicle.year)}
+                <span className="font-semibold">Год выпуска</span>{' '}
+                {editControl('vehicleYear', 'upd-edit-inline min-w-[4rem]')}
               </Cell>
               <Cell>
-                <span className="font-semibold">Номер двигателя</span>
+                <span className="font-semibold">Номер двигателя</span>{' '}
+                {editControl('vehicleEngineNumber', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
             </tr>
           </tbody>
@@ -420,25 +630,79 @@ export default function RepairOrderPrintPage() {
           </p>
           <div className="grid grid-cols-2 items-start gap-x-8">
             <p>
-              Дата <span className="inline-block min-w-[7rem] border-b border-black">&nbsp;</span>
+              Дата {editControl('signDate', 'upd-edit-inline min-w-[7rem]')}
             </p>
             <div className="space-y-2 text-right">
-              <p>
-                Подпись заказчика{' '}
+              <p className="flex items-end justify-end gap-1">
+                Подпись заказчика
                 <span className="inline-block min-w-[4.5rem] border-b border-black">&nbsp;</span>
                 /
-                <span className="inline-block min-w-[8rem] border-b border-black">&nbsp;</span>
+                {editControl('clientSignName', 'upd-edit-inline min-w-[8rem]')}
               </p>
-              <p>
-                Подпись исполнителя{' '}
+              <p className="flex items-end justify-end gap-1">
+                Подпись исполнителя
                 <span className="inline-block min-w-[4.5rem] border-b border-black">&nbsp;</span>
                 /
-                <span className="inline-block min-w-[8rem] border-b border-black">&nbsp;</span>
+                {editControl('contractorSignName', 'upd-edit-inline min-w-[8rem]')}
               </p>
             </div>
           </div>
         </footer>
       </article>
+
+      <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Реквизиты заказ-наряда"
+        size="lg"
+        wrapperClassName="z-[140]"
+      >
+        <p className="mb-3 text-sm text-gray-500">
+          Серым уже подставлено из заказа и организации. Пустые поля можно заполнить вручную.
+        </p>
+        <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+          {MODAL_FIELDS.map((field) => {
+            const filled = Boolean(String(form[field.key] || '').trim());
+            return (
+              <label key={field.key} className="block text-sm">
+                <span className="mb-1 flex items-center gap-2 text-xs font-medium text-gray-600">
+                  <span>
+                    {field.label}
+                    {REQUIRED_FIELD_KEYS.has(field.key) ? (
+                      <span className="ml-0.5 text-red-500">*</span>
+                    ) : null}
+                  </span>
+                  <span className={filled ? 'font-normal text-emerald-600' : 'font-normal text-amber-600'}>
+                    {filled ? 'подставлено' : 'можно заполнить'}
+                  </span>
+                </span>
+                {field.multiline ? (
+                  <textarea
+                    className="block min-h-[4.5rem] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
+                    value={form[field.key] ?? ''}
+                    onChange={(e) => setField(field.key, e.target.value)}
+                  />
+                ) : (
+                  <input
+                    className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
+                    value={form[field.key] ?? ''}
+                    onChange={(e) => setField(field.key, e.target.value)}
+                    placeholder={filled ? '' : 'Не заполнено'}
+                  />
+                )}
+              </label>
+            );
+          })}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" size="sm" onClick={() => setEditOpen(false)}>
+            Подтвердить
+          </Button>
+        </div>
+      </Modal>
+      <style>{`
+        @page { size: A4 portrait; margin: 10mm; }
+      `}</style>
     </div>
   );
 }

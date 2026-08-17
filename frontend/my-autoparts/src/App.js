@@ -112,6 +112,7 @@ const AutoserviceOrdersPage = lazy(() => import('./pages/Autoservice/Autoservice
 const AutoserviceOrderFormPage = lazy(() => import('./pages/Autoservice/AutoserviceOrderFormPage'));
 const RepairOrderPrintPage = lazy(() => import('./pages/Autoservice/RepairOrderPrintPage'));
 const RepairOrderUpdPrintPage = lazy(() => import('./pages/Autoservice/RepairOrderUpdPrintPage'));
+const RepairOrderInvoicePrintPage = lazy(() => import('./pages/Autoservice/RepairOrderInvoicePrintPage'));
 const AutoserviceWelcomePage = lazy(() => import('./pages/Autoservice/AutoserviceWelcomePage'));
 const AutoserviceRepairBookingPage = lazy(() => import('./pages/Autoservice/AutoserviceRepairBookingPage'));
 const AutoservicePlannerPage = lazy(() => import('./pages/Autoservice/AutoservicePlannerPage'));
@@ -341,6 +342,13 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
     return (
       <LazyRoute>
         <RepairOrderUpdPrintPage />
+      </LazyRoute>
+    );
+  }
+  if (section === 'order-invoice-print') {
+    return (
+      <LazyRoute>
+        <RepairOrderInvoicePrintPage />
       </LazyRoute>
     );
   }
@@ -1048,6 +1056,10 @@ function App() {
           <Route
             path="/autoservice/orders/:orderId/print/upd"
             element={<AutoserviceStaffRoute section="order-upd-print" />}
+          />
+          <Route
+            path="/autoservice/orders/:orderId/print/invoice"
+            element={<AutoserviceStaffRoute section="order-invoice-print" />}
           />
           <Route
             path="/autoservice/orders/:orderId/print"

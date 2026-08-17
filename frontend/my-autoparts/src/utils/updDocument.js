@@ -55,3 +55,100 @@ export const UPD_UNIT_META = {
   kg: { code: '166', label: 'кг' },
   service: { code: '796', label: 'шт' },
 };
+
+const ONES_M = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
+const ONES_F = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять'];
+const TEENS = [
+  'десять',
+  'одиннадцать',
+  'двенадцать',
+  'тринадцать',
+  'четырнадцать',
+  'пятнадцать',
+  'шестнадцать',
+  'семнадцать',
+  'восемнадцать',
+  'девятнадцать',
+];
+const TENS = [
+  '',
+  '',
+  'двадцать',
+  'тридцать',
+  'сорок',
+  'пятьдесят',
+  'шестьдесят',
+  'семьдесят',
+  'восемьдесят',
+  'девяносто',
+];
+const HUNDREDS = [
+  '',
+  'сто',
+  'двести',
+  'триста',
+  'четыреста',
+  'пятьсот',
+  'шестьсот',
+  'семьсот',
+  'восемьсот',
+  'девятьсот',
+];
+
+function ruPlural(n, one, few, many) {
+  const n10 = n % 10;
+  const n100 = n % 100;
+  if (n10 === 1 && n100 !== 11) return one;
+  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few;
+  return many;
+}
+
+function triadToWords(value, female) {
+  const n = Number(value) || 0;
+  if (!n) return [];
+  const ones = female ? ONES_F : ONES_M;
+  const parts = [];
+  const h = Math.floor(n / 100);
+  const rest = n % 100;
+  if (h) parts.push(HUNDREDS[h]);
+  if (rest >= 10 && rest <= 19) {
+    parts.push(TEENS[rest - 10]);
+    return parts;
+  }
+  const t = Math.floor(rest / 10);
+  const o = rest % 10;
+  if (t) parts.push(TENS[t]);
+  if (o) parts.push(ones[o]);
+  return parts;
+}
+
+export function formatRublesInWords(amount) {
+  const cents = Math.round((Number(amount) || 0) * 100);
+  const rub = Math.floor(Math.abs(cents) / 100);
+  const kop = Math.abs(cents) % 100;
+  if (!rub) {
+    const zero = `Ноль рублей ${String(kop).padStart(2, '0')} ${ruPlural(kop, 'копейка', 'копейки', 'копеек')}`;
+    return cents < 0 ? `Минус ${zero.toLowerCase()}` : zero;
+  }
+  const groups = [];
+  let rest = rub;
+  const scales = [
+    { female: false, one: '', few: '', many: '' },
+    { female: true, one: 'тысяча', few: 'тысячи', many: 'тысяч' },
+    { female: false, one: 'миллион', few: 'миллиона', many: 'миллионов' },
+    { female: false, one: 'миллиард', few: 'миллиарда', many: 'миллиардов' },
+  ];
+  for (let i = 0; i < scales.length && rest > 0; i += 1) {
+    const triad = rest % 1000;
+    rest = Math.floor(rest / 1000);
+    if (!triad) continue;
+    const scale = scales[i];
+    const words = triadToWords(triad, scale.female);
+    if (scale.one) words.push(ruPlural(triad, scale.one, scale.few, scale.many));
+    groups.unshift(...words);
+  }
+  const text = groups.join(' ').replace(/\s+/g, ' ').trim();
+  const capitalized = text.charAt(0).toUpperCase() + text.slice(1);
+  const result = `${capitalized} ${ruPlural(rub, 'рубль', 'рубля', 'рублей')} ${String(kop).padStart(2, '0')} ${ruPlural(kop, 'копейка', 'копейки', 'копеек')}`;
+  return cents < 0 ? `Минус ${result.charAt(0).toLowerCase()}${result.slice(1)}` : result;
+}

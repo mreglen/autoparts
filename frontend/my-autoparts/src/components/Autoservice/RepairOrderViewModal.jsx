@@ -643,9 +643,15 @@ export default function RepairOrderViewModal({
         <button type="button" disabled className={`${secondaryBtnClass} w-full cursor-not-allowed opacity-50`}>
           ТОРГ-12
         </button>
-        <button type="button" disabled className={`${secondaryBtnClass} w-full cursor-not-allowed opacity-50`}>
+        <a
+          href={order?.id ? `/autoservice/orders/${order.id}/print/invoice` : '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${secondaryBtnClass} w-full`}
+          onClick={() => setPrintPickerOpen(false)}
+        >
           Счёт на оплату
-        </button>
+        </a>
       </div>
     </Modal>
     </>

@@ -11,6 +11,7 @@ import {
   shopPartPricingOptions,
 } from '../../utils/repairOrderShopPartUtils';
 import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
+import { downloadPrintSheetPdf } from '../../utils/downloadPrintPdf';
 import {
   UPD_UNIT_META,
   UPD_VAT_RATE,
@@ -319,6 +320,7 @@ export default function RepairOrderUpdPrintPage() {
   const org = useSelector((state) => state.organization.data);
   const orgId = user?.organization_id;
   const seeded = useRef(false);
+  const sheetRef = useRef(null);
 
   const [order, setOrder] = useState(null);
   const [buyers, setBuyers] = useState([]);
@@ -329,6 +331,7 @@ export default function RepairOrderUpdPrintPage() {
   const [autoForm, setAutoForm] = useState(EMPTY_FORM);
   const [editOpen, setEditOpen] = useState(false);
   const [printHint, setPrintHint] = useState('');
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   useEffect(() => {
     if (orgId) dispatch(fetchOrganization(orgId));
@@ -494,6 +497,29 @@ export default function RepairOrderUpdPrintPage() {
     window.print();
   };
 
+  const handleDownloadPdf = async () => {
+    if (!canPrint) {
+      const reasons = missingRequired.map(([, label]) => label);
+      if (lines.length === 0) reasons.push('Нет строк работ или материалов');
+      setPrintHint(`Заполните: ${reasons.join(', ')}`);
+      setEditOpen(true);
+      return;
+    }
+    setPdfBusy(true);
+    setPrintHint('');
+    try {
+      await downloadPrintSheetPdf({
+        element: sheetRef.current,
+        filename: `УПД №${order.order_number}`,
+        orientation: 'landscape',
+      });
+    } catch (e) {
+      setPrintHint(e?.message || 'Не удалось сохранить PDF');
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   const editControl = (name, extraClass = '') => (
     <FieldEdit name={name} form={form} autoForm={autoForm} onChange={setField} className={extraClass} />
   );
@@ -539,16 +565,30 @@ export default function RepairOrderUpdPrintPage() {
             <Button type="button" size="sm" disabled={!canPrint} onClick={handlePrint}>
               Печать
             </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={!canPrint || pdfBusy}
+              loading={pdfBusy}
+              onClick={handleDownloadPdf}
+            >
+              Скачать PDF
+            </Button>
           </div>
         </div>
-        {!canPrint ? (
+        {!canPrint || printHint ? (
           <p className="mx-auto mt-2 max-w-[297mm] text-xs text-red-600">
             {printHint || 'Печать недоступна: заполните обязательные поля или нажмите «Редактировать».'}
           </p>
         ) : null}
       </div>
 
-      <article className="upd-print-sheet my-4 text-black shadow-sm print:my-0 print:shadow-none">
+      <article
+        ref={sheetRef}
+        data-print-sheet="true"
+        className="upd-print-sheet my-4 text-black shadow-sm print:my-0 print:shadow-none"
+      >
         <div className="upd-l-body">
         <div className="upd-shell">
           <aside className="upd-rail">
