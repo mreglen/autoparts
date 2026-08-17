@@ -646,7 +646,6 @@ export default function RepairOrderViewModal({
         <button type="button" disabled className={`${secondaryBtnClass} w-full cursor-not-allowed opacity-50`}>
           Счёт на оплату
         </button>
-        <p className="pt-1 text-center text-xs text-gray-400">ТОРГ-12 и счёт появятся позже</p>
       </div>
     </Modal>
     </>
