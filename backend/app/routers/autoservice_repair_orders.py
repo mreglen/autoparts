@@ -978,19 +978,32 @@ def list_repair_orders(
     scope: str = Query("active"),
     q: str | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
+    client_id: int | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_staff(db, current_user)
-    if scope not in ("active", "history"):
+    if scope not in ("active", "history", "all"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="scope должен быть active или history",
+            detail="scope должен быть active, history или all",
         )
     query = _order_query(db).filter(RepairOrder.organization_id == org_id)
+    if client_id is not None:
+        client = (
+            db.query(AutoserviceClient)
+            .filter(
+                AutoserviceClient.id == client_id,
+                AutoserviceClient.organization_id == org_id,
+            )
+            .first()
+        )
+        if not client:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Клиент не найден")
+        query = query.filter(RepairOrder.client_id.in_(related_autoservice_client_ids(db, client)))
     if scope == "active":
         query = query.filter(RepairOrder.status.in_(ACTIVE_STATUSES))
-    else:
+    elif scope == "history":
         if status_filter:
             if status_filter not in HISTORY_STATUSES:
                 raise HTTPException(

@@ -5,10 +5,15 @@ import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import Modal from '../../components/UI/Modal';
+import { UnderlineTabs } from '../../components/UI';
+import RepairOrderViewModal, {
+  OrderStatusBadge,
+  vehicleLabel,
+} from '../../components/Autoservice/RepairOrderViewModal';
 import { apiRequest } from '../../utils/apiClient';
 import AutoserviceClientRequisitesFields from '../../components/Autoservice/AutoserviceClientRequisitesFields';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
-import { formatServerDateTime } from '../../utils/serverDate';
+import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import {
   clientRequisitesChanged,
@@ -130,6 +135,167 @@ function ClientProfileFields({ client }) {
   );
 }
 
+const BOOKING_STATUS_LABELS = {
+  new: 'В ожидании',
+  processed: 'Обработано',
+  cancelled: 'Отменена',
+};
+
+const BOOKING_STATUS_STYLES = {
+  new: 'bg-amber-50 text-amber-800 ring-amber-200',
+  processed: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  cancelled: 'bg-gray-100 text-gray-600 ring-gray-200',
+};
+
+const BOOKING_SOURCE_LABELS = {
+  site: 'Сайт',
+  staff: 'Сотрудник',
+  client: 'Клиент',
+};
+
+function formatMoney(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return '0,00';
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function BookingStatusBadge({ status }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
+        BOOKING_STATUS_STYLES[status] || BOOKING_STATUS_STYLES.new
+      }`}
+    >
+      {BOOKING_STATUS_LABELS[status] || status}
+    </span>
+  );
+}
+
+function ClientHistoryList({ loading, empty, children }) {
+  if (loading) {
+    return <p className="text-sm text-gray-500">Загрузка…</p>;
+  }
+  if (!children) {
+    return <p className="text-sm text-gray-500">{empty}</p>;
+  }
+  return <ul className="divide-y divide-gray-100">{children}</ul>;
+}
+
+function ClientOrderRow({ row, onOpen }) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(row)}
+        className="flex w-full items-start justify-between gap-3 py-2.5 text-left transition hover:bg-gray-50/80"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-900">
+            Заказ-наряд №{row.order_number || row.id}
+          </p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {formatServerDateTime(row.scheduled_at || row.created_at) || '—'}
+            {row.vehicle ? ` · ${vehicleLabel(row.vehicle)}` : ''}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <OrderStatusBadge status={row.status} />
+          <p className="mt-1 text-xs tabular-nums text-gray-600">
+            {formatMoney(row.grand_total)} ₽
+          </p>
+        </div>
+      </button>
+    </li>
+  );
+}
+
+function ClientBookingRow({ row, onOpen }) {
+  const vehicle = row.vehicle
+    ? [row.vehicle.make, row.vehicle.model, row.vehicle.plate].filter(Boolean).join(' ')
+    : '';
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(row)}
+        className="flex w-full items-start justify-between gap-3 py-2.5 text-left transition hover:bg-gray-50/80"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-900">
+            {formatServerDate(row.preferred_date) || 'Запись'}
+          </p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {BOOKING_SOURCE_LABELS[row.source] || row.source || '—'}
+            {vehicle ? ` · ${vehicle}` : ''}
+          </p>
+        </div>
+        <BookingStatusBadge status={row.status} />
+      </button>
+    </li>
+  );
+}
+
+function ClientBookingViewModal({ booking, onClose }) {
+  if (!booking) return null;
+  const vehicle = booking.vehicle
+    ? [booking.vehicle.make, booking.vehicle.model, booking.vehicle.year, booking.vehicle.plate]
+        .filter(Boolean)
+        .join(' ')
+    : '';
+  return (
+    <Modal
+      open={Boolean(booking)}
+      onClose={onClose}
+      title={`Запись · ${formatServerDate(booking.preferred_date) || booking.name || ''}`}
+      size="md"
+      wrapperClassName="z-[120]"
+      footer={
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            Закрыть
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-3 text-sm text-gray-700">
+        <div className="flex flex-wrap items-center gap-2">
+          <BookingStatusBadge status={booking.status} />
+          <span className="text-xs text-gray-500">
+            {BOOKING_SOURCE_LABELS[booking.source] || booking.source || '—'}
+          </span>
+        </div>
+        <p>
+          <span className="font-medium text-gray-900">Имя:</span> {booking.name || '—'}
+        </p>
+        <p>
+          <span className="font-medium text-gray-900">Телефон:</span> {booking.phone || '—'}
+        </p>
+        <p>
+          <span className="font-medium text-gray-900">Желаемая дата:</span>{' '}
+          {formatServerDate(booking.preferred_date) || '—'}
+        </p>
+        <p>
+          <span className="font-medium text-gray-900">Автомобиль:</span> {vehicle || '—'}
+        </p>
+        <p>
+          <span className="font-medium text-gray-900">Создана:</span>{' '}
+          {formatServerDateTime(booking.created_at) || '—'}
+        </p>
+        <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
+          <p>
+            <span className="font-medium text-gray-900">Комментарий:</span>{' '}
+            <span className="whitespace-pre-wrap">{booking.notes?.trim() || '—'}</span>
+          </p>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function ClientProfileModal({
   open,
   client,
@@ -140,19 +306,74 @@ function ClientProfileModal({
   onVinClick,
   onSaved,
 }) {
+  const navigate = useNavigate();
   const isGuest = isGuestClient(client);
+  const clientId = client?.id;
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(emptyClientRequisites(client));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [section, setSection] = useState('profile');
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [viewBooking, setViewBooking] = useState(null);
 
   useEffect(() => {
-    if (!open) return;
     setEditing(false);
     setForm(emptyClientRequisites(client));
     setError('');
     setSaving(false);
-  }, [open, client]);
+    setSection('profile');
+    setOrders([]);
+    setBookings([]);
+    setViewOrder(null);
+    setViewBooking(null);
+  }, [open, clientId]);
+
+  useEffect(() => {
+    if (!open || !clientId) return undefined;
+    let cancelled = false;
+    (async () => {
+      setOrdersLoading(true);
+      try {
+        const data = await apiRequest(
+          `/autoservice/repair-orders?scope=all&client_id=${encodeURIComponent(clientId)}`,
+        );
+        if (!cancelled) setOrders(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setOrders([]);
+      } finally {
+        if (!cancelled) setOrdersLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, clientId]);
+
+  useEffect(() => {
+    if (!open || !clientId) return undefined;
+    let cancelled = false;
+    (async () => {
+      setBookingsLoading(true);
+      try {
+        const data = await apiRequest(
+          `/autoservice/inspection-bookings?client_id=${encodeURIComponent(clientId)}`,
+        );
+        if (!cancelled) setBookings(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setBookings([]);
+      } finally {
+        if (!cancelled) setBookingsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, clientId]);
 
   const handleClose = () => {
     if (saving) return;
@@ -160,8 +381,18 @@ function ClientProfileModal({
     onClose?.();
   };
 
+  const startEditing = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    setSection('profile');
+    setForm(emptyClientRequisites(client));
+    setError('');
+    setEditing(true);
+  };
+
   const handleSave = async (e) => {
     e?.preventDefault?.();
+    e?.stopPropagation?.();
     if (!client?.id) return;
     setError('');
     if (isGuest) {
@@ -192,7 +423,14 @@ function ClientProfileModal({
     }
   };
 
+  const tabs = [
+    { id: 'profile', label: 'Профиль' },
+    { id: 'orders', label: 'Заказ-наряды', count: ordersLoading ? undefined : orders.length },
+    { id: 'bookings', label: 'Записи', count: bookingsLoading ? undefined : bookings.length },
+  ];
+
   return (
+    <>
     <Modal
       open={open}
       onClose={handleClose}
@@ -215,8 +453,8 @@ function ClientProfileModal({
                 Отмена
               </button>
               <button
-                type="submit"
-                form="edit-autoservice-client"
+                type="button"
+                onClick={handleSave}
                 disabled={saving}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
               >
@@ -232,17 +470,16 @@ function ClientProfileModal({
               >
                 Закрыть
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setForm(emptyClientRequisites(client));
-                  setError('');
-                  setEditing(true);
-                }}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
-              >
-                Редактировать
-              </button>
+              {section === 'profile' ? (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={startEditing}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  Редактировать
+                </button>
+              ) : null}
             </>
           )}
         </div>
@@ -250,47 +487,96 @@ function ClientProfileModal({
     >
       {client ? (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <AccountBadge userId={client.user_id} />
-            {isGuest ? (
-              <p className="text-xs text-gray-500">
-                Гость — можно менять ФИО, телефон и автомобили.
-              </p>
-            ) : (
-              <p className="text-xs text-gray-500">
-                ФИО и телефон берутся из аккаунта.
-              </p>
-            )}
-          </div>
-
-          {editing ? (
-            <form id="edit-autoservice-client" onSubmit={handleSave} className="space-y-3">
-              <AutoserviceClientRequisitesFields
-                form={form}
-                onChange={setForm}
-                isGuest={isGuest}
-                disabled={saving}
-                idPrefix="client-card"
-              />
-              {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            </form>
-          ) : (
-            <ClientProfileFields client={client} />
+          {editing ? null : (
+            <UnderlineTabs
+              tabs={tabs}
+              value={section}
+              onChange={setSection}
+              ariaLabel="Разделы карточки клиента"
+            />
           )}
 
-          <div className="border-t border-gray-100 pt-4">
-            <h3 className="mb-3 text-sm font-semibold text-gray-900">Автомобили</h3>
-            <VehicleList
-              vehicles={vehicles}
-              loading={loading}
-              canEdit={isGuest}
-              onEdit={onEditVehicle}
-              onVinClick={onVinClick}
-            />
-          </div>
+          {section === 'profile' || editing ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <AccountBadge userId={client.user_id} />
+                {isGuest ? (
+                  <p className="text-xs text-gray-500">
+                    Гость — можно менять ФИО, телефон и автомобили.
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    ФИО и телефон берутся из аккаунта.
+                  </p>
+                )}
+              </div>
+
+              {editing ? (
+                <form id="edit-autoservice-client" onSubmit={handleSave} className="space-y-3">
+                  <AutoserviceClientRequisitesFields
+                    form={form}
+                    onChange={setForm}
+                    isGuest={isGuest}
+                    disabled={saving}
+                    idPrefix="client-card"
+                  />
+                  {error ? <p className="text-sm text-red-600">{error}</p> : null}
+                </form>
+              ) : (
+                <ClientProfileFields client={client} />
+              )}
+
+              <div className="border-t border-gray-100 pt-4">
+                <h3 className="mb-3 text-sm font-semibold text-gray-900">Автомобили</h3>
+                <VehicleList
+                  vehicles={vehicles}
+                  loading={loading}
+                  canEdit={isGuest}
+                  onEdit={onEditVehicle}
+                  onVinClick={onVinClick}
+                />
+              </div>
+            </>
+          ) : null}
+
+          {section === 'orders' && !editing ? (
+            <ClientHistoryList loading={ordersLoading} empty="Заказ-нарядов нет">
+              {orders.length
+                ? orders.map((row) => (
+                    <ClientOrderRow key={row.id} row={row} onOpen={setViewOrder} />
+                  ))
+                : null}
+            </ClientHistoryList>
+          ) : null}
+
+          {section === 'bookings' && !editing ? (
+            <ClientHistoryList loading={bookingsLoading} empty="Записей нет">
+              {bookings.length
+                ? bookings.map((row) => (
+                    <ClientBookingRow key={row.id} row={row} onOpen={setViewBooking} />
+                  ))
+                : null}
+            </ClientHistoryList>
+          ) : null}
         </div>
       ) : null}
     </Modal>
+    <RepairOrderViewModal
+      order={viewOrder}
+      enablePayment
+      onClose={() => setViewOrder(null)}
+      onOrderChange={(updated) => {
+        setViewOrder(updated);
+        setOrders((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
+      }}
+      onEdit={(order) => {
+        setViewOrder(null);
+        handleClose();
+        navigate(`/autoservice/orders/${order.id}/edit`);
+      }}
+    />
+    <ClientBookingViewModal booking={viewBooking} onClose={() => setViewBooking(null)} />
+    </>
   );
 }
 

@@ -211,6 +211,7 @@ def create_client_inspection_booking(
 )
 def list_inspection_bookings(
     status_filter: str | None = Query(None, alias="status"),
+    client_id: int | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -220,6 +221,23 @@ def list_inspection_bookings(
         .options(joinedload(InspectionBooking.vehicle))
         .filter(InspectionBooking.organization_id == org_id)
     )
+    if client_id is not None:
+        client = (
+            db.query(AutoserviceClient)
+            .filter(
+                AutoserviceClient.id == client_id,
+                AutoserviceClient.organization_id == org_id,
+            )
+            .first()
+        )
+        if not client:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Клиент не найден")
+        related_ids = related_autoservice_client_ids(db, client)
+        phone_clauses = [InspectionBooking.client_id.in_(related_ids)]
+        phone = (client.phone or "").strip()
+        if phone:
+            phone_clauses.append(InspectionBooking.phone == phone)
+        q = q.filter(or_(*phone_clauses))
     if status_filter:
         if status_filter not in VALID_STATUSES:
             raise HTTPException(
