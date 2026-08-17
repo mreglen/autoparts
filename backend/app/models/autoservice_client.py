@@ -4,6 +4,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -23,6 +24,12 @@ class AutoserviceClient(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     name = Column(String(120), nullable=False)
     phone = Column(String(32), nullable=False)
+    person_type = Column(String(16), nullable=False, default="individual")
+    legal_name = Column(String(255), nullable=True)
+    address = Column(Text, nullable=True)
+    inn = Column(String(12), nullable=True)
+    kpp = Column(String(9), nullable=True)
+    ogrn = Column(String(15), nullable=True)
     status = Column(String(32), nullable=False, default="active")
     source = Column(String(32), nullable=False)
     consented_at = Column(DateTime, nullable=False)

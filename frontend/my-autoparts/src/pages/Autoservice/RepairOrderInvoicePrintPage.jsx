@@ -11,6 +11,7 @@ import {
   shopPartPricingOptions,
 } from '../../utils/repairOrderShopPartUtils';
 import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
+import AutoserviceDocumentClientEditor from '../../components/Autoservice/AutoserviceDocumentClientEditor';
 import { downloadPrintSheetPdf } from '../../utils/downloadPrintPdf';
 import {
   UPD_UNIT_META,
@@ -21,6 +22,14 @@ import {
   roundMoney,
   splitVatInclusive,
 } from '../../utils/updDocument';
+import {
+  clientRequisitesChanged,
+  clientToBuyerFields,
+  emptyClientRequisites,
+  isGuestClient,
+  resolveClientForDocuments,
+  saveAutoserviceClientRequisites,
+} from '../../utils/autoserviceClientRequisites';
 
 const EMPTY_FORM = {
   invoiceNumber: '',
@@ -70,10 +79,6 @@ const MODAL_FIELDS = [
   { key: 'bik', label: 'БИК' },
   { key: 'checkingAccount', label: 'Расчётный счёт' },
   { key: 'corrAccount', label: 'Корр. счёт' },
-  { key: 'buyerName', label: 'Покупатель' },
-  { key: 'buyerAddress', label: 'Адрес покупателя' },
-  { key: 'buyerInn', label: 'ИНН покупателя' },
-  { key: 'buyerKpp', label: 'КПП покупателя' },
   { key: 'purpose', label: 'Основание' },
   { key: 'directorName', label: 'Руководитель (фамилия и инициалы)' },
   { key: 'accountantName', label: 'Бухгалтер (фамилия и инициалы)' },
@@ -144,11 +149,11 @@ function FieldEdit({ name, form, autoForm, onChange, className = '', ...rest }) 
   );
 }
 
-function buildAutoForm(order, org, buyer) {
+function buildAutoForm(order, org, client) {
   const sellerName = org?.legal_name || org?.name || '';
   const sellerAddress = org?.legal_address || org?.address || '';
   const shortDate = formatServerDate(order.created_at || order.scheduled_at);
-  const buyerName = buyer?.name || order?.client?.name || '';
+  const buyer = clientToBuyerFields(client || order?.client);
   return {
     ...EMPTY_FORM,
     invoiceNumber: String(order.order_number || ''),
@@ -158,10 +163,10 @@ function buildAutoForm(order, org, buyer) {
     sellerInn: String(org?.inn || '').trim(),
     sellerKpp: String(org?.kpp || '').trim(),
     sellerPhone: String(org?.phone || '').trim(),
-    buyerName,
-    buyerAddress: buyer?.address || '',
-    buyerInn: String(buyer?.inn || '').trim(),
-    buyerKpp: String(buyer?.kpp || '').trim(),
+    buyerName: buyer.buyerName,
+    buyerAddress: buyer.buyerAddress,
+    buyerInn: buyer.buyerInn,
+    buyerKpp: buyer.buyerKpp,
     purpose: `Заказ-наряд № ${order.order_number} от ${shortDate}`,
     directorName: formatSurnameInitials(org?.director_name),
     accountantName: formatSurnameInitials(org?.accountant_name),
@@ -179,8 +184,10 @@ export default function RepairOrderInvoicePrintPage() {
   const sheetRef = useRef(null);
 
   const [order, setOrder] = useState(null);
-  const [buyers, setBuyers] = useState([]);
-  const [matchedBuyer, setMatchedBuyer] = useState(null);
+  const [client, setClient] = useState(null);
+  const [clientForm, setClientForm] = useState(emptyClientRequisites());
+  const [clientSaving, setClientSaving] = useState(false);
+  const [clientError, setClientError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
@@ -207,18 +214,13 @@ export default function RepairOrderInvoicePrintPage() {
       setLoading(true);
       setError('');
       try {
-        const [orderData, buyersData] = await Promise.all([
-          apiRequest(`/autoservice/repair-orders/${orderId}`),
-          apiRequest('/autoservice/document-buyers').catch(() => []),
-        ]);
+        const orderData = await apiRequest(`/autoservice/repair-orders/${orderId}`);
         if (cancelled) return;
-        const list = Array.isArray(buyersData) ? buyersData : [];
+        const resolved = await resolveClientForDocuments(orderData?.client);
+        if (cancelled) return;
         setOrder(orderData);
-        setBuyers(list);
-        const clientName = String(orderData?.client?.name || '').trim().toLowerCase();
-        setMatchedBuyer(
-          list.find((row) => String(row.name || '').trim().toLowerCase() === clientName) || null,
-        );
+        setClient(resolved || orderData?.client || null);
+        setClientForm(emptyClientRequisites(resolved || orderData?.client));
       } catch (e) {
         if (!cancelled) {
           setOrder(null);
@@ -236,11 +238,11 @@ export default function RepairOrderInvoicePrintPage() {
   useEffect(() => {
     if (!order || seeded.current) return;
     if (orgId && !org) return;
-    const next = buildAutoForm(order, org, matchedBuyer);
+    const next = buildAutoForm(order, org, client);
     setAutoForm(next);
     setForm(next);
     seeded.current = true;
-  }, [order, org, orgId, matchedBuyer]);
+  }, [order, org, orgId, client]);
 
   const lines = useMemo(() => {
     if (!order) return [];
@@ -287,22 +289,44 @@ export default function RepairOrderInvoicePrintPage() {
   );
   const canPrint = missingRequired.length === 0 && lines.length > 0;
 
-  const setField = (name, value) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
-    setPrintHint('');
+  const applyClientToSheet = (clientLike) => {
+    const buyer = clientToBuyerFields(clientLike);
+    setForm((prev) => ({ ...prev, ...buyer }));
+    setAutoForm((prev) => ({ ...prev, ...buyer }));
   };
 
-  const applySavedBuyer = (id) => {
-    const row = buyers.find((item) => String(item.id) === String(id));
-    if (!row) return;
-    const nextBuyer = {
-      buyerName: row.name || '',
-      buyerAddress: row.address || '',
-      buyerInn: String(row.inn || '').trim(),
-      buyerKpp: String(row.kpp || '').trim(),
-    };
-    setForm((prev) => ({ ...prev, ...nextBuyer }));
-    setAutoForm((prev) => ({ ...prev, ...nextBuyer }));
+  const handleClientFormChange = (next) => {
+    setClientForm(next);
+    setClientError('');
+    applyClientToSheet({ ...(client || {}), ...next });
+  };
+
+  const handleConfirmEdit = async () => {
+    if (client?.id && clientRequisitesChanged(clientForm, emptyClientRequisites(client))) {
+      setClientSaving(true);
+      setClientError('');
+      try {
+        const updated = await saveAutoserviceClientRequisites(client.id, clientForm, {
+          isGuest: isGuestClient(client),
+        });
+        setClient(updated);
+        setClientForm(emptyClientRequisites(updated));
+        applyClientToSheet(updated);
+        saveBank(orgId, form);
+      } catch (err) {
+        setClientError(err?.message || 'Не удалось сохранить клиента');
+        setClientSaving(false);
+        return;
+      }
+      setClientSaving(false);
+    } else {
+      saveBank(orgId, form);
+    }
+    setEditOpen(false);
+  };
+
+  const setField = (name, value) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
     setPrintHint('');
   };
 
@@ -561,27 +585,14 @@ export default function RepairOrderInvoicePrintPage() {
         wrapperClassName="z-[140]"
       >
         <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
-          {buyers.length ? (
-            <label className="block text-sm">
-              <span className="mb-1 block text-xs font-medium text-gray-600">Покупатель из справочника</span>
-              <select
-                className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
-                defaultValue=""
-                onChange={(e) => {
-                  applySavedBuyer(e.target.value);
-                  e.target.value = '';
-                }}
-              >
-                <option value="">Выбрать сохранённого…</option>
-                {buyers.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {row.name}
-                    {row.inn ? ` · ИНН ${row.inn}` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
+          <AutoserviceDocumentClientEditor
+            client={client}
+            form={clientForm}
+            onChange={handleClientFormChange}
+            disabled={clientSaving}
+            idPrefix="invoice-client"
+          />
+          {clientError ? <p className="text-sm text-red-600">{clientError}</p> : null}
           {MODAL_FIELDS.map((field) => (
             <label key={field.key} className="block text-sm">
               <span className="mb-1 block text-xs font-medium text-gray-600">
@@ -592,6 +603,7 @@ export default function RepairOrderInvoicePrintPage() {
                 className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
                 value={form[field.key] ?? ''}
                 onChange={(e) => setField(field.key, e.target.value)}
+                placeholder={String(form[field.key] || '').trim() ? '' : 'Не заполнено'}
               />
             </label>
           ))}
@@ -600,10 +612,8 @@ export default function RepairOrderInvoicePrintPage() {
           <Button
             type="button"
             size="sm"
-            onClick={() => {
-              saveBank(orgId, form);
-              setEditOpen(false);
-            }}
+            loading={clientSaving}
+            onClick={handleConfirmEdit}
           >
             Подтвердить
           </Button>

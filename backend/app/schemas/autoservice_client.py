@@ -5,11 +5,23 @@ from pydantic import BaseModel, Field
 
 
 AutoserviceClientSource = Literal["self", "staff"]
+AutoserviceClientPersonType = Literal["individual", "ie", "legal"]
 
 
 class AutoserviceClientStaffCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     phone: str = Field(min_length=5, max_length=40)
+
+
+class AutoserviceClientStaffUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=120)
+    phone: Optional[str] = Field(default=None, min_length=5, max_length=40)
+    person_type: Optional[AutoserviceClientPersonType] = None
+    legal_name: Optional[str] = Field(default=None, max_length=255)
+    address: Optional[str] = None
+    inn: Optional[str] = Field(default=None, max_length=20)
+    kpp: Optional[str] = Field(default=None, max_length=20)
+    ogrn: Optional[str] = Field(default=None, max_length=20)
 
 
 class AutoserviceClientView(BaseModel):
@@ -18,6 +30,12 @@ class AutoserviceClientView(BaseModel):
     user_id: Optional[int] = None
     name: str
     phone: str
+    person_type: str = "individual"
+    legal_name: Optional[str] = None
+    address: Optional[str] = None
+    inn: Optional[str] = None
+    kpp: Optional[str] = None
+    ogrn: Optional[str] = None
     status: str
     source: str
     consented_at: datetime

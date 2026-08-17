@@ -159,7 +159,18 @@ def _vehicle_brief(vehicle: GarageVehicle) -> RepairOrderVehicleBrief:
 
 
 def _client_brief(client: AutoserviceClient) -> RepairOrderClientBrief:
-    return RepairOrderClientBrief(id=client.id, name=client.name, phone=client.phone)
+    return RepairOrderClientBrief(
+        id=client.id,
+        name=client.name,
+        phone=client.phone,
+        user_id=client.user_id,
+        person_type=client.person_type or "individual",
+        legal_name=client.legal_name,
+        address=client.address,
+        inn=client.inn,
+        kpp=client.kpp,
+        ogrn=client.ogrn,
+    )
 
 
 def _sorted_works(row: RepairOrder) -> list[RepairOrderWork]:

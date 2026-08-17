@@ -5434,3 +5434,36 @@ def ensure_autoservice_document_buyers_table() -> None:
     logger.info("Applied autoservice_document_buyers table patch")
 
 
+def ensure_autoservice_clients_requisites_columns() -> None:
+    """Add optional legal requisites used on client cards and printed documents."""
+    inspector = inspect(engine)
+    if "autoservice_clients" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("autoservice_clients")}
+    statements = []
+    if "person_type" not in columns:
+        statements.append(
+            "ALTER TABLE autoservice_clients ADD COLUMN person_type VARCHAR(16) NOT NULL DEFAULT 'individual'"
+        )
+    if "legal_name" not in columns:
+        statements.append("ALTER TABLE autoservice_clients ADD COLUMN legal_name VARCHAR(255)")
+    if "address" not in columns:
+        statements.append("ALTER TABLE autoservice_clients ADD COLUMN address TEXT")
+    if "inn" not in columns:
+        statements.append("ALTER TABLE autoservice_clients ADD COLUMN inn VARCHAR(12)")
+    if "kpp" not in columns:
+        statements.append("ALTER TABLE autoservice_clients ADD COLUMN kpp VARCHAR(9)")
+    if "ogrn" not in columns:
+        statements.append("ALTER TABLE autoservice_clients ADD COLUMN ogrn VARCHAR(15)")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied autoservice_clients requisites column patches: %s", statements)
+
+

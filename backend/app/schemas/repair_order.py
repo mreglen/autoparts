@@ -37,6 +37,13 @@ class RepairOrderClientBrief(BaseModel):
     id: int
     name: str
     phone: str
+    user_id: Optional[int] = None
+    person_type: str = "individual"
+    legal_name: Optional[str] = None
+    address: Optional[str] = None
+    inn: Optional[str] = None
+    kpp: Optional[str] = None
+    ogrn: Optional[str] = None
 
 
 class RepairOrderWorkZoneBrief(BaseModel):

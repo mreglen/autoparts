@@ -6,9 +6,17 @@ import AutoserviceLiveSearchField from '../../components/Autoservice/Autoservice
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
+import AutoserviceClientRequisitesFields from '../../components/Autoservice/AutoserviceClientRequisitesFields';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import {
+  clientRequisitesChanged,
+  emptyClientRequisites,
+  isGuestClient,
+  personTypeLabel,
+  saveAutoserviceClientRequisites,
+} from '../../utils/autoserviceClientRequisites';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
@@ -78,7 +86,51 @@ function VehicleList({ vehicles, loading, canEdit = false, onEdit, onVinClick })
   );
 }
 
-function ClientVehiclesModal({
+function ProfileValue({ value }) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return <span className="text-gray-400">не указано</span>;
+  }
+  return text;
+}
+
+function ClientProfileFields({ client }) {
+  const type = client?.person_type || 'individual';
+  const rows = [
+    ['Телефон', client?.phone],
+    ['Тип', personTypeLabel(type)],
+  ];
+  if (type === 'legal') {
+    rows.push(['Наименование', client?.legal_name]);
+  }
+  if (type === 'ie') {
+    rows.push(['Наименование ИП', client?.legal_name]);
+  }
+  rows.push([type === 'legal' ? 'Юридический адрес' : 'Адрес', client?.address]);
+  rows.push(['ИНН', client?.inn]);
+  if (type === 'legal') {
+    rows.push(['КПП', client?.kpp]);
+    rows.push(['ОГРН', client?.ogrn]);
+  }
+  if (type === 'ie') {
+    rows.push(['ОГРНИП', client?.ogrn]);
+  }
+
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {rows.map(([label, value]) => (
+        <div key={label} className={label.includes('адрес') || label.includes('Адрес') ? 'sm:col-span-2' : ''}>
+          <dt className="text-xs font-medium text-gray-500">{label}</dt>
+          <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-900">
+            <ProfileValue value={value} />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function ClientProfileModal({
   open,
   client,
   vehicles,
@@ -86,45 +138,156 @@ function ClientVehiclesModal({
   onClose,
   onEditVehicle,
   onVinClick,
+  onSaved,
 }) {
-  const isGuest = client && !client.user_id;
+  const isGuest = isGuestClient(client);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(emptyClientRequisites(client));
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setEditing(false);
+    setForm(emptyClientRequisites(client));
+    setError('');
+    setSaving(false);
+  }, [open, client]);
+
+  const handleClose = () => {
+    if (saving) return;
+    setEditing(false);
+    onClose?.();
+  };
+
+  const handleSave = async (e) => {
+    e?.preventDefault?.();
+    if (!client?.id) return;
+    setError('');
+    if (isGuest) {
+      if (String(form.name || '').trim().length < 2) {
+        setError('Укажите ФИО');
+        return;
+      }
+      const phoneErr = validatePhone(form.phone);
+      if (phoneErr) {
+        setError(phoneErr);
+        return;
+      }
+    }
+    if (!clientRequisitesChanged(form, emptyClientRequisites(client))) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await saveAutoserviceClientRequisites(client.id, form, { isGuest });
+      onSaved?.(updated);
+      setForm(emptyClientRequisites(updated));
+      setEditing(false);
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить клиента');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
-      title={client ? `Автомобили — ${client.name}` : 'Автомобили'}
-      size="md"
+      onClose={handleClose}
+      title={client ? client.name : 'Клиент'}
+      size="lg"
       footer={
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-          >
-            Закрыть
-          </button>
+        <div className="flex flex-wrap justify-end gap-2">
+          {editing ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(false);
+                  setForm(emptyClientRequisites(client));
+                  setError('');
+                }}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                disabled={saving}
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                form="edit-autoservice-client"
+                disabled={saving}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {saving ? 'Сохранение…' : 'Сохранить'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                Закрыть
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setForm(emptyClientRequisites(client));
+                  setError('');
+                  setEditing(true);
+                }}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                Редактировать
+              </button>
+            </>
+          )}
         </div>
       }
     >
       {client ? (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-            <span>{client.phone || '—'}</span>
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-2">
             <AccountBadge userId={client.user_id} />
+            {isGuest ? (
+              <p className="text-xs text-gray-500">
+                Гость — можно менять ФИО, телефон и автомобили.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500">
+                ФИО и телефон берутся из аккаунта.
+              </p>
+            )}
           </div>
-          {isGuest ? (
-            <p className="text-xs text-gray-500">
-              Клиент без аккаунта — автомобили можно редактировать.
-            </p>
-          ) : null}
-          <VehicleList
-            vehicles={vehicles}
-            loading={loading}
-            canEdit={isGuest}
-            onEdit={onEditVehicle}
-            onVinClick={onVinClick}
-          />
+
+          {editing ? (
+            <form id="edit-autoservice-client" onSubmit={handleSave} className="space-y-3">
+              <AutoserviceClientRequisitesFields
+                form={form}
+                onChange={setForm}
+                isGuest={isGuest}
+                disabled={saving}
+                idPrefix="client-card"
+              />
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            </form>
+          ) : (
+            <ClientProfileFields client={client} />
+          )}
+
+          <div className="border-t border-gray-100 pt-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-900">Автомобили</h3>
+            <VehicleList
+              vehicles={vehicles}
+              loading={loading}
+              canEdit={isGuest}
+              onEdit={onEditVehicle}
+              onVinClick={onVinClick}
+            />
+          </div>
         </div>
       ) : null}
     </Modal>
@@ -409,11 +572,12 @@ function AddClientModal({ open, onClose, onCreated }) {
     >
       <form id="add-autoservice-client" onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Имя</label>
+          <label className="block text-sm font-medium text-gray-700">ФИО</label>
           <input
             className={inputClass}
             value={name}
             onChange={(e) => setName(e.target.value)}
+            placeholder="Иванов Иван Иванович"
             disabled={saving}
             required
             maxLength={120}
@@ -657,7 +821,7 @@ export default function AutoserviceClientsPage() {
         }}
       />
 
-      <ClientVehiclesModal
+      <ClientProfileModal
         open={Boolean(vehiclesModalClient)}
         client={vehiclesModalClient}
         vehicles={vehiclesModalClient ? clientVehicles[vehiclesModalClient.id] : []}
@@ -665,6 +829,10 @@ export default function AutoserviceClientsPage() {
         onClose={closeClientVehicles}
         onEditVehicle={setEditVehicle}
         onVinClick={handleVinClick}
+        onSaved={(updated) => {
+          setVehiclesModalClient(updated);
+          setRows((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
+        }}
       />
 
       <EditGuestVehicleModal

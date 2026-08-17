@@ -12,6 +12,7 @@ from app.models.user import User
 from app.schemas.autoservice_client import (
     AutoserviceClientMeResponse,
     AutoserviceClientStaffCreate,
+    AutoserviceClientStaffUpdate,
     AutoserviceClientView,
 )
 from app.utils.autoservice_access import (
@@ -47,6 +48,44 @@ def _find_by_phone(db: Session, org_id: str, phone: str) -> AutoserviceClient | 
         )
         .first()
     )
+
+
+def _digits_or_none(value: str | None, max_len: int) -> str | None:
+    if value is None:
+        return None
+    digits = "".join(ch for ch in str(value) if ch.isdigit())[:max_len]
+    return digits or None
+
+
+def _text_or_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _get_org_client_or_404(db: Session, org_id: str, client_id: int) -> AutoserviceClient:
+    row = (
+        db.query(AutoserviceClient)
+        .filter(
+            AutoserviceClient.id == client_id,
+            AutoserviceClient.organization_id == org_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Клиент не найден")
+    return row
+
+
+def _apply_person_type_defaults(row: AutoserviceClient) -> None:
+    person_type = row.person_type or "individual"
+    if person_type == "individual":
+        row.legal_name = None
+        row.kpp = None
+        row.ogrn = None
+    elif person_type == "ie":
+        row.kpp = None
 
 
 @router.get("/autoservice/clients/me", response_model=AutoserviceClientMeResponse)
@@ -122,6 +161,7 @@ def become_autoservice_client(
         user_id=current_user.id,
         name=user_display_name(current_user),
         phone=phone,
+        person_type="individual",
         status="active",
         source="self",
         consented_at=now,
@@ -177,12 +217,69 @@ def create_autoservice_client_staff(
         user_id=linked_user.id if linked_user else None,
         name=name,
         phone=phone,
+        person_type="individual",
         status="active",
         source="staff",
         consented_at=now,
         created_by_user_id=current_user.id,
     )
     db.add(row)
+    db.commit()
+    db.refresh(row)
+    return AutoserviceClientView.model_validate(row)
+
+
+@router.patch(
+    "/autoservice/clients/{client_id}",
+    response_model=AutoserviceClientView,
+)
+def update_autoservice_client_staff(
+    client_id: int,
+    payload: AutoserviceClientStaffUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    row = _get_org_client_or_404(db, org_id, client_id)
+    data = payload.model_dump(exclude_unset=True)
+    is_guest = row.user_id is None
+
+    if "name" in data:
+        if is_guest:
+            name = (data["name"] or "").strip()
+            if len(name) < 2:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Укажите имя",
+                )
+            row.name = name
+
+    if "phone" in data:
+        if is_guest:
+            phone = normalize_phone_or_400(data["phone"])
+            existing = _find_by_phone(db, org_id, phone)
+            if existing and existing.id != row.id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Этот телефон уже привязан к другому клиенту автосервиса",
+                )
+            row.phone = phone
+
+    if "person_type" in data and data["person_type"]:
+        row.person_type = data["person_type"]
+
+    if "legal_name" in data:
+        row.legal_name = _text_or_none(data["legal_name"])
+    if "address" in data:
+        row.address = _text_or_none(data["address"])
+    if "inn" in data:
+        row.inn = _digits_or_none(data["inn"], 12)
+    if "kpp" in data:
+        row.kpp = _digits_or_none(data["kpp"], 9)
+    if "ogrn" in data:
+        row.ogrn = _digits_or_none(data["ogrn"], 15)
+
+    _apply_person_type_defaults(row)
     db.commit()
     db.refresh(row)
     return AutoserviceClientView.model_validate(row)

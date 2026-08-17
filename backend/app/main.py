@@ -30,6 +30,7 @@ from app.db.schema_patches import (
     ensure_inspection_bookings_table,
     ensure_inspection_bookings_unified,
     ensure_autoservice_clients_table,
+    ensure_autoservice_clients_requisites_columns,
     ensure_autoservice_tariff_applications_table,
     ensure_garage_vehicles_table,
     ensure_garage_vehicle_laximo_columns,
@@ -230,6 +231,7 @@ try:
     ensure_inspection_bookings_table()
     ensure_inspection_bookings_unified()
     ensure_autoservice_clients_table()
+    ensure_autoservice_clients_requisites_columns()
     ensure_autoservice_tariff_applications_table()
     ensure_garage_vehicles_table()
     ensure_garage_vehicle_laximo_columns()

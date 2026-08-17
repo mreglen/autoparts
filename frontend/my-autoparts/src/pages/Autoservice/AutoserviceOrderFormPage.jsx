@@ -350,11 +350,12 @@ function AddClientModal({ onClose, onCreated }) {
     <Modal title="Добавить клиента" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sg-caption font-medium text-ink-muted">Имя</label>
+          <label className="block text-sg-caption font-medium text-ink-muted">ФИО</label>
           <input
             className={pillInputClass}
             value={name}
             onChange={(e) => setName(e.target.value)}
+            placeholder="Иванов Иван Иванович"
             disabled={saving}
             required
             maxLength={120}

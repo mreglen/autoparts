@@ -13,7 +13,16 @@ import {
   shopPartPricingOptions,
 } from '../../utils/repairOrderShopPartUtils';
 import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
+import AutoserviceDocumentClientEditor from '../../components/Autoservice/AutoserviceDocumentClientEditor';
 import { downloadPrintSheetPdf } from '../../utils/downloadPrintPdf';
+import {
+  clientRequisitesChanged,
+  clientToOrderCustomer,
+  emptyClientRequisites,
+  isGuestClient,
+  resolveClientForDocuments,
+  saveAutoserviceClientRequisites,
+} from '../../utils/autoserviceClientRequisites';
 
 const EMPTY_FORM = {
   orderNumber: '',
@@ -58,8 +67,6 @@ const MODAL_FIELDS = [
   { key: 'contractorAddress', label: 'Адрес исполнителя' },
   { key: 'contractorInn', label: 'ИНН исполнителя' },
   { key: 'contractorPhone', label: 'Телефон исполнителя' },
-  { key: 'clientName', label: 'Заказчик, ФИО' },
-  { key: 'clientPhone', label: 'Телефон заказчика' },
   { key: 'vehicleMake', label: 'Марка' },
   { key: 'vehicleModel', label: 'Модель' },
   { key: 'vehicleYear', label: 'Год выпуска' },
@@ -188,7 +195,7 @@ function emptyDate(value) {
   return !value || value === '—';
 }
 
-function buildAutoForm(order, org) {
+function buildAutoForm(order, org, client) {
   const vehicle = order?.vehicle || {};
   const completedDate =
     order.status === 'completed' || order.status === 'done'
@@ -198,6 +205,7 @@ function buildAutoForm(order, org) {
     .map((v) => (v || '').trim())
     .filter(Boolean)
     .join('\n');
+  const customer = clientToOrderCustomer(client || order?.client);
   return {
     ...EMPTY_FORM,
     orderNumber: String(order.order_number || ''),
@@ -208,14 +216,15 @@ function buildAutoForm(order, org) {
     contractorAddress: org?.legal_address || org?.address || '',
     contractorInn: org?.inn || '',
     contractorPhone: org?.phone || '',
-    clientName: order.client?.name || '',
-    clientPhone: order.client?.phone || '',
+    clientName: customer.clientName,
+    clientPhone: customer.clientPhone,
     vehicleMake: vehicle.make || '',
     vehicleModel: vehicle.model || '',
     vehiclePlate: vehicle.plate || '',
     vehicleVin: vehicle.vin || '',
     vehicleYear: vehicle.year != null ? String(vehicle.year) : '',
     defectComment,
+    clientSignName: client?.name || order.client?.name || '',
     contractorSignName: order.accepted_by?.name || org?.director_name || '',
   };
 }
@@ -230,6 +239,10 @@ export default function RepairOrderPrintPage() {
   const sheetRef = useRef(null);
 
   const [order, setOrder] = useState(null);
+  const [client, setClient] = useState(null);
+  const [clientForm, setClientForm] = useState(emptyClientRequisites());
+  const [clientSaving, setClientSaving] = useState(false);
+  const [clientError, setClientError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
@@ -257,7 +270,12 @@ export default function RepairOrderPrintPage() {
       setError('');
       try {
         const data = await apiRequest(`/autoservice/repair-orders/${orderId}`);
-        if (!cancelled) setOrder(data);
+        if (cancelled) return;
+        const resolved = await resolveClientForDocuments(data?.client);
+        if (cancelled) return;
+        setOrder(data);
+        setClient(resolved || data?.client || null);
+        setClientForm(emptyClientRequisites(resolved || data?.client));
       } catch (e) {
         if (!cancelled) {
           setOrder(null);
@@ -275,11 +293,11 @@ export default function RepairOrderPrintPage() {
   useEffect(() => {
     if (!order || seeded.current) return;
     if (orgId && !org) return;
-    const next = buildAutoForm(order, org);
+    const next = buildAutoForm(order, org, client);
     setAutoForm(next);
     setForm(next);
     seeded.current = true;
-  }, [order, org, orgId]);
+  }, [order, org, orgId, client]);
 
   const totals = useMemo(() => {
     if (!order) return { worksTotal: 0, shopTotal: 0, grand: 0 };
@@ -302,6 +320,39 @@ export default function RepairOrderPrintPage() {
 
   const missingRequired = REQUIRED_FIELDS.filter(([key]) => !String(form[key] || '').trim());
   const canPrint = missingRequired.length === 0;
+
+  const applyClientToSheet = (clientLike) => {
+    const customer = clientToOrderCustomer(clientLike);
+    setForm((prev) => ({ ...prev, ...customer }));
+    setAutoForm((prev) => ({ ...prev, ...customer }));
+  };
+
+  const handleClientFormChange = (next) => {
+    setClientForm(next);
+    setClientError('');
+    applyClientToSheet({ ...(client || {}), ...next });
+  };
+
+  const handleConfirmEdit = async () => {
+    if (client?.id && clientRequisitesChanged(clientForm, emptyClientRequisites(client))) {
+      setClientSaving(true);
+      setClientError('');
+      try {
+        const updated = await saveAutoserviceClientRequisites(client.id, clientForm, {
+          isGuest: isGuestClient(client),
+        });
+        setClient(updated);
+        setClientForm(emptyClientRequisites(updated));
+        applyClientToSheet(updated);
+      } catch (err) {
+        setClientError(err?.message || 'Не удалось сохранить клиента');
+        setClientSaving(false);
+        return;
+      }
+      setClientSaving(false);
+    }
+    setEditOpen(false);
+  };
 
   const setField = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -658,9 +709,17 @@ export default function RepairOrderPrintPage() {
         wrapperClassName="z-[140]"
       >
         <p className="mb-3 text-sm text-gray-500">
-          Серым уже подставлено из заказа и организации. Пустые поля можно заполнить вручную.
+          Серым уже подставлено из заказа и организации. Реквизиты клиента сохраняются в его карточку.
         </p>
         <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+          <AutoserviceDocumentClientEditor
+            client={client}
+            form={clientForm}
+            onChange={handleClientFormChange}
+            disabled={clientSaving}
+            idPrefix="order-client"
+          />
+          {clientError ? <p className="text-sm text-red-600">{clientError}</p> : null}
           {MODAL_FIELDS.map((field) => {
             const filled = Boolean(String(form[field.key] || '').trim());
             return (
@@ -681,6 +740,7 @@ export default function RepairOrderPrintPage() {
                     className="block min-h-[4.5rem] w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
                     value={form[field.key] ?? ''}
                     onChange={(e) => setField(field.key, e.target.value)}
+                    placeholder={filled ? '' : 'Не заполнено'}
                   />
                 ) : (
                   <input
@@ -695,7 +755,7 @@ export default function RepairOrderPrintPage() {
           })}
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" size="sm" onClick={() => setEditOpen(false)}>
+          <Button type="button" size="sm" loading={clientSaving} onClick={handleConfirmEdit}>
             Подтвердить
           </Button>
         </div>
