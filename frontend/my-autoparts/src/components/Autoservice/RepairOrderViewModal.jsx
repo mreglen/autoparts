@@ -3,7 +3,6 @@ import Modal from '../UI/Modal';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
 import { Skeleton } from '../UI';
-import UpdBuyerPickerModal from './UpdBuyerPickerModal';
 import {
   formatShopPartQty,
   formatShopPartUnit,
@@ -341,7 +340,6 @@ export default function RepairOrderViewModal({
   const [completeSaving, setCompleteSaving] = useState(false);
   const [completeError, setCompleteError] = useState('');
   const [printPickerOpen, setPrintPickerOpen] = useState(false);
-  const [updBuyerPickerOpen, setUpdBuyerPickerOpen] = useState(false);
 
   useEffect(() => {
     setPayOpen(false);
@@ -350,7 +348,6 @@ export default function RepairOrderViewModal({
     setPayError('');
     setCompleteError('');
     setPrintPickerOpen(false);
-    setUpdBuyerPickerOpen(false);
   }, [order?.id]);
 
   const totals = order ? orderTotals(order) : null;
@@ -430,7 +427,6 @@ export default function RepairOrderViewModal({
       open={!!order || loading}
       onClose={() => {
         setPrintPickerOpen(false);
-        setUpdBuyerPickerOpen(false);
         onClose?.();
       }}
       closeVariant="back"
@@ -635,16 +631,15 @@ export default function RepairOrderViewModal({
         >
           Заказ-наряд
         </a>
-        <button
-          type="button"
+        <a
+          href={order?.id ? `/autoservice/orders/${order.id}/print/upd` : '#'}
+          target="_blank"
+          rel="noopener noreferrer"
           className={`${secondaryBtnClass} w-full`}
-          onClick={() => {
-            setPrintPickerOpen(false);
-            setUpdBuyerPickerOpen(true);
-          }}
+          onClick={() => setPrintPickerOpen(false)}
         >
           УПД
-        </button>
+        </a>
         <button type="button" disabled className={`${secondaryBtnClass} w-full cursor-not-allowed opacity-50`}>
           ТОРГ-12
         </button>
@@ -654,12 +649,6 @@ export default function RepairOrderViewModal({
         <p className="pt-1 text-center text-xs text-gray-400">ТОРГ-12 и счёт появятся позже</p>
       </div>
     </Modal>
-    <UpdBuyerPickerModal
-      open={updBuyerPickerOpen && Boolean(order?.id)}
-      orderId={order?.id}
-      defaultName={order?.client?.name || ''}
-      onClose={() => setUpdBuyerPickerOpen(false)}
-    />
     </>
   );
 }

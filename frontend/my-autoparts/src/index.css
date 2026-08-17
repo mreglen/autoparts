@@ -263,7 +263,7 @@ input[type="password"] {
 
 .upd-print-sheet {
   --upd-rail: 36mm;
-  --upd-bar: 3.5px;
+  --upd-bar: 2px;
   box-sizing: border-box;
   width: 297mm;
   min-height: 210mm;
@@ -311,10 +311,20 @@ input[type="password"] {
 }
 
 .upd-l-body {
-  background-image: linear-gradient(#000, #000);
-  background-repeat: no-repeat;
-  background-position: var(--upd-rail) 0;
-  background-size: var(--upd-bar) 100%;
+  position: relative;
+}
+
+.upd-l-body::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--upd-rail);
+  width: var(--upd-bar);
+  margin-left: -1px;
+  background: #000;
+  z-index: 2;
+  pointer-events: none;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
 }
@@ -390,6 +400,7 @@ input[type="password"] {
 .upd-print-sheet thead th:first-child,
 .upd-print-sheet tbody td:first-child {
   width: var(--upd-rail);
+  border-right-color: transparent;
 }
 
 .upd-sheets {
@@ -427,6 +438,56 @@ input[type="password"] {
   font-size: 9.5pt;
 }
 
+.upd-edit {
+  display: inline-block;
+  box-sizing: border-box;
+  min-height: 1.15em;
+  min-width: 3.2rem;
+  width: 100%;
+  margin: 0;
+  padding: 0 3px;
+  border: 0;
+  border-bottom: 1px solid #000;
+  border-radius: 0;
+  background: #e5e7eb;
+  color: #111;
+  font: inherit;
+  line-height: 1.15;
+  outline: none;
+}
+
+.upd-edit.upd-edit-inline {
+  width: auto;
+  max-width: 100%;
+}
+
+.upd-edit.is-manual {
+  color: #dc2626;
+}
+
+.upd-edit:focus {
+  background: #dbeafe;
+}
+
+.upd-uv .upd-edit {
+  border-bottom: 0;
+  background: #e5e7eb;
+}
+
+@media print {
+  .upd-edit,
+  .upd-uv .upd-edit {
+    background: transparent !important;
+    color: #000 !important;
+    border-bottom: 1px solid #000;
+    padding: 0 2px;
+  }
+
+  .upd-uv .upd-edit {
+    border-bottom: 0;
+  }
+}
+
 .upd-fn {
   padding-bottom: 1px;
   text-align: center;
@@ -451,6 +512,7 @@ input[type="password"] {
   left: var(--upd-rail);
   right: 0;
   height: var(--upd-bar);
+  margin-left: -1px;
   background: #000;
   print-color-adjust: exact;
   -webkit-print-color-adjust: exact;
@@ -564,7 +626,7 @@ input[type="password"] {
   }
 
   html.upd-print-root .upd-print-sheet {
-    --upd-bar: 1.5px;
+    --upd-bar: 2px;
     width: 100% !important;
     max-width: 100% !important;
     min-height: 0 !important;

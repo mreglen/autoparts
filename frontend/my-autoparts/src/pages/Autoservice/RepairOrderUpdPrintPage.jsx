@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
@@ -10,7 +10,7 @@ import {
   shopPartDisplayName,
   shopPartPricingOptions,
 } from '../../utils/repairOrderShopPartUtils';
-import { Button, EmptyState, Skeleton } from '../../components/UI';
+import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
 import {
   UPD_UNIT_META,
   UPD_VAT_RATE,
@@ -21,10 +21,91 @@ import {
   splitVatInclusive,
 } from '../../utils/updDocument';
 
-function dash(value) {
-  const text = value == null ? '' : String(value).trim();
-  return text || '--';
-}
+const EMPTY_FORM = {
+  invoiceNumber: '',
+  invoiceDate: '',
+  correctionNumber: '--',
+  correctionDate: '--',
+  sellerName: '',
+  sellerAddress: '',
+  sellerInnKpp: '',
+  buyerName: '',
+  buyerAddress: '',
+  buyerInnKpp: '',
+  consignor: '--',
+  consignee: '--',
+  currency: 'Российский рубль, 643',
+  govContract: '--',
+  paymentNumber: '',
+  paymentDate: '',
+  shipmentDoc: '',
+  advanceInvoice: '',
+  grounds: '',
+  transport: '--',
+  directorName: '',
+  accountantName: '',
+  ipName: '',
+  ogrn: '',
+  handedPosition: '',
+  handedName: '',
+  shipDate: '',
+  handedOther: '',
+  handedEntity: '',
+  receivedPosition: '',
+  receivedName: '',
+  receiveDate: '',
+  receivedOther: '',
+  receivedEntity: '',
+};
+
+const REQUIRED_FIELDS = [
+  ['invoiceNumber', 'Счет-фактура № (1)'],
+  ['invoiceDate', 'Дата счета-фактуры (1)'],
+  ['sellerName', 'Продавец (2)'],
+  ['sellerAddress', 'Адрес продавца (2а)'],
+  ['sellerInnKpp', 'ИНН/КПП продавца (2б)'],
+  ['buyerName', 'Покупатель (6)'],
+  ['buyerAddress', 'Адрес покупателя (6а)'],
+  ['buyerInnKpp', 'ИНН/КПП покупателя (6б)'],
+];
+const REQUIRED_FIELD_KEYS = new Set(REQUIRED_FIELDS.map(([key]) => key));
+
+const MODAL_FIELDS = [
+  { num: '(1)', key: 'invoiceNumber', label: 'Счет-фактура №' },
+  { num: '(1)', key: 'invoiceDate', label: 'Дата счета-фактуры' },
+  { num: '(1а)', key: 'correctionNumber', label: 'Исправление №' },
+  { num: '(1а)', key: 'correctionDate', label: 'Дата исправления' },
+  { num: '(2)', key: 'sellerName', label: 'Продавец' },
+  { num: '(2а)', key: 'sellerAddress', label: 'Адрес продавца' },
+  { num: '(2б)', key: 'sellerInnKpp', label: 'ИНН/КПП продавца' },
+  { num: '(6)', key: 'buyerName', label: 'Покупатель' },
+  { num: '(6а)', key: 'buyerAddress', label: 'Адрес покупателя' },
+  { num: '(6б)', key: 'buyerInnKpp', label: 'ИНН/КПП покупателя' },
+  { num: '(3)', key: 'consignor', label: 'Грузоотправитель и его адрес' },
+  { num: '(4)', key: 'consignee', label: 'Грузополучатель и его адрес' },
+  { num: '(7)', key: 'currency', label: 'Валюта: наименование, код' },
+  { num: '(8)', key: 'govContract', label: 'Идентификатор госконтракта' },
+  { num: '(5)', key: 'paymentNumber', label: 'К платежно-расчетному документу №' },
+  { num: '(5)', key: 'paymentDate', label: 'Дата платежно-расчетного документа' },
+  { num: '(5а)', key: 'shipmentDoc', label: 'Документ об отгрузке' },
+  { num: '(5б)', key: 'advanceInvoice', label: 'К счету-фактуре (аванс)' },
+  { num: '[8]', key: 'grounds', label: 'Основание передачи' },
+  { num: '[9]', key: 'transport', label: 'Данные о транспортировке и грузе' },
+  { num: '', key: 'directorName', label: 'Руководитель (ф.и.о.)' },
+  { num: '', key: 'accountantName', label: 'Главный бухгалтер (ф.и.о.)' },
+  { num: '', key: 'ipName', label: 'Индивидуальный предприниматель (ф.и.о.)' },
+  { num: '', key: 'ogrn', label: 'ОГРН / ОГРНИП' },
+  { num: '[10]', key: 'handedPosition', label: 'Сдал, должность' },
+  { num: '[10]', key: 'handedName', label: 'Сдал, ф.и.о.' },
+  { num: '[11]', key: 'shipDate', label: 'Дата отгрузки, передачи (сдачи)' },
+  { num: '[12]', key: 'handedOther', label: 'Иные сведения об отгрузке' },
+  { num: '[14]', key: 'handedEntity', label: 'Составитель документа (продавец)' },
+  { num: '[15]', key: 'receivedPosition', label: 'Принял, должность' },
+  { num: '[15]', key: 'receivedName', label: 'Принял, ф.и.о.' },
+  { num: '[16]', key: 'receiveDate', label: 'Дата получения (приемки)' },
+  { num: '[17]', key: 'receivedOther', label: 'Иные сведения о получении' },
+  { num: '[19]', key: 'receivedEntity', label: 'Составитель документа (покупатель)' },
+];
 
 function lineSum(qty, unitPrice) {
   const q = Number(qty) || 0;
@@ -57,11 +138,17 @@ function Th({ children, className = '', rowSpan, colSpan }) {
   );
 }
 
-function Line({ children, className = '' }) {
+function FieldEdit({ name, form, autoForm, onChange, className = '', ...rest }) {
+  const value = form[name] ?? '';
+  const auto = autoForm[name] ?? '';
+  const isManual = String(value).trim() !== String(auto).trim();
   return (
-    <span className={`inline-block min-h-[1.1em] min-w-[4rem] border-b border-black px-0.5 ${className}`}>
-      {children || '\u00a0'}
-    </span>
+    <input
+      className={`upd-edit ${isManual ? 'is-manual' : ''} ${className}`}
+      value={value}
+      onChange={(e) => onChange(name, e.target.value)}
+      {...rest}
+    />
   );
 }
 
@@ -88,13 +175,13 @@ function FieldWide({ label, children, num }) {
   );
 }
 
-function SignPair({ name }) {
+function SignPair({ nameNode }) {
   return (
     <div>
       <p className="flex items-end gap-1">
-        <Line className="min-w-[5.2rem]" />
+        <span className="inline-block min-w-[5.2rem] border-b border-black">&nbsp;</span>
         <span>/</span>
-        <Line className="min-w-[7.5rem] text-center">{name}</Line>
+        <span className="min-w-[7.5rem] flex-1">{nameNode}</span>
       </p>
       <p className="flex gap-1">
         <span className="upd-hint inline-block min-w-[5.2rem] text-center">(подпись)</span>
@@ -105,15 +192,15 @@ function SignPair({ name }) {
   );
 }
 
-function TripleSign({ position, name }) {
+function TripleSign({ positionNode, nameNode }) {
   return (
     <div>
       <p className="mt-0.5 flex items-end gap-1">
-        <Line className="min-w-[4.2rem] text-center">{position}</Line>
+        <span className="min-w-[4.2rem] flex-1">{positionNode}</span>
         <span>/</span>
-        <Line className="min-w-[4.2rem]" />
+        <span className="inline-block min-w-[4.2rem] border-b border-black">&nbsp;</span>
         <span>/</span>
-        <Line className="min-w-[6.5rem] text-center">{name}</Line>
+        <span className="min-w-[6.5rem] flex-1">{nameNode}</span>
       </p>
       <p className="flex gap-1">
         <span className="upd-hint inline-block min-w-[4.2rem] text-center">(должность)</span>
@@ -131,10 +218,11 @@ function TransferSide({
   otherHint,
   responsibleLabel,
   entityLabel,
-  position,
-  name,
-  dateText,
-  entity,
+  positionNode,
+  nameNode,
+  dateNode,
+  otherNode,
+  entityNode,
   markStart,
 }) {
   return (
@@ -142,7 +230,7 @@ function TransferSide({
       <div className="flex gap-1">
         <div className="min-w-0 flex-1">
           <p>{handedLabel}</p>
-          <TripleSign position={position} name={name} />
+          <TripleSign positionNode={positionNode} nameNode={nameNode} />
         </div>
         <span className="upd-fn">[{markStart}]</span>
       </div>
@@ -150,14 +238,14 @@ function TransferSide({
         <p className="min-w-0 flex-1">
           {dateLabel}
           {' '}
-          <Line className="min-w-[9rem]">{dateText}</Line>
+          <span className="inline-block min-w-[9rem] align-bottom">{dateNode}</span>
         </p>
         <span className="upd-fn">[{markStart + 1}]</span>
       </div>
       <div className="flex gap-1">
         <p className="min-w-0 flex-1">
           {otherLabel}
-          <span className="upd-uv mt-0.5"> </span>
+          <span className="upd-uv mt-0.5">{otherNode}</span>
           <span className="upd-hint mt-0.5 block">{otherHint}</span>
         </p>
         <span className="upd-fn">[{markStart + 2}]</span>
@@ -165,14 +253,14 @@ function TransferSide({
       <div className="flex gap-1">
         <div className="min-w-0 flex-1">
           <p>{responsibleLabel}</p>
-          <TripleSign position={position} name={name} />
+          <TripleSign positionNode={positionNode} nameNode={nameNode} />
         </div>
         <span className="upd-fn">[{markStart + 3}]</span>
       </div>
       <div className="flex gap-1">
         <p className="min-w-0 flex-1">
           {entityLabel}
-          <span className="upd-uv mt-0.5">{entity}</span>
+          <span className="upd-uv mt-0.5">{entityNode}</span>
           <span className="upd-hint mt-0.5 block">
             (может не заполняться при проставлении печати в М.П., может быть указан ИНН / КПП)
           </span>
@@ -184,6 +272,44 @@ function TransferSide({
   );
 }
 
+function buildAutoForm(order, org, buyer) {
+  const sellerName = org?.legal_name || org?.name || '';
+  const sellerAddress = org?.legal_address || org?.address || '';
+  const sellerInnKpp = innKpp(org?.inn, org?.kpp);
+  const sellerIsIp = /ип|индивидуальн/i.test(sellerName);
+  const directorName = org?.director_name || '';
+  const accountantName = org?.accountant_name || '';
+  const ogrnText = String(org?.ogrn || '').trim();
+  const docDate = parseServerDate(order.created_at || order.scheduled_at) || new Date();
+  const shortDate = formatServerDate(order.created_at || order.scheduled_at);
+  const buyerName = buyer?.name || order?.client?.name || '';
+  const buyerAddress = buyer?.address || '';
+  const buyerInnKpp = innKpp(buyer?.inn, buyer?.kpp);
+  return {
+    ...EMPTY_FORM,
+    invoiceNumber: String(order.order_number || ''),
+    invoiceDate: formatUpdLongDate(docDate),
+    sellerName,
+    sellerAddress,
+    sellerInnKpp,
+    buyerName,
+    buyerAddress,
+    buyerInnKpp,
+    shipmentDoc: `Универсальный передаточный документ, № ${order.order_number} от ${shortDate}`,
+    grounds: `Заказ-наряд № ${order.order_number} от ${shortDate}`,
+    directorName: sellerIsIp ? '' : directorName,
+    accountantName: sellerIsIp ? '' : accountantName,
+    ipName: sellerIsIp ? directorName : '',
+    ogrn: ogrnText,
+    handedPosition: sellerIsIp ? 'ИП' : '',
+    handedName: directorName,
+    shipDate: formatUpdQuotedDate(docDate),
+    handedEntity: `${sellerName}${sellerInnKpp ? `, ИНН/КПП ${sellerInnKpp}` : ''}`,
+    receiveDate: formatUpdQuotedDate(docDate),
+    receivedEntity: `${buyerName}${buyerInnKpp ? `, ИНН ${buyerInnKpp}` : ''}`,
+  };
+}
+
 export default function RepairOrderUpdPrintPage() {
   const { orderId } = useParams();
   const [searchParams] = useSearchParams();
@@ -192,11 +318,17 @@ export default function RepairOrderUpdPrintPage() {
   const user = useSelector((state) => state.auth.user);
   const org = useSelector((state) => state.organization.data);
   const orgId = user?.organization_id;
+  const seeded = useRef(false);
 
   const [order, setOrder] = useState(null);
-  const [buyer, setBuyer] = useState(null);
+  const [buyers, setBuyers] = useState([]);
+  const [matchedBuyer, setMatchedBuyer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [autoForm, setAutoForm] = useState(EMPTY_FORM);
+  const [editOpen, setEditOpen] = useState(false);
+  const [printHint, setPrintHint] = useState('');
 
   useEffect(() => {
     if (orgId) dispatch(fetchOrganization(orgId));
@@ -216,23 +348,24 @@ export default function RepairOrderUpdPrintPage() {
       setLoading(true);
       setError('');
       try {
-        const requests = [apiRequest(`/autoservice/repair-orders/${orderId}`)];
-        if (buyerId) {
-          requests.push(apiRequest(`/autoservice/document-buyers/${buyerId}`));
-        } else {
-          requests.push(Promise.resolve(null));
-        }
-        const [orderData, buyerData] = await Promise.all(requests);
+        const [orderData, buyersData, pickedBuyer] = await Promise.all([
+          apiRequest(`/autoservice/repair-orders/${orderId}`),
+          apiRequest('/autoservice/document-buyers').catch(() => []),
+          buyerId ? apiRequest(`/autoservice/document-buyers/${buyerId}`).catch(() => null) : Promise.resolve(null),
+        ]);
         if (cancelled) return;
+        const list = Array.isArray(buyersData) ? buyersData : [];
         setOrder(orderData);
-        setBuyer(buyerData);
-        if (!buyerData) {
-          setError('Выберите покупателя для УПД');
-        }
+        setBuyers(list);
+        const clientName = String(orderData?.client?.name || '').trim().toLowerCase();
+        const matched =
+          pickedBuyer ||
+          list.find((row) => String(row.name || '').trim().toLowerCase() === clientName) ||
+          null;
+        setMatchedBuyer(matched);
       } catch (e) {
         if (!cancelled) {
           setOrder(null);
-          setBuyer(null);
           setError(e?.message || 'Не удалось загрузить УПД');
         }
       } finally {
@@ -243,6 +376,15 @@ export default function RepairOrderUpdPrintPage() {
       cancelled = true;
     };
   }, [orderId, buyerId]);
+
+  useEffect(() => {
+    if (!order || seeded.current) return;
+    if (orgId && !org) return;
+    const next = buildAutoForm(order, org, matchedBuyer);
+    setAutoForm(next);
+    setForm(next);
+    seeded.current = true;
+  }, [order, org, orgId, matchedBuyer]);
 
   const lines = useMemo(() => {
     if (!order) return [];
@@ -294,6 +436,68 @@ export default function RepairOrderUpdPrintPage() {
     [lines],
   );
 
+  const missingRequired = REQUIRED_FIELDS.filter(([key]) => !String(form[key] || '').trim() || String(form[key]).trim() === '--');
+  const canPrint = missingRequired.length === 0 && lines.length > 0;
+
+  const setField = (name, value) => {
+    setForm((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === 'sellerName' || name === 'sellerInnKpp') {
+        const sellerName = name === 'sellerName' ? value : next.sellerName;
+        const sellerInnKpp = name === 'sellerInnKpp' ? value : next.sellerInnKpp;
+        if (String(prev.handedEntity).trim() === String(autoForm.handedEntity).trim()) {
+          next.handedEntity = `${sellerName}${sellerInnKpp ? `, ИНН/КПП ${sellerInnKpp}` : ''}`;
+        }
+      }
+      if (name === 'buyerName' || name === 'buyerInnKpp') {
+        const buyerName = name === 'buyerName' ? value : next.buyerName;
+        const buyerInnKpp = name === 'buyerInnKpp' ? value : next.buyerInnKpp;
+        if (String(prev.receivedEntity).trim() === String(autoForm.receivedEntity).trim()) {
+          next.receivedEntity = `${buyerName}${buyerInnKpp ? `, ИНН ${buyerInnKpp}` : ''}`;
+        }
+      }
+      return next;
+    });
+    setPrintHint('');
+  };
+
+  const applySavedBuyer = (id) => {
+    const row = buyers.find((item) => String(item.id) === String(id));
+    if (!row) return;
+    const buyerInn = innKpp(row.inn, row.kpp);
+    const receivedEntity = `${row.name || ''}${buyerInn ? `, ИНН ${buyerInn}` : ''}`;
+    setForm((prev) => ({
+      ...prev,
+      buyerName: row.name || '',
+      buyerAddress: row.address || '',
+      buyerInnKpp: buyerInn,
+      receivedEntity,
+    }));
+    setAutoForm((prev) => ({
+      ...prev,
+      buyerName: row.name || '',
+      buyerAddress: row.address || '',
+      buyerInnKpp: buyerInn,
+      receivedEntity,
+    }));
+    setPrintHint('');
+  };
+
+  const handlePrint = () => {
+    if (!canPrint) {
+      const reasons = missingRequired.map(([, label]) => label);
+      if (lines.length === 0) reasons.push('Нет строк работ или материалов');
+      setPrintHint(`Заполните: ${reasons.join(', ')}`);
+      setEditOpen(true);
+      return;
+    }
+    window.print();
+  };
+
+  const editControl = (name, extraClass = '') => (
+    <FieldEdit name={name} form={form} autoForm={autoForm} onChange={setField} className={extraClass} />
+  );
+
   if (loading) {
     return (
       <div className="mx-auto max-w-[297mm] space-y-4 p-6">
@@ -303,7 +507,7 @@ export default function RepairOrderUpdPrintPage() {
     );
   }
 
-  if (error || !order || !buyer) {
+  if (error || !order) {
     return (
       <div className="mx-auto max-w-lg p-6">
         <EmptyState
@@ -320,33 +524,28 @@ export default function RepairOrderUpdPrintPage() {
     );
   }
 
-  const sellerName = org?.legal_name || org?.name || 'Автосервис';
-  const sellerAddress = org?.legal_address || org?.address || '';
-  const sellerInnKpp = innKpp(org?.inn, org?.kpp);
-  const sellerIsIp = /ип|индивидуальн/i.test(sellerName);
-  const directorName = org?.director_name || '';
-  const accountantName = org?.accountant_name || '';
-  const ogrnText = String(org?.ogrn || '').trim();
-  const docDate = parseServerDate(order.created_at || order.scheduled_at) || new Date();
-  const shortDate = formatServerDate(order.created_at || order.scheduled_at);
-  const grounds = `Заказ-наряд № ${order.order_number} от ${shortDate}`;
-  const shipmentTitle = `Универсальный передаточный документ, № ${order.order_number} от ${shortDate}`;
-  const buyerInnKpp = innKpp(buyer.inn, buyer.kpp);
-
   return (
     <div className="upd-print-page min-h-screen bg-gray-100 text-black print:min-h-0 print:bg-white">
       <div className="upd-print-toolbar sticky top-0 z-10 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-[297mm] flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-ink">УПД №{order.order_number}</p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
               Закрыть
             </Button>
-            <Button type="button" size="sm" onClick={() => window.print()}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+              Редактировать
+            </Button>
+            <Button type="button" size="sm" disabled={!canPrint} onClick={handlePrint}>
               Печать
             </Button>
           </div>
         </div>
+        {!canPrint ? (
+          <p className="mx-auto mt-2 max-w-[297mm] text-xs text-red-600">
+            {printHint || 'Печать недоступна: заполните обязательные поля или нажмите «Редактировать».'}
+          </p>
+        ) : null}
       </div>
 
       <article className="upd-print-sheet my-4 text-black shadow-sm print:my-0 print:shadow-none">
@@ -375,15 +574,15 @@ export default function RepairOrderUpdPrintPage() {
               <div className="upd-invoice">
                 <div className="flex items-end gap-2">
                   <p className="min-w-0 flex-1">
-                    Счет-фактура № <Line className="min-w-[2.6rem] font-semibold">{order.order_number}</Line>
-                    {' '}от <Line className="min-w-[7.5rem] font-semibold">{formatUpdLongDate(docDate)}</Line>
+                    Счет-фактура № {editControl('invoiceNumber', 'upd-edit-inline min-w-[2.6rem] font-semibold')}
+                    {' '}от {editControl('invoiceDate', 'upd-edit-inline min-w-[7.5rem] font-semibold')}
                   </p>
                   <span className="upd-fn">(1)</span>
                 </div>
                 <div className="mt-1 flex items-end gap-2">
                   <p className="min-w-0 flex-1">
-                    Исправление № <Line className="min-w-[2.6rem]">--</Line>
-                    {' '}от <Line className="min-w-[7.5rem]">--</Line>
+                    Исправление № {editControl('correctionNumber', 'upd-edit-inline min-w-[2.6rem]')}
+                    {' '}от {editControl('correctionDate', 'upd-edit-inline min-w-[7.5rem]')}
                   </p>
                   <span className="upd-fn">(1а)</span>
                 </div>
@@ -397,49 +596,49 @@ export default function RepairOrderUpdPrintPage() {
             <div className="mt-1">
               <FieldRow
                 leftLabel="Продавец:"
-                leftValue={sellerName}
+                leftValue={editControl('sellerName')}
                 leftNum="(2)"
                 rightLabel="Покупатель:"
-                rightValue={buyer.name}
+                rightValue={editControl('buyerName')}
                 rightNum="(6)"
               />
               <FieldRow
                 leftLabel="Адрес:"
-                leftValue={dash(sellerAddress)}
+                leftValue={editControl('sellerAddress')}
                 leftNum="(2а)"
                 rightLabel="Адрес:"
-                rightValue={dash(buyer.address)}
+                rightValue={editControl('buyerAddress')}
                 rightNum="(6а)"
               />
               <FieldRow
                 leftLabel="ИНН/КПП продавца:"
-                leftValue={dash(sellerInnKpp)}
+                leftValue={editControl('sellerInnKpp')}
                 leftNum="(2б)"
                 rightLabel="ИНН/КПП покупателя:"
-                rightValue={dash(buyerInnKpp)}
+                rightValue={editControl('buyerInnKpp')}
                 rightNum="(6б)"
               />
               <FieldRow
                 leftLabel="Грузоотправитель и его адрес:"
-                leftValue="--"
+                leftValue={editControl('consignor')}
                 leftNum="(3)"
                 rightLabel="Валюта: наименование, код"
-                rightValue="Российский рубль, 643"
+                rightValue={editControl('currency')}
                 rightNum="(7)"
               />
               <FieldRow
                 leftLabel="Грузополучатель и его адрес:"
-                leftValue="--"
+                leftValue={editControl('consignee')}
                 leftNum="(4)"
                 rightLabel="Идентификатор государственного контракта, договора (соглашения) (при наличии):"
-                rightValue="--"
+                rightValue={editControl('govContract')}
                 rightNum="(8)"
               />
               <FieldWide label="К платежно-расчетному документу №" num="(5)">
-                <Line className="min-w-[4rem]" /> от <Line className="min-w-[4rem]" />
+                {editControl('paymentNumber', 'upd-edit-inline min-w-[4rem]')} от {editControl('paymentDate', 'upd-edit-inline min-w-[4rem]')}
               </FieldWide>
               <FieldWide label="Документ об отгрузке" num="(5а)">
-                {shipmentTitle}
+                {editControl('shipmentDoc')}
               </FieldWide>
               <div className="mt-1">
                 <p className="leading-tight">
@@ -447,7 +646,7 @@ export default function RepairOrderUpdPrintPage() {
                 </p>
                 <div className="mt-0.5 flex items-end gap-1">
                   <p className="min-w-0 flex-1">
-                    № <Line className="min-w-[3rem]" /> от <Line className="min-w-[3rem]" />, исправление № <Line className="min-w-[3rem]" /> от <Line className="min-w-[3rem]" />
+                    {editControl('advanceInvoice')}
                   </p>
                   <span className="upd-fn">(5б)</span>
                 </div>
@@ -551,18 +750,18 @@ export default function RepairOrderUpdPrintPage() {
           <div className="upd-main grid grid-cols-2 items-start gap-x-4 pt-1">
             <div>
               <p>Руководитель организации или иное уполномоченное лицо</p>
-              <SignPair name={sellerIsIp ? '' : directorName} />
+              <SignPair nameNode={editControl('directorName')} />
               <p className="mt-2">Индивидуальный предприниматель или иное уполномоченное лицо</p>
-              <SignPair name={sellerIsIp ? directorName : ''} />
+              <SignPair nameNode={editControl('ipName')} />
               <p className="upd-hint mt-0.5">
-                {ogrnText
-                  ? `ОГРНИП ${ogrnText}`
+                {form.ogrn
+                  ? <>ОГРНИП {editControl('ogrn')}</>
                   : '(основной государственный регистрационный номер индивидуального предпринимателя и дата присвоения такого номера)'}
               </p>
             </div>
             <div>
               <p>Главный бухгалтер или иное уполномоченное лицо</p>
-              <SignPair name={sellerIsIp ? '' : accountantName} />
+              <SignPair nameNode={editControl('accountantName')} />
             </div>
           </div>
         </div>
@@ -573,7 +772,7 @@ export default function RepairOrderUpdPrintPage() {
             <div className="flex gap-1">
               <div className="min-w-0 flex-1">
                 <p>Основание передачи (сдачи) / получения (приемки)</p>
-                <span className="upd-uv">{grounds}</span>
+                <span className="upd-uv">{editControl('grounds')}</span>
                 <span className="upd-hint mt-0.5 block">(договор; доверенность и др.)</span>
               </div>
               <span className="upd-fn">[8]</span>
@@ -581,7 +780,7 @@ export default function RepairOrderUpdPrintPage() {
             <div className="mt-1.5 flex gap-1">
               <div className="min-w-0 flex-1">
                 <p>Данные о транспортировке и грузе</p>
-                <span className="upd-uv">--</span>
+                <span className="upd-uv">{editControl('transport')}</span>
                 <span className="upd-hint mt-0.5 block">
                   (транспортная накладная, поручение экспедитору, экспедиторская / складская расписка и др. / масса нетто/ брутто груза, если не приведены ссылки на транспортные документы, содержащие эти сведения)
                 </span>
@@ -598,10 +797,11 @@ export default function RepairOrderUpdPrintPage() {
             otherHint="(ссылки на неотъемлемые приложения, сопутствующие документы, иные документы и т.п.)"
             responsibleLabel="Ответственный за правильность оформления факта хозяйственной жизни"
             entityLabel="Наименование экономического субъекта – составителя документа (в т.ч. комиссионера / агента)"
-            position={sellerIsIp ? 'ИП' : ''}
-            name={directorName}
-            dateText={formatUpdQuotedDate(docDate)}
-            entity={`${sellerName}${sellerInnKpp ? `, ИНН/КПП ${sellerInnKpp}` : ''}`}
+            positionNode={editControl('handedPosition')}
+            nameNode={editControl('handedName')}
+            dateNode={editControl('shipDate', 'upd-edit-inline')}
+            otherNode={editControl('handedOther')}
+            entityNode={editControl('handedEntity')}
             markStart={10}
           />
           <TransferSide
@@ -611,15 +811,67 @@ export default function RepairOrderUpdPrintPage() {
             otherHint="(информация о наличии/отсутствии претензии; ссылки на неотъемлемые приложения, и другие документы и т.п.)"
             responsibleLabel="Ответственный за правильность оформления факта хозяйственной жизни"
             entityLabel="Наименование экономического субъекта – составителя документа"
-            position=""
-            name=""
-            dateText={formatUpdQuotedDate(docDate)}
-            entity={`${buyer.name}${buyerInnKpp ? `, ИНН ${buyerInnKpp}` : ''}`}
+            positionNode={editControl('receivedPosition')}
+            nameNode={editControl('receivedName')}
+            dateNode={editControl('receiveDate', 'upd-edit-inline')}
+            otherNode={editControl('receivedOther')}
+            entityNode={editControl('receivedEntity')}
             markStart={15}
           />
           </div>
         </div>
       </article>
+
+      <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Реквизиты УПД"
+        size="lg"
+        wrapperClassName="z-[140]"
+      >
+        <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+          {buyers.length ? (
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs font-medium text-gray-600">Покупатель из справочника</span>
+              <select
+                className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
+                defaultValue=""
+                onChange={(e) => {
+                  applySavedBuyer(e.target.value);
+                  e.target.value = '';
+                }}
+              >
+                <option value="">Выбрать сохранённого…</option>
+                {buyers.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                    {row.inn ? ` · ИНН ${row.inn}` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {MODAL_FIELDS.map((field) => (
+            <label key={`${field.num}-${field.key}`} className="block text-sm">
+              <span className="mb-1 block text-xs font-medium text-gray-600">
+                {field.num ? <span className="mr-1 text-gray-400">{field.num}</span> : null}
+                {field.label}
+                {REQUIRED_FIELD_KEYS.has(field.key) ? <span className="ml-0.5 text-red-500">*</span> : null}
+              </span>
+              <input
+                className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
+                value={form[field.key] ?? ''}
+                onChange={(e) => setField(field.key, e.target.value)}
+              />
+            </label>
+          ))}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={() => setEditOpen(false)}>
+            Готово
+          </Button>
+        </div>
+      </Modal>
       <style>{`
         @page { size: A4 landscape; margin: 6mm; }
       `}</style>
