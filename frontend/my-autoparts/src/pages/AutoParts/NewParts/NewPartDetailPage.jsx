@@ -183,6 +183,36 @@ export default function NewPartDetailPage() {
   }, [numericCardId]);
 
   useEffect(() => {
+    if (!card?.id || card?.image_url) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await apiAxiosUnauth.post(
+          `/public/new-parts/cards/${card.id}/resolve-image`,
+        );
+        const nextUrl = response?.data?.image_url;
+        const nextCredit = response?.data?.image_attribution;
+        if (!cancelled && nextUrl) {
+          setCard((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  image_url: nextUrl,
+                  image_attribution: nextCredit || prev.image_attribution,
+                }
+              : prev,
+          );
+        }
+      } catch (_e) {
+        // keep placeholder
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [card?.id, card?.image_url]);
+
+  useEffect(() => {
     if (!card?.brand || !card?.article) return;
     const run = async () => {
       setRosskoStatus('loading');
@@ -595,6 +625,7 @@ export default function NewPartDetailPage() {
           <div className="flex gap-3 sm:gap-4">
             <NewPartDetailThumb
               imageUrl={card?.image_url}
+              attribution={card?.image_attribution}
               alt={`${brand} ${article}`}
             />
             <div className="min-w-0 flex-1">
