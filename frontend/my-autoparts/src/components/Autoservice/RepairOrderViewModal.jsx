@@ -487,8 +487,7 @@ export default function RepairOrderViewModal({
                   }}
                   className={secondaryBtnClass}
                 >
-                  <span className="md:hidden">Печать</span>
-                  <span className="hidden md:inline">Печать (макет ещё в разработке)</span>
+                  Печать
                 </button>
               ) : null}
               {onEdit && !payOpen ? (
