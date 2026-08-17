@@ -17,6 +17,7 @@ import {
   formatRublesInWords,
   formatUpdMoney,
   innKpp,
+  roundMoney,
   splitVatInclusive,
 } from '../../utils/updDocument';
 
@@ -244,21 +245,22 @@ export default function RepairOrderInvoicePrintPage() {
     if (!order) return [];
     const rows = [];
     (order.works || []).forEach((w) => {
-      const withVat = w.line_sum ?? lineSum(w.qty, w.unit_price);
+      const withVat = roundMoney(w.line_sum ?? lineSum(w.qty, w.unit_price));
       const qty = Number(w.qty) || 0;
       rows.push({
         title: w.title || 'Работа',
         unit: UPD_UNIT_META.service.label,
         qty,
         qtyLabel: qty || '',
-        unitPrice: qty ? Math.round((withVat / qty) * 100) / 100 : withVat,
+        unitPrice: qty ? roundMoney(withVat / qty) : withVat,
         withVat,
       });
     });
     (order.shop_parts || []).forEach((p) => {
-      const withVat =
+      const withVat = roundMoney(
         p.line_sum ??
-        shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p));
+          shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p)),
+      );
       const qty = Number(p.qty) || 0;
       const unitKey = p.unit && UPD_UNIT_META[p.unit] ? p.unit : 'pcs';
       rows.push({
@@ -266,7 +268,7 @@ export default function RepairOrderInvoicePrintPage() {
         unit: UPD_UNIT_META[unitKey].label,
         qty,
         qtyLabel: formatShopPartQty(p.qty, p.unit || 'pcs'),
-        unitPrice: qty ? Math.round((withVat / qty) * 100) / 100 : withVat,
+        unitPrice: qty ? roundMoney(withVat / qty) : withVat,
         withVat,
       });
     });
@@ -274,7 +276,7 @@ export default function RepairOrderInvoicePrintPage() {
   }, [order]);
 
   const totals = useMemo(() => {
-    const withVat = lines.reduce((sum, row) => Math.round((sum + row.withVat) * 100) / 100, 0);
+    const withVat = lines.reduce((sum, row) => roundMoney(sum + Number(row.withVat || 0)), 0);
     const split = splitVatInclusive(withVat);
     return { ...split, count: lines.length };
   }, [lines]);

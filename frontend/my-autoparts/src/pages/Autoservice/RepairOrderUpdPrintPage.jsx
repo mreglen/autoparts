@@ -19,6 +19,7 @@ import {
   formatUpdMoney,
   formatUpdQuotedDate,
   innKpp,
+  roundMoney,
   splitVatInclusive,
 } from '../../utils/updDocument';
 
@@ -393,7 +394,7 @@ export default function RepairOrderUpdPrintPage() {
     if (!order) return [];
     const rows = [];
     (order.works || []).forEach((w) => {
-      const withVat = w.line_sum ?? lineSum(w.qty, w.unit_price);
+      const withVat = roundMoney(w.line_sum ?? lineSum(w.qty, w.unit_price));
       const split = splitVatInclusive(withVat);
       const qty = Number(w.qty) || 0;
       const unitPrice = qty ? Math.round((split.without / qty) * 100) / 100 : split.without;
@@ -407,9 +408,10 @@ export default function RepairOrderUpdPrintPage() {
       });
     });
     (order.shop_parts || []).forEach((p) => {
-      const withVat =
+      const withVat = roundMoney(
         p.line_sum ??
-        shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p));
+          shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p)),
+      );
       const split = splitVatInclusive(withVat);
       const qty = Number(p.qty) || 0;
       const unitKey = p.unit && UPD_UNIT_META[p.unit] ? p.unit : 'pcs';
@@ -430,9 +432,9 @@ export default function RepairOrderUpdPrintPage() {
     () =>
       lines.reduce(
         (acc, row) => ({
-          without: Math.round((acc.without + row.without) * 100) / 100,
-          vat: Math.round((acc.vat + row.vat) * 100) / 100,
-          withVat: Math.round((acc.withVat + row.withVat) * 100) / 100,
+          without: roundMoney(acc.without + Number(row.without || 0)),
+          vat: roundMoney(acc.vat + Number(row.vat || 0)),
+          withVat: roundMoney(acc.withVat + Number(row.withVat || 0)),
         }),
         { without: 0, vat: 0, withVat: 0 },
       ),
