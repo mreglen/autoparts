@@ -57,6 +57,29 @@ function flattenFormFields(root) {
   });
 }
 
+function normalizeTableCells(sheet) {
+  sheet.querySelectorAll('td, th').forEach((cell) => {
+    cell.classList.remove('h-5');
+    const isBorderless = cell.classList.contains('border-0');
+
+    cell.style.setProperty('height', 'auto', 'important');
+    cell.style.setProperty('line-height', '1.45', 'important');
+    cell.style.setProperty('vertical-align', 'top', 'important');
+    cell.style.setProperty('overflow', 'visible', 'important');
+    cell.style.setProperty('box-sizing', 'border-box', 'important');
+    cell.style.setProperty('word-break', 'break-word', 'important');
+
+    if (isBorderless) {
+      cell.style.setProperty('min-height', '0', 'important');
+      cell.style.setProperty('padding', '2px 4px', 'important');
+      return;
+    }
+
+    cell.style.setProperty('min-height', '22px', 'important');
+    cell.style.setProperty('padding', '5px 4px', 'important');
+  });
+}
+
 function prepareSheetForPdf(clonedDoc, sheet) {
   const style = clonedDoc.createElement('style');
   style.textContent = `
@@ -70,18 +93,27 @@ function prepareSheetForPdf(clonedDoc, sheet) {
       box-shadow: none !important;
       margin: 0 !important;
       background: #fff !important;
+      font-family: Arial, Helvetica, sans-serif !important;
+    }
+    [data-print-sheet="true"] .leading-tight {
+      line-height: 1.45 !important;
     }
     [data-print-sheet="true"] table {
-      border-collapse: separate !important;
+      border-collapse: collapse !important;
       border-spacing: 0 !important;
     }
     [data-print-sheet="true"] th,
     [data-print-sheet="true"] td {
       height: auto !important;
-      min-height: 0 !important;
-      line-height: 1.35 !important;
+      line-height: 1.45 !important;
       overflow: visible !important;
-      vertical-align: middle !important;
+      vertical-align: top !important;
+      box-sizing: border-box !important;
+    }
+    [data-print-sheet="true"] .invoice-bank td {
+      height: auto !important;
+      min-height: 22px !important;
+      padding: 5px 4px !important;
     }
   `;
   clonedDoc.head.appendChild(style);
@@ -90,12 +122,8 @@ function prepareSheetForPdf(clonedDoc, sheet) {
   sheet.style.margin = '0';
   sheet.style.background = '#fff';
 
-  sheet.querySelectorAll('table').forEach((table) => {
-    table.style.borderCollapse = 'separate';
-    table.style.borderSpacing = '0';
-  });
-
   flattenFormFields(sheet);
+  normalizeTableCells(sheet);
 }
 
 export async function downloadPrintSheetPdf({

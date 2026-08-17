@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
@@ -916,7 +916,10 @@ export default function AutoserviceClientsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiRequest('/autoservice/clients');
+      const params = new URLSearchParams();
+      if (qApplied.trim()) params.set('q', qApplied.trim());
+      const suffix = params.toString() ? `?${params.toString()}` : '';
+      const data = await apiRequest(`/autoservice/clients${suffix}`);
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить клиентов');
@@ -924,25 +927,13 @@ export default function AutoserviceClientsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [qApplied]);
 
   useEffect(() => {
     if (isReady && isAuthenticated) {
       load();
     }
   }, [isReady, isAuthenticated, load]);
-
-  const filteredRows = useMemo(() => {
-    const query = qApplied.trim().toLowerCase();
-    if (!query) return rows;
-    const digits = query.replace(/\D/g, '');
-    return rows.filter((row) => {
-      const name = String(row.name || '').toLowerCase();
-      const phone = String(row.phone || '').toLowerCase();
-      const phoneDigits = phone.replace(/\D/g, '');
-      return name.includes(query) || phone.includes(query) || (digits && phoneDigits.includes(digits));
-    });
-  }, [rows, qApplied]);
 
   const openClientVehicles = async (client) => {
     if (!client?.id) return;
@@ -975,7 +966,7 @@ export default function AutoserviceClientsPage() {
             {loading
               ? 'Загрузка…'
               : qApplied.trim()
-                ? `${filteredRows.length} из ${rows.length}`
+                ? `${rows.length} найдено`
                 : `${rows.length} клиентов`}
           </p>
         </div>
@@ -992,7 +983,7 @@ export default function AutoserviceClientsPage() {
         <AutoserviceLiveSearchField
           value={q}
           onChange={setQ}
-          placeholder="Имя или телефон"
+          placeholder="Имя, телефон, авто, VIN, заказ-наряд, запись, ИНН…"
           ariaLabel="Поиск клиентов"
         />
         <button
@@ -1037,14 +1028,14 @@ export default function AutoserviceClientsPage() {
                   Загрузка…
                 </td>
               </tr>
-            ) : filteredRows.length === 0 ? (
+            ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-12 text-center text-gray-500">
                   {rows.length === 0 ? 'Клиентов пока нет' : 'Ничего не найдено'}
                 </td>
               </tr>
             ) : (
-              filteredRows.map((row) => (
+              rows.map((row) => (
                 <tr
                   key={row.id}
                   className="cursor-pointer transition-colors hover:bg-gray-50/70"
@@ -1080,12 +1071,12 @@ export default function AutoserviceClientsPage() {
       <div className="md:hidden">
         {loading ? (
           <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
-        ) : filteredRows.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="py-10 text-center text-sm text-gray-500">
             {rows.length === 0 ? 'Клиентов пока нет' : 'Ничего не найдено'}
           </p>
         ) : (
-          filteredRows.map((row) => (
+          rows.map((row) => (
             <div
               key={row.id}
               onDoubleClick={() => openClientVehicles(row)}

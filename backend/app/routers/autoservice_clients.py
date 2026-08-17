@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import String, cast, or_
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
+from app.models.garage_vehicle import GarageVehicle
+from app.models.inspection_booking import InspectionBooking
+from app.models.repair_booking import RepairBooking
+from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_client import (
     AutoserviceClientMeResponse,
@@ -86,6 +91,127 @@ def _apply_person_type_defaults(row: AutoserviceClient) -> None:
         row.ogrn = None
     elif person_type == "ie":
         row.kpp = None
+
+
+def _apply_client_search_filter(query, org_id: str, q: str | None):
+    if not q or not q.strip():
+        return query
+
+    raw = q.strip()
+    term = f"%{raw}%"
+    digits = "".join(ch for ch in raw if ch.isdigit())
+
+    client_clauses = [
+        AutoserviceClient.name.ilike(term),
+        AutoserviceClient.phone.ilike(term),
+        AutoserviceClient.legal_name.ilike(term),
+        AutoserviceClient.address.ilike(term),
+        AutoserviceClient.inn.ilike(term),
+        AutoserviceClient.kpp.ilike(term),
+        AutoserviceClient.ogrn.ilike(term),
+    ]
+    if digits:
+        client_clauses.append(AutoserviceClient.phone.ilike(f"%{digits}%"))
+        client_clauses.append(AutoserviceClient.inn.ilike(f"%{digits}%"))
+        client_clauses.append(AutoserviceClient.kpp.ilike(f"%{digits}%"))
+        client_clauses.append(AutoserviceClient.ogrn.ilike(f"%{digits}%"))
+
+    session = query.session
+
+    vehicle_client_ids = (
+        session.query(GarageVehicle.client_id)
+        .filter(
+            GarageVehicle.organization_id == org_id,
+            or_(
+                GarageVehicle.make.ilike(term),
+                GarageVehicle.model.ilike(term),
+                GarageVehicle.plate.ilike(term),
+                GarageVehicle.vin.ilike(term),
+                GarageVehicle.color.ilike(term),
+                GarageVehicle.notes.ilike(term),
+                cast(GarageVehicle.year, String).ilike(term),
+            ),
+        )
+        .distinct()
+    )
+    client_clauses.append(AutoserviceClient.id.in_(vehicle_client_ids))
+
+    order_client_ids = (
+        session.query(RepairOrder.client_id)
+        .filter(
+            RepairOrder.organization_id == org_id,
+            RepairOrder.order_number.ilike(term),
+        )
+        .distinct()
+    )
+    client_clauses.append(AutoserviceClient.id.in_(order_client_ids))
+
+    booking_clauses = [
+        InspectionBooking.name.ilike(term),
+        InspectionBooking.phone.ilike(term),
+        InspectionBooking.notes.ilike(term),
+    ]
+    if raw.isdigit():
+        booking_clauses.append(InspectionBooking.id == int(raw))
+    if digits:
+        booking_clauses.append(InspectionBooking.phone.ilike(f"%{digits}%"))
+
+    booking_client_ids = (
+        session.query(InspectionBooking.client_id)
+        .filter(
+            InspectionBooking.organization_id == org_id,
+            InspectionBooking.client_id.isnot(None),
+            or_(*booking_clauses),
+        )
+        .distinct()
+    )
+    client_clauses.append(AutoserviceClient.id.in_(booking_client_ids))
+
+    booking_phones = (
+        session.query(InspectionBooking.phone)
+        .filter(
+            InspectionBooking.organization_id == org_id,
+            or_(*booking_clauses),
+        )
+        .distinct()
+    )
+    client_clauses.append(AutoserviceClient.phone.in_(booking_phones))
+
+    repair_booking_clauses = [
+        RepairBooking.name.ilike(term),
+        RepairBooking.phone.ilike(term),
+        RepairBooking.comment.ilike(term),
+    ]
+    if raw.isdigit():
+        repair_booking_clauses.append(RepairBooking.id == int(raw))
+    if digits:
+        repair_booking_clauses.append(RepairBooking.phone.ilike(f"%{digits}%"))
+
+    repair_booking_client_ids = (
+        session.query(RepairBooking.client_id)
+        .filter(
+            RepairBooking.organization_id == org_id,
+            RepairBooking.client_id.isnot(None),
+            or_(*repair_booking_clauses),
+        )
+        .distinct()
+    )
+    client_clauses.append(AutoserviceClient.id.in_(repair_booking_client_ids))
+
+    repair_booking_phones = (
+        session.query(RepairBooking.phone)
+        .filter(
+            RepairBooking.organization_id == org_id,
+            or_(*repair_booking_clauses),
+        )
+        .distinct()
+    )
+    client_clauses.append(AutoserviceClient.phone.in_(repair_booking_phones))
+
+    if raw.isdigit():
+        client_clauses.append(AutoserviceClient.id == int(raw))
+
+    return query.filter(or_(*client_clauses))
 
 
 @router.get("/autoservice/clients/me", response_model=AutoserviceClientMeResponse)
@@ -175,16 +301,17 @@ def become_autoservice_client(
 
 @router.get("/autoservice/clients", response_model=list[AutoserviceClientView])
 def list_autoservice_clients(
+    q: str | None = Query(None, max_length=120),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_staff(db, current_user)
-    rows = (
-        db.query(AutoserviceClient)
-        .filter(AutoserviceClient.organization_id == org_id)
-        .order_by(AutoserviceClient.consented_at.desc(), AutoserviceClient.id.desc())
-        .all()
-    )
+    query = db.query(AutoserviceClient).filter(AutoserviceClient.organization_id == org_id)
+    query = _apply_client_search_filter(query, org_id, q)
+    rows = query.order_by(
+        AutoserviceClient.consented_at.desc(),
+        AutoserviceClient.id.desc(),
+    ).all()
     return [AutoserviceClientView.model_validate(row) for row in rows]
 
 
