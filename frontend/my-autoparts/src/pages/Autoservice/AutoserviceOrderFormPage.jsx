@@ -123,7 +123,6 @@ function workPayAmount(qty, unitPrice, percent) {
 function emptyClientPart() {
   return { title: '', qty: '', unit: 'pcs' };
 }
-
 function emptyShopPart(overrides = {}, defaultMarkupPercent = 0) {
   return {
     title: '',
@@ -213,6 +212,8 @@ function SearchableSelect({
   loading = false,
   emptyMessage = 'Ничего не найдено',
   noResultsMessage = 'Ничего не найдено',
+  addOptionLabel = 'Добавить',
+  onAddClick,
   className = '',
   inputClassName = pillInputClass,
 }) {
@@ -284,6 +285,25 @@ function SearchableSelect({
               </li>
             ))
           )}
+          {onAddClick ? (
+            <li className="sticky bottom-0 border-t border-line-soft bg-surface">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-brand-600 hover:bg-brand-50"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setOpen(false);
+                  setQuery('');
+                  onAddClick();
+                }}
+              >
+                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {addOptionLabel}
+              </button>
+            </li>
+          ) : null}
         </ul>
       ) : null}
     </div>
@@ -355,6 +375,86 @@ function AddClientModal({ onClose, onCreated }) {
             required
           />
           {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
+        </div>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
+            Отмена
+          </button>
+          <button type="submit" disabled={saving} className={btnPrimaryClass}>
+            {saving ? 'Сохранение…' : 'Добавить'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function AddEmployeeModal({ onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [workPercent, setWorkPercent] = useState('30');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    const trimmedName = name.trim();
+    if (trimmedName.length < 2) {
+      setError('Укажите имя');
+      return;
+    }
+    const percent = Number(workPercent);
+    if (Number.isNaN(percent) || percent < 0 || percent > 100) {
+      setError('Укажите корректный процент');
+      return;
+    }
+    setSaving(true);
+    try {
+      const row = await apiRequest('/autoservice/service-employees', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: trimmedName,
+          salary_type: 'percent_work',
+          salary_amount: 0,
+          work_percent: percent,
+        }),
+      });
+      onCreated(row);
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось добавить сотрудника');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title="Добавить сотрудника" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sg-caption font-medium text-ink-muted">Имя</label>
+          <input
+            className={pillInputClass}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={saving}
+            required
+            maxLength={120}
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-sg-caption font-medium text-ink-muted">% от работ</label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            className={pillInputClass}
+            value={workPercent}
+            onChange={(e) => setWorkPercent(e.target.value)}
+            disabled={saving}
+          />
         </div>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <div className="flex justify-end gap-2 pt-2">
@@ -728,6 +828,8 @@ export default function AutoserviceOrderFormPage() {
 
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
+  const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
+  const [addEmployeeTarget, setAddEmployeeTarget] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const plannerPrefillRef = useRef(location.state);
@@ -749,6 +851,11 @@ export default function AutoserviceOrderFormPage() {
   const loadClients = useCallback(async () => {
     const data = await apiRequest('/autoservice/clients');
     setClients(Array.isArray(data) ? data : []);
+  }, []);
+
+  const loadServiceEmployees = useCallback(async () => {
+    const data = await apiRequest('/autoservice/repair-orders/service-employees-options');
+    setServiceEmployees(Array.isArray(data) ? data : []);
   }, []);
 
   const loadMeta = useCallback(async () => {
@@ -983,6 +1090,22 @@ export default function AutoserviceOrderFormPage() {
         ? { ...w, executors: (w.executors || []).filter((_, j) => j !== execIndex) }
         : w
     )));
+  };
+
+  const handleEmployeeCreated = async (row) => {
+    await loadServiceEmployees();
+    if (!row?.id || !addEmployeeTarget) return;
+    const { workIndex, execIndex } = addEmployeeTarget;
+    updateWorkExecutor(workIndex, execIndex, {
+      employee_id: String(row.id),
+      percent: String(row.work_percent ?? 0),
+    });
+    setAddEmployeeTarget(null);
+  };
+
+  const openAddEmployeeModal = (workIndex, execIndex) => {
+    setAddEmployeeTarget({ workIndex, execIndex });
+    setAddEmployeeOpen(true);
   };
 
   const updatePart = (index, patch) => {
@@ -1557,6 +1680,8 @@ export default function AutoserviceOrderFormPage() {
                             placeholder="Сотрудник"
                             emptyMessage="Нет сотрудников"
                             noResultsMessage="Не найдено"
+                            addOptionLabel="Добавить сотрудника"
+                            onAddClick={() => openAddEmployeeModal(index, execIndex)}
                           />
                           <input
                             type="number"
@@ -1856,6 +1981,16 @@ export default function AutoserviceOrderFormPage() {
           clientId={clientId}
           onClose={() => setAddVehicleOpen(false)}
           onCreated={handleVehicleCreated}
+        />
+      ) : null}
+
+      {addEmployeeOpen ? (
+        <AddEmployeeModal
+          onClose={() => {
+            setAddEmployeeOpen(false);
+            setAddEmployeeTarget(null);
+          }}
+          onCreated={handleEmployeeCreated}
         />
       ) : null}
 

@@ -60,7 +60,7 @@ def create_service_employee(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_director(db, current_user)
+    org_id = require_autoservice_staff(db, current_user)
     row = AutoserviceServiceEmployee(
         organization_id=org_id,
         name=payload.name.strip(),

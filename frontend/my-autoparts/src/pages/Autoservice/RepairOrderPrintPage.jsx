@@ -100,7 +100,7 @@ function Cell({ children, className = '', align = 'left', ...props }) {
       className={`h-5 border border-black px-1 py-0.5 align-middle ${alignClass} ${className}`}
       {...props}
     >
-      {children || '\u00a0'}
+      {children || '{2E2A4540-3C30-409F-9D86-1D7F965ACEE1}.png'}
     </td>
   );
 }
