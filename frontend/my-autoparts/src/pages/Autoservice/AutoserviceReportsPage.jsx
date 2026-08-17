@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
 import {
@@ -22,6 +22,7 @@ import {
   warehousePageClass,
   warehousePillControlClass,
 } from '../../utils/warehouseListUi';
+import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 
 const METHOD_LABELS = {
   card: 'Карта',
@@ -52,7 +53,21 @@ function ReportField({ label, children }) {
   );
 }
 
+function RepairOrderLink({ orderId, orderNumber, onOpen }) {
+  if (!orderId) return orderNumber || '—';
+  return (
+    <button
+      type="button"
+      className="text-indigo-600 hover:underline"
+      onClick={() => onOpen(orderId)}
+    >
+      № {orderNumber}
+    </button>
+  );
+}
+
 export default function AutoserviceReportsPage() {
+  const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
   const canSeePayroll = Boolean(user?.is_director);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -72,6 +87,10 @@ export default function AutoserviceReportsPage() {
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [payrollError, setPayrollError] = useState('');
   const [payroll, setPayroll] = useState({ total: 0, employees: [] });
+
+  const [viewOrder, setViewOrder] = useState(null);
+  const [viewOrderLoading, setViewOrderLoading] = useState(false);
+  const [viewOrderError, setViewOrderError] = useState('');
 
   const tabs = useMemo(() => {
     const items = [{ id: 'payments', label: 'Платежи' }];
@@ -119,6 +138,27 @@ export default function AutoserviceReportsPage() {
       setPayrollLoading(false);
     }
   }, [canSeePayroll, monthValue]);
+
+  const openOrderView = useCallback(async (orderId) => {
+    setViewOrderLoading(true);
+    setViewOrder(null);
+    setViewOrderError('');
+    try {
+      const data = await apiRequest(`/autoservice/repair-orders/${orderId}`);
+      setViewOrder(data);
+    } catch (e) {
+      setViewOrderError(e?.message || 'Не удалось загрузить заказ-наряд');
+    } finally {
+      setViewOrderLoading(false);
+    }
+  }, []);
+
+  const handleOrderUpdated = useCallback((updated) => {
+    setViewOrder(updated);
+    if (tab === 'payments') {
+      loadPayments();
+    }
+  }, [tab, loadPayments]);
 
   useEffect(() => {
     if (tab === 'payments') loadPayments();
@@ -216,6 +256,10 @@ export default function AutoserviceReportsPage() {
             <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{paymentsError}</div>
           ) : null}
 
+          {viewOrderError ? (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{viewOrderError}</div>
+          ) : null}
+
           {paymentsLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-12 w-full" />
@@ -237,9 +281,11 @@ export default function AutoserviceReportsPage() {
                     >
                       <ReportField label="№">{row.sequential_number}</ReportField>
                       <ReportField label="Заказ-наряд">
-                        <Link className="text-indigo-600 hover:underline" to={`/autoservice/orders/${row.repair_order_id}/edit`}>
-                          № {row.repair_order_number}
-                        </Link>
+                        <RepairOrderLink
+                          orderId={row.repair_order_id}
+                          orderNumber={row.repair_order_number}
+                          onOpen={openOrderView}
+                        />
                       </ReportField>
                       <ReportField label="Клиент">{row.client_name || '—'}</ReportField>
                       <ReportField label="Способ">{METHOD_LABELS[row.method] || row.method}</ReportField>
@@ -257,11 +303,11 @@ export default function AutoserviceReportsPage() {
                       key: 'repair_order_number',
                       label: 'Заказ-наряд',
                       render: (row) => (
-                        row.repair_order_id ? (
-                          <Link className="text-indigo-600 hover:underline" to={`/autoservice/orders/${row.repair_order_id}/edit`}>
-                            № {row.repair_order_number}
-                          </Link>
-                        ) : (row.repair_order_number || '')
+                        <RepairOrderLink
+                          orderId={row.repair_order_id}
+                          orderNumber={row.repair_order_number}
+                          onOpen={openOrderView}
+                        />
                       ),
                     },
                     { key: 'client_name', label: 'Клиент', render: (row) => row.client_name || '—' },
@@ -355,6 +401,20 @@ export default function AutoserviceReportsPage() {
           )}
         </>
       )}
+      <RepairOrderViewModal
+        order={viewOrder}
+        loading={viewOrderLoading}
+        enablePayment
+        onOrderChange={handleOrderUpdated}
+        onClose={() => {
+          setViewOrder(null);
+          setViewOrderLoading(false);
+        }}
+        onEdit={(order) => {
+          setViewOrder(null);
+          navigate(`/autoservice/orders/${order.id}/edit`);
+        }}
+      />
     </div>
   );
 }

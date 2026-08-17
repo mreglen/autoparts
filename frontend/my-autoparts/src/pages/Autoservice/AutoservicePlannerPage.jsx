@@ -4,7 +4,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import RepairOrderViewModal, { OrderStatusBadge } from '../../components/Autoservice/RepairOrderViewModal';
 import { apiRequest } from '../../utils/apiClient';
-import { formatOrderClockRange } from '../../utils/autoserviceOrderDisplay';
+import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
 import {
   addDays,
   getWeekStart,
@@ -66,15 +66,18 @@ function PlannerDayCell({ orders, onOrderClick, isToday }) {
     >
       {items.map((order) => {
         const styleClass = ORDER_STATUS_STYLES[order.status] || ORDER_STATUS_STYLES.pending;
+        const clientName = order.client_name || '—';
+        const clientLabel = formatPersonNameWithInitials(clientName);
         return (
           <button
             key={order.id}
             type="button"
             onClick={() => onOrderClick(order.id)}
-            className={`w-full rounded-lg px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition sm:text-xs ${styleClass}`}
-            title={order.order_number}
+            className={`w-full rounded-lg px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:text-xs ${styleClass}`}
+            title={`№ ${order.order_number} · ${clientName}`}
           >
-            {formatOrderClockRange(order)}
+            <span className="block tabular-nums">{formatOrderClockRange(order)}</span>
+            <span className="mt-0.5 block truncate font-normal">{clientLabel}</span>
           </button>
         );
       })}
@@ -223,7 +226,7 @@ function MobileDayPlanner({
                               <OrderStatusBadge status={order.status} />
                             </span>
                             <span className="mt-0.5 block truncate text-sm text-gray-500">
-                              {order.client_name || '—'}
+                              {formatPersonNameWithInitials(order.client_name)}
                               {order.client_phone ? ` · ${order.client_phone}` : ''}
                             </span>
                           </span>
