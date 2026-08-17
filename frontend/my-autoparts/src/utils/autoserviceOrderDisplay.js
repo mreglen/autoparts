@@ -28,12 +28,8 @@ export function formatPersonNameWithInitials(name) {
   if (!text || text === '—') return '—';
   const parts = text.split(/\s+/).filter(Boolean);
   if (parts.length === 1) return parts[0];
-  if (parts.length === 2) {
-    return `${parts[0]} ${parts[1].charAt(0).toUpperCase()}.`;
-  }
-  const [last, first, patronymic, ...rest] = parts;
-  const firstInitial = first ? `${first.charAt(0).toUpperCase()}.` : '';
-  const patronymicInitial = patronymic ? `${patronymic.charAt(0).toUpperCase()}.` : '';
-  const extra = rest.length ? ` ${rest.join(' ')}` : '';
-  return `${last} ${firstInitial}${patronymicInitial}${extra}`.trim();
+  const lastName = parts[0];
+  const firstName = parts[1];
+  const lastInitial = lastName.charAt(0).toUpperCase();
+  return `${firstName} ${lastInitial}.`;
 }
