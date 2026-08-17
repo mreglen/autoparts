@@ -480,15 +480,14 @@ export default function RepairOrderViewModal({
             {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
             <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
               {order?.id && showExecutors ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.open(`/autoservice/orders/${order.id}/print`, '_blank', 'noopener,noreferrer');
-                  }}
+                <a
+                  href={`/autoservice/orders/${order.id}/print`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={secondaryBtnClass}
                 >
                   Печать
-                </button>
+                </a>
               ) : null}
               {onEdit && !payOpen ? (
                 <button type="button" onClick={() => onEdit(order)} className={secondaryBtnClass}>
