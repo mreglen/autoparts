@@ -236,3 +236,43 @@ input[type="password"] {
     height: -webkit-fill-available;
   }
 }
+
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@media print {
+  html.repair-order-print-root,
+  html.repair-order-print-root body {
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  html.repair-order-print-root #root,
+  html.repair-order-print-root .repair-order-print-layout {
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    max-width: none !important;
+  }
+
+  html.repair-order-print-root .repair-order-print-toolbar {
+    display: none !important;
+  }
+
+  html.repair-order-print-root .repair-order-print-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+}

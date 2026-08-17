@@ -182,7 +182,7 @@ export default function ProfileWithMenuLayout() {
 
     if (isPrintPage) {
         return (
-            <div className="min-h-screen max-w-full overflow-x-hidden bg-white">
+            <div className="repair-order-print-layout min-h-screen max-w-full overflow-x-hidden bg-white print:min-h-0 print:overflow-visible">
                 <Outlet key={location.pathname} />
             </div>
         );

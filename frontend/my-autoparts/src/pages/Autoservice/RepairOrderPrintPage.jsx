@@ -76,6 +76,24 @@ function PrintTable({ columns, children }) {
   );
 }
 
+function TableTotalRow({ label, value }) {
+  return (
+    <tr>
+      <td colSpan={3} className="border-0 p-0" />
+      <td
+        colSpan={2}
+        className="border-0 px-1 py-0.5 text-right align-middle text-[10px] font-semibold"
+      >
+        {label}
+      </td>
+      <td className="h-5 border border-black px-1 py-0.5 text-right align-middle text-[10px] font-bold">
+        {value}
+      </td>
+      <td colSpan={2} className="border-0 p-0" />
+    </tr>
+  );
+}
+
 function Cell({ children, className = '', align = 'left', ...props }) {
   const alignClass =
     align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left';
@@ -103,6 +121,13 @@ export default function RepairOrderPrintPage() {
   useEffect(() => {
     if (orgId) dispatch(fetchOrganization(orgId));
   }, [dispatch, orgId]);
+
+  useEffect(() => {
+    document.documentElement.classList.add('repair-order-print-root');
+    return () => {
+      document.documentElement.classList.remove('repair-order-print-root');
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,7 +214,7 @@ export default function RepairOrderPrintPage() {
 
   const workRows = padItems(works, 4);
   const shopRows = padItems(shopParts, 2);
-  const clientRows = padItems(clientParts, 2);
+  const clientRows = clientParts.length > 0 ? clientParts : [null];
 
   const workColumns = [
     { key: 'n', label: '№', className: 'w-7' },
@@ -229,7 +254,7 @@ export default function RepairOrderPrintPage() {
         </div>
       </div>
 
-      <article className="repair-order-print-sheet mx-auto my-4 w-[210mm] bg-white px-[10mm] py-[8mm] shadow-sm print:my-0 print:w-auto print:px-0 print:py-0 print:shadow-none">
+      <article className="repair-order-print-sheet mx-auto my-4 box-border w-[210mm] max-w-full bg-white px-[10mm] py-[8mm] shadow-sm print:my-0 print:w-full print:max-w-none print:px-0 print:py-0 print:shadow-none">
         <header className="grid grid-cols-2 gap-x-8 gap-y-1 text-[11px]">
           <div className="space-y-0.5">
             <h1 className="mb-1 text-[15px] font-bold leading-none">
@@ -266,12 +291,8 @@ export default function RepairOrderPrintPage() {
               <Cell className="w-[27%]">
                 <span className="font-semibold">Гос. номер</span> {dash(vehicle.plate)}
               </Cell>
-              <Cell rowSpan={3} className="align-top">
-                <p>
-                  <span className="font-semibold">VIN</span> {dash(vehicle.vin)}
-                </p>
-                <p className="mt-2 font-semibold">Описание дефектов / комментарий</p>
-                <p className="mt-0.5 min-h-[2.6rem] whitespace-pre-wrap">{defectComment}</p>
+              <Cell>
+                <span className="font-semibold">VIN</span> {dash(vehicle.vin)}
               </Cell>
             </tr>
             <tr>
@@ -280,6 +301,10 @@ export default function RepairOrderPrintPage() {
               </Cell>
               <Cell>
                 <span className="font-semibold">Номер кузова</span>
+              </Cell>
+              <Cell rowSpan={2} className="align-top">
+                <p className="font-semibold">Описание дефектов / комментарий</p>
+                <p className="mt-0.5 min-h-[2.6rem] whitespace-pre-wrap">{defectComment}</p>
               </Cell>
             </tr>
             <tr>
@@ -310,18 +335,7 @@ export default function RepairOrderPrintPage() {
                 <Cell />
               </tr>
             ))}
-            <tr>
-              <td
-                colSpan={5}
-                className="border border-black px-1 py-0.5 text-right text-[10px] font-semibold"
-              >
-                Стоимость работ, руб
-              </td>
-              <td className="border border-black px-1 py-0.5 text-right text-[10px] font-bold">
-                {formatMoney(totals.worksTotal)}
-              </td>
-              <td className="border border-black" colSpan={2} />
-            </tr>
+            <TableTotalRow label="Стоимость работ, руб" value={formatMoney(totals.worksTotal)} />
           </PrintTable>
         </section>
 
@@ -365,18 +379,7 @@ export default function RepairOrderPrintPage() {
                 </tr>
               );
             })}
-            <tr>
-              <td
-                colSpan={5}
-                className="border border-black px-1 py-0.5 text-right text-[10px] font-semibold"
-              >
-                Стоимость материалов, руб
-              </td>
-              <td className="border border-black px-1 py-0.5 text-right text-[10px] font-bold">
-                {formatMoney(totals.shopTotal)}
-              </td>
-              <td className="border border-black" colSpan={2} />
-            </tr>
+            <TableTotalRow label="Стоимость материалов, руб" value={formatMoney(totals.shopTotal)} />
           </PrintTable>
         </section>
 
@@ -415,38 +418,48 @@ export default function RepairOrderPrintPage() {
             Заказ и замененные дефектные детали (остатки материалов) получил. Изделие проверено в
             моем присутствии.
           </p>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+          <div className="grid grid-cols-2 items-start gap-x-8">
             <p>
               Дата <span className="inline-block min-w-[7rem] border-b border-black">&nbsp;</span>
             </p>
-            <p>
-              Подпись заказчика{' '}
-              <span className="inline-block min-w-[4.5rem] border-b border-black">&nbsp;</span>
-              /
-              <span className="inline-block min-w-[8rem] border-b border-black">&nbsp;</span>
-            </p>
-            <p className="col-span-2">
-              Подпись исполнителя{' '}
-              <span className="inline-block min-w-[4.5rem] border-b border-black">&nbsp;</span>
-              /
-              <span className="inline-block min-w-[8rem] border-b border-black">&nbsp;</span>
-            </p>
+            <div className="space-y-2 text-right">
+              <p>
+                Подпись заказчика{' '}
+                <span className="inline-block min-w-[4.5rem] border-b border-black">&nbsp;</span>
+                /
+                <span className="inline-block min-w-[8rem] border-b border-black">&nbsp;</span>
+              </p>
+              <p>
+                Подпись исполнителя{' '}
+                <span className="inline-block min-w-[4.5rem] border-b border-black">&nbsp;</span>
+                /
+                <span className="inline-block min-w-[8rem] border-b border-black">&nbsp;</span>
+              </p>
+            </div>
           </div>
         </footer>
       </article>
 
       <style>{`
-        @page { size: A4 portrait; margin: 8mm; }
+        @page { size: A4 portrait; margin: 10mm; }
         @media print {
-          html, body { background: white !important; height: auto !important; }
+          html, body, #root {
+            background: white !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+          }
           .repair-order-print-toolbar { display: none !important; }
           .repair-order-print-sheet {
-            width: auto !important;
-            max-width: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
             box-shadow: none !important;
-            page-break-inside: avoid;
+          }
+          .repair-order-print-sheet table {
+            width: 100% !important;
+            table-layout: fixed !important;
           }
         }
       `}</style>
