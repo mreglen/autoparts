@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -8,6 +8,8 @@ import { formatOrderClockRange } from '../../utils/autoserviceOrderDisplay';
 import {
   addDays,
   getWeekStart,
+  plannerCellKey,
+  plannerCreateOrderState,
   sortDayOrders,
   toIsoDate,
 } from '../../utils/autoservicePlannerLayout';
@@ -35,24 +37,48 @@ function formatWeekRange(startDate, endDate) {
   return `${start} – ${end} · ${year}`;
 }
 
-function PlannerDayCell({ orders, onOrderClick, isToday }) {
+function PlannerDayCell({ orders, onOrderClick, isToday, isSelected, onSelect, onCreateOrder }) {
   const items = useMemo(() => sortDayOrders(orders), [orders]);
+  const isEmpty = items.length === 0;
 
-  if (items.length === 0) {
+  const cellClassName = `min-h-[3rem] border-b border-r border-gray-100 p-1.5 sm:p-2 transition ${
+    isToday ? 'bg-brand-50/30' : 'bg-white'
+  } ${isSelected ? 'ring-2 ring-inset ring-indigo-400 bg-indigo-50/40' : ''}`;
+
+  if (isEmpty) {
     return (
       <div
-        className={`min-h-[3rem] border-b border-r border-gray-100 ${
-          isToday ? 'bg-brand-50/30' : 'bg-white'
-        }`}
-      />
+        role="button"
+        tabIndex={0}
+        onClick={onSelect}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onSelect?.();
+          }
+        }}
+        className={`${cellClassName} cursor-pointer ${isSelected ? '' : 'hover:bg-gray-50'}`}
+        aria-label={isSelected ? 'Ячейка выбрана' : 'Выбрать ячейку для нового заказ-наряда'}
+      >
+        {isSelected ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCreateOrder?.();
+            }}
+            className="inline-flex w-full items-center justify-center rounded-lg bg-indigo-600 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-indigo-700 sm:text-xs"
+          >
+            Создать заказ-наряд
+          </button>
+        ) : null}
+      </div>
     );
   }
 
   return (
     <div
-      className={`flex min-h-[3rem] flex-col gap-1 border-b border-r border-gray-100 p-1.5 sm:p-2 ${
-        isToday ? 'bg-brand-50/20' : 'bg-white'
-      }`}
+      className={`flex min-h-[3rem] flex-col gap-1 ${cellClassName}`}
     >
       {items.map((order) => {
         const styleClass = ORDER_STATUS_STYLES[order.status] || ORDER_STATUS_STYLES.pending;
@@ -82,6 +108,8 @@ export default function AutoservicePlannerPage() {
   const [error, setError] = useState('');
   const [viewOrder, setViewOrder] = useState(null);
   const [viewOrderLoading, setViewOrderLoading] = useState(false);
+  const [selectedCellKey, setSelectedCellKey] = useState(null);
+  const plannerRef = useRef(null);
 
   const weekStartIso = toIsoDate(weekStart);
   const weekDays = useMemo(
@@ -106,6 +134,26 @@ export default function AutoservicePlannerPage() {
   useEffect(() => {
     if (isReady && isAuthenticated) load();
   }, [isReady, isAuthenticated, load]);
+
+  useEffect(() => {
+    setSelectedCellKey(null);
+  }, [weekStartIso]);
+
+  useEffect(() => {
+    if (!selectedCellKey) return undefined;
+    const onDocClick = (event) => {
+      if (plannerRef.current?.contains(event.target)) return;
+      setSelectedCellKey(null);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [selectedCellKey]);
+
+  const handleCreateOrder = useCallback((zoneId, isoDate) => {
+    navigate('/autoservice/orders/new', {
+      state: plannerCreateOrderState(zoneId, isoDate),
+    });
+  }, [navigate]);
 
   const openOrderView = async (orderId) => {
     setViewOrderLoading(true);
@@ -199,7 +247,7 @@ export default function AutoservicePlannerPage() {
         </div>
       ) : null}
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" ref={plannerRef}>
         <div className="min-w-[36rem] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div
             className="grid w-full"
@@ -241,12 +289,16 @@ export default function AutoservicePlannerPage() {
                   {(zone.days || []).map((dayCell) => {
                     const iso = String(dayCell.date).slice(0, 10);
                     const isToday = iso === toIsoDate(today);
+                    const cellKey = plannerCellKey(zone.id, iso);
                     return (
                       <PlannerDayCell
                         key={`${zone.id ?? 'unassigned'}-${dayCell.date}`}
                         orders={dayCell.orders || []}
                         onOrderClick={openOrderView}
                         isToday={isToday}
+                        isSelected={selectedCellKey === cellKey}
+                        onSelect={() => setSelectedCellKey((prev) => (prev === cellKey ? null : cellKey))}
+                        onCreateOrder={() => handleCreateOrder(zone.id, iso)}
                       />
                     );
                   })}

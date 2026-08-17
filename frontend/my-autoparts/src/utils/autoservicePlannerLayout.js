@@ -27,3 +27,20 @@ export function sortDayOrders(orders) {
     return (a.id || 0) - (b.id || 0);
   });
 }
+
+export function plannerCellKey(zoneId, isoDate) {
+  return `${zoneId ?? 'unassigned'}:${isoDate}`;
+}
+
+/** Default local datetime for planner → new order form (datetime-local input). */
+export function plannerDefaultScheduledAtLocal(isoDate, hour = 10, minute = 0) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${isoDate}T${pad(hour)}:${pad(minute)}`;
+}
+
+export function plannerCreateOrderState(zoneId, isoDate) {
+  return {
+    scheduledAtLocal: plannerDefaultScheduledAtLocal(isoDate),
+    workZoneId: zoneId != null ? String(zoneId) : '',
+  };
+}
