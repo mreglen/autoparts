@@ -217,6 +217,8 @@ function SearchableSelect({
   onAddClick,
   className = '',
   inputClassName = pillInputClass,
+  remoteSearch = false,
+  onQueryChange,
 }) {
   const rootRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -236,10 +238,19 @@ function SearchableSelect({
   const selected = options.find((o) => String(o.value) === String(value));
 
   const filtered = useMemo(() => {
+    if (remoteSearch) return options;
     const q = query.trim().toLowerCase();
     if (!q) return options;
     return options.filter((o) => (o.searchText || o.label).toLowerCase().includes(q));
-  }, [options, query]);
+  }, [options, query, remoteSearch]);
+
+  useEffect(() => {
+    if (!remoteSearch || !onQueryChange || !open) return undefined;
+    const timer = setTimeout(() => {
+      onQueryChange(query);
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [query, remoteSearch, onQueryChange, open]);
 
   const displayValue = open ? query : selected?.label || '';
   const listEmptyMessage = options.length === 0 ? emptyMessage : noResultsMessage;
@@ -258,7 +269,9 @@ function SearchableSelect({
         }}
         onFocus={() => {
           setOpen(true);
-          setQuery('');
+          if (!remoteSearch) {
+            setQuery('');
+          }
         }}
         autoComplete="off"
       />
@@ -281,7 +294,10 @@ function SearchableSelect({
                     setQuery('');
                   }}
                 >
-                  {o.label}
+                  <span className="block font-medium">{o.label}</span>
+                  {o.hint ? (
+                    <span className="mt-0.5 block text-xs text-brand-600">{o.hint}</span>
+                  ) : null}
                 </button>
               </li>
             ))
@@ -796,6 +812,7 @@ export default function AutoserviceOrderFormPage() {
   const isEdit = !isCreate && Boolean(orderId);
 
   const [clients, setClients] = useState([]);
+  const [clientSearchLoading, setClientSearchLoading] = useState(false);
   const [workCatalog, setWorkCatalog] = useState([]);
   const [serviceEmployees, setServiceEmployees] = useState([]);
   const [workZones, setWorkZones] = useState([]);
@@ -850,10 +867,23 @@ export default function AutoserviceOrderFormPage() {
     setShopParts(state.shopParts);
   }, []);
 
-  const loadClients = useCallback(async () => {
-    const data = await apiRequest('/autoservice/clients');
+  const loadClients = useCallback(async (query = '') => {
+    const q = String(query || '').trim();
+    const suffix = q ? `?q=${encodeURIComponent(q)}` : '';
+    const data = await apiRequest(`/autoservice/clients${suffix}`);
     setClients(Array.isArray(data) ? data : []);
   }, []);
+
+  const handleClientSearchQuery = useCallback(async (query) => {
+    setClientSearchLoading(true);
+    try {
+      await loadClients(query);
+    } catch {
+      /* metaError handled elsewhere when needed */
+    } finally {
+      setClientSearchLoading(false);
+    }
+  }, [loadClients]);
 
   const loadServiceEmployees = useCallback(async () => {
     const data = await apiRequest('/autoservice/repair-orders/service-employees-options');
@@ -864,13 +894,12 @@ export default function AutoserviceOrderFormPage() {
     setMetaLoading(true);
     setMetaError('');
     try {
-      const [clientsData, worksData, employeesData, zonesData] = await Promise.all([
-        apiRequest('/autoservice/clients'),
+      const [worksData, employeesData, zonesData] = await Promise.all([
         apiRequest('/autoservice/works'),
         apiRequest('/autoservice/repair-orders/service-employees-options'),
         apiRequest('/autoservice/repair-orders/work-zones-meta'),
       ]);
-      setClients(Array.isArray(clientsData) ? clientsData : []);
+      await loadClients();
       setWorkCatalog(Array.isArray(worksData) ? worksData : []);
       setServiceEmployees(Array.isArray(employeesData) ? employeesData : []);
       setWorkZones(Array.isArray(zonesData?.work_zones) ? zonesData.work_zones : []);
@@ -879,7 +908,7 @@ export default function AutoserviceOrderFormPage() {
     } finally {
       setMetaLoading(false);
     }
-  }, []);
+  }, [loadClients]);
 
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
@@ -985,10 +1014,20 @@ export default function AutoserviceOrderFormPage() {
       clients.map((c) => ({
         value: String(c.id),
         label: `${c.name} · ${c.phone}`,
-        searchText: `${c.name} ${c.phone}`.toLowerCase(),
+        hint: c.matched_vehicle_label || null,
+        matchedVehicleId: c.matched_vehicle_id || null,
+        searchText: `${c.name} ${c.phone} ${c.matched_vehicle_label || ''}`.toLowerCase(),
       })),
     [clients],
   );
+
+  const handleClientSelect = useCallback((nextClientId) => {
+    const option = clientOptions.find((item) => item.value === String(nextClientId));
+    setClientId(String(nextClientId));
+    if (option?.matchedVehicleId) {
+      setVehicleId(String(option.matchedVehicleId));
+    }
+  }, [clientOptions]);
 
   const vehicleOptions = useMemo(
     () =>
@@ -1125,7 +1164,7 @@ export default function AutoserviceOrderFormPage() {
       brand: values.brand || '',
       partnumber: values.article || '',
       qty: values.quantity,
-      unit: 'pcs',
+      unit: values.unit || 'pcs',
       unit_price: String(values.unit_price ?? 0),
       source: isRossko ? 'rossko' : 'manual',
       rossko_brand: isRossko ? (values.brand || '') : '',
@@ -1502,10 +1541,12 @@ export default function AutoserviceOrderFormPage() {
               </div>
               <SearchableSelect
                 value={clientId}
-                onChange={setClientId}
+                onChange={handleClientSelect}
                 options={clientOptions}
-                placeholder="Поиск по имени или телефону"
-                loading={metaLoading}
+                placeholder="Поиск по имени, телефону или авто"
+                loading={metaLoading || clientSearchLoading}
+                remoteSearch
+                onQueryChange={handleClientSearchQuery}
               />
             </div>
             <div>
@@ -2074,6 +2115,7 @@ export default function AutoserviceOrderFormPage() {
         onSubmit={handleManualShopPartAdd}
         title="Добавить запчасть вручную"
         submitLabel="Добавить в заказ-наряд"
+        showUnitSelector
       />
     </div>
     </div>

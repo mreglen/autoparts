@@ -43,6 +43,8 @@ class AutoserviceClientView(BaseModel):
     consented_at: datetime
     created_by_user_id: Optional[int] = None
     created_at: datetime
+    matched_vehicle_id: Optional[int] = None
+    matched_vehicle_label: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

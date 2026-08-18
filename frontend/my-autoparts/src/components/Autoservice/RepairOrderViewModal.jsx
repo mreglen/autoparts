@@ -11,6 +11,7 @@ import {
   shopPartDisplayName,
   shopPartPricingOptions,
 } from '../../utils/repairOrderShopPartUtils';
+import { splitVatInclusive } from '../../utils/updDocument';
 
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
@@ -47,8 +48,7 @@ function formatMoney(value) {
 }
 
 function vatIncluded(amount) {
-  const cents = Math.round((Number(amount) || 0) * 100);
-  return Math.round((cents * 20) / 120) / 100;
+  return splitVatInclusive(amount).vat;
 }
 
 const PAYMENT_METHODS = [

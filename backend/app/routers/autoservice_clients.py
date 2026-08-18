@@ -132,6 +132,73 @@ def _client_view_with_account_email(db: Session, row: AutoserviceClient) -> Auto
     return view
 
 
+def _format_vehicle_label(vehicle: GarageVehicle) -> str:
+    parts = [vehicle.make, vehicle.model]
+    if vehicle.year:
+        parts.append(str(vehicle.year))
+    base = " ".join(part for part in parts if part).strip()
+    if vehicle.plate:
+        return f"{base} ({vehicle.plate})" if base else str(vehicle.plate)
+    return base or "Авто"
+
+
+def _vehicle_search_clauses(term: str, raw: str):
+    clauses = [
+        GarageVehicle.make.ilike(term),
+        GarageVehicle.model.ilike(term),
+        GarageVehicle.plate.ilike(term),
+        GarageVehicle.vin.ilike(term),
+        GarageVehicle.color.ilike(term),
+        GarageVehicle.notes.ilike(term),
+        cast(GarageVehicle.year, String).ilike(term),
+    ]
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if digits:
+        clauses.append(GarageVehicle.plate.ilike(f"%{digits}%"))
+        clauses.append(GarageVehicle.vin.ilike(f"%{digits}%"))
+    return clauses
+
+
+def _find_matching_vehicle(
+    db: Session,
+    org_id: str,
+    client_id: int,
+    q: str,
+) -> GarageVehicle | None:
+    raw = (q or "").strip()
+    if not raw:
+        return None
+    term = f"%{raw}%"
+    return (
+        db.query(GarageVehicle)
+        .filter(
+            GarageVehicle.organization_id == org_id,
+            GarageVehicle.client_id == client_id,
+            or_(*_vehicle_search_clauses(term, raw)),
+        )
+        .order_by(GarageVehicle.id.desc())
+        .first()
+    )
+
+
+def _client_search_view(
+    db: Session,
+    org_id: str,
+    row: AutoserviceClient,
+    q: str,
+) -> AutoserviceClientView:
+    view = _client_view_with_account_email(db, row)
+    vehicle = _find_matching_vehicle(db, org_id, row.id, q)
+    if not vehicle:
+        return view
+    return view.model_copy(
+        update={
+            "matched_vehicle_id": vehicle.id,
+            "matched_vehicle_label": _format_vehicle_label(vehicle),
+        }
+    )
+
+
 def _split_person_name(full_name: str) -> tuple[str, str, str | None]:
     parts = [part for part in (full_name or "").strip().split() if part]
     if len(parts) >= 3:
@@ -379,6 +446,9 @@ def list_autoservice_clients(
         AutoserviceClient.consented_at.desc(),
         AutoserviceClient.id.desc(),
     ).all()
+    q_norm = (q or "").strip()
+    if q_norm:
+        return [_client_search_view(db, org_id, row, q_norm) for row in rows]
     return [_client_view_with_account_email(db, row) for row in rows]
 
 

@@ -29,7 +29,7 @@ def _normalize_article(value: str | None) -> str:
     return (value or "").strip()[:120]
 
 
-def _get_or_create_item(
+def _create_item(
     db: Session,
     *,
     org_id: str,
@@ -40,17 +40,6 @@ def _get_or_create_item(
 ) -> AutoserviceWarehouseItem:
     brand_norm = _normalize_brand(brand)
     article_norm = _normalize_article(article)
-    item = (
-        db.query(AutoserviceWarehouseItem)
-        .filter(
-            AutoserviceWarehouseItem.organization_id == org_id,
-            AutoserviceWarehouseItem.brand == brand_norm,
-            AutoserviceWarehouseItem.article == article_norm,
-        )
-        .first()
-    )
-    if item:
-        return item
     item = AutoserviceWarehouseItem(
         organization_id=org_id,
         brand=brand_norm,
@@ -63,6 +52,47 @@ def _get_or_create_item(
     db.add(item)
     db.flush()
     return item
+
+
+def _get_or_create_item(
+    db: Session,
+    *,
+    org_id: str,
+    brand: str,
+    article: str,
+    name: str,
+    unit_price: Decimal,
+) -> AutoserviceWarehouseItem:
+    brand_norm = _normalize_brand(brand)
+    article_norm = _normalize_article(article)
+    if not article_norm:
+        return _create_item(
+            db,
+            org_id=org_id,
+            brand=brand_norm,
+            article=article_norm,
+            name=name,
+            unit_price=unit_price,
+        )
+    item = (
+        db.query(AutoserviceWarehouseItem)
+        .filter(
+            AutoserviceWarehouseItem.organization_id == org_id,
+            AutoserviceWarehouseItem.brand == brand_norm,
+            AutoserviceWarehouseItem.article == article_norm,
+        )
+        .first()
+    )
+    if item:
+        return item
+    return _create_item(
+        db,
+        org_id=org_id,
+        brand=brand_norm,
+        article=article_norm,
+        name=name,
+        unit_price=unit_price,
+    )
 
 
 def _existing_receipt_for_cart(
@@ -169,7 +199,7 @@ def receipt_manual_line(
 
     name_norm = (name or "").strip()[:255]
     brand_norm = _normalize_brand(brand)
-    article_norm = _normalize_article(article) or name_norm[:120]
+    article_norm = _normalize_article(article)
     if not name_norm:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

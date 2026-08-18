@@ -15,6 +15,7 @@ const EMPTY_FORM = {
   article: '',
   name: '',
   quantity: '1',
+  unit: 'pcs',
   unit_price: '',
 };
 
@@ -29,6 +30,7 @@ export default function AutoserviceWarehouseAddModal({
   title = 'Добавить на склад',
   submitLabel = 'Добавить',
   showRosskoLookup = true,
+  showUnitSelector = false,
 }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
@@ -134,14 +136,21 @@ export default function AutoserviceWarehouseAddModal({
   const handleSubmit = async (event) => {
     event.preventDefault();
     const name = form.name.trim();
-    const quantity = Math.round(Number(form.quantity));
+    const unit = form.unit || 'pcs';
+    const quantityRaw = Number(form.quantity);
     const unitPrice = Number(form.unit_price);
     if (!name) {
       setError('Укажите наименование');
       return;
     }
-    if (!Number.isFinite(quantity) || quantity < 1) {
-      setError('Количество должно быть целым числом ≥ 1');
+    if (unit === 'pcs') {
+      const quantity = Math.round(quantityRaw);
+      if (!Number.isFinite(quantity) || quantity < 1) {
+        setError('Количество должно быть целым числом ≥ 1');
+        return;
+      }
+    } else if (!Number.isFinite(quantityRaw) || quantityRaw < 0.001) {
+      setError('Количество должно быть ≥ 0,001');
       return;
     }
     if (!Number.isFinite(unitPrice) || unitPrice < 0) {
@@ -153,7 +162,8 @@ export default function AutoserviceWarehouseAddModal({
         brand: form.brand.trim(),
         article: form.article.trim(),
         name,
-        quantity,
+        quantity: unit === 'pcs' ? Math.round(quantityRaw) : quantityRaw,
+        unit: showUnitSelector ? unit : 'pcs',
         unit_price: unitPrice,
         source: filledFromRossko ? 'rossko' : 'manual',
       });
@@ -225,19 +235,33 @@ export default function AutoserviceWarehouseAddModal({
             inputClassName={`mt-1 ${fieldClass}`}
           />
         </label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid gap-3 ${showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <label className="block text-sm">
             <span className="font-medium text-gray-700">Количество</span>
             <input
               type="number"
-              min="1"
-              step="1"
+              min={form.unit === 'pcs' ? 1 : 0.001}
+              step={form.unit === 'pcs' ? 1 : 0.001}
               className={`mt-1 ${fieldClass}`}
               value={form.quantity}
               onChange={(e) => patch('quantity', e.target.value)}
               required
             />
           </label>
+          {showUnitSelector ? (
+            <label className="block text-sm">
+              <span className="font-medium text-gray-700">Ед.</span>
+              <select
+                className={`mt-1 ${fieldClass}`}
+                value={form.unit}
+                onChange={(e) => patch('unit', e.target.value)}
+              >
+                <option value="pcs">шт.</option>
+                <option value="l">л</option>
+                <option value="kg">кг</option>
+              </select>
+            </label>
+          ) : null}
           <label className="block text-sm">
             <span className="font-medium text-gray-700">Цена, ₽</span>
             <input
@@ -248,7 +272,6 @@ export default function AutoserviceWarehouseAddModal({
               value={form.unit_price}
               onChange={(e) => patch('unit_price', e.target.value)}
               placeholder="0"
-              required
             />
           </label>
         </div>

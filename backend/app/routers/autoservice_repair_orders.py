@@ -745,7 +745,14 @@ def _replace_shop_parts(
         source = item.source
         qty = _qty(item.qty)
         if source == "manual":
-            qty_int = max(1, int(Decimal(str(qty or 1)).quantize(Decimal("1"))))
+            saved_unit = item.unit if item.unit in ("pcs", "l", "kg") else "pcs"
+            qty_dec = Decimal(str(qty or 1))
+            if saved_unit == "pcs":
+                qty_int = max(1, int(qty_dec.quantize(Decimal("1"))))
+                qty = _qty(qty_int)
+            else:
+                qty = _qty(qty_dec)
+                qty_int = max(1, int(qty_dec.quantize(Decimal("1"), rounding=ROUND_HALF_UP)))
             wh_item, _, _ = receipt_manual_line(
                 db,
                 org_id=org_id,
@@ -759,8 +766,7 @@ def _replace_shop_parts(
             )
             source = "autoservice_stock"
             autoservice_stock_item_id = wh_item.id
-            unit = "pcs"
-            qty = _qty(qty_int)
+            unit = saved_unit
             brand = (wh_item.brand or brand or "")[:120] or None
             partnumber = (wh_item.article or partnumber or "")[:120] or None
         new_part = RepairOrderShopPart(
