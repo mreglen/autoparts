@@ -5,6 +5,10 @@ import { unwrapResult } from '@reduxjs/toolkit';
 
 import { updateProfile, uploadAvatar, deleteAvatar } from '../../redux/slices/UserSlice';
 import { logout, fetchProfile } from '../../redux/slices/AuthSlice';
+import {
+  fetchAutoserviceClientMe,
+  selectIsAutoserviceClient,
+} from '../../redux/slices/AutoserviceClientSlice';
 import UserAvatar from '../../components/UserAvatar/UserAvatar';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import ChangePasswordModal from './ChangePasswordModal';
@@ -86,6 +90,16 @@ const IconLock = () => (
   </svg>
 );
 
+const IconCar = () => (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M8 17h8M5 11l1.5-4h11L19 11M6 17a1.5 1.5 0 103 0 1.5 1.5 0 00-3 0zm9 0a1.5 1.5 0 103 0 1.5 1.5 0 00-3 0zM5 11h14"
+    />
+  </svg>
+);
+
 const IconLogout = () => (
   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -96,6 +110,8 @@ export default function ProfilePage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user, isLoading, isReady } = useAuthReady();
+  const isAutoserviceClient = useSelector(selectIsAutoserviceClient);
+  const autoserviceClientStatus = useSelector((state) => state.autoserviceClient.status);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const { loading: saving, avatarLoading, error: saveError } = useSelector((state) => state.user);
 
@@ -120,6 +136,11 @@ export default function ProfilePage() {
     }
   }, [user?.last_name, user?.first_name, user?.patronymic]);
 
+  useEffect(() => {
+    if (!user || autoserviceClientStatus !== 'idle') return;
+    dispatch(fetchAutoserviceClientMe());
+  }, [dispatch, user, autoserviceClientStatus]);
+
   const displayName = useMemo(() => {
     if (!user) return '';
     const parts = [user.last_name, user.first_name, user.patronymic].filter(Boolean);
@@ -139,10 +160,6 @@ export default function ProfilePage() {
   if (isReady && !user) {
     return (
       <div className={profilePageShell}>
-        <div>
-          
-          <h1 className="mt-0.5 text-xl font-bold text-gray-900 sm:text-2xl">Профиль</h1>
-        </div>
         <ProfileBlock padded>
           <div className="py-6 text-center">
             <p className="text-sm text-gray-900 sm:text-[15px]">Войдите в аккаунт</p>
@@ -227,25 +244,28 @@ export default function ProfilePage() {
   );
 
   const quickActions = [
+    isAutoserviceClient ? { to: '/garage', label: 'Мои авто', icon: <IconCar /> } : null,
     showMyParts ? { to: '/my-parts', label: 'Мои запчасти', icon: <IconParts /> } : null,
     { to: '/purchases/orders', label: 'Заказы', icon: <IconBag /> },
     { to: '/profile/notifications', label: 'Уведомления', icon: <IconBell /> },
   ].filter(Boolean);
 
+  const quickActionsGridClass =
+    quickActions.length >= 4
+      ? 'grid-cols-2 sm:grid-cols-4'
+      : quickActions.length === 3
+        ? 'grid-cols-3'
+        : 'grid-cols-2';
+
   return (
     <div className={profilePageShell}>
-      <div className="mb-1 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-       
-          <h1 className="mt-0.5 text-xl font-bold text-gray-900 sm:text-2xl">Профиль</h1>
-          <p className="mt-0.5 text-sm text-gray-500">{getRoleLabel(user)}</p>
-        </div>
-        {!isEditing ? (
+      {!isEditing ? (
+        <div className="mb-1 flex justify-end">
           <button type="button" onClick={handleEdit} className={profileSecondaryBtn}>
             Редактировать
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {!isEditing ? (
         <ProfileBlock>
@@ -370,7 +390,7 @@ export default function ProfilePage() {
         </ProfileBlock>
       )}
 
-      <div className={`grid gap-2 sm:gap-3 ${quickActions.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+      <div className={`grid gap-2 sm:gap-3 ${quickActionsGridClass}`}>
         {quickActions.map((action) => (
           <ProfileQuickAction
             key={action.to}
