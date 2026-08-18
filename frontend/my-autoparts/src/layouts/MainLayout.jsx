@@ -53,7 +53,15 @@ export default function MainLayout() {
     } = useMobileMenuShell(user);
 
     useEffect(() => {
-        window.scrollTo(0, 0);
+        const pathname = location.pathname;
+        const isAutoserviceDocumentEditing = /^\/autoservice\/orders\/\d+(\/edit|\/print(\/upd|\/invoice)?|\/print\/upd|\/print\/invoice)$/.test(
+            pathname,
+        );
+
+        // When navigating between document editor/print routes, users expect to stay at the same scroll position.
+        if (!isAutoserviceDocumentEditing) {
+            window.scrollTo(0, 0);
+        }
     }, [location.pathname]);
 
     return (
