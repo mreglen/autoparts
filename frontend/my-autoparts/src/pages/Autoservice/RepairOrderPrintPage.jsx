@@ -167,6 +167,21 @@ function Cell({ children, className = '', align = 'left', ...props }) {
   );
 }
 
+function SignLine({ label, nameControl }) {
+  return (
+    <table className="repair-order-sign-table ml-auto border-collapse">
+      <tbody>
+        <tr>
+          <td className="whitespace-nowrap pr-1 align-bottom">{label}</td>
+          <td className="w-20 min-w-[4.5rem] border-b border-black align-bottom">&nbsp;</td>
+          <td className="px-0.5 align-bottom">/</td>
+          <td className="whitespace-nowrap align-bottom">{nameControl}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
 function FieldEdit({ name, form, autoForm, onChange, className = '', multiline = false, ...rest }) {
   const value = form[name] ?? '';
   const auto = autoForm[name] ?? '';
@@ -676,30 +691,35 @@ export default function RepairOrderPrintPage() {
           </table>
         </section>
 
-        <footer className="mt-3 space-y-2 text-[11px] leading-tight">
+        <footer className="mt-3 space-y-2 text-[11px] leading-snug">
           <p>
             Заказ и замененные дефектные детали (остатки материалов) получил. Изделие проверено в
             моем присутствии.
           </p>
-          <div className="grid grid-cols-2 items-start gap-x-8">
-            <p>
-              Дата {editControl('signDate', 'upd-edit-inline min-w-[7rem]')}
-            </p>
-            <div className="space-y-2 text-right">
-              <p className="flex items-end justify-end gap-1">
-                Подпись заказчика
-                <span className="inline-block min-w-[4.5rem] border-b border-black">&nbsp;</span>
-                /
-                {editControl('clientSignName', 'upd-edit-inline min-w-[8rem]')}
-              </p>
-              <p className="flex items-end justify-end gap-1">
-                Подпись исполнителя
-                <span className="inline-block min-w-[4.5rem] border-b border-black">&nbsp;</span>
-                /
-                {editControl('contractorSignName', 'upd-edit-inline min-w-[8rem]')}
-              </p>
-            </div>
-          </div>
+          <table className="w-full border-collapse">
+            <tbody>
+              <tr>
+                <td className="w-[38%] align-top pt-1">
+                  Дата {editControl('signDate', 'upd-edit-inline min-w-[7rem]')}
+                </td>
+                <td className="align-top pt-1">
+                  <SignLine
+                    label="Подпись заказчика"
+                    nameControl={editControl('clientSignName', 'upd-edit-inline')}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td />
+                <td className="align-top pt-1">
+                  <SignLine
+                    label="Подпись исполнителя"
+                    nameControl={editControl('contractorSignName', 'upd-edit-inline')}
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </footer>
       </article>
       </AutoservicePrintPreview>

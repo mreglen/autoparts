@@ -261,19 +261,36 @@ input[type="password"] {
   word-break: break-word;
 }
 
-/* Предпросмотр документов на телефоне: пропорциональное уменьшение + pinch-zoom */
+/* Предпросмотр документов: масштаб + перетаскивание мышью/пальцем */
 .autoservice-print-preview {
   box-sizing: border-box;
   width: 100%;
+  height: calc(100dvh - 9rem);
+  min-height: 320px;
   padding: 1rem;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y pinch-zoom;
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.autoservice-print-preview__frame,
-.autoservice-print-preview__scale {
-  overflow: visible;
+.autoservice-print-preview.is-dragging {
+  cursor: grabbing !important;
+}
+
+.autoservice-print-preview input,
+.autoservice-print-preview textarea,
+.autoservice-print-preview select,
+.autoservice-print-preview button,
+.autoservice-print-preview a {
+  user-select: text;
+  touch-action: auto;
+  cursor: auto;
+}
+
+.autoservice-print-preview__transform {
+  will-change: transform;
 }
 
 @media screen {

@@ -27,7 +27,7 @@ export function navigateBack(navigate, { fallback, explicitBack } = {}) {
   }
 }
 
-/** Returns a stable callback that goes back in browser history or uses fallback. */
+
 export default function useHistoryBack(fallback) {
   const navigate = useNavigate();
   const location = useLocation();

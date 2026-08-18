@@ -600,9 +600,6 @@ function ClientMobileCard({
           Согласие: {formatServerDateTime(row.consented_at) || '—'}
         </p>
       </div>
-      <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-medium text-indigo-700">
-        Авто
-      </span>
     </button>
   );
 }
@@ -1015,20 +1012,19 @@ export default function AutoserviceClientsPage() {
               <th className="py-3 pr-3">Имя</th>
               <th className="w-44 py-3 pr-3">Телефон</th>
               <th className="hidden w-44 py-3 pr-3 lg:table-cell">Согласие</th>
-              <th className="w-28 py-3 pr-3">Аккаунт</th>
-              <th className="w-28 py-3 text-right">Авто</th>
+              <th className="w-28 py-3">Аккаунт</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-gray-500">
+                <td colSpan={4} className="py-12 text-center text-gray-500">
                   Загрузка…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-gray-500">
+                <td colSpan={4} className="py-12 text-center text-gray-500">
                   {rows.length === 0 ? 'Клиентов пока нет' : 'Ничего не найдено'}
                 </td>
               </tr>
@@ -1044,20 +1040,8 @@ export default function AutoserviceClientsPage() {
                   <td className="hidden whitespace-nowrap py-3 pr-3 align-middle text-gray-600 lg:table-cell">
                     {formatServerDateTime(row.consented_at) || '—'}
                   </td>
-                  <td className="py-3 pr-3 align-middle">
+                  <td className="py-3 align-middle">
                     <AccountBadge userId={row.user_id} />
-                  </td>
-                  <td className="py-3 text-right align-middle">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openClientVehicles(row);
-                      }}
-                      className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
-                    >
-                      Показать
-                    </button>
                   </td>
                 </tr>
               ))

@@ -10,6 +10,7 @@ function safePdfName(name) {
 function flattenFormFields(root) {
   root.querySelectorAll('input, textarea, select').forEach((el) => {
     const isMultiline = el.tagName === 'TEXTAREA';
+    const inSignTable = Boolean(el.closest('.repair-order-sign-table'));
     const value =
       el.tagName === 'SELECT'
         ? el.options[el.selectedIndex]?.text || el.value || ''
@@ -31,6 +32,23 @@ function flattenFormFields(root) {
     ].join(';');
 
     if (isMultiline) {
+      el.replaceWith(text);
+      return;
+    }
+
+    if (inSignTable) {
+      text.style.cssText = [
+        'display:inline',
+        'margin:0',
+        'padding:0',
+        'border:0',
+        'background:transparent',
+        'color:#000',
+        'font:inherit',
+        'line-height:1.35',
+        'white-space:nowrap',
+        'text-decoration:none',
+      ].join(';');
       el.replaceWith(text);
       return;
     }
@@ -59,6 +77,7 @@ function flattenFormFields(root) {
 
 function normalizeTableCells(sheet) {
   sheet.querySelectorAll('td, th').forEach((cell) => {
+    if (cell.closest('.repair-order-sign-table')) return;
     cell.classList.remove('h-5');
     const isBorderless = cell.classList.contains('border-0');
 
@@ -114,6 +133,23 @@ function prepareSheetForPdf(clonedDoc, sheet) {
       height: auto !important;
       min-height: 22px !important;
       padding: 5px 4px !important;
+    }
+    [data-print-sheet="true"] .repair-order-sign-table td {
+      height: auto !important;
+      min-height: 0 !important;
+      padding: 1px 2px !important;
+      line-height: 1.35 !important;
+      vertical-align: bottom !important;
+      white-space: nowrap !important;
+      word-break: normal !important;
+    }
+    [data-print-sheet="true"] footer > table td {
+      height: auto !important;
+      min-height: 0 !important;
+      padding: 2px 4px !important;
+      vertical-align: top !important;
+      word-break: normal !important;
+      border: 0 !important;
     }
   `;
   clonedDoc.head.appendChild(style);
