@@ -18,7 +18,7 @@ const EMPTY_FORM = {
 };
 
 const fieldClass =
-  'mt-1 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-indigo-400 focus:ring-0';
+  'h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-indigo-400 focus:ring-0';
 
 export default function AutoserviceWarehouseAddModal({
   open,
@@ -157,7 +157,7 @@ export default function AutoserviceWarehouseAddModal({
           <span className="font-medium text-gray-700">Бренд</span>
           <span className="ml-1 text-xs font-normal text-gray-400">необязательно</span>
           <input
-            className={fieldClass}
+            className={`mt-1 ${fieldClass}`}
             value={form.brand}
             onChange={(e) => patch('brand', e.target.value)}
             placeholder="Например, Bosch"
@@ -166,9 +166,9 @@ export default function AutoserviceWarehouseAddModal({
         <label className="block text-sm">
           <span className="font-medium text-gray-700">Артикул</span>
           <span className="ml-1 text-xs font-normal text-gray-400">необязательно</span>
-          <div className="mt-1 flex gap-2">
+          <div className="mt-1 flex h-10 items-stretch gap-2">
             <input
-              className={`${fieldClass} mt-0 min-w-0 flex-1`}
+              className={`${fieldClass} min-w-0 flex-1`}
               value={form.article}
               onChange={(e) => patch('article', e.target.value)}
               placeholder="Например, 0986424794"
@@ -178,7 +178,7 @@ export default function AutoserviceWarehouseAddModal({
                 type="button"
                 onClick={handleFillFromRossko}
                 disabled={rosskoLookupLoading || !form.article.trim()}
-                className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold leading-none text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {rosskoLookupLoading ? 'Поиск…' : 'Найти в Rossko'}
               </button>
@@ -195,7 +195,7 @@ export default function AutoserviceWarehouseAddModal({
           <span className="font-medium text-gray-700">Наименование</span>
           <span className="ml-1 text-xs font-normal text-red-500">*</span>
           <input
-            className={fieldClass}
+            className={`mt-1 ${fieldClass}`}
             value={form.name}
             onChange={(e) => patch('name', e.target.value)}
             placeholder="Например, Колодки тормозные"
@@ -209,7 +209,7 @@ export default function AutoserviceWarehouseAddModal({
               type="number"
               min="1"
               step="1"
-              className={fieldClass}
+              className={`mt-1 ${fieldClass}`}
               value={form.quantity}
               onChange={(e) => patch('quantity', e.target.value)}
               required
@@ -221,7 +221,7 @@ export default function AutoserviceWarehouseAddModal({
               type="number"
               min="0"
               step="0.01"
-              className={fieldClass}
+              className={`mt-1 ${fieldClass}`}
               value={form.unit_price}
               onChange={(e) => patch('unit_price', e.target.value)}
               placeholder="0"
