@@ -10,7 +10,7 @@ from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
 from app.models.product import Product
 from app.models.repair_order import RepairOrder, RepairOrderShopPart
 from app.schemas.repair_order import RepairOrderPurchaseImportIn
-from app.services.autoservice_warehouse_service import receipt_purchase_line
+from app.services.autoservice_warehouse_service import ReceiptDocumentBatch
 from app.services.repair_order_cart_import import (
     _derive_prices,
     _money,
@@ -104,6 +104,12 @@ def append_purchase_items_to_repair_order(
     existing = _existing_purchase_keys(order)
     position = _next_position(order)
     added = 0
+    receipt_batch = ReceiptDocumentBatch(
+        db,
+        org_id=org_id,
+        user_id=user_id,
+        repair_order_id=order.id,
+    )
 
     if payload.order_type == "new":
         rows = (
@@ -143,10 +149,7 @@ def append_purchase_items_to_repair_order(
             markup_percent = _money(payload.markup_percent)
             qty = _qty(row.quantity or 1)
 
-            stock_item, _, _ = receipt_purchase_line(
-                db,
-                org_id=org_id,
-                user_id=user_id,
+            stock_item, _, _ = receipt_batch.add_purchase(
                 cart_item_type="new",
                 cart_item_id=row.id,
                 brand=brand,
@@ -154,7 +157,8 @@ def append_purchase_items_to_repair_order(
                 name=title,
                 quantity=int(qty),
                 unit_price=unit_price,
-                repair_order_id=order.id,
+                source_order_type="new",
+                source_order_id=row.order_id,
             )
             reserve_autoservice_item_for_repair(db, item=stock_item, qty=int(qty))
 
@@ -240,10 +244,7 @@ def append_purchase_items_to_repair_order(
             markup_percent = _money(payload.markup_percent)
             qty = _qty(row.quantity or 1)
 
-            stock_item, _, _ = receipt_purchase_line(
-                db,
-                org_id=org_id,
-                user_id=user_id,
+            stock_item, _, _ = receipt_batch.add_purchase(
                 cart_item_type="used",
                 cart_item_id=row.id,
                 brand=brand,
@@ -251,7 +252,8 @@ def append_purchase_items_to_repair_order(
                 name=title,
                 quantity=int(qty),
                 unit_price=unit_price,
-                repair_order_id=order.id,
+                source_order_type="used",
+                source_order_id=row.order_id,
             )
             reserve_autoservice_item_for_repair(db, item=stock_item, qty=int(qty))
 
@@ -279,6 +281,7 @@ def append_purchase_items_to_repair_order(
             position += 1
             added += 1
 
+    receipt_batch.flush()
     return added
 
 

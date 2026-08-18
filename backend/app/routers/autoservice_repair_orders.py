@@ -85,7 +85,7 @@ from app.services.repair_order_stock_reserve import (
 from app.services.autoservice_warehouse_service import (
     fulfill_autoservice_stock_on_order_complete,
     product_available_qty,
-    receipt_manual_line,
+    ReceiptDocumentBatch,
 )
 from app.services.autoservice_work_zone_helpers import (
     normalize_dt as _normalize_dt,
@@ -723,6 +723,13 @@ def _replace_shop_parts(
     ]
     db.flush()
 
+    receipt_batch = ReceiptDocumentBatch(
+        db,
+        org_id=org_id,
+        user_id=user_id,
+        repair_order_id=order.id,
+    )
+
     for item in manual_items:
         title = item.title.strip()
         if not title:
@@ -753,20 +760,48 @@ def _replace_shop_parts(
             else:
                 qty = _qty(qty_dec)
                 qty_int = max(1, int(qty_dec.quantize(Decimal("1"), rounding=ROUND_HALF_UP)))
-            wh_item, _, _ = receipt_manual_line(
-                db,
-                org_id=org_id,
-                user_id=user_id,
+            wh_item, _, _ = receipt_batch.add_manual(
                 brand=brand or "",
                 article=partnumber or "",
                 name=title,
                 quantity=qty_int,
                 unit_price=_money(item.unit_price),
-                repair_order_id=order.id,
             )
             source = "autoservice_stock"
             autoservice_stock_item_id = wh_item.id
             unit = saved_unit
+            brand = (wh_item.brand or brand or "")[:120] or None
+            partnumber = (wh_item.article or partnumber or "")[:120] or None
+            product_id = None
+        elif source == "warehouse":
+            if not product_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Не указан товар склада «Мои запчасти»",
+                )
+            product = (
+                db.query(Product)
+                .filter(Product.id == product_id, Product.organization_id == org_id)
+                .with_for_update()
+                .first()
+            )
+            if not product:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Товар склада не найден",
+                )
+            qty_int = max(1, int(Decimal(str(qty or 1)).quantize(Decimal("1"))))
+            wh_item, _, _ = receipt_batch.add_my_parts(
+                product=product,
+                brand=(product.brand or brand or "")[:120],
+                article=(product.article or product.internal_code or partnumber or "")[:120],
+                name=(product.name or title or "Запчасть")[:255],
+                quantity=qty_int,
+                unit_price=_money(item.unit_price or product.price or 0),
+            )
+            source = "autoservice_stock"
+            autoservice_stock_item_id = wh_item.id
+            product_id = None
             brand = (wh_item.brand or brand or "")[:120] or None
             partnumber = (wh_item.article or partnumber or "")[:120] or None
         new_part = RepairOrderShopPart(
@@ -789,9 +824,11 @@ def _replace_shop_parts(
             rossko_brand=rossko_brand[:120] if rossko_brand else None,
             rossko_partnumber=rossko_partnumber[:120] if rossko_partnumber else None,
         )
-        if source in ("warehouse", "autoservice_stock"):
+        if source == "autoservice_stock":
             apply_shop_part_reservation(db, new_part)
         order.shop_parts.append(new_part)
+
+    receipt_batch.flush()
 
     for idx, part in enumerate(order.shop_parts or [], start=1):
         part.position = idx

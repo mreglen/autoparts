@@ -26,11 +26,41 @@ class AutoserviceWarehouseReceiptView(BaseModel):
     name: str
     quantity: int
     unit_price: Decimal
+    line_total: Decimal
     cart_item_type: Optional[str] = None
     cart_item_id: Optional[int] = None
     repair_order_id: Optional[int] = None
     created_at: date
     creator_name: Optional[str] = None
+
+
+class AutoserviceWarehouseReceiptDocListView(BaseModel):
+    id: int
+    number: str
+    doc_date: date
+    supplier_kind: str
+    supplier_name: str
+    total_amount: Decimal
+    lines_count: int
+    repair_order_id: Optional[int] = None
+    repair_order_number: Optional[str] = None
+    creator_name: Optional[str] = None
+    created_at: datetime
+
+
+class AutoserviceWarehouseReceiptDocDetailView(BaseModel):
+    id: int
+    number: str
+    doc_date: date
+    supplier_kind: str
+    supplier_name: str
+    total_amount: Decimal
+    lines_count: int
+    repair_order_id: Optional[int] = None
+    repair_order_number: Optional[str] = None
+    creator_name: Optional[str] = None
+    created_at: datetime
+    lines: list[AutoserviceWarehouseReceiptView]
 
 
 class AutoserviceWarehouseExpenseView(BaseModel):

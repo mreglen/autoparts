@@ -4,6 +4,43 @@ from sqlalchemy.orm import relationship
 from ..db.database import Base
 
 
+class AutoserviceWarehouseReceiptDoc(Base):
+    __tablename__ = "autoservice_warehouse_receipt_docs"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "number",
+            name="uq_autoservice_wh_receipt_doc_org_number",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(String, ForeignKey("organizations.id"), nullable=False, index=True)
+    number = Column(String(32), nullable=False)
+    doc_date = Column(Date, server_default=func.current_date(), nullable=False)
+    supplier_kind = Column(String(24), nullable=False)
+    supplier_name = Column(String(255), nullable=False)
+    source_order_type = Column(String(8), nullable=True)
+    source_order_id = Column(Integer, nullable=True)
+    repair_order_id = Column(
+        Integer,
+        ForeignKey("repair_orders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    organization = relationship("Organization")
+    repair_order = relationship("RepairOrder")
+    creator = relationship("User", foreign_keys=[created_by])
+    lines = relationship(
+        "AutoserviceWarehouseReceipt",
+        back_populates="document",
+        cascade="all, delete-orphan",
+    )
+
+
 class AutoserviceWarehouseItem(Base):
     __tablename__ = "autoservice_warehouse_items"
     __table_args__ = (
@@ -48,6 +85,12 @@ class AutoserviceWarehouseReceipt(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(String, ForeignKey("organizations.id"), nullable=False, index=True)
+    document_id = Column(
+        Integer,
+        ForeignKey("autoservice_warehouse_receipt_docs.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     item_id = Column(
         Integer,
         ForeignKey("autoservice_warehouse_items.id", ondelete="CASCADE"),
@@ -68,6 +111,7 @@ class AutoserviceWarehouseReceipt(Base):
     created_at = Column(Date, server_default=func.current_date(), nullable=False)
 
     organization = relationship("Organization")
+    document = relationship("AutoserviceWarehouseReceiptDoc", back_populates="lines")
     item = relationship("AutoserviceWarehouseItem", back_populates="receipts")
     repair_order = relationship("RepairOrder")
     creator = relationship("User", foreign_keys=[created_by])

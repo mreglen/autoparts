@@ -5398,6 +5398,95 @@ def ensure_autoservice_warehouse_tables() -> None:
     logger.info("Applied autoservice warehouse tables patch")
 
 
+def ensure_autoservice_warehouse_receipt_docs_table() -> None:
+    """Create autoservice warehouse receipt document headers table."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "autoservice_warehouse_receipt_docs" in tables:
+        return
+    if "autoservice_warehouse_items" not in tables:
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    ts_type = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    ddl = f"""
+        CREATE TABLE autoservice_warehouse_receipt_docs (
+            id {pk},
+            organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+            number VARCHAR(32) NOT NULL,
+            doc_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            supplier_kind VARCHAR(24) NOT NULL,
+            supplier_name VARCHAR(255) NOT NULL,
+            source_order_type VARCHAR(8),
+            source_order_id INTEGER,
+            repair_order_id INTEGER REFERENCES repair_orders(id) ON DELETE SET NULL,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at {ts_type} NOT NULL DEFAULT {"NOW()" if is_pg else "CURRENT_TIMESTAMP"},
+            CONSTRAINT uq_autoservice_wh_receipt_doc_org_number
+                UNIQUE (organization_id, number)
+        )
+    """
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        for idx_stmt in (
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_receipt_docs_org "
+            "ON autoservice_warehouse_receipt_docs (organization_id)",
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_receipt_docs_repair_order "
+            "ON autoservice_warehouse_receipt_docs (repair_order_id)",
+        ):
+            try:
+                conn.execute(text(idx_stmt))
+            except Exception:
+                pass
+    logger.info("Applied autoservice warehouse receipt docs table patch")
+
+
+def ensure_autoservice_warehouse_receipts_document_id() -> None:
+    """Add document_id to autoservice_warehouse_receipts."""
+    inspector = inspect(engine)
+    if "autoservice_warehouse_receipts" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("autoservice_warehouse_receipts")}
+    if "document_id" in columns:
+        return
+    stmt = (
+        "ALTER TABLE autoservice_warehouse_receipts "
+        "ADD COLUMN document_id INTEGER "
+        "REFERENCES autoservice_warehouse_receipt_docs(id) ON DELETE CASCADE"
+    )
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+        try:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_receipts_document_id "
+                    "ON autoservice_warehouse_receipts (document_id)"
+                )
+            )
+        except Exception:
+            pass
+    logger.info("Applied autoservice_warehouse_receipts.document_id patch")
+
+
+def ensure_autoservice_warehouse_receipt_docs_backfill() -> None:
+    """One-shot migration of flat receipts into grouped receipt documents."""
+    from app.db.database import SessionLocal
+    from app.services.autoservice_warehouse_receipt_backfill import (
+        backfill_autoservice_receipt_documents,
+    )
+
+    db = SessionLocal()
+    try:
+        stats = backfill_autoservice_receipt_documents(db)
+        logger.info("autoservice warehouse receipt docs backfill finished: %s", stats)
+    except Exception:
+        logger.exception("autoservice warehouse receipt docs backfill failed")
+        db.rollback()
+    finally:
+        db.close()
+
+
 def ensure_autoservice_document_buyers_table() -> None:
     """Buyers (counterparties) for UPD and other closing documents."""
     inspector = inspect(engine)

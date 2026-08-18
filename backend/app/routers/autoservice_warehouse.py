@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
@@ -11,6 +12,7 @@ from app.models.autoservice_warehouse import (
     AutoserviceWarehouseExpense,
     AutoserviceWarehouseItem,
     AutoserviceWarehouseReceipt,
+    AutoserviceWarehouseReceiptDoc,
 )
 from app.models.user import User
 from app.schemas.autoservice_warehouse import (
@@ -19,6 +21,8 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseImportResult,
     AutoserviceWarehouseItemView,
     AutoserviceWarehouseManualReceiptIn,
+    AutoserviceWarehouseReceiptDocDetailView,
+    AutoserviceWarehouseReceiptDocListView,
     AutoserviceWarehouseReceiptSuggestView,
     AutoserviceWarehouseReceiptView,
     PurchaseWarehouseImportIn,
@@ -32,6 +36,10 @@ from app.services.autoservice_warehouse_service import (
 from app.utils.autoservice_access import require_autoservice_staff
 
 router = APIRouter(tags=["Autoservice Warehouse"])
+
+
+def _money(value) -> Decimal:
+    return Decimal(str(value or 0)).quantize(Decimal("0.01"))
 
 
 def _creator_name(user) -> str | None:
@@ -53,6 +61,68 @@ def _item_view(item: AutoserviceWarehouseItem) -> AutoserviceWarehouseItemView:
         reserved_qty=int(item.reserved_qty or 0),
         available_qty=autoservice_item_available_qty(item),
         unit_price=item.unit_price,
+    )
+
+
+def _receipt_line_view(row: AutoserviceWarehouseReceipt) -> AutoserviceWarehouseReceiptView:
+    item = row.item
+    qty = int(row.quantity or 0)
+    unit_price = _money(row.unit_price)
+    return AutoserviceWarehouseReceiptView(
+        id=row.id,
+        item_id=row.item_id,
+        brand=item.brand if item else "",
+        article=item.article if item else "",
+        name=item.name if item else "",
+        quantity=qty,
+        unit_price=unit_price,
+        line_total=_money(unit_price * qty),
+        cart_item_type=row.cart_item_type,
+        cart_item_id=row.cart_item_id,
+        repair_order_id=row.repair_order_id,
+        created_at=row.created_at,
+        creator_name=_creator_name(row.creator),
+    )
+
+
+def _doc_total(doc: AutoserviceWarehouseReceiptDoc) -> Decimal:
+    total = Decimal("0")
+    for line in doc.lines or []:
+        total += _money(line.unit_price) * int(line.quantity or 0)
+    return _money(total)
+
+
+def _doc_list_view(doc: AutoserviceWarehouseReceiptDoc) -> AutoserviceWarehouseReceiptDocListView:
+    return AutoserviceWarehouseReceiptDocListView(
+        id=doc.id,
+        number=doc.number,
+        doc_date=doc.doc_date,
+        supplier_kind=doc.supplier_kind,
+        supplier_name=doc.supplier_name,
+        total_amount=_doc_total(doc),
+        lines_count=len(doc.lines or []),
+        repair_order_id=doc.repair_order_id,
+        repair_order_number=doc.repair_order.order_number if doc.repair_order else None,
+        creator_name=_creator_name(doc.creator),
+        created_at=doc.created_at,
+    )
+
+
+def _doc_detail_view(doc: AutoserviceWarehouseReceiptDoc) -> AutoserviceWarehouseReceiptDocDetailView:
+    lines = [_receipt_line_view(line) for line in (doc.lines or [])]
+    return AutoserviceWarehouseReceiptDocDetailView(
+        id=doc.id,
+        number=doc.number,
+        doc_date=doc.doc_date,
+        supplier_kind=doc.supplier_kind,
+        supplier_name=doc.supplier_name,
+        total_amount=_doc_total(doc),
+        lines_count=len(lines),
+        repair_order_id=doc.repair_order_id,
+        repair_order_number=doc.repair_order.order_number if doc.repair_order else None,
+        creator_name=_creator_name(doc.creator),
+        created_at=doc.created_at,
+        lines=lines,
     )
 
 
@@ -89,7 +159,7 @@ def list_autoservice_warehouse_items(
 
 @router.get(
     "/autoservice/warehouse/receipts",
-    response_model=list[AutoserviceWarehouseReceiptView],
+    response_model=list[AutoserviceWarehouseReceiptDocListView],
 )
 def list_autoservice_warehouse_receipts(
     db: Session = Depends(get_db),
@@ -97,39 +167,21 @@ def list_autoservice_warehouse_receipts(
 ):
     org_id = require_autoservice_staff(db, current_user)
     rows = (
-        db.query(AutoserviceWarehouseReceipt)
+        db.query(AutoserviceWarehouseReceiptDoc)
         .options(
-            joinedload(AutoserviceWarehouseReceipt.item),
-            joinedload(AutoserviceWarehouseReceipt.creator),
+            joinedload(AutoserviceWarehouseReceiptDoc.lines),
+            joinedload(AutoserviceWarehouseReceiptDoc.repair_order),
+            joinedload(AutoserviceWarehouseReceiptDoc.creator),
         )
-        .filter(AutoserviceWarehouseReceipt.organization_id == org_id)
+        .filter(AutoserviceWarehouseReceiptDoc.organization_id == org_id)
         .order_by(
-            AutoserviceWarehouseReceipt.created_at.desc(),
-            AutoserviceWarehouseReceipt.id.desc(),
+            AutoserviceWarehouseReceiptDoc.doc_date.desc(),
+            AutoserviceWarehouseReceiptDoc.id.desc(),
         )
         .limit(500)
         .all()
     )
-    result = []
-    for row in rows:
-        item = row.item
-        result.append(
-            AutoserviceWarehouseReceiptView(
-                id=row.id,
-                item_id=row.item_id,
-                brand=item.brand if item else "",
-                article=item.article if item else "",
-                name=item.name if item else "",
-                quantity=int(row.quantity or 0),
-                unit_price=row.unit_price,
-                cart_item_type=row.cart_item_type,
-                cart_item_id=row.cart_item_id,
-                repair_order_id=row.repair_order_id,
-                created_at=row.created_at,
-                creator_name=_creator_name(row.creator),
-            )
-        )
-    return result
+    return [_doc_list_view(row) for row in rows]
 
 
 @router.get(
@@ -193,6 +245,39 @@ def suggest_autoservice_warehouse_receipts(
         if len(result) >= limit:
             break
     return result
+
+
+@router.get(
+    "/autoservice/warehouse/receipts/{doc_id}",
+    response_model=AutoserviceWarehouseReceiptDocDetailView,
+)
+def get_autoservice_warehouse_receipt_doc(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    doc = (
+        db.query(AutoserviceWarehouseReceiptDoc)
+        .options(
+            joinedload(AutoserviceWarehouseReceiptDoc.lines).joinedload(
+                AutoserviceWarehouseReceipt.item
+            ),
+            joinedload(AutoserviceWarehouseReceiptDoc.lines).joinedload(
+                AutoserviceWarehouseReceipt.creator
+            ),
+            joinedload(AutoserviceWarehouseReceiptDoc.repair_order),
+            joinedload(AutoserviceWarehouseReceiptDoc.creator),
+        )
+        .filter(
+            AutoserviceWarehouseReceiptDoc.id == doc_id,
+            AutoserviceWarehouseReceiptDoc.organization_id == org_id,
+        )
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Документ поступления не найден")
+    return _doc_detail_view(doc)
 
 
 @router.get(
@@ -260,7 +345,7 @@ def import_purchases_to_autoservice_warehouse(
 
 @router.post(
     "/autoservice/warehouse/receipts",
-    response_model=AutoserviceWarehouseReceiptView,
+    response_model=AutoserviceWarehouseReceiptDocDetailView,
 )
 def create_autoservice_warehouse_receipt(
     payload: AutoserviceWarehouseManualReceiptIn,
@@ -268,7 +353,7 @@ def create_autoservice_warehouse_receipt(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_staff(db, current_user)
-    item, receipt, _created = receipt_manual_line(
+    _item, receipt, _created = receipt_manual_line(
         db,
         org_id=org_id,
         user_id=current_user.id,
@@ -278,23 +363,32 @@ def create_autoservice_warehouse_receipt(
         quantity=payload.quantity,
         unit_price=payload.unit_price,
     )
+    db.flush()
+    doc_id = receipt.document_id
     db.commit()
-    db.refresh(receipt)
-    db.refresh(item)
-    return AutoserviceWarehouseReceiptView(
-        id=receipt.id,
-        item_id=receipt.item_id,
-        brand=item.brand or "",
-        article=item.article or "",
-        name=item.name,
-        quantity=int(receipt.quantity or 0),
-        unit_price=receipt.unit_price,
-        cart_item_type=receipt.cart_item_type,
-        cart_item_id=receipt.cart_item_id,
-        repair_order_id=receipt.repair_order_id,
-        created_at=receipt.created_at,
-        creator_name=_creator_name(current_user),
+    if not doc_id:
+        raise HTTPException(status_code=500, detail="Не удалось создать документ поступления")
+    doc = (
+        db.query(AutoserviceWarehouseReceiptDoc)
+        .options(
+            joinedload(AutoserviceWarehouseReceiptDoc.lines).joinedload(
+                AutoserviceWarehouseReceipt.item
+            ),
+            joinedload(AutoserviceWarehouseReceiptDoc.lines).joinedload(
+                AutoserviceWarehouseReceipt.creator
+            ),
+            joinedload(AutoserviceWarehouseReceiptDoc.repair_order),
+            joinedload(AutoserviceWarehouseReceiptDoc.creator),
+        )
+        .filter(
+            AutoserviceWarehouseReceiptDoc.id == doc_id,
+            AutoserviceWarehouseReceiptDoc.organization_id == org_id,
+        )
+        .first()
     )
+    if not doc:
+        raise HTTPException(status_code=500, detail="Документ поступления не найден")
+    return _doc_detail_view(doc)
 
 
 @router.post(

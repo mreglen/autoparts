@@ -4,6 +4,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
+import AutoserviceReceiptDocumentModal from '../../components/Autoservice/AutoserviceReceiptDocumentModal';
 import {
   warehousePageClass,
   warehousePillControlClass,
@@ -21,6 +22,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDocId, setSelectedDocId] = useState(null);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -44,7 +46,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter((row) => [row.brand, row.article, row.name, row.creator_name]
+    return rows.filter((row) => [row.number, row.supplier_name, row.repair_order_number, row.creator_name]
       .some((value) => String(value || '').toLowerCase().includes(q)));
   }, [rows, searchQuery]);
 
@@ -72,7 +74,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
           type="search"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Поиск"
+          placeholder="Поиск по номеру или поставщику"
           className={`${warehousePillControlClass} sm:max-w-md`}
         />
       </div>
@@ -96,24 +98,24 @@ export default function AutoserviceWarehouseReceiptsPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
               <tr>
+                <th className="px-4 py-3">Номер</th>
                 <th className="px-4 py-3">Дата</th>
-                <th className="px-4 py-3">Бренд</th>
-                <th className="px-4 py-3">Артикул</th>
-                <th className="px-4 py-3">Наименование</th>
-                <th className="px-4 py-3 text-right">Кол-во</th>
-                <th className="px-4 py-3 text-right">Цена</th>
+                <th className="px-4 py-3">Поставщик</th>
+                <th className="px-4 py-3 text-right">Сумма</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredRows.map((row) => (
-                <tr key={row.id} className="text-gray-800">
-                  <td className="px-4 py-3 whitespace-nowrap">{formatDate(row.created_at)}</td>
-                  <td className="px-4 py-3 font-medium">{row.brand || '—'}</td>
-                  <td className="px-4 py-3 font-mono text-gray-600">{row.article || '—'}</td>
-                  <td className="px-4 py-3">{row.name || '—'}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{row.quantity} шт.</td>
+                <tr
+                  key={row.id}
+                  className="cursor-pointer text-gray-800 hover:bg-gray-50"
+                  onClick={() => setSelectedDocId(row.id)}
+                >
+                  <td className="px-4 py-3 font-medium text-indigo-700">{row.number}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{formatDate(row.doc_date)}</td>
+                  <td className="px-4 py-3">{row.supplier_name}</td>
                   <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                    {formatAutoserviceWarehouseMoney(row.unit_price)}
+                    {formatAutoserviceWarehouseMoney(row.total_amount)}
                   </td>
                 </tr>
               ))}
@@ -121,6 +123,11 @@ export default function AutoserviceWarehouseReceiptsPage() {
           </table>
         </div>
       )}
+
+      <AutoserviceReceiptDocumentModal
+        docId={selectedDocId}
+        onClose={() => setSelectedDocId(null)}
+      />
     </div>
   );
 }
