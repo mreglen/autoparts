@@ -9,6 +9,12 @@ import {
   fetchAutoserviceClientMe,
   selectIsAutoserviceClient,
 } from '../../redux/slices/AutoserviceClientSlice';
+import {
+  canAccessAutoserviceClientMenu,
+  selectAutoserviceOrganizationId,
+  selectShowAutoservice,
+} from '../../utils/autoservicePublic';
+import { getCabinetMode } from '../../utils/cabinetMode';
 import UserAvatar from '../../components/UserAvatar/UserAvatar';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import ChangePasswordModal from './ChangePasswordModal';
@@ -112,6 +118,8 @@ export default function ProfilePage() {
   const { user, isLoading, isReady } = useAuthReady();
   const isAutoserviceClient = useSelector(selectIsAutoserviceClient);
   const autoserviceClientStatus = useSelector((state) => state.autoserviceClient.status);
+  const showAutoservice = useSelector(selectShowAutoservice);
+  const autoserviceOrganizationId = useSelector(selectAutoserviceOrganizationId);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const { loading: saving, avatarLoading, error: saveError } = useSelector((state) => state.user);
 
@@ -243,8 +251,19 @@ export default function ProfilePage() {
     || (user?.is_employee && permissionCodes && permissionCodes.includes('my-parts')),
   );
 
+  const canOpenGarage = Boolean(
+    user
+    && isAutoserviceClient
+    && canAccessAutoserviceClientMenu(user, {
+      showAutoservice,
+      autoserviceOrganizationId,
+      cabinetMode: getCabinetMode(user, { autoserviceOrganizationId }),
+      organizationIsAutoservice: Boolean(user.organization_is_autoservice),
+    }),
+  );
+
   const quickActions = [
-    isAutoserviceClient ? { to: '/garage', label: 'Мои авто', icon: <IconCar /> } : null,
+    canOpenGarage ? { to: '/garage', label: 'Мои авто', icon: <IconCar /> } : null,
     showMyParts ? { to: '/my-parts', label: 'Мои запчасти', icon: <IconParts /> } : null,
     { to: '/purchases/orders', label: 'Заказы', icon: <IconBag /> },
     { to: '/profile/notifications', label: 'Уведомления', icon: <IconBell /> },

@@ -8,11 +8,13 @@ import { isMyPartsFormRoute } from '../../utils/partRoutes';
 import { showSplashBeforeReload } from '../../utils/appSplash';
 
 const SOFT_REFRESH_MIN_MS = 350;
+const AUTOSERVICE_DOCUMENT_PATH_RE = /^\/autoservice\/orders\/\d+\/print(\/upd|\/invoice)?$/;
 
 export default function PullToRefresh() {
   const location = useLocation();
   const dispatch = useDispatch();
   const organizationId = useSelector((state) => state.auth.user?.organization_id);
+  const disablePullToRefresh = AUTOSERVICE_DOCUMENT_PATH_RE.test(location.pathname);
 
   const onRefresh = useCallback(async () => {
     if (!isMyPartsFormRoute(location.pathname)) {
@@ -37,7 +39,10 @@ export default function PullToRefresh() {
     }
   }, [dispatch, location.pathname, organizationId]);
 
-  const { distance, refreshing, threshold, isActive } = usePullToRefresh({ onRefresh });
+  const { distance, refreshing, threshold, isActive } = usePullToRefresh({
+    enabled: !disablePullToRefresh,
+    onRefresh,
+  });
 
   if (!isActive || (distance <= 0 && !refreshing)) {
     return null;
