@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 
@@ -17,6 +19,7 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseImportResult,
     AutoserviceWarehouseItemView,
     AutoserviceWarehouseManualReceiptIn,
+    AutoserviceWarehouseReceiptSuggestView,
     AutoserviceWarehouseReceiptView,
     PurchaseWarehouseImportIn,
 )
@@ -126,6 +129,69 @@ def list_autoservice_warehouse_receipts(
                 creator_name=_creator_name(row.creator),
             )
         )
+    return result
+
+
+@router.get(
+    "/autoservice/warehouse/receipts/suggest",
+    response_model=list[AutoserviceWarehouseReceiptSuggestView],
+)
+def suggest_autoservice_warehouse_receipts(
+    field: Literal["brand", "article", "name"] = Query("name"),
+    q: str = Query("", max_length=120),
+    limit: int = Query(15, ge=1, le=30),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    term = (q or "").strip()
+    query = (
+        db.query(AutoserviceWarehouseReceipt, AutoserviceWarehouseItem)
+        .join(
+            AutoserviceWarehouseItem,
+            AutoserviceWarehouseReceipt.item_id == AutoserviceWarehouseItem.id,
+        )
+        .filter(AutoserviceWarehouseReceipt.organization_id == org_id)
+    )
+    if term:
+        like = f"%{term}%"
+        if field == "brand":
+            query = query.filter(AutoserviceWarehouseItem.brand.ilike(like))
+        elif field == "article":
+            query = query.filter(AutoserviceWarehouseItem.article.ilike(like))
+        else:
+            query = query.filter(AutoserviceWarehouseItem.name.ilike(like))
+    rows = (
+        query.order_by(
+            AutoserviceWarehouseReceipt.created_at.desc(),
+            AutoserviceWarehouseReceipt.id.desc(),
+        )
+        .limit(400)
+        .all()
+    )
+
+    seen: set[tuple[str, str, str]] = set()
+    result: list[AutoserviceWarehouseReceiptSuggestView] = []
+    for receipt, item in rows:
+        brand = (item.brand or "").strip()
+        article = (item.article or "").strip()
+        name = (item.name or "").strip()
+        if not name:
+            continue
+        key = (brand, article, name)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(
+            AutoserviceWarehouseReceiptSuggestView(
+                brand=brand,
+                article=article,
+                name=name,
+                unit_price=receipt.unit_price,
+            )
+        )
+        if len(result) >= limit:
+            break
     return result
 
 

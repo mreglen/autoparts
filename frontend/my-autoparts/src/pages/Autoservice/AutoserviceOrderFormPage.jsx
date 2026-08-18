@@ -110,7 +110,7 @@ function fromLocalInputValue(local) {
 }
 
 function emptyWork() {
-  return { title: '', catalog_work_id: '', qty: 1, unit_price: '0', executors: [] };
+  return { title: '', catalog_work_id: '', qty: 1, unit_price: '', executors: [] };
 }
 
 function emptyExecutor(employeeId = '', percent = '') {
@@ -1652,7 +1652,7 @@ export default function AutoserviceOrderFormPage() {
                       min={0}
                       step="0.01"
                       className="h-8 w-24 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
-                      placeholder="Цена"
+                      placeholder="0"
                       value={w.unit_price}
                       onChange={(e) => updateWork(index, { unit_price: e.target.value })}
                     />

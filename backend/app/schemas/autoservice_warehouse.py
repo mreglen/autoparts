@@ -72,3 +72,10 @@ class AutoserviceWarehouseManualReceiptIn(BaseModel):
 class AutoserviceWarehouseImportResult(BaseModel):
     added_items: int
     skipped_items: int
+
+
+class AutoserviceWarehouseReceiptSuggestView(BaseModel):
+    brand: str
+    article: str
+    name: str
+    unit_price: Decimal

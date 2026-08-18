@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import { apiAxios } from '../../utils/apiClient';
+import AutoserviceReceiptSuggestField from './AutoserviceReceiptSuggestField';
 import {
   buildRosskoLookupText,
   getRosskoMinPrice,
@@ -53,6 +54,22 @@ export default function AutoserviceWarehouseAddModal({
     if (key === 'brand' || key === 'article' || key === 'name' || key === 'unit_price') {
       setFilledFromRossko(false);
     }
+  };
+
+  const applyReceiptSuggestion = (row) => {
+    setForm((prev) => ({
+      ...prev,
+      brand: row.brand ?? prev.brand,
+      article: row.article ?? prev.article,
+      name: row.name ?? prev.name,
+      unit_price: row.unit_price != null && row.unit_price !== ''
+        ? String(row.unit_price)
+        : prev.unit_price,
+    }));
+    setFilledFromRossko(false);
+    setError('');
+    setRosskoLookupError('');
+    setRosskoLookupNotice('');
   };
 
   const handleClose = () => {
@@ -156,22 +173,27 @@ export default function AutoserviceWarehouseAddModal({
         <label className="block text-sm">
           <span className="font-medium text-gray-700">Бренд</span>
           <span className="ml-1 text-xs font-normal text-gray-400">необязательно</span>
-          <input
-            className={`mt-1 ${fieldClass}`}
+          <AutoserviceReceiptSuggestField
+            field="brand"
             value={form.brand}
-            onChange={(e) => patch('brand', e.target.value)}
+            onValueChange={(value) => patch('brand', value)}
+            onPick={applyReceiptSuggestion}
             placeholder="Например, Bosch"
+            inputClassName={`mt-1 ${fieldClass}`}
           />
         </label>
         <label className="block text-sm">
           <span className="font-medium text-gray-700">Артикул</span>
           <span className="ml-1 text-xs font-normal text-gray-400">необязательно</span>
           <div className="mt-1 flex h-10 items-stretch gap-2">
-            <input
-              className={`${fieldClass} min-w-0 flex-1`}
+            <AutoserviceReceiptSuggestField
+              field="article"
               value={form.article}
-              onChange={(e) => patch('article', e.target.value)}
+              onValueChange={(value) => patch('article', value)}
+              onPick={applyReceiptSuggestion}
               placeholder="Например, 0986424794"
+              inputClassName={fieldClass}
+              className="min-w-0 flex-1"
             />
             {showRosskoLookup ? (
               <button
@@ -194,12 +216,13 @@ export default function AutoserviceWarehouseAddModal({
         <label className="block text-sm">
           <span className="font-medium text-gray-700">Наименование</span>
           <span className="ml-1 text-xs font-normal text-red-500">*</span>
-          <input
-            className={`mt-1 ${fieldClass}`}
+          <AutoserviceReceiptSuggestField
+            field="name"
             value={form.name}
-            onChange={(e) => patch('name', e.target.value)}
+            onValueChange={(value) => patch('name', value)}
+            onPick={applyReceiptSuggestion}
             placeholder="Например, Колодки тормозные"
-            required
+            inputClassName={`mt-1 ${fieldClass}`}
           />
         </label>
         <div className="grid grid-cols-2 gap-3">
