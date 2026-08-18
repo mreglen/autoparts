@@ -1,6 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
+import { apiAxios } from '../../utils/apiClient';
+import {
+  buildRosskoLookupText,
+  getRosskoMinPrice,
+  pickBestRosskoPart,
+  roundRosskoSalePrice,
+} from '../../pages/AutoParts/NewParts/rosskoHelpers';
 
 const EMPTY_FORM = {
   brand: '',
@@ -20,19 +27,91 @@ export default function AutoserviceWarehouseAddModal({
   submitting = false,
   title = 'Добавить на склад',
   submitLabel = 'Добавить',
+  showRosskoLookup = true,
 }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
+  const [rosskoLookupLoading, setRosskoLookupLoading] = useState(false);
+  const [rosskoLookupError, setRosskoLookupError] = useState('');
+  const [rosskoLookupNotice, setRosskoLookupNotice] = useState('');
+  const [filledFromRossko, setFilledFromRossko] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm(EMPTY_FORM);
+    setError('');
+    setRosskoLookupError('');
+    setRosskoLookupNotice('');
+    setFilledFromRossko(false);
+  }, [open]);
 
   const patch = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     setError('');
+    setRosskoLookupError('');
+    setRosskoLookupNotice('');
+    if (key === 'brand' || key === 'article' || key === 'name' || key === 'unit_price') {
+      setFilledFromRossko(false);
+    }
   };
 
   const handleClose = () => {
     setForm(EMPTY_FORM);
     setError('');
+    setRosskoLookupError('');
+    setRosskoLookupNotice('');
+    setFilledFromRossko(false);
     onClose?.();
+  };
+
+  const handleFillFromRossko = async () => {
+    const article = form.article.trim();
+    const brand = form.brand.trim();
+    if (!article) {
+      setRosskoLookupError('Введите артикул для поиска в Rossko');
+      return;
+    }
+
+    setRosskoLookupLoading(true);
+    setRosskoLookupError('');
+    setRosskoLookupNotice('');
+
+    try {
+      const response = await apiAxios.post('/rossko/GetSearch', {
+        text: buildRosskoLookupText(article, brand),
+        delivery_id: '000000001',
+        address_id: 176458,
+      });
+
+      const best = pickBestRosskoPart(response.data, article, brand);
+      if (!best) {
+        setRosskoLookupError('В Rossko ничего не найдено по введённым данным');
+        return;
+      }
+
+      const minPrice = roundRosskoSalePrice(getRosskoMinPrice(best));
+      const filledArticle = best.partnumber || article;
+      const filledBrand = best.brand || brand;
+      const filledName = best.name || form.name;
+
+      setForm((prev) => ({
+        ...prev,
+        article: filledArticle,
+        brand: filledBrand,
+        name: filledName || prev.name,
+        unit_price: minPrice > 0 ? String(minPrice) : prev.unit_price,
+      }));
+      setFilledFromRossko(true);
+      setRosskoLookupNotice(
+        `Данные заполнены: ${filledBrand || '—'} ${filledArticle}`.trim(),
+      );
+    } catch (err) {
+      setRosskoLookupError(
+        err.response?.data?.detail || err.message || 'Ошибка при поиске в Rossko',
+      );
+    } finally {
+      setRosskoLookupLoading(false);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -59,9 +138,13 @@ export default function AutoserviceWarehouseAddModal({
         name,
         quantity,
         unit_price: unitPrice,
+        source: filledFromRossko ? 'rossko' : 'manual',
       });
       setForm(EMPTY_FORM);
       setError('');
+      setRosskoLookupError('');
+      setRosskoLookupNotice('');
+      setFilledFromRossko(false);
     } catch (err) {
       setError(err?.message || 'Не удалось сохранить');
     }
@@ -72,6 +155,7 @@ export default function AutoserviceWarehouseAddModal({
       <form onSubmit={handleSubmit} className="space-y-3">
         <label className="block text-sm">
           <span className="font-medium text-gray-700">Бренд</span>
+          <span className="ml-1 text-xs font-normal text-gray-400">необязательно</span>
           <input
             className={fieldClass}
             value={form.brand}
@@ -81,15 +165,35 @@ export default function AutoserviceWarehouseAddModal({
         </label>
         <label className="block text-sm">
           <span className="font-medium text-gray-700">Артикул</span>
-          <input
-            className={fieldClass}
-            value={form.article}
-            onChange={(e) => patch('article', e.target.value)}
-            placeholder="Например, 0986424794"
-          />
+          <span className="ml-1 text-xs font-normal text-gray-400">необязательно</span>
+          <div className="mt-1 flex gap-2">
+            <input
+              className={`${fieldClass} mt-0 min-w-0 flex-1`}
+              value={form.article}
+              onChange={(e) => patch('article', e.target.value)}
+              placeholder="Например, 0986424794"
+            />
+            {showRosskoLookup ? (
+              <button
+                type="button"
+                onClick={handleFillFromRossko}
+                disabled={rosskoLookupLoading || !form.article.trim()}
+                className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {rosskoLookupLoading ? 'Поиск…' : 'Найти в Rossko'}
+              </button>
+            ) : null}
+          </div>
         </label>
+        {showRosskoLookup && rosskoLookupError ? (
+          <p className="text-sm text-red-600">{rosskoLookupError}</p>
+        ) : null}
+        {showRosskoLookup && rosskoLookupNotice ? (
+          <p className="text-sm text-green-700">{rosskoLookupNotice}</p>
+        ) : null}
         <label className="block text-sm">
           <span className="font-medium text-gray-700">Наименование</span>
+          <span className="ml-1 text-xs font-normal text-red-500">*</span>
           <input
             className={fieldClass}
             value={form.name}

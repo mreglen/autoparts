@@ -1119,6 +1119,7 @@ export default function AutoserviceOrderFormPage() {
   };
 
   const handleManualShopPartAdd = (values) => {
+    const isRossko = values.source === 'rossko';
     setShopParts((prev) => [...prev, makeEmptyShopPart({
       title: values.name,
       brand: values.brand || '',
@@ -1126,7 +1127,9 @@ export default function AutoserviceOrderFormPage() {
       qty: values.quantity,
       unit: 'pcs',
       unit_price: String(values.unit_price ?? 0),
-      source: 'manual',
+      source: isRossko ? 'rossko' : 'manual',
+      rossko_brand: isRossko ? (values.brand || '') : '',
+      rossko_partnumber: isRossko ? (values.article || '') : '',
     })]);
     setShopPartManualOpen(false);
   };
@@ -1317,7 +1320,7 @@ export default function AutoserviceOrderFormPage() {
         return 'Итоговая цена ЗЧ исполнителя должна быть ≥ 0';
       }
       if (p.pending_import) continue;
-      if (!String(p.title || '').trim() && !String(p.brand || '').trim()) {
+      if (!String(p.title || '').trim()) {
         return 'У каждой запчасти исполнителя должно быть наименование';
       }
       if (!isValidShopPartQty(p.qty, p.unit || 'pcs')) {
