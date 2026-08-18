@@ -83,11 +83,57 @@ export function formatPhoneInput(inputValue) {
   return formatted;
 }
 
+function getPhoneCursorPosition(formatted, digitsBeforeCursor) {
+  if (!formatted) return 0;
+  if (digitsBeforeCursor <= 0) {
+    return formatted.startsWith('+7') ? 3 : 0;
+  }
+
+  let seen = 0;
+  for (let i = 0; i < formatted.length; i += 1) {
+    if (/\d/.test(formatted[i])) {
+      seen += 1;
+      if (seen >= digitsBeforeCursor) {
+        return i + 1;
+      }
+    }
+  }
+  return formatted.length;
+}
+
+export function formatPhoneInputChange(inputValue, selectionStart = null) {
+  const cursor = selectionStart ?? String(inputValue || '').length;
+  const digitsBeforeCursor = String(inputValue || '')
+    .slice(0, cursor)
+    .replace(/\D/g, '').length;
+  const formatted = formatPhoneInput(inputValue);
+  const nextCursor = getPhoneCursorPosition(formatted, digitsBeforeCursor);
+
+  return {
+    value: formatted,
+    selectionStart: nextCursor,
+    selectionEnd: nextCursor,
+  };
+}
+
+export function handlePhoneInputChange(event, setValue) {
+  const input = event.target;
+  const result = formatPhoneInputChange(input.value, input.selectionStart ?? input.value.length);
+  const { selectionStart, selectionEnd } = result;
+  setValue(result.value);
+  const restoreCursor = () => {
+    if (document.activeElement === input) {
+      input.setSelectionRange(selectionStart, selectionEnd);
+    }
+  };
+  requestAnimationFrame(() => requestAnimationFrame(restoreCursor));
+}
+
 export function validatePhone(value) {
   const pure = (value || '').replace(/\D/g, '');
   if (!pure) return 'Укажите номер телефона';
   if (pure.length !== 11 || !pure.startsWith('7')) {
-    return 'Введите полный номер в формате +7 (999) 123-45-67';
+    return 'Введите полный номер в формате +7 (___) ___-__-__';
   }
   return '';
 }

@@ -28,6 +28,7 @@ import {
   validateEmail,
   validatePhone,
   formatPhoneInput,
+  handlePhoneInputChange,
   formatPhoneFromRaw,
 } from '../../utils/contactValidation';
 import {
@@ -585,7 +586,9 @@ export default function NewPartsOrderRegistration() {
                 type="tel"
                 value={recipient.phone}
                 onChange={(e) =>
-                  setRecipient((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))
+                  handlePhoneInputChange(e, (value) =>
+                    setRecipient((prev) => ({ ...prev, phone: value })),
+                  )
                 }
                 onBlur={() => {
                   markTouched('phone');

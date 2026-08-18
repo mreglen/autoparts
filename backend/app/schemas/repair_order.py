@@ -37,6 +37,7 @@ class RepairOrderClientBrief(BaseModel):
     id: int
     name: str
     phone: str
+    email: Optional[str] = None
     user_id: Optional[int] = None
     person_type: str = "individual"
     legal_name: Optional[str] = None

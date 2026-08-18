@@ -5,7 +5,7 @@ import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDr
 import Modal from '../../components/UI/Modal';
 import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
-import { formatPhoneFromRaw, formatPhoneInput, validatePhone } from '../../utils/contactValidation';
+import { formatPhoneFromRaw, formatPhoneInput, handlePhoneInputChange, validatePhone } from '../../utils/contactValidation';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
@@ -212,7 +212,7 @@ function EmployeeEditModal({ employee, onClose, onSaved }) {
             autoComplete="tel"
             className={inputClass}
             value={form.phone}
-            onChange={(e) => setForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))}
+            onChange={(e) => handlePhoneInputChange(e, (value) => setForm((p) => ({ ...p, phone: value })))}
             onBlur={() => setForm((p) => ({ ...p, phone: formatPhoneInput(p.phone) }))}
             placeholder="+7 (___) ___-__-__"
           />

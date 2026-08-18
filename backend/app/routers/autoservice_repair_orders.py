@@ -163,6 +163,7 @@ def _client_brief(client: AutoserviceClient) -> RepairOrderClientBrief:
         id=client.id,
         name=client.name,
         phone=client.phone,
+        email=client.email,
         user_id=client.user_id,
         person_type=client.person_type or "individual",
         legal_name=client.legal_name,

@@ -7,7 +7,7 @@ import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDr
 import Modal from '../../components/UI/Modal';
 import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
-import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
+import { formatPhoneInput, handlePhoneInputChange, validatePhone } from '../../utils/contactValidation';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
@@ -314,7 +314,7 @@ function AddBookingModal({ open, onClose, onCreated }) {
             className={`${inputClass} ${phoneError ? 'border-red-500' : ''}`}
             value={phone}
             onChange={(e) => {
-              setPhone(formatPhoneInput(e.target.value));
+              handlePhoneInputChange(e, setPhone);
               setPhoneError('');
             }}
             placeholder="+7 (___) ___-__-__"

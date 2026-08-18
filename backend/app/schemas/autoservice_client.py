@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 AutoserviceClientSource = Literal["self", "staff"]
@@ -16,6 +16,7 @@ class AutoserviceClientStaffCreate(BaseModel):
 class AutoserviceClientStaffUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=2, max_length=120)
     phone: Optional[str] = Field(default=None, min_length=5, max_length=40)
+    email: Optional[EmailStr] = None
     person_type: Optional[AutoserviceClientPersonType] = None
     legal_name: Optional[str] = Field(default=None, max_length=255)
     address: Optional[str] = None
@@ -30,6 +31,7 @@ class AutoserviceClientView(BaseModel):
     user_id: Optional[int] = None
     name: str
     phone: str
+    email: Optional[str] = None
     person_type: str = "individual"
     legal_name: Optional[str] = None
     address: Optional[str] = None
@@ -48,3 +50,11 @@ class AutoserviceClientView(BaseModel):
 class AutoserviceClientMeResponse(BaseModel):
     is_client: bool
     client: Optional[AutoserviceClientView] = None
+
+
+class AutoserviceClientCreateAccountResponse(BaseModel):
+    client: AutoserviceClientView
+    user_id: int
+    email: str
+    email_sent: bool
+    status: Literal["created_and_linked"] = "created_and_linked"

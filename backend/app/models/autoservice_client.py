@@ -24,6 +24,7 @@ class AutoserviceClient(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     name = Column(String(120), nullable=False)
     phone = Column(String(32), nullable=False)
+    email = Column(String(255), nullable=True)
     person_type = Column(String(16), nullable=False, default="individual")
     legal_name = Column(String(255), nullable=True)
     address = Column(Text, nullable=True)

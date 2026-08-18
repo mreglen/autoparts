@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+import string
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,14 +9,17 @@ from sqlalchemy import String, cast, or_
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
+from app.core.security import get_password_hash
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
 from app.models.garage_vehicle import GarageVehicle
 from app.models.inspection_booking import InspectionBooking
+from app.models.organization import Organization
 from app.models.repair_booking import RepairBooking
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_client import (
+    AutoserviceClientCreateAccountResponse,
     AutoserviceClientMeResponse,
     AutoserviceClientStaffCreate,
     AutoserviceClientStaffUpdate,
@@ -27,7 +32,9 @@ from app.utils.autoservice_access import (
     require_autoservice_staff,
     user_display_name,
 )
+from app.utils.email import send_autoservice_guest_account_email
 from app.utils.user_avatar import resolve_user_by_contact
+from app.utils.user_public_code import assign_public_code
 
 router = APIRouter(tags=["Autoservice clients"])
 
@@ -62,6 +69,18 @@ def _digits_or_none(value: str | None, max_len: int) -> str | None:
     return digits or None
 
 
+def _inn_or_none(value: str | None) -> str | None:
+    digits = _digits_or_none(value, 12)
+    if digits is None:
+        return None
+    if len(digits) not in (10, 12):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ИНН: 10 или 12 цифр",
+        )
+    return digits
+
+
 def _text_or_none(value: str | None) -> str | None:
     if value is None:
         return None
@@ -83,6 +102,13 @@ def _get_org_client_or_404(db: Session, org_id: str, client_id: int) -> Autoserv
     return row
 
 
+def _email_or_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    return text or None
+
+
 def _apply_person_type_defaults(row: AutoserviceClient) -> None:
     person_type = row.person_type or "individual"
     if person_type == "individual":
@@ -91,6 +117,46 @@ def _apply_person_type_defaults(row: AutoserviceClient) -> None:
         row.ogrn = None
     elif person_type == "ie":
         row.kpp = None
+
+
+def _client_view_with_account_email(db: Session, row: AutoserviceClient) -> AutoserviceClientView:
+    view = AutoserviceClientView.model_validate(row)
+    if view.user_id and not (view.email or "").strip():
+        user_email = (
+            db.query(User.email)
+            .filter(User.id == view.user_id)
+            .scalar()
+        )
+        if user_email:
+            view.email = user_email
+    return view
+
+
+def _split_person_name(full_name: str) -> tuple[str, str, str | None]:
+    parts = [part for part in (full_name or "").strip().split() if part]
+    if len(parts) >= 3:
+        return parts[0], parts[1], " ".join(parts[2:])
+    if len(parts) == 2:
+        return parts[0], parts[1], None
+    if len(parts) == 1:
+        return "", parts[0], None
+    return "", "Клиент", None
+
+
+def _generate_account_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _link_orphan_bookings(db: Session, org_id: str, client: AutoserviceClient) -> None:
+    if not client.phone:
+        return
+    for model in (InspectionBooking, RepairBooking):
+        db.query(model).filter(
+            model.organization_id == org_id,
+            model.client_id.is_(None),
+            model.phone == client.phone,
+        ).update({model.client_id: client.id}, synchronize_session=False)
 
 
 def _apply_client_search_filter(query, org_id: str, q: str | None):
@@ -104,6 +170,7 @@ def _apply_client_search_filter(query, org_id: str, q: str | None):
     client_clauses = [
         AutoserviceClient.name.ilike(term),
         AutoserviceClient.phone.ilike(term),
+        AutoserviceClient.email.ilike(term),
         AutoserviceClient.legal_name.ilike(term),
         AutoserviceClient.address.ilike(term),
         AutoserviceClient.inn.ilike(term),
@@ -241,7 +308,7 @@ def get_my_autoservice_client(
         return AutoserviceClientMeResponse(is_client=False, client=None)
     return AutoserviceClientMeResponse(
         is_client=True,
-        client=AutoserviceClientView.model_validate(row),
+        client=_client_view_with_account_email(db, row),
     )
 
 
@@ -255,7 +322,7 @@ def become_autoservice_client(
 
     existing = _find_by_user(db, org_id, current_user.id)
     if existing:
-        return AutoserviceClientView.model_validate(existing)
+        return _client_view_with_account_email(db, existing)
 
     if not current_user.phone:
         raise HTTPException(
@@ -273,9 +340,9 @@ def become_autoservice_client(
                 by_phone.status = "active"
             db.commit()
             db.refresh(by_phone)
-            return AutoserviceClientView.model_validate(by_phone)
+            return _client_view_with_account_email(db, by_phone)
         if by_phone.user_id == current_user.id:
-            return AutoserviceClientView.model_validate(by_phone)
+            return _client_view_with_account_email(db, by_phone)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Этот телефон уже привязан к другому клиенту автосервиса",
@@ -296,7 +363,7 @@ def become_autoservice_client(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return AutoserviceClientView.model_validate(row)
+    return _client_view_with_account_email(db, row)
 
 
 @router.get("/autoservice/clients", response_model=list[AutoserviceClientView])
@@ -312,7 +379,7 @@ def list_autoservice_clients(
         AutoserviceClient.consented_at.desc(),
         AutoserviceClient.id.desc(),
     ).all()
-    return [AutoserviceClientView.model_validate(row) for row in rows]
+    return [_client_view_with_account_email(db, row) for row in rows]
 
 
 @router.post(
@@ -330,13 +397,13 @@ def create_autoservice_client_staff(
 
     existing = _find_by_phone(db, org_id, phone)
     if existing:
-        return AutoserviceClientView.model_validate(existing)
+        return _client_view_with_account_email(db, existing)
 
     linked_user = resolve_user_by_contact(db, phone, None)
     if linked_user:
         by_user = _find_by_user(db, org_id, linked_user.id)
         if by_user:
-            return AutoserviceClientView.model_validate(by_user)
+            return _client_view_with_account_email(db, by_user)
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     row = AutoserviceClient(
@@ -353,7 +420,7 @@ def create_autoservice_client_staff(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return AutoserviceClientView.model_validate(row)
+    return _client_view_with_account_email(db, row)
 
 
 @router.patch(
@@ -392,6 +459,9 @@ def update_autoservice_client_staff(
                 )
             row.phone = phone
 
+    if "email" in data:
+        row.email = _email_or_none(data["email"])
+
     if "person_type" in data and data["person_type"]:
         row.person_type = data["person_type"]
 
@@ -400,7 +470,7 @@ def update_autoservice_client_staff(
     if "address" in data:
         row.address = _text_or_none(data["address"])
     if "inn" in data:
-        row.inn = _digits_or_none(data["inn"], 12)
+        row.inn = _inn_or_none(data["inn"])
     if "kpp" in data:
         row.kpp = _digits_or_none(data["kpp"], 9)
     if "ogrn" in data:
@@ -409,4 +479,86 @@ def update_autoservice_client_staff(
     _apply_person_type_defaults(row)
     db.commit()
     db.refresh(row)
-    return AutoserviceClientView.model_validate(row)
+    return _client_view_with_account_email(db, row)
+
+
+@router.post(
+    "/autoservice/clients/{client_id}/create-account",
+    response_model=AutoserviceClientCreateAccountResponse,
+)
+def create_autoservice_client_account(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    row = _get_org_client_or_404(db, org_id, client_id)
+
+    if row.user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="У клиента уже есть аккаунт",
+        )
+
+    email = _email_or_none(row.email)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите email клиента перед созданием аккаунта",
+        )
+
+    existing_by_email = db.query(User).filter(User.email == email).first()
+    if existing_by_email:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Пользователь с таким email уже зарегистрирован",
+        )
+
+    phone = normalize_phone_or_400(row.phone)
+    existing_by_phone = resolve_user_by_contact(db, phone, None)
+    if existing_by_phone:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Телефон уже привязан к другому аккаунту",
+        )
+
+    password = _generate_account_password()
+    last_name, first_name, patronymic = _split_person_name(row.name)
+    user = User(
+        last_name=last_name or None,
+        first_name=first_name,
+        patronymic=patronymic,
+        email=email,
+        phone=phone,
+        is_buyer=True,
+        hashed_password=get_password_hash(password),
+    )
+    assign_public_code(user, db)
+    db.add(user)
+    db.flush()
+
+    row.user_id = user.id
+    row.email = email
+    row.phone = phone
+    _link_orphan_bookings(db, org_id, row)
+
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+    org_name = organization.name if organization else None
+
+    db.commit()
+    db.refresh(row)
+    db.refresh(user)
+
+    email_sent = send_autoservice_guest_account_email(
+        email=email,
+        full_name=row.name,
+        password=password,
+        organization_name=org_name,
+    )
+
+    return AutoserviceClientCreateAccountResponse(
+        client=_client_view_with_account_email(db, row),
+        user_id=user.id,
+        email=email,
+        email_sent=email_sent,
+    )

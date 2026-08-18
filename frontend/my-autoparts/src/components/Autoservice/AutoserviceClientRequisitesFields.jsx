@@ -1,5 +1,5 @@
 import { FieldHint, FieldLabel, Input, Textarea } from '../UI';
-import { formatPhoneInput } from '../../utils/contactValidation';
+import { formatEmailInput, handlePhoneInputChange } from '../../utils/contactValidation';
 import {
   CLIENT_PLACEHOLDERS,
   PERSON_TYPES,
@@ -70,9 +70,22 @@ export default function AutoserviceClientRequisitesFields({
             id={`${idPrefix}-phone`}
             type="tel"
             value={form?.phone || ''}
-            onChange={(e) => setField('phone', formatPhoneInput(e.target.value))}
+            onChange={(e) => handlePhoneInputChange(e, (value) => setField('phone', value))}
             placeholder={CLIENT_PLACEHOLDERS.phone}
             disabled={disabled || lockIdentity}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <FieldLabel htmlFor={`${idPrefix}-email`}>Email</FieldLabel>
+          <Input
+            id={`${idPrefix}-email`}
+            type="email"
+            autoComplete="email"
+            value={form?.email || ''}
+            onChange={(e) => setField('email', formatEmailInput(e.target.value))}
+            placeholder={CLIENT_PLACEHOLDERS.email}
+            disabled={disabled}
+            maxLength={255}
           />
         </div>
       </div>
@@ -128,9 +141,7 @@ export default function AutoserviceClientRequisitesFields({
             inputMode="numeric"
             value={form?.inn || ''}
             onChange={(e) => setField('inn', e.target.value.replace(/\D/g, '').slice(0, 12))}
-            placeholder={
-              personType === 'legal' ? CLIENT_PLACEHOLDERS.inn_legal : CLIENT_PLACEHOLDERS.inn_individual
-            }
+            placeholder={CLIENT_PLACEHOLDERS.inn}
             disabled={disabled}
           />
         </div>

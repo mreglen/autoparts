@@ -9,17 +9,17 @@ export const PERSON_TYPES = [
 export const CLIENT_PLACEHOLDERS = {
   name: 'Иванов Иван Иванович',
   phone: '+7 (___) ___-__-__',
+  email: 'name@mail.ru',
   legal_name: 'ООО «Ромашка»',
   legal_name_ie: 'ИП Иванов Иван Иванович',
   address: 'г. Москва, ул. Ленина, д. 1',
-  inn_individual: '12 цифр',
-  inn_legal: '10 цифр',
+  inn: '10–12 цифр',
   kpp: '9 цифр',
   ogrn: '13 цифр',
   ogrnip: '15 цифр',
 };
 
-const REQUISITE_KEYS = ['name', 'phone', 'person_type', 'legal_name', 'address', 'inn', 'kpp', 'ogrn'];
+const REQUISITE_KEYS = ['name', 'phone', 'email', 'person_type', 'legal_name', 'address', 'inn', 'kpp', 'ogrn'];
 
 export function normalizePersonType(value) {
   if (value === 'ie' || value === 'legal') return value;
@@ -31,6 +31,13 @@ export function personTypeLabel(value) {
   return PERSON_TYPES.find((item) => item.id === type)?.label || 'Физлицо';
 }
 
+export function validateInn(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.length === 10 || digits.length === 12) return null;
+  return 'ИНН: 10 или 12 цифр';
+}
+
 export function isGuestClient(client) {
   return Boolean(client) && !client.user_id;
 }
@@ -39,6 +46,7 @@ export function emptyClientRequisites(client) {
   return {
     name: client?.name || '',
     phone: client?.phone || '',
+    email: client?.email || '',
     person_type: normalizePersonType(client?.person_type),
     legal_name: client?.legal_name || '',
     address: client?.address || '',
@@ -78,6 +86,7 @@ export function clientRequisitesPatchPayload(form, { isGuest } = {}) {
   const personType = normalizePersonType(form?.person_type);
   const payload = {
     person_type: personType,
+    email: String(form?.email || '').trim().toLowerCase() || null,
     legal_name: String(form?.legal_name || '').trim() || null,
     address: String(form?.address || '').trim() || null,
     inn: String(form?.inn || '').trim() || null,
@@ -135,6 +144,12 @@ export async function saveAutoserviceClientRequisites(clientId, form, { isGuest 
   return apiRequest(`/autoservice/clients/${clientId}`, {
     method: 'PATCH',
     body: JSON.stringify(clientRequisitesPatchPayload(form, { isGuest })),
+  });
+}
+
+export async function createAutoserviceClientAccount(clientId) {
+  return apiRequest(`/autoservice/clients/${clientId}/create-account`, {
+    method: 'POST',
   });
 }
 

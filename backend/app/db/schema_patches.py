@@ -5456,6 +5456,8 @@ def ensure_autoservice_clients_requisites_columns() -> None:
         statements.append("ALTER TABLE autoservice_clients ADD COLUMN kpp VARCHAR(9)")
     if "ogrn" not in columns:
         statements.append("ALTER TABLE autoservice_clients ADD COLUMN ogrn VARCHAR(15)")
+    if "email" not in columns:
+        statements.append("ALTER TABLE autoservice_clients ADD COLUMN email VARCHAR(255)")
 
     if not statements:
         return

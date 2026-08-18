@@ -14,6 +14,7 @@ import {
   validateEmail,
   validatePhone,
   formatPhoneInput,
+  handlePhoneInputChange,
   formatPhoneFromRaw,
 } from '../../utils/contactValidation';
 import { trackFormField, trackFormSubmit, trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
@@ -344,7 +345,7 @@ export default function OrderRegistration() {
   };
 
   const handlePhoneChange = (e) => {
-    setRecipient((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }));
+    handlePhoneInputChange(e, (value) => setRecipient((prev) => ({ ...prev, phone: value })));
   };
 
   const handlePhoneBlur = () => {

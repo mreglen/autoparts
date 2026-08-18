@@ -12,7 +12,7 @@ import RepairOrderViewModal, {
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { apiRequest } from '../../utils/apiClient';
 import AutoserviceClientRequisitesFields from '../../components/Autoservice/AutoserviceClientRequisitesFields';
-import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
+import { handlePhoneInputChange, validatePhone, validateEmail } from '../../utils/contactValidation';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import {
@@ -21,6 +21,8 @@ import {
   isGuestClient,
   personTypeLabel,
   saveAutoserviceClientRequisites,
+  createAutoserviceClientAccount,
+  validateInn,
 } from '../../utils/autoserviceClientRequisites';
 
 const inputClass =
@@ -41,7 +43,45 @@ function AccountBadge({ userId }) {
   );
 }
 
-function VehicleList({ vehicles, loading, canEdit = false, onEdit, onVinClick }) {
+function normalizeSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hiddenMatchHint(client, query) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return null;
+
+  const hiddenFields = [
+    { label: 'Email', value: client?.email },
+    { label: 'Наименование', value: client?.legal_name },
+    { label: 'ИНН', value: client?.inn },
+    { label: 'КПП', value: client?.kpp },
+    { label: client?.person_type === 'legal' ? 'Юр. адрес' : 'Адрес', value: client?.address },
+    { label: client?.person_type === 'ie' ? 'ОГРНИП' : 'ОГРН', value: client?.ogrn },
+  ];
+
+  for (const field of hiddenFields) {
+    const raw = String(field.value || '').trim();
+    if (!raw) continue;
+    if (normalizeSearchText(raw).includes(normalizedQuery)) {
+      return `${field.label}: ${raw}`;
+    }
+  }
+  return null;
+}
+
+function VehicleList({
+  vehicles,
+  loading,
+  canEdit = false,
+  onEdit,
+  onVinClick,
+  onShowVehicleOrders,
+  ordersByVehicle = {},
+}) {
   if (loading) {
     return <p className="text-sm text-gray-500">Загрузка автомобилей…</p>;
   }
@@ -51,8 +91,9 @@ function VehicleList({ vehicles, loading, canEdit = false, onEdit, onVinClick })
   return (
     <ul className="space-y-2">
       {vehicles.map((v) => (
-        <li key={v.id} className="flex items-start justify-between gap-3 text-sm text-gray-700">
-          <div className="min-w-0">
+        <li key={v.id} className="rounded-lg border border-gray-100 p-3 text-sm text-gray-700">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
             <span className="font-medium text-gray-900">
               {v.make} {v.model}
               {v.year ? `, ${v.year}` : ''}
@@ -73,17 +114,43 @@ function VehicleList({ vehicles, loading, canEdit = false, onEdit, onVinClick })
                 </button>
               </>
             ) : null}
-            {v.plate ? ` · ${v.plate}` : ''}
-            {v.color ? ` · ${v.color}` : ''}
+              {v.plate ? ` · ${v.plate}` : ''}
+              {v.color ? ` · ${v.color}` : ''}
+              <div className="mt-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShowVehicleOrders?.(v);
+                  }}
+                  className="text-sm font-medium text-indigo-600 underline decoration-indigo-300 underline-offset-2 transition hover:text-indigo-800 hover:decoration-indigo-600"
+                >
+                  Заказ-наряды
+                </button>
+              </div>
+            </div>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => onEdit?.(v)}
+                className="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
+              >
+                Изменить
+              </button>
+            ) : null}
           </div>
-          {canEdit ? (
-            <button
-              type="button"
-              onClick={() => onEdit?.(v)}
-              className="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
-            >
-              Изменить
-            </button>
+
+          {ordersByVehicle[v.id]?.length ? (
+            <div className="mt-3 border-t border-gray-100 pt-2">
+              <p className="mb-1 text-xs font-medium text-gray-500">Заказ-наряды по этому авто</p>
+              <ul className="space-y-1">
+                {ordersByVehicle[v.id].map((order) => (
+                  <li key={order.id} className="text-xs text-gray-700">
+                    №{order.order_number || order.id} · {formatServerDateTime(order.scheduled_at || order.created_at) || '—'}
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
         </li>
       ))}
@@ -103,6 +170,7 @@ function ClientProfileFields({ client }) {
   const type = client?.person_type || 'individual';
   const rows = [
     ['Телефон', client?.phone],
+    ['Email', client?.email],
     ['Тип', personTypeLabel(type)],
   ];
   if (type === 'legal') {
@@ -303,6 +371,7 @@ function ClientProfileModal({
   loading,
   onClose,
   onEditVehicle,
+  onAddVehicle,
   onVinClick,
   onSaved,
 }) {
@@ -320,6 +389,12 @@ function ClientProfileModal({
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [viewOrder, setViewOrder] = useState(null);
   const [viewBooking, setViewBooking] = useState(null);
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [accountMessage, setAccountMessage] = useState('');
+  const [vehicleOrderFilterId, setVehicleOrderFilterId] = useState(null);
+
+  const guestEmail = String((editing ? form.email : client?.email) || '').trim();
+  const canCreateAccount = isGuest && guestEmail && !validateEmail(guestEmail);
 
   useEffect(() => {
     setEditing(false);
@@ -331,6 +406,9 @@ function ClientProfileModal({
     setBookings([]);
     setViewOrder(null);
     setViewBooking(null);
+    setCreatingAccount(false);
+    setAccountMessage('');
+    setVehicleOrderFilterId(null);
   }, [open, clientId]);
 
   useEffect(() => {
@@ -378,6 +456,7 @@ function ClientProfileModal({
   const handleClose = () => {
     if (saving) return;
     setEditing(false);
+    setAccountMessage('');
     onClose?.();
   };
 
@@ -387,6 +466,7 @@ function ClientProfileModal({
     setSection('profile');
     setForm(emptyClientRequisites(client));
     setError('');
+    setAccountMessage('');
     setEditing(true);
   };
 
@@ -406,6 +486,19 @@ function ClientProfileModal({
         return;
       }
     }
+    const email = String(form.email || '').trim();
+    if (email) {
+      const emailErr = validateEmail(email);
+      if (emailErr) {
+        setError(emailErr);
+        return;
+      }
+    }
+    const innErr = validateInn(form.inn);
+    if (innErr) {
+      setError(innErr);
+      return;
+    }
     if (!clientRequisitesChanged(form, emptyClientRequisites(client))) {
       setEditing(false);
       return;
@@ -423,11 +516,61 @@ function ClientProfileModal({
     }
   };
 
+  const handleCreateAccount = async () => {
+    if (!client?.id || !canCreateAccount) return;
+    const email = guestEmail;
+    if (
+      !window.confirm(
+        `Создать личный кабинет и отправить пароль на ${email}?\n\nКлиент сможет входить на сайт и видеть свои заказ-наряды и записи.`,
+      )
+    ) {
+      return;
+    }
+
+    setError('');
+    setAccountMessage('');
+    setCreatingAccount(true);
+    try {
+      if (editing && clientRequisitesChanged(form, emptyClientRequisites(client))) {
+        const saved = await saveAutoserviceClientRequisites(client.id, form, { isGuest });
+        onSaved?.(saved);
+        setForm(emptyClientRequisites(saved));
+      }
+      const result = await createAutoserviceClientAccount(client.id);
+      onSaved?.(result.client);
+      setForm(emptyClientRequisites(result.client));
+      setEditing(false);
+      setAccountMessage(
+        result.email_sent
+          ? `Аккаунт создан. Пароль отправлен на ${result.email}.`
+          : `Аккаунт создан, но письмо на ${result.email} не удалось отправить.`,
+      );
+    } catch (err) {
+      setError(err?.message || 'Не удалось создать аккаунт');
+    } finally {
+      setCreatingAccount(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Профиль' },
+    { id: 'vehicles', label: 'Автомобили', count: loading ? undefined : vehicles.length },
     { id: 'orders', label: 'Заказ-наряды', count: ordersLoading ? undefined : orders.length },
     { id: 'bookings', label: 'Записи', count: bookingsLoading ? undefined : bookings.length },
   ];
+  const filteredOrders = vehicleOrderFilterId ? orders.filter((row) => row.vehicle_id === vehicleOrderFilterId) : orders;
+  const filteredVehicle = vehicleOrderFilterId
+    ? vehicles.find((v) => v.id === vehicleOrderFilterId)
+    : null;
+  const filteredVehicleLabel = filteredVehicle
+    ? [filteredVehicle.make, filteredVehicle.model].filter(Boolean).join(' ')
+    : '';
+  const ordersByVehicle = orders.reduce((acc, row) => {
+    if (!row?.vehicle_id) return acc;
+    if (!acc[row.vehicle_id]) acc[row.vehicle_id] = [];
+    acc[row.vehicle_id].push(row);
+    return acc;
+  }, {});
 
   return (
     <>
@@ -438,6 +581,16 @@ function ClientProfileModal({
       size="lg"
       footer={
         <div className="flex flex-wrap justify-end gap-2">
+          {canCreateAccount && (section === 'profile' || editing) ? (
+            <button
+              type="button"
+              onClick={handleCreateAccount}
+              disabled={saving || creatingAccount}
+              className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
+            >
+              {creatingAccount ? 'Создание…' : 'Создать аккаунт'}
+            </button>
+          ) : null}
           {editing ? (
             <>
               <button
@@ -503,6 +656,7 @@ function ClientProfileModal({
                 {isGuest ? (
                   <p className="text-xs text-gray-500">
                     Гость — можно менять ФИО, телефон и автомобили.
+                    {canCreateAccount ? ' Email указан — можно создать личный кабинет.' : ''}
                   </p>
                 ) : (
                   <p className="text-xs text-gray-500">
@@ -521,32 +675,74 @@ function ClientProfileModal({
                     idPrefix="client-card"
                   />
                   {error ? <p className="text-sm text-red-600">{error}</p> : null}
+                  {accountMessage ? <p className="text-sm text-emerald-700">{accountMessage}</p> : null}
                 </form>
               ) : (
                 <ClientProfileFields client={client} />
               )}
 
-              <div className="border-t border-gray-100 pt-4">
-                <h3 className="mb-3 text-sm font-semibold text-gray-900">Автомобили</h3>
-                <VehicleList
-                  vehicles={vehicles}
-                  loading={loading}
-                  canEdit={isGuest}
-                  onEdit={onEditVehicle}
-                  onVinClick={onVinClick}
-                />
-              </div>
+              {!editing && accountMessage ? (
+                <p className="text-sm text-emerald-700">{accountMessage}</p>
+              ) : null}
+
             </>
           ) : null}
 
+          {section === 'vehicles' && !editing ? (
+            <div className="space-y-3">
+              {isGuest ? (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={onAddVehicle}
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                  >
+                    Добавить авто
+                  </button>
+                </div>
+              ) : null}
+              <VehicleList
+                vehicles={vehicles}
+                loading={loading}
+                canEdit={isGuest}
+                onEdit={onEditVehicle}
+                onVinClick={onVinClick}
+                onShowVehicleOrders={(vehicle) => {
+                  setVehicleOrderFilterId(vehicle.id);
+                  setSection('orders');
+                }}
+                ordersByVehicle={ordersByVehicle}
+              />
+            </div>
+          ) : null}
+
           {section === 'orders' && !editing ? (
-            <ClientHistoryList loading={ordersLoading} empty="Заказ-нарядов нет">
-              {orders.length
-                ? orders.map((row) => (
-                    <ClientOrderRow key={row.id} row={row} onOpen={setViewOrder} />
-                  ))
-                : null}
-            </ClientHistoryList>
+            <div className="space-y-3">
+              {vehicleOrderFilterId && filteredVehicleLabel ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-800 ring-1 ring-inset ring-indigo-200">
+                    Фильтр: авто {filteredVehicleLabel}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setVehicleOrderFilterId(null)}
+                    className="text-xs font-medium text-indigo-600 underline decoration-indigo-300 underline-offset-2 transition hover:text-indigo-800 hover:decoration-indigo-600"
+                  >
+                    Сбросить фильтр
+                  </button>
+                </div>
+              ) : null}
+              <ClientHistoryList
+                loading={ordersLoading}
+                empty={vehicleOrderFilterId ? 'Нет заказ-нарядов по этому авто' : 'Заказ-нарядов нет'}
+              >
+                {filteredOrders.length
+                  ? filteredOrders.map((row) => (
+                      <ClientOrderRow key={row.id} row={row} onOpen={setViewOrder} />
+                    ))
+                  : null}
+              </ClientHistoryList>
+            </div>
           ) : null}
 
           {section === 'bookings' && !editing ? (
@@ -577,30 +773,6 @@ function ClientProfileModal({
     />
     <ClientBookingViewModal booking={viewBooking} onClose={() => setViewBooking(null)} />
     </>
-  );
-}
-
-function ClientMobileCard({
-  row,
-  onOpen,
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(row)}
-      className="flex w-full items-start justify-between gap-3 border-b border-gray-100 py-3 text-left transition last:border-b-0 active:bg-gray-50/80"
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold text-gray-900">{row.name}</p>
-          <AccountBadge userId={row.user_id} />
-        </div>
-        <p className="mt-1 text-sm text-gray-600">{row.phone || '—'}</p>
-        <p className="mt-1 text-xs text-gray-500">
-          Согласие: {formatServerDateTime(row.consented_at) || '—'}
-        </p>
-      </div>
-    </button>
   );
 }
 
@@ -776,6 +948,179 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
   );
 }
 
+function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
+  const [form, setForm] = useState({
+    vin: '',
+    make: '',
+    model: '',
+    year: '',
+    color: '',
+    plate: '',
+    notes: '',
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      vin: '',
+      make: '',
+      model: '',
+      year: '',
+      color: '',
+      plate: '',
+      notes: '',
+    });
+    setError('');
+    setSaving(false);
+  }, [open]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!clientId) return;
+    setError('');
+    const make = form.make.trim();
+    const model = form.model.trim();
+    if (!make || !model) {
+      setError('Укажите марку и модель');
+      return;
+    }
+    const year = form.year ? Number(form.year) : null;
+    if (form.year && (!Number.isFinite(year) || year < 1900 || year > 2100)) {
+      setError('Некорректный год');
+      return;
+    }
+    setSaving(true);
+    try {
+      const row = await apiRequest('/autoservice/garage/vehicles/staff', {
+        method: 'POST',
+        body: JSON.stringify({
+          client_id: clientId,
+          vin: form.vin.trim() || null,
+          make,
+          model,
+          year,
+          color: form.color.trim() || null,
+          plate: form.plate.trim() || null,
+          notes: form.notes.trim() || null,
+        }),
+      });
+      onCreated(row);
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось добавить автомобиль');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Добавить автомобиль"
+      size="md"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            disabled={saving}
+          >
+            Отмена
+          </button>
+          <button
+            type="submit"
+            form="add-guest-vehicle"
+            disabled={saving}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {saving ? 'Сохранение…' : 'Добавить'}
+          </button>
+        </div>
+      }
+    >
+      <form id="add-guest-vehicle" onSubmit={handleSubmit} className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">VIN</label>
+            <input
+              className={inputClass}
+              value={form.vin}
+              onChange={(e) => setForm((p) => ({ ...p, vin: sanitizeVinInput(e.target.value) }))}
+              maxLength={VIN_INPUT_MAX_LENGTH}
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Марка</label>
+            <input
+              className={inputClass}
+              value={form.make}
+              onChange={(e) => setForm((p) => ({ ...p, make: e.target.value }))}
+              required
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Модель</label>
+            <input
+              className={inputClass}
+              value={form.model}
+              onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
+              required
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Год</label>
+            <input
+              type="number"
+              className={inputClass}
+              value={form.year}
+              onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
+              min={1900}
+              max={2100}
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Цвет</label>
+            <input
+              className={inputClass}
+              value={form.color}
+              onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
+              disabled={saving}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">Госномер</label>
+            <input
+              className={inputClass}
+              value={form.plate}
+              onChange={(e) => setForm((p) => ({ ...p, plate: e.target.value }))}
+              disabled={saving}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700">Заметка</label>
+            <textarea
+              className={inputClass}
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+              disabled={saving}
+            />
+          </div>
+        </div>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      </form>
+    </Modal>
+  );
+}
+
 function AddClientModal({ open, onClose, onCreated }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -818,7 +1163,12 @@ function AddClientModal({ open, onClose, onCreated }) {
       onCreated(row);
       onClose();
     } catch (err) {
-      setError(err?.message || 'Не удалось добавить клиента');
+      const msg = err?.message || 'Не удалось добавить клиента';
+      if (/телефон/i.test(msg)) {
+        setPhoneError(msg);
+      } else {
+        setError(msg);
+      }
     } finally {
       setSaving(false);
     }
@@ -871,8 +1221,10 @@ function AddClientModal({ open, onClose, onCreated }) {
             className={`${inputClass} ${phoneError ? 'border-red-500' : ''}`}
             value={phone}
             onChange={(e) => {
-              setPhone(formatPhoneInput(e.target.value));
-              setPhoneError('');
+              handlePhoneInputChange(e, (value) => {
+                setPhone(value);
+                setPhoneError('');
+              });
             }}
             placeholder="+7 (___) ___-__-__"
             disabled={saving}
@@ -899,10 +1251,18 @@ export default function AutoserviceClientsPage() {
   const [clientVehicles, setClientVehicles] = useState({});
   const [vehiclesLoadingId, setVehiclesLoadingId] = useState(null);
   const [editVehicle, setEditVehicle] = useState(null);
+  const [addVehicleOpen, setAddVehicleOpen] = useState(false);
 
-  const handleVinClick = useCallback((rawVin) => {
+  const handleVinClick = useCallback(async (rawVin) => {
     const vin = normalizeVinOrNull(rawVin);
     if (!vin) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(vin);
+      }
+    } catch {
+      // no-op: clipboard may be unavailable in insecure context
+    }
     setVehiclesModalClient(null);
     navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
   }, [navigate]);
@@ -1005,67 +1365,57 @@ export default function AutoserviceClientsPage() {
         </p>
       ) : null}
 
-      <div className="hidden overflow-x-auto md:block">
+      <div className="overflow-x-auto">
         <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
           <thead>
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
               <th className="py-3 pr-3">Имя</th>
               <th className="w-44 py-3 pr-3">Телефон</th>
-              <th className="hidden w-44 py-3 pr-3 lg:table-cell">Согласие</th>
               <th className="w-28 py-3">Аккаунт</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={4} className="py-12 text-center text-gray-500">
+                <td colSpan={3} className="py-12 text-center text-gray-500">
                   Загрузка…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-12 text-center text-gray-500">
-                  {rows.length === 0 ? 'Клиентов пока нет' : 'Ничего не найдено'}
+                <td colSpan={3} className="py-12 text-center text-gray-500">
+                  {qApplied.trim() ? 'Ничего не найдено' : 'Клиентов пока нет'}
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="cursor-pointer transition-colors hover:bg-gray-50/70"
-                  onClick={() => openClientVehicles(row)}
-                >
-                  <td className="py-3 pr-3 align-middle font-medium text-gray-900">{row.name}</td>
-                  <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">{row.phone || '—'}</td>
-                  <td className="hidden whitespace-nowrap py-3 pr-3 align-middle text-gray-600 lg:table-cell">
-                    {formatServerDateTime(row.consented_at) || '—'}
-                  </td>
-                  <td className="py-3 align-middle">
-                    <AccountBadge userId={row.user_id} />
-                  </td>
-                </tr>
-              ))
+              rows.map((row) => {
+                const hint = hiddenMatchHint(row, qApplied);
+                return (
+                  <tr
+                    key={row.id}
+                    className="cursor-pointer transition-colors hover:bg-gray-50/70"
+                    onClick={() => openClientVehicles(row)}
+                  >
+                    <td className="py-3 pr-3 align-middle">
+                      <p className="font-medium text-gray-900">{row.name}</p>
+                      {hint ? (
+                        <p className="mt-0.5 truncate text-xs text-indigo-600" title={hint}>
+                          Найдено по: {hint}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3 align-middle tabular-nums text-gray-700">
+                      {row.phone || '—'}
+                    </td>
+                    <td className="py-3 align-middle">
+                      <AccountBadge userId={row.user_id} />
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="md:hidden">
-        {loading ? (
-          <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
-        ) : rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">
-            {rows.length === 0 ? 'Клиентов пока нет' : 'Ничего не найдено'}
-          </p>
-        ) : (
-          rows.map((row) => (
-            <ClientMobileCard
-              key={row.id}
-              row={row}
-              onOpen={openClientVehicles}
-            />
-          ))
-        )}
       </div>
 
       <AddClientModal
@@ -1083,10 +1433,24 @@ export default function AutoserviceClientsPage() {
         loading={vehiclesModalClient ? vehiclesLoadingId === vehiclesModalClient.id : false}
         onClose={closeClientVehicles}
         onEditVehicle={setEditVehicle}
+        onAddVehicle={() => setAddVehicleOpen(true)}
         onVinClick={handleVinClick}
         onSaved={(updated) => {
           setVehiclesModalClient(updated);
           setRows((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
+        }}
+      />
+
+      <AddGuestVehicleModal
+        open={addVehicleOpen}
+        clientId={vehiclesModalClient?.id}
+        onClose={() => setAddVehicleOpen(false)}
+        onCreated={(created) => {
+          if (!created?.client_id) return;
+          setClientVehicles((prev) => ({
+            ...prev,
+            [created.client_id]: [created, ...(prev[created.client_id] || [])],
+          }));
         }}
       />
 

@@ -7,10 +7,7 @@ export function canGoBackInHistory() {
   return typeof historyIdx === 'number' && historyIdx > 0;
 }
 
-/**
- * Navigate to the previous page when possible, otherwise optional fallback.
- * Honors `location.state.backTo` when it is an absolute in-app path.
- */
+
 export function navigateBack(navigate, { fallback, explicitBack } = {}) {
   if (typeof explicitBack === 'string' && explicitBack.startsWith('/')) {
     navigate(explicitBack);
