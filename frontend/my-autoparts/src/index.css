@@ -261,6 +261,41 @@ input[type="password"] {
   word-break: break-word;
 }
 
+/* Предпросмотр документов на телефоне: пропорциональное уменьшение + pinch-zoom */
+.autoservice-print-preview {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 1rem;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+.autoservice-print-preview__frame,
+.autoservice-print-preview__scale {
+  overflow: visible;
+}
+
+@media screen {
+  .autoservice-print-preview .repair-order-print-sheet,
+  .autoservice-print-preview .invoice-schet-sheet {
+    width: 210mm;
+    max-width: none;
+  }
+
+  .autoservice-print-preview .upd-print-sheet {
+    width: 297mm;
+    max-width: none;
+  }
+}
+
+@media print {
+  .autoservice-print-preview {
+    padding: 0;
+    overflow: visible;
+  }
+}
+
 .upd-print-sheet {
   --upd-rail: 36mm;
   --upd-bar: 2px;

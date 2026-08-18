@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import useHistoryBack from '../../hooks/useHistoryBack';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
@@ -1228,9 +1229,7 @@ export default function AutoserviceOrderFormPage() {
     setShopParts((prev) => [...prev, ...previewParts]);
   };
 
-  const goBack = () => {
-    navigate('/autoservice/orders');
-  };
+  const goBack = useHistoryBack('/autoservice/orders');
 
   const buildPayload = () => ({
     client_id: Number(clientId),
@@ -1441,9 +1440,9 @@ export default function AutoserviceOrderFormPage() {
   if (orderLoading || metaLoading || !formInitialized) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <Link to="/autoservice/orders" className={linkActionClass}>
-          ← К записям
-        </Link>
+        <button type="button" onClick={goBack} className={linkActionClass}>
+          ← Назад
+        </button>
         <p className="mt-6 text-sm text-ink-muted">Загрузка…</p>
       </div>
     );
@@ -1452,15 +1451,12 @@ export default function AutoserviceOrderFormPage() {
   if (orderError) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <Link to="/autoservice/orders" className={linkActionClass}>
-          ← К записям
-        </Link>
+        <button type="button" onClick={goBack} className={linkActionClass}>
+          ← Назад
+        </button>
         <p className="mt-6 text-sm text-red-600" role="alert">
           {orderError}
         </p>
-        <button type="button" onClick={goBack} className={`${btnSecondaryClass} mt-4`}>
-          Вернуться к списку
-        </button>
       </div>
     );
   }
@@ -1469,9 +1465,9 @@ export default function AutoserviceOrderFormPage() {
     <div className="min-h-screen bg-white">
     <div className="mx-auto max-w-4xl px-4 py-6 pb-28">
       <header className="mb-6">
-        <Link to="/autoservice/orders" className={linkActionClass}>
-          ← К записям
-        </Link>
+        <button type="button" onClick={goBack} className={linkActionClass}>
+          ← Назад
+        </button>
         <h1 className="mt-2 text-sg-title text-ink">{pageTitle}</h1>
       </header>
 

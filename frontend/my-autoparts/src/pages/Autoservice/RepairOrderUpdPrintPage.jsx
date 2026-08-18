@@ -12,6 +12,7 @@ import {
 } from '../../utils/repairOrderShopPartUtils';
 import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
 import AutoserviceDocumentClientEditor from '../../components/Autoservice/AutoserviceDocumentClientEditor';
+import AutoservicePrintPreview from '../../components/Autoservice/AutoservicePrintPreview';
 import { downloadPrintSheetPdf } from '../../utils/downloadPrintPdf';
 import {
   UPD_UNIT_META,
@@ -609,6 +610,7 @@ export default function RepairOrderUpdPrintPage() {
         ) : null}
       </div>
 
+      <AutoservicePrintPreview>
       <article
         ref={sheetRef}
         data-print-sheet="true"
@@ -886,6 +888,7 @@ export default function RepairOrderUpdPrintPage() {
           </div>
         </div>
       </article>
+      </AutoservicePrintPreview>
 
       <Modal
         open={editOpen}

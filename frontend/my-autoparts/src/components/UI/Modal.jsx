@@ -48,18 +48,18 @@ export default function Modal({
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : undefined}
         className={cx(
-          'relative w-full overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:rounded-sg-lg',
+          'relative flex w-full max-h-[min(92dvh,100%)] flex-col overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:max-h-[85vh] sm:rounded-sg-lg',
           width,
           className,
         )}
       >
         {(title || onClose) && (
-          <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:gap-3 sm:px-5 sm:py-4">
+          <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-3 sm:gap-3 sm:px-5 sm:py-4">
             {onClose && closeVariant === 'back' ? (
               <button
                 type="button"
                 onClick={onClose}
-                className="-ml-1 shrink-0 rounded-sg p-1.5 text-ink hover:bg-surface-subtle"
+                className="-ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-sg text-ink hover:bg-surface-subtle"
                 aria-label="Назад"
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,8 +88,14 @@ export default function Modal({
             ) : null}
           </div>
         )}
-        <div className="max-h-[75vh] overflow-y-auto px-5 py-4">{children}</div>
-        {footer ? <div className="border-t border-line px-5 py-4">{footer}</div> : null}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 [-webkit-overflow-scrolling:touch]">
+          {children}
+        </div>
+        {footer ? (
+          <div className="shrink-0 border-t border-line px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>
   );

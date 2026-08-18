@@ -14,6 +14,7 @@ import {
 } from '../../utils/repairOrderShopPartUtils';
 import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
 import AutoserviceDocumentClientEditor from '../../components/Autoservice/AutoserviceDocumentClientEditor';
+import AutoservicePrintPreview from '../../components/Autoservice/AutoservicePrintPreview';
 import { downloadPrintSheetPdf } from '../../utils/downloadPrintPdf';
 import {
   clientRequisitesChanged,
@@ -490,6 +491,7 @@ export default function RepairOrderPrintPage() {
         ) : null}
       </div>
 
+      <AutoservicePrintPreview>
       <article
         ref={sheetRef}
         data-print-sheet="true"
@@ -700,6 +702,7 @@ export default function RepairOrderPrintPage() {
           </div>
         </footer>
       </article>
+      </AutoservicePrintPreview>
 
       <Modal
         open={editOpen}

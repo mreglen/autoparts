@@ -582,30 +582,28 @@ function ClientProfileModal({
 
 function ClientMobileCard({
   row,
-  onShowVehicles,
+  onOpen,
 }) {
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-gray-900">{row.name}</p>
-            <AccountBadge userId={row.user_id} />
-          </div>
-          <p className="mt-1 text-sm text-gray-600">{row.phone || '—'}</p>
-          <p className="mt-1 text-xs text-gray-500">
-            Согласие: {formatServerDateTime(row.consented_at) || '—'}
-          </p>
+    <button
+      type="button"
+      onClick={() => onOpen(row)}
+      className="flex w-full items-start justify-between gap-3 border-b border-gray-100 py-3 text-left transition last:border-b-0 active:bg-gray-50/80"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-gray-900">{row.name}</p>
+          <AccountBadge userId={row.user_id} />
         </div>
-        <button
-          type="button"
-          onClick={onShowVehicles}
-          className="shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
-        >
-          Авто
-        </button>
+        <p className="mt-1 text-sm text-gray-600">{row.phone || '—'}</p>
+        <p className="mt-1 text-xs text-gray-500">
+          Согласие: {formatServerDateTime(row.consented_at) || '—'}
+        </p>
       </div>
-    </div>
+      <span className="shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-medium text-indigo-700">
+        Авто
+      </span>
+    </button>
   );
 }
 
@@ -1039,7 +1037,7 @@ export default function AutoserviceClientsPage() {
                 <tr
                   key={row.id}
                   className="cursor-pointer transition-colors hover:bg-gray-50/70"
-                  onDoubleClick={() => openClientVehicles(row)}
+                  onClick={() => openClientVehicles(row)}
                 >
                   <td className="py-3 pr-3 align-middle font-medium text-gray-900">{row.name}</td>
                   <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">{row.phone || '—'}</td>
@@ -1077,15 +1075,11 @@ export default function AutoserviceClientsPage() {
           </p>
         ) : (
           rows.map((row) => (
-            <div
+            <ClientMobileCard
               key={row.id}
-              onDoubleClick={() => openClientVehicles(row)}
-            >
-              <ClientMobileCard
-                row={row}
-                onShowVehicles={() => openClientVehicles(row)}
-              />
-            </div>
+              row={row}
+              onOpen={openClientVehicles}
+            />
           ))
         )}
       </div>
