@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import RepairOrderViewModal, { OrderStatusBadge } from '../../components/Autoservice/RepairOrderViewModal';
+import PlannerCreateChoiceModal from '../../components/Autoservice/PlannerCreateChoiceModal';
+import PlannerCellContextMenu from '../../components/Autoservice/PlannerCellContextMenu';
+import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
 import {
@@ -45,24 +48,30 @@ function formatLongDay(isoDate) {
   });
 }
 
-function PlannerDayCell({ orders, onOrderClick, isToday }) {
+function PlannerDayCell({ orders, onOrderClick, isToday, onContextMenu }) {
   const items = useMemo(() => sortDayOrders(orders), [orders]);
+  const cellClass = `min-h-[3rem] border-b border-r border-gray-100 transition-colors hover:bg-gray-200/45 ${
+    isToday ? 'bg-brand-50/30' : 'bg-white'
+  }`;
+
+  const handleContextMenu = (event) => {
+    event.preventDefault();
+    onContextMenu?.({ x: event.clientX, y: event.clientY });
+  };
 
   if (items.length === 0) {
     return (
       <div
-        className={`min-h-[3rem] border-b border-r border-gray-100 ${
-          isToday ? 'bg-brand-50/30' : 'bg-white'
-        }`}
+        className={cellClass}
+        onContextMenu={handleContextMenu}
       />
     );
   }
 
   return (
     <div
-      className={`flex min-h-[3rem] flex-col gap-1 border-b border-r border-gray-100 p-1.5 sm:p-2 ${
-        isToday ? 'bg-brand-50/20' : 'bg-white'
-      }`}
+      className={`flex ${cellClass} flex-col gap-1 p-1.5 sm:p-2`}
+      onContextMenu={handleContextMenu}
     >
       {items.map((order) => {
         const styleClass = ORDER_STATUS_STYLES[order.status] || ORDER_STATUS_STYLES.pending;
@@ -148,6 +157,7 @@ function MobileDayPlanner({
   selectedDayIso,
   onSelectDay,
   onOrderClick,
+  onCellContextMenu,
   loading,
 }) {
   const selectedIndex = dayHeaders.findIndex(
@@ -201,7 +211,16 @@ function MobileDayPlanner({
             return (
               <section
                 key={zone.id ?? 'unassigned'}
-                className="rounded-2xl border border-gray-200 bg-white px-3.5 py-3 shadow-sm"
+                className="rounded-2xl border border-gray-200 bg-white px-3.5 py-3 shadow-sm transition-colors hover:bg-gray-50/80"
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  onCellContextMenu?.({
+                    x: event.clientX,
+                    y: event.clientY,
+                    dayIso: selectedDayIso,
+                    zoneId: zone.id ?? null,
+                  });
+                }}
               >
                 <h2 className="text-base font-semibold text-gray-900">{zone.name}</h2>
                 {orders.length === 0 ? (
@@ -256,6 +275,11 @@ export default function AutoservicePlannerPage() {
   const [viewOrder, setViewOrder] = useState(null);
   const [viewOrderLoading, setViewOrderLoading] = useState(false);
   const [selectedDayIso, setSelectedDayIso] = useState(todayIso);
+  const [createChoiceOpen, setCreateChoiceOpen] = useState(false);
+  const [createContext, setCreateContext] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
+  const [inspectionPrefillDate, setInspectionPrefillDate] = useState(null);
 
   const weekStartIso = toIsoDate(weekStart);
   const weekDays = useMemo(
@@ -312,11 +336,30 @@ export default function AutoservicePlannerPage() {
     setSelectedDayIso(isoDate);
   };
 
-  const handleCreateOrder = () => {
+  const beginCreateOrder = useCallback((ctx) => {
+    const dayIso = ctx?.dayIso || todayIso;
     navigate('/autoservice/orders/new', {
-      state: { scheduledAtLocal: `${selectedDayIso}T10:00` },
+      state: {
+        scheduledAtLocal: `${dayIso}T10:00`,
+        ...(ctx?.zoneId != null ? { workZoneId: ctx.zoneId } : {}),
+      },
     });
-  };
+  }, [navigate, todayIso]);
+
+  const beginCreateInspection = useCallback((ctx) => {
+    const dayIso = ctx?.dayIso || todayIso;
+    setInspectionPrefillDate(dayIso);
+    setInspectionModalOpen(true);
+  }, [todayIso]);
+
+  const openCreateChoice = useCallback((ctx) => {
+    setCreateContext(ctx || null);
+    setCreateChoiceOpen(true);
+  }, []);
+
+  const handleCellContextMenu = useCallback(({ x, y, dayIso, zoneId }) => {
+    setContextMenu({ x, y, dayIso, zoneId });
+  }, []);
 
   if (!isReady) return <AuthLoadingScreen />;
 
@@ -331,6 +374,15 @@ export default function AutoservicePlannerPage() {
     ? selectedDayIso
     : (dayIsos.includes(todayIso) ? todayIso : dayIsos[0]);
 
+  const handleOpenCreate = () => {
+    openCreateChoice({ dayIso: activeDayIso, zoneId: null });
+  };
+
+  const resolvedCreateContext = createContext || { dayIso: activeDayIso, zoneId: null };
+  const contextMenuContext = contextMenu
+    ? { dayIso: contextMenu.dayIso, zoneId: contextMenu.zoneId }
+    : null;
+
   return (
     <div className="w-full min-w-0">
       <div className="mb-3 flex flex-col gap-3 md:mb-5 md:flex-row md:items-center md:justify-between">
@@ -339,10 +391,10 @@ export default function AutoservicePlannerPage() {
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
           <button
             type="button"
-            onClick={handleCreateOrder}
+            onClick={handleOpenCreate}
             className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-base font-semibold text-white transition hover:bg-indigo-700 md:h-10 md:w-auto md:text-sm"
           >
-            Создать заказ-наряд
+            Создать
           </button>
           <WeekToolbar
             weekRangeLabel={weekRangeLabel}
@@ -371,6 +423,7 @@ export default function AutoservicePlannerPage() {
         selectedDayIso={activeDayIso}
         onSelectDay={setSelectedDayIso}
         onOrderClick={openOrderView}
+        onCellContextMenu={handleCellContextMenu}
         loading={loading}
       />
 
@@ -422,6 +475,12 @@ export default function AutoservicePlannerPage() {
                         orders={dayCell.orders || []}
                         onOrderClick={openOrderView}
                         isToday={isToday}
+                        onContextMenu={({ x, y }) => handleCellContextMenu({
+                          x,
+                          y,
+                          dayIso: iso,
+                          zoneId: zone.id ?? null,
+                        })}
                       />
                     );
                   })}
@@ -449,6 +508,33 @@ export default function AutoservicePlannerPage() {
           setViewOrder(null);
           navigate(`/autoservice/orders/${order.id}/edit`);
         }}
+      />
+
+      <PlannerCreateChoiceModal
+        open={createChoiceOpen}
+        onClose={() => setCreateChoiceOpen(false)}
+        onChooseOrder={() => {
+          setCreateChoiceOpen(false);
+          beginCreateOrder(resolvedCreateContext);
+        }}
+        onChooseInspection={() => {
+          setCreateChoiceOpen(false);
+          beginCreateInspection(resolvedCreateContext);
+        }}
+      />
+
+      <PlannerCellContextMenu
+        position={contextMenu ? { x: contextMenu.x, y: contextMenu.y } : null}
+        onClose={() => setContextMenu(null)}
+        onCreateOrder={() => beginCreateOrder(contextMenuContext)}
+        onCreateInspection={() => beginCreateInspection(contextMenuContext)}
+      />
+
+      <InspectionBookingAddModal
+        open={inspectionModalOpen}
+        onClose={() => setInspectionModalOpen(false)}
+        initialPreferredDate={inspectionPrefillDate}
+        onCreated={() => setInspectionModalOpen(false)}
       />
     </div>
   );

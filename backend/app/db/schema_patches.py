@@ -5283,6 +5283,52 @@ def ensure_repair_order_shop_parts_autoservice_stock() -> None:
     logger.info("Applied repair_order_shop_parts.autoservice_stock_item_id patch")
 
 
+def ensure_repair_order_shop_parts_warehouse_receipt_id() -> None:
+    """Add warehouse_receipt_id to repair_order_shop_parts."""
+    inspector = inspect(engine)
+    if "repair_order_shop_parts" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("repair_order_shop_parts")}
+    if "warehouse_receipt_id" in columns:
+        return
+    statements = [
+        "ALTER TABLE repair_order_shop_parts "
+        "ADD COLUMN warehouse_receipt_id INTEGER "
+        "REFERENCES autoservice_warehouse_receipts(id) ON DELETE SET NULL",
+    ]
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        try:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_repair_order_shop_parts_warehouse_receipt_id "
+                    "ON repair_order_shop_parts (warehouse_receipt_id)"
+                )
+            )
+        except Exception:
+            pass
+    logger.info("Applied repair_order_shop_parts.warehouse_receipt_id patch")
+
+
+def ensure_autoservice_warehouse_items_unit() -> None:
+    """Add unit column to autoservice warehouse items."""
+    inspector = inspect(engine)
+    if "autoservice_warehouse_items" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("autoservice_warehouse_items")}
+    if "unit" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE autoservice_warehouse_items "
+                "ADD COLUMN unit VARCHAR(16) NOT NULL DEFAULT 'pcs'"
+            )
+        )
+    logger.info("Applied autoservice_warehouse_items.unit patch")
+
+
 def ensure_autoservice_warehouse_tables() -> None:
     """Create autoservice warehouse items, receipts, expenses tables."""
     inspector = inspect(engine)

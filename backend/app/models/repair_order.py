@@ -232,6 +232,12 @@ class RepairOrderShopPart(Base):
         nullable=True,
         index=True,
     )
+    warehouse_receipt_id = Column(
+        Integer,
+        ForeignKey("autoservice_warehouse_receipts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     brand = Column(String(120), nullable=True)
     partnumber = Column(String(120), nullable=True)
     rossko_brand = Column(String(120), nullable=True)

@@ -27,10 +27,13 @@ export default function AutoserviceWarehouseAddModal({
   onClose,
   onSubmit,
   submitting = false,
-  title = 'Добавить на склад',
+  title = 'Добавить запчасть вручную',
   submitLabel = 'Добавить',
   showRosskoLookup = true,
-  showUnitSelector = false,
+  showUnitSelector = true,
+  initialValues = null,
+  mode = 'add',
+  editScope = null,
 }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
@@ -41,12 +44,27 @@ export default function AutoserviceWarehouseAddModal({
 
   useEffect(() => {
     if (!open) return;
-    setForm(EMPTY_FORM);
+    if (initialValues) {
+      setForm({
+        brand: initialValues.brand ?? '',
+        article: initialValues.article ?? '',
+        name: initialValues.name ?? '',
+        quantity: initialValues.quantity == null || initialValues.quantity === ''
+          ? '1'
+          : String(initialValues.quantity),
+        unit: initialValues.unit || 'pcs',
+        unit_price: initialValues.unit_price == null || initialValues.unit_price === ''
+          ? ''
+          : String(initialValues.unit_price),
+      });
+    } else {
+      setForm(EMPTY_FORM);
+    }
     setError('');
     setRosskoLookupError('');
     setRosskoLookupNotice('');
     setFilledFromRossko(false);
-  }, [open]);
+  }, [open, initialValues]);
 
   const patch = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -137,25 +155,28 @@ export default function AutoserviceWarehouseAddModal({
     event.preventDefault();
     const name = form.name.trim();
     const unit = form.unit || 'pcs';
+    const isWarehouseEdit = mode === 'edit' && editScope === 'warehouse';
     const quantityRaw = Number(form.quantity);
     const unitPrice = Number(form.unit_price);
     if (!name) {
       setError('Укажите наименование');
       return;
     }
-    if (unit === 'pcs') {
-      const quantity = Math.round(quantityRaw);
-      if (!Number.isFinite(quantity) || quantity < 1) {
-        setError('Количество должно быть целым числом ≥ 1');
+    if (!isWarehouseEdit) {
+      if (unit === 'pcs') {
+        const quantity = Math.round(quantityRaw);
+        if (!Number.isFinite(quantity) || quantity < 1) {
+          setError('Количество должно быть целым числом ≥ 1');
+          return;
+        }
+      } else if (!Number.isFinite(quantityRaw) || quantityRaw < 0.001) {
+        setError('Количество должно быть ≥ 0,001');
         return;
       }
-    } else if (!Number.isFinite(quantityRaw) || quantityRaw < 0.001) {
-      setError('Количество должно быть ≥ 0,001');
-      return;
-    }
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-      setError('Цена должна быть ≥ 0');
-      return;
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        setError('Цена должна быть ≥ 0');
+        return;
+      }
     }
     try {
       await onSubmit({
@@ -163,7 +184,7 @@ export default function AutoserviceWarehouseAddModal({
         article: form.article.trim(),
         name,
         quantity: unit === 'pcs' ? Math.round(quantityRaw) : quantityRaw,
-        unit: showUnitSelector ? unit : 'pcs',
+        unit,
         unit_price: unitPrice,
         source: filledFromRossko ? 'rossko' : 'manual',
       });
@@ -177,8 +198,14 @@ export default function AutoserviceWarehouseAddModal({
     }
   };
 
+  const modalTitle = mode === 'edit'
+    ? (editScope === 'warehouse' ? 'Редактировать товар' : 'Редактировать запчасть')
+    : title;
+  const modalSubmitLabel = mode === 'edit' ? 'Сохранить' : submitLabel;
+  const isWarehouseEdit = mode === 'edit' && editScope === 'warehouse';
+
   return (
-    <Modal open={open} onClose={handleClose} title={title} size="sm">
+    <Modal open={open} onClose={handleClose} title={modalTitle} size="sm">
       <form onSubmit={handleSubmit} className="space-y-3">
         <label className="block text-sm">
           <span className="font-medium text-gray-700">Бренд</span>
@@ -235,19 +262,21 @@ export default function AutoserviceWarehouseAddModal({
             inputClassName={`mt-1 ${fieldClass}`}
           />
         </label>
-        <div className={`grid gap-3 ${showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
-          <label className="block text-sm">
-            <span className="font-medium text-gray-700">Количество</span>
-            <input
-              type="number"
-              min={form.unit === 'pcs' ? 1 : 0.001}
-              step={form.unit === 'pcs' ? 1 : 0.001}
-              className={`mt-1 ${fieldClass}`}
-              value={form.quantity}
-              onChange={(e) => patch('quantity', e.target.value)}
-              required
-            />
-          </label>
+        <div className={`grid gap-3 ${isWarehouseEdit ? 'grid-cols-1' : showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {!isWarehouseEdit ? (
+            <label className="block text-sm">
+              <span className="font-medium text-gray-700">Количество</span>
+              <input
+                type="number"
+                min={form.unit === 'pcs' ? 1 : 0.001}
+                step={form.unit === 'pcs' ? 1 : 0.001}
+                className={`mt-1 ${fieldClass}`}
+                value={form.quantity}
+                onChange={(e) => patch('quantity', e.target.value)}
+                required
+              />
+            </label>
+          ) : null}
           {showUnitSelector ? (
             <label className="block text-sm">
               <span className="font-medium text-gray-700">Ед.</span>
@@ -262,26 +291,33 @@ export default function AutoserviceWarehouseAddModal({
               </select>
             </label>
           ) : null}
-          <label className="block text-sm">
-            <span className="font-medium text-gray-700">Цена, ₽</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className={`mt-1 ${fieldClass}`}
-              value={form.unit_price}
-              onChange={(e) => patch('unit_price', e.target.value)}
-              placeholder="0"
-            />
-          </label>
+          {!isWarehouseEdit ? (
+            <label className="block text-sm">
+              <span className="font-medium text-gray-700">Цена, ₽</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className={`mt-1 ${fieldClass}`}
+                value={form.unit_price}
+                onChange={(e) => patch('unit_price', e.target.value)}
+                placeholder="0"
+              />
+            </label>
+          ) : null}
         </div>
+        {isWarehouseEdit ? (
+          <p className="text-xs text-gray-500">
+            Цены в поступлениях и расходах не изменятся — обновятся только карточка товара и связанные наименования.
+          </p>
+        ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
             Отмена
           </Button>
           <Button type="submit" loading={submitting}>
-            {submitLabel}
+            {modalSubmitLabel}
           </Button>
         </div>
       </form>

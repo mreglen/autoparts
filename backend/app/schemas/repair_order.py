@@ -104,6 +104,15 @@ class RepairOrderShopPartIn(BaseModel):
     rossko_partnumber: Optional[str] = Field(None, max_length=120)
 
 
+class ManualShopPartUpdate(BaseModel):
+    brand: str = Field("", max_length=120)
+    article: str = Field("", max_length=120)
+    name: str = Field(min_length=1, max_length=255)
+    quantity: Decimal = Field(gt=0)
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+    unit_price: Decimal = Field(ge=0)
+
+
 class RepairOrderPurchaseImportIn(BaseModel):
     order_type: Literal["new", "used"]
     item_ids: list[int] = Field(min_length=1)
@@ -163,6 +172,7 @@ class RepairOrderShopPartView(BaseModel):
     rossko_brand: Optional[str] = None
     rossko_partnumber: Optional[str] = None
     is_imported: bool = False
+    is_manual_editable: bool = False
     stock_max_qty: Optional[int] = None
 
 

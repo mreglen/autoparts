@@ -57,6 +57,8 @@ from app.db.schema_patches import (
     ensure_autoservice_document_buyers_table,
     ensure_product_reserved_qty_column,
     ensure_repair_order_shop_parts_autoservice_stock,
+    ensure_repair_order_shop_parts_warehouse_receipt_id,
+    ensure_autoservice_warehouse_items_unit,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
@@ -261,6 +263,8 @@ try:
     ensure_autoservice_document_buyers_table()
     ensure_product_reserved_qty_column()
     ensure_repair_order_shop_parts_autoservice_stock()
+    ensure_repair_order_shop_parts_warehouse_receipt_id()
+    ensure_autoservice_warehouse_items_unit()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
     ensure_group_chat_columns()

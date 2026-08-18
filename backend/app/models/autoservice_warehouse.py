@@ -59,6 +59,7 @@ class AutoserviceWarehouseItem(Base):
     name = Column(String(255), nullable=False)
     quantity = Column(Integer, nullable=False, default=0)
     reserved_qty = Column(Integer, nullable=False, default=0)
+    unit = Column(String(16), nullable=False, default="pcs")
     unit_price = Column(Numeric(12, 2), nullable=False, default=0)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

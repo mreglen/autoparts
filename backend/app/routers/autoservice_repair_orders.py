@@ -29,6 +29,7 @@ from app.schemas.repair_order import (
     ALL_STATUSES,
     HISTORY_STATUSES,
     RepairOrderAutoserviceStockImportIn,
+    ManualShopPartUpdate,
     RepairOrderClientBrief,
     RepairOrderClientPartIn,
     RepairOrderClientPartView,
@@ -86,6 +87,8 @@ from app.services.autoservice_warehouse_service import (
     fulfill_autoservice_stock_on_order_complete,
     product_available_qty,
     ReceiptDocumentBatch,
+    shop_part_is_manual_editable,
+    update_manual_shop_part,
 )
 from app.services.autoservice_work_zone_helpers import (
     normalize_dt as _normalize_dt,
@@ -279,6 +282,11 @@ def _shop_part_view(
         rossko_brand=part.rossko_brand,
         rossko_partnumber=part.rossko_partnumber,
         is_imported=shop_part_is_imported(part),
+        is_manual_editable=(
+            shop_part_is_manual_editable(db, org_id=org_id, part=part)
+            if db is not None and org_id
+            else False
+        ),
         stock_max_qty=(
             shop_part_stock_max_qty(db, org_id, part)
             if db is not None and org_id
@@ -696,6 +704,12 @@ def _replace_shop_parts(
         for part in (order.shop_parts or [])
         if shop_part_is_imported(part) and part.id is not None
     }
+    existing_stock_by_id = {
+        part.id: part
+        for part in (order.shop_parts or [])
+        if part.source == "autoservice_stock" and part.id is not None
+    }
+    kept_stock_ids: set[int] = set()
 
     manual_items: list[RepairOrderShopPartIn] = []
     for item in items:
@@ -706,12 +720,35 @@ def _replace_shop_parts(
                 if item.client_unit_price_override is not None
                 else None
             )
+        elif (
+            item.id is not None
+            and item.id in existing_stock_by_id
+            and item.source == "autoservice_stock"
+            and item.autoservice_stock_item_id
+            == existing_stock_by_id[item.id].autoservice_stock_item_id
+        ):
+            part = existing_stock_by_id[item.id]
+            unit = item.unit if item.unit in ("pcs", "l", "kg") else "pcs"
+            new_qty = _qty(item.qty)
+            if part.qty != new_qty:
+                release_shop_part_reservation(db, part)
+                part.qty = new_qty
+                apply_shop_part_reservation(db, part)
+            part.unit = unit
+            part.unit_price = _money(item.unit_price)
+            part.markup_percent = _money(item.markup_percent)
+            part.client_unit_price_override = (
+                _money(item.client_unit_price_override)
+                if item.client_unit_price_override is not None
+                else None
+            )
+            kept_stock_ids.add(item.id)
         else:
             manual_items.append(item)
 
     removed_parts = [
         part for part in (order.shop_parts or [])
-        if not shop_part_is_imported(part)
+        if not shop_part_is_imported(part) and part.id not in kept_stock_ids
     ]
     for part in removed_parts:
         if part.source in ("warehouse", "autoservice_stock"):
@@ -719,7 +756,7 @@ def _replace_shop_parts(
 
     order.shop_parts[:] = [
         part for part in (order.shop_parts or [])
-        if shop_part_is_imported(part)
+        if shop_part_is_imported(part) or part.id in kept_stock_ids
     ]
     db.flush()
 
@@ -751,6 +788,7 @@ def _replace_shop_parts(
         unit = item.unit if item.unit in ("pcs", "l", "kg") else "pcs"
         source = item.source
         qty = _qty(item.qty)
+        warehouse_receipt_id = None
         if source == "manual":
             saved_unit = item.unit if item.unit in ("pcs", "l", "kg") else "pcs"
             qty_dec = Decimal(str(qty or 1))
@@ -760,15 +798,17 @@ def _replace_shop_parts(
             else:
                 qty = _qty(qty_dec)
                 qty_int = max(1, int(qty_dec.quantize(Decimal("1"), rounding=ROUND_HALF_UP)))
-            wh_item, _, _ = receipt_batch.add_manual(
+            wh_item, receipt, _ = receipt_batch.add_manual(
                 brand=brand or "",
                 article=partnumber or "",
                 name=title,
                 quantity=qty_int,
                 unit_price=_money(item.unit_price),
+                unit=saved_unit,
             )
             source = "autoservice_stock"
             autoservice_stock_item_id = wh_item.id
+            warehouse_receipt_id = receipt.id
             unit = saved_unit
             brand = (wh_item.brand or brand or "")[:120] or None
             partnumber = (wh_item.article or partnumber or "")[:120] or None
@@ -821,6 +861,7 @@ def _replace_shop_parts(
             source=source,
             product_id=product_id,
             autoservice_stock_item_id=autoservice_stock_item_id,
+            warehouse_receipt_id=warehouse_receipt_id,
             rossko_brand=rossko_brand[:120] if rossko_brand else None,
             rossko_partnumber=rossko_partnumber[:120] if rossko_partnumber else None,
         )
@@ -1173,6 +1214,35 @@ def update_repair_order(
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
     return _to_staff_view(db, row)
+
+
+@router.patch(
+    "/autoservice/repair-orders/{order_id}/shop-parts/{part_id}/manual",
+    response_model=RepairOrderShopPartView,
+)
+def update_manual_repair_order_shop_part(
+    order_id: int,
+    part_id: int,
+    payload: ManualShopPartUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    _get_org_order_or_404(db, org_id, order_id)
+    part = update_manual_shop_part(
+        db,
+        org_id=org_id,
+        order_id=order_id,
+        part_id=part_id,
+        brand=payload.brand,
+        article=payload.article,
+        name=payload.name,
+        quantity=payload.quantity,
+        unit=payload.unit,
+        unit_price=payload.unit_price,
+    )
+    db.commit()
+    return _shop_part_view(part, db=db, org_id=org_id)
 
 
 @router.post(

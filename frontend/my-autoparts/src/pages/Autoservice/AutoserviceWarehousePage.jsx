@@ -52,6 +52,7 @@ export default function AutoserviceWarehousePage() {
   const [pendingOrderItems, setPendingOrderItems] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [editItem, setEditItem] = useState(null);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -100,6 +101,37 @@ export default function AutoserviceWarehousePage() {
     setOrderQty('1');
   };
 
+  const openEditItem = (item) => {
+    if (!item) return;
+    setError('');
+    setDetailsItem(null);
+    setEditItem(item);
+  };
+
+  const handleEditItem = async (values) => {
+    if (!editItem?.id) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/warehouse/items/${editItem.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          brand: values.brand?.trim() || '',
+          article: values.article?.trim() || '',
+          name: values.name?.trim(),
+          unit: values.unit || 'pcs',
+        }),
+      });
+      setEditItem(null);
+      await loadItems();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить изменения');
+      throw err;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleWriteOff = async () => {
     if (!writeOffItem) return;
     setSubmitting(true);
@@ -128,7 +160,14 @@ export default function AutoserviceWarehousePage() {
     try {
       await apiRequest('/autoservice/warehouse/receipts', {
         method: 'POST',
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          brand: values.brand?.trim() || '',
+          article: values.article?.trim() || '',
+          name: values.name?.trim(),
+          quantity: values.quantity,
+          unit: values.unit || 'pcs',
+          unit_price: Number(values.unit_price),
+        }),
       });
       setAddOpen(false);
       await loadItems();
@@ -266,9 +305,12 @@ export default function AutoserviceWarehousePage() {
                         showLabel
                         label="Действия"
                         menuClassName="w-56 z-50"
-                        estimatedMenuHeight={120}
+                        estimatedMenuHeight={160}
                         buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                       >
+                        <ActionsDropdownItem onClick={() => openEditItem(item)}>
+                          Редактировать
+                        </ActionsDropdownItem>
                         <ActionsDropdownItem
                           disabled={!canAct}
                           onClick={() => openAddToOrder(item)}
@@ -325,6 +367,9 @@ export default function AutoserviceWarehousePage() {
               </div>
             </dl>
             <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={() => openEditItem(detailsItem)}>
+                Редактировать
+              </Button>
               <Button variant="secondary" onClick={() => openAddToOrder(detailsItem)}>
                 Добавить в заказ-наряд
               </Button>
@@ -424,6 +469,22 @@ export default function AutoserviceWarehousePage() {
         onClose={() => setAddOpen(false)}
         onSubmit={handleAddManual}
         submitting={submitting}
+        submitLabel="Добавить на склад"
+      />
+
+      <AutoserviceWarehouseAddModal
+        open={Boolean(editItem)}
+        onClose={() => setEditItem(null)}
+        onSubmit={handleEditItem}
+        submitting={submitting}
+        mode="edit"
+        editScope="warehouse"
+        initialValues={editItem ? {
+          brand: editItem.brand || '',
+          article: editItem.article || '',
+          name: editItem.name || '',
+          unit: editItem.unit || 'pcs',
+        } : null}
       />
 
       <RepairOrderPickerModal

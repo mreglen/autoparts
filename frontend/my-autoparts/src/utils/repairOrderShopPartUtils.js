@@ -69,6 +69,42 @@ export function isWarehouseLinkedShopPart(part) {
   return part?.source === 'warehouse' || part?.source === 'autoservice_stock';
 }
 
+export function isManualEditableShopPart(part) {
+  if (part?.is_imported || part?.pending_import) return false;
+  if (part?.is_manual_editable) return true;
+  if (part?.source === 'manual' || part?.source === 'rossko') return true;
+  return false;
+}
+
+export function manualShopPartFormValues(part) {
+  return {
+    brand: part?.brand || part?.rossko_brand || '',
+    article: part?.partnumber || part?.rossko_partnumber || '',
+    name: part?.title || '',
+    quantity: part?.qty ?? 1,
+    unit: part?.unit || 'pcs',
+    unit_price: part?.unit_price ?? '0',
+  };
+}
+
+export function applyManualShopPartFormValues(part, values) {
+  const isRossko = values.source === 'rossko';
+  return {
+    ...part,
+    title: values.name,
+    brand: values.brand || '',
+    partnumber: values.article || '',
+    qty: values.quantity,
+    unit: values.unit || 'pcs',
+    unit_price: String(values.unit_price ?? 0),
+    source: isRossko
+      ? 'rossko'
+      : (part?.source === 'autoservice_stock' ? part.source : 'manual'),
+    rossko_brand: isRossko ? (values.brand || '') : (part?.rossko_brand || ''),
+    rossko_partnumber: isRossko ? (values.article || '') : (part?.rossko_partnumber || ''),
+  };
+}
+
 export function clampWarehouseShopPartQty(raw, part) {
   const unit = part?.unit || 'pcs';
   if (raw === '' || raw == null) return '';

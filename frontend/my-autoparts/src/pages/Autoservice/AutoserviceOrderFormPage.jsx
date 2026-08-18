@@ -30,9 +30,12 @@ import {
   saveLinkedRepairOrder,
 } from '../../utils/repairOrderPurchaseDraft';
 import {
+  applyManualShopPartFormValues,
   clampWarehouseShopPartQty,
+  isManualEditableShopPart,
   isValidShopPartQty,
   isWarehouseLinkedShopPart,
+  manualShopPartFormValues,
   priceWithMarkup,
   shopLineSum,
   shopPartDisplayName,
@@ -150,6 +153,34 @@ function shopPartLineValue(part) {
   );
   if (!hasBrandOrArticle) return part?.title ?? '';
   return shopPartDisplayName(part) === '—' ? (part?.title || '') : shopPartDisplayName(part);
+}
+
+function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
+  return {
+    id: p.id,
+    title: p.title || '',
+    brand: p.brand || p.rossko_brand || '',
+    partnumber: p.partnumber || p.rossko_partnumber || '',
+    qty: (() => {
+      const n = Number(p.qty ?? 1);
+      if (Number.isNaN(n)) return 1;
+      return (p.unit || 'pcs') === 'pcs' ? Math.round(n) : Number(n);
+    })(),
+    unit: p.unit || 'pcs',
+    unit_price: String(p.unit_price ?? '0'),
+    markup_percent: String(p.markup_percent ?? defaultMarkupPercent),
+    client_unit_price_override: p.client_unit_price_override == null
+      ? ''
+      : String(p.client_unit_price_override),
+    source: p.source || 'manual',
+    product_id: p.product_id || null,
+    autoservice_stock_item_id: p.autoservice_stock_item_id || null,
+    stock_max_qty: p.stock_max_qty ?? null,
+    rossko_brand: p.rossko_brand || '',
+    rossko_partnumber: p.rossko_partnumber || '',
+    is_imported: Boolean(p.is_imported),
+    is_manual_editable: Boolean(p.is_manual_editable),
+  };
 }
 
 function moveItem(list, index, delta) {
@@ -784,6 +815,7 @@ function mapOrderToFormState(order) {
           rossko_brand: p.rossko_brand || '',
           rossko_partnumber: p.rossko_partnumber || '',
           is_imported: Boolean(p.is_imported),
+          is_manual_editable: Boolean(p.is_manual_editable),
         }))
       : [],
   };
@@ -840,6 +872,8 @@ export default function AutoserviceOrderFormPage() {
   const [myPartsPickerOpen, setMyPartsPickerOpen] = useState(false);
   const [autoserviceStockPickerOpen, setAutoserviceStockPickerOpen] = useState(false);
   const [shopPartManualOpen, setShopPartManualOpen] = useState(false);
+  const [shopPartEditIndex, setShopPartEditIndex] = useState(null);
+  const [shopPartEditSubmitting, setShopPartEditSubmitting] = useState(false);
 
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
@@ -1169,8 +1203,53 @@ export default function AutoserviceOrderFormPage() {
       source: isRossko ? 'rossko' : 'manual',
       rossko_brand: isRossko ? (values.brand || '') : '',
       rossko_partnumber: isRossko ? (values.article || '') : '',
+      is_manual_editable: true,
     })]);
     setShopPartManualOpen(false);
+  };
+
+  const handleManualShopPartEdit = async (values) => {
+    if (shopPartEditIndex == null) return;
+    const part = shopParts[shopPartEditIndex];
+    const shouldSyncWarehouse = Boolean(
+      isEdit && orderId && part?.id && part?.source === 'autoservice_stock',
+    );
+    if (shouldSyncWarehouse) {
+      setShopPartEditSubmitting(true);
+      setError('');
+      try {
+        const updated = await apiRequest(
+          `/autoservice/repair-orders/${orderId}/shop-parts/${part.id}/manual`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({
+              brand: values.brand?.trim() || '',
+              article: values.article?.trim() || '',
+              name: values.name?.trim(),
+              quantity: values.quantity,
+              unit: values.unit || 'pcs',
+              unit_price: Number(values.unit_price),
+            }),
+          },
+        );
+        setShopParts((prev) => prev.map((p, i) => (
+          i === shopPartEditIndex
+            ? mapShopPartFromApiView(updated, clientMarkupPercent)
+            : p
+        )));
+        setShopPartEditIndex(null);
+      } catch (err) {
+        setError(err?.message || 'Не удалось сохранить запчасть');
+        throw err;
+      } finally {
+        setShopPartEditSubmitting(false);
+      }
+      return;
+    }
+    setShopParts((prev) => prev.map((p, i) => (
+      i === shopPartEditIndex ? applyManualShopPartFormValues(p, values) : p
+    )));
+    setShopPartEditIndex(null);
   };
 
   const handleMyPartsStockSelect = (item, quantity) => {
@@ -1870,9 +1949,11 @@ export default function AutoserviceOrderFormPage() {
                     const qtyMin = p.unit === 'pcs' ? 1 : 0.001;
                     const isImported = Boolean(p.is_imported || p.pending_import);
                     const isWarehouseLinked = isWarehouseLinkedShopPart(p);
-                    const isNameLocked = isImported || isWarehouseLinked;
-                    const isQtyLocked = isImported;
-                    const isUnitLocked = isImported || isWarehouseLinked;
+                    const isManualEditable = isManualEditableShopPart(p);
+                    const useModalEditor = isManualEditable && p.source === 'autoservice_stock';
+                    const isNameLocked = isImported || (isWarehouseLinked && !isManualEditable);
+                    const isQtyLocked = isImported || useModalEditor;
+                    const isUnitLocked = isImported || p.source === 'warehouse' || useModalEditor;
                     const qtyValue = (p.unit || 'pcs') === 'pcs'
                       ? (Number.isFinite(Number(p.qty)) ? Math.round(Number(p.qty)) : '')
                       : p.qty;
@@ -1884,20 +1965,31 @@ export default function AutoserviceOrderFormPage() {
                       <tr key={p.id || `shop-part-${index}`} className="align-top">
                         <td className="px-2 py-2.5 tabular-nums text-ink-muted">{index + 1}</td>
                         <td className="px-2 py-2.5">
-                          <input
-                            className={`w-full min-w-[18rem] ${nameInputClass}`}
-                            placeholder="Бренд, артикул, наименование"
-                            value={shopPartLineValue(p)}
-                            readOnly={isNameLocked}
-                            disabled={isNameLocked}
-                            onChange={(e) => updateShopPart(index, {
-                              title: e.target.value,
-                              brand: '',
-                              partnumber: '',
-                              rossko_brand: '',
-                              rossko_partnumber: '',
-                            })}
-                          />
+                          {isManualEditable ? (
+                            <button
+                              type="button"
+                              className={`w-full min-w-[18rem] text-left ${pillInputSmClass} hover:bg-surface-muted/80`}
+                              onClick={() => setShopPartEditIndex(index)}
+                              title="Редактировать запчасть"
+                            >
+                              {shopPartLineValue(p) || '—'}
+                            </button>
+                          ) : (
+                            <input
+                              className={`w-full min-w-[18rem] ${nameInputClass}`}
+                              placeholder="Бренд, артикул, наименование"
+                              value={shopPartLineValue(p)}
+                              readOnly={isNameLocked}
+                              disabled={isNameLocked}
+                              onChange={(e) => updateShopPart(index, {
+                                title: e.target.value,
+                                brand: '',
+                                partnumber: '',
+                                rossko_brand: '',
+                                rossko_partnumber: '',
+                              })}
+                            />
+                          )}
                         </td>
                         <td className="px-2 py-2.5">
                           <input
@@ -2116,6 +2208,19 @@ export default function AutoserviceOrderFormPage() {
         title="Добавить запчасть вручную"
         submitLabel="Добавить в заказ-наряд"
         showUnitSelector
+      />
+
+      <AutoserviceWarehouseAddModal
+        open={shopPartEditIndex != null}
+        onClose={() => setShopPartEditIndex(null)}
+        onSubmit={handleManualShopPartEdit}
+        submitting={shopPartEditSubmitting}
+        mode="edit"
+        initialValues={
+          shopPartEditIndex == null
+            ? null
+            : manualShopPartFormValues(shopParts[shopPartEditIndex])
+        }
       />
     </div>
     </div>

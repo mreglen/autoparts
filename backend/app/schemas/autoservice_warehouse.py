@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AutoserviceWarehouseItemView(BaseModel):
@@ -13,9 +13,17 @@ class AutoserviceWarehouseItemView(BaseModel):
     quantity: int
     reserved_qty: int
     available_qty: int
+    unit: Literal["pcs", "l", "kg"] = "pcs"
     unit_price: Decimal
 
     model_config = {"from_attributes": True}
+
+
+class AutoserviceWarehouseItemUpdate(BaseModel):
+    brand: str = Field("", max_length=120)
+    article: str = Field("", max_length=120)
+    name: str = Field(min_length=1, max_length=255)
+    unit: Literal["pcs", "l", "kg"] = "pcs"
 
 
 class AutoserviceWarehouseReceiptView(BaseModel):
@@ -25,6 +33,7 @@ class AutoserviceWarehouseReceiptView(BaseModel):
     article: str
     name: str
     quantity: int
+    unit: Literal["pcs", "l", "kg"] = "pcs"
     unit_price: Decimal
     line_total: Decimal
     cart_item_type: Optional[str] = None
@@ -32,6 +41,18 @@ class AutoserviceWarehouseReceiptView(BaseModel):
     repair_order_id: Optional[int] = None
     created_at: date
     creator_name: Optional[str] = None
+    can_edit_price: bool = False
+    can_edit_unit: bool = False
+    client_unit_price_override: Optional[Decimal] = None
+    markup_percent: Optional[Decimal] = None
+    automatic_client_unit_price: Optional[Decimal] = None
+
+
+class AutoserviceWarehouseReceiptLinePriceUpdate(BaseModel):
+    unit_price: Optional[Decimal] = Field(default=None, ge=0)
+    client_unit_price_override: Optional[Decimal] = Field(default=None, ge=0)
+    clear_client_unit_price_override: bool = False
+    unit: Optional[Literal["pcs", "l", "kg"]] = None
 
 
 class AutoserviceWarehouseReceiptDocListView(BaseModel):
@@ -95,8 +116,16 @@ class AutoserviceWarehouseManualReceiptIn(BaseModel):
     brand: str = Field("", max_length=120)
     article: str = Field("", max_length=120)
     name: str = Field(min_length=1, max_length=255)
-    quantity: int = Field(ge=1)
+    quantity: Decimal = Field(gt=0)
+    unit: Literal["pcs", "l", "kg"] = "pcs"
     unit_price: Decimal = Field(ge=0)
+
+    @field_validator("quantity", mode="before")
+    @classmethod
+    def _parse_quantity(cls, value):
+        if value is None or value == "":
+            raise ValueError("Укажите количество")
+        return Decimal(str(value))
 
 
 class AutoserviceWarehouseImportResult(BaseModel):

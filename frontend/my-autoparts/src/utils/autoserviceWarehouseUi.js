@@ -1,20 +1,24 @@
-import { priceWithMarkup } from './repairOrderShopPartUtils';
+import { priceWithMarkup, formatShopPartUnit } from './repairOrderShopPartUtils';
 
 export function formatAutoserviceWarehouseMoney(value) {
-  return `${Number(value || 0).toLocaleString('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })} ₽`;
+  const amount = Number(value || 0)
+    .toLocaleString('ru-RU', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })
+    .replace(/\s/g, '\u00A0');
+  return `${amount}\u00A0₽`;
 }
 
 export function formatAutoserviceWarehouseQty(item) {
   const qty = Number(item?.quantity || 0);
   const reserved = Number(item?.reserved_qty || 0);
   const available = Number(item?.available_qty ?? Math.max(0, qty - reserved));
+  const unitLabel = formatShopPartUnit(item?.unit || 'pcs');
   if (reserved > 0) {
-    return `${available} шт. (в резерве ${reserved})`;
+    return `${available} ${unitLabel} (в резерве ${reserved})`;
   }
-  return `${qty} шт.`;
+  return `${qty} ${unitLabel}`;
 }
 
 export function autoserviceWarehouseClientPrice(unitPrice, markupPercent) {
