@@ -17,13 +17,19 @@ export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
   in_progress: 'В работе',
   done: 'Выполнен',
-  completed: 'Завершён',
+  completed: 'Закрыт',
   cancelled: 'Отменён',
   accepted: 'Ожидание',
-  ready: 'Завершён',
-  issued: 'Завершён',
+  ready: 'Закрыт',
+  issued: 'Закрыт',
   open: 'Ожидание',
 };
+
+export function normalizeRepairOrderStatus(status) {
+  if (status === 'accepted' || status === 'open') return 'pending';
+  if (status === 'ready' || status === 'issued') return 'completed';
+  return status;
+}
 
 const STATUS_STYLES = {
   pending: 'bg-amber-50 text-amber-800 ring-amber-200',
@@ -149,15 +155,95 @@ export function vehicleLabel(v) {
 }
 
 export function OrderStatusBadge({ status, className = '' }) {
+  const normalized = normalizeRepairOrderStatus(status);
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
-        STATUS_STYLES[status] || STATUS_STYLES.open
+        STATUS_STYLES[normalized] || STATUS_STYLES[status] || STATUS_STYLES.open
       } ${className}`}
     >
-      {REPAIR_ORDER_STATUS_LABELS[status] || status}
+      {REPAIR_ORDER_STATUS_LABELS[normalized] || REPAIR_ORDER_STATUS_LABELS[status] || status}
     </span>
   );
+}
+
+function OrderStatusStepButton({
+  children,
+  onClick,
+  disabled,
+  variant = 'primary',
+}) {
+  const className = variant === 'success'
+    ? 'inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60'
+    : 'inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60';
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={className}>
+      {children}
+    </button>
+  );
+}
+
+function OrderStatusProgress({
+  status,
+  enablePayment,
+  payment,
+  statusSaving,
+  paySaving,
+  onAdvanceStatus,
+  onPay,
+  onComplete,
+}) {
+  const normalized = normalizeRepairOrderStatus(status);
+  if (!enablePayment || status === 'cancelled' || normalized === 'completed') {
+    return null;
+  }
+
+  const busy = statusSaving || paySaving;
+
+  if (normalized === 'pending') {
+    return (
+      <OrderStatusStepButton
+        disabled={busy}
+        onClick={() => onAdvanceStatus('in_progress')}
+      >
+        {statusSaving ? 'Сохранение…' : 'В работу'}
+      </OrderStatusStepButton>
+    );
+  }
+
+  if (normalized === 'in_progress') {
+    return (
+      <OrderStatusStepButton
+        disabled={busy}
+        onClick={() => onAdvanceStatus('done')}
+      >
+        {statusSaving ? 'Сохранение…' : 'Выполнено'}
+      </OrderStatusStepButton>
+    );
+  }
+
+  if (normalized === 'done') {
+    if (payment?.remaining > 0.005) {
+      return (
+        <OrderStatusStepButton disabled={busy} onClick={onPay}>
+          Оплатить
+        </OrderStatusStepButton>
+      );
+    }
+    if (payment?.isPaid) {
+      return (
+        <OrderStatusStepButton
+          variant="success"
+          disabled={busy}
+          onClick={onComplete}
+        >
+          {statusSaving ? 'Закрытие…' : 'Закрыть'}
+        </OrderStatusStepButton>
+      );
+    }
+  }
+
+  return null;
 }
 
 function MetaItem({ label, children, className = '' }) {
@@ -337,6 +423,8 @@ export default function RepairOrderViewModal({
   const [payAmount, setPayAmount] = useState('');
   const [paySaving, setPaySaving] = useState(false);
   const [payError, setPayError] = useState('');
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState('');
   const [completeSaving, setCompleteSaving] = useState(false);
   const [completeError, setCompleteError] = useState('');
   const [printPickerOpen, setPrintPickerOpen] = useState(false);
@@ -346,18 +434,19 @@ export default function RepairOrderViewModal({
     setPayMethod(null);
     setPayAmount('');
     setPayError('');
+    setStatusError('');
     setCompleteError('');
     setPrintPickerOpen(false);
   }, [order?.id]);
 
   const totals = order ? orderTotals(order) : null;
   const payment = order && totals ? paymentSummary(order, totals.grand) : null;
-  const canPay = enablePayment && payment && payment.remaining > 0.005 && order.status !== 'completed' && order.status !== 'cancelled';
-  const canComplete =
-    enablePayment &&
-    payment?.isPaid &&
-    order?.status !== 'completed' &&
-    order?.status !== 'cancelled';
+  const normalizedStatus = order ? normalizeRepairOrderStatus(order.status) : null;
+  const canPay =
+    enablePayment
+    && payment
+    && payment.remaining > 0.005
+    && normalizedStatus === 'done';
 
   const resetPaymentWizard = useCallback(() => {
     setPayOpen(false);
@@ -368,11 +457,52 @@ export default function RepairOrderViewModal({
 
   const handleStartPayment = useCallback(() => {
     setCompleteError('');
+    setStatusError('');
     setPayOpen(true);
     setPayMethod(null);
     setPayAmount(payment?.remaining ? String(payment.remaining) : '');
     setPayError('');
   }, [payment?.remaining]);
+
+  const handleAdvanceStatus = useCallback(async (nextStatus) => {
+    if (!order?.id) return;
+    setStatusSaving(true);
+    setStatusError('');
+    setCompleteError('');
+    try {
+      const updated = await apiRequest(`/autoservice/repair-orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      onOrderChange?.(updated);
+    } catch (e) {
+      setStatusError(e?.message || 'Не удалось сменить статус');
+    } finally {
+      setStatusSaving(false);
+    }
+  }, [order?.id, onOrderChange]);
+
+  const handleCompleteOrder = useCallback(async () => {
+    if (!order?.id) return;
+    setCompleteSaving(true);
+    setStatusSaving(true);
+    setCompleteError('');
+    setStatusError('');
+    try {
+      const updated = await apiRequest(`/autoservice/repair-orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      onOrderChange?.(updated);
+    } catch (e) {
+      const message = e?.message || 'Не удалось закрыть заказ-наряд';
+      setCompleteError(message);
+      setStatusError(message);
+    } finally {
+      setCompleteSaving(false);
+      setStatusSaving(false);
+    }
+  }, [order?.id, onOrderChange]);
 
   const handleSubmitPayment = useCallback(async () => {
     if (!order?.id || !payMethod) return;
@@ -383,7 +513,20 @@ export default function RepairOrderViewModal({
         method: 'POST',
         body: JSON.stringify({ method: payMethod, amount: Number(payAmount) }),
       });
-      onOrderChange?.(updated);
+      const updatedTotals = orderTotals(updated);
+      const updatedPayment = paymentSummary(updated, updatedTotals.grand);
+      if (
+        normalizeRepairOrderStatus(updated.status) === 'done'
+        && updatedPayment.isPaid
+      ) {
+        const completed = await apiRequest(`/autoservice/repair-orders/${order.id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'completed' }),
+        });
+        onOrderChange?.(completed);
+      } else {
+        onOrderChange?.(updated);
+      }
       resetPaymentWizard();
     } catch (e) {
       setPayError(e?.message || 'Не удалось провести оплату');
@@ -392,23 +535,6 @@ export default function RepairOrderViewModal({
     }
   }, [order?.id, payMethod, payAmount, onOrderChange, resetPaymentWizard]);
 
-  const handleCompleteOrder = useCallback(async () => {
-    if (!order?.id) return;
-    setCompleteSaving(true);
-    setCompleteError('');
-    try {
-      const updated = await apiRequest(`/autoservice/repair-orders/${order.id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'completed' }),
-      });
-      onOrderChange?.(updated);
-    } catch (e) {
-      setCompleteError(e?.message || 'Не удалось закрыть заказ-наряд');
-    } finally {
-      setCompleteSaving(false);
-    }
-  }, [order?.id, onOrderChange]);
-
   if (!order && !loading) return null;
 
   const clientLine = [order?.client?.name, order?.client?.phone].filter(Boolean).join(' · ') || '—';
@@ -416,10 +542,6 @@ export default function RepairOrderViewModal({
   const hasStaffComment = Boolean(order?.staff_comment?.trim());
   const secondaryBtnClass =
     'inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60 md:h-10';
-  const primaryBtnClass =
-    'inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60 md:h-10';
-  const successBtnClass =
-    'inline-flex h-11 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60 md:h-10';
 
   return (
     <>
@@ -433,9 +555,24 @@ export default function RepairOrderViewModal({
       size="lg"
       title={
         order ? (
-          <div className="flex flex-wrap items-center gap-2.5 pr-2">
-            <h2 className="text-base font-semibold text-gray-900">Заказ-наряд №{order.order_number}</h2>
-            <OrderStatusBadge status={order.status} />
+          <div className="space-y-1 pr-2">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-base font-semibold text-gray-900">Заказ-наряд №{order.order_number}</h2>
+              <OrderStatusBadge status={order.status} />
+              <OrderStatusProgress
+                status={order.status}
+                enablePayment={enablePayment}
+                payment={payment}
+                statusSaving={statusSaving || completeSaving}
+                paySaving={paySaving}
+                onAdvanceStatus={handleAdvanceStatus}
+                onPay={handleStartPayment}
+                onComplete={handleCompleteOrder}
+              />
+            </div>
+            {statusError ? (
+              <p className="text-xs text-red-600" role="alert">{statusError}</p>
+            ) : null}
           </div>
         ) : (
           'Заказ-наряд'
@@ -507,26 +644,6 @@ export default function RepairOrderViewModal({
                   className={secondaryBtnClass}
                 >
                   Подробности
-                </button>
-              ) : null}
-              {canPay && !payOpen ? (
-                <button
-                  type="button"
-                  onClick={handleStartPayment}
-                  disabled={paySaving || completeSaving}
-                  className={`${primaryBtnClass} col-span-2 md:col-auto`}
-                >
-                  Оплата
-                </button>
-              ) : null}
-              {canComplete && !payOpen ? (
-                <button
-                  type="button"
-                  onClick={handleCompleteOrder}
-                  disabled={completeSaving || paySaving}
-                  className={`${successBtnClass} col-span-2 md:col-auto`}
-                >
-                  {completeSaving ? 'Закрытие…' : 'Закрыть'}
                 </button>
               ) : null}
             </div>
