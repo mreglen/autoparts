@@ -287,6 +287,54 @@ def shop_part_is_imported(part: RepairOrderShopPart) -> bool:
     return bool(part.cart_item_type and part.cart_item_id is not None)
 
 
+def detach_imported_shop_part_from_repair_order(
+    db: Session,
+    *,
+    org_id: str,
+    order_id: int,
+    part_id: int,
+) -> None:
+    """Remove purchase-imported shop part from repair order; keep warehouse receipt and stock."""
+    from app.schemas.repair_order import HISTORY_STATUSES
+
+    order = (
+        db.query(RepairOrder)
+        .filter(
+            RepairOrder.id == order_id,
+            RepairOrder.organization_id == org_id,
+        )
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ-наряд не найден")
+    if order.status in HISTORY_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя изменять завершённый или отменённый заказ-наряд",
+        )
+
+    part = (
+        db.query(RepairOrderShopPart)
+        .filter(
+            RepairOrderShopPart.id == part_id,
+            RepairOrderShopPart.order_id == order_id,
+        )
+        .first()
+    )
+    if not part:
+        raise HTTPException(status_code=404, detail="Позиция заказ-наряда не найдена")
+    if not shop_part_is_imported(part):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Можно убрать только позиции из оформленных заказов",
+        )
+
+    release_shop_part_reservation(db, part)
+    db.delete(part)
+    db.flush()
+    _reindex_shop_parts(db, order_id)
+
+
 def lookup_purchase_item_repair_orders(
     db: Session,
     *,

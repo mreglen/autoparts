@@ -36,6 +36,10 @@ function lineDraftFromRow(line) {
   };
 }
 
+function isPurchaseReceiptLine(line) {
+  return line?.cart_item_type === 'new' || line?.cart_item_type === 'used';
+}
+
 function MetaItem({ label, children }) {
   return (
     <div className="min-w-0">
@@ -186,14 +190,27 @@ function ReceiptLineRow({
         {formatAutoserviceWarehouseMoney(line.line_total)}
       </td>
       <td className="px-4 py-3 text-right">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={onStartEdit}
-        >
-          Редактировать
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {isPurchaseReceiptLine(line) ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled
+              title="Возвраты поставщику будут доступны позже"
+            >
+              Вернуть поставщику
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={onStartEdit}
+          >
+            Редактировать
+          </Button>
+        </div>
       </td>
     </tr>
   );

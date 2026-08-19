@@ -74,6 +74,7 @@ from app.services.autoservice_payment_service import (
 from app.services.repair_order_cart_import import shop_part_display_name
 from app.services.repair_order_purchase_import import (
     append_purchase_items_to_repair_order,
+    detach_imported_shop_part_from_repair_order,
     shop_part_is_imported,
 )
 from app.services.repair_order_stock_reserve import (
@@ -1262,6 +1263,28 @@ def update_manual_repair_order_shop_part(
     )
     db.commit()
     return _shop_part_view(part, db=db, org_id=org_id)
+
+
+@router.delete(
+    "/autoservice/repair-orders/{order_id}/shop-parts/{part_id}/imported",
+    response_model=RepairOrderStaffView,
+)
+def detach_imported_repair_order_shop_part(
+    order_id: int,
+    part_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    detach_imported_shop_part_from_repair_order(
+        db,
+        org_id=org_id,
+        order_id=order_id,
+        part_id=part_id,
+    )
+    db.commit()
+    row = _get_org_order_or_404(db, org_id, order_id)
+    return _to_staff_view(db, row)
 
 
 @router.post(

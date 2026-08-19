@@ -885,6 +885,7 @@ export default function AutoserviceOrderFormPage() {
   const [addEmployeeTarget, setAddEmployeeTarget] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [detachingShopPartId, setDetachingShopPartId] = useState(null);
   const plannerPrefillRef = useRef(location.state);
   const createInitRef = useRef(false);
 
@@ -1190,6 +1191,45 @@ export default function AutoserviceOrderFormPage() {
   const updateShopPart = (index, patch) => {
     setShopParts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
+
+  const removeShopPart = useCallback(async (index) => {
+    const part = shopParts[index];
+    if (!part) return;
+
+    const isImportedSaved = Boolean(part.is_imported && part.id);
+    const isPendingImport = Boolean(part.pending_import);
+
+    if (isImportedSaved) {
+      const confirmed = window.confirm(
+        'Убрать позицию из заказ-наряда? Товар останется на складе автосервиса, резерв будет снят.',
+      );
+      if (!confirmed || !isEdit || !orderId) return;
+
+      setDetachingShopPartId(part.id);
+      setError('');
+      try {
+        const order = await apiRequest(
+          `/autoservice/repair-orders/${orderId}/shop-parts/${part.id}/imported`,
+          { method: 'DELETE' },
+        );
+        applyFormState(mapOrderToFormState(order));
+      } catch (err) {
+        setError(err?.message || 'Не удалось убрать позицию из заказ-наряда');
+      } finally {
+        setDetachingShopPartId(null);
+      }
+      return;
+    }
+
+    if (isPendingImport) {
+      const confirmed = window.confirm(
+        'Убрать позицию из заказ-наряда? Товар останётся на складе автосервиса.',
+      );
+      if (!confirmed) return;
+    }
+
+    setShopParts((prev) => prev.filter((_, i) => i !== index));
+  }, [shopParts, isEdit, orderId, applyFormState]);
 
   const handleManualShopPartAdd = (values) => {
     const isRossko = values.source === 'rossko';
@@ -2054,16 +2094,15 @@ export default function AutoserviceOrderFormPage() {
                           {formatMoney(lineTotal)} ₽
                         </td>
                         <td className="px-2 py-2.5">
-                          {!isImported ? (
-                            <button
-                              type="button"
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-muted transition hover:bg-danger-50 hover:text-danger-600"
-                              aria-label="Удалить"
-                              onClick={() => setShopParts((prev) => prev.filter((_, i) => i !== index))}
-                            >
-                              ×
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-muted transition hover:bg-danger-50 hover:text-danger-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label={isImported ? 'Убрать из заказ-наряда' : 'Удалить'}
+                            disabled={detachingShopPartId === p.id}
+                            onClick={() => removeShopPart(index)}
+                          >
+                            ×
+                          </button>
                         </td>
                       </tr>
                     );

@@ -2,7 +2,7 @@ import sys
 import types
 import unittest
 from decimal import Decimal
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 if "fcntl" not in sys.modules:
     sys.modules["fcntl"] = types.ModuleType("fcntl")
@@ -11,6 +11,7 @@ from app.schemas.repair_order import RepairOrderPurchaseImportIn
 from app.services.repair_order_cart_import import shop_part_display_name
 from app.services.repair_order_purchase_import import (
     append_purchase_items_to_repair_order,
+    detach_imported_shop_part_from_repair_order,
     detach_purchase_items_from_other_orders,
     shop_part_is_imported,
 )
@@ -116,6 +117,96 @@ class DetachPurchaseItemsTests(unittest.TestCase):
 
         self.assertEqual(removed, 0)
         db.delete.assert_not_called()
+
+
+class DetachImportedShopPartTests(unittest.TestCase):
+    def test_releases_reservation_and_deletes_imported_part(self):
+        from fastapi import HTTPException
+
+        order = MagicMock(id=2, organization_id="ORG1", status="pending")
+        part = MagicMock(
+            id=9,
+            order_id=2,
+            cart_item_type="new",
+            cart_item_id=15,
+            source="autoservice_stock",
+            autoservice_stock_item_id=3,
+            qty=1,
+        )
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.side_effect = [order, part]
+        remaining_query = db.query.return_value.filter.return_value.order_by.return_value
+        remaining_query.all.return_value = []
+
+        with patch(
+            "app.services.repair_order_purchase_import.release_shop_part_reservation",
+        ) as release_mock:
+            detach_imported_shop_part_from_repair_order(
+                db,
+                org_id="ORG1",
+                order_id=2,
+                part_id=9,
+            )
+
+        release_mock.assert_called_once_with(db, part)
+        db.delete.assert_called_once_with(part)
+        db.flush.assert_called_once()
+
+    def test_rejects_non_imported_part(self):
+        from fastapi import HTTPException
+
+        order = MagicMock(id=2, organization_id="ORG1", status="pending")
+        part = MagicMock(
+            id=9,
+            order_id=2,
+            cart_item_type=None,
+            cart_item_id=None,
+        )
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.side_effect = [order, part]
+
+        with self.assertRaises(HTTPException) as ctx:
+            detach_imported_shop_part_from_repair_order(
+                db,
+                org_id="ORG1",
+                order_id=2,
+                part_id=9,
+            )
+        self.assertEqual(ctx.exception.status_code, 400)
+        db.delete.assert_not_called()
+
+    def test_rejects_completed_order(self):
+        from fastapi import HTTPException
+
+        order = MagicMock(id=2, organization_id="ORG1", status="completed")
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = order
+
+        with self.assertRaises(HTTPException) as ctx:
+            detach_imported_shop_part_from_repair_order(
+                db,
+                org_id="ORG1",
+                order_id=2,
+                part_id=9,
+            )
+        self.assertEqual(ctx.exception.status_code, 400)
+        db.delete.assert_not_called()
+
+    def test_missing_part_returns_404(self):
+        from fastapi import HTTPException
+
+        order = MagicMock(id=2, organization_id="ORG1", status="pending")
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.side_effect = [order, None]
+
+        with self.assertRaises(HTTPException) as ctx:
+            detach_imported_shop_part_from_repair_order(
+                db,
+                org_id="ORG1",
+                order_id=2,
+                part_id=999,
+            )
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 class LookupPurchaseItemRepairOrdersTests(unittest.TestCase):
