@@ -100,7 +100,6 @@ def _receipt_line_view(
         article=item.article if item else "",
         name=item.name if item else "",
         quantity=qty,
-        unit=pricing.get("unit", "pcs"),
         unit_price=unit_price,
         line_total=_money(unit_price * qty),
         cart_item_type=row.cart_item_type,
