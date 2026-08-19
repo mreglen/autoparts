@@ -3,8 +3,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
     fetchRosskoCheckoutDetails,
+    fetchRosskoCredentials,
     fetchRosskoSettings,
     fetchRosskoMarkupSettings,
+    saveRosskoCredentials,
     saveRosskoSettings,
     saveRosskoMarkupSettings,
     clearRosskoAdminErrors,
@@ -22,18 +24,26 @@ export default function RosskoSettingsPage() {
     const { isReady, user } = useAuthReady();
     const {
         checkoutDetails,
+        credentials,
         settings,
         markupSettings,
         loadingDetails,
+        loadingCredentials,
         loadingSettings,
         loadingMarkupSettings,
         saving,
+        savingCredentials,
         savingMarkup,
         error,
         saveError,
+        credentialsSaveError,
         markupSaveError,
     } = useSelector((state) => state.rosskoAdmin);
 
+    const [credentialsForm, setCredentialsForm] = useState({
+        key1: '',
+        key2: '',
+    });
     const [form, setForm] = useState({
         delivery_id: '',
         address_id: '',
@@ -65,6 +75,7 @@ export default function RosskoSettingsPage() {
             return;
         }
         dispatch(clearRosskoAdminErrors());
+        dispatch(fetchRosskoCredentials());
         dispatch(fetchRosskoCheckoutDetails());
         dispatch(fetchRosskoSettings());
         dispatch(fetchRosskoMarkupSettings());
@@ -162,6 +173,27 @@ export default function RosskoSettingsPage() {
         dispatch(fetchRosskoCheckoutDetails());
     }, [dispatch]);
 
+    const canSaveCredentials = useMemo(
+        () => credentialsForm.key1.trim() && credentialsForm.key2.trim(),
+        [credentialsForm],
+    );
+
+    const handleSaveCredentials = async () => {
+        if (!canSaveCredentials || savingCredentials) return;
+        setNotification(null);
+        try {
+            await dispatch(saveRosskoCredentials({
+                key1: credentialsForm.key1.trim(),
+                key2: credentialsForm.key2.trim(),
+            })).unwrap();
+            setCredentialsForm({ key1: '', key2: '' });
+            setNotification({ type: 'success', message: 'Ключи Rossko сохранены' });
+            dispatch(fetchRosskoCheckoutDetails());
+        } catch (err) {
+            setNotification({ type: 'error', message: err || 'Не удалось сохранить ключи' });
+        }
+    };
+
     const handleSave = async () => {
         if (!canSave || saving) return;
         setNotification(null);
@@ -227,31 +259,31 @@ export default function RosskoSettingsPage() {
     if (!isReady) return <AuthLoadingScreen />;
 
     const loading = loadingDetails || loadingSettings;
+    const keysConfigured = credentials?.keys_configured || settings?.keys_configured;
 
     return (
         <div className="w-full max-w-3xl">
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <p className="text-sm font-medium text-indigo-600">Админка</p>
-                    <h1 className="text-2xl font-bold text-gray-900">Rossko — оформление заказов</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Rossko</h1>
                     <p className="mt-1 text-sm text-gray-600">
-                        Доставка, оплата и реквизиты загружаются из GetCheckoutDetails (личный кабинет
-                        Rossko).
+                        API-ключи, оформление заказов и наценки для новых запчастей.
                     </p>
                 </div>
                 <button
                     type="button"
                     onClick={handleRefreshCheckoutDetails}
-                    disabled={loadingDetails}
+                    disabled={loadingDetails || !keysConfigured}
                     className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                     {loadingDetails ? 'Обновление…' : 'Обновить списки'}
                 </button>
             </div>
 
-            {(error || saveError || markupSaveError) && (
+            {(error || saveError || credentialsSaveError || markupSaveError) && (
                 <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                    {error || saveError || markupSaveError}
+                    {error || saveError || credentialsSaveError || markupSaveError}
                 </div>
             )}
             {notification && (
@@ -266,10 +298,90 @@ export default function RosskoSettingsPage() {
                 </div>
             )}
 
-            {loading ? (
+            <div className="mb-8 space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900">API-ключи Rossko</h2>
+                        <p className="mt-1 text-sm text-gray-600">
+                            KEY1 и KEY2 из личного кабинета Rossko. Хранятся в базе в зашифрованном виде.
+                        </p>
+                    </div>
+                    <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            keysConfigured
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-700'
+                        }`}
+                    >
+                        {keysConfigured ? 'Ключи настроены' : 'Не настроено'}
+                    </span>
+                </div>
+
+                {loadingCredentials ? (
+                    <p className="text-gray-600">Загрузка…</p>
+                ) : (
+                    <>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700">
+                                    KEY1 *
+                                </label>
+                                <input
+                                    type="password"
+                                    autoComplete="off"
+                                    className={inputClass}
+                                    value={credentialsForm.key1}
+                                    onChange={(e) =>
+                                        setCredentialsForm((prev) => ({ ...prev, key1: e.target.value }))
+                                    }
+                                    placeholder={credentials?.key1_configured ? '••••••••' : 'Введите KEY1'}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-gray-700">
+                                    KEY2 *
+                                </label>
+                                <input
+                                    type="password"
+                                    autoComplete="off"
+                                    className={inputClass}
+                                    value={credentialsForm.key2}
+                                    onChange={(e) =>
+                                        setCredentialsForm((prev) => ({ ...prev, key2: e.target.value }))
+                                    }
+                                    placeholder={credentials?.key2_configured ? '••••••••' : 'Введите KEY2'}
+                                />
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                            После сохранения ключи не показываются повторно — введите новые значения, чтобы заменить их.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleSaveCredentials}
+                            disabled={!canSaveCredentials || savingCredentials}
+                            className="inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                            {savingCredentials ? 'Сохранение…' : 'Сохранить ключи'}
+                        </button>
+                    </>
+                )}
+            </div>
+
+            {!keysConfigured ? (
+                <div className="mb-8 rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-600 sm:p-6">
+                    Сначала сохраните KEY1 и KEY2 — после этого станут доступны настройки оформления заказов.
+                </div>
+            ) : loading ? (
                 <p className="text-gray-600">Загрузка…</p>
             ) : (
                 <div className="space-y-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900">Оформление заказов</h2>
+                        <p className="mt-1 text-sm text-gray-600">
+                            Доставка, оплата и реквизиты загружаются из GetCheckoutDetails.
+                        </p>
+                    </div>
                     <div>
                         <label className="mb-1 block text-sm font-medium text-gray-700">
                             Способ доставки *

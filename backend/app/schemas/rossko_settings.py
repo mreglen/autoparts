@@ -53,6 +53,7 @@ class RosskoSettingsResponse(BaseModel):
     requires_address: Optional[bool] = None
     requires_requisite: Optional[bool] = None
     configured: bool = False
+    keys_configured: bool = False
     updated_at: Optional[datetime] = None
     allow_unpaid_checkout: bool = False
 
@@ -85,6 +86,17 @@ class RosskoMarkupSettingsUpdate(BaseModel):
     buyer_markup_percent: float = Field(..., ge=0, le=500)
     seller_markup_percent: float = Field(..., ge=0, le=500)
     autoservice_markup_percent: float = Field(..., ge=0, le=500)
+
+
+class RosskoCredentialsView(BaseModel):
+    key1_configured: bool = False
+    key2_configured: bool = False
+    keys_configured: bool = False
+
+
+class RosskoCredentialsUpdate(BaseModel):
+    key1: str = Field(..., min_length=1, max_length=512)
+    key2: str = Field(..., min_length=1, max_length=512)
 
 
 class NewPartsOrderCreateIn(BaseModel):

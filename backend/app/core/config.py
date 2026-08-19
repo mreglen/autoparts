@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     EMAIL_HOST_PASSWORD: str
     EMAIL_FROM: str
     VERIFICATION_CODE_EXPIRE_SECONDS: int
-    ROSSKO_KEY1: str
-    ROSSKO_KEY2: str
+    ROSSKO_KEY1: Optional[str] = None
+    ROSSKO_KEY2: Optional[str] = None
     GET_SEARCH: str
     GET_CHECK_OUT_DETAILS: str
     GET_CHECK_OUT: str

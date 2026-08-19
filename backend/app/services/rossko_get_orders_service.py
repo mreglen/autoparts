@@ -7,10 +7,9 @@ from typing import Any
 
 from zeep.helpers import serialize_object
 
-from app.core.config import Settings
+from app.utils.rossko_api_keys import get_rossko_api_keys
 
 logger = logging.getLogger(__name__)
-settings = Settings()
 
 BATCH_SIZE = 50
 
@@ -206,10 +205,11 @@ def fetch_orders_by_ids(order_ids: list[int]) -> dict[str, RosskoOrderSnapshot]:
 
     for offset in range(0, len(unique_ids), BATCH_SIZE):
         chunk = unique_ids[offset : offset + BATCH_SIZE]
+        key1, key2 = get_rossko_api_keys()
         params = _clean_soap_params(
             {
-                "KEY1": settings.ROSSKO_KEY1,
-                "KEY2": settings.ROSSKO_KEY2,
+                "KEY1": key1,
+                "KEY2": key2,
                 "order_ids": {"id": chunk},
             }
         )

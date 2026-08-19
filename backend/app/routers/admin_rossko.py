@@ -6,12 +6,13 @@ from sqlalchemy.orm import Session
 from zeep.helpers import serialize_object
 
 from app.core.auth import get_current_admin_user
-from app.core.config import Settings
 from app.db.database import get_db
 from app.models.user import User
 from app.routers.rossko_api.rossko_api import get_details_client
 from app.schemas.rossko_settings import (
     RosskoCheckoutDetailsResponse,
+    RosskoCredentialsUpdate,
+    RosskoCredentialsView,
     RosskoMarkupSettingsResponse,
     RosskoMarkupSettingsUpdate,
     RosskoSettingsResponse,
@@ -24,6 +25,13 @@ from app.utils.org_markup import (
     buyer_markup_percent,
     global_markup_percent,
 )
+from app.utils.rossko_api_keys import (
+    RosskoApiKeysError,
+    get_rossko_api_keys,
+    migrate_rossko_keys_from_env,
+    rossko_api_keys_configured,
+    save_rossko_api_keys,
+)
 from app.utils.rossko_settings_db import (
     get_rossko_settings,
     rossko_settings_configured,
@@ -32,7 +40,6 @@ from app.utils.rossko_settings_db import (
 from app.utils.site_settings_db import get_or_create_site_settings
 
 router = APIRouter(prefix="/admin/rossko", tags=["Admin Rossko"])
-settings = Settings()
 
 
 def _settings_to_response(row) -> RosskoSettingsResponse:
@@ -53,7 +60,18 @@ def _settings_to_response(row) -> RosskoSettingsResponse:
         requires_address=row.requires_address,
         requires_requisite=row.requires_requisite,
         configured=rossko_settings_configured(row),
+        keys_configured=rossko_api_keys_configured(row),
         updated_at=row.updated_at,
+    )
+
+
+def _credentials_to_response(row) -> RosskoCredentialsView:
+    key1_configured = bool(getattr(row, "key1_encrypted", None))
+    key2_configured = bool(getattr(row, "key2_encrypted", None))
+    return RosskoCredentialsView(
+        key1_configured=key1_configured,
+        key2_configured=key2_configured,
+        keys_configured=key1_configured and key2_configured,
     )
 
 
@@ -77,14 +95,57 @@ def _validate_settings_payload(payload: RosskoSettingsUpdate) -> None:
         )
 
 
+@router.get("/credentials", response_model=RosskoCredentialsView)
+def admin_get_rossko_credentials(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    migrate_rossko_keys_from_env(db)
+    row = get_rossko_settings(db)
+    return _credentials_to_response(row)
+
+
+@router.put("/credentials", response_model=RosskoCredentialsView)
+def admin_put_rossko_credentials(
+    payload: RosskoCredentialsUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        save_rossko_api_keys(
+            db,
+            payload.key1,
+            payload.key2,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    row = get_rossko_settings(db)
+    log_audit(
+        db,
+        event_type="rossko_credentials_updated",
+        category="integrations",
+        summary="Ключи Rossko обновлены",
+        user=current_user,
+        entity_type="rossko_settings",
+        entity_id=row.id,
+    )
+    return _credentials_to_response(row)
+
+
 @router.get("/checkout-details", response_model=RosskoCheckoutDetailsResponse)
 def admin_rossko_checkout_details(
     current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
 ):
+    del current_user
     try:
+        key1, key2 = get_rossko_api_keys(db)
         result = get_details_client().service.GetCheckoutDetails(
-            KEY1=settings.ROSSKO_KEY1,
-            KEY2=settings.ROSSKO_KEY2,
+            KEY1=key1,
+            KEY2=key2,
         )
         serialized = serialize_object(result)
         if isinstance(serialized, dict):
@@ -92,6 +153,8 @@ def admin_rossko_checkout_details(
             if err:
                 raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=err)
         return normalize_checkout_details(serialized)
+    except RosskoApiKeysError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except HTTPException:
         raise
     except Exception as exc:
@@ -106,6 +169,8 @@ def admin_get_rossko_settings(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
+    del current_user
+    migrate_rossko_keys_from_env(db)
     row = get_rossko_settings(db)
     return _settings_to_response(row)
 
@@ -176,6 +241,7 @@ def admin_get_rossko_markup_settings(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
+    del current_user
     row = get_or_create_site_settings(db)
     return _markup_settings_to_response(row)
 

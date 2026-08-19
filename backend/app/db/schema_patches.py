@@ -1625,6 +1625,29 @@ def ensure_rossko_settings_row_defaults() -> None:
     logger.info("Applied rossko_settings row defaults patch")
 
 
+def ensure_rossko_settings_api_key_columns() -> None:
+    """Add encrypted Rossko API key columns to rossko_settings."""
+    inspector = inspect(engine)
+    if "rossko_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("rossko_settings")}
+    statements: list[str] = []
+    if "key1_encrypted" not in columns:
+        statements.append("ALTER TABLE rossko_settings ADD COLUMN key1_encrypted TEXT")
+    if "key2_encrypted" not in columns:
+        statements.append("ALTER TABLE rossko_settings ADD COLUMN key2_encrypted TEXT")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied rossko_settings API key columns patch")
+
+
 def ensure_garage_new_order_rossko_columns() -> None:
     """Add Rossko order linkage columns to garage_new_orders."""
     inspector = inspect(engine)

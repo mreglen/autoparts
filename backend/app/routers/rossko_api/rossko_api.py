@@ -5,6 +5,7 @@ from app.core.auth import get_current_admin_user
 from app.models.user import User
 from app.schemas.rossko import CheckoutRequest, GetOrdersRequest, SearchRequest
 from app.db.database import get_db
+from app.utils.rossko_api_keys import RosskoApiKeysError, get_rossko_api_keys
 from datetime import datetime
 from zeep import Client
 from zeep.helpers import serialize_object
@@ -85,12 +86,13 @@ async def save_stock_data_to_db(search_result: dict, db: Session):
     # Заглушка - сохранение данных складов отключено
     pass
 
-async def rossko_checkout(checkout_data):
+async def rossko_checkout(checkout_data, db: Session | None = None):
     """Отправка заказа в RossKo API"""
     try:
+        key1, key2 = get_rossko_api_keys(db)
         params = {
-            "KEY1": settings.ROSSKO_KEY1,
-            "KEY2": settings.ROSSKO_KEY2,
+            "KEY1": key1,
+            "KEY2": key2,
             "delivery": checkout_data["delivery"],
             "payment": checkout_data["payment"],
             "contact": checkout_data["contact"],
@@ -113,6 +115,8 @@ async def rossko_checkout(checkout_data):
         serialized_result = serialize_object(result)
         return serialized_result
 
+    except RosskoApiKeysError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Ошибка при выполнении запроса GetCheckout: {str(error)}")
 
@@ -122,9 +126,10 @@ def _blocking_get_search(params: dict) -> object:
 
 async def rossko_search(request: SearchRequest, db: Session = Depends(get_db)):
     try:
+        key1, key2 = get_rossko_api_keys(db)
         params = {
-            "KEY1": settings.ROSSKO_KEY1,
-            "KEY2": settings.ROSSKO_KEY2,
+            "KEY1": key1,
+            "KEY2": key2,
             "text": request.text,
             "delivery_id": request.delivery_id,
         }
@@ -139,6 +144,8 @@ async def rossko_search(request: SearchRequest, db: Session = Depends(get_db)):
 
         return serialized_result
 
+    except RosskoApiKeysError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     except Exception as error:
         logger.exception("ROSSKO GetSearch failed for text=%r", request.text)
         raise HTTPException(status_code=500, detail=f"Ошибка при выполнении запроса: {str(error)}")
@@ -150,16 +157,22 @@ async def search_items(request: SearchRequest, db: Session = Depends(get_db)):
     
 
 @router.get("/GetCheckoutDetails")
-async def get_details(_: User = Depends(get_current_admin_user)):
+async def get_details(
+    _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
     try:
+        key1, key2 = get_rossko_api_keys(db)
         params = {
-            "KEY1": settings.ROSSKO_KEY1,
-            "KEY2": settings.ROSSKO_KEY2,
+            "KEY1": key1,
+            "KEY2": key2,
         }
 
         result = get_details_client().service.GetCheckoutDetails(**params)
         return result
 
+    except RosskoApiKeysError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Ошибка при выполнении запроса: {str(error)}")
 
@@ -168,11 +181,13 @@ async def get_details(_: User = Depends(get_current_admin_user)):
 async def get_checkout(
     request: CheckoutRequest,
     _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
 ):
     try:
+        key1, key2 = get_rossko_api_keys(db)
         params = {
-            "KEY1": settings.ROSSKO_KEY1,
-            "KEY2": settings.ROSSKO_KEY2,
+            "KEY1": key1,
+            "KEY2": key2,
 
             "delivery": {
                 "delivery_id": request.delivery.delivery_id,
@@ -220,6 +235,8 @@ async def get_checkout(
 
         return serialize_object(result)
 
+    except RosskoApiKeysError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -230,11 +247,13 @@ async def get_checkout(
 async def get_orders(
     request: GetOrdersRequest,
     _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
 ):
     try:
+        key1, key2 = get_rossko_api_keys(db)
         params = {
-            "KEY1": settings.ROSSKO_KEY1,
-            "KEY2": settings.ROSSKO_KEY2,
+            "KEY1": key1,
+            "KEY2": key2,
         }
 
         if request.order_ids:
@@ -268,6 +287,8 @@ async def get_orders(
 
         return serialize_object(result)
 
+    except RosskoApiKeysError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     except Exception as e:
         raise HTTPException(
             status_code=500,

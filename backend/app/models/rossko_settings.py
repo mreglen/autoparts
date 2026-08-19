@@ -24,5 +24,7 @@ class RosskoSettings(Base):
     is_pickup = Column(Boolean, nullable=True)
     requires_address = Column(Boolean, nullable=True)
     requires_requisite = Column(Boolean, nullable=True)
+    key1_encrypted = Column(Text, nullable=True)
+    key2_encrypted = Column(Text, nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

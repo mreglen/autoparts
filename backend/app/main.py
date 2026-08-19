@@ -78,6 +78,7 @@ from app.db.schema_patches import (
     ensure_product_photo_thumb_url_column,
     ensure_rossko_settings_table,
     ensure_rossko_settings_row_defaults,
+    ensure_rossko_settings_api_key_columns,
     ensure_seo_new_parts_sync_settings_table,
     ensure_garage_new_order_rossko_columns,
     ensure_garage_new_order_item_seo_card_column,
@@ -288,6 +289,7 @@ try:
     ensure_product_photo_thumb_url_column()
     ensure_rossko_settings_table()
     ensure_rossko_settings_row_defaults()
+    ensure_rossko_settings_api_key_columns()
     ensure_seo_new_parts_sync_settings_table()
     ensure_garage_new_order_rossko_columns()
     ensure_garage_new_order_item_seo_card_column()

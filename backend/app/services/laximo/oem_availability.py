@@ -12,6 +12,7 @@ from zeep.helpers import serialize_object
 from zeep.transports import Transport
 
 from app.core.config import Settings
+from app.utils.rossko_api_keys import get_rossko_api_keys
 from app.models.product import Product as ProductModel
 from app.services.laximo.doc_client import LaximoDocError, find_oem
 from app.services.laximo.gate import laximo_doc_ready
@@ -110,9 +111,10 @@ def _empty_used() -> dict[str, Any]:
 def _lookup_rossko(oem: str) -> dict[str, Any]:
     empty = _empty_rossko()
     try:
+        key1, key2 = get_rossko_api_keys()
         params = {
-            "KEY1": settings.ROSSKO_KEY1,
-            "KEY2": settings.ROSSKO_KEY2,
+            "KEY1": key1,
+            "KEY2": key2,
             "text": oem,
             "delivery_id": ROSSKO_DELIVERY_ID,
         }

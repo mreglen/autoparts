@@ -15,6 +15,7 @@ from app.models.carts.new_parts_cart import NewPartsCart
 from app.models.rossko_settings import RosskoSettings
 from app.routers.rossko_api.rossko_api import get_details_client, rossko_checkout
 from app.services.rossko_checkout_details import normalize_checkout_details, payment_requires_requisite
+from app.utils.rossko_api_keys import get_rossko_api_keys
 from app.utils.rossko_settings_db import rossko_settings_configured
 
 settings = Settings()
@@ -34,9 +35,10 @@ def resolve_requisite_id(rossko_cfg: RosskoSettings) -> int | None:
         return int(rossko_cfg.requisite_id)
 
     try:
+        key1, key2 = get_rossko_api_keys()
         result = get_details_client().service.GetCheckoutDetails(
-            KEY1=settings.ROSSKO_KEY1,
-            KEY2=settings.ROSSKO_KEY2,
+            KEY1=key1,
+            KEY2=key2,
         )
         details = normalize_checkout_details(serialize_object(result))
     except Exception as exc:

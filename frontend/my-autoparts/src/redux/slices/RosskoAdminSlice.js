@@ -12,6 +12,31 @@ export const fetchRosskoCheckoutDetails = createAsyncThunk(
     }
 );
 
+export const fetchRosskoCredentials = createAsyncThunk(
+    'rosskoAdmin/fetchCredentials',
+    async (_, { rejectWithValue }) => {
+        try {
+            return await apiRequest('/admin/rossko/credentials');
+        } catch (error) {
+            return rejectWithValue(error?.message || 'Ошибка загрузки ключей Rossko');
+        }
+    }
+);
+
+export const saveRosskoCredentials = createAsyncThunk(
+    'rosskoAdmin/saveCredentials',
+    async (payload, { rejectWithValue }) => {
+        try {
+            return await apiRequest('/admin/rossko/credentials', {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+            });
+        } catch (error) {
+            return rejectWithValue(error?.message || 'Ошибка сохранения ключей Rossko');
+        }
+    }
+);
+
 export const fetchRosskoSettings = createAsyncThunk(
     'rosskoAdmin/fetchSettings',
     async (_, { rejectWithValue }) => {
@@ -66,21 +91,26 @@ const rosskoAdminSlice = createSlice({
     name: 'rosskoAdmin',
     initialState: {
         checkoutDetails: null,
+        credentials: null,
         settings: null,
         markupSettings: null,
         loadingDetails: false,
+        loadingCredentials: false,
         loadingSettings: false,
         loadingMarkupSettings: false,
         saving: false,
+        savingCredentials: false,
         savingMarkup: false,
         error: null,
         saveError: null,
+        credentialsSaveError: null,
         markupSaveError: null,
     },
     reducers: {
         clearRosskoAdminErrors: (state) => {
             state.error = null;
             state.saveError = null;
+            state.credentialsSaveError = null;
             state.markupSaveError = null;
         },
     },
@@ -97,6 +127,35 @@ const rosskoAdminSlice = createSlice({
             .addCase(fetchRosskoCheckoutDetails.rejected, (state, action) => {
                 state.loadingDetails = false;
                 state.error = action.payload;
+            })
+            .addCase(fetchRosskoCredentials.pending, (state) => {
+                state.loadingCredentials = true;
+            })
+            .addCase(fetchRosskoCredentials.fulfilled, (state, action) => {
+                state.loadingCredentials = false;
+                state.credentials = action.payload;
+            })
+            .addCase(fetchRosskoCredentials.rejected, (state, action) => {
+                state.loadingCredentials = false;
+                state.error = action.payload;
+            })
+            .addCase(saveRosskoCredentials.pending, (state) => {
+                state.savingCredentials = true;
+                state.credentialsSaveError = null;
+            })
+            .addCase(saveRosskoCredentials.fulfilled, (state, action) => {
+                state.savingCredentials = false;
+                state.credentials = action.payload;
+                if (state.settings) {
+                    state.settings = {
+                        ...state.settings,
+                        keys_configured: action.payload.keys_configured,
+                    };
+                }
+            })
+            .addCase(saveRosskoCredentials.rejected, (state, action) => {
+                state.savingCredentials = false;
+                state.credentialsSaveError = action.payload;
             })
             .addCase(fetchRosskoSettings.pending, (state) => {
                 state.loadingSettings = true;
