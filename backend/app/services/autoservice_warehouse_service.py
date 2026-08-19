@@ -74,15 +74,6 @@ def _get_or_create_item(
 ) -> AutoserviceWarehouseItem:
     brand_norm = _normalize_brand(brand)
     article_norm = _normalize_article(article)
-    if not article_norm:
-        return _create_item(
-            db,
-            org_id=org_id,
-            brand=brand_norm,
-            article=article_norm,
-            name=name,
-            unit_price=unit_price,
-        )
     item = (
         db.query(AutoserviceWarehouseItem)
         .filter(

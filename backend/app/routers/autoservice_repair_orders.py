@@ -692,6 +692,45 @@ def _validate_autoservice_stock_item(
     return item.id
 
 
+def _apply_existing_shop_part_update(
+    db: Session,
+    part: RepairOrderShopPart,
+    item: RepairOrderShopPartIn,
+) -> None:
+    title = item.title.strip()
+    if not title:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Название запчасти исполнителя не может быть пустым",
+        )
+    brand = (item.brand or item.rossko_brand or "").strip() or None
+    partnumber = (item.partnumber or item.rossko_partnumber or "").strip() or None
+    unit = item.unit if item.unit in ("pcs", "l", "kg") else "pcs"
+    new_qty = _qty(item.qty)
+    if part.qty != new_qty and part.source == "autoservice_stock":
+        release_shop_part_reservation(db, part)
+        part.qty = new_qty
+        apply_shop_part_reservation(db, part)
+    else:
+        part.qty = new_qty
+    part.title = title[:255]
+    part.brand = brand[:120] if brand else None
+    part.partnumber = partnumber[:120] if partnumber else None
+    part.unit = unit
+    part.unit_price = _money(item.unit_price)
+    part.markup_percent = _money(item.markup_percent)
+    part.client_unit_price_override = (
+        _money(item.client_unit_price_override)
+        if item.client_unit_price_override is not None
+        else None
+    )
+    if item.source == "rossko":
+        rossko_brand = (item.rossko_brand or "").strip() or None
+        rossko_partnumber = (item.rossko_partnumber or "").strip() or None
+        part.rossko_brand = rossko_brand[:120] if rossko_brand else None
+        part.rossko_partnumber = rossko_partnumber[:120] if rossko_partnumber else None
+
+
 def _replace_shop_parts(
     db: Session,
     order: RepairOrder,
@@ -704,12 +743,12 @@ def _replace_shop_parts(
         for part in (order.shop_parts or [])
         if shop_part_is_imported(part) and part.id is not None
     }
-    existing_stock_by_id = {
+    existing_by_id = {
         part.id: part
         for part in (order.shop_parts or [])
-        if part.source == "autoservice_stock" and part.id is not None
+        if part.id is not None and not shop_part_is_imported(part)
     }
-    kept_stock_ids: set[int] = set()
+    kept_part_ids: set[int] = set()
 
     manual_items: list[RepairOrderShopPartIn] = []
     for item in items:
@@ -720,35 +759,15 @@ def _replace_shop_parts(
                 if item.client_unit_price_override is not None
                 else None
             )
-        elif (
-            item.id is not None
-            and item.id in existing_stock_by_id
-            and item.source == "autoservice_stock"
-            and item.autoservice_stock_item_id
-            == existing_stock_by_id[item.id].autoservice_stock_item_id
-        ):
-            part = existing_stock_by_id[item.id]
-            unit = item.unit if item.unit in ("pcs", "l", "kg") else "pcs"
-            new_qty = _qty(item.qty)
-            if part.qty != new_qty:
-                release_shop_part_reservation(db, part)
-                part.qty = new_qty
-                apply_shop_part_reservation(db, part)
-            part.unit = unit
-            part.unit_price = _money(item.unit_price)
-            part.markup_percent = _money(item.markup_percent)
-            part.client_unit_price_override = (
-                _money(item.client_unit_price_override)
-                if item.client_unit_price_override is not None
-                else None
-            )
-            kept_stock_ids.add(item.id)
+        elif item.id is not None and item.id in existing_by_id:
+            _apply_existing_shop_part_update(db, existing_by_id[item.id], item)
+            kept_part_ids.add(item.id)
         else:
             manual_items.append(item)
 
     removed_parts = [
         part for part in (order.shop_parts or [])
-        if not shop_part_is_imported(part) and part.id not in kept_stock_ids
+        if not shop_part_is_imported(part) and part.id not in kept_part_ids
     ]
     for part in removed_parts:
         if part.source in ("warehouse", "autoservice_stock"):
@@ -756,7 +775,7 @@ def _replace_shop_parts(
 
     order.shop_parts[:] = [
         part for part in (order.shop_parts or [])
-        if shop_part_is_imported(part) or part.id in kept_stock_ids
+        if shop_part_is_imported(part) or part.id in kept_part_ids
     ]
     db.flush()
 
