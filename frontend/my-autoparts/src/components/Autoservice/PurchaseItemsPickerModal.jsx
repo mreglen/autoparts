@@ -3,11 +3,12 @@ import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import { apiAxios } from '../../utils/apiClient';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
-import { normalizeNewPartsCustomerStatus } from '../../utils/garageOrderUi';
 import {
   groupPurchaseSelections,
   purchaseSelectionKey,
 } from '../../utils/repairOrderPurchaseDraft';
+
+const EMPTY_SELECTED_KEYS = new Set();
 
 function formatPrice(amount) {
   return `${Number(amount || 0).toLocaleString('ru-RU')} ₽`;
@@ -17,14 +18,14 @@ export default function PurchaseItemsPickerModal({
   open,
   onClose,
   onConfirm,
-  initialSelectedKeys = new Set(),
+  initialSelectedKeys = EMPTY_SELECTED_KEYS,
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [usedOrders, setUsedOrders] = useState([]);
   const [newOrders, setNewOrders] = useState([]);
   const [expandedOrderKey, setExpandedOrderKey] = useState(null);
-  const [selectedKeys, setSelectedKeys] = useState(new Set(initialSelectedKeys));
+  const [selectedKeys, setSelectedKeys] = useState(() => new Set(initialSelectedKeys));
 
   useEffect(() => {
     if (!open) return;
