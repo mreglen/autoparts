@@ -76,6 +76,7 @@ class GarageUsedOrderItem(Base):
     fulfilled_at = Column(DateTime(timezone=True), nullable=True)
 
     order = relationship("GarageUsedOrder", back_populates="items")
+    product = relationship("Product", foreign_keys=[product_id])
     stock_out = relationship(
         "StockOut",
         foreign_keys=[stock_out_id],

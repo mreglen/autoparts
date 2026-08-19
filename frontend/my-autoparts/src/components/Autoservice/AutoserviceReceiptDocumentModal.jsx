@@ -1,9 +1,17 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '../UI/Modal';
+import Button from '../UI/Button';
 import { Skeleton } from '../UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 import { SHOP_PART_UNIT_LABELS } from '../../utils/repairOrderShopPartUtils';
+
+const inlineInputClass =
+  'block w-full min-w-0 rounded-md border border-line bg-white px-2 py-1 text-xs leading-tight text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
+const inlineQtyClass =
+  'w-14 shrink-0 rounded-md border border-line bg-white px-2 py-1 text-right text-xs tabular-nums text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
+const inlineSelectClass =
+  'shrink-0 min-w-[3.5rem] rounded-md border border-line bg-white py-1 pl-2 pr-7 text-xs leading-tight text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
 
 function formatDate(value) {
   if (!value) return '—';
@@ -17,161 +25,175 @@ function formatMoneyInput(value) {
   return String(n);
 }
 
+function lineDraftFromRow(line) {
+  return {
+    brand: line.brand || '',
+    article: line.article || '',
+    name: line.name || '',
+    quantity: String(line.quantity ?? 1),
+    unit: line.unit || 'pcs',
+    unit_price: formatMoneyInput(line.unit_price),
+  };
+}
+
 function MetaItem({ label, children }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
-      <dd className="mt-1 text-sm font-medium text-gray-900">{children}</dd>
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-ink">{children}</dd>
     </div>
   );
 }
 
-function EditablePriceInput({
-  value,
-  placeholder,
+function ReceiptLineRow({
+  line,
+  isEditing,
   saving,
+  onStartEdit,
+  onCancelEdit,
   onSave,
 }) {
-  const [draft, setDraft] = useState(
-    value == null || value === '' ? '' : formatMoneyInput(value),
-  );
+  const [draft, setDraft] = useState(() => lineDraftFromRow(line));
 
   useEffect(() => {
-    setDraft(value == null || value === '' ? '' : formatMoneyInput(value));
-  }, [value]);
+    if (!isEditing) {
+      setDraft(lineDraftFromRow(line));
+    }
+  }, [isEditing, line]);
 
-  const commit = async () => {
-    const trimmed = String(draft ?? '').trim();
-    const current = value == null || value === '' ? '' : formatMoneyInput(value);
-    if (trimmed === current) return;
-    await onSave(trimmed);
+  const lineTotalPreview = useMemo(() => {
+    const price = Number(draft.unit_price);
+    const qty = Number(draft.quantity);
+    if (Number.isNaN(price) || Number.isNaN(qty)) return line.line_total;
+    return price * qty;
+  }, [draft.unit_price, draft.quantity, line.line_total]);
+
+  const qtyStep = draft.unit === 'pcs' ? '1' : '0.001';
+
+  const patchDraft = (key, value) => {
+    setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
-  return (
-    <input
-      type="number"
-      min={0}
-      step="0.01"
-      className="w-full min-w-[5.5rem] rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-right text-sm tabular-nums focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-60"
-      value={draft}
-      placeholder={placeholder}
-      disabled={saving}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => { commit().catch(() => {}); }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          e.currentTarget.blur();
-        }
-      }}
-    />
-  );
-}
-
-function EditableUnitSelect({ value, saving, onSave }) {
-  return (
-    <select
-      className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-60"
-      value={value || 'pcs'}
-      disabled={saving}
-      onChange={(e) => {
-        const next = e.target.value;
-        if (next !== (value || 'pcs')) {
-          onSave(next).catch(() => {});
-        }
-      }}
-    >
-      {Object.entries(SHOP_PART_UNIT_LABELS).map(([unit, label]) => (
-        <option key={unit} value={unit}>{label}</option>
-      ))}
-    </select>
-  );
-}
-
-function ReceiptLineRow({ line, hasClientPriceColumn, saving, onSave }) {
-  const [purchaseDraft, setPurchaseDraft] = useState(formatMoneyInput(line.unit_price));
-  const [clientDraft, setClientDraft] = useState(
-    line.client_unit_price_override == null
-      ? ''
-      : formatMoneyInput(line.client_unit_price_override),
-  );
-
-  useEffect(() => {
-    setPurchaseDraft(formatMoneyInput(line.unit_price));
-    setClientDraft(
-      line.client_unit_price_override == null
-        ? ''
-        : formatMoneyInput(line.client_unit_price_override),
-    );
-  }, [line.unit_price, line.client_unit_price_override]);
-
-  const showClientColumn = hasClientPriceColumn
-    && line.can_edit_price
-    && line.automatic_client_unit_price != null;
-  const clientPlaceholder = line.automatic_client_unit_price != null
-    ? formatMoneyInput(line.automatic_client_unit_price)
-    : '';
-
-  return (
-    <tr className="text-gray-800">
-      <td className="px-4 py-3">{line.brand || '—'}</td>
-      <td className="px-4 py-3 font-mono text-gray-600">{line.article || '—'}</td>
-      <td className="px-4 py-3">{line.name || '—'}</td>
-      <td className="px-4 py-3 text-right tabular-nums">
-        <div className="inline-flex items-center justify-end gap-2">
-          <span>{line.quantity}</span>
-          {line.can_edit_unit ? (
-            <EditableUnitSelect
-              value={line.unit || 'pcs'}
-              saving={saving}
-              onSave={async (unit) => {
-                await onSave(line, {
-                  purchaseRaw: purchaseDraft,
-                  clientRaw: clientDraft,
-                  unit,
-                });
-              }}
+  if (isEditing) {
+    return (
+      <tr className="bg-brand-50/30 text-xs text-ink-soft">
+        <td className="px-2 py-2">
+          <input
+            type="text"
+            className={inlineInputClass}
+            value={draft.brand}
+            onChange={(e) => patchDraft('brand', e.target.value)}
+            disabled={saving}
+          />
+        </td>
+        <td className="px-2 py-2">
+          <input
+            type="text"
+            className={`${inlineInputClass} font-mono`}
+            value={draft.article}
+            onChange={(e) => patchDraft('article', e.target.value)}
+            disabled={saving}
+          />
+        </td>
+        <td className="max-w-[11rem] px-2 py-2">
+          <input
+            type="text"
+            className={inlineInputClass}
+            value={draft.name}
+            onChange={(e) => patchDraft('name', e.target.value)}
+            disabled={saving}
+            required
+          />
+        </td>
+        <td className="px-2 py-2 text-right tabular-nums">
+          <div className="inline-flex items-center justify-end gap-1.5">
+            <input
+              type="number"
+              min={draft.unit === 'pcs' ? 1 : 0.001}
+              step={qtyStep}
+              className={inlineQtyClass}
+              value={draft.quantity}
+              disabled={saving}
+              onChange={(e) => patchDraft('quantity', e.target.value)}
             />
-          ) : (
-            <span className="text-gray-500">
-              {SHOP_PART_UNIT_LABELS[line.unit || 'pcs'] || line.unit || 'шт.'}
-            </span>
-          )}
-        </div>
+            <select
+              className={inlineSelectClass}
+              value={draft.unit}
+              disabled={saving}
+              onChange={(e) => patchDraft('unit', e.target.value)}
+              aria-label="Единица измерения"
+            >
+              {Object.entries(SHOP_PART_UNIT_LABELS).map(([unit, label]) => (
+                <option key={unit} value={unit}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </td>
+        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            className={`${inlineInputClass} w-20 text-right tabular-nums`}
+            value={draft.unit_price}
+            disabled={saving}
+            onChange={(e) => patchDraft('unit_price', e.target.value)}
+          />
+        </td>
+        <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums font-semibold text-ink">
+          {formatAutoserviceWarehouseMoney(lineTotalPreview)}
+        </td>
+        <td className="px-2 py-2">
+          <div className="flex justify-end gap-1.5">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={saving}
+              onClick={onCancelEdit}
+            >
+              Отмена
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              loading={saving}
+              onClick={() => onSave(draft)}
+            >
+              Сохранить
+            </Button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="text-ink-soft hover:bg-surface-muted/60">
+      <td className="px-4 py-3">{line.brand || '—'}</td>
+      <td className="px-4 py-3 font-mono text-ink-muted">{line.article || '—'}</td>
+      <td className="max-w-[14rem] px-4 py-3 text-ink">{line.name || '—'}</td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        {line.quantity}{' '}
+        <span className="text-ink-muted">
+          {SHOP_PART_UNIT_LABELS[line.unit || 'pcs'] || line.unit || 'шт.'}
+        </span>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-        {line.can_edit_price ? (
-          <EditablePriceInput
-            value={line.unit_price}
-            saving={saving}
-            onSave={async (raw) => {
-              setPurchaseDraft(raw);
-              await onSave(line, { purchaseRaw: raw, clientRaw: clientDraft });
-            }}
-          />
-        ) : (
-          formatAutoserviceWarehouseMoney(line.unit_price)
-        )}
+        {formatAutoserviceWarehouseMoney(line.unit_price)}
       </td>
-      {hasClientPriceColumn ? (
-        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
-          {showClientColumn ? (
-            <EditablePriceInput
-              value={line.client_unit_price_override}
-              placeholder={clientPlaceholder}
-              saving={saving}
-              onSave={async (raw) => {
-                setClientDraft(raw);
-                await onSave(line, { purchaseRaw: purchaseDraft, clientRaw: raw });
-              }}
-            />
-          ) : (
-            '—'
-          )}
-        </td>
-      ) : null}
-      <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums font-semibold">
+      <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums font-semibold text-ink">
         {formatAutoserviceWarehouseMoney(line.line_total)}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={onStartEdit}
+        >
+          Редактировать
+        </Button>
       </td>
     </tr>
   );
@@ -182,6 +204,7 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [savingLineId, setSavingLineId] = useState(null);
+  const [editingLineId, setEditingLineId] = useState(null);
 
   const loadDoc = useCallback(async () => {
     if (!docId) return;
@@ -201,84 +224,83 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
     loadDoc();
   }, [loadDoc]);
 
-  const saveLinePrices = useCallback(async (line, { purchaseRaw, clientRaw, unit }) => {
-    if (!docId || (!line?.can_edit_price && !line?.can_edit_unit)) return;
-    const body = {};
-    if (line.can_edit_price) {
-      const currentPurchase = formatMoneyInput(line.unit_price);
-      const purchaseTrimmed = String(purchaseRaw ?? '').trim();
-      if (purchaseTrimmed !== currentPurchase) {
-        if (!purchaseTrimmed) {
-          throw new Error('Укажите закупочную цену');
-        }
-        body.unit_price = Number(purchaseTrimmed);
-      }
-
-      const hasClientField = line.automatic_client_unit_price != null;
-      if (hasClientField) {
-        const currentClient = line.client_unit_price_override == null
-          ? ''
-          : formatMoneyInput(line.client_unit_price_override);
-        const clientTrimmed = String(clientRaw ?? '').trim();
-        if (clientTrimmed !== currentClient) {
-          if (!clientTrimmed) {
-            body.clear_client_unit_price_override = true;
-          } else {
-            body.client_unit_price_override = Number(clientTrimmed);
-          }
-        }
-      }
+  useEffect(() => {
+    if (!docId) {
+      setEditingLineId(null);
     }
+  }, [docId]);
 
-    if (unit != null && line.can_edit_unit && unit !== (line.unit || 'pcs')) {
-      body.unit = unit;
+  const saveLineEdit = useCallback(async (line, draft) => {
+    if (!docId) return;
+    const name = String(draft.name ?? '').trim();
+    if (!name) {
+      throw new Error('Укажите наименование');
     }
-
-    if (Object.keys(body).length === 0) return;
+    const priceRaw = String(draft.unit_price ?? '').trim();
+    if (!priceRaw) {
+      throw new Error('Укажите цену');
+    }
+    const qtyRaw = String(draft.quantity ?? '').trim();
+    if (!qtyRaw) {
+      throw new Error('Укажите количество');
+    }
+    const qtyNum = Number(qtyRaw);
+    if (Number.isNaN(qtyNum) || qtyNum <= 0) {
+      throw new Error('Укажите количество');
+    }
+    if ((draft.unit || 'pcs') === 'pcs' && !Number.isInteger(qtyNum)) {
+      throw new Error('Количество в штуках должно быть целым числом');
+    }
 
     setSavingLineId(line.id);
     setError('');
     try {
       const data = await apiRequest(
         `/autoservice/warehouse/receipts/${docId}/lines/${line.id}`,
-        { method: 'PATCH', body: JSON.stringify(body) },
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            brand: draft.brand ?? '',
+            article: draft.article ?? '',
+            name,
+            quantity: qtyNum,
+            unit: draft.unit || 'pcs',
+            unit_price: Number(priceRaw),
+          }),
+        },
       );
       setDoc(data);
+      setEditingLineId(null);
     } catch (err) {
-      setError(err?.message || 'Не удалось сохранить цену');
+      setError(err?.message || 'Не удалось сохранить изменения');
       throw err;
     } finally {
       setSavingLineId(null);
     }
   }, [docId]);
 
-  const hasClientPriceColumn = (doc?.lines || []).some(
-    (line) => line.can_edit_price && line.automatic_client_unit_price != null,
-  );
-
   return (
     <Modal
       open={Boolean(docId)}
       onClose={onClose}
       title={doc?.number ? `Поступление ${doc.number}` : 'Поступление'}
-      size="lg"
+      size="xl"
       closeVariant="back"
     >
       {loading ? (
-        <div className="space-y-3 py-4">
-          <Skeleton className="h-4 w-2/3" />
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-32 w-full" />
+        <div className="space-y-4 py-2">
+          <Skeleton className="h-20 w-full rounded-sg-lg" />
+          <Skeleton className="h-48 w-full rounded-sg-lg" />
         </div>
       ) : doc ? (
         <div className="space-y-5">
           {error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <div className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800">
               {error}
             </div>
           ) : null}
 
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <dl className="grid gap-4 rounded-sg-lg border border-line bg-surface-subtle/60 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3 sm:px-5">
             <MetaItem label="Номер">{doc.number}</MetaItem>
             <MetaItem label="Дата">{formatDate(doc.doc_date)}</MetaItem>
             <MetaItem label="Поставщик">{doc.supplier_name}</MetaItem>
@@ -290,48 +312,46 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
             ) : null}
           </dl>
 
-          {doc.supplier_kind === 'manual' ? (
-            <p className="text-xs text-gray-500">
-              Закупочная цена и единица измерения синхронизируются со складом и заказ-нарядом.
-              Если очистить цену для клиента, она рассчитается по закупочной с наценкой.
-            </p>
-          ) : null}
+          <p className="text-xs leading-relaxed text-ink-muted">
+            Нажмите «Редактировать» — строка станет редактируемой прямо в таблице.
+            Изменения сохранятся на складе и в заказ-нарядах.
+          </p>
 
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <div className="overflow-x-auto rounded-sg-lg border border-line bg-surface">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <thead className="bg-surface-muted text-xs font-semibold uppercase tracking-wide text-ink-muted">
                 <tr>
                   <th className="px-4 py-3">Бренд</th>
                   <th className="px-4 py-3">Артикул</th>
                   <th className="px-4 py-3">Наименование</th>
                   <th className="px-4 py-3 text-right">Кол-во / ед.</th>
-                  <th className="px-4 py-3 text-right">Закупочная</th>
-                  {hasClientPriceColumn ? (
-                    <th className="px-4 py-3 text-right">Цена клиента</th>
-                  ) : null}
+                  <th className="px-4 py-3 text-right">Цена</th>
                   <th className="px-4 py-3 text-right">Сумма</th>
+                  <th className="px-4 py-3 text-right" aria-label="Действия" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-line">
                 {(doc.lines || []).map((line) => (
                   <ReceiptLineRow
                     key={line.id}
                     line={line}
-                    hasClientPriceColumn={hasClientPriceColumn}
+                    isEditing={editingLineId === line.id}
                     saving={savingLineId === line.id}
-                    onSave={saveLinePrices}
+                    onStartEdit={() => setEditingLineId(line.id)}
+                    onCancelEdit={() => setEditingLineId(null)}
+                    onSave={(draft) => saveLineEdit(line, draft).catch(() => {})}
                   />
                 ))}
               </tbody>
-              <tfoot className="border-t border-gray-200 bg-gray-50">
+              <tfoot className="border-t border-line bg-surface-muted/60">
                 <tr>
                   <td
-                    colSpan={hasClientPriceColumn ? 6 : 5}
-                    className="px-4 py-3 text-right text-sm font-semibold text-gray-700"
+                    colSpan={6}
+                    className="px-4 py-3 text-right text-sm font-semibold text-ink-soft"
                   >
                     Итого
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold tabular-nums text-gray-900">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold tabular-nums text-ink">
                     {formatAutoserviceWarehouseMoney(doc.total_amount)}
                   </td>
                 </tr>
@@ -340,7 +360,7 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
           </div>
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800">
           {error}
         </div>
       ) : null}

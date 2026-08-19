@@ -3,12 +3,13 @@ from __future__ import annotations
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.models.garage_new_orders import GarageNewOrder, GarageNewOrderItem
-from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
-from app.models.product import Product
+from app.models.garage_used_orders import GarageUsedOrderItem
 from app.models.repair_order import RepairOrder, RepairOrderShopPart
+from app.models.user import User
+from app.utils.purchase_buyer_access import fetch_used_purchase_items_for_buyer
 from app.schemas.repair_order import RepairOrderPurchaseImportIn
 from app.services.autoservice_warehouse_service import ReceiptDocumentBatch
 from app.services.repair_order_cart_import import (
@@ -97,7 +98,7 @@ def append_purchase_items_to_repair_order(
     *,
     order: RepairOrder,
     org_id: str,
-    user_id: int,
+    user: User,
     payload: RepairOrderPurchaseImportIn,
 ) -> int:
     """Append completed purchase order lines to repair order shop parts."""
@@ -107,7 +108,7 @@ def append_purchase_items_to_repair_order(
     receipt_batch = ReceiptDocumentBatch(
         db,
         org_id=org_id,
-        user_id=user_id,
+        user_id=user.id,
         repair_order_id=order.id,
     )
 
@@ -116,7 +117,7 @@ def append_purchase_items_to_repair_order(
             db.query(GarageNewOrderItem)
             .join(GarageNewOrder, GarageNewOrderItem.order_id == GarageNewOrder.id)
             .filter(
-                GarageNewOrder.user_id == user_id,
+                GarageNewOrder.user_id == user.id,
                 GarageNewOrderItem.id.in_(payload.item_ids),
             )
             .all()
@@ -149,7 +150,7 @@ def append_purchase_items_to_repair_order(
             markup_percent = _money(payload.markup_percent)
             qty = _qty(row.quantity or 1)
 
-            stock_item, _, _ = receipt_batch.add_purchase(
+            stock_item, receipt, _ = receipt_batch.add_purchase(
                 cart_item_type="new",
                 cart_item_id=row.id,
                 brand=brand,
@@ -176,6 +177,7 @@ def append_purchase_items_to_repair_order(
                     source="autoservice_stock",
                     product_id=None,
                     autoservice_stock_item_id=stock_item.id,
+                    warehouse_receipt_id=receipt.id,
                     rossko_brand=brand[:120] or None,
                     rossko_partnumber=partnumber[:120] or None,
                     cart_item_type="new",
@@ -186,15 +188,10 @@ def append_purchase_items_to_repair_order(
             position += 1
             added += 1
     else:
-        rows = (
-            db.query(GarageUsedOrderItem)
-            .join(GarageUsedOrder, GarageUsedOrderItem.order_id == GarageUsedOrder.id)
-            .options(joinedload(GarageUsedOrderItem.product).joinedload(Product.organization))
-            .filter(
-                GarageUsedOrder.user_id == user_id,
-                GarageUsedOrderItem.id.in_(payload.item_ids),
-            )
-            .all()
+        rows = fetch_used_purchase_items_for_buyer(
+            db,
+            user=user,
+            item_ids=payload.item_ids,
         )
         found_ids = {row.id for row in rows}
         missing = set(payload.item_ids) - found_ids
@@ -244,7 +241,7 @@ def append_purchase_items_to_repair_order(
             markup_percent = _money(payload.markup_percent)
             qty = _qty(row.quantity or 1)
 
-            stock_item, _, _ = receipt_batch.add_purchase(
+            stock_item, receipt, _ = receipt_batch.add_purchase(
                 cart_item_type="used",
                 cart_item_id=row.id,
                 brand=brand,
@@ -271,6 +268,7 @@ def append_purchase_items_to_repair_order(
                     source=source,
                     product_id=product_id,
                     autoservice_stock_item_id=stock_item.id,
+                    warehouse_receipt_id=receipt.id,
                     rossko_brand=None,
                     rossko_partnumber=None,
                     cart_item_type="used",

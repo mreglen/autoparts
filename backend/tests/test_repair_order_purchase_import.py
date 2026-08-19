@@ -57,7 +57,7 @@ class AppendPurchaseItemsTests(unittest.TestCase):
                 db,
                 order=order,
                 org_id="ORG1",
-                user_id=5,
+                user=MagicMock(id=5, email=None, phone=None),
                 payload=payload,
             )
 
@@ -73,7 +73,7 @@ class AppendPurchaseItemsTests(unittest.TestCase):
                 db,
                 order=order,
                 org_id="ORG1",
-                user_id=5,
+                user=MagicMock(id=5, email=None, phone=None),
                 payload=payload,
             )
         db.delete.assert_not_called()

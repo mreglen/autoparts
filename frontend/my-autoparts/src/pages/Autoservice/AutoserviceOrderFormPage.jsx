@@ -1970,7 +1970,7 @@ export default function AutoserviceOrderFormPage() {
                               type="button"
                               className={`w-full min-w-[18rem] text-left ${pillInputSmClass} hover:bg-surface-muted/80`}
                               onClick={() => setShopPartEditIndex(index)}
-                              title="Редактировать запчасть"
+                              title="Редактировать товар"
                             >
                               {shopPartLineValue(p) || '—'}
                             </button>

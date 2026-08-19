@@ -135,58 +135,63 @@ export default function PurchasesOrdersPage() {
   }, [isReady, isAuthenticated, navigate]);
 
   const fetchAll = useCallback(async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
+    let pending = 3;
+    const finishOne = () => {
+      pending -= 1;
+      if (pending <= 0) {
+        setLoading(false);
+        setRefreshing(false);
       }
-      setError(null);
+    };
 
-      const results = await Promise.allSettled([
-        apiAxios.get('/sales/purchases/used-orders'),
-        apiAxios.get('/sales/purchases/new-orders'),
-        apiAxios.get('/sales/purchases/returns'),
-      ]);
+    apiAxios.get('/sales/purchases/used-orders')
+      .then((response) => {
+        setUsedOrders(Array.isArray(response.data) ? response.data : []);
+      })
+      .catch((err) => {
+        setError(err?.response?.data?.detail || err.message || 'Не удалось загрузить заказы');
+      })
+      .finally(finishOne);
 
-      const [usedRes, newRes, returnsRes] = results;
-
-      if (usedRes.status === 'fulfilled') {
-        setUsedOrders(Array.isArray(usedRes.value.data) ? usedRes.value.data : []);
-      } else {
-        throw usedRes.reason;
-      }
-
-      if (newRes.status === 'fulfilled') {
+    apiAxios.get('/sales/purchases/new-orders')
+      .then((response) => {
         setNewOrdersLoadFailed(false);
-        const loaded = Array.isArray(newRes.value.data) ? newRes.value.data : [];
+        const loaded = Array.isArray(response.data) ? response.data : [];
         setNewOrders(loaded);
         if (loaded.length) {
-          apiAxios
-            .post('/sales/purchases/new-orders/sync-supplier-status')
-            .then((response) => {
-              setNewOrders(Array.isArray(response.data) ? response.data : []);
-            })
-            .catch(() => {});
+          window.setTimeout(() => {
+            apiAxios
+              .post('/sales/purchases/new-orders/sync-supplier-status')
+              .then((syncResponse) => {
+                setNewOrders(Array.isArray(syncResponse.data) ? syncResponse.data : []);
+              })
+              .catch(() => {});
+          }, 300);
         }
-      } else {
+      })
+      .catch(() => {
         setNewOrders([]);
         setNewOrdersLoadFailed(true);
-      }
+      })
+      .finally(finishOne);
 
-      if (returnsRes.status === 'fulfilled') {
+    apiAxios.get('/sales/purchases/returns')
+      .then((response) => {
         const ids = new Set();
-        (returnsRes.value.data || []).forEach((r) => {
+        (response.data || []).forEach((r) => {
           if (!TERMINAL_RETURN_STATUSES.has(r.status_code)) ids.add(r.order_id);
         });
         setActiveReturnOrderIds(ids);
-      }
-    } catch (e) {
-      setError(e?.response?.data?.detail || e.message || 'Не удалось загрузить заказы');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+      })
+      .catch(() => {})
+      .finally(finishOne);
   }, []);
 
   useEffect(() => {
@@ -323,7 +328,11 @@ export default function PurchasesOrdersPage() {
   const handleAddToRepairOrder = (orderType, orderId, items) => {
     const entries = buildEntriesForOrder(orderType, orderId, items);
     const groups = groupPurchaseSelections(entries);
-    if (!groups.length) return;
+    if (!groups.length) {
+      setWarehouseMessage('Выберите хотя бы одну позицию заказа.');
+      return;
+    }
+    setWarehouseMessage('');
     setPickerGroups(groups);
     setPickerLinkedOrder(linkedRepairOrderFromItems(entries));
     setRepairPickerOpen(true);
@@ -332,21 +341,32 @@ export default function PurchasesOrdersPage() {
   const handleAddToAutoserviceWarehouse = async (orderType, orderId, items) => {
     const entries = buildEntriesForOrder(orderType, orderId, items);
     const groups = groupPurchaseSelections(entries);
-    if (!groups.length) return;
+    if (!groups.length) {
+      setWarehouseMessage('Выберите хотя бы одну позицию заказа.');
+      return;
+    }
     setWarehouseImportLoading(true);
     setWarehouseMessage('');
     try {
       const result = await importPurchaseGroupsToAutoserviceWarehouse(apiRequest, groups);
       const added = Number(result?.added_items || 0);
       const skipped = Number(result?.skipped_items || 0);
+      const notFound = Number(result?.not_found_items || 0);
       if (added > 0 && skipped > 0) {
         setWarehouseMessage(`Добавлено позиций: ${added}. Пропущено (уже на складе): ${skipped}.`);
       } else if (added > 0) {
         setWarehouseMessage(`Добавлено на склад автосервиса: ${added} поз.`);
-      } else {
+      } else if (skipped > 0) {
         setWarehouseMessage('Выбранные позиции уже были на складе автосервиса.');
+      } else if (notFound > 0) {
+        setWarehouseMessage('Не удалось найти выбранные позиции заказа.');
+      } else {
+        setWarehouseMessage('Не удалось добавить выбранные позиции на склад.');
       }
       setSelectedItemKeys(new Set());
+      if (added > 0) {
+        fetchAll(true);
+      }
     } catch (err) {
       setWarehouseMessage(err?.message || 'Не удалось добавить на склад автосервиса');
     } finally {
@@ -364,8 +384,15 @@ export default function PurchasesOrdersPage() {
     setSelectedItemKeys(new Set());
     setPickerGroups([]);
     setRepairPickerOpen(false);
+    setWarehouseMessage(
+      order?.order_number
+        ? `Позиции добавлены в заказ-наряд №${order.order_number}.`
+        : 'Позиции добавлены в заказ-наряд.',
+    );
     fetchAll(true);
   };
+
+  const showInitialSkeleton = loading && usedOrders.length === 0 && newOrders.length === 0;
 
   if (!isReady || !isAuthenticated) {
     return <AuthLoadingScreen className="min-h-[16rem]" />;
@@ -375,7 +402,7 @@ export default function PurchasesOrdersPage() {
     <div className={`${warehousePageClass} min-w-0 space-y-4`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Мои заказы</h1>
-        {loading ? <SkeletonHeaderStats /> : !error ? <OrdersHeaderStats stats={stats} formatPrice={formatPrice} /> : null}
+        {showInitialSkeleton ? <SkeletonHeaderStats /> : !error ? <OrdersHeaderStats stats={stats} formatPrice={formatPrice} /> : null}
       </div>
 
       <div className="space-y-3">
@@ -415,9 +442,9 @@ export default function PurchasesOrdersPage() {
         </div>
       </div>
 
-      {loading && <SkeletonListCards />}
+      {showInitialSkeleton && <SkeletonListCards />}
 
-      {error && !loading && (
+      {error && !showInitialSkeleton && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center">
           <p className="text-sm font-medium text-red-800">{error}</p>
           <button
@@ -430,7 +457,7 @@ export default function PurchasesOrdersPage() {
         </div>
       )}
 
-      {!loading && !error && newOrdersLoadFailed && (
+      {!showInitialSkeleton && !error && newOrdersLoadFailed && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Не удалось загрузить заказы новых запчастей. Показаны только заказы б/у — попробуйте обновить страницу.
         </div>
@@ -442,7 +469,7 @@ export default function PurchasesOrdersPage() {
         </div>
       ) : null}
 
-      {!loading && !error && (
+      {!showInitialSkeleton && !error && (
         <>
           {stats.total > 0 && filteredUnifiedOrders.length !== stats.total && (
             <p className="text-sm text-gray-500">

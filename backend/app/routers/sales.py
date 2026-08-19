@@ -52,6 +52,7 @@ from app.services.new_parts_order_enrichment import (
     persist_rossko_supplier_statuses,
     sync_active_rossko_supplier_statuses,
 )
+from app.services.new_parts_seo_card_service import seo_card_ids_for_order_items
 if TYPE_CHECKING:
     from app.services.rossko_get_orders_service import RosskoOrderSnapshot
 from app.services.rossko_status_labels import (
@@ -227,6 +228,29 @@ def _seller_user_id_for_org(db: Session, org_id: str | None) -> int | None:
     if not seller:
         seller = db.query(UserModel).filter(UserModel.organization_id == org_id).first()
     return seller.id if seller else None
+
+
+def _seller_user_ids_for_orgs(db: Session, org_ids: set[str]) -> dict[str, int | None]:
+    if not org_ids:
+        return {}
+    rows = (
+        db.query(UserModel)
+        .filter(UserModel.organization_id.in_(org_ids))
+        .all()
+    )
+    grouped: dict[str, list] = {}
+    for user in rows:
+        grouped.setdefault(user.organization_id, []).append(user)
+    result: dict[str, int | None] = {}
+    for org_id in org_ids:
+        candidates = grouped.get(org_id) or []
+        preferred = next(
+            (user for user in candidates if user.is_director or user.is_seller),
+            None,
+        )
+        chosen = preferred or (candidates[0] if candidates else None)
+        result[org_id] = chosen.id if chosen else None
+    return result
 
 
 def _buyer_autoservice_org_id(db: Session, user: UserModel) -> str | None:
@@ -1762,12 +1786,10 @@ def list_purchased_used_orders(
         org.id: org
         for org in db.query(Organization).filter(Organization.id.in_(org_ids)).all()
     } if org_ids else {}
-    seller_by_org: dict[str | None, int | None] = {}
+    seller_by_org = _seller_user_ids_for_orgs(db, org_ids)
     for order in visible_orders:
         apply_purchase_item_repair_order_links(order.items, used_links)
         org = orgs.get(order.organization_id)
-        if order.organization_id not in seller_by_org:
-            seller_by_org[order.organization_id] = _seller_user_id_for_org(db, order.organization_id)
         pickup = get_buyer_pickup_payload(order, order_kind="used")
         order_dict = {
             "id": order.id,
@@ -1819,12 +1841,12 @@ def _purchased_new_order_responses(
         org.id: org
         for org in db.query(Organization).filter(Organization.id.in_(org_ids)).all()
     } if org_ids else {}
-    seller_by_org: dict[str | None, int | None] = {}
+    seller_by_org = _seller_user_ids_for_orgs(db, org_ids)
+    all_new_items = [item for order in orders for item in (order.items or [])]
+    seo_card_by_item_id = seo_card_ids_for_order_items(db, all_new_items)
     result = []
     for order in orders:
         org_id = order.organization_id
-        if org_id not in seller_by_org:
-            seller_by_org[org_id] = _seller_user_id_for_org(db, org_id)
         org = orgs.get(org_id)
         result.append(
             build_buyer_new_parts_order_response(
@@ -1834,7 +1856,7 @@ def _purchased_new_order_responses(
                 rossko_sync_error=rossko_sync_error,
                 organization_name=org.name if org else None,
                 seller_user_id=seller_by_org.get(org_id),
-                resolve_seo_card_id=_resolve_new_part_seo_card_id,
+                seo_card_by_item_id=seo_card_by_item_id,
                 repair_order_links=new_links,
             )
         )

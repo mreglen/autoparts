@@ -198,9 +198,7 @@ export default function AutoserviceWarehouseAddModal({
     }
   };
 
-  const modalTitle = mode === 'edit'
-    ? (editScope === 'warehouse' ? 'Редактировать товар' : 'Редактировать запчасть')
-    : title;
+  const modalTitle = mode === 'edit' ? 'Редактировать товар' : title;
   const modalSubmitLabel = mode === 'edit' ? 'Сохранить' : submitLabel;
   const isWarehouseEdit = mode === 'edit' && editScope === 'warehouse';
 

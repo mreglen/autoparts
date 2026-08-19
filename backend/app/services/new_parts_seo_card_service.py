@@ -411,6 +411,71 @@ def find_active_new_part_card_by_brand_article(
     )
 
 
+def batch_lookup_active_new_part_card_ids(
+    db: Session,
+    pairs: list[tuple[str | None, str | None]],
+) -> dict[tuple[str, str], int]:
+    """Batch lookup active SEO card ids by (brand, article) pairs."""
+    keys: set[tuple[str, str]] = set()
+    for brand, article in pairs:
+        brand_text = _safe_text(brand).lower()
+        article_text = _safe_text(article).lower()
+        if brand_text and article_text:
+            keys.add((brand_text, article_text))
+    if not keys:
+        return {}
+
+    brands = {brand for brand, _ in keys}
+    articles = {article for _, article in keys}
+    rows = (
+        db.query(NewPartsSeoCard.id, NewPartsSeoCard.brand, NewPartsSeoCard.article)
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.brand).in_(brands),
+            func.lower(NewPartsSeoCard.article).in_(articles),
+        )
+        .order_by(NewPartsSeoCard.id.desc())
+        .all()
+    )
+    out: dict[tuple[str, str], int] = {}
+    for card_id, brand, article in rows:
+        key = (_safe_text(brand).lower(), _safe_text(article).lower())
+        if key in keys and key not in out:
+            out[key] = int(card_id)
+    return out
+
+
+def seo_card_ids_for_order_items(
+    db: Session,
+    items: list,
+) -> dict[int, int | None]:
+    """Map garage new order item id -> seo_card_id without per-item queries."""
+    if not items:
+        return {}
+
+    missing_pairs: list[tuple[str | None, str | None]] = []
+    for item in items:
+        stored = getattr(item, "seo_card_id", None)
+        if stored:
+            continue
+        missing_pairs.append((getattr(item, "brand", None), getattr(item, "partnumber", None)))
+
+    card_by_pair = batch_lookup_active_new_part_card_ids(db, missing_pairs)
+    out: dict[int, int | None] = {}
+    for item in items:
+        stored = getattr(item, "seo_card_id", None)
+        if stored:
+            out[int(item.id)] = int(stored)
+            continue
+        brand_text = _safe_text(getattr(item, "brand", None)).lower()
+        article_text = _safe_text(getattr(item, "partnumber", None)).lower()
+        if brand_text and article_text:
+            out[int(item.id)] = card_by_pair.get((brand_text, article_text))
+        else:
+            out[int(item.id)] = None
+    return out
+
+
 def _brand_cards_base_query(db: Session, brand: str):
     brand_text = _safe_text(brand)
     return (

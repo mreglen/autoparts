@@ -389,7 +389,7 @@ export default function AutoserviceOrdersPage() {
                 <tr
                   key={row.id}
                   className="group cursor-pointer transition-colors hover:bg-gray-50/70"
-                  onDoubleClick={(e) => {
+                  onClick={(e) => {
                     if (e.target.closest('.actions-dropdown') || e.target.closest('.status-picker')) {
                       return;
                     }

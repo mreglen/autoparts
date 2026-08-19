@@ -1261,7 +1261,7 @@ def import_repair_order_purchase_items(
         db,
         order=row,
         org_id=org_id,
-        user_id=current_user.id,
+        user=current_user,
         payload=payload,
     )
     db.commit()

@@ -55,6 +55,15 @@ class AutoserviceWarehouseReceiptLinePriceUpdate(BaseModel):
     unit: Optional[Literal["pcs", "l", "kg"]] = None
 
 
+class AutoserviceWarehouseReceiptLineUpdate(BaseModel):
+    brand: str = Field("", max_length=120)
+    article: str = Field("", max_length=120)
+    name: str = Field(min_length=1, max_length=255)
+    quantity: Decimal = Field(gt=0)
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+    unit_price: Decimal = Field(ge=0)
+
+
 class AutoserviceWarehouseReceiptDocListView(BaseModel):
     id: int
     number: str
@@ -131,6 +140,7 @@ class AutoserviceWarehouseManualReceiptIn(BaseModel):
 class AutoserviceWarehouseImportResult(BaseModel):
     added_items: int
     skipped_items: int
+    not_found_items: int = 0
 
 
 class AutoserviceWarehouseReceiptSuggestView(BaseModel):

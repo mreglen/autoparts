@@ -207,7 +207,8 @@ def merge_buyer_items_with_rossko(
     order: GarageNewOrder,
     snapshot: RosskoOrderSnapshot | None,
     *,
-    resolve_seo_card_id: Callable[[Session, GarageNewOrderItem], int | None],
+    resolve_seo_card_id: Callable[[Session, GarageNewOrderItem], int | None] | None = None,
+    seo_card_by_item_id: dict[int, int | None] | None = None,
     repair_order_links: dict[int, dict] | None = None,
 ) -> list[PurchasedNewOrderItemResponse]:
     rossko_by_key = _rossko_lines_by_key(snapshot)
@@ -216,6 +217,13 @@ def merge_buyer_items_with_rossko(
         line = rossko_by_key.get(item_match_key(item.brand, item.partnumber))
         status_code = _display_status_from_rossko_line(item.status_code, line)
         link = (repair_order_links or {}).get(item.id) or {}
+        if seo_card_by_item_id is not None:
+            seo_card_id = seo_card_by_item_id.get(int(item.id))
+        elif resolve_seo_card_id is not None:
+            seo_card_id = resolve_seo_card_id(db, item)
+        else:
+            stored = getattr(item, "seo_card_id", None)
+            seo_card_id = int(stored) if stored else None
         merged.append(
             PurchasedNewOrderItemResponse(
                 id=item.id,
@@ -225,7 +233,7 @@ def merge_buyer_items_with_rossko(
                 quantity=int(item.quantity),
                 price=float(item.price),
                 status_code=status_code,
-                seo_card_id=resolve_seo_card_id(db, item),
+                seo_card_id=seo_card_id,
                 repair_order_id=link.get("id"),
                 repair_order_number=link.get("order_number"),
             )
@@ -283,7 +291,8 @@ def build_buyer_new_parts_order_response(
     rossko_sync_error: str | None = None,
     organization_name: str | None = None,
     seller_user_id: int | None = None,
-    resolve_seo_card_id: Callable[[Session, GarageNewOrderItem], int | None],
+    resolve_seo_card_id: Callable[[Session, GarageNewOrderItem], int | None] | None = None,
+    seo_card_by_item_id: dict[int, int | None] | None = None,
     repair_order_links: dict[int, dict] | None = None,
 ) -> PurchasedNewOrderResponse:
     rossko_id = order.rossko_order_id
@@ -293,6 +302,7 @@ def build_buyer_new_parts_order_response(
         order,
         snapshot,
         resolve_seo_card_id=resolve_seo_card_id,
+        seo_card_by_item_id=seo_card_by_item_id,
         repair_order_links=repair_order_links,
     )
 

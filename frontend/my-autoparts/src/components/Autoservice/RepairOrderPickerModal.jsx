@@ -107,7 +107,7 @@ export default function RepairOrderPickerModal({
       return;
     }
     if (purchaseItemsAlreadyOnRepairOrder(groups, orderId)) {
-      onClose();
+      setError('Выбранные позиции уже добавлены в этот заказ-наряд.');
       return;
     }
     setImportingId(orderId);

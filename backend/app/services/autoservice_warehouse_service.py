@@ -19,7 +19,9 @@ from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
 from app.models.organization import Organization
 from app.models.product import Product
 from app.models.repair_order import RepairOrder, RepairOrderShopPart
+from app.models.user import User
 from app.schemas.autoservice_warehouse import PurchaseWarehouseImportGroup
+from app.utils.purchase_buyer_access import fetch_used_purchase_items_for_buyer
 
 SupplierKind = Literal["manual", "my_parts", "purchase_new", "purchase_used"]
 
@@ -617,12 +619,13 @@ def import_purchase_groups_to_warehouse(
     db: Session,
     *,
     org_id: str,
-    user_id: int,
+    user: User,
     groups: list[PurchaseWarehouseImportGroup],
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     added = 0
     skipped = 0
-    batch = ReceiptDocumentBatch(db, org_id=org_id, user_id=user_id)
+    not_found = 0
+    batch = ReceiptDocumentBatch(db, org_id=org_id, user_id=user.id)
 
     for group in groups:
         if group.order_type == "new":
@@ -630,11 +633,12 @@ def import_purchase_groups_to_warehouse(
                 db.query(GarageNewOrderItem)
                 .join(GarageNewOrder, GarageNewOrderItem.order_id == GarageNewOrder.id)
                 .filter(
-                    GarageNewOrder.user_id == user_id,
+                    GarageNewOrder.user_id == user.id,
                     GarageNewOrderItem.id.in_(group.item_ids),
                 )
                 .all()
             )
+            not_found += len(set(group.item_ids) - {row.id for row in rows})
             for row in rows:
                 brand = _normalize_brand(row.brand)
                 article = _normalize_article(row.partnumber)
@@ -657,16 +661,12 @@ def import_purchase_groups_to_warehouse(
                 else:
                     skipped += 1
         else:
-            rows = (
-                db.query(GarageUsedOrderItem)
-                .join(GarageUsedOrder, GarageUsedOrderItem.order_id == GarageUsedOrder.id)
-                .options(joinedload(GarageUsedOrderItem.product))
-                .filter(
-                    GarageUsedOrder.user_id == user_id,
-                    GarageUsedOrderItem.id.in_(group.item_ids),
-                )
-                .all()
+            rows = fetch_used_purchase_items_for_buyer(
+                db,
+                user=user,
+                item_ids=group.item_ids,
             )
+            not_found += len(set(group.item_ids) - {row.id for row in rows})
             for row in rows:
                 product = row.product
                 brand = _normalize_brand(row.brand or (product.brand if product else ""))
@@ -701,7 +701,7 @@ def import_purchase_groups_to_warehouse(
                     skipped += 1
 
     batch.flush()
-    return added, skipped
+    return added, skipped, not_found
 
 
 def consume_reserved_autoservice_stock(
@@ -1002,6 +1002,167 @@ def update_manual_receipt_line_prices(
             )
         for part in _shop_parts_for_manual_receipt_line(db, receipt):
             part.unit = unit
+
+    db.flush()
+    return receipt
+
+
+def _shop_parts_for_item(db: Session, item_id: int) -> list[RepairOrderShopPart]:
+    return (
+        db.query(RepairOrderShopPart)
+        .filter(RepairOrderShopPart.autoservice_stock_item_id == item_id)
+        .all()
+    )
+
+
+def _shop_parts_for_receipt_line(
+    db: Session,
+    receipt: AutoserviceWarehouseReceipt,
+) -> list[RepairOrderShopPart]:
+    by_receipt = (
+        db.query(RepairOrderShopPart)
+        .filter(RepairOrderShopPart.warehouse_receipt_id == receipt.id)
+        .all()
+    )
+    if by_receipt:
+        return by_receipt
+    if receipt.cart_item_type and receipt.cart_item_id is not None:
+        linked = (
+            db.query(RepairOrderShopPart)
+            .filter(
+                RepairOrderShopPart.cart_item_type == receipt.cart_item_type,
+                RepairOrderShopPart.cart_item_id == receipt.cart_item_id,
+            )
+            .all()
+        )
+        if linked:
+            return linked
+    if receipt.repair_order_id and receipt.item_id:
+        return (
+            db.query(RepairOrderShopPart)
+            .filter(
+                RepairOrderShopPart.order_id == receipt.repair_order_id,
+                RepairOrderShopPart.autoservice_stock_item_id == receipt.item_id,
+            )
+            .all()
+        )
+    return _shop_parts_for_item(db, receipt.item_id)
+
+
+def update_receipt_line_details(
+    db: Session,
+    *,
+    org_id: str,
+    doc_id: int,
+    line_id: int,
+    brand: str,
+    article: str,
+    name: str,
+    quantity: Decimal,
+    unit: str,
+    unit_price: Decimal,
+) -> AutoserviceWarehouseReceipt:
+    from app.services.repair_order_stock_reserve import (
+        apply_shop_part_reservation,
+        release_shop_part_reservation,
+    )
+
+    doc = (
+        db.query(AutoserviceWarehouseReceiptDoc)
+        .filter(
+            AutoserviceWarehouseReceiptDoc.id == doc_id,
+            AutoserviceWarehouseReceiptDoc.organization_id == org_id,
+        )
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Документ поступления не найден")
+
+    receipt = (
+        db.query(AutoserviceWarehouseReceipt)
+        .options(joinedload(AutoserviceWarehouseReceipt.item))
+        .filter(
+            AutoserviceWarehouseReceipt.id == line_id,
+            AutoserviceWarehouseReceipt.document_id == doc_id,
+            AutoserviceWarehouseReceipt.organization_id == org_id,
+        )
+        .first()
+    )
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Строка поступления не найдена")
+
+    item = receipt.item
+    if not item:
+        raise HTTPException(status_code=404, detail="Позиция склада не найдена")
+
+    name_norm = (name or "").strip()[:255]
+    if not name_norm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите наименование",
+        )
+
+    unit_norm = unit if unit in ("pcs", "l", "kg") else "pcs"
+    brand_norm = _normalize_brand(brand)
+    article_norm = _normalize_article(article)
+    price = _money(unit_price)
+    qty_saved, qty_int = _shop_part_qty_values(quantity, unit_norm)
+    old_receipt_qty = int(receipt.quantity or 0)
+    qty_delta = qty_int - old_receipt_qty
+    new_item_qty = int(item.quantity or 0) + qty_delta
+    if new_item_qty < int(item.reserved_qty or 0):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя уменьшить количество ниже зарезервированного остатка",
+        )
+    if new_item_qty < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Недостаточно остатка на складе",
+        )
+
+    if article_norm and (
+        brand_norm != item.brand or article_norm != item.article
+    ):
+        conflict = (
+            db.query(AutoserviceWarehouseItem)
+            .filter(
+                AutoserviceWarehouseItem.organization_id == org_id,
+                AutoserviceWarehouseItem.brand == brand_norm,
+                AutoserviceWarehouseItem.article == article_norm,
+                AutoserviceWarehouseItem.id != item.id,
+            )
+            .first()
+        )
+        if conflict:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="На складе уже есть товар с таким брендом и артикулом",
+            )
+
+    item.brand = brand_norm
+    item.article = article_norm
+    item.name = name_norm
+    item.unit = unit_norm
+    item.unit_price = price
+    item.quantity = new_item_qty
+
+    receipt.quantity = qty_int
+    receipt.unit_price = price
+
+    linked_parts = _shop_parts_for_receipt_line(db, receipt)
+    for part in linked_parts:
+        if part.source in ("warehouse", "autoservice_stock"):
+            release_shop_part_reservation(db, part)
+        part.qty = qty_saved
+        part.title = name_norm
+        part.brand = brand_norm or None
+        part.partnumber = article_norm or None
+        part.unit = unit_norm
+        part.unit_price = price
+        part.warehouse_receipt_id = receipt.id
+        if part.source in ("warehouse", "autoservice_stock"):
+            apply_shop_part_reservation(db, part)
 
     db.flush()
     return receipt

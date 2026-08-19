@@ -289,7 +289,7 @@ export default function AutoserviceWarehousePage() {
                   <tr
                     key={item.id}
                     className="cursor-pointer text-gray-800 hover:bg-gray-50"
-                    onDoubleClick={() => setDetailsItem(item)}
+                    onClick={() => setDetailsItem(item)}
                   >
                     <td className="px-4 py-3 font-medium">{item.brand || '—'}</td>
                     <td className="px-4 py-3 font-mono text-gray-600">{item.article || '—'}</td>
@@ -300,7 +300,7 @@ export default function AutoserviceWarehousePage() {
                     <td className="px-4 py-3 text-right tabular-nums font-semibold">
                       {formatAutoserviceWarehouseMoney(displayPrice)}
                     </td>
-                    <td className="px-4 py-3 text-right" onDoubleClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <ActionsDropdown
                         showLabel
                         label="Действия"
