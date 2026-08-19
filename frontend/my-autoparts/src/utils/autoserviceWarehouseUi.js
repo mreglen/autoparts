@@ -25,9 +25,22 @@ export function autoserviceWarehouseClientPrice(unitPrice, markupPercent) {
   return priceWithMarkup(unitPrice, markupPercent);
 }
 
+export function autoserviceWarehouseItemLabel(item) {
+  const name = item?.name || 'Запчасть';
+  const parts = [item?.brand, item?.article, name].filter(Boolean);
+  const base = parts.join(' · ') || name;
+  if (!item?.brand && !item?.article && item?.id != null) {
+    return `${base} · №${item.id}`;
+  }
+  return base;
+}
+
 export function matchesAutoserviceWarehouseSearch(item, query) {
   const q = (query || '').trim().toLowerCase();
   if (!q) return true;
-  return [item.brand, item.article, item.name]
-    .some((value) => String(value || '').toLowerCase().includes(q));
+  const fields = [item.brand, item.article, item.name];
+  if (!item.brand && !item.article && item.id != null) {
+    fields.push(String(item.id));
+  }
+  return fields.some((value) => String(value || '').toLowerCase().includes(q));
 }

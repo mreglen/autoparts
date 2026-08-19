@@ -1,5 +1,6 @@
 """Idempotent schema patches for columns added after initial deploy."""
 import logging
+import uuid
 
 from sqlalchemy import inspect, text
 
@@ -5646,6 +5647,99 @@ def ensure_autoservice_warehouse_return_tables() -> None:
                     )
                 )
     logger.info("Ensured autoservice warehouse return tables")
+
+
+def ensure_autoservice_warehouse_item_internal_key() -> None:
+    """Add internal_key and allow multiple items without brand and article."""
+    inspector = inspect(engine)
+    if "autoservice_warehouse_items" not in inspector.get_table_names():
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    columns = {
+        col["name"] for col in inspector.get_columns("autoservice_warehouse_items")
+    }
+
+    with engine.begin() as conn:
+        if "internal_key" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE autoservice_warehouse_items "
+                    "ADD COLUMN internal_key VARCHAR(36)"
+                )
+            )
+
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text("SELECT id FROM autoservice_warehouse_items WHERE internal_key IS NULL")
+        ).fetchall()
+        for (row_id,) in rows:
+            conn.execute(
+                text(
+                    "UPDATE autoservice_warehouse_items "
+                    "SET internal_key = :internal_key "
+                    "WHERE id = :item_id"
+                ),
+                {"internal_key": str(uuid.uuid4()), "item_id": row_id},
+            )
+
+    with engine.begin() as conn:
+        if is_pg:
+            conn.execute(
+                text(
+                    "ALTER TABLE autoservice_warehouse_items "
+                    "ALTER COLUMN internal_key SET NOT NULL"
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    "UPDATE autoservice_warehouse_items "
+                    "SET internal_key = :fallback "
+                    "WHERE internal_key IS NULL"
+                ),
+                {"fallback": str(uuid.uuid4())},
+            )
+
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_autoservice_wh_item_internal_key "
+                "ON autoservice_warehouse_items (internal_key)"
+            )
+        )
+
+        if is_pg:
+            conn.execute(
+                text(
+                    "ALTER TABLE autoservice_warehouse_items "
+                    "DROP CONSTRAINT IF EXISTS uq_autoservice_wh_item_org_brand_article"
+                )
+            )
+        conn.execute(
+            text(
+                "DROP INDEX IF EXISTS uq_autoservice_wh_item_org_brand_article"
+            )
+        )
+        if is_pg:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_autoservice_wh_item_org_brand_article_nonempty "
+                    "ON autoservice_warehouse_items (organization_id, brand, article) "
+                    "WHERE NOT (brand = '' AND article = '')"
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_autoservice_wh_item_org_brand_article_nonempty "
+                    "ON autoservice_warehouse_items (organization_id, brand, article) "
+                    "WHERE NOT (brand = '' AND article = '')"
+                )
+            )
+
+    logger.info("Ensured autoservice warehouse item internal_key patch")
 
 
 def ensure_autoservice_document_buyers_table() -> None:

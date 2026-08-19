@@ -4,8 +4,11 @@ import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
+import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
+import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
+import { Skeleton, UnderlineTabs } from '../../components/UI';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import AutoserviceWarehouseReturnModal from '../../components/Autoservice/AutoserviceWarehouseReturnModal';
@@ -15,20 +18,127 @@ import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import {
   autoserviceWarehouseClientPrice,
+  autoserviceWarehouseItemLabel,
   formatAutoserviceWarehouseMoney,
   formatAutoserviceWarehouseQty,
   matchesAutoserviceWarehouseSearch,
 } from '../../utils/autoserviceWarehouseUi';
 import {
-  warehousePageClass,
-  warehousePillControlClass,
-  warehousePrimaryButtonClass,
+  autoserviceListActionsButtonClass,
+  autoserviceListErrorClass,
+  autoserviceListHeaderSubtitleClass,
+  autoserviceListHeaderTitleClass,
+  autoserviceListMobileWrapClass,
+  autoserviceListPageClass,
+  autoserviceListPrimaryButtonClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdActionsClass,
+  autoserviceListTdClass,
+  autoserviceListTdRightClass,
+  autoserviceListThActionsClass,
+  autoserviceListThClass,
+  autoserviceListThRightClass,
+  autoserviceListTheadRowClass,
+  autoserviceListTrClass,
+  autoserviceListTrClickableClass,
   warehouseSecondaryButtonClass,
-  warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
 
-function itemLabel(item) {
-  return [item?.brand, item?.article, item?.name].filter(Boolean).join(' · ') || 'Запчасть';
+function WarehouseItemActionsMenu({
+  canAct,
+  onEdit,
+  onAddToOrder,
+  onWriteOff,
+  showLabel = true,
+}) {
+  return (
+    <ActionsDropdown
+      menuClassName="w-56 z-50"
+      estimatedMenuHeight={160}
+      showLabel={showLabel}
+      buttonClassName={autoserviceListActionsButtonClass}
+    >
+      <ActionsDropdownItem onClick={onEdit}>Редактировать</ActionsDropdownItem>
+      <ActionsDropdownItem disabled={!canAct} onClick={onAddToOrder}>
+        Добавить в заказ-наряд
+      </ActionsDropdownItem>
+      <ActionsDropdownItem disabled={!canAct} onClick={onWriteOff}>
+        Списать
+      </ActionsDropdownItem>
+    </ActionsDropdown>
+  );
+}
+
+function WarehouseItemMobileCard({
+  item,
+  displayPrice,
+  canAct,
+  onOpen,
+  onEdit,
+  onAddToOrder,
+  onWriteOff,
+}) {
+  return (
+    <div className="border-b border-gray-100 py-3 last:border-b-0">
+      <div className="flex items-start justify-between gap-2">
+        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+          <p className="font-medium text-gray-900">{item.name || '—'}</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {[item.brand, item.article].filter(Boolean).join(' · ') || `№${item.id}`}
+          </p>
+          <p className="mt-1 text-sm text-gray-600">
+            {formatAutoserviceWarehouseQty(item)}
+            {' · '}
+            {formatAutoserviceWarehouseMoney(displayPrice)}
+          </p>
+        </button>
+        <div className="shrink-0" onClick={(event) => event.stopPropagation()}>
+          <WarehouseItemActionsMenu
+            canAct={canAct}
+            showLabel={false}
+            onEdit={onEdit}
+            onAddToOrder={onAddToOrder}
+            onWriteOff={onWriteOff}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PurchaseLotMobileCard({ lot, onReturn }) {
+  return (
+    <div className="border-b border-gray-100 py-3 last:border-b-0">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-gray-900">{lot.name}</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
+          </p>
+          <p className="mt-1 text-sm text-gray-600">
+            {lot.supplier_name}
+            {lot.source_order_id ? ` · Заказ №${lot.source_order_id}` : ''}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Поступило {lot.quantity} · Доступно к возврату {lot.max_returnable_qty}
+          </p>
+        </div>
+        <div className="shrink-0">
+          {lot.active_return ? (
+            <span className="text-xs font-medium text-indigo-700">
+              №{lot.active_return.id}
+            </span>
+          ) : (
+            <Button type="button" variant="secondary" size="sm" onClick={onReturn}>
+              Вернуть
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AutoserviceWarehousePage() {
@@ -219,6 +329,11 @@ export default function AutoserviceWarehousePage() {
     await loadItems();
   };
 
+  const listCount = activeTab === 'purchases' ? filteredLots.length : filteredItems.length;
+  const listCountLabel = activeTab === 'purchases'
+    ? `${listCount} партий`
+    : `${listCount} позиций`;
+
   if (!isReady) {
     return <AuthLoadingScreen />;
   }
@@ -228,11 +343,13 @@ export default function AutoserviceWarehousePage() {
   }
 
   return (
-    <div className={warehousePageClass}>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className={autoserviceListPageClass}>
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Склад автосервиса</h1>
-          <p className="mt-1 text-sm text-gray-500">Остатки запчастей автосервиса</p>
+          <h1 className={autoserviceListHeaderTitleClass}>Склад автосервиса</h1>
+          <p className={autoserviceListHeaderSubtitleClass}>
+            {loading ? 'Загрузка…' : listCountLabel}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -241,195 +358,268 @@ export default function AutoserviceWarehousePage() {
               setError('');
               setAddOpen(true);
             }}
-            className={warehousePrimaryButtonClass}
+            className={autoserviceListPrimaryButtonClass}
           >
             Добавить
           </button>
-          <button
-            type="button"
-            onClick={loadItems}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Обновить
-          </button>
         </div>
       </div>
 
-      <div className="mb-4 flex gap-2 rounded-full bg-gray-100 p-1 sm:w-fit">
-        <button
-          type="button"
-          onClick={() => setActiveTab('all')}
-          className={`rounded-full px-4 py-2 text-sm font-medium ${
-            activeTab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
-          }`}
-        >
-          Все товары
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('purchases')}
-          className={`rounded-full px-4 py-2 text-sm font-medium ${
-            activeTab === 'purchases' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
-          }`}
-        >
-          Из закупок
-        </button>
-      </div>
+      <UnderlineTabs
+        className="mb-4"
+        ariaLabel="Разделы склада автосервиса"
+        gapClassName="gap-4"
+        tabs={[
+          { id: 'all', label: 'Все товары' },
+          { id: 'purchases', label: 'Из закупок' },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
-      <div className={`${warehouseToolbarClass} mb-4`}>
-        <input
-          type="search"
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <AutoserviceLiveSearchField
           value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Поиск по бренду, артикулу, названию"
-          className={`${warehousePillControlClass} sm:max-w-md`}
+          onChange={setSearchQuery}
+          placeholder={
+            activeTab === 'purchases'
+              ? 'Поиск по товару, поставщику или заказу'
+              : 'Поиск по бренду, артикулу, названию'
+          }
+          ariaLabel="Поиск по складу автосервиса"
         />
+        <AutoserviceListRefreshButton loading={loading} onClick={loadItems} />
       </div>
 
       {error ? (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p className={autoserviceListErrorClass} role="alert">
           {error}
-        </div>
+        </p>
       ) : null}
 
-      {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500">
-          Загрузка…
-        </div>
-      ) : activeTab === 'purchases' ? (
-        filteredLots.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
-            <p className="text-sm text-gray-600">На складе нет партий из оформленных заказов</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-4 py-3">Товар</th>
-                  <th className="px-4 py-3">Поставщик</th>
-                  <th className="px-4 py-3">Заказ</th>
-                  <th className="px-4 py-3 text-right">Поступило</th>
-                  <th className="px-4 py-3 text-right">Резерв</th>
-                  <th className="px-4 py-3 text-right">Доступно к возврату</th>
-                  <th className="px-4 py-3 text-right">Действие</th>
+      {activeTab === 'purchases' ? (
+        <>
+          <div className={autoserviceListTableWrapClass}>
+            <table className={autoserviceListTableClass}>
+              <thead>
+                <tr className={autoserviceListTheadRowClass}>
+                  <th className={autoserviceListThClass}>Товар</th>
+                  <th className={autoserviceListThClass}>Поставщик</th>
+                  <th className={`w-24 ${autoserviceListThClass}`}>Заказ</th>
+                  <th className={autoserviceListThRightClass}>Поступило</th>
+                  <th className={autoserviceListThRightClass}>Резерв</th>
+                  <th className={autoserviceListThRightClass}>К возврату</th>
+                  <th className={autoserviceListThActionsClass}>Действие</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredLots.map((lot) => (
-                  <tr key={lot.receipt_id} className="text-gray-800">
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{lot.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">{lot.supplier_name}</td>
-                    <td className="px-4 py-3">№ {lot.source_order_id}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{lot.quantity}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {lot.item_reserved_qty || 0}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {lot.max_returnable_qty}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {lot.active_return ? (
-                        <span className="text-xs font-medium text-indigo-700">
-                          Заявка №{lot.active_return.id} · {lot.active_return.status_code}
-                        </span>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setReturnLot(lot)}
-                        >
-                          Вернуть
-                        </Button>
-                      )}
+              <tbody className={autoserviceListTbodyClass}>
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, index) => (
+                    <tr key={`sk-lot-${index}`}>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-28" /></td>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
+                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
+                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
+                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
+                      <td className={autoserviceListTdActionsClass}><Skeleton className="ml-auto h-8 w-16 rounded-lg" /></td>
+                    </tr>
+                  ))
+                ) : filteredLots.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-gray-500">
+                      На складе нет партий из оформленных заказов
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredLots.map((lot) => (
+                    <tr key={lot.receipt_id} className={autoserviceListTrClass}>
+                      <td className={autoserviceListTdClass}>
+                        <p className="font-medium text-gray-900">{lot.name}</p>
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
+                        </p>
+                      </td>
+                      <td className={autoserviceListTdClass}>{lot.supplier_name}</td>
+                      <td className={autoserviceListTdClass}>№ {lot.source_order_id}</td>
+                      <td className={`${autoserviceListTdRightClass} tabular-nums`}>{lot.quantity}</td>
+                      <td className={`${autoserviceListTdRightClass} tabular-nums`}>
+                        {lot.item_reserved_qty || 0}
+                      </td>
+                      <td className={`${autoserviceListTdRightClass} tabular-nums`}>
+                        {lot.max_returnable_qty}
+                      </td>
+                      <td className={autoserviceListTdActionsClass}>
+                        {lot.active_return ? (
+                          <span className="text-xs font-medium text-indigo-700">
+                            Заявка №{lot.active_return.id} · {lot.active_return.status_code}
+                          </span>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setReturnLot(lot)}
+                          >
+                            Вернуть
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
-        )
-      ) : filteredItems.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
-          <p className="text-sm text-gray-600">На складе автосервиса пока нет позиций</p>
-        </div>
+
+          <div className={autoserviceListMobileWrapClass}>
+            {loading ? (
+              <div className="divide-y divide-gray-100">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={`msk-lot-${index}`} className="py-3">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="mt-2 h-3 w-40" />
+                  </div>
+                ))}
+              </div>
+            ) : filteredLots.length === 0 ? (
+              <p className="py-10 text-center text-sm text-gray-500">
+                На складе нет партий из оформленных заказов
+              </p>
+            ) : (
+              filteredLots.map((lot) => (
+                <PurchaseLotMobileCard
+                  key={lot.receipt_id}
+                  lot={lot}
+                  onReturn={() => setReturnLot(lot)}
+                />
+              ))
+            )}
+          </div>
+        </>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-4 py-3">Бренд</th>
-                <th className="px-4 py-3">Артикул</th>
-                <th className="px-4 py-3">Наименование</th>
-                <th className="px-4 py-3 text-right">Кол-во</th>
-                <th className="px-4 py-3 text-right">
-                  <span className="inline-flex items-center justify-end gap-1.5">
-                    {clientMarkupEnabled ? <ClientMarkupPopover /> : null}
-                    <span>Цена</span>
-                  </span>
-                </th>
-                <th className="px-4 py-3 text-right">Действия</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredItems.map((item) => {
+        <>
+          <div className={autoserviceListTableWrapClass}>
+            <table className={autoserviceListTableClass}>
+              <thead>
+                <tr className={autoserviceListTheadRowClass}>
+                  <th className={`w-24 ${autoserviceListThClass}`}>Бренд</th>
+                  <th className={`w-28 ${autoserviceListThClass}`}>Артикул</th>
+                  <th className={autoserviceListThClass}>Наименование</th>
+                  <th className={autoserviceListThRightClass}>Кол-во</th>
+                  <th className={autoserviceListThRightClass}>
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      {clientMarkupEnabled ? <ClientMarkupPopover /> : null}
+                      <span>Цена</span>
+                    </span>
+                  </th>
+                  <th className={autoserviceListThActionsClass}>Действия</th>
+                </tr>
+              </thead>
+              <tbody className={autoserviceListTbodyClass}>
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, index) => (
+                    <tr key={`sk-item-${index}`}>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
+                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-12" /></td>
+                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
+                      <td className={autoserviceListTdActionsClass}><Skeleton className="ml-auto h-8 w-20 rounded-lg" /></td>
+                    </tr>
+                  ))
+                ) : filteredItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-gray-500">
+                      На складе автосервиса пока нет позиций
+                    </td>
+                  </tr>
+                ) : (
+                  filteredItems.map((item) => {
+                    const displayPrice = autoserviceWarehouseClientPrice(
+                      item.unit_price,
+                      catalogMarkupPercent,
+                    );
+                    const canAct = Number(item.available_qty) > 0;
+                    return (
+                      <tr
+                        key={item.id}
+                        className={autoserviceListTrClickableClass}
+                        onClick={(event) => {
+                          if (event.target.closest('.actions-dropdown')) return;
+                          setDetailsItem(item);
+                        }}
+                      >
+                        <td className={`${autoserviceListTdClass} font-medium`}>{item.brand || '—'}</td>
+                        <td className={`${autoserviceListTdClass} font-mono text-gray-600`}>{item.article || '—'}</td>
+                        <td className={autoserviceListTdClass}>
+                          <div className="font-medium text-gray-900">{item.name || '—'}</div>
+                          {!item.brand && !item.article ? (
+                            <div className="mt-0.5 text-xs text-gray-400">№{item.id}</div>
+                          ) : null}
+                        </td>
+                        <td className={`${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
+                          {formatAutoserviceWarehouseQty(item)}
+                        </td>
+                        <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                          {formatAutoserviceWarehouseMoney(displayPrice)}
+                        </td>
+                        <td className={autoserviceListTdActionsClass}>
+                          <WarehouseItemActionsMenu
+                            canAct={canAct}
+                            onEdit={() => openEditItem(item)}
+                            onAddToOrder={() => openAddToOrder(item)}
+                            onWriteOff={() => openWriteOff(item)}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className={autoserviceListMobileWrapClass}>
+            {loading ? (
+              <div className="divide-y divide-gray-100">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={`msk-item-${index}`} className="flex items-start justify-between gap-3 py-3">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                    <Skeleton className="h-8 w-8 rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <p className="py-10 text-center text-sm text-gray-500">
+                На складе автосервиса пока нет позиций
+              </p>
+            ) : (
+              filteredItems.map((item) => {
                 const displayPrice = autoserviceWarehouseClientPrice(
                   item.unit_price,
                   catalogMarkupPercent,
                 );
                 const canAct = Number(item.available_qty) > 0;
                 return (
-                  <tr
+                  <WarehouseItemMobileCard
                     key={item.id}
-                    className="cursor-pointer text-gray-800 hover:bg-gray-50"
-                    onClick={() => setDetailsItem(item)}
-                  >
-                    <td className="px-4 py-3 font-medium">{item.brand || '—'}</td>
-                    <td className="px-4 py-3 font-mono text-gray-600">{item.article || '—'}</td>
-                    <td className="px-4 py-3">{item.name || '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
-                      {formatAutoserviceWarehouseQty(item)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                      {formatAutoserviceWarehouseMoney(displayPrice)}
-                    </td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <ActionsDropdown
-                        showLabel
-                        label="Действия"
-                        menuClassName="w-56 z-50"
-                        estimatedMenuHeight={160}
-                        buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                      >
-                        <ActionsDropdownItem onClick={() => openEditItem(item)}>
-                          Редактировать
-                        </ActionsDropdownItem>
-                        <ActionsDropdownItem
-                          disabled={!canAct}
-                          onClick={() => openAddToOrder(item)}
-                        >
-                          Добавить в заказ-наряд
-                        </ActionsDropdownItem>
-                        <ActionsDropdownItem
-                          disabled={!canAct}
-                          onClick={() => openWriteOff(item)}
-                        >
-                          Списать
-                        </ActionsDropdownItem>
-                      </ActionsDropdown>
-                    </td>
-                  </tr>
+                    item={item}
+                    displayPrice={displayPrice}
+                    canAct={canAct}
+                    onOpen={() => setDetailsItem(item)}
+                    onEdit={() => openEditItem(item)}
+                    onAddToOrder={() => openAddToOrder(item)}
+                    onWriteOff={() => openWriteOff(item)}
+                  />
                 );
-              })}
-            </tbody>
-          </table>
-        </div>
+              })
+            )}
+          </div>
+        </>
       )}
 
       <AutoserviceWarehouseReturnModal
@@ -442,7 +632,7 @@ export default function AutoserviceWarehousePage() {
       <Modal
         open={Boolean(detailsItem)}
         onClose={() => setDetailsItem(null)}
-        title={detailsItem ? itemLabel(detailsItem) : 'Позиция склада'}
+        title={detailsItem ? autoserviceWarehouseItemLabel(detailsItem) : 'Позиция склада'}
       >
         {detailsItem ? (
           <div className="space-y-4">
@@ -494,7 +684,7 @@ export default function AutoserviceWarehousePage() {
       >
         {writeOffItem ? (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">{itemLabel(writeOffItem)}</p>
+            <p className="text-sm text-gray-700">{autoserviceWarehouseItemLabel(writeOffItem)}</p>
             <label className="block text-sm">
               <span className="font-medium text-gray-700">Количество</span>
               <input
@@ -525,7 +715,7 @@ export default function AutoserviceWarehousePage() {
               </button>
               <button
                 type="button"
-                className={warehousePrimaryButtonClass}
+                className={autoserviceListPrimaryButtonClass}
                 disabled={submitting}
                 onClick={handleWriteOff}
               >
@@ -543,7 +733,7 @@ export default function AutoserviceWarehousePage() {
       >
         {orderQtyItem ? (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">{itemLabel(orderQtyItem)}</p>
+            <p className="text-sm text-gray-700">{autoserviceWarehouseItemLabel(orderQtyItem)}</p>
             <label className="block text-sm">
               <span className="font-medium text-gray-700">Количество</span>
               <input
@@ -562,7 +752,7 @@ export default function AutoserviceWarehousePage() {
               <button type="button" className={warehouseSecondaryButtonClass} onClick={() => setOrderQtyItem(null)}>
                 Отмена
               </button>
-              <button type="button" className={warehousePrimaryButtonClass} onClick={confirmOrderQty}>
+              <button type="button" className={autoserviceListPrimaryButtonClass} onClick={confirmOrderQty}>
                 Выбрать заказ-наряд
               </button>
             </div>

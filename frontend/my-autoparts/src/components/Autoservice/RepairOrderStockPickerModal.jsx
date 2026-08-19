@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
-import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
+import { formatAutoserviceWarehouseMoney, autoserviceWarehouseItemLabel } from '../../utils/autoserviceWarehouseUi';
 import { warehousePrimaryButtonClass, warehouseSecondaryButtonClass } from '../../utils/warehouseListUi';
 
 export default function RepairOrderStockPickerModal({
@@ -91,9 +91,7 @@ export default function RepairOrderStockPickerModal({
             <div className="px-4 py-8 text-center text-sm text-gray-500">Позиции не найдены</div>
           ) : (
             items.map((item) => {
-              const label = [item.brand, item.article || item.internal_code, item.title || item.name]
-                .filter(Boolean)
-                .join(' · ');
+              const label = autoserviceWarehouseItemLabel(item);
               const available = item.available_qty ?? item.quantity ?? 0;
               return (
                 <button

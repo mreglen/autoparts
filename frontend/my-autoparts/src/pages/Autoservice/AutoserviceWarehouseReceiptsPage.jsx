@@ -1,19 +1,53 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
+import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
+import { Skeleton } from '../../components/UI';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 import AutoserviceReceiptDocumentModal from '../../components/Autoservice/AutoserviceReceiptDocumentModal';
 import {
-  warehousePageClass,
-  warehousePillControlClass,
-  warehouseToolbarClass,
+  autoserviceListErrorClass,
+  autoserviceListHeaderSubtitleClass,
+  autoserviceListHeaderTitleClass,
+  autoserviceListMobileWrapClass,
+  autoserviceListPageClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListTdRightClass,
+  autoserviceListThClass,
+  autoserviceListThRightClass,
+  autoserviceListTheadRowClass,
+  autoserviceListTrClickableClass,
 } from '../../utils/warehouseListUi';
 
 function formatDate(value) {
   if (!value) return '—';
   return new Date(value).toLocaleDateString('ru-RU');
+}
+
+function ReceiptMobileCard({ row, onOpen }) {
+  return (
+    <div className="border-b border-gray-100 py-3 last:border-b-0">
+      <button type="button" onClick={onOpen} className="w-full text-left">
+        <div className="flex items-start justify-between gap-2">
+          <span className="font-semibold text-indigo-700">{row.number}</span>
+          <span className="shrink-0 tabular-nums font-semibold text-gray-900">
+            {formatAutoserviceWarehouseMoney(row.total_amount)}
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-gray-600">
+          {formatDate(row.doc_date)}
+          {' · '}
+          {row.supplier_name}
+        </p>
+      </button>
+    </div>
+  );
 }
 
 export default function AutoserviceWarehouseReceiptsPage() {
@@ -54,75 +88,98 @@ export default function AutoserviceWarehouseReceiptsPage() {
   if (!isAuthenticated || !userHasAutoserviceOrganization(user)) return null;
 
   return (
-    <div className={warehousePageClass}>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className={autoserviceListPageClass}>
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Поступления</h1>
-          <p className="mt-1 text-sm text-gray-500">Документы поступления на склад автосервиса</p>
+          <h1 className={autoserviceListHeaderTitleClass}>Поступления</h1>
+          <p className={autoserviceListHeaderSubtitleClass}>
+            {loading ? 'Загрузка…' : `${filteredRows.length} документов`}
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={loadRows}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Обновить
-        </button>
       </div>
 
-      <div className={`${warehouseToolbarClass} mb-4`}>
-        <input
-          type="search"
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <AutoserviceLiveSearchField
           value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
+          onChange={setSearchQuery}
           placeholder="Поиск по номеру или поставщику"
-          className={`${warehousePillControlClass} sm:max-w-md`}
+          ariaLabel="Поиск поступлений"
         />
+        <AutoserviceListRefreshButton loading={loading} onClick={loadRows} />
       </div>
 
       {error ? (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p className={autoserviceListErrorClass} role="alert">
           {error}
-        </div>
+        </p>
       ) : null}
 
-      {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500">
-          Загрузка…
-        </div>
-      ) : filteredRows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
-          <p className="text-sm text-gray-600">Поступлений пока нет</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <div className={autoserviceListTableWrapClass}>
+        <table className={autoserviceListTableClass}>
+          <thead>
+            <tr className={autoserviceListTheadRowClass}>
+              <th className={`w-32 ${autoserviceListThClass}`}>Номер</th>
+              <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
+              <th className={autoserviceListThClass}>Поставщик</th>
+              <th className={autoserviceListThRightClass}>Сумма</th>
+            </tr>
+          </thead>
+          <tbody className={autoserviceListTbodyClass}>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, index) => (
+                <tr key={`sk-${index}`}>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-40" /></td>
+                  <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-20" /></td>
+                </tr>
+              ))
+            ) : filteredRows.length === 0 ? (
               <tr>
-                <th className="px-4 py-3">Номер</th>
-                <th className="px-4 py-3">Дата</th>
-                <th className="px-4 py-3">Поставщик</th>
-                <th className="px-4 py-3 text-right">Сумма</th>
+                <td colSpan={4} className="py-12 text-center text-gray-500">
+                  Поступлений пока нет
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredRows.map((row) => (
+            ) : (
+              filteredRows.map((row) => (
                 <tr
                   key={row.id}
-                  className="cursor-pointer text-gray-800 hover:bg-gray-50"
+                  className={autoserviceListTrClickableClass}
                   onClick={() => setSelectedDocId(row.id)}
                 >
-                  <td className="px-4 py-3 font-medium text-indigo-700">{row.number}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{formatDate(row.doc_date)}</td>
-                  <td className="px-4 py-3">{row.supplier_name}</td>
-                  <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                  <td className={autoserviceListTdClass}>
+                    <span className="font-semibold text-indigo-700">{row.number}</span>
+                  </td>
+                  <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.doc_date)}</td>
+                  <td className={autoserviceListTdClass}>{row.supplier_name}</td>
+                  <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                     {formatAutoserviceWarehouseMoney(row.total_amount)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className={autoserviceListMobileWrapClass}>
+        {loading ? (
+          <div className="divide-y divide-gray-100">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={`msk-${index}`} className="py-3">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="mt-2 h-4 w-40" />
+              </div>
+            ))}
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-500">Поступлений пока нет</p>
+        ) : (
+          filteredRows.map((row) => (
+            <ReceiptMobileCard key={row.id} row={row} onOpen={() => setSelectedDocId(row.id)} />
+          ))
+        )}
+      </div>
 
       <AutoserviceReceiptDocumentModal
         docId={selectedDocId}

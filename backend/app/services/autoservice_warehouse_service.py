@@ -40,11 +40,6 @@ def _normalize_article(value: str | None) -> str:
 
 
 def _warehouse_item_identity_conflict_message(*, brand: str, article: str) -> str:
-    if not brand and not article:
-        return (
-            "На складе уже есть товар без бренда и артикула. "
-            "Укажите уникальный артикул или бренд."
-        )
     return "На складе уже есть товар с таким брендом и артикулом"
 
 
@@ -56,6 +51,8 @@ def _ensure_unique_warehouse_item_identity(
     brand: str,
     article: str,
 ) -> None:
+    if not brand and not article:
+        return
     conflict = (
         db.query(AutoserviceWarehouseItem)
         .filter(
@@ -112,6 +109,15 @@ def _get_or_create_item(
 ) -> AutoserviceWarehouseItem:
     brand_norm = _normalize_brand(brand)
     article_norm = _normalize_article(article)
+    if not brand_norm and not article_norm:
+        return _create_item(
+            db,
+            org_id=org_id,
+            brand=brand_norm,
+            article=article_norm,
+            name=name,
+            unit_price=unit_price,
+        )
     item = (
         db.query(AutoserviceWarehouseItem)
         .filter(

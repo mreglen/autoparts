@@ -1,19 +1,57 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
+import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
+import { Skeleton } from '../../components/UI';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 import {
-  warehousePageClass,
-  warehousePillControlClass,
-  warehouseSecondaryButtonClass,
-  warehouseToolbarClass,
+  autoserviceListErrorClass,
+  autoserviceListHeaderSubtitleClass,
+  autoserviceListHeaderTitleClass,
+  autoserviceListMobileWrapClass,
+  autoserviceListPageClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListTdRightClass,
+  autoserviceListThClass,
+  autoserviceListThRightClass,
+  autoserviceListTheadRowClass,
+  autoserviceListTrClass,
 } from '../../utils/warehouseListUi';
 
 function formatDate(value) {
   if (!value) return '—';
   return new Date(value).toLocaleDateString('ru-RU');
+}
+
+function ExpenseMobileCard({ row }) {
+  return (
+    <div className="border-b border-gray-100 py-3 last:border-b-0">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-gray-900">{row.name || '—'}</p>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {[row.brand, row.article].filter(Boolean).join(' · ') || '—'}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {formatDate(row.created_at)}
+            {row.reason ? ` · ${row.reason}` : ''}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="tabular-nums text-sm font-semibold text-gray-900">{row.quantity} шт.</p>
+          <p className="mt-0.5 tabular-nums text-xs text-gray-600">
+            {formatAutoserviceWarehouseMoney(row.unit_price)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AutoserviceWarehouseExpensesPage() {
@@ -53,73 +91,99 @@ export default function AutoserviceWarehouseExpensesPage() {
   if (!isAuthenticated || !userHasAutoserviceOrganization(user)) return null;
 
   return (
-    <div className={warehousePageClass}>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className={autoserviceListPageClass}>
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Расходы</h1>
-          <p className="mt-1 text-sm text-gray-500">Списания со склада автосервиса</p>
+          <h1 className={autoserviceListHeaderTitleClass}>Расходы</h1>
+          <p className={autoserviceListHeaderSubtitleClass}>
+            {loading ? 'Загрузка…' : `${filteredRows.length} списаний`}
+          </p>
         </div>
-        <button type="button" onClick={loadData} className={warehouseSecondaryButtonClass}>
-          Обновить
-        </button>
       </div>
 
-      <div className={`${warehouseToolbarClass} mb-4`}>
-        <input
-          type="search"
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <AutoserviceLiveSearchField
           value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Поиск"
-          className={`${warehousePillControlClass} sm:max-w-md`}
+          onChange={setSearchQuery}
+          placeholder="Поиск по товару или причине"
+          ariaLabel="Поиск расходов"
         />
+        <AutoserviceListRefreshButton loading={loading} onClick={loadData} />
       </div>
 
       {error ? (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p className={autoserviceListErrorClass} role="alert">
           {error}
-        </div>
+        </p>
       ) : null}
 
-      {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500">
-          Загрузка…
-        </div>
-      ) : filteredRows.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
-          <p className="text-sm text-gray-600">Расходов пока нет</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <div className={autoserviceListTableWrapClass}>
+        <table className={autoserviceListTableClass}>
+          <thead>
+            <tr className={autoserviceListTheadRowClass}>
+              <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
+              <th className={`w-24 ${autoserviceListThClass}`}>Бренд</th>
+              <th className={`w-28 ${autoserviceListThClass}`}>Артикул</th>
+              <th className={autoserviceListThClass}>Наименование</th>
+              <th className={autoserviceListThRightClass}>Кол-во</th>
+              <th className={autoserviceListThRightClass}>Цена</th>
+              <th className={autoserviceListThClass}>Причина</th>
+            </tr>
+          </thead>
+          <tbody className={autoserviceListTbodyClass}>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, index) => (
+                <tr key={`sk-${index}`}>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
+                  <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-12" /></td>
+                  <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-28" /></td>
+                </tr>
+              ))
+            ) : filteredRows.length === 0 ? (
               <tr>
-                <th className="px-4 py-3">Дата</th>
-                <th className="px-4 py-3">Бренд</th>
-                <th className="px-4 py-3">Артикул</th>
-                <th className="px-4 py-3">Наименование</th>
-                <th className="px-4 py-3 text-right">Кол-во</th>
-                <th className="px-4 py-3 text-right">Цена</th>
-                <th className="px-4 py-3">Причина</th>
+                <td colSpan={7} className="py-12 text-center text-gray-500">
+                  Расходов пока нет
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredRows.map((row) => (
-                <tr key={row.id} className="text-gray-800">
-                  <td className="px-4 py-3 whitespace-nowrap">{formatDate(row.created_at)}</td>
-                  <td className="px-4 py-3 font-medium">{row.brand || '—'}</td>
-                  <td className="px-4 py-3 font-mono text-gray-600">{row.article || '—'}</td>
-                  <td className="px-4 py-3">{row.name || '—'}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{row.quantity} шт.</td>
-                  <td className="px-4 py-3 text-right tabular-nums font-semibold">
+            ) : (
+              filteredRows.map((row) => (
+                <tr key={row.id} className={autoserviceListTrClass}>
+                  <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.created_at)}</td>
+                  <td className={`${autoserviceListTdClass} font-medium`}>{row.brand || '—'}</td>
+                  <td className={`${autoserviceListTdClass} font-mono text-gray-600`}>{row.article || '—'}</td>
+                  <td className={autoserviceListTdClass}>{row.name || '—'}</td>
+                  <td className={`${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
+                  <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                     {formatAutoserviceWarehouseMoney(row.unit_price)}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{row.reason || '—'}</td>
+                  <td className={`${autoserviceListTdClass} text-gray-600`}>{row.reason || '—'}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className={autoserviceListMobileWrapClass}>
+        {loading ? (
+          <div className="divide-y divide-gray-100">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={`msk-${index}`} className="py-3">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="mt-2 h-3 w-24" />
+              </div>
+            ))}
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-500">Расходов пока нет</p>
+        ) : (
+          filteredRows.map((row) => <ExpenseMobileCard key={row.id} row={row} />)
+        )}
+      </div>
     </div>
   );
 }

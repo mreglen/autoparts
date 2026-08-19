@@ -1,7 +1,13 @@
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+import uuid
+
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import relationship
 
 from ..db.database import Base
+
+
+def _new_warehouse_item_internal_key() -> str:
+    return str(uuid.uuid4())
 
 
 class AutoserviceWarehouseReceiptDoc(Base):
@@ -44,15 +50,25 @@ class AutoserviceWarehouseReceiptDoc(Base):
 class AutoserviceWarehouseItem(Base):
     __tablename__ = "autoservice_warehouse_items"
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_autoservice_wh_item_org_brand_article_nonempty",
             "organization_id",
             "brand",
             "article",
-            name="uq_autoservice_wh_item_org_brand_article",
+            unique=True,
+            postgresql_where=text("NOT (brand = '' AND article = '')"),
+            sqlite_where=text("NOT (brand = '' AND article = '')"),
         ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
+    internal_key = Column(
+        String(36),
+        nullable=False,
+        unique=True,
+        index=True,
+        default=_new_warehouse_item_internal_key,
+    )
     organization_id = Column(String, ForeignKey("organizations.id"), nullable=False, index=True)
     brand = Column(String(120), nullable=False, default="")
     article = Column(String(120), nullable=False, default="")
