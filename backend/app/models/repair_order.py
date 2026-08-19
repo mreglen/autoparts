@@ -75,6 +75,11 @@ class RepairOrder(Base):
         index=True,
     )
     status = Column(String(32), nullable=False, default="accepted")
+    status_pending_at = Column(DateTime, nullable=True)
+    status_in_progress_at = Column(DateTime, nullable=True)
+    status_done_at = Column(DateTime, nullable=True)
+    status_completed_at = Column(DateTime, nullable=True)
+    status_cancelled_at = Column(DateTime, nullable=True)
     work_zone_id = Column(
         Integer,
         ForeignKey("autoservice_work_zones.id", ondelete="SET NULL"),

@@ -60,6 +60,7 @@ from app.db.schema_patches import (
     ensure_product_reserved_qty_column,
     ensure_repair_order_shop_parts_autoservice_stock,
     ensure_repair_order_shop_parts_warehouse_receipt_id,
+    ensure_repair_order_status_timestamps,
     ensure_autoservice_warehouse_items_unit,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
@@ -269,6 +270,7 @@ try:
     ensure_product_reserved_qty_column()
     ensure_repair_order_shop_parts_autoservice_stock()
     ensure_repair_order_shop_parts_warehouse_receipt_id()
+    ensure_repair_order_status_timestamps()
     ensure_autoservice_warehouse_items_unit()
     ensure_event_log_audit_columns()
     ensure_user_public_code()

@@ -77,6 +77,7 @@ from app.services.repair_order_purchase_import import (
     detach_imported_shop_part_from_repair_order,
     shop_part_is_imported,
 )
+from app.services.repair_order_status_timestamps import record_repair_order_status_timestamp
 from app.services.repair_order_stock_reserve import (
     append_autoservice_stock_to_repair_order,
     apply_shop_part_reservation,
@@ -1170,6 +1171,7 @@ def create_repair_order(
         accepted_by_user_id=current_user.id,
         status="pending",
     )
+    record_repair_order_status_timestamp(row, "pending")
     row.assignees = assignees
     db.add(row)
     db.flush()
@@ -1362,6 +1364,8 @@ def patch_repair_order_status(
         ensure_order_fully_paid(db, row, _order_grand_total(row))
     if payload.status == "cancelled" and prev_status not in ("cancelled", "completed"):
         release_order_reservations(db, row)
+    if prev_status != payload.status:
+        record_repair_order_status_timestamp(row, payload.status)
     row.status = payload.status
     if prev_status == "completed" and payload.status != "completed":
         clear_order_accruals(db, row.id)

@@ -5335,6 +5335,44 @@ def ensure_repair_order_shop_parts_warehouse_receipt_id() -> None:
     logger.info("Applied repair_order_shop_parts.warehouse_receipt_id patch")
 
 
+def ensure_repair_order_status_timestamps() -> None:
+    """Add per-status timestamp columns on repair_orders."""
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+    ts_type = "TIMESTAMPTZ" if engine.dialect.name == "postgresql" else "DATETIME"
+    new_columns = (
+        "status_pending_at",
+        "status_in_progress_at",
+        "status_done_at",
+        "status_completed_at",
+        "status_cancelled_at",
+    )
+    statements = [
+        f"ALTER TABLE repair_orders ADD COLUMN {name} {ts_type}"
+        for name in new_columns
+        if name not in columns
+    ]
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        if "status_pending_at" not in columns:
+            conn.execute(
+                text(
+                    "UPDATE repair_orders "
+                    "SET status_pending_at = created_at "
+                    "WHERE status_pending_at IS NULL"
+                )
+            )
+
+    logger.info("Applied repair_orders status timestamp columns patch")
+
+
 def ensure_autoservice_warehouse_items_unit() -> None:
     """Add unit column to autoservice warehouse items."""
     inspector = inspect(engine)
