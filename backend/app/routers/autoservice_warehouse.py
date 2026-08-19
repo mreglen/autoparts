@@ -46,6 +46,7 @@ from app.services.autoservice_warehouse_service import (
     update_receipt_line_details,
 )
 from app.utils.autoservice_access import require_autoservice_staff
+from app.utils.autoservice_warehouse_supplier import resolve_autoservice_supplier_display_name
 from app.services.autoservice_warehouse_return_service import (
     create_warehouse_return,
     list_purchase_lots,
@@ -148,13 +149,18 @@ def _doc_total(doc: AutoserviceWarehouseReceiptDoc) -> Decimal:
     return _money(total)
 
 
-def _doc_list_view(doc: AutoserviceWarehouseReceiptDoc) -> AutoserviceWarehouseReceiptDocListView:
+def _doc_list_view(db: Session, doc: AutoserviceWarehouseReceiptDoc) -> AutoserviceWarehouseReceiptDocListView:
     return AutoserviceWarehouseReceiptDocListView(
         id=doc.id,
         number=doc.number,
         doc_date=doc.doc_date,
         supplier_kind=doc.supplier_kind,
-        supplier_name=doc.supplier_name,
+        supplier_name=resolve_autoservice_supplier_display_name(
+            db,
+            supplier_name=doc.supplier_name,
+            source_order_type=doc.source_order_type,
+            source_order_id=doc.source_order_id,
+        ),
         total_amount=_doc_total(doc),
         lines_count=len(doc.lines or []),
         repair_order_id=doc.repair_order_id,
@@ -171,7 +177,12 @@ def _doc_detail_view(db: Session, doc: AutoserviceWarehouseReceiptDoc) -> Autose
         number=doc.number,
         doc_date=doc.doc_date,
         supplier_kind=doc.supplier_kind,
-        supplier_name=doc.supplier_name,
+        supplier_name=resolve_autoservice_supplier_display_name(
+            db,
+            supplier_name=doc.supplier_name,
+            source_order_type=doc.source_order_type,
+            source_order_id=doc.source_order_id,
+        ),
         total_amount=_doc_total(doc),
         lines_count=len(lines),
         repair_order_id=doc.repair_order_id,
@@ -346,7 +357,7 @@ def list_autoservice_warehouse_receipts(
         .limit(500)
         .all()
     )
-    return [_doc_list_view(row) for row in rows]
+    return [_doc_list_view(db, row) for row in rows]
 
 
 @router.get(

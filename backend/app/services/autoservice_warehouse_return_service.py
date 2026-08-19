@@ -18,6 +18,7 @@ from app.models.autoservice_warehouse import (
 from app.models.garage_new_orders import GarageNewOrder
 from app.models.garage_used_orders import GarageUsedOrder
 from app.models.user import User
+from app.utils.autoservice_warehouse_supplier import resolve_autoservice_supplier_display_name
 
 ACTIVE_RETURN_STATUSES = frozenset({"requested", "reviewing", "approved", "sent"})
 RETURN_TRANSITIONS = {
@@ -188,7 +189,12 @@ def list_purchase_lots(db: Session, *, org_id: str) -> list[dict]:
                 "source_order_id": int(source_order_id),
                 "cart_item_type": receipt.cart_item_type,
                 "cart_item_id": int(receipt.cart_item_id),
-                "supplier_name": doc.supplier_name,
+                "supplier_name": resolve_autoservice_supplier_display_name(
+                    db,
+                    supplier_name=doc.supplier_name,
+                    source_order_type=source_type,
+                    source_order_id=int(source_order_id),
+                ),
                 "provider_kind": provider_kind,
                 "brand": item.brand or "",
                 "article": item.article or "",

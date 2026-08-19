@@ -86,12 +86,6 @@ function Search() {
 
     if (isOnUsedAutoparts || (!showNewAutoparts && location.pathname.startsWith('/autoparts'))) {
       debouncedUsedLiveSearch(value);
-      return;
-    }
-
-    const trimmedValue = value.trim();
-    if (trimmedValue && !location.pathname.startsWith('/autoparts')) {
-      navigate(`${autopartsSearchPath}?q=${encodeURIComponent(trimmedValue)}`);
     }
   };
 

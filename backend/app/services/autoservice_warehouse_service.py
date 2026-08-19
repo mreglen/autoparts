@@ -23,6 +23,11 @@ from app.models.repair_order import RepairOrder, RepairOrderShopPart
 from app.models.user import User
 from app.schemas.autoservice_warehouse import PurchaseWarehouseImportGroup
 from app.utils.purchase_buyer_access import fetch_used_purchase_items_for_buyer
+from app.utils.autoservice_warehouse_supplier import (
+    ROSSKO_SUPPLIER_LABEL,
+    is_admin_marketplace_rossko_new_order,
+    resolve_autoservice_supplier_display_name,
+)
 
 SupplierKind = Literal["manual", "my_parts", "purchase_new", "purchase_used"]
 
@@ -193,6 +198,12 @@ def _purchase_supplier_meta(
         order = db.query(GarageNewOrder).filter(GarageNewOrder.id == source_order_id).first()
         if not order:
             return "purchase_new", "Поставщик"
+        if is_admin_marketplace_rossko_new_order(
+            db,
+            source_order_type="new",
+            source_order_id=source_order_id,
+        ):
+            return "purchase_new", ROSSKO_SUPPLIER_LABEL
         seller = (order.seller or "").strip()
         if seller:
             return "purchase_new", seller[:255]

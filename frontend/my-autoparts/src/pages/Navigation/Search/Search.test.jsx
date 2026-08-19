@@ -1,6 +1,6 @@
 import React from 'react';
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import RosskoReducer from '../../../redux/slices/RosskoSlice';
@@ -8,6 +8,12 @@ import RosskoReducer from '../../../redux/slices/RosskoSlice';
 const mockNavigate = jest.fn();
 let mockPathname = '/autoparts/used';
 let mockSearchParams = new URLSearchParams('q=bmw');
+
+jest.mock('../../../utils/apiClient', () => ({
+  apiAxios: {
+    post: jest.fn(() => Promise.resolve({ data: { parts: [] } })),
+  },
+}));
 
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
@@ -85,6 +91,25 @@ describe('Search clear button', () => {
     renderSearch();
     fireEvent.click(screen.getByLabelText('Распознать VIN'));
     expect(screen.getByText('VIN scan modal')).toBeInTheDocument();
+  });
+
+  it('does not navigate while typing outside autoparts catalog', () => {
+    mockPathname = '/';
+    mockSearchParams = new URLSearchParams('');
+    renderSearch();
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'mann' } });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('navigates to catalog only after explicit search submit', async () => {
+    mockPathname = '/';
+    mockSearchParams = new URLSearchParams('');
+    renderSearch();
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'mann' } });
+    fireEvent.click(screen.getByLabelText('Искать'));
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/autoparts/new?q=mann');
+    });
   });
 
   it('navigates to VIN catalog after scan confirm', () => {
