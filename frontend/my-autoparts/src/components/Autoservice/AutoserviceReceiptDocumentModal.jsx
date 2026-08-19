@@ -312,11 +312,6 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
             ) : null}
           </dl>
 
-          <p className="text-xs leading-relaxed text-ink-muted">
-            Нажмите «Редактировать» — строка станет редактируемой прямо в таблице.
-            Изменения сохранятся на складе и в заказ-нарядах.
-          </p>
-
           <div className="overflow-x-auto rounded-sg-lg border border-line bg-surface">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-surface-muted text-xs font-semibold uppercase tracking-wide text-ink-muted">
