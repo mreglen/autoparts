@@ -5533,6 +5533,121 @@ def ensure_autoservice_warehouse_receipt_docs_backfill() -> None:
         db.close()
 
 
+def ensure_autoservice_warehouse_return_tables() -> None:
+    """Add receipt-level return tracking and internal return requests."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "autoservice_warehouse_items" not in tables:
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    ts_type = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    now_sql = "NOW()" if is_pg else "CURRENT_TIMESTAMP"
+
+    item_columns = {
+        col["name"] for col in inspector.get_columns("autoservice_warehouse_items")
+    }
+    receipt_columns = {
+        col["name"] for col in inspector.get_columns("autoservice_warehouse_receipts")
+    }
+    with engine.begin() as conn:
+        if "return_reserved_qty" not in item_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE autoservice_warehouse_items "
+                    "ADD COLUMN return_reserved_qty INTEGER NOT NULL DEFAULT 0"
+                )
+            )
+        if "return_reserved_qty" not in receipt_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE autoservice_warehouse_receipts "
+                    "ADD COLUMN return_reserved_qty INTEGER NOT NULL DEFAULT 0"
+                )
+            )
+        if "returned_qty" not in receipt_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE autoservice_warehouse_receipts "
+                    "ADD COLUMN returned_qty INTEGER NOT NULL DEFAULT 0"
+                )
+            )
+
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "autoservice_warehouse_return_requests" not in tables:
+        ddl = f"""
+            CREATE TABLE autoservice_warehouse_return_requests (
+                id {pk},
+                organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+                supplier_organization_id VARCHAR REFERENCES organizations(id),
+                receipt_id INTEGER NOT NULL
+                    REFERENCES autoservice_warehouse_receipts(id) ON DELETE RESTRICT,
+                item_id INTEGER NOT NULL
+                    REFERENCES autoservice_warehouse_items(id) ON DELETE RESTRICT,
+                source_order_type VARCHAR(8) NOT NULL,
+                source_order_id INTEGER NOT NULL,
+                cart_item_type VARCHAR(16) NOT NULL,
+                cart_item_id INTEGER NOT NULL,
+                provider_kind VARCHAR(24) NOT NULL,
+                processing_mode VARCHAR(16) NOT NULL DEFAULT 'manual',
+                supplier_name VARCHAR(255) NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                reason VARCHAR(50) NOT NULL,
+                comment TEXT,
+                photo_urls_json TEXT,
+                status_code VARCHAR(32) NOT NULL DEFAULT 'requested',
+                seller_note TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at {ts_type} NOT NULL DEFAULT {now_sql},
+                updated_at {ts_type} NOT NULL DEFAULT {now_sql},
+                status_changed_at {ts_type} NOT NULL DEFAULT {now_sql}
+            )
+        """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+
+    with engine.begin() as conn:
+        for stmt in (
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_returns_org "
+            "ON autoservice_warehouse_return_requests (organization_id)",
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_returns_supplier_org "
+            "ON autoservice_warehouse_return_requests (supplier_organization_id)",
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_returns_receipt "
+            "ON autoservice_warehouse_return_requests (receipt_id)",
+            "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_returns_status "
+            "ON autoservice_warehouse_return_requests (status_code)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_autoservice_wh_returns_active_receipt "
+            "ON autoservice_warehouse_return_requests (receipt_id) "
+            "WHERE status_code IN ('requested','reviewing','approved','sent')",
+        ):
+            conn.execute(text(stmt))
+
+    inspector = inspect(engine)
+    if "autoservice_warehouse_expenses" in inspector.get_table_names():
+        expense_columns = {
+            col["name"] for col in inspector.get_columns("autoservice_warehouse_expenses")
+        }
+        if "return_request_id" not in expense_columns:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE autoservice_warehouse_expenses "
+                        "ADD COLUMN return_request_id INTEGER "
+                        "REFERENCES autoservice_warehouse_return_requests(id) ON DELETE SET NULL"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_expenses_return "
+                        "ON autoservice_warehouse_expenses (return_request_id)"
+                    )
+                )
+    logger.info("Ensured autoservice warehouse return tables")
+
+
 def ensure_autoservice_document_buyers_table() -> None:
     """Buyers (counterparties) for UPD and other closing documents."""
     inspector = inspect(engine)

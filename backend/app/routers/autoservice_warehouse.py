@@ -29,6 +29,10 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseReceiptLineUpdate,
     AutoserviceWarehouseReceiptSuggestView,
     AutoserviceWarehouseReceiptView,
+    AutoserviceWarehousePurchaseLotView,
+    AutoserviceWarehouseReturnCreate,
+    AutoserviceWarehouseReturnStatusUpdate,
+    AutoserviceWarehouseReturnView,
     PurchaseWarehouseImportIn,
 )
 from app.services.autoservice_warehouse_service import (
@@ -42,6 +46,15 @@ from app.services.autoservice_warehouse_service import (
     update_receipt_line_details,
 )
 from app.utils.autoservice_access import require_autoservice_staff
+from app.services.autoservice_warehouse_return_service import (
+    create_warehouse_return,
+    list_purchase_lots,
+    list_warehouse_returns,
+    serialize_warehouse_return,
+    update_warehouse_return_status,
+)
+from app.services.notification_service import notify_return_request_seller
+from app.services.order_return_service import RETURN_REASON_LABELS
 
 router = APIRouter(tags=["Autoservice Warehouse"])
 
@@ -70,6 +83,7 @@ def _item_view(item: AutoserviceWarehouseItem) -> AutoserviceWarehouseItemView:
         name=item.name,
         quantity=int(item.quantity or 0),
         reserved_qty=int(item.reserved_qty or 0),
+        return_reserved_qty=int(getattr(item, "return_reserved_qty", 0) or 0),
         available_qty=autoservice_item_available_qty(item),
         unit=unit,
         unit_price=item.unit_price,
@@ -114,6 +128,8 @@ def _receipt_line_view(
         article=(item.article if item else None) or "",
         name=(item.name if item else None) or "",
         quantity=qty,
+        return_reserved_qty=int(getattr(row, "return_reserved_qty", 0) or 0),
+        returned_qty=int(getattr(row, "returned_qty", 0) or 0),
         unit_price=unit_price,
         line_total=_money(unit_price * qty),
         cart_item_type=row.cart_item_type,
@@ -164,6 +180,91 @@ def _doc_detail_view(db: Session, doc: AutoserviceWarehouseReceiptDoc) -> Autose
         created_at=doc.created_at,
         lines=lines,
     )
+
+
+@router.get(
+    "/autoservice/warehouse/purchase-lots",
+    response_model=list[AutoserviceWarehousePurchaseLotView],
+)
+def list_autoservice_warehouse_purchase_lots(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    return list_purchase_lots(db, org_id=org_id)
+
+
+@router.post(
+    "/autoservice/warehouse/returns",
+    response_model=AutoserviceWarehouseReturnView,
+    status_code=201,
+)
+def create_autoservice_warehouse_return(
+    payload: AutoserviceWarehouseReturnCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    row = create_warehouse_return(
+        db,
+        org_id=org_id,
+        user=current_user,
+        receipt_id=payload.receipt_id,
+        quantity=payload.quantity,
+        reason=payload.reason,
+        comment=payload.comment,
+        photo_urls=payload.photo_urls,
+    )
+    if row.supplier_organization_id:
+        notify_return_request_seller(
+            db,
+            organization_id=row.supplier_organization_id,
+            return_id=row.id,
+            order_id=row.source_order_id,
+            reason_label=RETURN_REASON_LABELS.get(row.reason, row.reason),
+        )
+    return serialize_warehouse_return(row)
+
+
+@router.get(
+    "/autoservice/warehouse/returns",
+    response_model=list[AutoserviceWarehouseReturnView],
+)
+def list_autoservice_warehouse_returns(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    return [
+        serialize_warehouse_return(row)
+        for row in list_warehouse_returns(db, org_id=org_id)
+    ]
+
+
+@router.patch(
+    "/autoservice/warehouse/returns/{return_id}/status",
+    response_model=AutoserviceWarehouseReturnView,
+)
+def update_own_autoservice_warehouse_return(
+    return_id: int,
+    payload: AutoserviceWarehouseReturnStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    if payload.status_code != "cancelled":
+        raise HTTPException(
+            status_code=403,
+            detail="Автосервис может только отменить свою заявку",
+        )
+    row = update_warehouse_return_status(
+        db,
+        return_id=return_id,
+        new_status=payload.status_code,
+        seller_note=payload.seller_note,
+        buyer_org_id=org_id,
+    )
+    return serialize_warehouse_return(row)
 
 
 @router.get(

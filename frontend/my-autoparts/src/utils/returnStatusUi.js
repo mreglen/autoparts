@@ -11,6 +11,8 @@ export const RETURN_STATUS_LABELS = {
   reviewing: 'На рассмотрении',
   approved: 'Возврат согласован',
   rejected: 'Отклонён',
+  cancelled: 'Отменён',
+  sent: 'Отправлен поставщику',
   received: 'Товар получен',
   refunded: 'Деньги возвращены',
   closed: 'Закрыто',
@@ -21,12 +23,14 @@ export const RETURN_STATUS_COLORS = {
   reviewing: 'bg-blue-50 text-blue-800 ring-blue-100',
   approved: 'bg-emerald-50 text-emerald-800 ring-emerald-100',
   rejected: 'bg-red-50 text-red-800 ring-red-100',
+  cancelled: 'bg-gray-100 text-gray-700 ring-gray-200',
+  sent: 'bg-violet-50 text-violet-800 ring-violet-100',
   received: 'bg-indigo-50 text-indigo-800 ring-indigo-100',
   refunded: 'bg-teal-50 text-teal-800 ring-teal-100',
   closed: 'bg-gray-100 text-gray-700 ring-gray-200',
 };
 
-export const TERMINAL_RETURN_STATUSES = new Set(['rejected', 'closed']);
+export const TERMINAL_RETURN_STATUSES = new Set(['rejected', 'cancelled', 'closed']);
 
 export const SELLER_NEXT_STATUSES = {
   requested: ['reviewing', 'approved', 'rejected'],

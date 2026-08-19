@@ -8,6 +8,7 @@ import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
+import AutoserviceWarehouseReturnModal from '../../components/Autoservice/AutoserviceWarehouseReturnModal';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import useNewPartsMarkupPercent from '../../hooks/useNewPartsMarkupPercent';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
@@ -39,6 +40,8 @@ export default function AutoserviceWarehousePage() {
   const catalogMarkupPercent = useNewPartsMarkupPercent('autoservice');
   const clientMarkupPercent = clientMarkupEnabled ? storedClientMarkupPercent : 0;
   const [items, setItems] = useState([]);
+  const [purchaseLots, setPurchaseLots] = useState([]);
+  const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,13 +56,18 @@ export default function AutoserviceWarehousePage() {
   const [submitting, setSubmitting] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [returnLot, setReturnLot] = useState(null);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiRequest('/autoservice/warehouse/items');
+      const [data, lots] = await Promise.all([
+        apiRequest('/autoservice/warehouse/items'),
+        apiRequest('/autoservice/warehouse/purchase-lots'),
+      ]);
       setItems(Array.isArray(data) ? data : []);
+      setPurchaseLots(Array.isArray(lots) ? lots : []);
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить склад автосервиса');
     } finally {
@@ -77,6 +85,17 @@ export default function AutoserviceWarehousePage() {
     () => items.filter((item) => matchesAutoserviceWarehouseSearch(item, searchQuery)),
     [items, searchQuery],
   );
+  const filteredLots = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return purchaseLots;
+    return purchaseLots.filter((lot) => [
+      lot.brand,
+      lot.article,
+      lot.name,
+      lot.supplier_name,
+      lot.source_order_id,
+    ].some((value) => String(value || '').toLowerCase().includes(query)));
+  }, [purchaseLots, searchQuery]);
 
   const openWriteOff = (item) => {
     if (!item || Number(item.available_qty) < 1) {
@@ -236,6 +255,27 @@ export default function AutoserviceWarehousePage() {
         </div>
       </div>
 
+      <div className="mb-4 flex gap-2 rounded-full bg-gray-100 p-1 sm:w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab('all')}
+          className={`rounded-full px-4 py-2 text-sm font-medium ${
+            activeTab === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
+          }`}
+        >
+          Все товары
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('purchases')}
+          className={`rounded-full px-4 py-2 text-sm font-medium ${
+            activeTab === 'purchases' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
+          }`}
+        >
+          Из закупок
+        </button>
+      </div>
+
       <div className={`${warehouseToolbarClass} mb-4`}>
         <input
           type="search"
@@ -256,6 +296,65 @@ export default function AutoserviceWarehousePage() {
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500">
           Загрузка…
         </div>
+      ) : activeTab === 'purchases' ? (
+        filteredLots.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
+            <p className="text-sm text-gray-600">На складе нет партий из оформленных заказов</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-4 py-3">Товар</th>
+                  <th className="px-4 py-3">Поставщик</th>
+                  <th className="px-4 py-3">Заказ</th>
+                  <th className="px-4 py-3 text-right">Поступило</th>
+                  <th className="px-4 py-3 text-right">Резерв</th>
+                  <th className="px-4 py-3 text-right">Доступно к возврату</th>
+                  <th className="px-4 py-3 text-right">Действие</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredLots.map((lot) => (
+                  <tr key={lot.receipt_id} className="text-gray-800">
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{lot.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3">{lot.supplier_name}</td>
+                    <td className="px-4 py-3">№ {lot.source_order_id}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{lot.quantity}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {lot.item_reserved_qty || 0}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {lot.max_returnable_qty}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {lot.active_return ? (
+                        <span className="text-xs font-medium text-indigo-700">
+                          Заявка №{lot.active_return.id} · {lot.active_return.status_code}
+                        </span>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setReturnLot(lot)}
+                        >
+                          Вернуть
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : filteredItems.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
           <p className="text-sm text-gray-600">На складе автосервиса пока нет позиций</p>
@@ -332,6 +431,13 @@ export default function AutoserviceWarehousePage() {
           </table>
         </div>
       )}
+
+      <AutoserviceWarehouseReturnModal
+        receiptId={returnLot?.receipt_id || null}
+        initialLot={returnLot}
+        onClose={() => setReturnLot(null)}
+        onCreated={loadItems}
+      />
 
       <Modal
         open={Boolean(detailsItem)}

@@ -96,6 +96,95 @@ function SiteReturnCard({ item, onStatusChange }) {
   );
 }
 
+const WAREHOUSE_NEXT_STATUSES = {
+  requested: ['reviewing', 'approved', 'rejected'],
+  reviewing: ['approved', 'rejected'],
+  approved: ['sent', 'rejected'],
+  sent: ['refunded'],
+  refunded: ['closed'],
+};
+
+function WarehouseReturnCard({ item, onStatusChange }) {
+  const [nextStatus, setNextStatus] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const options = WAREHOUSE_NEXT_STATUSES[item.status_code] || [];
+  return (
+    <article className="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4">
+      <div className="flex flex-wrap justify-between gap-3">
+        <div>
+          <p className="text-xs text-gray-500">
+            Склад автосервиса · заявка №{item.id} · заказ №{item.source_order_id}
+          </p>
+          <p className="font-semibold text-gray-900">{item.name}</p>
+          <p className="mt-1 text-sm text-gray-600">
+            {item.supplier_name} · {item.quantity} шт.
+          </p>
+          <p className="mt-1 text-xs text-gray-500">{getReturnReasonLabel(item.reason)}</p>
+        </div>
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ring-1 ${getReturnStatusColor(item.status_code)}`}>
+          {getReturnStatusLabel(item.status_code)}
+        </span>
+      </div>
+      {item.processing_mode === 'manual' ? (
+        <p className="mt-2 text-xs font-medium text-amber-700">Ручная обработка поставщиком</p>
+      ) : null}
+      {item.comment ? <p className="mt-3 text-sm text-gray-700">{item.comment}</p> : null}
+      {item.photo_urls?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {item.photo_urls.map((url) => (
+            <a key={url} href={url} target="_blank" rel="noreferrer">
+              <img src={url} alt="" className="h-14 w-14 rounded-lg border object-cover" />
+            </a>
+          ))}
+        </div>
+      ) : null}
+      {options.length ? (
+        <div className="mt-4 space-y-2 border-t border-indigo-100 pt-4">
+          <select
+            value={nextStatus}
+            onChange={(event) => setNextStatus(event.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">Выберите следующий статус</option>
+            {options.map((statusCode) => (
+              <option key={statusCode} value={statusCode}>
+                {getReturnStatusLabel(statusCode)}
+              </option>
+            ))}
+          </select>
+          {nextStatus === 'rejected' ? (
+            <textarea
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Причина отклонения"
+              rows={2}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          ) : null}
+          <button
+            type="button"
+            disabled={!nextStatus || saving || (nextStatus === 'rejected' && !note.trim())}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onStatusChange(item.id, nextStatus, note);
+                setNextStatus('');
+                setNote('');
+              } finally {
+                setSaving(false);
+              }
+            }}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+          >
+            {saving ? 'Сохранение…' : 'Обновить статус'}
+          </button>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 function AvitoReturnCard({ order, onAcceptReturn, onTransition }) {
   const [terminal, setTerminal] = useState('');
   const [transition, setTransition] = useState('');
@@ -175,6 +264,7 @@ export default function SalesReturnsPage() {
   const [loading, setLoading] = useState(true);
   const [siteReturns, setSiteReturns] = useState([]);
   const [avitoReturns, setAvitoReturns] = useState([]);
+  const [warehouseReturns, setWarehouseReturns] = useState([]);
   const [error, setError] = useState(null);
 
   const hasPermission = user?.is_admin || user?.is_seller
@@ -184,12 +274,16 @@ export default function SalesReturnsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [siteRes, avitoRes] = await Promise.allSettled([
+      const [siteRes, avitoRes, warehouseRes] = await Promise.allSettled([
         apiAxios.get('/sales/returns'),
         apiAxios.get('/sales/avito-orders/returns'),
+        apiAxios.get('/sales/warehouse-returns'),
       ]);
       setSiteReturns(siteRes.status === 'fulfilled' ? (siteRes.value.data || []) : []);
       setAvitoReturns(avitoRes.status === 'fulfilled' ? (avitoRes.value.data || []) : []);
+      setWarehouseReturns(
+        warehouseRes.status === 'fulfilled' ? (warehouseRes.value.data || []) : [],
+      );
     } catch {
       setError('Не удалось загрузить возвраты');
     } finally {
@@ -228,6 +322,14 @@ export default function SalesReturnsPage() {
     load();
   };
 
+  const handleWarehouseStatusChange = async (returnId, statusCode, sellerNote) => {
+    await apiAxios.patch(`/sales/warehouse-returns/${returnId}/status`, {
+      status_code: statusCode,
+      seller_note: sellerNote || null,
+    });
+    load();
+  };
+
   const handleAvitoTransition = async (orderId, transition) => {
     await apiAxios.post(`/sales/avito-orders/${orderId}/transition`, { transition });
     load();
@@ -257,6 +359,24 @@ export default function SalesReturnsPage() {
             <div className="space-y-4">
               {siteReturns.map((item) => (
                 <SiteReturnCard key={item.id} item={item} onStatusChange={handleStatusChange} />
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold text-gray-900 mb-3">
+              Возвраты со склада автосервиса
+            </h2>
+            {warehouseReturns.length === 0 ? (
+              <p className="text-sm text-gray-500">Нет заявок со склада автосервиса</p>
+            ) : null}
+            <div className="space-y-4">
+              {warehouseReturns.map((item) => (
+                <WarehouseReturnCard
+                  key={item.id}
+                  item={item}
+                  onStatusChange={handleWarehouseStatusChange}
+                />
               ))}
             </div>
           </section>

@@ -12,6 +12,7 @@ class AutoserviceWarehouseItemView(BaseModel):
     name: str
     quantity: int
     reserved_qty: int
+    return_reserved_qty: int = 0
     available_qty: int
     unit: Literal["pcs", "l", "kg"] = "pcs"
     unit_price: Decimal
@@ -33,6 +34,8 @@ class AutoserviceWarehouseReceiptView(BaseModel):
     article: str
     name: str
     quantity: int
+    return_reserved_qty: int = 0
+    returned_qty: int = 0
     unit: Literal["pcs", "l", "kg"] = "pcs"
     unit_price: Decimal
     line_total: Decimal
@@ -148,3 +151,87 @@ class AutoserviceWarehouseReceiptSuggestView(BaseModel):
     article: str
     name: str
     unit_price: Decimal
+
+
+WarehouseReturnReason = Literal[
+    "defect",
+    "wrong_item",
+    "not_as_described",
+    "changed_mind",
+    "other",
+]
+
+
+class AutoserviceWarehouseReturnCreate(BaseModel):
+    receipt_id: int
+    quantity: int = Field(ge=1)
+    reason: WarehouseReturnReason
+    comment: Optional[str] = Field(default=None, max_length=4000)
+    photo_urls: list[str] = Field(default_factory=list, max_length=5)
+
+
+class AutoserviceWarehouseReturnStatusUpdate(BaseModel):
+    status_code: Literal[
+        "reviewing",
+        "approved",
+        "rejected",
+        "cancelled",
+        "sent",
+        "refunded",
+        "closed",
+    ]
+    seller_note: Optional[str] = Field(default=None, max_length=4000)
+
+
+class AutoserviceWarehouseReturnView(BaseModel):
+    id: int
+    organization_id: str
+    supplier_organization_id: Optional[str] = None
+    receipt_id: int
+    item_id: int
+    source_order_type: str
+    source_order_id: int
+    cart_item_type: str
+    cart_item_id: int
+    provider_kind: str
+    processing_mode: str
+    supplier_name: str
+    brand: str
+    article: str
+    name: str
+    quantity: int
+    unit_price: Decimal
+    reason: str
+    comment: Optional[str] = None
+    photo_urls: list[str] = Field(default_factory=list)
+    status_code: str
+    seller_note: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    status_changed_at: datetime
+
+
+class AutoserviceWarehousePurchaseLotView(BaseModel):
+    receipt_id: int
+    document_id: Optional[int] = None
+    item_id: int
+    source_order_type: str
+    source_order_id: int
+    cart_item_type: str
+    cart_item_id: int
+    supplier_name: str
+    provider_kind: str
+    brand: str
+    article: str
+    name: str
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+    quantity: int
+    returned_qty: int
+    return_reserved_qty: int
+    item_quantity: int
+    item_reserved_qty: int
+    item_return_reserved_qty: int
+    max_returnable_qty: int
+    unit_price: Decimal
+    created_at: date
+    active_return: Optional[AutoserviceWarehouseReturnView] = None

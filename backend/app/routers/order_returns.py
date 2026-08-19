@@ -14,6 +14,7 @@ from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.organization_avito_integration import OrganizationAvitoIntegration
 from app.models.permission import Permission
 from app.models.user import User as UserModel
+from app.models.autoservice_warehouse import AutoserviceWarehouseReturnRequest
 from app.models.user_permission import UserPermission
 from app.schemas.order_returns import (
     AvitoAcceptReturnRequest,
@@ -21,6 +22,15 @@ from app.schemas.order_returns import (
     OrderReturnCreate,
     OrderReturnOut,
     OrderReturnStatusUpdate,
+)
+from app.schemas.autoservice_warehouse import (
+    AutoserviceWarehouseReturnStatusUpdate,
+    AutoserviceWarehouseReturnView,
+)
+from app.services.autoservice_warehouse_return_service import (
+    list_warehouse_returns,
+    serialize_warehouse_return,
+    update_warehouse_return_status,
 )
 from app.services.order_return_service import (
     RETURN_REASON_LABELS,
@@ -160,6 +170,60 @@ def seller_list_returns(
     _require_sales_returns_access(db, current_user)
     rows = list_seller_returns(db, current_user, status_filter=status_code)
     return [_serialize_return_with_db(db, r, include_order=True) for r in rows]
+
+
+@router.get(
+    "/warehouse-returns",
+    response_model=list[AutoserviceWarehouseReturnView],
+)
+def seller_list_warehouse_returns(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _require_sales_returns_access(db, current_user)
+    rows = list_warehouse_returns(
+        db,
+        supplier_org_id=None if current_user.is_admin else current_user.organization_id,
+    )
+    if current_user.is_admin:
+        # Platform operators process external/Rossko requests and may support org sellers.
+        rows = list_warehouse_returns(db)
+    return [serialize_warehouse_return(row) for row in rows]
+
+
+@router.patch(
+    "/warehouse-returns/{return_id}/status",
+    response_model=AutoserviceWarehouseReturnView,
+)
+def seller_update_warehouse_return_status(
+    return_id: int,
+    payload: AutoserviceWarehouseReturnStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _require_sales_returns_access(db, current_user)
+    existing = (
+        db.query(AutoserviceWarehouseReturnRequest)
+        .filter(AutoserviceWarehouseReturnRequest.id == return_id)
+        .first()
+    )
+    previous_status = existing.status_code if existing else None
+    row = update_warehouse_return_status(
+        db,
+        return_id=return_id,
+        new_status=payload.status_code,
+        seller_note=payload.seller_note,
+        supplier_org_id=current_user.organization_id,
+        is_admin=bool(current_user.is_admin),
+    )
+    notify_return_status_buyer(
+        user_id=row.created_by,
+        return_id=row.id,
+        order_id=row.source_order_id,
+        status_code=row.status_code,
+        previous_status_code=previous_status,
+    )
+    return serialize_warehouse_return(row)
 
 
 @router.get("/returns/{return_id}", response_model=OrderReturnOut)

@@ -82,7 +82,7 @@ class AppendPurchaseItemsTests(unittest.TestCase):
 
 class DetachPurchaseItemsTests(unittest.TestCase):
     def test_deletes_matching_parts_from_other_orders_and_reindexes(self):
-        stale = MagicMock(order_id=1, position=1)
+        stale = MagicMock(order_id=1, position=1, qty=1)
         leftover = MagicMock(order_id=1, position=2)
         db = MagicMock()
         stale_query = db.query.return_value.join.return_value.filter.return_value

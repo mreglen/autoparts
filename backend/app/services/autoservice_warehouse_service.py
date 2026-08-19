@@ -786,7 +786,7 @@ def create_autoservice_expense(
     if not item:
         raise HTTPException(status_code=404, detail="Позиция склада не найдена")
 
-    available = int(item.quantity or 0) - int(item.reserved_qty or 0)
+    available = autoservice_item_available_qty(item)
     if quantity > available:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -830,7 +830,12 @@ def product_available_qty(product: Product) -> int:
 
 
 def autoservice_item_available_qty(item: AutoserviceWarehouseItem) -> int:
-    return max(0, int(item.quantity or 0) - int(item.reserved_qty or 0))
+    return max(
+        0,
+        int(item.quantity or 0)
+        - int(item.reserved_qty or 0)
+        - int(getattr(item, "return_reserved_qty", 0) or 0),
+    )
 
 
 def _price_with_markup(
@@ -1101,7 +1106,20 @@ def update_receipt_line_details(
     old_receipt_qty = int(receipt.quantity or 0)
     qty_delta = qty_int - old_receipt_qty
     new_item_qty = int(item.quantity or 0) + qty_delta
-    if new_item_qty < int(item.reserved_qty or 0):
+    protected_item_qty = (
+        int(item.reserved_qty or 0)
+        + int(getattr(item, "return_reserved_qty", 0) or 0)
+    )
+    protected_receipt_qty = (
+        int(getattr(receipt, "returned_qty", 0) or 0)
+        + int(getattr(receipt, "return_reserved_qty", 0) or 0)
+    )
+    if qty_int < protected_receipt_qty:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя уменьшить партию ниже количества в возвратах",
+        )
+    if new_item_qty < protected_item_qty:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Нельзя уменьшить количество ниже зарезервированного остатка",
@@ -1337,7 +1355,20 @@ def update_manual_shop_part(
     old_receipt_qty = int(receipt.quantity or 0)
     qty_delta = qty_int - old_receipt_qty
     new_item_qty = int(item.quantity or 0) + qty_delta
-    if new_item_qty < int(item.reserved_qty or 0):
+    protected_item_qty = (
+        int(item.reserved_qty or 0)
+        + int(getattr(item, "return_reserved_qty", 0) or 0)
+    )
+    protected_receipt_qty = (
+        int(getattr(receipt, "returned_qty", 0) or 0)
+        + int(getattr(receipt, "return_reserved_qty", 0) or 0)
+    )
+    if qty_int < protected_receipt_qty:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя уменьшить партию ниже количества в возвратах",
+        )
+    if new_item_qty < protected_item_qty:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Нельзя уменьшить количество ниже зарезервированного остатка",

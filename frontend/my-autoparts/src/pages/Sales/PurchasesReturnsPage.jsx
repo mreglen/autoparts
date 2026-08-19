@@ -236,12 +236,49 @@ function ReturnCard({ item }) {
   );
 }
 
+function WarehouseReturnCard({ item }) {
+  return (
+    <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-gray-500">
+            Заявка №{item.id} · Заказ №{item.source_order_id}
+          </p>
+          <p className="font-semibold text-gray-900">{item.name}</p>
+          <p className="mt-1 text-sm text-gray-600">
+            {item.supplier_name} · {item.quantity} шт.
+          </p>
+          <p className="mt-1 text-xs text-gray-500">{getReturnReasonLabel(item.reason)}</p>
+        </div>
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ring-1 ${getReturnStatusColor(item.status_code)}`}>
+          {getReturnStatusLabel(item.status_code)}
+        </span>
+      </div>
+      {item.provider_kind === 'rossko' ? (
+        <p className="mt-2 text-xs font-medium text-amber-700">Rossko · ручная обработка</p>
+      ) : null}
+      {item.comment ? <p className="mt-3 text-sm text-gray-700">{item.comment}</p> : null}
+      {item.photo_urls?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {item.photo_urls.map((url) => (
+            <a key={url} href={url} target="_blank" rel="noreferrer">
+              <img src={url} alt="" className="h-14 w-14 rounded-lg border object-cover" />
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 export default function PurchasesReturnsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isReady, isAuthenticated } = useAuthReady();
   const [loading, setLoading] = useState(true);
   const [returns, setReturns] = useState([]);
+  const [warehouseReturns, setWarehouseReturns] = useState([]);
+  const [activeTab, setActiveTab] = useState('orders');
   const [usedOrders, setUsedOrders] = useState([]);
   const [showCreate, setShowCreate] = useState(searchParams.get('create') === '1');
   const initialOrderId = searchParams.get('orderId');
@@ -251,12 +288,16 @@ export default function PurchasesReturnsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [returnsRes, ordersRes] = await Promise.all([
+      const [returnsRes, ordersRes, warehouseRes] = await Promise.allSettled([
         apiAxios.get('/sales/purchases/returns'),
         apiAxios.get('/sales/purchases/used-orders'),
+        apiAxios.get('/autoservice/warehouse/returns'),
       ]);
-      setReturns(returnsRes.data || []);
-      setUsedOrders(ordersRes.data || []);
+      setReturns(returnsRes.status === 'fulfilled' ? (returnsRes.value.data || []) : []);
+      setUsedOrders(ordersRes.status === 'fulfilled' ? (ordersRes.value.data || []) : []);
+      setWarehouseReturns(
+        warehouseRes.status === 'fulfilled' ? (warehouseRes.value.data || []) : [],
+      );
     } catch (e) {
       setError('Не удалось загрузить возвраты');
     } finally {
@@ -293,30 +334,50 @@ export default function PurchasesReturnsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Возвраты</h1>
           <p className="mt-1 text-sm text-gray-600">Заявки на возврат б/у товаров с сайта</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowCreate(true)}
-          className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          Создать заявку
-        </button>
+        {activeTab === 'orders' ? (
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Создать заявку
+          </button>
+        ) : null}
       </div>
 
-      <p className="text-sm text-gray-500 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
-        Возвраты заказов Avito оформляются в приложении Avito. Здесь — только покупки б/у запчастей на сайте.
-      </p>
+      <div className="flex gap-2 rounded-full bg-gray-100 p-1 sm:w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab('orders')}
+          className={`rounded-full px-4 py-2 text-sm font-medium ${activeTab === 'orders' ? 'bg-white shadow-sm' : 'text-gray-600'}`}
+        >
+          Покупки
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('warehouse')}
+          className={`rounded-full px-4 py-2 text-sm font-medium ${activeTab === 'warehouse' ? 'bg-white shadow-sm' : 'text-gray-600'}`}
+        >
+          Со склада автосервиса
+        </button>
+      </div>
 
       {loading ? <SkeletonListCards count={3} /> : null}
       {error && <p className="text-red-600">{error}</p>}
 
-      {!loading && !error && returns.length === 0 && (
+      {!loading && !error && activeTab === 'orders' && returns.length === 0 && (
         <div className="text-center py-12 text-gray-500">Заявок на возврат пока нет</div>
+      )}
+      {!loading && !error && activeTab === 'warehouse' && warehouseReturns.length === 0 && (
+        <div className="text-center py-12 text-gray-500">Заявок со склада пока нет</div>
       )}
 
       <div className="space-y-4">
-        {returns.map((item) => (
-          <ReturnCard key={item.id} item={item} />
-        ))}
+        {activeTab === 'orders'
+          ? returns.map((item) => <ReturnCard key={item.id} item={item} />)
+          : warehouseReturns.map((item) => (
+            <WarehouseReturnCard key={item.id} item={item} />
+          ))}
       </div>
 
       {showCreate && (

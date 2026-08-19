@@ -5,6 +5,7 @@ import { Skeleton } from '../UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 import { SHOP_PART_UNIT_LABELS } from '../../utils/repairOrderShopPartUtils';
+import AutoserviceWarehouseReturnModal from './AutoserviceWarehouseReturnModal';
 
 const inlineInputClass =
   'block w-full min-w-0 rounded-md border border-line bg-white px-2 py-1 text-xs leading-tight text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
@@ -56,6 +57,7 @@ function ReceiptLineRow({
   onStartEdit,
   onCancelEdit,
   onSave,
+  onReturn,
 }) {
   const [draft, setDraft] = useState(() => lineDraftFromRow(line));
 
@@ -196,8 +198,7 @@ function ReceiptLineRow({
               type="button"
               variant="secondary"
               size="sm"
-              disabled
-              title="Возвраты поставщику будут доступны позже"
+              onClick={() => onReturn(line)}
             >
               Вернуть поставщику
             </Button>
@@ -222,6 +223,7 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
   const [error, setError] = useState('');
   const [savingLineId, setSavingLineId] = useState(null);
   const [editingLineId, setEditingLineId] = useState(null);
+  const [returnReceiptId, setReturnReceiptId] = useState(null);
 
   const loadDoc = useCallback(async () => {
     if (!docId) return;
@@ -352,6 +354,7 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
                     onStartEdit={() => setEditingLineId(line.id)}
                     onCancelEdit={() => setEditingLineId(null)}
                     onSave={(draft) => saveLineEdit(line, draft).catch(() => {})}
+                    onReturn={(targetLine) => setReturnReceiptId(targetLine.id)}
                   />
                 ))}
               </tbody>
@@ -370,6 +373,11 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
               </tfoot>
             </table>
           </div>
+          <AutoserviceWarehouseReturnModal
+            receiptId={returnReceiptId}
+            onClose={() => setReturnReceiptId(null)}
+            onCreated={loadDoc}
+          />
         </div>
       ) : error ? (
         <div className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800">
