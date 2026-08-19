@@ -6,6 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.autoservice_warehouse import (
@@ -36,6 +37,43 @@ def _normalize_brand(value: str | None) -> str:
 
 def _normalize_article(value: str | None) -> str:
     return (value or "").strip()[:120]
+
+
+def _warehouse_item_identity_conflict_message(*, brand: str, article: str) -> str:
+    if not brand and not article:
+        return (
+            "На складе уже есть товар без бренда и артикула. "
+            "Укажите уникальный артикул или бренд."
+        )
+    return "На складе уже есть товар с таким брендом и артикулом"
+
+
+def _ensure_unique_warehouse_item_identity(
+    db: Session,
+    *,
+    org_id: str,
+    item_id: int,
+    brand: str,
+    article: str,
+) -> None:
+    conflict = (
+        db.query(AutoserviceWarehouseItem)
+        .filter(
+            AutoserviceWarehouseItem.organization_id == org_id,
+            AutoserviceWarehouseItem.brand == brand,
+            AutoserviceWarehouseItem.article == article,
+            AutoserviceWarehouseItem.id != item_id,
+        )
+        .first()
+    )
+    if conflict:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_warehouse_item_identity_conflict_message(
+                brand=brand,
+                article=article,
+            ),
+        )
 
 
 def _create_item(
@@ -1436,24 +1474,14 @@ def update_autoservice_warehouse_item(
     brand_norm = _normalize_brand(brand)
     article_norm = _normalize_article(article)
 
-    if article_norm and (
-        brand_norm != item.brand or article_norm != item.article
-    ):
-        conflict = (
-            db.query(AutoserviceWarehouseItem)
-            .filter(
-                AutoserviceWarehouseItem.organization_id == org_id,
-                AutoserviceWarehouseItem.brand == brand_norm,
-                AutoserviceWarehouseItem.article == article_norm,
-                AutoserviceWarehouseItem.id != item.id,
-            )
-            .first()
+    if brand_norm != item.brand or article_norm != item.article:
+        _ensure_unique_warehouse_item_identity(
+            db,
+            org_id=org_id,
+            item_id=item.id,
+            brand=brand_norm,
+            article=article_norm,
         )
-        if conflict:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="На складе уже есть товар с таким брендом и артикулом",
-            )
 
     item.brand = brand_norm
     item.article = article_norm
@@ -1471,77 +1499,15 @@ def update_autoservice_warehouse_item(
         part.partnumber = article_norm or None
         part.unit = unit_norm
 
-    db.flush()
-    return item
-
-
-def update_autoservice_warehouse_item(
-    db: Session,
-    *,
-    org_id: str,
-    item_id: int,
-    brand: str,
-    article: str,
-    name: str,
-    unit: str,
-) -> AutoserviceWarehouseItem:
-    item = (
-        db.query(AutoserviceWarehouseItem)
-        .filter(
-            AutoserviceWarehouseItem.id == item_id,
-            AutoserviceWarehouseItem.organization_id == org_id,
-        )
-        .with_for_update()
-        .first()
-    )
-    if not item:
-        raise HTTPException(status_code=404, detail="Позиция склада не найдена")
-
-    name_norm = (name or "").strip()[:255]
-    if not name_norm:
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Укажите наименование",
-        )
-
-    unit_norm = unit if unit in ("pcs", "l", "kg") else "pcs"
-    brand_norm = _normalize_brand(brand)
-    article_norm = _normalize_article(article)
-
-    if article_norm and (
-        brand_norm != item.brand or article_norm != item.article
-    ):
-        conflict = (
-            db.query(AutoserviceWarehouseItem)
-            .filter(
-                AutoserviceWarehouseItem.organization_id == org_id,
-                AutoserviceWarehouseItem.brand == brand_norm,
-                AutoserviceWarehouseItem.article == article_norm,
-                AutoserviceWarehouseItem.id != item.id,
-            )
-            .first()
-        )
-        if conflict:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="На складе уже есть товар с таким брендом и артикулом",
-            )
-
-    item.brand = brand_norm
-    item.article = article_norm
-    item.name = name_norm
-    item.unit = unit_norm
-
-    linked_parts = (
-        db.query(RepairOrderShopPart)
-        .filter(RepairOrderShopPart.autoservice_stock_item_id == item.id)
-        .all()
-    )
-    for part in linked_parts:
-        part.title = name_norm
-        part.brand = brand_norm or None
-        part.partnumber = article_norm or None
-        part.unit = unit_norm
-
-    db.flush()
+            detail=_warehouse_item_identity_conflict_message(
+                brand=brand_norm,
+                article=article_norm,
+            ),
+        ) from exc
     return item
