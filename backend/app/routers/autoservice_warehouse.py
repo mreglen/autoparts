@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 
@@ -75,6 +76,12 @@ def _item_view(item: AutoserviceWarehouseItem) -> AutoserviceWarehouseItemView:
     )
 
 
+def _line_created_at(value) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    return value
+
+
 def _receipt_line_view(
     db: Session,
     row: AutoserviceWarehouseReceipt,
@@ -99,22 +106,22 @@ def _receipt_line_view(
     if item and getattr(item, "unit", None) in ("pcs", "l", "kg"):
         item_unit = item.unit
     line_unit = pricing["unit"] if pricing.get("can_edit_unit") else item_unit
+    pricing_fields = {**pricing, "unit": line_unit}
     return AutoserviceWarehouseReceiptView(
         id=row.id,
         item_id=row.item_id,
-        brand=item.brand if item else "",
-        article=item.article if item else "",
-        name=item.name if item else "",
+        brand=(item.brand if item else None) or "",
+        article=(item.article if item else None) or "",
+        name=(item.name if item else None) or "",
         quantity=qty,
-        unit=line_unit,
         unit_price=unit_price,
         line_total=_money(unit_price * qty),
         cart_item_type=row.cart_item_type,
         cart_item_id=row.cart_item_id,
         repair_order_id=row.repair_order_id,
-        created_at=row.created_at,
+        created_at=_line_created_at(row.created_at),
         creator_name=_creator_name(row.creator),
-        **{**pricing, "unit": line_unit},
+        **pricing_fields,
     )
 
 
