@@ -5,6 +5,7 @@ import {
   emptyForm,
   formatAccountStatus,
   formatPayroll,
+  parseEmployeeSaveError,
   validateEmployeeForm,
 } from './employeesPageUtils';
 
@@ -60,6 +61,12 @@ describe('employeesPageUtils', () => {
     expect(formatPayroll({ is_service_executor: false })).toBe('—');
     expect(formatPayroll({ is_service_executor: true, salary_type: 'percent_work', work_percent: 50 })).toBe('% от работ · 50%');
     expect(formatPayroll({ is_service_executor: true, salary_type: 'fixed', salary_amount: 40000 })).toMatch(/Фикс · 40.?000 ₽/);
+  });
+
+  it('parseEmployeeSaveError maps email conflict to friendly message', () => {
+    const parsed = parseEmployeeSaveError('Попробуйте использовать другую почту');
+    expect(parsed.formError).toBe('Попробуйте использовать другую почту');
+    expect(parsed.fieldErrors.email).toBe('Попробуйте использовать другую почту');
   });
 
   it('canCreateEmployeeAccount is true only when email exists and account is missing', () => {

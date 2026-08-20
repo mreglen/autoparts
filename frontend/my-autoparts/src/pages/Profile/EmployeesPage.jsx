@@ -8,11 +8,10 @@ import {
   createEmployeeAccount,
 } from '../../redux/slices/OrganizationSlice';
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
+import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import {
-  Badge,
   Button,
   ConfirmDialog,
-  DataTable,
   EmptyState,
   FieldHint,
   FieldLabel,
@@ -23,7 +22,7 @@ import {
   SkeletonListCards,
   Textarea,
 } from '../../components/UI';
-import { SettingsActionsDropdown, SettingsToggle } from '../Settings/settingsUi';
+import { SettingsToggle } from '../Settings/settingsUi';
 import { warehousePageClass } from '../../utils/warehouseListUi';
 import {
   buildPayload,
@@ -32,6 +31,7 @@ import {
   formatPayroll,
   getEmployeeFullName,
   validateEmployeeForm,
+  parseEmployeeSaveError,
 } from './employeesPageUtils';
 
 function InlineNotice({ tone = 'error', children, onClose }) {
@@ -57,15 +57,99 @@ function InlineNotice({ tone = 'error', children, onClose }) {
   );
 }
 
-function getEmployeeInitials(employee) {
-  return (employee.first_name?.[0] || employee.last_name?.[0] || '?').toUpperCase();
+const ACCOUNT_STATUS_STYLES = {
+  success: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  brand: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
+  neutral: 'bg-gray-100 text-gray-600 ring-gray-500/20',
+};
+
+function EmployeeAccountBadge({ employee }) {
+  const status = formatAccountStatus(employee);
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
+        ACCOUNT_STATUS_STYLES[status.tone] || ACCOUNT_STATUS_STYLES.neutral
+      }`}
+    >
+      {status.label}
+    </span>
+  );
 }
 
-function EmployeeAvatar({ employee, size = 'md' }) {
-  const sizeClass = size === 'lg' ? 'h-12 w-12 text-base' : 'h-10 w-10 text-sm';
+function EmployeeActionsMenu({
+  employee,
+  fullName,
+  creatingAccountId,
+  onEdit,
+  onPermissions,
+  onCreateAccount,
+  onDelete,
+  showLabel = true,
+}) {
+  const canCreateAccount = employee.email && !employee.user_id && employee.account_status !== 'linked';
+  const accountLoading = creatingAccountId === employee.id;
+
   return (
-    <div className={`flex shrink-0 items-center justify-center rounded-xl bg-brand-50 font-semibold text-brand-700 ring-1 ring-brand-100 ${sizeClass}`}>
-      {getEmployeeInitials(employee)}
+    <ActionsDropdown
+      menuClassName="w-56 z-50"
+      estimatedMenuHeight={canCreateAccount ? 180 : 140}
+      showLabel={showLabel}
+      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+    >
+      <ActionsDropdownItem onClick={onEdit}>Редактировать</ActionsDropdownItem>
+      <ActionsDropdownItem onClick={onPermissions}>Назначить права</ActionsDropdownItem>
+      {canCreateAccount ? (
+        <ActionsDropdownItem disabled={accountLoading} onClick={onCreateAccount}>
+          {accountLoading ? 'Создание…' : 'Создать аккаунт'}
+        </ActionsDropdownItem>
+      ) : null}
+      <ActionsDropdownItem danger onClick={onDelete}>Удалить</ActionsDropdownItem>
+    </ActionsDropdown>
+  );
+}
+
+function EmployeeMobileCard({
+  employee,
+  creatingAccountId,
+  onEdit,
+  onPermissions,
+  onCreateAccount,
+  onDelete,
+}) {
+  const fullName = getEmployeeFullName(employee);
+
+  return (
+    <div className="border-b border-gray-100 py-3 last:border-b-0">
+      <div className="flex items-start justify-between gap-2">
+        <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900">{fullName || '—'}</span>
+            <EmployeeAccountBadge employee={employee} />
+          </div>
+          {employee.position ? (
+            <p className="mt-1 truncate text-sm text-gray-500">{employee.position}</p>
+          ) : null}
+          <p className="mt-0.5 truncate text-sm text-gray-500">{employee.phone || '—'}</p>
+          {employee.email ? (
+            <p className="mt-0.5 truncate text-xs text-gray-500">{employee.email}</p>
+          ) : null}
+          {employee.is_service_executor ? (
+            <p className="mt-1 text-xs text-gray-500">{formatPayroll(employee)}</p>
+          ) : null}
+        </button>
+        <div className="shrink-0">
+          <EmployeeActionsMenu
+            employee={employee}
+            fullName={fullName}
+            creatingAccountId={creatingAccountId}
+            onEdit={onEdit}
+            onPermissions={onPermissions}
+            onCreateAccount={onCreateAccount}
+            onDelete={onDelete}
+            showLabel={false}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -236,7 +320,11 @@ export default function EmployeesPage() {
       resetForm();
       setNotice('Сотрудник добавлен');
     } catch (error) {
-      setFormError(typeof error === 'string' ? error : error?.message || 'Не удалось создать сотрудника');
+      const parsed = parseEmployeeSaveError(error);
+      setFormError(parsed.formError);
+      if (Object.keys(parsed.fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...parsed.fieldErrors }));
+      }
     } finally {
       setIsCreating(false);
     }
@@ -273,7 +361,11 @@ export default function EmployeesPage() {
       resetForm();
       setNotice('Изменения сохранены');
     } catch (error) {
-      setFormError(typeof error === 'string' ? error : error?.message || 'Не удалось обновить сотрудника');
+      const parsed = parseEmployeeSaveError(error);
+      setFormError(parsed.formError);
+      if (Object.keys(parsed.fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...parsed.fieldErrors }));
+      }
     } finally {
       setIsSaving(false);
     }
@@ -308,79 +400,21 @@ export default function EmployeesPage() {
     }
   };
 
-  const buildActions = (employee, fullName) => {
-    const canCreateAccount = employee.email && !employee.user_id && employee.account_status !== 'linked';
-    const items = [
-      { key: 'edit', label: 'Редактировать', onClick: () => startEditing(employee) },
-      { key: 'permissions', label: 'Назначить права', onClick: () => { setSelectedEmployee(employee); setShowPermissionModal(true); } },
-    ];
-    if (canCreateAccount) {
-      items.push({
-        key: 'account',
-        label: creatingAccountId === employee.id ? 'Создание…' : 'Создать аккаунт',
-        onClick: () => handleCreateAccount(employee),
-        disabled: creatingAccountId === employee.id,
-      });
-    }
-    items.push({
-      key: 'delete',
-      label: 'Удалить',
-      danger: true,
-      onClick: () => { setEmployeeToDelete({ id: employee.id, name: fullName }); setShowDeleteModal(true); },
-    });
-    return (
-      <div className="flex justify-end">
-        <SettingsActionsDropdown menuWidth="w-56" items={items} />
-      </div>
-    );
+  const getEmployeeActions = (employee) => {
+    const fullName = getEmployeeFullName(employee);
+    return {
+      onEdit: () => startEditing(employee),
+      onPermissions: () => {
+        setSelectedEmployee(employee);
+        setShowPermissionModal(true);
+      },
+      onCreateAccount: () => handleCreateAccount(employee),
+      onDelete: () => {
+        setEmployeeToDelete({ id: employee.id, name: fullName });
+        setShowDeleteModal(true);
+      },
+    };
   };
-
-  const tableColumns = useMemo(() => [
-    {
-      key: 'name',
-      label: 'Сотрудник',
-      render: (employee) => {
-        const fullName = getEmployeeFullName(employee);
-        return (
-          <div className="flex items-center gap-3">
-            <EmployeeAvatar employee={employee} />
-            <div className="min-w-0">
-              <p className="truncate font-semibold text-ink">{fullName || '—'}</p>
-              {employee.position ? <p className="truncate text-xs text-ink-muted">{employee.position}</p> : null}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'contacts',
-      label: 'Контакты',
-      render: (employee) => (
-        <div className="min-w-0 text-sm text-ink-soft">
-          {employee.phone ? <p className="truncate">{employee.phone}</p> : null}
-          {employee.email ? <p className="truncate text-xs text-ink-muted">{employee.email}</p> : <span className="text-ink-muted">—</span>}
-        </div>
-      ),
-    },
-    {
-      key: 'payroll',
-      label: 'Оплата',
-      render: (employee) => <span className="text-sm text-ink-soft">{formatPayroll(employee)}</span>,
-    },
-    {
-      key: 'account',
-      label: 'Аккаунт',
-      render: (employee) => {
-        const status = formatAccountStatus(employee);
-        return <Badge tone={status.tone}>{status.label}</Badge>;
-      },
-    },
-    {
-      key: 'actions',
-      label: '',
-      render: (employee) => buildActions(employee, getEmployeeFullName(employee)),
-    },
-  ], [creatingAccountId, orgId]);
 
   const pageSubtitle = loadingEmployees
     ? 'Загрузка списка…'
@@ -419,32 +453,74 @@ export default function EmployeesPage() {
         <EmptyState illustration="search" title="Никого не нашли" description="Попробуйте изменить запрос поиска." />
       ) : (
         <>
-          <div className="hidden md:block">
-            <DataTable columns={tableColumns} rows={filteredEmployees} />
+          <div className="hidden md:block min-w-0">
+            <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <th className="py-3 pr-3">Сотрудник</th>
+                  <th className="py-3 pr-3">Контакты</th>
+                  <th className="w-40 py-3 pr-3">Оплата</th>
+                  <th className="w-44 py-3 pr-3">Аккаунт</th>
+                  <th className="w-28 py-3 text-right">Действия</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredEmployees.map((employee) => {
+                  const fullName = getEmployeeFullName(employee);
+                  const actions = getEmployeeActions(employee);
+                  return (
+                    <tr
+                      key={employee.id}
+                      className="group cursor-pointer transition-colors hover:bg-gray-50/70"
+                      onClick={(e) => {
+                        if (e.target.closest('.actions-dropdown')) return;
+                        startEditing(employee);
+                      }}
+                    >
+                      <td className="py-3 pr-3 align-middle">
+                        <div className="font-medium text-gray-900">{fullName || '—'}</div>
+                        {employee.position ? (
+                          <div className="mt-0.5 text-xs text-gray-500">{employee.position}</div>
+                        ) : null}
+                      </td>
+                      <td className="py-3 pr-3 align-middle">
+                        {employee.phone ? (
+                          <div className="font-medium text-gray-900">{employee.phone}</div>
+                        ) : (
+                          <div className="text-gray-500">—</div>
+                        )}
+                        {employee.email ? (
+                          <div className="mt-0.5 text-xs text-gray-500">{employee.email}</div>
+                        ) : null}
+                      </td>
+                      <td className="py-3 pr-3 align-middle text-gray-600">{formatPayroll(employee)}</td>
+                      <td className="py-3 pr-3 align-middle">
+                        <EmployeeAccountBadge employee={employee} />
+                      </td>
+                      <td className="py-3 text-right align-middle">
+                        <EmployeeActionsMenu
+                          employee={employee}
+                          fullName={fullName}
+                          creatingAccountId={creatingAccountId}
+                          {...actions}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          <div className="md:hidden divide-y divide-line">
+          <div className="md:hidden">
             {filteredEmployees.map((employee) => {
-              const fullName = getEmployeeFullName(employee);
-              const account = formatAccountStatus(employee);
+              const actions = getEmployeeActions(employee);
               return (
-                <div key={employee.id} className="flex gap-3 py-3">
-                  <EmployeeAvatar employee={employee} size="lg" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-ink">{fullName || '—'}</p>
-                        {employee.position ? <p className="text-xs text-ink-muted">{employee.position}</p> : null}
-                        <p className="mt-1 text-xs text-ink-muted">{employee.phone || '—'}</p>
-                        <p className="text-xs text-ink-muted">{employee.email || '—'}</p>
-                      </div>
-                      {buildActions(employee, fullName)}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge tone={account.tone}>{account.label}</Badge>
-                      {employee.is_service_executor ? <Badge tone="success">{formatPayroll(employee)}</Badge> : null}
-                    </div>
-                  </div>
-                </div>
+                <EmployeeMobileCard
+                  key={employee.id}
+                  employee={employee}
+                  creatingAccountId={creatingAccountId}
+                  {...actions}
+                />
               );
             })}
           </div>

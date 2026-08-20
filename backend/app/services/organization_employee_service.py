@@ -25,6 +25,8 @@ from app.utils.email import send_employee_account_email
 from app.utils.phone import normalize_to_storage_format
 from app.utils.user_public_code import assign_public_code
 
+EMAIL_ALREADY_USED_MSG = "Попробуйте использовать другую почту"
+
 
 def _money(value: Decimal | float | int) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"))
@@ -204,7 +206,7 @@ def create_employee_card(db: Session, org_id: str, payload) -> dict:
     if email:
         existing = db.query(User).filter(User.email == email).first()
         if existing:
-            raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
+            raise HTTPException(status_code=400, detail=EMAIL_ALREADY_USED_MSG)
 
     card = OrganizationEmployee(
         organization_id=org_id,
@@ -252,7 +254,7 @@ def update_employee_card(db: Session, org_id: str, card_id: int, payload) -> dic
         if email:
             existing = db.query(User).filter(User.email == email, User.id != (card.user_id or -1)).first()
             if existing:
-                raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
+                raise HTTPException(status_code=400, detail=EMAIL_ALREADY_USED_MSG)
         card.email = email
 
     if "phone" in data:

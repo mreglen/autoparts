@@ -128,7 +128,7 @@ export const fetchEmployees = createAsyncThunk(
             const result = await apiRequest(`/organizations/${orgId}/employee-cards`);
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка загрузки сотрудников');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка загрузки сотрудников');
         }
     }
 );
@@ -144,7 +144,7 @@ export const addEmployee = createAsyncThunk(
             });
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка добавления сотрудника');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка добавления сотрудника');
         }
     }
 );
@@ -158,7 +158,7 @@ export const deleteEmployee = createAsyncThunk(
             });
             return cardId;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка удаления сотрудника');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка удаления сотрудника');
         }
     }
 );
@@ -174,7 +174,7 @@ export const updateEmployee = createAsyncThunk(
             });
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка обновления сотрудника');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка обновления сотрудника');
         }
     }
 );
@@ -189,7 +189,7 @@ export const createEmployeeAccount = createAsyncThunk(
             );
             return { cardId, ...result };
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка создания аккаунта');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка создания аккаунта');
         }
     }
 );
@@ -217,7 +217,7 @@ export const fetchEmployeePermissions = createAsyncThunk(
             );
             return { cardId, permissions: result };
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка загрузки прав сотрудника');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка загрузки прав сотрудника');
         }
     }
 );
@@ -233,7 +233,7 @@ export const saveEmployeePermissions = createAsyncThunk(
             });
             return { cardId, permissionIds };
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка сохранения прав');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка сохранения прав');
         }
     }
 );

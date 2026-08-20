@@ -63,6 +63,21 @@ export function validateEmployeeForm(data) {
 
 export const EMPLOYEE_TABLE_COLUMNS = ['Сотрудник', 'Контакты', 'Оплата', 'Аккаунт'];
 
+export function parseEmployeeSaveError(error) {
+  const message = typeof error === 'string' ? error : error?.message || '';
+  const emailConflict = /другую почту|таким email|email уже/i.test(message);
+  if (emailConflict) {
+    return {
+      formError: 'Попробуйте использовать другую почту',
+      fieldErrors: { email: 'Попробуйте использовать другую почту' },
+    };
+  }
+  return {
+    formError: message || 'Не удалось сохранить сотрудника',
+    fieldErrors: {},
+  };
+}
+
 export function canCreateEmployeeAccount(employee) {
   return Boolean(employee.email && !employee.user_id && employee.account_status !== 'linked');
 }
