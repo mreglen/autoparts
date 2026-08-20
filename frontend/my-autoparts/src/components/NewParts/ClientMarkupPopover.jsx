@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Button from '../UI/Button';
@@ -7,9 +7,11 @@ import {
   CLIENT_MARKUP_DISPLAY_BOTH,
   CLIENT_MARKUP_DISPLAY_MARKED_UP_ONLY,
 } from '../../redux/slices/ClientMarkupSlice';
+import { MOBILE_BOTTOM_NAV_OFFSET } from '../../utils/actionsDropdownPlacement';
 
 const PANEL_WIDTH = 288;
 const PANEL_GAP = 8;
+const PANEL_ESTIMATED_HEIGHT = 340;
 
 const fieldClass =
   'mt-1 block w-full rounded-sg border border-line bg-white px-3 py-2 text-sm text-ink shadow-sg-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
@@ -19,7 +21,7 @@ function clampPanelLeft(triggerRect) {
   return Math.max(PANEL_GAP, Math.min(ideal, window.innerWidth - PANEL_WIDTH - PANEL_GAP));
 }
 
-export default function ClientMarkupPopover({ onApply }) {
+export default function ClientMarkupPopover({ onApply, bottomInset = 0 }) {
   const dispatch = useDispatch();
   const settings = useSelector((state) => state.clientMarkup);
   const [open, setOpen] = useState(false);
@@ -33,11 +35,25 @@ export default function ClientMarkupPopover({ onApply }) {
   const updatePanelPosition = useCallback(() => {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
+
+    const panelHeight = panelRef.current?.offsetHeight || PANEL_ESTIMATED_HEIGHT;
+    const reservedBottom = bottomInset
+      || (window.matchMedia('(max-width: 767px)').matches ? MOBILE_BOTTOM_NAV_OFFSET : 0);
+    const spaceBelow = window.innerHeight - rect.bottom - PANEL_GAP - reservedBottom;
+    const spaceAbove = rect.top - PANEL_GAP;
+    const openUp = spaceBelow < panelHeight && spaceAbove >= panelHeight * 0.6;
+
+    let top = openUp
+      ? rect.top - panelHeight - PANEL_GAP
+      : rect.bottom + PANEL_GAP;
+
+    top = Math.max(PANEL_GAP, Math.min(top, window.innerHeight - panelHeight - PANEL_GAP));
+
     setPanelStyle({
-      top: rect.bottom + PANEL_GAP,
+      top,
       left: clampPanelLeft(rect),
     });
-  }, []);
+  }, [bottomInset]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -46,6 +62,11 @@ export default function ClientMarkupPopover({ onApply }) {
     setShowPurchaseInCart(settings.showPurchaseInCart);
     updatePanelPosition();
   }, [open, settings, updatePanelPosition]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePanelPosition();
+  }, [open, displayMode, showPurchaseInCart, updatePanelPosition]);
 
   useEffect(() => {
     if (!open) return undefined;

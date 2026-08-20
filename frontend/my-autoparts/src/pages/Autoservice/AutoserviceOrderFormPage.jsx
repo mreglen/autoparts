@@ -1968,7 +1968,7 @@ export default function AutoserviceOrderFormPage() {
                   <th className="w-28 px-2 py-2.5">
                     <span className="inline-flex items-center gap-1.5">
                       {clientMarkupEnabled ? (
-                        <ClientMarkupPopover onApply={applyShopPartsMarkup} />
+                        <ClientMarkupPopover onApply={applyShopPartsMarkup} bottomInset={72} />
                       ) : null}
                       <span>Цена</span>
                     </span>
