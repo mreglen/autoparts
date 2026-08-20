@@ -8,6 +8,7 @@ import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDr
 import RepairOrderViewModal, { OrderStatusBadge, vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
+import { buildRepairOrderDuplicatePayload } from '../../utils/repairOrderDuplicate';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
@@ -78,16 +79,26 @@ function StatusPicker({ status, options, disabled, saving, onChange }) {
   );
 }
 
-function OrderActionsMenu({ onView, onEdit, showLabel = true }) {
+function OrderActionsMenu({
+  onView,
+  onEdit,
+  onDuplicate,
+  duplicating = false,
+  showLabel = true,
+}) {
   return (
     <ActionsDropdown
-      menuClassName="w-44 z-50"
-      estimatedMenuHeight={120}
+      menuClassName="w-52 z-50"
+      estimatedMenuHeight={168}
       showLabel={showLabel}
-      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+      disabled={duplicating}
+      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60"
     >
-      <ActionsDropdownItem onClick={onView}>Просмотр</ActionsDropdownItem>
-      <ActionsDropdownItem onClick={onEdit}>Изменить</ActionsDropdownItem>
+      <ActionsDropdownItem onClick={onView} disabled={duplicating}>Просмотр</ActionsDropdownItem>
+      <ActionsDropdownItem onClick={onEdit} disabled={duplicating}>Изменить</ActionsDropdownItem>
+      <ActionsDropdownItem onClick={onDuplicate} disabled={duplicating}>
+        {duplicating ? 'Копирование…' : 'Скопировать и создать'}
+      </ActionsDropdownItem>
     </ActionsDropdown>
   );
 }
@@ -99,6 +110,8 @@ function OrderMobileCard({
   onStatusChange,
   onView,
   onEdit,
+  onDuplicate,
+  duplicating = false,
 }) {
   return (
     <div className="border-b border-gray-100 py-3 last:border-b-0">
@@ -125,7 +138,13 @@ function OrderMobileCard({
           ) : null}
         </button>
         <div className="shrink-0">
-          <OrderActionsMenu onView={onView} onEdit={onEdit} showLabel={false} />
+          <OrderActionsMenu
+            onView={onView}
+            onEdit={onEdit}
+            onDuplicate={onDuplicate}
+            duplicating={duplicating}
+            showLabel={false}
+          />
         </div>
       </div>
     </div>
@@ -146,6 +165,7 @@ export default function AutoserviceOrdersPage() {
   const [historyStatus, setHistoryStatus] = useState('');
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
+  const [duplicatingId, setDuplicatingId] = useState(null);
   const prevScopeKeyRef = useRef(null);
 
   const scope = viewHistory ? 'history' : 'active';
@@ -230,6 +250,28 @@ export default function AutoserviceOrdersPage() {
     },
     [statusActions],
   );
+
+  const handleDuplicate = async (row) => {
+    setDuplicatingId(row.id);
+    setError('');
+    try {
+      const order = await apiRequest(`/autoservice/repair-orders/${row.id}`);
+      const created = await apiRequest('/autoservice/repair-orders', {
+        method: 'POST',
+        body: JSON.stringify(buildRepairOrderDuplicatePayload(order)),
+      });
+      if (viewHistory) {
+        setSearchParams({});
+      } else {
+        await load();
+      }
+      setViewOrder(created);
+    } catch (e) {
+      setError(e?.message || 'Не удалось скопировать заказ-наряд');
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
 
   const handleOrderUpdated = useCallback(
     (updated) => {
@@ -390,6 +432,8 @@ export default function AutoserviceOrdersPage() {
                     <OrderActionsMenu
                       onView={() => setViewOrder(row)}
                       onEdit={() => navigate(`/autoservice/orders/${row.id}/edit`)}
+                      onDuplicate={() => handleDuplicate(row)}
+                      duplicating={duplicatingId === row.id}
                     />
                   </td>
                 </tr>
@@ -428,6 +472,8 @@ export default function AutoserviceOrdersPage() {
               onStatusChange={handleStatus}
               onView={() => setViewOrder(row)}
               onEdit={() => navigate(`/autoservice/orders/${row.id}/edit`)}
+              onDuplicate={() => handleDuplicate(row)}
+              duplicating={duplicatingId === row.id}
             />
           ))
         )}
