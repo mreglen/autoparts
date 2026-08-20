@@ -73,6 +73,7 @@ from app.services.autoservice_payment_service import (
     order_payment_summary,
 )
 from app.services.repair_order_cart_import import shop_part_display_name
+from app.services.repair_order_delete import delete_repair_order
 from app.services.repair_order_purchase_import import (
     append_purchase_items_to_repair_order,
     detach_imported_shop_part_from_repair_order,
@@ -1366,6 +1367,20 @@ def import_autoservice_stock_to_repair_order(
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
     return _to_staff_view(db, row)
+
+
+@router.delete(
+    "/autoservice/repair-orders/{order_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def remove_repair_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    delete_repair_order(db, org_id=org_id, order_id=order_id)
+    db.commit()
 
 
 @router.patch(

@@ -1788,12 +1788,7 @@ export default function AutoserviceOrderFormPage() {
           </div>
         </SectionCard>
 
-        <SectionCard
-          title="Работы"
-          action={(
-            <SectionAddLink onClick={() => setWorks((prev) => [...prev, emptyWork()])} />
-          )}
-        >
+        <SectionCard title="Работы">
           {works.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет работ</p>
           ) : (
@@ -1901,12 +1896,7 @@ export default function AutoserviceOrderFormPage() {
           </div>
         </SectionCard>
 
-        <SectionCard
-          title="Запчасти клиента"
-          action={(
-            <SectionAddLink onClick={() => setClientParts((prev) => [...prev, emptyClientPart()])} />
-          )}
-        >
+        <SectionCard title="Запчасти клиента">
           {clientParts.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет запчастей клиента</p>
           ) : (
@@ -1966,12 +1956,7 @@ export default function AutoserviceOrderFormPage() {
           </div>
         </SectionCard>
 
-        <SectionCard
-          title="Запчасти исполнителя"
-          action={(
-            <SectionAddLink onClick={() => setShopPartAddMenuOpen(true)} />
-          )}
-        >
+        <SectionCard title="Запчасти исполнителя">
           <div className="overflow-x-auto rounded-sg border border-line">
             <table className="min-w-[820px] w-full text-left text-sm">
               <thead>

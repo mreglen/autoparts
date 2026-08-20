@@ -7,6 +7,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import RepairOrderViewModal, { OrderStatusBadge, vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
+import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { buildRepairOrderDuplicatePayload } from '../../utils/repairOrderDuplicate';
 import { formatServerDateTime } from '../../utils/serverDate';
@@ -83,13 +84,14 @@ function OrderActionsMenu({
   onView,
   onEdit,
   onDuplicate,
+  onDelete,
   duplicating = false,
   showLabel = true,
 }) {
   return (
     <ActionsDropdown
       menuClassName="w-52 z-50"
-      estimatedMenuHeight={168}
+      estimatedMenuHeight={204}
       showLabel={showLabel}
       disabled={duplicating}
       buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60"
@@ -98,6 +100,9 @@ function OrderActionsMenu({
       <ActionsDropdownItem onClick={onEdit} disabled={duplicating}>Изменить</ActionsDropdownItem>
       <ActionsDropdownItem onClick={onDuplicate} disabled={duplicating}>
         {duplicating ? 'Копирование…' : 'Скопировать и создать'}
+      </ActionsDropdownItem>
+      <ActionsDropdownItem onClick={onDelete} disabled={duplicating} danger>
+        Удалить
       </ActionsDropdownItem>
     </ActionsDropdown>
   );
@@ -111,6 +116,7 @@ function OrderMobileCard({
   onView,
   onEdit,
   onDuplicate,
+  onDelete,
   duplicating = false,
 }) {
   return (
@@ -142,6 +148,7 @@ function OrderMobileCard({
             onView={onView}
             onEdit={onEdit}
             onDuplicate={onDuplicate}
+            onDelete={onDelete}
             duplicating={duplicating}
             showLabel={false}
           />
@@ -166,6 +173,8 @@ export default function AutoserviceOrdersPage() {
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
   const [duplicatingId, setDuplicatingId] = useState(null);
+  const [deleteConfirmOrder, setDeleteConfirmOrder] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const prevScopeKeyRef = useRef(null);
 
   const scope = viewHistory ? 'history' : 'active';
@@ -270,6 +279,26 @@ export default function AutoserviceOrdersPage() {
       setError(e?.message || 'Не удалось скопировать заказ-наряд');
     } finally {
       setDuplicatingId(null);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmOrder) return;
+    setDeletingId(deleteConfirmOrder.id);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/repair-orders/${deleteConfirmOrder.id}`, {
+        method: 'DELETE',
+      });
+      if (viewOrder?.id === deleteConfirmOrder.id) {
+        setViewOrder(null);
+      }
+      setDeleteConfirmOrder(null);
+      await load();
+    } catch (e) {
+      setError(e?.message || 'Не удалось удалить заказ-наряд');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -433,6 +462,7 @@ export default function AutoserviceOrdersPage() {
                       onView={() => setViewOrder(row)}
                       onEdit={() => navigate(`/autoservice/orders/${row.id}/edit`)}
                       onDuplicate={() => handleDuplicate(row)}
+                      onDelete={() => setDeleteConfirmOrder(row)}
                       duplicating={duplicatingId === row.id}
                     />
                   </td>
@@ -473,6 +503,7 @@ export default function AutoserviceOrdersPage() {
               onView={() => setViewOrder(row)}
               onEdit={() => navigate(`/autoservice/orders/${row.id}/edit`)}
               onDuplicate={() => handleDuplicate(row)}
+              onDelete={() => setDeleteConfirmOrder(row)}
               duplicating={duplicatingId === row.id}
             />
           ))
@@ -488,6 +519,23 @@ export default function AutoserviceOrdersPage() {
           setViewOrder(null);
           navigate(`/autoservice/orders/${order.id}/edit`);
         }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteConfirmOrder)}
+        onClose={() => {
+          if (!deletingId) setDeleteConfirmOrder(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        title="Удалить заказ-наряд?"
+        message={
+          deleteConfirmOrder
+            ? `Заказ-наряд № ${deleteConfirmOrder.order_number} будет удалён безвозвратно. Запчасти исполнителя вернутся на склад автосервиса.`
+            : ''
+        }
+        confirmLabel="Удалить"
+        danger
+        loading={Boolean(deletingId)}
       />
     </div>
   );
