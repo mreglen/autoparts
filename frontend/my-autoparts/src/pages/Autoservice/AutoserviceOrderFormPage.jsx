@@ -1532,7 +1532,7 @@ export default function AutoserviceOrderFormPage() {
       };
 
       if (isEdit) {
-        const updated = await apiRequest(`/autoservice/repair-orders/${orderId}`, {
+        await apiRequest(`/autoservice/repair-orders/${orderId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
