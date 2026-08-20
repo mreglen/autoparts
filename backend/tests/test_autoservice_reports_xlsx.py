@@ -91,6 +91,19 @@ class PayrollReportXlsxTests(unittest.TestCase):
                                 "plate": "A123BC",
                             },
                             "amount": Decimal("300.00"),
+                            "works": [
+                                {
+                                    "work_id": 501,
+                                    "title": "Замена масла",
+                                    "qty": 1,
+                                    "unit_price": Decimal("1000.00"),
+                                    "line_total": Decimal("1000.00"),
+                                    "percent": Decimal("30.00"),
+                                    "accrual_type": "work_percent",
+                                    "accrual_type_label": "Процент от работы",
+                                    "amount": Decimal("300.00"),
+                                }
+                            ],
                         }
                     ],
                 }
@@ -103,9 +116,10 @@ class PayrollReportXlsxTests(unittest.TestCase):
             content = build_payroll_report_workbook_bytes(db, "ORG1", 2026, 8)
         self.assertTrue(content)
         wb = load_workbook(BytesIO(content))
-        self.assertEqual(wb.sheetnames, ["Сводка", "Сотрудники", "Детализация"])
+        self.assertEqual(wb.sheetnames, ["Сводка", "Сотрудники", "По заказ-нарядам", "Работы"])
         self.assertEqual(wb["Сводка"]["A1"].value, "Зарплаты автосервиса")
-        self.assertEqual(wb["Детализация"]["B2"].value, "ЗН-001")
+        self.assertEqual(wb["Работы"]["D1"].value, "Работа")
+        self.assertEqual(wb["Работы"]["D2"].value, "Замена масла")
 
 
 if __name__ == "__main__":

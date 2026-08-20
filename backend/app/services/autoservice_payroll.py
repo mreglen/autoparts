@@ -165,6 +165,75 @@ def _vehicle_brief(vehicle) -> dict | None:
     }
 
 
+ACCRUAL_TYPE_LABELS = {
+    "work_percent": "Процент от работы",
+    "daily_rate": "Сменная ставка",
+}
+
+
+def _executor_percent(work: RepairOrderWork | None, employee_id: int) -> Decimal | None:
+    if work is None:
+        return None
+    for row in work.executors or []:
+        if row.employee_id == employee_id:
+            return _money(row.percent)
+    return None
+
+
+def _accrual_work_row(accrual: AutoservicePayrollAccrual, works_by_id: dict[int, RepairOrderWork]) -> dict:
+    amount = _money(accrual.amount)
+    if accrual.accrual_type == "daily_rate":
+        return {
+            "work_id": None,
+            "title": ACCRUAL_TYPE_LABELS["daily_rate"],
+            "qty": None,
+            "unit_price": None,
+            "line_total": None,
+            "percent": None,
+            "accrual_type": accrual.accrual_type,
+            "accrual_type_label": ACCRUAL_TYPE_LABELS["daily_rate"],
+            "amount": amount,
+        }
+
+    work = works_by_id.get(accrual.work_id) if accrual.work_id else None
+    if work is None:
+        return {
+            "work_id": accrual.work_id,
+            "title": "Работа",
+            "qty": None,
+            "unit_price": None,
+            "line_total": None,
+            "percent": None,
+            "accrual_type": accrual.accrual_type,
+            "accrual_type_label": ACCRUAL_TYPE_LABELS.get(accrual.accrual_type, accrual.accrual_type),
+            "amount": amount,
+        }
+
+    unit_price = _money(work.unit_price)
+    line_total = _line_sum(work.qty, unit_price)
+    return {
+        "work_id": work.id,
+        "title": work.title,
+        "qty": work.qty,
+        "unit_price": unit_price,
+        "line_total": line_total,
+        "percent": _executor_percent(work, accrual.employee_id),
+        "accrual_type": accrual.accrual_type,
+        "accrual_type_label": ACCRUAL_TYPE_LABELS.get(accrual.accrual_type, accrual.accrual_type),
+        "amount": amount,
+        "position": work.position,
+    }
+
+
+def _sort_work_rows(rows: list[dict]) -> list[dict]:
+    def sort_key(row: dict) -> tuple:
+        if row.get("accrual_type") == "daily_rate":
+            return (1, row.get("title") or "")
+        return (0, row.get("position") or 0, row.get("title") or "")
+
+    return sorted(rows, key=sort_key)
+
+
 def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int) -> dict:
     start, end = month_bounds(year, month)
     employees = (
@@ -191,10 +260,12 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
             "employee_id": emp.id,
             "name": emp.name,
             "order_amounts": {},
+            "order_works": {},
         }
 
     employees_by_id = {emp.id: emp for emp in employees}
     all_order_ids: set[int] = set()
+    all_work_ids: set[int] = set()
     for accrual in accruals:
         bucket = by_emp.get(accrual.employee_id)
         if bucket is None:
@@ -203,15 +274,28 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
                 "employee_id": accrual.employee_id,
                 "name": emp.name if emp else f"#{accrual.employee_id}",
                 "order_amounts": {},
+                "order_works": {},
             }
             by_emp[accrual.employee_id] = bucket
         if not accrual.order_id:
             continue
         all_order_ids.add(accrual.order_id)
+        if accrual.work_id:
+            all_work_ids.add(accrual.work_id)
         amount = _money(accrual.amount)
         bucket["order_amounts"][accrual.order_id] = (
             bucket["order_amounts"].get(accrual.order_id, Decimal("0.00")) + amount
         )
+        bucket["order_works"].setdefault(accrual.order_id, []).append(accrual)
+
+    works_by_id: dict[int, RepairOrderWork] = {}
+    if all_work_ids:
+        works = (
+            db.query(RepairOrderWork)
+            .filter(RepairOrderWork.id.in_(all_work_ids))
+            .all()
+        )
+        works_by_id = {work.id: work for work in works}
 
     orders_by_id: dict[int, RepairOrder] = {}
     vehicles_by_id: dict[int, GarageVehicle] = {}
@@ -246,12 +330,17 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
             order_amount = _money(amount)
             row_total += order_amount
             vehicle = vehicles_by_id.get(order.vehicle_id) if order and order.vehicle_id else None
+            work_accruals = bucket["order_works"].get(order_id, [])
+            works = _sort_work_rows(
+                [_accrual_work_row(accrual, works_by_id) for accrual in work_accruals]
+            )
             order_rows.append(
                 {
                     "order_id": order_id,
                     "order_number": order.order_number if order else f"#{order_id}",
                     "vehicle": _vehicle_brief(vehicle),
                     "amount": order_amount,
+                    "works": works,
                 }
             )
         row_total = _money(row_total)

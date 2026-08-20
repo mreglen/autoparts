@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.garage_vehicle import GarageVehicle
-from app.models.repair_order import RepairOrder
+from app.models.repair_order import RepairOrder, RepairOrderWork
 from app.services.autoservice_payroll import compute_org_monthly_payroll, month_bounds
 
 
@@ -31,10 +31,11 @@ def _order(order_id: int, order_number: str):
 
 
 class AutoserviceMonthlyPayrollTests(unittest.TestCase):
-    def _mock_db(self, employees, accruals, orders=None, vehicles=None):
+    def _mock_db(self, employees, accruals, orders=None, vehicles=None, works=None):
         db = MagicMock()
         orders = orders or []
         vehicles = vehicles or [_vehicle(order.id) for order in orders if getattr(order, "vehicle_id", None)]
+        works = works or []
 
         def query_side_effect(model):
             q = MagicMock()
@@ -48,6 +49,8 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 q.all.return_value = orders
             elif model is GarageVehicle:
                 q.all.return_value = vehicles
+            elif model is RepairOrderWork:
+                q.all.return_value = works
             else:
                 q.all.return_value = []
             return q
@@ -74,31 +77,57 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
             SimpleNamespace(
                 employee_id=1,
                 order_id=10,
+                work_id=501,
                 accrual_type="work_percent",
                 amount=Decimal("100.00"),
             ),
             SimpleNamespace(
                 employee_id=1,
                 order_id=11,
+                work_id=502,
                 accrual_type="work_percent",
                 amount=Decimal("50.00"),
             ),
             SimpleNamespace(
                 employee_id=2,
                 order_id=10,
+                work_id=501,
                 accrual_type="work_percent",
                 amount=Decimal("200.00"),
             ),
             SimpleNamespace(
                 employee_id=2,
                 order_id=10,
+                work_id=None,
                 accrual_type="daily_rate",
                 amount=Decimal("1500.00"),
             ),
         ]
 
+        works = [
+            SimpleNamespace(
+                id=501,
+                title="Замена масла",
+                qty=1,
+                unit_price=Decimal("1000.00"),
+                position=1,
+                executors=[
+                    SimpleNamespace(employee_id=1, percent=Decimal("10.00")),
+                    SimpleNamespace(employee_id=2, percent=Decimal("20.00")),
+                ],
+            ),
+            SimpleNamespace(
+                id=502,
+                title="Диагностика",
+                qty=1,
+                unit_price=Decimal("500.00"),
+                position=1,
+                executors=[SimpleNamespace(employee_id=1, percent=Decimal("10.00"))],
+            ),
+        ]
+
         orders = [_order(10, "RO-010"), _order(11, "RO-011")]
-        db = self._mock_db([emp_a, emp_b, emp_idle], accruals, orders)
+        db = self._mock_db([emp_a, emp_b, emp_idle], accruals, orders, works=works)
 
         result = compute_org_monthly_payroll(db, "ORG1", 2026, 8)
 
@@ -116,6 +145,9 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         self.assertEqual(ivanov_by_order[10]["amount"], Decimal("100.00"))
         self.assertEqual(ivanov_by_order[10]["order_number"], "RO-010")
         self.assertEqual(ivanov_by_order[10]["vehicle"]["make"], "Toyota")
+        self.assertEqual(len(ivanov_by_order[10]["works"]), 1)
+        self.assertEqual(ivanov_by_order[10]["works"][0]["title"], "Замена масла")
+        self.assertEqual(ivanov_by_order[10]["works"][0]["percent"], Decimal("10.00"))
         self.assertEqual(ivanov_by_order[11]["amount"], Decimal("50.00"))
 
         petrov = by_name["Петров"]
@@ -124,6 +156,10 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         self.assertEqual(len(petrov["orders"]), 1)
         self.assertEqual(petrov["orders"][0]["order_id"], 10)
         self.assertEqual(petrov["orders"][0]["amount"], Decimal("1700.00"))
+        self.assertEqual(len(petrov["orders"][0]["works"]), 2)
+        petrov_work_titles = [item["title"] for item in petrov["orders"][0]["works"]]
+        self.assertIn("Замена масла", petrov_work_titles)
+        self.assertIn("Сменная ставка", petrov_work_titles)
         self.assertEqual(petrov["orders"][0]["vehicle"]["plate"], "A010BC")
 
         sidorov = by_name["Сидоров"]
@@ -137,23 +173,36 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
             SimpleNamespace(
                 employee_id=1,
                 order_id=10,
+                work_id=501,
                 accrual_type="work_percent",
                 amount=Decimal("100.00"),
             ),
             SimpleNamespace(
                 employee_id=1,
                 order_id=10,
+                work_id=None,
                 accrual_type="daily_rate",
                 amount=Decimal("1500.00"),
             ),
             SimpleNamespace(
                 employee_id=1,
                 order_id=10,
+                work_id=501,
                 accrual_type="work_percent",
                 amount=Decimal("50.00"),
             ),
         ]
-        db = self._mock_db([emp], accruals, [_order(10, "RO-010")])
+        works = [
+            SimpleNamespace(
+                id=501,
+                title="Ремонт",
+                qty=1,
+                unit_price=Decimal("1500.00"),
+                position=1,
+                executors=[SimpleNamespace(employee_id=1, percent=Decimal("10.00"))],
+            ),
+        ]
+        db = self._mock_db([emp], accruals, [_order(10, "RO-010")], works=works)
 
         result = compute_org_monthly_payroll(db, "ORG1", 2026, 8)
 
@@ -163,6 +212,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         self.assertEqual(row["total"], Decimal("1650.00"))
         self.assertEqual(len(row["orders"]), 1)
         self.assertEqual(row["orders"][0]["amount"], Decimal("1650.00"))
+        self.assertEqual(len(row["orders"][0]["works"]), 3)
 
     def test_skips_inactive_without_accruals(self):
         inactive = SimpleNamespace(id=4, name="Архив", is_active=False, organization_id="ORG1")
