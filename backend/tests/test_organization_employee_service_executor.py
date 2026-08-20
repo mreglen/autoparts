@@ -20,6 +20,10 @@ class OrganizationEmployeeServiceExecutorTests(TestCase):
             name="Иван Мастер",
             phone="+7 (999) 111-22-33",
             position="Механик",
+            salary_type="percent_work",
+            salary_amount=Decimal("0"),
+            work_percent=Decimal("30"),
+            is_active=True,
         )
         db.query.return_value.filter.return_value.first.return_value = None
 
@@ -27,8 +31,8 @@ class OrganizationEmployeeServiceExecutorTests(TestCase):
 
         self.assertTrue(card.is_service_executor)
         self.assertEqual(card.legacy_service_employee_id, 7)
-        db.add.assert_called_once_with(card)
-        db.flush.assert_called_once()
+        self.assertGreaterEqual(db.add.call_count, 1)
+        db.flush.assert_called()
 
     def test_service_employee_is_executor_requires_flag(self):
         db = MagicMock()

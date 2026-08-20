@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
-from app.models.organization_employee import OrganizationEmployee
+from app.models.organization_employee import (
+    OrganizationEmployee,
+    OrganizationEmployeePayrollTerm,
+)
 from app.models.user import User
 
 
@@ -77,12 +81,32 @@ def get_or_create_card_for_user(db: Session, user: User) -> OrganizationEmployee
     return card
 
 
+def _ensure_payroll_from_legacy(db: Session, card: OrganizationEmployee, legacy: AutoserviceServiceEmployee) -> None:
+    if card.payroll_terms:
+        return
+    salary_type = legacy.salary_type if legacy.salary_type in ("percent_work", "fixed") else "percent_work"
+    work_percent = legacy.work_percent if salary_type == "percent_work" else Decimal("0")
+    if salary_type == "percent_work" and (not work_percent or work_percent <= 0):
+        work_percent = Decimal("50")
+    db.add(
+        OrganizationEmployeePayrollTerm(
+            organization_employee_id=card.id,
+            salary_type=salary_type,
+            salary_amount=legacy.salary_amount or Decimal("0"),
+            work_percent=work_percent,
+            effective_from=date.today(),
+        )
+    )
+
+
 def sync_user_service_executor(
     db: Session,
     user: User,
     enabled: bool,
     *,
     work_percent: Decimal | None = None,
+    salary_type: str = "percent_work",
+    salary_amount: Decimal | None = None,
 ) -> OrganizationEmployee:
     card = get_or_create_card_for_user(db, user)
     card.is_service_executor = enabled
@@ -118,6 +142,9 @@ def sync_user_service_executor(
             service_emp.phone = user.phone
         if work_percent is not None:
             service_emp.work_percent = work_percent
+            service_emp.salary_type = salary_type
+        if salary_amount is not None:
+            service_emp.salary_amount = salary_amount
     elif card.legacy_service_employee_id:
         service_emp = (
             db.query(AutoserviceServiceEmployee)
@@ -133,11 +160,11 @@ def link_service_employee_card(
     db: Session,
     service_employee: AutoserviceServiceEmployee,
 ) -> OrganizationEmployee:
-    """Standalone autoservice employee (e.g. legacy list) — mark as service executor."""
     card = get_card_by_service_employee_id(db, service_employee.id)
     if card:
         card.is_service_executor = True
-        card.is_active = True
+        card.is_active = bool(service_employee.is_active)
+        _ensure_payroll_from_legacy(db, card, service_employee)
         return card
     card = OrganizationEmployee(
         organization_id=service_employee.organization_id,
@@ -147,11 +174,12 @@ def link_service_employee_card(
         phone=service_employee.phone,
         position=service_employee.position,
         is_service_executor=True,
-        is_active=True,
+        is_active=bool(service_employee.is_active),
         account_status="no_account",
     )
     db.add(card)
     db.flush()
+    _ensure_payroll_from_legacy(db, card, service_employee)
     return card
 
 
@@ -172,13 +200,24 @@ def user_is_service_executor(db: Session, user: User) -> bool:
 def backfill_organization_employee_cards(db: Session) -> None:
     """Idempotent: link legacy service employees and create cards for org users."""
     for service_employee in db.query(AutoserviceServiceEmployee).all():
-        if not get_card_by_service_employee_id(db, service_employee.id):
-            link_service_employee_card(db, service_employee)
+        link_service_employee_card(db, service_employee)
 
-    users = db.query(User).filter(User.organization_id.isnot(None)).all()
+    users = (
+        db.query(User)
+        .filter(User.organization_id.isnot(None))
+        .filter((User.is_employee.is_(True)) | (User.is_director.is_(True)) | (User.is_seller.is_(True)))
+        .all()
+    )
     for user in users:
         card = get_or_create_card_for_user(db, user)
         if card.legacy_service_employee_id and not card.is_service_executor:
             card.is_service_executor = True
+            legacy = (
+                db.query(AutoserviceServiceEmployee)
+                .filter(AutoserviceServiceEmployee.id == card.legacy_service_employee_id)
+                .first()
+            )
+            if legacy:
+                _ensure_payroll_from_legacy(db, card, legacy)
 
     db.commit()

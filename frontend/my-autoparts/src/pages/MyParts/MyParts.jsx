@@ -1088,6 +1088,7 @@ function MyParts() {
     quantity: '',
     price: '',
     reason: '',
+    comment: '',
   });
 
   // Сортировка: по умолчанию сначала новые
@@ -1415,6 +1416,7 @@ function MyParts() {
   const handleOpenModal = (part, type) => {
     setSelectedPart(part);
     setOperationType(type);
+    setFormData({ quantity: '', price: '', reason: '', comment: '' });
     setModalOpen(true);
   };
 
@@ -1803,6 +1805,8 @@ function MyParts() {
         return;
       }
       stockOutData.sale_price = price;
+      const comment = (formData.comment || '').trim();
+      stockOutData.reason = comment || null;
     } else {
       stockOutData.reason = formData.reason || 'Списание';
     }

@@ -120,12 +120,12 @@ export const deleteStorageLocation = createAsyncThunk(
     }
 );
 
-// Получить сотрудников
+// Получить карточки сотрудников
 export const fetchEmployees = createAsyncThunk(
     'organization/fetchEmployees',
     async (orgId, { rejectWithValue }) => {
         try {
-            const result = await apiRequest(`/organizations/${orgId}/employees`);
+            const result = await apiRequest(`/organizations/${orgId}/employee-cards`);
             return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка загрузки сотрудников');
@@ -133,12 +133,12 @@ export const fetchEmployees = createAsyncThunk(
     }
 );
 
-// Добавить сотрудника
+// Добавить карточку сотрудника
 export const addEmployee = createAsyncThunk(
     'organization/addEmployee',
     async ({ orgId, employeeData }, { rejectWithValue }) => {
         try {
-            const result = await apiRequest(`/organizations/${orgId}/employees`, {
+            const result = await apiRequest(`/organizations/${orgId}/employee-cards`, {
                 method: 'POST',
                 body: JSON.stringify(employeeData),
             });
@@ -151,30 +151,45 @@ export const addEmployee = createAsyncThunk(
 
 export const deleteEmployee = createAsyncThunk(
     'organization/deleteEmployee',
-    async ({ orgId, userId }, { rejectWithValue }) => {
+    async ({ orgId, cardId }, { rejectWithValue }) => {
         try {
-            await apiRequest(`/organizations/${orgId}/employees/${userId}`, {
+            await apiRequest(`/organizations/${orgId}/employee-cards/${cardId}`, {
                 method: 'DELETE',
             });
-            return userId;
+            return cardId;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка удаления сотрудника');
         }
     }
 );
 
-// Обновление сотрудника
+// Обновление карточки сотрудника
 export const updateEmployee = createAsyncThunk(
     'organization/updateEmployee',
-    async ({ orgId, userId, updateData }, { rejectWithValue }) => {
+    async ({ orgId, cardId, updateData }, { rejectWithValue }) => {
         try {
-            const result = await apiRequest(`/organizations/${orgId}/employees/${userId}`, {
+            const result = await apiRequest(`/organizations/${orgId}/employee-cards/${cardId}`, {
                 method: 'PUT',
                 body: JSON.stringify(updateData),
             });
             return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка обновления сотрудника');
+        }
+    }
+);
+
+export const createEmployeeAccount = createAsyncThunk(
+    'organization/createEmployeeAccount',
+    async ({ orgId, cardId }, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest(
+                `/organizations/${orgId}/employee-cards/${cardId}/create-account`,
+                { method: 'POST' },
+            );
+            return { cardId, ...result };
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка создания аккаунта');
         }
     }
 );
@@ -192,32 +207,31 @@ export const fetchPermissions = createAsyncThunk(
     }
 );
 
-// Загрузка прав сотрудника
+// Загрузка прав карточки сотрудника
 export const fetchEmployeePermissions = createAsyncThunk(
     'organization/fetchEmployeePermissions',
-    async (employeeId, { rejectWithValue }) => {
+    async ({ orgId, cardId }, { rejectWithValue }) => {
         try {
-            const result = await apiRequest(`/employees/${employeeId}/permissions`);
-            return { employeeId, permissions: result };
+            const result = await apiRequest(
+                `/organizations/${orgId}/employee-cards/${cardId}/permissions`,
+            );
+            return { cardId, permissions: result };
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка загрузки прав сотрудника');
         }
     }
 );
 
-// Сохранение прав сотрудника
+// Сохранение прав карточки сотрудника
 export const saveEmployeePermissions = createAsyncThunk(
     'organization/saveEmployeePermissions',
-    async ({ employeeId, permissionIds }, { rejectWithValue }) => {
+    async ({ orgId, cardId, permissionIds }, { rejectWithValue }) => {
         try {
-            const result = await apiRequest(`/employees/${employeeId}/permissions`, {
+            await apiRequest(`/organizations/${orgId}/employee-cards/${cardId}/permissions`, {
                 method: 'PUT',
-                body: JSON.stringify({
-                    employee_id: employeeId,
-                    permission_ids: permissionIds
-                }),
+                body: JSON.stringify({ permission_ids: permissionIds }),
             });
-            return { employeeId, permissionIds };
+            return { cardId, permissionIds };
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка сохранения прав');
         }
@@ -329,6 +343,16 @@ const organizationSlice = createSlice({
                 state.loadingEmployees = false;
                 state.employeesError = action.payload;
             })
+            .addCase(createEmployeeAccount.fulfilled, (state, action) => {
+                const index = state.employees.findIndex((emp) => emp.id === action.payload.cardId);
+                if (index !== -1) {
+                    state.employees[index] = {
+                        ...state.employees[index],
+                        user_id: action.payload.user_id,
+                        account_status: 'linked',
+                    };
+                }
+            })
             .addCase(createStorageLocation.pending, (state) => {
                 state.locationsError = null;
             })
@@ -404,7 +428,7 @@ const organizationSlice = createSlice({
             })
             .addCase(fetchEmployeePermissions.fulfilled, (state, action) => {
                 state.loadingEmployeePermissions = false;
-                state.employeePermissions[action.payload.employeeId] = action.payload.permissions;
+                state.employeePermissions[action.payload.cardId] = action.payload.permissions;
             })
             .addCase(fetchEmployeePermissions.rejected, (state, action) => {
                 state.loadingEmployeePermissions = false;
@@ -416,7 +440,7 @@ const organizationSlice = createSlice({
             })
             .addCase(saveEmployeePermissions.fulfilled, (state, action) => {
                 state.savingEmployeePermissions = false;
-                state.employeePermissions[action.payload.employeeId] = action.payload.permissionIds;
+                state.employeePermissions[action.payload.cardId] = action.payload.permissionIds;
             })
             .addCase(saveEmployeePermissions.rejected, (state, action) => {
                 state.savingEmployeePermissions = false;

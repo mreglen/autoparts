@@ -16,6 +16,7 @@ __all__ = [
     "send_welcome_email",
     "send_notification_email",
     "send_autoservice_guest_account_email",
+    "send_employee_account_email",
 ]
 
 settings = Settings()
@@ -244,3 +245,51 @@ https://svoygarage.ru/
         plain_body,
         html_body,
     )
+
+
+def send_employee_account_email(
+    email: str,
+    full_name: str,
+    password: str,
+    organization_name: str | None = None,
+) -> bool:
+    """Send credentials for a new organization employee account."""
+    greeting_name = (full_name or "").strip() or "сотрудник"
+    org_line = f"Организация: {organization_name}\n\n" if organization_name else ""
+    org_html = (
+        f"<p>Организация: <strong>{organization_name}</strong></p>"
+        if organization_name
+        else ""
+    )
+
+    plain_body = f"""Здравствуйте, {greeting_name}!
+
+Для вас создан аккаунт сотрудника.
+{org_line}Данные для входа:
+- Логин: {email}
+- Пароль: {password}
+
+При первом входе система попросит сменить пароль.
+
+Войти: https://svoygarage.ru/login
+
+С уважением,
+команда Свой Гараж
+https://svoygarage.ru/
+"""
+
+    html_body = f"""<!DOCTYPE html>
+<html lang="ru">
+<head><meta charset="utf-8"><title>Аккаунт сотрудника</title></head>
+<body style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.6;">
+  <p>Здравствуйте, {greeting_name}!</p>
+  <p>Для вас создан аккаунт сотрудника.</p>
+  {org_html}
+  <p><strong>Логин:</strong> {email}<br><strong>Пароль:</strong> {password}</p>
+  <p>При первом входе система попросит сменить пароль.</p>
+  <p><a href="https://svoygarage.ru/login">Войти на сайт</a></p>
+  <p>С уважением,<br>команда Свой Гараж</p>
+</body>
+</html>"""
+
+    return _send_multipart_email(email, "Доступ сотрудника организации", plain_body, html_body)

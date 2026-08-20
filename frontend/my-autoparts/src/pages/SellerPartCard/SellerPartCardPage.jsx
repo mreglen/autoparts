@@ -65,7 +65,7 @@ const SellerPartCardPage = () => {
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [stockInModalOpen, setStockInModalOpen] = useState(false);
   const [cellsModalOpen, setCellsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ quantity: '', price: '', reason: '' });
+  const [formData, setFormData] = useState({ quantity: '', price: '', reason: '', comment: '' });
 
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
@@ -163,6 +163,7 @@ const SellerPartCardPage = () => {
 
   const handleOpenModal = (type) => {
     setOperationType(type);
+    setFormData({ quantity: '', price: '', reason: '', comment: '' });
     setModalOpen(true);
   };
 
@@ -187,6 +188,8 @@ const SellerPartCardPage = () => {
       const price = parseFloat(formData.price);
       if (!price || price <= 0) return;
       stockOutData.sale_price = price;
+      const comment = (formData.comment || '').trim();
+      stockOutData.reason = comment || null;
     } else {
       stockOutData.reason = formData.reason || 'Списание';
     }
@@ -196,7 +199,7 @@ const SellerPartCardPage = () => {
     await dispatch(updateProductQuantityAPI({ productId: part.id, newQuantity })).unwrap();
     setPart((prev) => ({ ...prev, quantity: newQuantity }));
     setModalOpen(false);
-    setFormData({ quantity: '', price: '', reason: '' });
+    setFormData({ quantity: '', price: '', reason: '', comment: '' });
     setOperationType(null);
   };
 

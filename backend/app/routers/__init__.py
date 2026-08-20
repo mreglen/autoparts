@@ -26,6 +26,7 @@ from app.routers.tecdoc_parts import router as tecdoc_parts_router
 from app.routers.carts import router as carts_router
 from app.routers.checkout import router as checkout_router
 from app.routers.clients import router as clients_router
+from app.routers.organization_employees import router as organization_employees_router
 from app.routers.employees import router as employees_router
 from app.routers.delivery_methods import router as delivery_methods_router
 from app.routers.payment_methods import router as payment_methods_router
@@ -118,6 +119,7 @@ api_router.include_router(stock_outs_router)
 api_router.include_router(carts_router)
 api_router.include_router(checkout_router)
 api_router.include_router(clients_router)
+api_router.include_router(organization_employees_router)
 api_router.include_router(employees_router)
 api_router.include_router(delivery_methods_router)
 api_router.include_router(payment_methods_router)

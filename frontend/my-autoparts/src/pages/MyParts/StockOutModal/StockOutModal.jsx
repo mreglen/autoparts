@@ -40,17 +40,29 @@ const StockOutModal = ({
           </div>
 
           {operationType === 'sale' ? (
-            <div className="mb-4">
-              <label className="block text-sm text-gray-700 mb-1">Цена продажи, ₽</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.price}
-                onChange={(e) => onFormChange('price', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
+            <>
+              <div className="mb-4">
+                <label className="block text-sm text-gray-700 mb-1">Цена продажи, ₽</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.price}
+                  onChange={(e) => onFormChange('price', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm text-gray-700 mb-1">Комментарий</label>
+                <textarea
+                  value={formData.comment || ''}
+                  onChange={(e) => onFormChange('comment', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  rows="3"
+                  placeholder="Например: продажа клиенту, самовывоз..."
+                />
+              </div>
+            </>
           ) : (
             <div className="mb-4">
               <label className="block text-sm text-gray-700 mb-1">Причина списания</label>

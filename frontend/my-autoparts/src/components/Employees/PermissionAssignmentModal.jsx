@@ -46,7 +46,7 @@ function PermissionTile({ permission, checked, disabled, onToggle }) {
   );
 }
 
-const PermissionAssignmentModal = ({ show, employee, onClose }) => {
+const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
   const dispatch = useDispatch();
   const [localPermissions, setLocalPermissions] = useState([]);
 
@@ -60,11 +60,11 @@ const PermissionAssignmentModal = ({ show, employee, onClose }) => {
   } = useSelector((state) => state.organization);
 
   useEffect(() => {
-    if (show && employee) {
+    if (show && employee && orgId) {
       dispatch(fetchPermissions());
-      dispatch(fetchEmployeePermissions(employee.id));
+      dispatch(fetchEmployeePermissions({ orgId, cardId: employee.id }));
     }
-  }, [show, employee, dispatch]);
+  }, [show, employee, orgId, dispatch]);
 
   useEffect(() => {
     if (employee && employeePermissions[employee.id]) {
@@ -111,11 +111,12 @@ const PermissionAssignmentModal = ({ show, employee, onClose }) => {
   };
 
   const handleSave = async () => {
-    if (!employee) return;
+    if (!employee || !orgId) return;
 
     const resultAction = await dispatch(
       saveEmployeePermissions({
-        employeeId: employee.id,
+        orgId,
+        cardId: employee.id,
         permissionIds: localPermissions,
       })
     );
