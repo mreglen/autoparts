@@ -18,7 +18,7 @@ from app.schemas.autoservice_planner import (
     PlannerWeekZoneDay,
     PlannerWeekZoneRow,
 )
-from app.utils.autoservice_access import require_autoservice_staff
+from app.utils.autoservice_access import display_client_phone, require_autoservice_staff
 
 router = APIRouter(tags=["Autoservice planner"])
 
@@ -46,7 +46,7 @@ def _planner_order(row: RepairOrder) -> PlannerRepairOrder:
         order_number=row.order_number,
         client_id=row.client_id,
         client_name=row.client.name if row.client else "—",
-        client_phone=row.client.phone if row.client else "",
+        client_phone=display_client_phone(row.client.phone) if row.client else "",
         vehicle=_vehicle_label(row.vehicle),
         status=row.status,
         scheduled_at=row.scheduled_at,

@@ -138,6 +138,12 @@ export function validatePhone(value) {
   return '';
 }
 
+export function validatePhoneOptional(value) {
+  const pure = (value || '').replace(/\D/g, '');
+  if (!pure) return '';
+  return validatePhone(value);
+}
+
 export function isPhoneComplete(value) {
   const pure = (value || '').replace(/\D/g, '');
   return pure.length === 11 && pure.startsWith('7');

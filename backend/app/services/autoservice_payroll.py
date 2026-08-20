@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
+from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import RepairOrder, RepairOrderWork
 
 
@@ -151,6 +152,19 @@ def month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
     return start, datetime(year, month + 1, 1)
 
 
+def _vehicle_brief(vehicle) -> dict | None:
+    if vehicle is None:
+        return None
+    return {
+        "id": vehicle.id,
+        "make": vehicle.make,
+        "model": vehicle.model,
+        "year": vehicle.year,
+        "vin": vehicle.vin,
+        "plate": vehicle.plate,
+    }
+
+
 def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int) -> dict:
     start, end = month_bounds(year, month)
     employees = (
@@ -176,12 +190,11 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
         by_emp[emp.id] = {
             "employee_id": emp.id,
             "name": emp.name,
-            "order_ids": set(),
-            "from_works": Decimal("0.00"),
-            "from_daily": Decimal("0.00"),
+            "order_amounts": {},
         }
 
     employees_by_id = {emp.id: emp for emp in employees}
+    all_order_ids: set[int] = set()
     for accrual in accruals:
         bucket = by_emp.get(accrual.employee_id)
         if bucket is None:
@@ -189,34 +202,67 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
             bucket = {
                 "employee_id": accrual.employee_id,
                 "name": emp.name if emp else f"#{accrual.employee_id}",
-                "order_ids": set(),
-                "from_works": Decimal("0.00"),
-                "from_daily": Decimal("0.00"),
+                "order_amounts": {},
             }
             by_emp[accrual.employee_id] = bucket
-        if accrual.order_id:
-            bucket["order_ids"].add(accrual.order_id)
+        if not accrual.order_id:
+            continue
+        all_order_ids.add(accrual.order_id)
         amount = _money(accrual.amount)
-        if accrual.accrual_type == "work_percent":
-            bucket["from_works"] += amount
-        elif accrual.accrual_type == "daily_rate":
-            bucket["from_daily"] += amount
+        bucket["order_amounts"][accrual.order_id] = (
+            bucket["order_amounts"].get(accrual.order_id, Decimal("0.00")) + amount
+        )
+
+    orders_by_id: dict[int, RepairOrder] = {}
+    vehicles_by_id: dict[int, GarageVehicle] = {}
+    if all_order_ids:
+        orders = (
+            db.query(RepairOrder)
+            .filter(RepairOrder.id.in_(all_order_ids))
+            .all()
+        )
+        orders_by_id = {order.id: order for order in orders}
+        vehicle_ids = {order.vehicle_id for order in orders if order.vehicle_id}
+        if vehicle_ids:
+            vehicles = (
+                db.query(GarageVehicle)
+                .filter(GarageVehicle.id.in_(vehicle_ids))
+                .all()
+            )
+            vehicles_by_id = {vehicle.id: vehicle for vehicle in vehicles}
 
     rows = []
     total = Decimal("0.00")
     for bucket in sorted(by_emp.values(), key=lambda item: item["name"].lower()):
-        from_works = _money(bucket["from_works"])
-        from_daily = _money(bucket["from_daily"])
-        row_total = _money(from_works + from_daily)
+        order_rows = []
+        row_total = Decimal("0.00")
+        for order_id, amount in sorted(
+            bucket["order_amounts"].items(),
+            key=lambda item: (
+                orders_by_id[item[0]].order_number if item[0] in orders_by_id else str(item[0])
+            ),
+        ):
+            order = orders_by_id.get(order_id)
+            order_amount = _money(amount)
+            row_total += order_amount
+            vehicle = vehicles_by_id.get(order.vehicle_id) if order and order.vehicle_id else None
+            order_rows.append(
+                {
+                    "order_id": order_id,
+                    "order_number": order.order_number if order else f"#{order_id}",
+                    "vehicle": _vehicle_brief(vehicle),
+                    "amount": order_amount,
+                }
+            )
+        row_total = _money(row_total)
         total += row_total
         rows.append(
             {
                 "employee_id": bucket["employee_id"],
                 "name": bucket["name"],
-                "completed_orders": len(bucket["order_ids"]),
-                "from_works": from_works,
-                "from_daily": from_daily,
+                "completed_orders": len(bucket["order_amounts"]),
                 "total": row_total,
+                "orders": order_rows,
             }
         )
     return {

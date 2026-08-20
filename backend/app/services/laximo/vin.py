@@ -10,6 +10,7 @@ VIN_MAX_LENGTH = 17
 # ISO 3779: VIN uses A–Z and 0–9 except I, O, Q
 _VIN_FORBIDDEN = frozenset("IOQ")
 _VIN_ALLOWED = frozenset("ABCDEFGHJKLMNPRSTUVWXYZ0123456789")
+_RELAXED_VIN_ALLOWED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 # Cyrillic lookalikes typed on a RU keyboard → Latin VIN letters
 _CYR_TO_LATIN = str.maketrans(
@@ -106,6 +107,21 @@ def _token_looks_like_brand_word(token: str) -> bool:
     return len(token) >= 4 and token.isalpha() and token.isascii()
 
 
+def _resolve_vin_for_lookup(norm: str) -> str | None:
+    """Strict ISO VIN after optional I/O/Q OCR fixes (1/0)."""
+    for candidate in (norm, _rewrite_common_vin_ocr_confusions(norm)):
+        if looks_like_vin(candidate):
+            return candidate
+    return None
+
+
+def normalize_vin_for_lookup_or_none(value: str | None) -> str | None:
+    norm = normalize_vin(value)
+    if not (VIN_MIN_LENGTH <= len(norm) <= VIN_MAX_LENGTH):
+        return None
+    return _resolve_vin_for_lookup(norm)
+
+
 def normalize_vin_for_search_or_none(value: str | None) -> str | None:
     """
     VIN normalization for global search: ignore brand+article queries and other
@@ -122,22 +138,121 @@ def normalize_vin_for_search_or_none(value: str | None) -> str | None:
         joined = "".join(tokens)
         if not all(1 <= len(token) <= _VIN_FRAGMENT_MAX_LEN and token.isalnum() for token in tokens):
             return None
-        if not looks_like_vin(joined):
-            return None
-        return normalize_vin(joined)
+        return _resolve_vin_for_lookup(joined)
 
     if any(sep in text for sep in ("/", "\\", ".", "_")):
         return None
 
-    if not looks_like_vin(text):
-        return None
-    return normalize_vin(text)
+    return normalize_vin_for_lookup_or_none(text)
 
 
 def normalize_vin_or_none(vin: str | None) -> str | None:
     if not looks_like_vin(vin):
         return None
     return normalize_vin(vin)
+
+
+def _rewrite_common_vin_ocr_confusions(norm: str) -> str:
+    """I/O/Q are invalid in ISO VIN but often confused with 1/0 on plates and scans."""
+    return norm.replace("O", "0").replace("Q", "0").replace("I", "1")
+
+
+def _looks_like_relaxed_chassis(norm: str) -> bool:
+    if not (VIN_MIN_LENGTH <= len(norm) <= VIN_MAX_LENGTH):
+        return False
+    if not all(ch in _RELAXED_VIN_ALLOWED for ch in norm):
+        return False
+    if not any(ch.isalpha() for ch in norm):
+        return False
+    if _looks_like_part_number(norm):
+        return False
+    return True
+
+
+def normalize_vin_for_lookup_or_raise(vin: str | None) -> str:
+    """Validate VIN for Laximo catalog lookup; fixes common I/O/Q OCR typos."""
+    if vin is None or not str(vin).strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"VIN должен содержать от {VIN_MIN_LENGTH} до {VIN_MAX_LENGTH} символов",
+        )
+    norm = normalize_vin(vin)
+    if not (VIN_MIN_LENGTH <= len(norm) <= VIN_MAX_LENGTH):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"VIN должен содержать от {VIN_MIN_LENGTH} до {VIN_MAX_LENGTH} символов",
+        )
+    resolved = _resolve_vin_for_lookup(norm)
+    if resolved is not None:
+        return resolved
+    if any(ch in _VIN_FORBIDDEN for ch in norm):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="VIN не должен содержать буквы I, O или Q",
+        )
+    if not all(ch in _VIN_ALLOWED for ch in norm):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="VIN должен содержать только латинские буквы и цифры",
+        )
+    if not any(ch.isalpha() for ch in norm):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="VIN должен содержать хотя бы одну букву",
+        )
+    if _looks_like_part_number(norm):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Строка похожа на артикул, а не на VIN",
+        )
+    return norm
+
+
+def normalize_garage_vin_or_raise(vin: str | None) -> str:
+    """
+    Validate VIN/chassis for garage storage.
+    Accepts ISO VINs, common I/O/Q OCR typos, and other plausible chassis numbers.
+    """
+    if vin is None or not str(vin).strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"VIN должен содержать от {VIN_MIN_LENGTH} до {VIN_MAX_LENGTH} символов",
+        )
+    norm = normalize_vin(vin)
+    if not (VIN_MIN_LENGTH <= len(norm) <= VIN_MAX_LENGTH):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"VIN должен содержать от {VIN_MIN_LENGTH} до {VIN_MAX_LENGTH} символов",
+        )
+
+    resolved = _resolve_vin_for_lookup(norm)
+    if resolved is not None:
+        return resolved
+
+    if _looks_like_relaxed_chassis(norm):
+        return norm
+
+    if any(ch in _VIN_FORBIDDEN for ch in norm):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="VIN не должен содержать буквы I, O или Q",
+        )
+    if not all(ch in _VIN_ALLOWED for ch in norm):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="VIN должен содержать только латинские буквы и цифры",
+        )
+    if not any(ch.isalpha() for ch in norm):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="VIN должен содержать хотя бы одну букву",
+        )
+    if _looks_like_part_number(norm):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Строка похожа на артикул, а не на VIN",
+        )
+    return norm
 
 
 def normalize_vin_or_raise(vin: str | None) -> str:

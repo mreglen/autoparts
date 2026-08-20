@@ -47,6 +47,25 @@ class LooksLikeVinTests(unittest.TestCase):
             normalize_vin_for_search_or_none("XW8ZZZ7PZDG00269"),
             "XW8ZZZ7PZDG00269",
         )
+        self.assertEqual(
+            normalize_vin_for_search_or_none("IFMDU75W74ZA42366"),
+            "1FMDU75W74ZA42366",
+        )
+
+    def test_ocr_typo_lookup_and_garage(self):
+        from app.services.laximo.vin import (
+            normalize_garage_vin_or_raise,
+            normalize_vin_for_lookup_or_raise,
+        )
+
+        self.assertEqual(
+            normalize_vin_for_lookup_or_raise("IFMDU75W74ZA42366"),
+            "1FMDU75W74ZA42366",
+        )
+        self.assertEqual(
+            normalize_garage_vin_or_raise("IFMDU75W74ZA42366"),
+            "1FMDU75W74ZA42366",
+        )
 
     def test_spaces_and_dashes(self):
         self.assertEqual(

@@ -7,7 +7,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
 import { apiRequest } from '../../utils/apiClient';
-import { formatPhoneInput, handlePhoneInputChange, validatePhone } from '../../utils/contactValidation';
+import { formatPhoneInput, handlePhoneInputChange, validatePhoneOptional } from '../../utils/contactValidation';
 import { parseServerDate } from '../../utils/serverDate';
 import {
   candidateLabel,
@@ -15,7 +15,7 @@ import {
   mapCandidateToGarageForm,
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
-import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import { normalizeVinForLookupOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItemsPickerModal';
@@ -396,16 +396,18 @@ function AddClientModal({ onClose, onCreated }) {
       setError('Укажите имя');
       return;
     }
-    const phoneErr = validatePhone(phone);
+    const phoneErr = validatePhoneOptional(phone);
     if (phoneErr) {
       setPhoneError(phoneErr);
       return;
     }
     setSaving(true);
     try {
+      const payload = { name: trimmedName };
+      if (phone.trim()) payload.phone = phone;
       const row = await apiRequest('/autoservice/clients', {
         method: 'POST',
-        body: JSON.stringify({ name: trimmedName, phone }),
+        body: JSON.stringify(payload),
       });
       onCreated(row);
       onClose();
@@ -432,7 +434,7 @@ function AddClientModal({ onClose, onCreated }) {
           />
         </div>
         <div>
-          <label className="block text-sg-caption font-medium text-ink-muted">Телефон</label>
+          <label className="block text-sg-caption font-medium text-ink-muted">Телефон (необязательно)</label>
           <input
             type="tel"
             className={`${pillInputClass} ${phoneError ? '!border-danger-600 !bg-danger-50 focus:!border-danger-600' : ''}`}
@@ -443,7 +445,6 @@ function AddClientModal({ onClose, onCreated }) {
             }}
             placeholder="+7 (___) ___-__-__"
             disabled={saving}
-            required
           />
           {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
         </div>
@@ -575,7 +576,7 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
 
   const handleDecodeVin = async () => {
     setError('');
-    const vin = normalizeVinOrNull(form.vin);
+    const vin = normalizeVinForLookupOrNull(form.vin);
     if (!vin) {
       setError('VIN должен содержать от 11 до 17 символов');
       return;
@@ -898,8 +899,13 @@ export default function AutoserviceOrderFormPage() {
   const [myPartsPickerOpen, setMyPartsPickerOpen] = useState(false);
   const [autoserviceStockPickerOpen, setAutoserviceStockPickerOpen] = useState(false);
   const [shopPartManualOpen, setShopPartManualOpen] = useState(false);
+  const [shopPartManualDraft, setShopPartManualDraft] = useState(null);
   const [shopPartEditIndex, setShopPartEditIndex] = useState(null);
   const [shopPartEditSubmitting, setShopPartEditSubmitting] = useState(false);
+
+  useEffect(() => {
+    setShopPartManualDraft(null);
+  }, [orderId, isCreate]);
 
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
@@ -1272,6 +1278,7 @@ export default function AutoserviceOrderFormPage() {
       rossko_partnumber: isRossko ? (values.article || '') : '',
       is_manual_editable: true,
     })]);
+    setShopPartManualDraft(null);
     setShopPartManualOpen(false);
   };
 
@@ -2258,6 +2265,9 @@ export default function AutoserviceOrderFormPage() {
         title="Добавить запчасть вручную"
         submitLabel="Добавить в заказ-наряд"
         showUnitSelector
+        preserveDraftOnClose
+        initialValues={shopPartManualDraft}
+        onDraftPersist={setShopPartManualDraft}
       />
 
       <AutoserviceWarehouseAddModal

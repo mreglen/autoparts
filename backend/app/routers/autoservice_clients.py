@@ -26,10 +26,15 @@ from app.schemas.autoservice_client import (
     AutoserviceClientView,
 )
 from app.utils.autoservice_access import (
+    display_client_phone,
+    is_missing_phone_placeholder,
+    missing_phone_placeholder,
     normalize_phone_or_400,
+    normalize_phone_optional_or_400,
     require_autoservice_enabled,
     require_autoservice_org_id,
     require_autoservice_staff,
+    storage_phone_or_placeholder,
     user_display_name,
 )
 from app.utils.email import send_autoservice_guest_account_email
@@ -121,6 +126,7 @@ def _apply_person_type_defaults(row: AutoserviceClient) -> None:
 
 def _client_view_with_account_email(db: Session, row: AutoserviceClient) -> AutoserviceClientView:
     view = AutoserviceClientView.model_validate(row)
+    view.phone = display_client_phone(view.phone)
     if view.user_id and not (view.email or "").strip():
         user_email = (
             db.query(User.email)
@@ -216,7 +222,7 @@ def _generate_account_password(length: int = 12) -> str:
 
 
 def _link_orphan_bookings(db: Session, org_id: str, client: AutoserviceClient) -> None:
-    if not client.phone:
+    if not client.phone or is_missing_phone_placeholder(client.phone):
         return
     for model in (InspectionBooking, RepairBooking):
         db.query(model).filter(
@@ -462,18 +468,20 @@ def create_autoservice_client_staff(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_staff(db, current_user)
-    phone = normalize_phone_or_400(payload.phone)
+    phone = storage_phone_or_placeholder(payload.phone)
     name = payload.name.strip()
 
-    existing = _find_by_phone(db, org_id, phone)
-    if existing:
-        return _client_view_with_account_email(db, existing)
+    linked_user = None
+    if not is_missing_phone_placeholder(phone):
+        existing = _find_by_phone(db, org_id, phone)
+        if existing:
+            return _client_view_with_account_email(db, existing)
 
-    linked_user = resolve_user_by_contact(db, phone, None)
-    if linked_user:
-        by_user = _find_by_user(db, org_id, linked_user.id)
-        if by_user:
-            return _client_view_with_account_email(db, by_user)
+        linked_user = resolve_user_by_contact(db, phone, None)
+        if linked_user:
+            by_user = _find_by_user(db, org_id, linked_user.id)
+            if by_user:
+                return _client_view_with_account_email(db, by_user)
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     row = AutoserviceClient(
@@ -520,14 +528,17 @@ def update_autoservice_client_staff(
 
     if "phone" in data:
         if is_guest:
-            phone = normalize_phone_or_400(data["phone"])
-            existing = _find_by_phone(db, org_id, phone)
-            if existing and existing.id != row.id:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Этот телефон уже привязан к другому клиенту автосервиса",
-                )
-            row.phone = phone
+            normalized = normalize_phone_optional_or_400(data["phone"])
+            if normalized:
+                existing = _find_by_phone(db, org_id, normalized)
+                if existing and existing.id != row.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Этот телефон уже привязан к другому клиенту автосервиса",
+                    )
+                row.phone = normalized
+            elif not is_missing_phone_placeholder(row.phone):
+                row.phone = missing_phone_placeholder()
 
     if "email" in data:
         row.email = _email_or_none(data["email"])
@@ -582,6 +593,12 @@ def create_autoservice_client_account(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Пользователь с таким email уже зарегистрирован",
+        )
+
+    if is_missing_phone_placeholder(row.phone):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите телефон клиента перед созданием аккаунта",
         )
 
     phone = normalize_phone_or_400(row.phone)

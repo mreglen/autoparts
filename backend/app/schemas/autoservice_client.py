@@ -10,7 +10,7 @@ AutoserviceClientPersonType = Literal["individual", "ie", "legal"]
 
 class AutoserviceClientStaffCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
-    phone: str = Field(min_length=5, max_length=40)
+    phone: Optional[str] = Field(default=None, max_length=40)
 
 
 class AutoserviceClientStaffUpdate(BaseModel):

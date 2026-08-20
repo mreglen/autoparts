@@ -7,6 +7,7 @@ export const VIN_INPUT_MAX_LENGTH = 32;
 
 const VIN_FORBIDDEN = /[IOQ]/;
 const VIN_ALLOWED = /^[A-HJ-NPR-Z0-9]+$/;
+const RELAXED_VIN_ALLOWED = /^[A-Z0-9]+$/;
 const SHORT_VIN_MAX_DIGIT_RATIO = 0.65;
 const SHORT_VIN_MIN_LETTERS = 3;
 const FULL_VIN_MIN_LETTERS = 3;
@@ -81,6 +82,43 @@ export function looksLikeVin(value) {
   return true;
 }
 
+function rewriteCommonVinOcrConfusions(norm) {
+  return norm.replace(/O/g, '0').replace(/Q/g, '0').replace(/I/g, '1');
+}
+
+function looksLikeRelaxedChassis(norm) {
+  if (norm.length < VIN_MIN_LENGTH || norm.length > VIN_MAX_LENGTH) return false;
+  if (!RELAXED_VIN_ALLOWED.test(norm)) return false;
+  if (!/[A-Z]/.test(norm)) return false;
+  if (looksLikePartNumber(norm)) return false;
+  return true;
+}
+
+/** Garage storage: ISO VIN, OCR fixes (I→1, O/Q→0), or relaxed chassis numbers. */
+function resolveVinForLookup(norm) {
+  for (const candidate of [norm, rewriteCommonVinOcrConfusions(norm)]) {
+    if (looksLikeVin(candidate)) return candidate;
+  }
+  return null;
+}
+
+/** Laximo/search: strict ISO VIN, with I→1 / O,Q→0 OCR fixes. */
+export function normalizeVinForLookupOrNull(value) {
+  const norm = sanitizeVinInput(value);
+  if (norm.length < VIN_MIN_LENGTH || norm.length > VIN_MAX_LENGTH) return null;
+  return resolveVinForLookup(norm);
+}
+
+export function normalizeGarageVinOrNull(value) {
+  const norm = sanitizeVinInput(value);
+  if (norm.length < VIN_MIN_LENGTH || norm.length > VIN_MAX_LENGTH) return null;
+
+  const resolved = resolveVinForLookup(norm);
+  if (resolved) return resolved;
+  if (looksLikeRelaxedChassis(norm)) return norm;
+  return null;
+}
+
 export function normalizeVinOrNull(value) {
   if (!looksLikeVin(value)) return null;
   return sanitizeVinInput(value);
@@ -98,12 +136,12 @@ export function normalizeVinForSearchOrNull(value) {
     if (tokens.some(tokenLooksLikeBrandWord)) return null;
     const joined = tokens.join('');
     if (!tokens.every((token) => VIN_FRAGMENT_RE.test(token))) return null;
-    return normalizeVinOrNull(joined);
+    return normalizeVinForLookupOrNull(joined);
   }
 
   if (/[/\\._]/.test(text)) return null;
 
-  return normalizeVinOrNull(text);
+  return normalizeVinForLookupOrNull(text);
 }
 
 export function queryLooksLikeVin(value) {

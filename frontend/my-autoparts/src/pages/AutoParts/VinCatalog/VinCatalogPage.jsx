@@ -7,7 +7,7 @@ import {
   candidateLabel,
   softNoticeVariantFromReason,
 } from '../../../utils/laximoVinCandidate';
-import { looksLikeVin, normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../../utils/laximoVin';
+import { looksLikeVin, normalizeVinForLookupOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../../utils/laximoVin';
 import { fetchPublicSiteConfig } from '../../../redux/slices/PublicInfoSlice';
 import VinCatalogBrowse from './VinCatalogBrowse';
 import VinScanModal from '../../../components/VinScanner/VinScanModal';
@@ -47,7 +47,7 @@ export default function VinCatalogPage() {
   const fallbackSearchPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
 
   const initialVin = useMemo(
-    () => normalizeVinOrNull(searchParams.get('vin') || '') || '',
+    () => normalizeVinForLookupOrNull(searchParams.get('vin') || '') || '',
     [searchParams]
   );
 
@@ -228,7 +228,7 @@ export default function VinCatalogPage() {
 
   const decodeVin = useCallback(
     async (vinValue) => {
-      const normalized = normalizeVinOrNull(vinValue);
+      const normalized = normalizeVinForLookupOrNull(vinValue);
       if (!normalized) {
         setError('VIN должен содержать от 11 до 17 символов');
         setStep('boot');
@@ -272,7 +272,7 @@ export default function VinCatalogPage() {
   );
 
   const submitVinSearch = useCallback((vinValue) => {
-    const next = normalizeVinOrNull(vinValue);
+    const next = normalizeVinForLookupOrNull(vinValue);
     if (!next) {
       setError('VIN должен содержать от 11 до 17 символов');
       return;

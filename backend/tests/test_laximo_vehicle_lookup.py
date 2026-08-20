@@ -16,7 +16,7 @@ from app.services.laximo.vehicle_lookup import (
     lookup_by_vin,
 )
 from app.services.laximo.vehicle_normalize import normalize_find_vehicle_row
-from app.services.laximo.vin import normalize_vin_or_raise
+from app.services.laximo.vin import normalize_vin_for_lookup_or_raise, normalize_vin_or_raise
 
 
 AUDI_LIKE_ROW = {
@@ -71,6 +71,12 @@ class VinNormalizeTests(unittest.TestCase):
             normalize_vin_or_raise("WBA3A5C58CF12345I")
         self.assertEqual(ctx.exception.status_code, 400)
         self.assertIn("I, O или Q", ctx.exception.detail)
+
+    def test_lookup_fixes_leading_i_ocr_typo(self):
+        self.assertEqual(
+            normalize_vin_for_lookup_or_raise("IFMDU75W74ZA42366"),
+            "1FMDU75W74ZA42366",
+        )
 
     def test_strips_separators_and_cyrillic(self):
         self.assertEqual(

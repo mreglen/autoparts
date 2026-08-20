@@ -12,9 +12,9 @@ import RepairOrderViewModal, {
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { apiRequest } from '../../utils/apiClient';
 import AutoserviceClientRequisitesFields from '../../components/Autoservice/AutoserviceClientRequisitesFields';
-import { handlePhoneInputChange, validatePhone, validateEmail } from '../../utils/contactValidation';
+import { handlePhoneInputChange, validatePhoneOptional, validateEmail } from '../../utils/contactValidation';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
-import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
+import { normalizeVinForLookupOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import {
   clientRequisitesChanged,
   emptyClientRequisites,
@@ -480,7 +480,7 @@ function ClientProfileModal({
         setError('Укажите ФИО');
         return;
       }
-      const phoneErr = validatePhone(form.phone);
+      const phoneErr = validatePhoneOptional(form.phone);
       if (phoneErr) {
         setError(phoneErr);
         return;
@@ -1146,19 +1146,18 @@ function AddClientModal({ open, onClose, onCreated }) {
       setError('Укажите имя');
       return;
     }
-    const phoneErr = validatePhone(phone);
+    const phoneErr = validatePhoneOptional(phone);
     if (phoneErr) {
       setPhoneError(phoneErr);
       return;
     }
     setSaving(true);
     try {
+      const payload = { name: trimmedName };
+      if (phone.trim()) payload.phone = phone;
       const row = await apiRequest('/autoservice/clients', {
         method: 'POST',
-        body: JSON.stringify({
-          name: trimmedName,
-          phone,
-        }),
+        body: JSON.stringify(payload),
       });
       onCreated(row);
       onClose();
@@ -1215,7 +1214,7 @@ function AddClientModal({ open, onClose, onCreated }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Телефон</label>
+          <label className="block text-sm font-medium text-gray-700">Телефон (необязательно)</label>
           <input
             type="tel"
             className={`${inputClass} ${phoneError ? 'border-red-500' : ''}`}
@@ -1228,7 +1227,6 @@ function AddClientModal({ open, onClose, onCreated }) {
             }}
             placeholder="+7 (___) ___-__-__"
             disabled={saving}
-            required
           />
           {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
         </div>
@@ -1254,7 +1252,7 @@ export default function AutoserviceClientsPage() {
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
 
   const handleVinClick = useCallback(async (rawVin) => {
-    const vin = normalizeVinOrNull(rawVin);
+    const vin = normalizeVinForLookupOrNull(rawVin);
     if (!vin) return;
     try {
       if (navigator?.clipboard?.writeText) {

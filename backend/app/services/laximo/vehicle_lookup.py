@@ -22,7 +22,11 @@ from app.services.laximo.gate import (
     public_message_for_reason,
 )
 from app.services.laximo.plate import normalize_plate_or_raise
-from app.services.laximo.vin import looks_like_vin, normalize_vin_or_none, normalize_vin_or_raise
+from app.services.laximo.vin import (
+    looks_like_vin,
+    normalize_vin_for_lookup_or_raise,
+    normalize_vin_or_none,
+)
 from app.services.laximo.snapshots import (
     KIND_VIN_LOOKUP,
     format_fetched_at,
@@ -270,7 +274,7 @@ def lookup_by_vin(db: Session, vin: str) -> ByVinResult:
     Soft-fails never expose quota / Laximo / upstream details.
     Falls back to durable snapshot when CAT is unavailable.
     """
-    normalized_vin = normalize_vin_or_raise(vin)
+    normalized_vin = normalize_vin_for_lookup_or_raise(vin)
 
     if not laximo_cat_ready(db):
         snap = _from_vin_snapshot(db, normalized_vin)

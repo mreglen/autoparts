@@ -59,6 +59,7 @@ from app.schemas.repair_order import (
 )
 from app.schemas.autoservice_finance import AutoservicePaymentIn
 from app.utils.autoservice_access import (
+    display_client_phone,
     related_autoservice_client_ids,
     require_autoservice_staff,
     require_my_active_autoservice_client,
@@ -171,7 +172,7 @@ def _client_brief(client: AutoserviceClient) -> RepairOrderClientBrief:
     return RepairOrderClientBrief(
         id=client.id,
         name=client.name,
-        phone=client.phone,
+        phone=display_client_phone(client.phone),
         email=client.email,
         user_id=client.user_id,
         person_type=client.person_type or "individual",

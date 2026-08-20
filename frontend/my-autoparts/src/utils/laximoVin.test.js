@@ -1,5 +1,7 @@
 import {
   looksLikeVin,
+  normalizeGarageVinOrNull,
+  normalizeVinForLookupOrNull,
   normalizeVinForSearchOrNull,
   normalizeVinOrNull,
 } from './laximoVin';
@@ -28,5 +30,11 @@ describe('laximoVin', () => {
   it('normalizeVinForSearchOrNull accepts spaced VIN', () => {
     expect(normalizeVinForSearchOrNull('WBA 3A5C58 CF123456')).toBe('WBA3A5C58CF123456');
     expect(normalizeVinForSearchOrNull('XW8ZZZ7PZDG00269')).toBe('XW8ZZZ7PZDG00269');
+  });
+
+  it('fixes common I/O/Q OCR typos for search and lookup', () => {
+    expect(normalizeVinForSearchOrNull('IFMDU75W74ZA42366')).toBe('1FMDU75W74ZA42366');
+    expect(normalizeVinForLookupOrNull('IFMDU75W74ZA42366')).toBe('1FMDU75W74ZA42366');
+    expect(normalizeGarageVinOrNull('IFMDU75W74ZA42366')).toBe('1FMDU75W74ZA42366');
   });
 });

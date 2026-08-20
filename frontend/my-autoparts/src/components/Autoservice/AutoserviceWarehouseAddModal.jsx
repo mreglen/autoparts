@@ -29,6 +29,8 @@ export default function AutoserviceWarehouseAddModal({
   showRosskoLookup = true,
   showUnitSelector = true,
   initialValues = null,
+  preserveDraftOnClose = false,
+  onDraftPersist,
   mode = 'add',
   editScope = null,
 }) {
@@ -54,14 +56,14 @@ export default function AutoserviceWarehouseAddModal({
           ? ''
           : String(initialValues.unit_price),
       });
-    } else {
+    } else if (!(preserveDraftOnClose && mode === 'add')) {
       setForm(EMPTY_FORM);
     }
     setError('');
     setRosskoLookupError('');
     setRosskoLookupNotice('');
     setFilledFromRossko(false);
-  }, [open, initialValues]);
+  }, [open, initialValues, preserveDraftOnClose, mode]);
 
   const patch = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -90,7 +92,11 @@ export default function AutoserviceWarehouseAddModal({
   };
 
   const handleClose = () => {
-    setForm(EMPTY_FORM);
+    if (preserveDraftOnClose && mode === 'add') {
+      onDraftPersist?.({ ...form });
+    } else {
+      setForm(EMPTY_FORM);
+    }
     setError('');
     setRosskoLookupError('');
     setRosskoLookupNotice('');

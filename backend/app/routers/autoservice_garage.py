@@ -23,7 +23,7 @@ from app.schemas.garage_vehicle import (
     GarageVehicleView,
 )
 from app.services.laximo.vehicle_lookup import lookup_by_frame, lookup_by_plate, lookup_by_vin
-from app.services.laximo.vin import normalize_vin_or_raise
+from app.services.laximo.vin import normalize_garage_vin_or_raise
 from app.utils.autoservice_access import (
     related_autoservice_client_ids,
     require_autoservice_staff,
@@ -36,7 +36,7 @@ router = APIRouter(tags=["Autoservice garage"])
 def _optional_vin_or_400(vin: str | None) -> str | None:
     if vin is None or not str(vin).strip():
         return None
-    return normalize_vin_or_raise(vin)
+    return normalize_garage_vin_or_raise(vin)
 
 
 def _vehicle_to_view(row: GarageVehicle) -> GarageVehicleView:

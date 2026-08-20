@@ -1,6 +1,8 @@
 """Shared access helpers for autoservice staff/public APIs."""
 from __future__ import annotations
 
+import uuid
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -68,6 +70,17 @@ def require_autoservice_director(db: Session, user: User) -> str:
     return org_id
 
 
+MISSING_PHONE_PREFIX = "__no_phone_"
+
+
+def is_missing_phone_placeholder(phone: str | None) -> bool:
+    return bool(phone) and str(phone).startswith(MISSING_PHONE_PREFIX)
+
+
+def missing_phone_placeholder() -> str:
+    return f"{MISSING_PHONE_PREFIX}{uuid.uuid4().hex}__"
+
+
 def normalize_phone_or_400(phone: str) -> str:
     normalized = normalize_to_storage_format(phone)
     if not normalized:
@@ -76,6 +89,28 @@ def normalize_phone_or_400(phone: str) -> str:
             detail="Неверный формат телефона",
         )
     return normalized
+
+
+def normalize_phone_optional_or_400(phone: str | None) -> str | None:
+    if phone is None:
+        return None
+    text = str(phone).strip()
+    if not text:
+        return None
+    return normalize_phone_or_400(text)
+
+
+def storage_phone_or_placeholder(phone: str | None) -> str:
+    normalized = normalize_phone_optional_or_400(phone)
+    if normalized:
+        return normalized
+    return missing_phone_placeholder()
+
+
+def display_client_phone(phone: str | None) -> str:
+    if not phone or is_missing_phone_placeholder(phone):
+        return ""
+    return phone
 
 
 def user_display_name(user: User) -> str:
@@ -105,7 +140,7 @@ def related_autoservice_client_ids(db: Session, client: AutoserviceClient) -> li
         ):
             ids.add(cid)
     phone = (client.phone or "").strip()
-    if phone:
+    if phone and not is_missing_phone_placeholder(phone):
         for (cid,) in (
             db.query(AutoserviceClient.id)
             .filter(
