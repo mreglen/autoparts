@@ -7,25 +7,24 @@ import {
   deleteEmployee,
 } from '../../redux/slices/OrganizationSlice';
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
-import PageIntro from '../../components/PageIntro/PageIntro';
 import {
   Badge,
   Button,
-  Card,
   ConfirmDialog,
+  DataTable,
   EmptyState,
   FieldHint,
   FieldLabel,
-  Checkbox,
   Input,
   Modal,
-  Skeleton,
+  PageHeader,
+  SkeletonListCards,
 } from '../../components/UI';
 import {
-  warehouseListShellClass,
-  warehousePageClass,
-} from '../../utils/warehouseListUi';
+  SettingsActionsDropdown,
+  SettingsToggle,
+} from '../Settings/settingsUi';
+import { warehousePageClass } from '../../utils/warehouseListUi';
 
 const emptyForm = {
   last_name: '',
@@ -41,10 +40,11 @@ function InlineNotice({ tone = 'error', children, onClose }) {
   const tones = {
     success: 'border-success-100 bg-success-50 text-success-700',
     error: 'border-danger-100 bg-danger-50 text-danger-700',
+    info: 'border-line bg-surface-subtle text-ink-soft',
   };
   return (
     <div
-      className={`mb-4 flex items-start justify-between gap-3 rounded-sg border px-4 py-3 ${tones[tone] || tones.error}`}
+      className={`flex items-start justify-between gap-3 rounded-sg border px-4 py-3 ${tones[tone] || tones.error}`}
       role="status"
     >
       <div className="min-w-0 flex-1 text-sm">{children}</div>
@@ -68,6 +68,25 @@ function InlineNotice({ tone = 'error', children, onClose }) {
   );
 }
 
+function getEmployeeFullName(employee) {
+  return `${employee.last_name || ''} ${employee.first_name || ''} ${employee.patronymic || ''}`.trim();
+}
+
+function getEmployeeInitials(employee) {
+  return (employee.first_name?.[0] || employee.last_name?.[0] || '?').toUpperCase();
+}
+
+function EmployeeAvatar({ employee, size = 'md' }) {
+  const sizeClass = size === 'lg' ? 'h-12 w-12 text-base' : 'h-10 w-10 text-sm';
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center rounded-xl bg-brand-50 font-semibold text-brand-700 ring-1 ring-brand-100 ${sizeClass}`}
+    >
+      {getEmployeeInitials(employee)}
+    </div>
+  );
+}
+
 function EmployeeFormFields({
   formData,
   errors,
@@ -75,37 +94,49 @@ function EmployeeFormFields({
   passwordRequired,
   showAutoserviceToggle = false,
 }) {
+  const handleAutoserviceToggle = (event) => {
+    onChange({
+      target: {
+        name: 'is_service_executor',
+        type: 'checkbox',
+        checked: event.target.checked,
+      },
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <div>
-        <FieldLabel htmlFor="emp-last-name" required>
-          Фамилия
-        </FieldLabel>
-        <Input
-          id="emp-last-name"
-          type="text"
-          name="last_name"
-          value={formData.last_name}
-          onChange={onChange}
-          error={Boolean(errors.last_name)}
-          placeholder="Введите фамилию"
-        />
-        {errors.last_name ? <FieldHint error>{errors.last_name}</FieldHint> : null}
-      </div>
-      <div>
-        <FieldLabel htmlFor="emp-first-name" required>
-          Имя
-        </FieldLabel>
-        <Input
-          id="emp-first-name"
-          type="text"
-          name="first_name"
-          value={formData.first_name}
-          onChange={onChange}
-          error={Boolean(errors.first_name)}
-          placeholder="Введите имя"
-        />
-        {errors.first_name ? <FieldHint error>{errors.first_name}</FieldHint> : null}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <FieldLabel htmlFor="emp-last-name" required>
+            Фамилия
+          </FieldLabel>
+          <Input
+            id="emp-last-name"
+            type="text"
+            name="last_name"
+            value={formData.last_name}
+            onChange={onChange}
+            error={Boolean(errors.last_name)}
+            placeholder="Иванов"
+          />
+          {errors.last_name ? <FieldHint error>{errors.last_name}</FieldHint> : null}
+        </div>
+        <div>
+          <FieldLabel htmlFor="emp-first-name" required>
+            Имя
+          </FieldLabel>
+          <Input
+            id="emp-first-name"
+            type="text"
+            name="first_name"
+            value={formData.first_name}
+            onChange={onChange}
+            error={Boolean(errors.first_name)}
+            placeholder="Иван"
+          />
+          {errors.first_name ? <FieldHint error>{errors.first_name}</FieldHint> : null}
+        </div>
       </div>
       <div>
         <FieldLabel htmlFor="emp-patronymic">Отчество</FieldLabel>
@@ -115,38 +146,40 @@ function EmployeeFormFields({
           name="patronymic"
           value={formData.patronymic}
           onChange={onChange}
-          placeholder="Введите отчество"
+          placeholder="Иванович"
         />
       </div>
-      <div>
-        <FieldLabel htmlFor="emp-email" required>
-          Email
-        </FieldLabel>
-        <Input
-          id="emp-email"
-          type="email"
-          name="email"
-          value={formData.email}
-          onChange={onChange}
-          error={Boolean(errors.email)}
-          placeholder="Введите email"
-        />
-        {errors.email ? <FieldHint error>{errors.email}</FieldHint> : null}
-      </div>
-      <div>
-        <FieldLabel htmlFor="emp-phone" required>
-          Телефон
-        </FieldLabel>
-        <Input
-          id="emp-phone"
-          type="tel"
-          name="phone"
-          value={formData.phone}
-          onChange={onChange}
-          error={Boolean(errors.phone)}
-          placeholder="Введите телефон"
-        />
-        {errors.phone ? <FieldHint error>{errors.phone}</FieldHint> : null}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <FieldLabel htmlFor="emp-email" required>
+            Email
+          </FieldLabel>
+          <Input
+            id="emp-email"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={onChange}
+            error={Boolean(errors.email)}
+            placeholder="name@company.ru"
+          />
+          {errors.email ? <FieldHint error>{errors.email}</FieldHint> : null}
+        </div>
+        <div>
+          <FieldLabel htmlFor="emp-phone" required>
+            Телефон
+          </FieldLabel>
+          <Input
+            id="emp-phone"
+            type="tel"
+            name="phone"
+            value={formData.phone}
+            onChange={onChange}
+            error={Boolean(errors.phone)}
+            placeholder="+7 (999) 000-00-00"
+          />
+          {errors.phone ? <FieldHint error>{errors.phone}</FieldHint> : null}
+        </div>
       </div>
       <div>
         <FieldLabel htmlFor="emp-password" required={passwordRequired}>
@@ -160,25 +193,59 @@ function EmployeeFormFields({
           onChange={onChange}
           error={Boolean(errors.password)}
           placeholder={
-            passwordRequired ? 'Введите пароль' : 'Новый пароль (если нужно изменить)'
+            passwordRequired ? 'Минимум 6 символов' : 'Новый пароль (если нужно изменить)'
           }
         />
         {errors.password ? <FieldHint error>{errors.password}</FieldHint> : null}
       </div>
       {showAutoserviceToggle ? (
-        <div>
-          <Checkbox
-            id="emp-service-executor"
-            name="is_service_executor"
-            checked={Boolean(formData.is_service_executor)}
-            onChange={onChange}
-            label="Сотрудник автосервиса"
-          />
-          <FieldHint>
-            Таких сотрудников можно указывать в заказ-нарядах как исполнителей работ.
-          </FieldHint>
-        </div>
+        <SettingsToggle
+          checked={Boolean(formData.is_service_executor)}
+          onChange={handleAutoserviceToggle}
+          label="Сотрудник автосервиса"
+          description="Таких сотрудников можно указывать в заказ-нарядах как исполнителей работ."
+        />
       ) : null}
+    </div>
+  );
+}
+
+function EmployeeMobileRow({ employee, fullName, isSelf, onEdit, onPermissions, onDelete }) {
+  return (
+    <div className="flex gap-3 border-b border-line py-3 last:border-b-0">
+      <EmployeeAvatar employee={employee} size="lg" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-ink">{fullName || '—'}</p>
+            <p className="mt-0.5 truncate text-xs text-ink-muted">{employee.email}</p>
+            <p className="truncate text-xs text-ink-muted">{employee.phone}</p>
+          </div>
+          {!isSelf ? (
+            <SettingsActionsDropdown
+              menuWidth="w-52"
+              items={[
+                { key: 'edit', label: 'Редактировать', onClick: onEdit },
+                { key: 'permissions', label: 'Назначить права', onClick: onPermissions },
+                {
+                  key: 'delete',
+                  label: 'Удалить',
+                  danger: true,
+                  onClick: onDelete,
+                },
+              ]}
+            />
+          ) : null}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Badge tone={employee.is_director ? 'success' : 'brand'}>
+            {employee.is_director ? 'Директор' : 'Сотрудник'}
+          </Badge>
+          {employee.is_service_executor ? (
+            <Badge tone="success">Автосервис</Badge>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -191,7 +258,6 @@ export default function EmployeesPage() {
   );
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [openDropdownId, setOpenDropdownId] = useState(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -203,6 +269,7 @@ export default function EmployeesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -210,17 +277,28 @@ export default function EmployeesPage() {
     }
   }, [dispatch, user]);
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (openDropdownId && !e.target.closest('.actions-popup-container')) {
-        setOpenDropdownId(null);
-      }
+  const showAutoserviceToggle = Boolean(user?.organization_is_autoservice);
+
+  const filteredEmployees = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return employees || [];
+    return (employees || []).filter((employee) => {
+      const fullName = getEmployeeFullName(employee).toLowerCase();
+      return (
+        fullName.includes(query)
+        || String(employee.email || '').toLowerCase().includes(query)
+        || String(employee.phone || '').toLowerCase().includes(query)
+      );
+    });
+  }, [employees, searchQuery]);
+
+  const stats = useMemo(() => {
+    const list = employees || [];
+    return {
+      total: list.length,
+      autoservice: list.filter((employee) => employee.is_service_executor).length,
     };
-    if (openDropdownId) {
-      document.addEventListener('click', handleClickOutside);
-    }
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, [openDropdownId]);
+  }, [employees]);
 
   const validateForm = (data, { requirePassword } = {}) => {
     const newErrors = {};
@@ -365,74 +443,119 @@ export default function EmployeesPage() {
     }
   };
 
-  const lastActionableEmployeeId = useMemo(() => {
-    const actionable = (employees || []).filter((e) => e.id !== user?.id);
-    return actionable.length > 0 ? actionable[actionable.length - 1].id : null;
-  }, [employees, user?.id]);
-
-  const renderEmployeeActions = (emp, fullName, containerExtraClass = '') => {
-    if (emp.id === user?.id) return null;
-    const isOpen = openDropdownId === emp.id;
+  const buildActions = (employee, fullName) => {
+    if (employee.id === user?.id) return null;
     return (
-      <ActionsDropdown
-        containerClassName={`relative actions-popup-container actions-dropdown ${containerExtraClass}`.trim()}
-        isOpen={isOpen}
-        onOpenChange={(next) => setOpenDropdownId(next ? emp.id : null)}
-        menuClassName="w-52 z-50"
-        estimatedMenuHeight={200}
-        preferOpenUp={emp.id === lastActionableEmployeeId}
-      >
-        <ActionsDropdownItem
-          onClick={() => {
-            startEditing(emp);
-            setOpenDropdownId(null);
-          }}
-        >
-          Редактировать
-        </ActionsDropdownItem>
-        <ActionsDropdownItem
-          onClick={() => {
-            openPermissionModal(emp);
-            setOpenDropdownId(null);
-          }}
-        >
-          Назначить права
-        </ActionsDropdownItem>
-        <ActionsDropdownItem
-          danger
-          className="border-t border-line"
-          onClick={() => {
-            openDeleteModal(emp.id, fullName);
-            setOpenDropdownId(null);
-          }}
-        >
-          Удалить
-        </ActionsDropdownItem>
-      </ActionsDropdown>
+      <div className="flex justify-end">
+        <SettingsActionsDropdown
+          menuWidth="w-52"
+          items={[
+            {
+              key: 'edit',
+              label: 'Редактировать',
+              onClick: () => startEditing(employee),
+            },
+            {
+              key: 'permissions',
+              label: 'Назначить права',
+              onClick: () => openPermissionModal(employee),
+            },
+            {
+              key: 'delete',
+              label: 'Удалить',
+              danger: true,
+              onClick: () => openDeleteModal(employee.id, fullName),
+            },
+          ]}
+        />
+      </div>
     );
   };
 
-  const employeeCount = employees?.length ?? 0;
-  const showAutoserviceToggle = Boolean(user?.organization_is_autoservice);
+  const tableColumns = useMemo(() => {
+    const columns = [
+      {
+        key: 'name',
+        label: 'Сотрудник',
+        render: (employee) => {
+          const fullName = getEmployeeFullName(employee);
+          return (
+            <div className="flex items-center gap-3">
+              <EmployeeAvatar employee={employee} />
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-ink">{fullName || '—'}</p>
+                <p className="truncate text-xs text-ink-muted">{employee.email}</p>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: 'phone',
+        label: 'Телефон',
+        render: (employee) => (
+          <span className="whitespace-nowrap text-ink-soft">{employee.phone || '—'}</span>
+        ),
+      },
+      {
+        key: 'role',
+        label: 'Роль',
+        render: (employee) => (
+          <Badge tone={employee.is_director ? 'success' : 'brand'}>
+            {employee.is_director ? 'Директор' : 'Сотрудник'}
+          </Badge>
+        ),
+      },
+    ];
+
+    if (showAutoserviceToggle) {
+      columns.push({
+        key: 'autoservice',
+        label: 'Автосервис',
+        render: (employee) => (
+          employee.is_service_executor ? (
+            <Badge tone="success">Да</Badge>
+          ) : (
+            <span className="text-ink-muted">—</span>
+          )
+        ),
+      });
+    }
+
+    columns.push({
+      key: 'actions',
+      label: '',
+      render: (employee) => buildActions(employee, getEmployeeFullName(employee)),
+    });
+
+    return columns;
+  }, [showAutoserviceToggle, user?.id]);
+
+  const pageSubtitle = loadingEmployees
+    ? 'Загрузка списка…'
+    : employeesError
+      ? 'Управление доступом сотрудников'
+      : stats.total > 0
+        ? `${stats.total} в организации${showAutoserviceToggle ? ` · ${stats.autoservice} в автосервисе` : ''}`
+        : 'Добавьте сотрудников и назначьте права доступа';
 
   return (
-    <div className={`${warehousePageClass} min-w-0 space-y-4`}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <PageIntro
-          title="Сотрудники"
-          description={
-            !loadingEmployees && !employeesError
-              ? employeeCount > 0
-                ? `${employeeCount} в организации`
-                : 'Управление доступом'
-              : 'Управление доступом'
-          }
-          className="mb-0"
-        />
-        <Button type="button" className="w-full sm:w-auto" onClick={openAddForm}>
-          Добавить сотрудника
-        </Button>
-      </div>
+    <div className={`${warehousePageClass} w-full min-w-0 space-y-6`}>
+      <PageHeader
+        title="Сотрудники"
+        subtitle={pageSubtitle}
+        action={(
+          <Button type="button" className="w-full sm:w-auto" onClick={openAddForm}>
+            Добавить сотрудника
+          </Button>
+        )}
+      />
+
+      {showAutoserviceToggle && !loadingEmployees && !employeesError ? (
+        <InlineNotice tone="info">
+          Отметьте сотрудников автосервиса — только они доступны для выбора исполнителей в заказ-нарядах.
+        </InlineNotice>
+      ) : null}
 
       {formError && !showAddForm && !showEditForm ? (
         <InlineNotice tone="error" onClose={() => setFormError('')}>
@@ -440,11 +563,25 @@ export default function EmployeesPage() {
         </InlineNotice>
       ) : null}
 
-      {loadingEmployees ? (
+      {!loadingEmployees && !employeesError && stats.total > 0 ? (
         <div className="space-y-3">
-          <Skeleton className="h-16 w-full rounded-sg-lg" />
-          <Skeleton className="h-40 w-full rounded-sg-lg" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Поиск по имени, email или телефону"
+            className="h-10 w-full rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-brand-500/20"
+          />
+          {searchQuery.trim() ? (
+            <p className="text-sm text-ink-muted">
+              Найдено: {filteredEmployees.length}
+            </p>
+          ) : null}
         </div>
+      ) : null}
+
+      {loadingEmployees ? (
+        <SkeletonListCards count={3} />
       ) : employeesError ? (
         <EmptyState
           illustration="error"
@@ -459,99 +596,30 @@ export default function EmployeesPage() {
           actionLabel="Добавить сотрудника"
           onAction={openAddForm}
         />
+      ) : filteredEmployees.length === 0 ? (
+        <EmptyState
+          illustration="search"
+          title="Никого не нашли"
+          description="Попробуйте изменить запрос поиска."
+        />
       ) : (
         <>
-          <div
-            className={`hidden md:block ${warehouseListShellClass} ${
-              openDropdownId ? 'overflow-visible' : 'overflow-hidden'
-            }`}
-          >
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-line bg-surface-subtle text-ink-soft">
-                <tr>
-                  <th className="px-4 py-3 font-medium">ФИО</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Телефон</th>
-                  <th className="px-4 py-3 font-medium">Роль</th>
-                  {showAutoserviceToggle ? (
-                    <th className="px-4 py-3 font-medium">Автосервис</th>
-                  ) : null}
-                  <th className="px-4 py-3 text-right font-medium">Действия</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {employees.map((emp) => {
-                  const fullName =
-                    `${emp.last_name || ''} ${emp.first_name || ''} ${emp.patronymic || ''}`.trim();
-                  return (
-                    <tr
-                      key={emp.id}
-                      className="bg-surface transition hover:bg-surface-subtle/60"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sg bg-brand-50 text-sm font-semibold text-brand-700 ring-1 ring-brand-100">
-                            {(emp.first_name?.[0] || emp.last_name?.[0] || '?').toUpperCase()}
-                          </div>
-                          <div className="font-semibold text-ink">{fullName || '—'}</div>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-ink-soft">{emp.email}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-ink-soft">{emp.phone}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <Badge tone={emp.is_director ? 'success' : 'brand'}>
-                          {emp.is_director ? 'Директор' : 'Сотрудник'}
-                        </Badge>
-                      </td>
-                      {showAutoserviceToggle ? (
-                        <td className="whitespace-nowrap px-4 py-3">
-                          {emp.is_service_executor ? (
-                            <Badge tone="success">Да</Badge>
-                          ) : (
-                            <span className="text-ink-soft">—</span>
-                          )}
-                        </td>
-                      ) : null}
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        {renderEmployeeActions(emp, fullName)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="hidden md:block">
+            <DataTable columns={tableColumns} rows={filteredEmployees} />
           </div>
-
-          <div className="space-y-3 md:hidden">
-            {employees.map((emp) => {
-              const fullName =
-                `${emp.last_name || ''} ${emp.first_name || ''} ${emp.patronymic || ''}`.trim();
+          <div className="md:hidden">
+            {filteredEmployees.map((employee) => {
+              const fullName = getEmployeeFullName(employee);
               return (
-                <Card key={emp.id} className="!p-4">
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 flex-1 items-start gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sg bg-brand-50 text-base font-semibold text-brand-700 ring-1 ring-brand-100">
-                        {(emp.first_name?.[0] || emp.last_name?.[0] || '?').toUpperCase()}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="break-words font-semibold text-ink">{fullName || '—'}</h3>
-                        <p className="mt-1 text-sm text-ink-muted">{emp.email}</p>
-                        <p className="text-sm text-ink-muted">{emp.phone}</p>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-2">
-                      <Badge tone={emp.is_director ? 'success' : 'brand'}>
-                        {emp.is_director ? 'Директор' : 'Сотрудник'}
-                      </Badge>
-                      {showAutoserviceToggle && emp.is_service_executor ? (
-                        <Badge tone="success">Автосервис</Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex justify-end border-t border-line pt-3">
-                    {renderEmployeeActions(emp, fullName)}
-                  </div>
-                </Card>
+                <EmployeeMobileRow
+                  key={employee.id}
+                  employee={employee}
+                  fullName={fullName}
+                  isSelf={employee.id === user?.id}
+                  onEdit={() => startEditing(employee)}
+                  onPermissions={() => openPermissionModal(employee)}
+                  onDelete={() => openDeleteModal(employee.id, fullName)}
+                />
               );
             })}
           </div>
@@ -584,9 +652,9 @@ export default function EmployeesPage() {
         )}
       >
         {formError && showAddForm ? (
-          <p className="mb-3 text-sm text-danger-600">{formError}</p>
+          <InlineNotice tone="error">{formError}</InlineNotice>
         ) : null}
-        <form id="employee-add-form" onSubmit={handleSubmit}>
+        <form id="employee-add-form" onSubmit={handleSubmit} className="mt-4">
           <EmployeeFormFields
             formData={formData}
             errors={errors}
@@ -614,9 +682,9 @@ export default function EmployeesPage() {
         )}
       >
         {formError && showEditForm ? (
-          <p className="mb-3 text-sm text-danger-600">{formError}</p>
+          <InlineNotice tone="error">{formError}</InlineNotice>
         ) : null}
-        <form id="employee-edit-form" onSubmit={saveEdit}>
+        <form id="employee-edit-form" onSubmit={saveEdit} className="mt-4">
           <EmployeeFormFields
             formData={formData}
             errors={errors}
