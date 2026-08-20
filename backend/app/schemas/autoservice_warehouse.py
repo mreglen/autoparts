@@ -240,3 +240,37 @@ class AutoserviceWarehousePurchaseLotView(BaseModel):
     unit_price: Decimal
     created_at: date
     active_return: Optional[AutoserviceWarehouseReturnView] = None
+
+
+class WarehouseStockReportRow(BaseModel):
+    id: int
+    brand: str = ""
+    article: str = ""
+    name: str = ""
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+    unit_price: Decimal = Decimal("0.00")
+    opening_qty: int = 0
+    received_qty: int = 0
+    expensed_qty: int = 0
+    closing_qty: int = 0
+    reserved_qty: Optional[int] = None
+    return_reserved_qty: Optional[int] = None
+    available_qty: Optional[int] = None
+    stock_amount: Decimal = Decimal("0.00")
+
+
+class WarehouseStockReportSummary(BaseModel):
+    positions: int = 0
+    closing_value: Decimal = Decimal("0.00")
+    opening_value: Decimal = Decimal("0.00")
+    received_qty: int = 0
+    expensed_qty: int = 0
+
+
+class WarehouseStockReportResponse(BaseModel):
+    year: int
+    month: int
+    as_of: date
+    is_current_month: bool
+    summary: WarehouseStockReportSummary
+    items: list[WarehouseStockReportRow] = Field(default_factory=list)

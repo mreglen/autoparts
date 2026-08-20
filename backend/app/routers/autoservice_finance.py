@@ -19,11 +19,18 @@ from app.schemas.autoservice_finance import (
     AutoservicePayrollReportEmployeeRow,
     AutoservicePayrollReportResponse,
 )
+from app.schemas.autoservice_warehouse import (
+    WarehouseStockReportResponse,
+    WarehouseStockReportRow,
+    WarehouseStockReportSummary,
+)
 from app.services.autoservice_order_economics import (
     OrderEconomicsFilters,
     build_order_economics_report,
 )
 from app.services.autoservice_order_economics_xlsx import build_order_economics_workbook_bytes
+from app.services.autoservice_warehouse_stock_report import WarehouseStockReportFilters, build_warehouse_stock_report
+from app.services.autoservice_warehouse_stock_report_xlsx import build_warehouse_stock_workbook_bytes
 from app.services.autoservice_payment_service import (
     list_finance_receipts,
     update_autoservice_payment_date,
@@ -139,6 +146,61 @@ def export_autoservice_order_economics_xlsx(
     )
     content = build_order_economics_workbook_bytes(db, org_id, filters)
     filename = f"order_economics_{date_from.isoformat()}_{date_to.isoformat()}.xlsx"
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/autoservice/reports/warehouse-stock",
+    response_model=WarehouseStockReportResponse,
+)
+def get_autoservice_warehouse_stock_report(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    q: str | None = Query(None),
+    hide_zero: bool = Query(True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    filters = WarehouseStockReportFilters(
+        year=year,
+        month=month,
+        q=q,
+        hide_zero=hide_zero,
+    )
+    data = build_warehouse_stock_report(db, org_id, filters)
+    return WarehouseStockReportResponse(
+        year=data["year"],
+        month=data["month"],
+        as_of=data["as_of"],
+        is_current_month=data["is_current_month"],
+        summary=WarehouseStockReportSummary.model_validate(data["summary"]),
+        items=[WarehouseStockReportRow.model_validate(row) for row in data["items"]],
+    )
+
+
+@router.get("/autoservice/reports/warehouse-stock.xlsx")
+def export_autoservice_warehouse_stock_xlsx(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    q: str | None = Query(None),
+    hide_zero: bool = Query(True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    filters = WarehouseStockReportFilters(
+        year=year,
+        month=month,
+        q=q,
+        hide_zero=hide_zero,
+    )
+    content = build_warehouse_stock_workbook_bytes(db, org_id, filters)
+    filename = f"warehouse_stock_{year}_{month:02d}.xlsx"
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
