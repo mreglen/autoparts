@@ -7,6 +7,12 @@ export function truncateRubles(price) {
   return Math.floor(amount);
 }
 
+export function ceilRubles(price) {
+  const amount = Number(price);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.ceil(amount);
+}
+
 export function parseSupplierPrice(price) {
   const numericPrice = parseFloat(price);
   if (Number.isNaN(numericPrice) || numericPrice <= 0) return 0;

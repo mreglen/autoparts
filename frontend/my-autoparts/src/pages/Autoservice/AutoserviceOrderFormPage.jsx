@@ -91,6 +91,12 @@ function formatMoney(value) {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatRubles(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return '0';
+  return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+}
+
 function lineSum(qty, unitPrice) {
   const q = Number(qty) || 0;
   const p = Number(unitPrice) || 0;
@@ -176,6 +182,85 @@ function shopPartLineValue(part) {
   if (!hasBrandOrArticle) return part?.title ?? '';
   return shopPartDisplayName(part) === '—' ? (part?.title || '') : shopPartDisplayName(part);
 }
+
+function shopPartNameParts(part) {
+  const brand = String(part?.brand || part?.rossko_brand || '').trim();
+  const article = String(part?.partnumber || part?.rossko_partnumber || '').trim();
+  const title = String(part?.title || '').trim();
+  const codeLine = [brand, article].filter(Boolean).join(' ');
+
+  if (codeLine && title) {
+    const titleLower = title.toLowerCase();
+    const codeLower = codeLine.toLowerCase();
+    if (titleLower === codeLower || titleLower.startsWith(`${codeLower} `)) {
+      return { primary: title, secondary: '' };
+    }
+    return { primary: codeLine, secondary: title };
+  }
+  if (codeLine) return { primary: codeLine, secondary: '' };
+  return { primary: title || '—', secondary: '' };
+}
+
+const shopPartNameBoxClass =
+  'min-w-0 rounded-sg border border-transparent bg-gray-100 px-3 py-2 text-sm text-ink break-words leading-snug';
+
+function ShopPartNameField({
+  part,
+  isManualEditable,
+  isNameLocked,
+  onEdit,
+  onChange,
+}) {
+  const { primary, secondary } = shopPartNameParts(part);
+  const structured = Boolean(
+    part?.brand || part?.partnumber || part?.rossko_brand || part?.rossko_partnumber,
+  );
+
+  const structuredBody = (
+    <>
+      <span className="block font-medium">{primary}</span>
+      {secondary ? (
+        <span className="mt-0.5 block text-xs text-ink-muted">{secondary}</span>
+      ) : null}
+    </>
+  );
+
+  if (isManualEditable) {
+    return (
+      <button
+        type="button"
+        className={`w-full text-left ${shopPartNameBoxClass} hover:bg-surface-muted/80`}
+        onClick={onEdit}
+        title="Редактировать товар"
+      >
+        {structured ? structuredBody : (primary || '—')}
+      </button>
+    );
+  }
+
+  if (isNameLocked) {
+    return (
+      <div className={`${shopPartNameBoxClass} cursor-default bg-surface-muted/80 opacity-90`}>
+        {structured ? structuredBody : (primary || '—')}
+      </div>
+    );
+  }
+
+  return (
+    <input
+      className={`w-full ${shopPartNameBoxClass} focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0`}
+      placeholder="Бренд, артикул, наименование"
+      value={shopPartLineValue(part)}
+      onChange={onChange}
+    />
+  );
+}
+
+const shopPartControlInputClass =
+  'h-8 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+
+const shopPartControlSelectClass =
+  'h-8 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
 
 function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
   return {
@@ -1022,7 +1107,7 @@ export default function AutoserviceOrderFormPage() {
         setFormInitialized(true);
       }
     }
-  }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState, clientMarkupPercent]);
+  }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState]);
 
   useEffect(() => {
     if (!isCreate || !formInitialized || metaLoading || clients.length === 0) return;
@@ -1963,172 +2048,143 @@ export default function AutoserviceOrderFormPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Запчасти исполнителя">
-          <div className="overflow-x-auto rounded-sg border border-line">
-            <table className="min-w-[820px] w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-line bg-surface-muted/60 text-xs font-medium uppercase tracking-wide text-ink-muted">
-                  <th className="w-10 px-2 py-2.5">№</th>
-                  <th className="min-w-[22rem] w-[45%] px-2 py-2.5">Наименование</th>
-                  <th className="w-20 px-2 py-2.5">Кол-во</th>
-                  <th className="w-16 px-2 py-2.5">Ед.</th>
-                  <th className="w-28 px-2 py-2.5">
-                    <span className="inline-flex items-center gap-1.5">
-                      {clientMarkupEnabled ? (
-                        <ClientMarkupPopover onApply={applyShopPartsMarkup} bottomInset={72} />
-                      ) : null}
-                      <span>Цена</span>
-                    </span>
-                  </th>
-                  <th className="w-24 px-2 py-2.5 text-right">Сумма</th>
-                  <th className="w-10 px-2 py-2.5" aria-hidden />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {shopParts.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-sm text-ink-muted">
-                      Пока нет запчастей исполнителя
-                    </td>
-                  </tr>
-                ) : (
-                  shopParts.map((p, index) => {
-                    const pricingOptions = shopPartPricingOptions(p);
-                    const automaticClientUnit = priceWithMarkup(
-                      p.unit_price,
-                      p.markup_percent,
-                      { ...pricingOptions, clientUnitPriceOverride: null },
-                    );
-                    const lineTotal = shopLineSum(p.qty, p.unit_price, p.markup_percent, pricingOptions);
-                    const qtyStep = p.unit === 'pcs' ? 1 : 0.001;
-                    const qtyMin = p.unit === 'pcs' ? 1 : 0.001;
-                    const isImported = Boolean(p.is_imported || p.pending_import);
-                    const isWarehouseLinked = isWarehouseLinkedShopPart(p);
-                    const isManualEditable = isManualEditableShopPart(p);
-                    const useModalEditor = isManualEditable && p.source === 'autoservice_stock';
-                    const isNameLocked = isImported || (isWarehouseLinked && !isManualEditable);
-                    const isQtyLocked = isImported || useModalEditor;
-                    const isUnitLocked = isImported || p.source === 'warehouse' || useModalEditor;
-                    const qtyValue = (p.unit || 'pcs') === 'pcs'
-                      ? (Number.isFinite(Number(p.qty)) ? Math.round(Number(p.qty)) : '')
-                      : p.qty;
-                    const nameInputClass = `${pillInputSmClass}${isNameLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-90' : ''}`;
-                    const lockedFieldClass = `${pillInputSmClass} cursor-not-allowed bg-surface-muted/80 opacity-80`;
-                    const qtyInputClass = isQtyLocked ? lockedFieldClass : pillInputSmClass;
-                    const selectClass = `${pillSelectSmClass}${isUnitLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`;
-                    return (
-                      <tr key={p.id || `shop-part-${index}`} className="align-top">
-                        <td className="px-2 py-2.5 tabular-nums text-ink-muted">{index + 1}</td>
-                        <td className="px-2 py-2.5">
-                          {isManualEditable ? (
-                            <button
-                              type="button"
-                              className={`w-full min-w-[18rem] text-left ${pillInputSmClass} hover:bg-surface-muted/80`}
-                              onClick={() => setShopPartEditIndex(index)}
-                              title="Редактировать товар"
-                            >
-                              {shopPartLineValue(p) || '—'}
-                            </button>
-                          ) : (
-                            <input
-                              className={`w-full min-w-[18rem] ${nameInputClass}`}
-                              placeholder="Бренд, артикул, наименование"
-                              value={shopPartLineValue(p)}
-                              readOnly={isNameLocked}
-                              disabled={isNameLocked}
-                              onChange={(e) => updateShopPart(index, {
-                                title: e.target.value,
-                                brand: '',
-                                partnumber: '',
-                                rossko_brand: '',
-                                rossko_partnumber: '',
-                              })}
-                            />
-                          )}
-                        </td>
-                        <td className="px-2 py-2.5">
-                          <input
-                            type="number"
-                            min={qtyMin}
-                            max={isWarehouseLinked && p.stock_max_qty != null ? p.stock_max_qty : undefined}
-                            step={qtyStep}
-                            className={`w-full min-w-[4rem] ${qtyInputClass}`}
-                            value={qtyValue}
-                            readOnly={isQtyLocked}
-                            disabled={isQtyLocked}
-                            title={
-                              isWarehouseLinked && p.stock_max_qty != null
-                                ? `Доступно не более ${p.stock_max_qty} шт.`
-                                : undefined
-                            }
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              if (isQtyLocked) return;
-                              if ((p.unit || 'pcs') === 'pcs') {
-                                updateShopPart(index, {
-                                  qty: clampWarehouseShopPartQty(
-                                    raw === '' ? '' : Math.round(Number(raw) || 0),
-                                    p,
-                                  ),
-                                });
-                              } else {
-                                updateShopPart(index, {
-                                  qty: clampWarehouseShopPartQty(raw, p),
-                                });
-                              }
-                            }}
-                          />
-                        </td>
-                        <td className="px-2 py-2.5">
-                          <select
-                            className={`w-full min-w-[3.5rem] ${selectClass}`}
-                            value={p.unit || 'pcs'}
-                            disabled={isUnitLocked}
-                            onChange={(e) => updateShopPart(index, { unit: e.target.value })}
-                          >
-                            <option value="pcs">шт.</option>
-                            <option value="l">л</option>
-                            <option value="kg">кг</option>
-                          </select>
-                        </td>
-                        <td className="px-2 py-2.5">
-                          <input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            className={`w-full min-w-[5rem] ${pillInputSmClass}`}
-                            value={p.client_unit_price_override ?? ''}
-                            placeholder={formatMoney(automaticClientUnit)}
-                            aria-label="Итоговая клиентская цена"
-                            onChange={(e) => updateShopPart(index, {
-                              client_unit_price_override: e.target.value,
-                            })}
-                          />
-                        </td>
-                        <td className="px-2 py-2.5 text-right tabular-nums font-medium text-ink whitespace-nowrap">
-                          {formatMoney(lineTotal)} ₽
-                        </td>
-                        <td className="px-2 py-2.5">
-                          <button
-                            type="button"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink-muted transition hover:bg-danger-50 hover:text-danger-600 disabled:cursor-not-allowed disabled:opacity-50"
-                            aria-label={isImported ? 'Убрать из заказ-наряда' : 'Удалить'}
-                            disabled={detachingShopPartId === p.id}
-                            onClick={() => removeShopPart(index)}
-                          >
-                            ×
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+        <SectionCard
+          title="Запчасти исполнителя"
+          action={clientMarkupEnabled ? (
+            <div className="flex items-center gap-1.5 text-sm text-ink-muted">
+              <span>Наценка</span>
+              <ClientMarkupPopover onApply={applyShopPartsMarkup} bottomInset={72} />
+            </div>
+          ) : null}
+        >
+          {shopParts.length === 0 ? (
+            <p className="text-sm text-ink-muted">Пока нет запчастей исполнителя</p>
+          ) : (
+            <div className="space-y-2">
+              {shopParts.map((p, index) => {
+                const pricingOptions = shopPartPricingOptions(p);
+                const automaticClientUnit = priceWithMarkup(
+                  p.unit_price,
+                  p.markup_percent,
+                  { ...pricingOptions, clientUnitPriceOverride: null },
+                );
+                const lineTotal = shopLineSum(p.qty, p.unit_price, p.markup_percent, pricingOptions);
+                const qtyStep = p.unit === 'pcs' ? 1 : 0.001;
+                const qtyMin = p.unit === 'pcs' ? 1 : 0.001;
+                const isImported = Boolean(p.is_imported || p.pending_import);
+                const isWarehouseLinked = isWarehouseLinkedShopPart(p);
+                const isManualEditable = isManualEditableShopPart(p);
+                const isNameLocked = isImported || (isWarehouseLinked && !isManualEditable);
+                const isQtyLocked = isImported || (isManualEditable && p.source === 'autoservice_stock');
+                const isUnitLocked = isImported || p.source === 'warehouse' || (isManualEditable && p.source === 'autoservice_stock');
+                const qtyValue = (p.unit || 'pcs') === 'pcs'
+                  ? (Number.isFinite(Number(p.qty)) ? Math.round(Number(p.qty)) : '')
+                  : p.qty;
+
+                return (
+                  <div
+                    key={p.id || `shop-part-${index}`}
+                    className="min-w-0 rounded-sg border border-line bg-white px-2.5 py-2"
+                  >
+                    <div className="flex min-w-0 items-start gap-1.5">
+                      <span className="mt-2 w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <ShopPartNameField
+                          part={p}
+                          isManualEditable={isManualEditable}
+                          isNameLocked={isNameLocked}
+                          onEdit={() => setShopPartEditIndex(index)}
+                          onChange={(e) => updateShopPart(index, {
+                            title: e.target.value,
+                            brand: '',
+                            partnumber: '',
+                            rossko_brand: '',
+                            rossko_partnumber: '',
+                          })}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className={`${rowActionBtnClass} mt-1.5 shrink-0 text-danger-600 hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-50`}
+                        aria-label={isImported ? 'Убрать из заказ-наряда' : 'Удалить'}
+                        disabled={detachingShopPartId === p.id}
+                        onClick={() => removeShopPart(index)}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 pl-5">
+                      <input
+                        type="number"
+                        min={qtyMin}
+                        max={isWarehouseLinked && p.stock_max_qty != null ? p.stock_max_qty : undefined}
+                        step={qtyStep}
+                        className={`w-16 ${shopPartControlInputClass}${isQtyLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
+                        value={qtyValue}
+                        readOnly={isQtyLocked}
+                        disabled={isQtyLocked}
+                        aria-label="Количество"
+                        title={
+                          isWarehouseLinked && p.stock_max_qty != null
+                            ? `Доступно не более ${p.stock_max_qty} шт.`
+                            : undefined
+                        }
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (isQtyLocked) return;
+                          if ((p.unit || 'pcs') === 'pcs') {
+                            updateShopPart(index, {
+                              qty: clampWarehouseShopPartQty(
+                                raw === '' ? '' : Math.round(Number(raw) || 0),
+                                p,
+                              ),
+                            });
+                          } else {
+                            updateShopPart(index, {
+                              qty: clampWarehouseShopPartQty(raw, p),
+                            });
+                          }
+                        }}
+                      />
+                      <select
+                        className={`w-[4.5rem] ${shopPartControlSelectClass}${isUnitLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
+                        value={p.unit || 'pcs'}
+                        disabled={isUnitLocked}
+                        aria-label="Единица измерения"
+                        onChange={(e) => updateShopPart(index, { unit: e.target.value })}
+                      >
+                        <option value="pcs">шт.</option>
+                        <option value="l">л</option>
+                        <option value="kg">кг</option>
+                      </select>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        className={`w-24 ${shopPartControlInputClass}`}
+                        value={p.client_unit_price_override ?? ''}
+                        placeholder={formatRubles(automaticClientUnit)}
+                        aria-label="Клиентская цена"
+                        onChange={(e) => updateShopPart(index, {
+                          client_unit_price_override: e.target.value,
+                        })}
+                      />
+                      <span className="text-xs tabular-nums text-ink-muted">₽</span>
+                      <span className="ml-auto text-sm font-medium tabular-nums text-ink">
+                        {formatRubles(lineTotal)} ₽
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-3">
             <p className="text-sm font-medium text-ink">
-              Итого ЗЧ исполнителя: {formatMoney(shopPartsTotal)} ₽
+              Итого ЗЧ исполнителя: {formatRubles(shopPartsTotal)} ₽
             </p>
             <SectionAddLink onClick={() => setShopPartAddMenuOpen(true)} />
           </div>
@@ -2143,7 +2199,7 @@ export default function AutoserviceOrderFormPage() {
               Итого {formatMoney(grandTotal)} ₽
             </p>
             <p className="truncate text-xs text-ink-muted">
-              работы {formatMoney(worksTotal)} · ЗЧ {formatMoney(shopPartsTotal)}
+              работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">

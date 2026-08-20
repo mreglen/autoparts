@@ -142,9 +142,9 @@ describe('repairOrderShopPartUtils', () => {
     expect(priceWithMarkup(100, 20, shopPartPricingOptions(part))).toBe(120);
   });
 
-  it('floors automatic Rossko price but preserves decimal override', () => {
+  it('rounds automatic client price up to whole rubles', () => {
     const part = { source: 'rossko', client_unit_price_override: '' };
-    expect(priceWithMarkup(100.99, 7, shopPartPricingOptions(part))).toBe(108);
+    expect(priceWithMarkup(100.99, 7, shopPartPricingOptions(part))).toBe(109);
     part.client_unit_price_override = '108.75';
     expect(priceWithMarkup(100.99, 7, shopPartPricingOptions(part))).toBe(108.75);
   });

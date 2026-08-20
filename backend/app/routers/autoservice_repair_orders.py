@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
+from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
@@ -125,13 +125,13 @@ def _price_with_markup(
     unit_price: Decimal | int | float | str,
     markup_percent: Decimal | int | float | str,
     *,
-    floor_rubles: bool = False,
+    ceil_rubles: bool = True,
 ) -> Decimal:
     price = _money(unit_price)
     markup = Decimal(str(markup_percent))
     result = price * (Decimal("1") + markup / Decimal("100"))
-    if floor_rubles:
-        return result.quantize(Decimal("1"), rounding=ROUND_DOWN).quantize(_TWOPLACES)
+    if ceil_rubles:
+        return result.quantize(Decimal("1"), rounding=ROUND_CEILING).quantize(_TWOPLACES)
     return _money(result)
 
 
@@ -142,7 +142,6 @@ def _effective_shop_unit_price(part: RepairOrderShopPart) -> Decimal:
     return _price_with_markup(
         part.unit_price,
         part.markup_percent,
-        floor_rubles=part.source == "rossko",
     )
 
 

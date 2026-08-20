@@ -1,4 +1,4 @@
-import { truncateRubles } from '../pages/AutoParts/NewParts/newPartStockUtils';
+import { ceilRubles, truncateRubles } from '../pages/AutoParts/NewParts/newPartStockUtils';
 
 export const SHOP_PART_UNIT_LABELS = {
   pcs: 'шт.',
@@ -33,12 +33,13 @@ export function formatShopPartUnit(unit = 'pcs') {
 export function priceWithMarkup(
   unitPrice,
   markupPercent,
-  { floorRubles = false, clientUnitPriceOverride = null } = {},
+  { floorRubles = false, ceilRubles: roundUpRubles = false, clientUnitPriceOverride = null } = {},
 ) {
   if (clientUnitPriceOverride !== null && clientUnitPriceOverride !== '') {
     return Math.round((Number(clientUnitPriceOverride) || 0) * 100) / 100;
   }
   const value = (Number(unitPrice) || 0) * (1 + (Number(markupPercent) || 0) / 100);
+  if (roundUpRubles) return ceilRubles(value);
   if (floorRubles) return truncateRubles(value);
   return Math.round(value * 100) / 100;
 }
@@ -46,14 +47,18 @@ export function priceWithMarkup(
 export function shopLineSum(qty, unitPrice, markupPercent, options = {}) {
   const unit = priceWithMarkup(unitPrice, markupPercent, options);
   const total = (Number(qty) || 0) * unit;
-  return options.floorRubles && options.clientUnitPriceOverride == null
-    ? truncateRubles(total)
-    : Math.round(total * 100) / 100;
+  if (options.ceilRubles && options.clientUnitPriceOverride == null) {
+    return ceilRubles(total);
+  }
+  if (options.floorRubles && options.clientUnitPriceOverride == null) {
+    return truncateRubles(total);
+  }
+  return Math.round(total * 100) / 100;
 }
 
 export function shopPartPricingOptions(part) {
   return {
-    floorRubles: part?.source === 'rossko',
+    ceilRubles: true,
     clientUnitPriceOverride: part?.client_unit_price_override,
   };
 }

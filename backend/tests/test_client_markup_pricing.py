@@ -31,14 +31,14 @@ class RepairOrderClientPriceTests(unittest.TestCase):
         )
         self.assertEqual(_effective_shop_unit_price(part), Decimal("155.50"))
 
-    def test_clear_override_restores_percentage_and_rossko_floor(self):
+    def test_clear_override_restores_percentage_and_rounds_up_to_ruble(self):
         part = SimpleNamespace(
             unit_price=Decimal("100.99"),
             markup_percent=Decimal("7.00"),
             client_unit_price_override=None,
             source="rossko",
         )
-        self.assertEqual(_effective_shop_unit_price(part), Decimal("108.00"))
+        self.assertEqual(_effective_shop_unit_price(part), Decimal("109.00"))
 
 
 if __name__ == "__main__":
