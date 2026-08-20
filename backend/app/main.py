@@ -61,6 +61,7 @@ from app.db.schema_patches import (
     ensure_repair_order_shop_parts_autoservice_stock,
     ensure_repair_order_shop_parts_warehouse_receipt_id,
     ensure_repair_order_status_timestamps,
+    ensure_repair_orders_shipping_date,
     ensure_organization_employees_tables,
     ensure_autoservice_warehouse_items_unit,
     ensure_group_chat_columns,
@@ -273,6 +274,7 @@ try:
     ensure_repair_order_shop_parts_autoservice_stock()
     ensure_repair_order_shop_parts_warehouse_receipt_id()
     ensure_repair_order_status_timestamps()
+    ensure_repair_orders_shipping_date()
     ensure_organization_employees_tables()
     from app.db.database import SessionLocal
     from app.services.organization_employee_sync import backfill_organization_employee_cards

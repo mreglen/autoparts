@@ -227,6 +227,13 @@ def _purchase_order_id_for_cart_item(
     return int(row[0]) if row else None
 
 
+def repair_order_receipt_doc_date(order) -> date:
+    shipped = getattr(order, "shipping_date", None)
+    if shipped:
+        return shipped
+    return date.today()
+
+
 @dataclass
 class _PendingReceiptLine:
     receipt: AutoserviceWarehouseReceipt
@@ -247,11 +254,13 @@ class ReceiptDocumentBatch:
         org_id: str,
         user_id: int,
         repair_order_id: int | None = None,
+        receipt_doc_date: date | None = None,
     ) -> None:
         self.db = db
         self.org_id = org_id
         self.user_id = user_id
         self.repair_order_id = repair_order_id
+        self.receipt_doc_date = receipt_doc_date
         self._pending: list[_PendingReceiptLine] = []
 
     def _append_receipt(
@@ -268,6 +277,7 @@ class ReceiptDocumentBatch:
         source_order_id: int | None,
         doc_date: date | None = None,
     ) -> AutoserviceWarehouseReceipt:
+        effective_doc_date = doc_date or self.receipt_doc_date or date.today()
         receipt = AutoserviceWarehouseReceipt(
             organization_id=self.org_id,
             item_id=item.id,
@@ -277,7 +287,7 @@ class ReceiptDocumentBatch:
             cart_item_id=cart_item_id,
             repair_order_id=self.repair_order_id,
             created_by=self.user_id,
-            created_at=doc_date or date.today(),
+            created_at=effective_doc_date,
         )
         self.db.add(receipt)
         self.db.flush()
@@ -288,7 +298,7 @@ class ReceiptDocumentBatch:
                 supplier_name=supplier_name,
                 source_order_type=source_order_type,
                 source_order_id=source_order_id,
-                doc_date=doc_date or date.today(),
+                doc_date=effective_doc_date,
             )
         )
         return receipt
@@ -1100,6 +1110,31 @@ def _shop_parts_for_receipt_line(
     return _shop_parts_for_item(db, receipt.item_id)
 
 
+def update_receipt_doc_date(
+    db: Session,
+    *,
+    org_id: str,
+    doc_id: int,
+    doc_date: date,
+) -> AutoserviceWarehouseReceiptDoc:
+    doc = (
+        db.query(AutoserviceWarehouseReceiptDoc)
+        .options(joinedload(AutoserviceWarehouseReceiptDoc.lines))
+        .filter(
+            AutoserviceWarehouseReceiptDoc.id == doc_id,
+            AutoserviceWarehouseReceiptDoc.organization_id == org_id,
+        )
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Документ поступления не найден")
+    doc.doc_date = doc_date
+    for line in doc.lines or []:
+        line.created_at = doc_date
+    db.flush()
+    return doc
+
+
 def update_receipt_line_details(
     db: Session,
     *,
@@ -1467,6 +1502,7 @@ def update_autoservice_warehouse_item(
     article: str,
     name: str,
     unit: str,
+    unit_price: Decimal,
 ) -> AutoserviceWarehouseItem:
     item = (
         db.query(AutoserviceWarehouseItem)
@@ -1504,6 +1540,7 @@ def update_autoservice_warehouse_item(
     item.article = article_norm
     item.name = name_norm
     item.unit = unit_norm
+    item.unit_price = _money(unit_price)
 
     linked_parts = (
         db.query(RepairOrderShopPart)

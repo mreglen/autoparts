@@ -11,7 +11,7 @@ from app.models.repair_order import RepairOrder, RepairOrderShopPart
 from app.models.user import User
 from app.utils.purchase_buyer_access import fetch_used_purchase_items_for_buyer
 from app.schemas.repair_order import RepairOrderPurchaseImportIn
-from app.services.autoservice_warehouse_service import ReceiptDocumentBatch
+from app.services.autoservice_warehouse_service import ReceiptDocumentBatch, repair_order_receipt_doc_date
 from app.services.repair_order_cart_import import (
     _derive_prices,
     _money,
@@ -110,6 +110,7 @@ def append_purchase_items_to_repair_order(
         org_id=org_id,
         user_id=user.id,
         repair_order_id=order.id,
+        receipt_doc_date=repair_order_receipt_doc_date(order),
     )
 
     if payload.order_type == "new":

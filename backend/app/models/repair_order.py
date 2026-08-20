@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -88,6 +89,7 @@ class RepairOrder(Base):
         index=True,
     )
     scheduled_end_at = Column(DateTime, nullable=True)
+    shipping_date = Column(Date, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime,

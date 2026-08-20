@@ -5373,6 +5373,19 @@ def ensure_repair_order_status_timestamps() -> None:
     logger.info("Applied repair_orders status timestamp columns patch")
 
 
+def ensure_repair_orders_shipping_date() -> None:
+    """Add shipping_date to repair_orders for warehouse receipt dating."""
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+    if "shipping_date" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE repair_orders ADD COLUMN shipping_date DATE"))
+    logger.info("Applied repair_orders.shipping_date patch")
+
+
 def ensure_autoservice_warehouse_items_unit() -> None:
     """Add unit column to autoservice warehouse items."""
     inspector = inspect(engine)

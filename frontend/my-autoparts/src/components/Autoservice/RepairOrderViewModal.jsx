@@ -73,10 +73,27 @@ function paymentSummary(order, grandTotal) {
   return { paid, remaining, isPaid };
 }
 
-function PaymentWizard({ remaining, method, amount, saving, error, onMethodChange, onAmountChange, onSubmit }) {
+function todayDateInputValue() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function PaymentWizard({
+  remaining,
+  method,
+  amount,
+  payDate,
+  saving,
+  error,
+  onMethodChange,
+  onAmountChange,
+  onPayDateChange,
+  onSubmit,
+}) {
   const payAmount = Number(amount) || 0;
   const afterPay = Math.max(0, Math.round((remaining - payAmount) * 100) / 100);
-  const canSubmit = Boolean(method) && payAmount > 0 && payAmount <= remaining + 0.005;
+  const canSubmit = Boolean(method) && Boolean(payDate) && payAmount > 0 && payAmount <= remaining + 0.005;
 
   return (
     <div className="flex min-h-[22rem] flex-col justify-center">
@@ -108,6 +125,17 @@ function PaymentWizard({ remaining, method, amount, saving, error, onMethodChang
             );
           })}
         </div>
+
+        <label className="block text-xs font-medium text-gray-700">
+          Дата оплаты
+          <input
+            type="date"
+            value={payDate}
+            onChange={(e) => onPayDateChange(e.target.value)}
+            disabled={saving}
+            className="mt-1 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+          />
+        </label>
 
         <label className="block text-xs font-medium text-gray-700">
           Сумма, ₽
@@ -421,6 +449,7 @@ export default function RepairOrderViewModal({
   const [payOpen, setPayOpen] = useState(false);
   const [payMethod, setPayMethod] = useState(null);
   const [payAmount, setPayAmount] = useState('');
+  const [payDate, setPayDate] = useState(todayDateInputValue);
   const [paySaving, setPaySaving] = useState(false);
   const [payError, setPayError] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
@@ -433,6 +462,7 @@ export default function RepairOrderViewModal({
     setPayOpen(false);
     setPayMethod(null);
     setPayAmount('');
+    setPayDate(todayDateInputValue());
     setPayError('');
     setStatusError('');
     setCompleteError('');
@@ -452,6 +482,7 @@ export default function RepairOrderViewModal({
     setPayOpen(false);
     setPayMethod(null);
     setPayAmount('');
+    setPayDate(todayDateInputValue());
     setPayError('');
   }, []);
 
@@ -461,6 +492,7 @@ export default function RepairOrderViewModal({
     setPayOpen(true);
     setPayMethod(null);
     setPayAmount(payment?.remaining ? String(payment.remaining) : '');
+    setPayDate(todayDateInputValue());
     setPayError('');
   }, [payment?.remaining]);
 
@@ -511,7 +543,11 @@ export default function RepairOrderViewModal({
     try {
       const updated = await apiRequest(`/autoservice/repair-orders/${order.id}/payments`, {
         method: 'POST',
-        body: JSON.stringify({ method: payMethod, amount: Number(payAmount) }),
+        body: JSON.stringify({
+          method: payMethod,
+          amount: Number(payAmount),
+          paid_at: payDate || todayDateInputValue(),
+        }),
       });
       const updatedTotals = orderTotals(updated);
       const updatedPayment = paymentSummary(updated, updatedTotals.grand);
@@ -533,7 +569,7 @@ export default function RepairOrderViewModal({
     } finally {
       setPaySaving(false);
     }
-  }, [order?.id, payMethod, payAmount, onOrderChange, resetPaymentWizard]);
+  }, [order?.id, payMethod, payAmount, payDate, onOrderChange, resetPaymentWizard]);
 
   if (!order && !loading) return null;
 
@@ -683,6 +719,7 @@ export default function RepairOrderViewModal({
           remaining={payment.remaining}
           method={payMethod}
           amount={payAmount}
+          payDate={payDate}
           saving={paySaving}
           error={payError}
           onMethodChange={(value) => {
@@ -692,6 +729,7 @@ export default function RepairOrderViewModal({
             }
           }}
           onAmountChange={setPayAmount}
+          onPayDateChange={setPayDate}
           onSubmit={handleSubmitPayment}
         />
       ) : (

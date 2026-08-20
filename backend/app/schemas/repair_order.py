@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
@@ -194,6 +194,7 @@ class RepairOrderCreate(BaseModel):
     vehicle_id: int
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
+    shipping_date: Optional[date] = None
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
     work_zone_id: Optional[int] = None
@@ -208,6 +209,7 @@ class RepairOrderUpdate(BaseModel):
     vehicle_id: Optional[int] = None
     scheduled_at: Optional[datetime] = None
     scheduled_end_at: Optional[datetime] = None
+    shipping_date: Optional[date] = None
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
     work_zone_id: Optional[int] = None
@@ -243,6 +245,7 @@ class RepairOrderStaffView(BaseModel):
     work_zone: Optional[RepairOrderWorkZoneBrief] = None
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
+    shipping_date: Optional[date] = None
     accepted_by_user_id: int
     status: str
     created_at: datetime

@@ -249,6 +249,7 @@ export default function AutoserviceWarehousePage() {
           article: values.article?.trim() || '',
           name: values.name?.trim(),
           unit: values.unit || 'pcs',
+          unit_price: Number(values.unit_price),
         }),
       });
       setEditItem(null);
@@ -780,6 +781,7 @@ export default function AutoserviceWarehousePage() {
           article: editItem.article || '',
           name: editItem.name || '',
           unit: editItem.unit || 'pcs',
+          unit_price: editItem.unit_price ?? 0,
         } : null}
       />
 

@@ -25,6 +25,7 @@ class AutoserviceWarehouseItemUpdate(BaseModel):
     article: str = Field("", max_length=120)
     name: str = Field(min_length=1, max_length=255)
     unit: Literal["pcs", "l", "kg"] = "pcs"
+    unit_price: Decimal = Field(ge=0)
 
 
 class AutoserviceWarehouseReceiptView(BaseModel):
@@ -79,6 +80,10 @@ class AutoserviceWarehouseReceiptDocListView(BaseModel):
     repair_order_number: Optional[str] = None
     creator_name: Optional[str] = None
     created_at: datetime
+
+
+class AutoserviceWarehouseReceiptDocUpdate(BaseModel):
+    doc_date: date
 
 
 class AutoserviceWarehouseReceiptDocDetailView(BaseModel):

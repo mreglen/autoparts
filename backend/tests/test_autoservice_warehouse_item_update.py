@@ -1,6 +1,7 @@
 import sys
 import types
 import unittest
+from decimal import Decimal
 from unittest.mock import MagicMock
 
 if "fcntl" not in sys.modules:
@@ -67,11 +68,13 @@ class WarehouseItemIdentityTests(unittest.TestCase):
             article="",
             name="Проводка двери",
             unit="pcs",
+            unit_price=Decimal("1200.00"),
         )
 
         self.assertIs(result, item)
         self.assertEqual(item.brand, "")
         self.assertEqual(item.article, "")
+        self.assertEqual(item.unit_price, Decimal("1200.00"))
         db.flush.assert_called_once()
 
 

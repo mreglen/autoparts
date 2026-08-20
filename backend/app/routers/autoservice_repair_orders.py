@@ -91,6 +91,7 @@ from app.services.autoservice_warehouse_service import (
     fulfill_autoservice_stock_on_order_complete,
     product_available_qty,
     ReceiptDocumentBatch,
+    repair_order_receipt_doc_date,
     shop_part_is_manual_editable,
     update_manual_shop_part,
 )
@@ -370,6 +371,7 @@ def _to_staff_view(
         work_zone=_work_zone_brief(row.work_zone),
         scheduled_at=row.scheduled_at,
         scheduled_end_at=row.scheduled_end_at,
+        shipping_date=row.shipping_date,
         accepted_by_user_id=row.accepted_by_user_id,
         status=row.status,
         created_at=row.created_at,
@@ -799,6 +801,7 @@ def _replace_shop_parts(
         org_id=org_id,
         user_id=user_id,
         repair_order_id=order.id,
+        receipt_doc_date=repair_order_receipt_doc_date(order),
     )
 
     for item in manual_items:
@@ -1187,6 +1190,7 @@ def create_repair_order(
         work_zone_id=work_zone_id,
         scheduled_at=scheduled_at,
         scheduled_end_at=scheduled_end_at,
+        shipping_date=payload.shipping_date,
         accepted_by_user_id=current_user.id,
         status="pending",
     )
@@ -1228,6 +1232,9 @@ def update_repair_order(
     if "scheduled_end_at" in payload.model_fields_set:
         end_at = payload.scheduled_end_at
         row.scheduled_end_at = _validate_schedule_end(row.scheduled_at, end_at)
+
+    if "shipping_date" in payload.model_fields_set:
+        row.shipping_date = payload.shipping_date
 
     if "client_comment" in payload.model_fields_set:
         comment = payload.client_comment
@@ -1423,6 +1430,7 @@ def post_repair_order_payment(
         method=payload.method,
         amount=payload.amount,
         grand_total=grand_total,
+        paid_at=payload.paid_at,
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)

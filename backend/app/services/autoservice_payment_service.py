@@ -82,6 +82,7 @@ def create_repair_order_payment(
     method: str,
     amount: Decimal,
     grand_total: Decimal,
+    paid_at: date | None = None,
 ) -> AutoservicePayment:
     if method not in _VALID_METHODS:
         raise HTTPException(
@@ -100,6 +101,11 @@ def create_repair_order_payment(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Сумма оплаты превышает остаток к оплате",
         )
+    effective_date = paid_at or date.today()
+    if effective_date == date.today():
+        created_at = datetime.now()
+    else:
+        created_at = datetime.combine(effective_date, time(12, 0))
     payment = AutoservicePayment(
         organization_id=org_id,
         repair_order_id=order.id,
@@ -107,6 +113,7 @@ def create_repair_order_payment(
         method=method,
         amount=pay_amount,
         created_by_user_id=user_id,
+        created_at=created_at,
     )
     db.add(payment)
     db.flush()

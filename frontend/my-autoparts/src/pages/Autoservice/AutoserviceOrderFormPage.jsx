@@ -54,6 +54,14 @@ const pillTextareaClass =
 
 const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700';
 
+function SectionAddLink({ onClick, label = '+ Добавить' }) {
+  return (
+    <button type="button" onClick={onClick} className={linkActionClass}>
+      {label}
+    </button>
+  );
+}
+
 const btnPrimaryClass =
   'inline-flex h-10 items-center justify-center rounded-full bg-brand-600 px-5 text-sm font-semibold text-white shadow-sg-sm transition hover:bg-brand-700 disabled:opacity-60';
 
@@ -110,6 +118,20 @@ function fromLocalInputValue(local) {
   const d = new Date(local);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
+}
+
+function toDateInputValue(iso) {
+  if (!iso) return '';
+  const d = parseServerDate(iso);
+  if (!d || Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function todayDateInputValue() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function emptyWork() {
@@ -772,6 +794,9 @@ function mapOrderToFormState(order) {
     scheduledEndAt: order?.scheduled_end_at
       ? toLocalInputValue(order.scheduled_end_at)
       : '',
+    shippingDate: order?.shipping_date
+      ? toDateInputValue(order.shipping_date)
+      : todayDateInputValue(),
     works: (order?.works || []).length
       ? order.works.map((w) => ({
           title: w.title || '',
@@ -862,6 +887,7 @@ export default function AutoserviceOrderFormPage() {
   const [comment, setComment] = useState('');
   const [staffComment, setStaffComment] = useState('');
   const [scheduledEndAt, setScheduledEndAt] = useState('');
+  const [shippingDate, setShippingDate] = useState(todayDateInputValue);
   const [workZoneId, setWorkZoneId] = useState('');
   const [works, setWorks] = useState([]);
   const [clientParts, setClientParts] = useState([]);
@@ -897,6 +923,7 @@ export default function AutoserviceOrderFormPage() {
     setStaffComment(state.staffComment);
     setWorkZoneId(state.workZoneId);
     setScheduledEndAt(state.scheduledEndAt);
+    setShippingDate(state.shippingDate || todayDateInputValue());
     setWorks(state.works);
     setClientParts(state.clientParts);
     setShopParts(state.shopParts);
@@ -1397,6 +1424,7 @@ export default function AutoserviceOrderFormPage() {
     vehicle_id: Number(vehicleId),
     scheduled_at: fromLocalInputValue(scheduledAt),
     scheduled_end_at: scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null,
+    shipping_date: shippingDate || null,
     client_comment: comment.trim() || null,
     staff_comment: staffComment.trim() || null,
     work_zone_id: workZoneId ? Number(workZoneId) : null,
@@ -1728,6 +1756,15 @@ export default function AutoserviceOrderFormPage() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="block text-sg-caption font-medium text-ink-muted">Дата отгрузки</label>
+              <input
+                type="date"
+                className={pillInputClass}
+                value={shippingDate}
+                onChange={(e) => setShippingDate(e.target.value)}
+              />
+            </div>
           </div>
           <div className="mt-4 grid gap-4">
             <div>
@@ -1754,13 +1791,7 @@ export default function AutoserviceOrderFormPage() {
         <SectionCard
           title="Работы"
           action={(
-            <button
-              type="button"
-              onClick={() => setWorks((prev) => [...prev, emptyWork()])}
-              className={linkActionClass}
-            >
-              + Добавить
-            </button>
+            <SectionAddLink onClick={() => setWorks((prev) => [...prev, emptyWork()])} />
           )}
         >
           {works.length === 0 ? (
@@ -1864,19 +1895,16 @@ export default function AutoserviceOrderFormPage() {
               ))}
             </div>
           )}
-          <p className="mt-3 text-sm font-medium text-ink">Итого работ: {formatMoney(worksTotal)} ₽</p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-3">
+            <p className="text-sm font-medium text-ink">Итого работ: {formatMoney(worksTotal)} ₽</p>
+            <SectionAddLink onClick={() => setWorks((prev) => [...prev, emptyWork()])} />
+          </div>
         </SectionCard>
 
         <SectionCard
           title="Запчасти клиента"
           action={(
-            <button
-              type="button"
-              onClick={() => setClientParts((prev) => [...prev, emptyClientPart()])}
-              className={linkActionClass}
-            >
-              + Добавить
-            </button>
+            <SectionAddLink onClick={() => setClientParts((prev) => [...prev, emptyClientPart()])} />
           )}
         >
           {clientParts.length === 0 ? (
@@ -1933,14 +1961,15 @@ export default function AutoserviceOrderFormPage() {
               ))}
             </div>
           )}
+          <div className="mt-3 flex justify-end border-t border-line-soft pt-3">
+            <SectionAddLink onClick={() => setClientParts((prev) => [...prev, emptyClientPart()])} />
+          </div>
         </SectionCard>
 
         <SectionCard
           title="Запчасти исполнителя"
           action={(
-            <button type="button" onClick={() => setShopPartAddMenuOpen(true)} className={linkActionClass}>
-              + Добавить
-            </button>
+            <SectionAddLink onClick={() => setShopPartAddMenuOpen(true)} />
           )}
         >
           <div className="overflow-x-auto rounded-sg border border-line">
@@ -2105,9 +2134,12 @@ export default function AutoserviceOrderFormPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-sm font-medium text-ink">
-            Итого ЗЧ исполнителя: {formatMoney(shopPartsTotal)} ₽
-          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-3">
+            <p className="text-sm font-medium text-ink">
+              Итого ЗЧ исполнителя: {formatMoney(shopPartsTotal)} ₽
+            </p>
+            <SectionAddLink onClick={() => setShopPartAddMenuOpen(true)} />
+          </div>
         </SectionCard>
 
       </form>

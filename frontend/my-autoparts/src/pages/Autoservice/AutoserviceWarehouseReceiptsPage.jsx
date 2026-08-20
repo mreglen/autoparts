@@ -184,6 +184,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
       <AutoserviceReceiptDocumentModal
         docId={selectedDocId}
         onClose={() => setSelectedDocId(null)}
+        onUpdated={loadRows}
       />
     </div>
   );

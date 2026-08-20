@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
@@ -10,6 +10,7 @@ AutoservicePaymentMethod = Literal["card", "cash", "bank"]
 class AutoservicePaymentIn(BaseModel):
     method: AutoservicePaymentMethod
     amount: Decimal = Field(gt=0)
+    paid_at: Optional[date] = None
 
 
 class AutoservicePaymentMethodTotals(BaseModel):

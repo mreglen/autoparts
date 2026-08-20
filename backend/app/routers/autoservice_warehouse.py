@@ -25,6 +25,7 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseManualReceiptIn,
     AutoserviceWarehouseReceiptDocDetailView,
     AutoserviceWarehouseReceiptDocListView,
+    AutoserviceWarehouseReceiptDocUpdate,
     AutoserviceWarehouseReceiptLinePriceUpdate,
     AutoserviceWarehouseReceiptLineUpdate,
     AutoserviceWarehouseReceiptSuggestView,
@@ -43,6 +44,7 @@ from app.services.autoservice_warehouse_service import (
     receipt_manual_line,
     update_autoservice_warehouse_item,
     update_manual_receipt_line_prices,
+    update_receipt_doc_date,
     update_receipt_line_details,
 )
 from app.utils.autoservice_access import require_autoservice_staff
@@ -328,6 +330,7 @@ def patch_autoservice_warehouse_item(
         article=payload.article,
         name=payload.name,
         unit=payload.unit,
+        unit_price=payload.unit_price,
     )
     db.commit()
     return _item_view(item)
@@ -453,6 +456,57 @@ def get_autoservice_warehouse_receipt_doc(
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Документ поступления не найден")
+    return _doc_detail_view(db, doc)
+
+
+def _load_receipt_doc_detail(
+    db: Session,
+    *,
+    org_id: str,
+    doc_id: int,
+) -> AutoserviceWarehouseReceiptDoc:
+    doc = (
+        db.query(AutoserviceWarehouseReceiptDoc)
+        .options(
+            joinedload(AutoserviceWarehouseReceiptDoc.lines).joinedload(
+                AutoserviceWarehouseReceipt.item
+            ),
+            joinedload(AutoserviceWarehouseReceiptDoc.lines).joinedload(
+                AutoserviceWarehouseReceipt.creator
+            ),
+            joinedload(AutoserviceWarehouseReceiptDoc.repair_order),
+            joinedload(AutoserviceWarehouseReceiptDoc.creator),
+        )
+        .filter(
+            AutoserviceWarehouseReceiptDoc.id == doc_id,
+            AutoserviceWarehouseReceiptDoc.organization_id == org_id,
+        )
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Документ поступления не найден")
+    return doc
+
+
+@router.patch(
+    "/autoservice/warehouse/receipts/{doc_id}",
+    response_model=AutoserviceWarehouseReceiptDocDetailView,
+)
+def update_autoservice_warehouse_receipt_doc(
+    doc_id: int,
+    payload: AutoserviceWarehouseReceiptDocUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    update_receipt_doc_date(
+        db,
+        org_id=org_id,
+        doc_id=doc_id,
+        doc_date=payload.doc_date,
+    )
+    db.commit()
+    doc = _load_receipt_doc_detail(db, org_id=org_id, doc_id=doc_id)
     return _doc_detail_view(db, doc)
 
 

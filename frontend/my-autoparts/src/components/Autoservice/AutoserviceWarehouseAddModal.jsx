@@ -4,10 +4,7 @@ import Button from '../UI/Button';
 import { apiAxios } from '../../utils/apiClient';
 import AutoserviceReceiptSuggestField from './AutoserviceReceiptSuggestField';
 import {
-  buildRosskoLookupText,
-  getRosskoMinPrice,
   pickBestRosskoPart,
-  roundRosskoSalePrice,
 } from '../../pages/AutoParts/NewParts/rosskoHelpers';
 
 const EMPTY_FORM = {
@@ -103,7 +100,6 @@ export default function AutoserviceWarehouseAddModal({
 
   const handleFillFromRossko = async () => {
     const article = form.article.trim();
-    const brand = form.brand.trim();
     if (!article) {
       setRosskoLookupError('Введите артикул для поиска в Rossko');
       return;
@@ -115,28 +111,26 @@ export default function AutoserviceWarehouseAddModal({
 
     try {
       const response = await apiAxios.post('/rossko/GetSearch', {
-        text: buildRosskoLookupText(article, brand),
+        text: article,
         delivery_id: '000000001',
         address_id: 176458,
       });
 
-      const best = pickBestRosskoPart(response.data, article, brand);
+      const best = pickBestRosskoPart(response.data, article, '');
       if (!best) {
-        setRosskoLookupError('В Rossko ничего не найдено по введённым данным');
+        setRosskoLookupError('В Rossko ничего не найдено по этому артикулу');
         return;
       }
 
-      const minPrice = roundRosskoSalePrice(getRosskoMinPrice(best));
       const filledArticle = best.partnumber || article;
-      const filledBrand = best.brand || brand;
+      const filledBrand = best.brand || '';
       const filledName = best.name || form.name;
 
       setForm((prev) => ({
         ...prev,
         article: filledArticle,
-        brand: filledBrand,
+        brand: filledBrand || prev.brand,
         name: filledName || prev.name,
-        unit_price: minPrice > 0 ? String(minPrice) : prev.unit_price,
       }));
       setFilledFromRossko(true);
       setRosskoLookupNotice(
@@ -177,6 +171,9 @@ export default function AutoserviceWarehouseAddModal({
         setError('Цена должна быть ≥ 0');
         return;
       }
+    } else if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      setError('Себестоимость должна быть ≥ 0');
+      return;
     }
     try {
       await onSubmit({
@@ -260,7 +257,7 @@ export default function AutoserviceWarehouseAddModal({
             inputClassName={`mt-1 ${fieldClass}`}
           />
         </label>
-        <div className={`grid gap-3 ${isWarehouseEdit ? 'grid-cols-1' : showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <div className={`grid gap-3 ${isWarehouseEdit ? 'grid-cols-2' : showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {!isWarehouseEdit ? (
             <label className="block text-sm">
               <span className="font-medium text-gray-700">Количество</span>
@@ -302,11 +299,24 @@ export default function AutoserviceWarehouseAddModal({
                 placeholder="0"
               />
             </label>
-          ) : null}
+          ) : (
+            <label className="block text-sm">
+              <span className="font-medium text-gray-700">Себестоимость, ₽</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className={`mt-1 ${fieldClass}`}
+                value={form.unit_price}
+                onChange={(e) => patch('unit_price', e.target.value)}
+                placeholder="0"
+              />
+            </label>
+          )}
         </div>
         {isWarehouseEdit ? (
           <p className="text-xs text-gray-500">
-            Цены в поступлениях и расходах не изменятся — обновятся только карточка товара и связанные наименования.
+            Себестоимость обновит карточку товара. Даты и суммы в уже созданных поступлениях и расходах не изменятся.
           </p>
         ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}

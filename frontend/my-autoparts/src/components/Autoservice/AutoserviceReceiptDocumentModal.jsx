@@ -19,6 +19,14 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('ru-RU');
 }
 
+function toDateInputValue(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function formatMoneyInput(value) {
   if (value == null || value === '') return '';
   const n = Number(value);
@@ -217,13 +225,15 @@ function ReceiptLineRow({
   );
 }
 
-export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
+export default function AutoserviceReceiptDocumentModal({ docId, onClose, onUpdated }) {
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [savingLineId, setSavingLineId] = useState(null);
   const [editingLineId, setEditingLineId] = useState(null);
   const [returnReceiptId, setReturnReceiptId] = useState(null);
+  const [docDateDraft, setDocDateDraft] = useState('');
+  const [savingDocDate, setSavingDocDate] = useState(false);
 
   const loadDoc = useCallback(async () => {
     if (!docId) return;
@@ -246,8 +256,39 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
   useEffect(() => {
     if (!docId) {
       setEditingLineId(null);
+      setDocDateDraft('');
     }
   }, [docId]);
+
+  useEffect(() => {
+    if (doc?.doc_date) {
+      setDocDateDraft(toDateInputValue(doc.doc_date));
+    }
+  }, [doc?.doc_date]);
+
+  const docDateChanged = Boolean(
+    doc?.doc_date
+    && docDateDraft
+    && docDateDraft !== toDateInputValue(doc.doc_date),
+  );
+
+  const saveDocDate = useCallback(async () => {
+    if (!docId || !docDateDraft) return;
+    setSavingDocDate(true);
+    setError('');
+    try {
+      const data = await apiRequest(`/autoservice/warehouse/receipts/${docId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ doc_date: docDateDraft }),
+      });
+      setDoc(data);
+      onUpdated?.();
+    } catch (err) {
+      setError(err?.message || 'Не удалось изменить дату поступления');
+    } finally {
+      setSavingDocDate(false);
+    }
+  }, [docId, docDateDraft, onUpdated]);
 
   const saveLineEdit = useCallback(async (line, draft) => {
     if (!docId) return;
@@ -321,7 +362,30 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose }) {
 
           <dl className="grid gap-4 rounded-sg-lg border border-line bg-surface-subtle/60 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3 sm:px-5">
             <MetaItem label="Номер">{doc.number}</MetaItem>
-            <MetaItem label="Дата">{formatDate(doc.doc_date)}</MetaItem>
+            <div className="min-w-0">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Дата</dt>
+              <dd className="mt-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="date"
+                    className={inlineInputClass}
+                    value={docDateDraft}
+                    disabled={savingDocDate}
+                    onChange={(e) => setDocDateDraft(e.target.value)}
+                  />
+                  {docDateChanged ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      loading={savingDocDate}
+                      onClick={saveDocDate}
+                    >
+                      Сохранить
+                    </Button>
+                  ) : null}
+                </div>
+              </dd>
+            </div>
             <MetaItem label="Поставщик">{doc.supplier_name}</MetaItem>
             {doc.repair_order_number ? (
               <MetaItem label="Заказ-наряд">№ {doc.repair_order_number}</MetaItem>
