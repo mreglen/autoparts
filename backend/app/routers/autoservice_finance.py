@@ -9,11 +9,16 @@ from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.autoservice_finance import (
+    AutoserviceFinanceReceiptRow,
     AutoserviceFinanceReceiptsResponse,
+    AutoservicePaymentDateUpdate,
     AutoservicePayrollReportEmployeeRow,
     AutoservicePayrollReportResponse,
 )
-from app.services.autoservice_payment_service import list_finance_receipts
+from app.services.autoservice_payment_service import (
+    list_finance_receipts,
+    update_autoservice_payment_date,
+)
 from app.services.autoservice_payroll import compute_org_monthly_payroll
 from app.utils.autoservice_access import require_autoservice_director, require_autoservice_staff
 
@@ -32,6 +37,27 @@ def get_autoservice_finance_receipts(
 ):
     org_id = require_autoservice_staff(db, current_user)
     return list_finance_receipts(db, org_id=org_id, date_from=date_from, date_to=date_to)
+
+
+@router.patch(
+    "/autoservice/finance/receipts/{payment_id}",
+    response_model=AutoserviceFinanceReceiptRow,
+)
+def patch_autoservice_finance_receipt_date(
+    payment_id: int,
+    payload: AutoservicePaymentDateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    row = update_autoservice_payment_date(
+        db,
+        org_id=org_id,
+        payment_id=payment_id,
+        paid_at=payload.paid_at,
+    )
+    db.commit()
+    return row
 
 
 @router.get(

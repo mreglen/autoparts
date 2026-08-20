@@ -20,6 +20,7 @@ class AutoservicePaymentMethodTotals(BaseModel):
 
 
 class AutoserviceFinanceReceiptRow(BaseModel):
+    id: int
     sequential_number: int
     repair_order_id: int
     repair_order_number: str
@@ -27,6 +28,10 @@ class AutoserviceFinanceReceiptRow(BaseModel):
     amount: Decimal
     method: AutoservicePaymentMethod
     created_at: datetime
+
+
+class AutoservicePaymentDateUpdate(BaseModel):
+    paid_at: date
 
 
 class AutoserviceFinanceReceiptsResponse(BaseModel):

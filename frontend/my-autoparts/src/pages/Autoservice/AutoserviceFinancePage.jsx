@@ -6,7 +6,7 @@ import {
   getFinanceTodayDate,
   getMonthRangeDefaults,
 } from '../Finance/financeDisplay';
-import { formatServerDateTime } from '../../utils/serverDate';
+import { toDateInputValue } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import { Skeleton } from '../../components/UI';
 import {
@@ -44,6 +44,37 @@ function FinanceField({ label, children }) {
   );
 }
 
+const paymentDateInputClass =
+  'block w-full min-w-[9.5rem] rounded-full border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-wait disabled:opacity-60';
+
+function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
+  const [draft, setDraft] = useState(() => toDateInputValue(row.created_at));
+
+  useEffect(() => {
+    setDraft(toDateInputValue(row.created_at));
+  }, [row.created_at, row.id]);
+
+  const handleChange = async (nextValue) => {
+    const clamped = clampFinanceDate(nextValue, todayDate);
+    setDraft(clamped);
+    const current = toDateInputValue(row.created_at);
+    if (!clamped || clamped === current) return;
+    await onSave(row.id, clamped);
+  };
+
+  return (
+    <input
+      type="date"
+      className={paymentDateInputClass}
+      value={draft}
+      max={todayDate}
+      disabled={saving}
+      onChange={(e) => handleChange(e.target.value)}
+      aria-label={`Дата поступления № ${row.sequential_number}`}
+    />
+  );
+}
+
 export default function AutoserviceFinancePage() {
   const defaults = useMemo(() => getMonthRangeDefaults(), []);
   const todayDate = useMemo(() => getFinanceTodayDate(), []);
@@ -53,6 +84,7 @@ export default function AutoserviceFinancePage() {
   const [error, setError] = useState('');
   const [data, setData] = useState({ totals: {}, total_amount: 0, count: 0, items: [] });
   const [selectedMethod, setSelectedMethod] = useState(null);
+  const [savingPaymentId, setSavingPaymentId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,6 +104,22 @@ export default function AutoserviceFinancePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const handlePaymentDateSave = async (paymentId, paidAt) => {
+    setSavingPaymentId(paymentId);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/finance/receipts/${paymentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paid_at: paidAt }),
+      });
+      await load();
+    } catch (e) {
+      setError(e?.message || 'Не удалось изменить дату поступления');
+    } finally {
+      setSavingPaymentId(null);
+    }
+  };
 
   const items = data.items || [];
   const methodStats = useMemo(() => {
@@ -245,14 +293,22 @@ export default function AutoserviceFinancePage() {
             ) : (
               selectedItems.map((row) => (
                 <div
-                  key={`${row.sequential_number}-${row.created_at}`}
+                  key={row.id}
                   className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80"
                 >
                   <FinanceField label="№">{row.sequential_number}</FinanceField>
                   <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
                   <FinanceField label="Клиент">{row.client_name || '—'}</FinanceField>
                   <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
-                  <FinanceField label="Дата">{formatServerDateTime(row.created_at)}</FinanceField>
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="shrink-0 text-gray-500">Дата</span>
+                    <PaymentReceiptDateField
+                      row={row}
+                      todayDate={todayDate}
+                      saving={savingPaymentId === row.id}
+                      onSave={handlePaymentDateSave}
+                    />
+                  </div>
                 </div>
               ))
             )}
@@ -278,7 +334,7 @@ export default function AutoserviceFinancePage() {
                   </tr>
                 ) : (
                   selectedItems.map((row) => (
-                    <tr key={`${row.sequential_number}-${row.created_at}`} className="hover:bg-gray-50/80">
+                    <tr key={row.id} className="hover:bg-gray-50/80">
                       <td className="px-4 py-3 tabular-nums font-medium text-gray-900">
                         {row.sequential_number}
                       </td>
@@ -287,8 +343,13 @@ export default function AutoserviceFinancePage() {
                       <td className="px-4 py-3 text-right font-medium tabular-nums">
                         {formatFinanceCurrency(row.amount)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                        {formatServerDateTime(row.created_at)}
+                      <td className="px-4 py-3">
+                        <PaymentReceiptDateField
+                          row={row}
+                          todayDate={todayDate}
+                          saving={savingPaymentId === row.id}
+                          onSave={handlePaymentDateSave}
+                        />
                       </td>
                     </tr>
                   ))

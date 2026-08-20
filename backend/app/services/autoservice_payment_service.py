@@ -23,6 +23,28 @@ def _money(value: Decimal | int | float | str) -> Decimal:
     return Decimal(str(value)).quantize(_TWOPLACES, rounding=ROUND_HALF_UP)
 
 
+def _created_at_for_payment_date(paid_at: date) -> datetime:
+    if paid_at == date.today():
+        return datetime.now()
+    return datetime.combine(paid_at, time(12, 0))
+
+
+def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceReceiptRow:
+    method = payment.method if payment.method in _VALID_METHODS else "cash"
+    order = payment.order
+    client_name = order.client.name if order and order.client else "—"
+    return AutoserviceFinanceReceiptRow(
+        id=payment.id,
+        sequential_number=payment.sequential_number,
+        repair_order_id=payment.repair_order_id,
+        repair_order_number=order.order_number if order else str(payment.repair_order_id),
+        client_name=client_name,
+        amount=_money(payment.amount),
+        method=method,
+        created_at=payment.created_at,
+    )
+
+
 def allocate_autoservice_payment_number(db: Session, organization_id: str) -> int:
     current = (
         db.query(func.max(AutoservicePayment.sequential_number))
@@ -102,10 +124,7 @@ def create_repair_order_payment(
             detail="Сумма оплаты превышает остаток к оплате",
         )
     effective_date = paid_at or date.today()
-    if effective_date == date.today():
-        created_at = datetime.now()
-    else:
-        created_at = datetime.combine(effective_date, time(12, 0))
+    created_at = _created_at_for_payment_date(effective_date)
     payment = AutoservicePayment(
         organization_id=org_id,
         repair_order_id=order.id,
@@ -159,19 +178,7 @@ def list_finance_receipts(
         method = row.method if row.method in _VALID_METHODS else "cash"
         amount = _money(row.amount)
         setattr(totals, method, _money(getattr(totals, method) + amount))
-        order = row.order
-        client_name = order.client.name if order and order.client else "—"
-        items.append(
-            AutoserviceFinanceReceiptRow(
-                sequential_number=row.sequential_number,
-                repair_order_id=row.repair_order_id,
-                repair_order_number=order.order_number if order else str(row.repair_order_id),
-                client_name=client_name,
-                amount=amount,
-                method=method,
-                created_at=row.created_at,
-            )
-        )
+        items.append(_finance_receipt_row(row))
     total_amount = _money(totals.card + totals.cash + totals.bank)
     return AutoserviceFinanceReceiptsResponse(
         totals=totals,
@@ -179,3 +186,31 @@ def list_finance_receipts(
         count=len(items),
         items=items,
     )
+
+
+def update_autoservice_payment_date(
+    db: Session,
+    *,
+    org_id: str,
+    payment_id: int,
+    paid_at: date,
+) -> AutoserviceFinanceReceiptRow:
+    payment = (
+        db.query(AutoservicePayment)
+        .options(
+            joinedload(AutoservicePayment.order).joinedload(RepairOrder.client),
+        )
+        .filter(
+            AutoservicePayment.id == payment_id,
+            AutoservicePayment.organization_id == org_id,
+        )
+        .first()
+    )
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Поступление не найдено",
+        )
+    payment.created_at = _created_at_for_payment_date(paid_at)
+    db.flush()
+    return _finance_receipt_row(payment)

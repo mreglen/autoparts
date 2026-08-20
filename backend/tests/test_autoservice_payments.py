@@ -15,6 +15,7 @@ from app.services.autoservice_payment_service import (
     ensure_order_fully_paid,
     list_finance_receipts,
     order_payment_summary,
+    update_autoservice_payment_date,
 )
 
 
@@ -127,6 +128,7 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
         db = MagicMock()
         order = self._order()
         payment_card = MagicMock(
+            id=11,
             sequential_number=1,
             repair_order_id=1,
             amount=Decimal("100.00"),
@@ -135,6 +137,7 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             order=order,
         )
         payment_cash = MagicMock(
+            id=12,
             sequential_number=2,
             repair_order_id=1,
             amount=Decimal("50.00"),
@@ -161,6 +164,33 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
         self.assertEqual(result.totals.cash, Decimal("50.00"))
         self.assertEqual(result.total_amount, Decimal("150.00"))
         self.assertEqual(result.items[0].client_name, "Ivan Petrov")
+        self.assertEqual(result.items[0].id, 11)
+
+    def test_update_autoservice_payment_date(self):
+        db = MagicMock()
+        order = self._order()
+        payment = MagicMock(
+            id=15,
+            sequential_number=4,
+            repair_order_id=1,
+            amount=Decimal("80.00"),
+            method="bank",
+            created_at=datetime(2026, 8, 5, 12, 0, 0),
+            order=order,
+        )
+        db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
+
+        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
+            result = update_autoservice_payment_date(
+                db,
+                org_id="ORG1",
+                payment_id=15,
+                paid_at=date(2026, 8, 19),
+            )
+
+        self.assertEqual(result.id, 15)
+        self.assertEqual(payment.created_at, datetime(2026, 8, 19, 12, 0))
+        db.flush.assert_called_once()
 
 
 if __name__ == "__main__":
