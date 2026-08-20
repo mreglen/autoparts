@@ -1527,14 +1527,8 @@ export default function AutoserviceOrderFormPage() {
           })
           .filter((group) => group.itemIds.length > 0)
         : [];
-      const goToSavedOrder = (saved) => {
-        const openOrderId = saved?.id || Number(orderId) || null;
-        navigate('/autoservice/orders', {
-          state: {
-            openOrderId,
-            openOrder: saved?.id ? saved : null,
-          },
-        });
+      const goToSavedOrder = () => {
+        navigate('/autoservice/orders');
       };
 
       if (isEdit) {
@@ -1542,7 +1536,7 @@ export default function AutoserviceOrderFormPage() {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        goToSavedOrder(updated);
+        goToSavedOrder();
       } else {
         const created = await apiRequest('/autoservice/repair-orders', {
           method: 'POST',
@@ -1582,7 +1576,7 @@ export default function AutoserviceOrderFormPage() {
           }
           clearRepairOrderPurchaseDraft();
         }
-        goToSavedOrder(saved);
+        goToSavedOrder();
       }
     } catch (err) {
       setError(err?.message || 'Не удалось сохранить');
