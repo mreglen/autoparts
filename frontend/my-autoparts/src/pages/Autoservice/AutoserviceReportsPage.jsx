@@ -227,10 +227,12 @@ export default function AutoserviceReportsPage() {
   const [paymentsLoading, setPaymentsLoading] = useState(true);
   const [paymentsError, setPaymentsError] = useState('');
   const [payments, setPayments] = useState({ total_amount: 0, count: 0, items: [] });
+  const [paymentsExporting, setPaymentsExporting] = useState(false);
 
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [payrollError, setPayrollError] = useState('');
   const [payroll, setPayroll] = useState({ total: 0, employees: [] });
+  const [payrollExporting, setPayrollExporting] = useState(false);
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null);
 
   const [economicsLoading, setEconomicsLoading] = useState(false);
@@ -304,6 +306,31 @@ export default function AutoserviceReportsPage() {
     }
   }, [dateFrom, dateTo]);
 
+  const exportPayments = useCallback(async () => {
+    setPaymentsExporting(true);
+    try {
+      const response = await apiAxios.get('/autoservice/finance/receipts.xlsx', {
+        params: { date_from: dateFrom, date_to: dateTo },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `autoservice_payments_${dateFrom}_${dateTo}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setPaymentsError(e?.message || 'Не удалось выгрузить Excel');
+    } finally {
+      setPaymentsExporting(false);
+    }
+  }, [dateFrom, dateTo]);
+
   const loadPayroll = useCallback(async () => {
     if (!canSeePayroll) return;
     const parsed = parseMonthValue(monthValue);
@@ -321,6 +348,33 @@ export default function AutoserviceReportsPage() {
       setPayrollLoading(false);
     }
   }, [canSeePayroll, monthValue]);
+
+  const exportPayroll = useCallback(async () => {
+    const parsed = parseMonthValue(monthValue);
+    if (!parsed) return;
+    setPayrollExporting(true);
+    try {
+      const response = await apiAxios.get('/autoservice/reports/payroll.xlsx', {
+        params: { year: parsed.year, month: parsed.month },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `payroll_${parsed.year}_${String(parsed.month).padStart(2, '0')}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setPayrollError(e?.message || 'Не удалось выгрузить Excel');
+    } finally {
+      setPayrollExporting(false);
+    }
+  }, [monthValue]);
 
   const loadEconomics = useCallback(async () => {
     setEconomicsLoading(true);
@@ -611,6 +665,20 @@ export default function AutoserviceReportsPage() {
             </div>
           </MobileCollapsibleFilters>
 
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-500">
+              {payments.count ?? 0} платеж{(payments.count ?? 0) === 1 ? '' : (payments.count ?? 0) >= 2 && (payments.count ?? 0) <= 4 ? 'а' : 'ей'} за период
+            </p>
+            <button
+              type="button"
+              onClick={exportPayments}
+              disabled={paymentsExporting || paymentsLoading}
+              className={`${warehousePrimaryButtonClass} w-full shrink-0 sm:w-auto`}
+            >
+              {paymentsExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
+            </button>
+          </div>
+
           {paymentsError ? (
             <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{paymentsError}</div>
           ) : null}
@@ -691,11 +759,21 @@ export default function AutoserviceReportsPage() {
         </>
       ) : tab === 'payroll' ? (
         <>
-          <MonthPickerField
-            value={monthValue}
-            onChange={(e) => setMonthValue(e.target.value || currentMonthValue())}
-            className={warehousePillControlClass}
-          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <MonthPickerField
+              value={monthValue}
+              onChange={(e) => setMonthValue(e.target.value || currentMonthValue())}
+              className={warehousePillControlClass}
+            />
+            <button
+              type="button"
+              onClick={exportPayroll}
+              disabled={payrollExporting || payrollLoading}
+              className={`${warehousePrimaryButtonClass} w-full shrink-0 sm:w-auto`}
+            >
+              {payrollExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
+            </button>
+          </div>
 
           {payrollError ? (
             <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{payrollError}</div>
