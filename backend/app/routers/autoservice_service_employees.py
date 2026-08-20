@@ -15,6 +15,7 @@ from app.schemas.autoservice_service_employee import (
     AutoserviceServiceEmployeeView,
 )
 from app.services.autoservice_payroll import compute_employee_stats
+from app.services.organization_employee_sync import link_service_employee_card
 from app.utils.autoservice_access import require_autoservice_director, require_autoservice_staff
 
 router = APIRouter(tags=["Autoservice service employees"])
@@ -72,6 +73,8 @@ def create_service_employee(
         is_active=True,
     )
     db.add(row)
+    db.flush()
+    link_service_employee_card(db, row)
     db.commit()
     db.refresh(row)
     return AutoserviceServiceEmployeeView.model_validate(row)

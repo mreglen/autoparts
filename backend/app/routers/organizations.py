@@ -12,6 +12,11 @@ from app.utils.phone import normalize_to_storage_format
 from app.utils.event_logger import log_event
 from app.services.audit_service import log_audit
 from app.utils.user_public_code import assign_public_code
+from app.services.organization_employee_sync import (
+    build_employee_response,
+    get_or_create_card_for_user,
+    sync_user_service_executor,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -50,15 +55,20 @@ def update_employee(
         raise HTTPException(status_code=404, detail="Сотрудник не найден")
 
     # 4. Обновить поля
-    for field, value in update_data.dict(exclude_unset=True).items():
+    update_dict = update_data.dict(exclude_unset=True)
+    service_executor_flag = update_dict.pop("is_service_executor", None)
+    for field, value in update_dict.items():
         if field == "password" and value is not None:
             employee.hashed_password = get_password_hash(value)
         elif field in ("last_name", "first_name", "patronymic", "email", "phone"):
             setattr(employee, field, value)
 
+    if service_executor_flag is not None:
+        sync_user_service_executor(db, employee, bool(service_executor_flag))
+
     db.commit()
     db.refresh(employee)
-    return employee
+    return build_employee_response(db, employee)
 
 @router.delete("/{org_id}/employees/{user_id}")
 def remove_employee(
@@ -183,9 +193,13 @@ def add_employee(org_id: str, employee: EmployeeCreate, db: Session = Depends(ge
 
         from app.services.organization_chat_service import on_user_joined_organization
         on_user_joined_organization(db, new_user)
+        if employee.is_service_executor:
+            sync_user_service_executor(db, new_user, True)
+        else:
+            get_or_create_card_for_user(db, new_user)
         db.commit()
         
-        return new_user
+        return build_employee_response(db, new_user)
     except Exception as e:
         db.rollback()
         logger.exception("Ошибка при создании сотрудника")
@@ -202,7 +216,7 @@ def get_organization_employees(
     ):
         raise HTTPException(status_code=403, detail="Доступ запрещён")
     employees = db.query(UserModel).filter(UserModel.organization_id == org_id).all()
-    return employees
+    return [build_employee_response(db, employee) for employee in employees]
 
 @router.post("/", response_model=OrganizationSchema)
 def create_organization(

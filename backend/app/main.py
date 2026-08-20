@@ -61,6 +61,7 @@ from app.db.schema_patches import (
     ensure_repair_order_shop_parts_autoservice_stock,
     ensure_repair_order_shop_parts_warehouse_receipt_id,
     ensure_repair_order_status_timestamps,
+    ensure_organization_employees_tables,
     ensure_autoservice_warehouse_items_unit,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
@@ -168,6 +169,7 @@ import app.models.organization_ai_description_access  # noqa: F401 — AI descri
 import app.models.product_draft  # noqa: F401 — product drafts
 import app.models.user_engagement  # noqa: F401 — favorites, views, subscriptions
 import app.models.autoservice_warehouse  # noqa: F401 — autoservice warehouse
+import app.models.organization_employee  # noqa: F401 — unified org employee cards
 import app.models.payment_method  # noqa: F401 — org payment methods
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
@@ -271,6 +273,18 @@ try:
     ensure_repair_order_shop_parts_autoservice_stock()
     ensure_repair_order_shop_parts_warehouse_receipt_id()
     ensure_repair_order_status_timestamps()
+    ensure_organization_employees_tables()
+    from app.db.database import SessionLocal
+    from app.services.organization_employee_sync import backfill_organization_employee_cards
+
+    try:
+        backfill_db = SessionLocal()
+        try:
+            backfill_organization_employee_cards(backfill_db)
+        finally:
+            backfill_db.close()
+    except Exception:
+        logger.exception("organization employee backfill failed")
     ensure_autoservice_warehouse_items_unit()
     ensure_event_log_audit_columns()
     ensure_user_public_code()

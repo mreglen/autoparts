@@ -19,7 +19,13 @@ class AutoservicePayrollAccrual(Base):
     employee_id = Column(
         Integer,
         ForeignKey("autoservice_service_employees.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    organization_employee_id = Column(
+        Integer,
+        ForeignKey("organization_employees.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     order_id = Column(
@@ -39,4 +45,8 @@ class AutoservicePayrollAccrual(Base):
     accrued_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
 
     employee = relationship("AutoserviceServiceEmployee", foreign_keys=[employee_id])
+    organization_employee = relationship(
+        "OrganizationEmployee",
+        foreign_keys=[organization_employee_id],
+    )
     order = relationship("RepairOrder", foreign_keys=[order_id])

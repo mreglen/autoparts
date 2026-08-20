@@ -15,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
+from app.models.organization_employee import repair_order_employee_assignees
 
 repair_order_assignees = Table(
     "repair_order_assignees",
@@ -105,6 +106,11 @@ class RepairOrder(Base):
         secondary=repair_order_assignees,
         lazy="joined",
     )
+    employee_assignees = relationship(
+        "OrganizationEmployee",
+        secondary=repair_order_employee_assignees,
+        lazy="selectin",
+    )
     works = relationship(
         "RepairOrderWork",
         back_populates="order",
@@ -180,13 +186,23 @@ class RepairOrderWorkExecutor(Base):
     employee_id = Column(
         Integer,
         ForeignKey("autoservice_service_employees.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    organization_employee_id = Column(
+        Integer,
+        ForeignKey("organization_employees.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     percent = Column(Numeric(5, 2), nullable=False, default=Decimal("0.00"))
 
     work = relationship("RepairOrderWork", back_populates="executors")
     employee = relationship("AutoserviceServiceEmployee", foreign_keys=[employee_id])
+    organization_employee = relationship(
+        "OrganizationEmployee",
+        foreign_keys=[organization_employee_id],
+    )
 
 
 class RepairOrderClientPart(Base):

@@ -5874,3 +5874,160 @@ def ensure_autoservice_clients_requisites_columns() -> None:
     logger.info("Applied autoservice_clients requisites column patches: %s", statements)
 
 
+def ensure_organization_employees_tables() -> None:
+    """Unified org employee directory, permissions, payroll terms, timesheet, account invites."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "organizations" not in tables:
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    ts_type = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    date_type = "DATE"
+    numeric = "NUMERIC(12,2)" if is_pg else "DECIMAL(12,2)"
+    numeric5 = "NUMERIC(5,2)" if is_pg else "DECIMAL(5,2)"
+    bool_true = "TRUE" if is_pg else "1"
+    pk_serial = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    now_sql = "NOW()" if is_pg else "CURRENT_TIMESTAMP"
+
+    if "organization_employees" not in tables:
+        ddl = f"""
+        CREATE TABLE organization_employees (
+            id {pk_serial},
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            user_id INTEGER REFERENCES users(id),
+            legacy_service_employee_id INTEGER REFERENCES autoservice_service_employees(id) ON DELETE SET NULL,
+            last_name VARCHAR(100) NOT NULL DEFAULT '',
+            first_name VARCHAR(100) NOT NULL DEFAULT '',
+            patronymic VARCHAR(100),
+            phone VARCHAR(32),
+            email VARCHAR(255),
+            position VARCHAR(80),
+            comment TEXT,
+            is_service_executor BOOLEAN NOT NULL DEFAULT {("FALSE" if is_pg else "0")},
+            is_active BOOLEAN NOT NULL DEFAULT {bool_true if is_pg else "1"},
+            account_status VARCHAR(32) NOT NULL DEFAULT 'no_account',
+            hired_at {ts_type},
+            archived_at {ts_type},
+            created_at {ts_type} NOT NULL DEFAULT {now_sql},
+            updated_at {ts_type} NOT NULL DEFAULT {now_sql}
+        )
+        """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_organization_employees_org "
+                    "ON organization_employees (organization_id)"
+                )
+            )
+        logger.info("Applied organization_employees table patch")
+        tables.add("organization_employees")
+
+    child_tables = [
+        (
+            "organization_employee_permissions",
+            f"""
+            CREATE TABLE organization_employee_permissions (
+                id {pk_serial},
+                organization_employee_id INTEGER NOT NULL REFERENCES organization_employees(id) ON DELETE CASCADE,
+                permission_id INTEGER NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+                UNIQUE (organization_employee_id, permission_id)
+            )
+            """,
+        ),
+        (
+            "organization_employee_payroll_terms",
+            f"""
+            CREATE TABLE organization_employee_payroll_terms (
+                id {pk_serial},
+                organization_employee_id INTEGER NOT NULL REFERENCES organization_employees(id) ON DELETE CASCADE,
+                salary_type VARCHAR(32) NOT NULL DEFAULT 'percent_work',
+                salary_amount {numeric} NOT NULL DEFAULT 0,
+                work_percent {numeric5} NOT NULL DEFAULT 0,
+                effective_from {date_type} NOT NULL,
+                effective_to {date_type},
+                created_at {ts_type} NOT NULL DEFAULT {now_sql}
+            )
+            """,
+        ),
+        (
+            "organization_employee_timesheet_entries",
+            f"""
+            CREATE TABLE organization_employee_timesheet_entries (
+                id {pk_serial},
+                organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                organization_employee_id INTEGER NOT NULL REFERENCES organization_employees(id) ON DELETE CASCADE,
+                work_date {date_type} NOT NULL,
+                status VARCHAR(16) NOT NULL DEFAULT 'draft',
+                daily_rate_snapshot {numeric} NOT NULL DEFAULT 0,
+                confirmed_at {ts_type},
+                confirmed_by_user_id INTEGER REFERENCES users(id),
+                created_at {ts_type} NOT NULL DEFAULT {now_sql},
+                UNIQUE (organization_employee_id, work_date)
+            )
+            """,
+        ),
+        (
+            "organization_employee_account_invites",
+            f"""
+            CREATE TABLE organization_employee_account_invites (
+                id {pk_serial},
+                organization_employee_id INTEGER NOT NULL REFERENCES organization_employees(id) ON DELETE CASCADE,
+                invite_type VARCHAR(32) NOT NULL,
+                target_email VARCHAR(255) NOT NULL,
+                token_hash VARCHAR(128) NOT NULL UNIQUE,
+                target_user_id INTEGER REFERENCES users(id),
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                expires_at {ts_type} NOT NULL,
+                confirmed_at {ts_type},
+                created_by_user_id INTEGER NOT NULL REFERENCES users(id),
+                created_at {ts_type} NOT NULL DEFAULT {now_sql}
+            )
+            """,
+        ),
+        (
+            "repair_order_employee_assignees",
+            """
+            CREATE TABLE repair_order_employee_assignees (
+                order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+                organization_employee_id INTEGER NOT NULL REFERENCES organization_employees(id) ON DELETE CASCADE,
+                PRIMARY KEY (order_id, organization_employee_id)
+            )
+            """,
+        ),
+    ]
+
+    with engine.begin() as conn:
+        for name, ddl in child_tables:
+            if name not in tables and "organization_employees" in tables:
+                if name == "repair_order_employee_assignees" and "repair_orders" not in tables:
+                    continue
+                conn.execute(text(ddl))
+                logger.info("Applied %s table patch", name)
+
+        if "users" in tables:
+            user_cols = {c["name"] for c in inspector.get_columns("users")}
+            if "must_change_password" not in user_cols:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT {bool_true if is_pg else '0'}"
+                    )
+                )
+
+        if "organization_employees" in tables:
+            org_emp_cols = {c["name"] for c in inspector.get_columns("organization_employees")}
+            if "comment" not in org_emp_cols:
+                conn.execute(text("ALTER TABLE organization_employees ADD COLUMN comment TEXT"))
+
+        for table_name, column_name, col_ddl in (
+            ("repair_order_work_executors", "organization_employee_id", "INTEGER REFERENCES organization_employees(id) ON DELETE CASCADE"),
+            ("autoservice_payroll_accruals", "organization_employee_id", "INTEGER REFERENCES organization_employees(id) ON DELETE CASCADE"),
+        ):
+            if table_name in tables:
+                cols = {c["name"] for c in inspector.get_columns(table_name)}
+                if column_name not in cols and "organization_employees" in tables:
+                    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {col_ddl}"))
+
+    logger.info("Ensured organization employees schema patch")
+

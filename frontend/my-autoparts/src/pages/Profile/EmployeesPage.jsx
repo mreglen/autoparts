@@ -17,6 +17,7 @@ import {
   EmptyState,
   FieldHint,
   FieldLabel,
+  Checkbox,
   Input,
   Modal,
   Skeleton,
@@ -33,6 +34,7 @@ const emptyForm = {
   email: '',
   phone: '',
   password: '',
+  is_service_executor: false,
 };
 
 function InlineNotice({ tone = 'error', children, onClose }) {
@@ -66,7 +68,13 @@ function InlineNotice({ tone = 'error', children, onClose }) {
   );
 }
 
-function EmployeeFormFields({ formData, errors, onChange, passwordRequired }) {
+function EmployeeFormFields({
+  formData,
+  errors,
+  onChange,
+  passwordRequired,
+  showAutoserviceToggle = false,
+}) {
   return (
     <div className="space-y-4">
       <div>
@@ -157,6 +165,20 @@ function EmployeeFormFields({ formData, errors, onChange, passwordRequired }) {
         />
         {errors.password ? <FieldHint error>{errors.password}</FieldHint> : null}
       </div>
+      {showAutoserviceToggle ? (
+        <div>
+          <Checkbox
+            id="emp-service-executor"
+            name="is_service_executor"
+            checked={Boolean(formData.is_service_executor)}
+            onChange={onChange}
+            label="Сотрудник автосервиса"
+          />
+          <FieldHint>
+            Таких сотрудников можно указывать в заказ-нарядах как исполнителей работ.
+          </FieldHint>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -220,8 +242,11 @@ export default function EmployeesPage() {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   };
 
   const openAddForm = () => {
@@ -268,6 +293,7 @@ export default function EmployeesPage() {
       email: employee.email || '',
       phone: employee.phone || '',
       password: '',
+      is_service_executor: Boolean(employee.is_service_executor),
     });
     setEditingId(employee.id);
     setErrors({});
@@ -281,11 +307,15 @@ export default function EmployeesPage() {
     setIsSaving(true);
     setFormError('');
     try {
+      const payload = { ...formData };
+      if (!payload.password?.trim()) {
+        delete payload.password;
+      }
       await dispatch(
         updateEmployee({
           orgId: user.organization_id,
           userId: editingId,
-          updateData: formData,
+          updateData: payload,
         }),
       ).unwrap();
       closeEditForm();
@@ -383,6 +413,7 @@ export default function EmployeesPage() {
   };
 
   const employeeCount = employees?.length ?? 0;
+  const showAutoserviceToggle = Boolean(user?.organization_is_autoservice);
 
   return (
     <div className={`${warehousePageClass} min-w-0 space-y-4`}>
@@ -442,6 +473,9 @@ export default function EmployeesPage() {
                   <th className="px-4 py-3 font-medium">Email</th>
                   <th className="px-4 py-3 font-medium">Телефон</th>
                   <th className="px-4 py-3 font-medium">Роль</th>
+                  {showAutoserviceToggle ? (
+                    <th className="px-4 py-3 font-medium">Автосервис</th>
+                  ) : null}
                   <th className="px-4 py-3 text-right font-medium">Действия</th>
                 </tr>
               </thead>
@@ -469,6 +503,15 @@ export default function EmployeesPage() {
                           {emp.is_director ? 'Директор' : 'Сотрудник'}
                         </Badge>
                       </td>
+                      {showAutoserviceToggle ? (
+                        <td className="whitespace-nowrap px-4 py-3">
+                          {emp.is_service_executor ? (
+                            <Badge tone="success">Да</Badge>
+                          ) : (
+                            <span className="text-ink-soft">—</span>
+                          )}
+                        </td>
+                      ) : null}
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         {renderEmployeeActions(emp, fullName)}
                       </td>
@@ -496,9 +539,14 @@ export default function EmployeesPage() {
                         <p className="text-sm text-ink-muted">{emp.phone}</p>
                       </div>
                     </div>
-                    <Badge tone={emp.is_director ? 'success' : 'brand'}>
-                      {emp.is_director ? 'Директор' : 'Сотрудник'}
-                    </Badge>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <Badge tone={emp.is_director ? 'success' : 'brand'}>
+                        {emp.is_director ? 'Директор' : 'Сотрудник'}
+                      </Badge>
+                      {showAutoserviceToggle && emp.is_service_executor ? (
+                        <Badge tone="success">Автосервис</Badge>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="flex justify-end border-t border-line pt-3">
                     {renderEmployeeActions(emp, fullName)}
@@ -544,6 +592,7 @@ export default function EmployeesPage() {
             errors={errors}
             onChange={handleInputChange}
             passwordRequired
+            showAutoserviceToggle={showAutoserviceToggle}
           />
         </form>
       </Modal>
@@ -573,6 +622,7 @@ export default function EmployeesPage() {
             errors={errors}
             onChange={handleInputChange}
             passwordRequired={false}
+            showAutoserviceToggle={showAutoserviceToggle}
           />
         </form>
       </Modal>

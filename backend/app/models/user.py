@@ -18,6 +18,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     is_director = Column(Boolean, default=False)
     is_employee = Column(Boolean, default=False)
+    must_change_password = Column(Boolean, default=False, nullable=False)
     hashed_password = Column(String)
     avatar_url = Column(String(512), nullable=True)
     notify_push_enabled = Column(Boolean, default=True, nullable=False)

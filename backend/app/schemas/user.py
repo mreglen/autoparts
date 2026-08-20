@@ -33,6 +33,7 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None      
     phone: str | None = None
     password: str | None = None
+    is_service_executor: bool | None = None
     
     class Config:
         extra = "ignore"
@@ -55,6 +56,7 @@ class UserResponse(BaseModel):
     organization_name: Optional[str] = None
     organization_phone: Optional[str] = None
     organization_is_autoservice: bool = False
+    is_service_executor: bool = False
     notification_prefs: NotificationPrefs = NotificationPrefs()
 
     class Config:
@@ -106,3 +108,4 @@ class EmployeeCreate(BaseModel):
     email: EmailStr
     phone: str
     password: str
+    is_service_executor: bool = False

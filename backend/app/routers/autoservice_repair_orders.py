@@ -12,6 +12,7 @@ from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
+from app.models.organization_employee import OrganizationEmployee
 from app.models.autoservice_work import AutoserviceWork
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import (
@@ -78,6 +79,7 @@ from app.services.repair_order_purchase_import import (
     shop_part_is_imported,
 )
 from app.services.repair_order_status_timestamps import record_repair_order_status_timestamp
+from app.services.organization_employee_sync import service_employee_is_executor, user_is_service_executor
 from app.services.repair_order_stock_reserve import (
     append_autoservice_stock_to_repair_order,
     apply_shop_part_reservation,
@@ -506,6 +508,11 @@ def _resolve_assignees(db: Session, org_id: str, user_ids: list[int]) -> list[Us
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Пользователь {u.id} не является сотрудником",
             )
+        if not user_is_service_executor(db, u):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="В заказ-наряде можно указать только сотрудников автосервиса",
+            )
     return users
 
 
@@ -567,6 +574,12 @@ def _resolve_work_executors(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Некоторые сотрудники сервиса не найдены",
         )
+    for employee_id in ids:
+        if not service_employee_is_executor(db, employee_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="В заказ-наряде можно указать только сотрудников автосервиса",
+            )
     return [(by_id[item.employee_id], _money(item.percent)) for item in executors]
 
 
@@ -992,9 +1005,15 @@ def list_repair_order_service_employee_options(
     org_id = require_autoservice_staff(db, current_user)
     rows = (
         db.query(AutoserviceServiceEmployee)
+        .join(
+            OrganizationEmployee,
+            OrganizationEmployee.legacy_service_employee_id == AutoserviceServiceEmployee.id,
+        )
         .filter(
             AutoserviceServiceEmployee.organization_id == org_id,
             AutoserviceServiceEmployee.is_active.is_(True),
+            OrganizationEmployee.is_service_executor.is_(True),
+            OrganizationEmployee.is_active.is_(True),
         )
         .order_by(AutoserviceServiceEmployee.name.asc())
         .all()
