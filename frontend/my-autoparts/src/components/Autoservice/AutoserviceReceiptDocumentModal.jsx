@@ -5,6 +5,7 @@ import { Skeleton } from '../UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 import { SHOP_PART_UNIT_LABELS } from '../../utils/repairOrderShopPartUtils';
+import { toDateInputValue } from '../../utils/serverDate';
 import AutoserviceWarehouseReturnModal from './AutoserviceWarehouseReturnModal';
 
 const inlineInputClass =
@@ -14,17 +15,9 @@ const inlineQtyClass =
 const inlineSelectClass =
   'shrink-0 min-w-[3.5rem] rounded-md border border-line bg-white py-1 pl-2 pr-7 text-xs leading-tight text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
 
-function formatDate(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('ru-RU');
-}
-
-function toDateInputValue(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function receiptDocDateSource(doc) {
+  if (!doc) return '';
+  return doc.doc_date || doc.created_at || doc.lines?.[0]?.created_at || '';
 }
 
 function formatMoneyInput(value) {
@@ -242,6 +235,7 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose, onUpda
     try {
       const data = await apiRequest(`/autoservice/warehouse/receipts/${docId}`);
       setDoc(data);
+      setDocDateDraft(toDateInputValue(receiptDocDateSource(data)));
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить документ');
     } finally {
@@ -261,15 +255,15 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose, onUpda
   }, [docId]);
 
   useEffect(() => {
-    if (doc?.doc_date) {
-      setDocDateDraft(toDateInputValue(doc.doc_date));
+    if (doc) {
+      setDocDateDraft(toDateInputValue(receiptDocDateSource(doc)));
     }
-  }, [doc?.doc_date]);
+  }, [doc]);
 
   const docDateChanged = Boolean(
-    doc?.doc_date
+    doc
     && docDateDraft
-    && docDateDraft !== toDateInputValue(doc.doc_date),
+    && docDateDraft !== toDateInputValue(receiptDocDateSource(doc)),
   );
 
   const saveDocDate = useCallback(async () => {
@@ -346,6 +340,16 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose, onUpda
       title={doc?.number ? `Поступление ${doc.number}` : 'Поступление'}
       size="xl"
       closeVariant="back"
+      headerActions={docDateChanged ? (
+        <Button
+          type="button"
+          size="sm"
+          loading={savingDocDate}
+          onClick={saveDocDate}
+        >
+          Сохранить
+        </Button>
+      ) : null}
     >
       {loading ? (
         <div className="space-y-4 py-2">
@@ -365,25 +369,13 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose, onUpda
             <div className="min-w-0">
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Дата</dt>
               <dd className="mt-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="date"
-                    className={inlineInputClass}
-                    value={docDateDraft}
-                    disabled={savingDocDate}
-                    onChange={(e) => setDocDateDraft(e.target.value)}
-                  />
-                  {docDateChanged ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      loading={savingDocDate}
-                      onClick={saveDocDate}
-                    >
-                      Сохранить
-                    </Button>
-                  ) : null}
-                </div>
+                <input
+                  type="date"
+                  className={inlineInputClass}
+                  value={docDateDraft}
+                  disabled={savingDocDate}
+                  onChange={(e) => setDocDateDraft(e.target.value)}
+                />
               </dd>
             </div>
             <MetaItem label="Поставщик">{doc.supplier_name}</MetaItem>

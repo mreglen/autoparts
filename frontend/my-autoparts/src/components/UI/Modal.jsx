@@ -11,6 +11,7 @@ export default function Modal({
   title,
   children,
   footer,
+  headerActions,
   size = 'md',
   className = '',
   closeVariant = 'close',
@@ -74,6 +75,9 @@ export default function Modal({
                 title
               )}
             </div>
+            {headerActions ? (
+              <div className="flex shrink-0 items-center gap-2">{headerActions}</div>
+            ) : null}
             {onClose && closeVariant !== 'back' ? (
               <button
                 type="button"
