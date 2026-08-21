@@ -45,6 +45,7 @@ import {
   formatShopPartUnit,
   warehouseStockKey,
 } from '../../utils/repairOrderShopPartUtils';
+import { splitVatInclusive } from '../../utils/updDocument';
 
 const pillInputClass =
   'mt-1 block h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
@@ -1207,6 +1208,7 @@ export default function AutoserviceOrderFormPage() {
   );
 
   const grandTotal = worksTotal + shopPartsTotal;
+  const grandVat = splitVatInclusive(grandTotal).vat;
 
   const handleClientCreated = async (row) => {
     await loadClients();
@@ -1714,10 +1716,10 @@ export default function AutoserviceOrderFormPage() {
 
   const pageTitle = isEdit
     ? ownMode
-      ? `Заявка ${repairOrderNumberLabel({ id: orderId, order_number: orderNumber })}`
+      ? `Заказ-наряд ${repairOrderNumberLabel({ id: orderId, order_number: orderNumber })}`
       : `Редактирование записи №${orderNumber ?? orderId}`
     : ownMode
-      ? 'Новая заявка'
+      ? 'Новый заказ-наряд'
       : 'Новая запись';
 
   if (orderLoading || metaLoading || !formInitialized) {
@@ -1823,7 +1825,7 @@ export default function AutoserviceOrderFormPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title={ownMode ? 'Заявка' : 'Запись'}>
+        <SectionCard title={ownMode ? 'Заказ-наряд' : 'Запись'}>
           {ownMode ? null : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -2220,16 +2222,13 @@ export default function AutoserviceOrderFormPage() {
         <div className="mx-auto flex w-full max-w-sg-content items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-ink">
-              {ownMode ? 'Заявка на проверку' : `Итого ${formatMoney(grandTotal)} ₽`}
+              {ownMode ? 'Заказ-наряд' : `Итого ${formatMoney(grandTotal)} ₽`}
             </p>
-            {ownMode ? (
+            {ownMode ? null : (
               <p className="truncate text-xs text-ink-muted">
-                После сохранения заявка появится у приёмщика во вкладке «На проверке»
+                работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)} · в т.ч. НДС{' '}
+                {formatMoney(grandVat)}
               </p>
-            ) : (
-            <p className="truncate text-xs text-ink-muted">
-              работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)}
-            </p>
             )}
           </div>
           <div className="flex shrink-0 gap-2">
@@ -2242,7 +2241,7 @@ export default function AutoserviceOrderFormPage() {
               disabled={saving}
               className={btnPrimaryClass}
             >
-              {saving ? 'Сохранение…' : ownMode ? 'Отправить на проверку' : 'Сохранить'}
+              {saving ? 'Сохранение…' : ownMode ? 'Отправить' : 'Сохранить'}
             </button>
           </div>
         </div>

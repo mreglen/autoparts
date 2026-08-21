@@ -15,6 +15,8 @@ from app.schemas.autoservice_finance import (
     AutoserviceFinanceReceiptsResponse,
     AutoservicePaymentMethodTotals,
 )
+from app.utils.autoservice_access import display_client_phone
+from app.utils.autoservice_payer_requisites import payer_catalog_name_from_row
 from app.services.autoservice_payroll import clear_order_accruals
 from app.services.repair_order_status_timestamps import record_repair_order_status_timestamp
 
@@ -42,10 +44,20 @@ def _display_payer_name(payment: AutoservicePayment) -> str:
     return "—"
 
 
+def _finance_receipt_client_phone(order) -> str:
+    if not order or not order.client:
+        return ""
+    raw = getattr(order.client, "phone", None)
+    if not isinstance(raw, str) or not raw.strip():
+        return ""
+    return display_client_phone(raw)
+
+
 def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceReceiptRow:
     method = payment.method if payment.method in _VALID_METHODS else "cash"
     order = payment.order
     client_name = order.client.name if order and order.client else "—"
+    client_phone = _finance_receipt_client_phone(order)
     raw_payer_id = getattr(payment, "payer_id", None)
     payer_id = raw_payer_id if isinstance(raw_payer_id, int) else None
     return AutoserviceFinanceReceiptRow(
@@ -54,6 +66,7 @@ def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceRecei
         repair_order_id=payment.repair_order_id,
         repair_order_number=order.order_number if order else str(payment.repair_order_id),
         client_name=client_name,
+        client_phone=client_phone,
         payer_id=payer_id,
         payer_name=_display_payer_name(payment),
         amount=_money(payment.amount),
@@ -160,7 +173,7 @@ def create_repair_order_payment(
                 detail="Плательщик не найден",
             )
         resolved_payer_id = payer.id
-        resolved_payer_name = (payer.name or "").strip() or None
+        resolved_payer_name = payer_catalog_name_from_row(payer) or None
     else:
         manual_name = (payer_name or "").strip()[:255]
         if manual_name:
@@ -226,7 +239,7 @@ def update_autoservice_payment_payer(
                 detail="Плательщик не найден",
             )
         payment.payer_id = payer.id
-        payment.payer_name = (payer.name or "").strip() or None
+        payment.payer_name = payer_catalog_name_from_row(payer) or None
 
     db.flush()
     return _finance_receipt_row(payment)

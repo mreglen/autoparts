@@ -3,8 +3,10 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import Modal from '../../components/UI/Modal';
+import PayerFormModal from '../../components/Autoservice/PayerFormModal';
 import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
+import { payerDisplayName, personTypeLabel } from '../../utils/autoservicePayerRequisites';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
@@ -177,80 +179,6 @@ function WorkZoneModal({ open, mode, zone, onClose, onSaved }) {
   );
 }
 
-function PayerModal({ open, mode, payer, onClose, onSaved }) {
-  const [name, setName] = useState(payer?.name || '');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (!open) return;
-    setName(payer?.name || '');
-    setError('');
-    setSaving(false);
-  }, [payer, mode, open]);
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError('Введите имя');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      if (mode === 'create') {
-        await apiRequest('/autoservice/payers', {
-          method: 'POST',
-          body: JSON.stringify({ name: trimmed }),
-        });
-      } else {
-        await apiRequest(`/autoservice/payers/${payer.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ name: trimmed }),
-        });
-      }
-      await onSaved();
-      onClose();
-    } catch (err) {
-      setError(err?.message || 'Не удалось сохранить');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={mode === 'create' ? 'Новый плательщик' : 'Изменить плательщика'}
-      size="sm"
-      footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className={btnGhost} disabled={saving}>
-            Отмена
-          </button>
-          <button type="submit" form="payer-form" disabled={saving} className={btnPrimary}>
-            {saving ? '…' : 'Сохранить'}
-          </button>
-        </div>
-      }
-    >
-      <form id="payer-form" onSubmit={handleSubmit}>
-        <label className="block text-sm font-medium text-gray-700">Имя</label>
-        <input
-          autoFocus
-          className={inputClass}
-          placeholder="Имя плательщика"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={255}
-        />
-        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-      </form>
-    </Modal>
-  );
-}
 
 export default function AutoserviceSettingsPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
@@ -634,27 +562,35 @@ export default function AutoserviceSettingsPage() {
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
                   <thead>
                     <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      <th className="py-3 pr-3">Имя</th>
+                      <th className="py-3 pr-3">Плательщик</th>
+                      <th className="w-28 py-3 pr-3">Тип</th>
+                      <th className="py-3 pr-3">Email</th>
                       <th className="w-40 py-3 text-right">Действия</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {payersLoading ? (
                       <tr>
-                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                        <td colSpan={4} className="py-12 text-center text-gray-500">
                           Загрузка…
                         </td>
                       </tr>
                     ) : payers.length === 0 ? (
                       <tr>
-                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                        <td colSpan={4} className="py-12 text-center text-gray-500">
                           Плательщиков пока нет
                         </td>
                       </tr>
                     ) : (
                       payers.map((payer) => (
                         <tr key={payer.id} className="transition-colors hover:bg-gray-50/70">
-                          <td className="py-3 pr-3 align-middle font-medium text-gray-900">{payer.name}</td>
+                          <td className="py-3 pr-3 align-middle font-medium text-gray-900">
+                            {payer.display_name || payerDisplayName(payer)}
+                          </td>
+                          <td className="py-3 pr-3 align-middle text-gray-600">
+                            {personTypeLabel(payer.person_type)}
+                          </td>
+                          <td className="py-3 pr-3 align-middle text-gray-600">{payer.email || '—'}</td>
                           <td className="py-3 text-right align-middle">
                             <ActionsDropdown
                               menuClassName="w-40 z-50"
@@ -684,7 +620,15 @@ export default function AutoserviceSettingsPage() {
                 ) : (
                   payers.map((payer) => (
                     <div key={payer.id} className="flex items-center justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0">
-                      <p className="min-w-0 truncate text-sm font-semibold text-gray-900">{payer.name}</p>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">
+                          {payer.display_name || payerDisplayName(payer)}
+                        </p>
+                        <p className="truncate text-xs text-gray-500">
+                          {personTypeLabel(payer.person_type)}
+                          {payer.email ? ` · ${payer.email}` : ''}
+                        </p>
+                      </div>
                       <ActionsDropdown
                         menuClassName="w-40 z-50"
                         estimatedMenuHeight={100}
@@ -724,7 +668,7 @@ export default function AutoserviceSettingsPage() {
         onSaved={loadWorkZones}
       />
 
-      <PayerModal
+      <PayerFormModal
         open={Boolean(payerModal)}
         mode={payerModal?.mode || 'create'}
         payer={payerModal?.payer}

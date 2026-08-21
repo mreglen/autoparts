@@ -47,6 +47,13 @@ def get_card_by_user_id(
     )
 
 
+def service_employee_id_for_user(db: Session, org_id: str, user_id: int) -> int | None:
+    card = get_card_by_user_id(db, org_id, user_id)
+    if not card or not card.is_active or not card.legacy_service_employee_id:
+        return None
+    return card.legacy_service_employee_id
+
+
 def get_card_by_service_employee_id(
     db: Session,
     service_employee_id: int,

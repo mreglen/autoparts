@@ -27,6 +27,7 @@ class AutoserviceFinanceReceiptRow(BaseModel):
     repair_order_id: int
     repair_order_number: str
     client_name: str
+    client_phone: str = ""
     payer_id: Optional[int] = None
     payer_name: str
     amount: Decimal
@@ -63,6 +64,39 @@ class AutoservicePayrollReportOrderRow(BaseModel):
     order_number: str
     vehicle: Optional[AutoservicePayrollReportOrderVehicle] = None
     amount: Decimal = Decimal("0.00")
+
+
+class AutoservicePayrollWorkRow(BaseModel):
+    work_id: Optional[int] = None
+    title: str
+    qty: Optional[int] = None
+    unit_price: Optional[Decimal] = None
+    line_total: Optional[Decimal] = None
+    percent: Optional[Decimal] = None
+    accrual_type: str
+    accrual_type_label: str
+    amount: Decimal = Decimal("0.00")
+
+
+class AutoserviceMyPayrollOrderRow(AutoservicePayrollReportOrderRow):
+    works: list[AutoservicePayrollWorkRow] = Field(default_factory=list)
+
+
+class AutoserviceMyPayrollResponse(BaseModel):
+    year: int
+    month: int
+    employee_id: int
+    name: str
+    position: Optional[str] = None
+    salary_type: str
+    salary_amount: Decimal = Decimal("0.00")
+    work_percent: Decimal = Decimal("0.00")
+    total: Decimal = Decimal("0.00")
+    completed_orders: int = 0
+    from_works: Decimal = Decimal("0.00")
+    from_daily: Decimal = Decimal("0.00")
+    from_fixed: Decimal = Decimal("0.00")
+    orders: list[AutoserviceMyPayrollOrderRow] = Field(default_factory=list)
 
 
 class AutoservicePayrollReportEmployeeRow(BaseModel):

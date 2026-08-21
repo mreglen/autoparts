@@ -1,4 +1,4 @@
-import React from 'react';
+import { payerDisplayName } from '../../utils/autoservicePayerRequisites';
 
 export default function PaymentPayerSelect({
   row,
@@ -34,7 +34,7 @@ export default function PaymentPayerSelect({
       </option>
       {(payers || []).map((payer) => (
         <option key={payer.id} value={String(payer.id)}>
-          {payer.name}
+          {payer.display_name || payerDisplayName(payer)}
         </option>
       ))}
     </select>

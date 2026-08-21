@@ -22,6 +22,11 @@ from app.utils.autoservice_access import (
     require_any_autoservice_permission,
     require_autoservice_settings,
 )
+from app.utils.autoservice_payer_requisites import (
+    apply_person_type_defaults,
+    payer_catalog_name,
+    payer_catalog_name_from_row,
+)
 
 router = APIRouter(tags=["Autoservice payers"])
 
@@ -44,6 +49,66 @@ def _normalize_name(name: str) -> str:
     return (name or "").strip()[:255]
 
 
+def _text_or_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _email_or_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    return text or None
+
+
+def _payer_view(row: AutoservicePayer) -> AutoservicePayerView:
+    view = AutoservicePayerView.model_validate(row)
+    view.display_name = payer_catalog_name_from_row(row)
+    return view
+
+
+def _apply_payer_payload(row: AutoservicePayer, payload: AutoservicePayerCreate | AutoservicePayerUpdate) -> None:
+    row.name = _normalize_name(payload.name)
+    row.email = _email_or_none(payload.email)
+    row.person_type = payload.person_type or "individual"
+    row.legal_name = _text_or_none(payload.legal_name)
+    row.address = _text_or_none(payload.address)
+    row.inn = _text_or_none(payload.inn)
+    row.kpp = _text_or_none(payload.kpp)
+    row.ogrn = _text_or_none(payload.ogrn)
+    apply_person_type_defaults(row)
+
+
+def _ensure_unique_catalog_name(
+    db: Session,
+    org_id: str,
+    catalog_name: str,
+    *,
+    exclude_id: int | None = None,
+) -> None:
+    if not catalog_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Введите имя плательщика",
+        )
+    rows = (
+        db.query(AutoservicePayer)
+        .filter(AutoservicePayer.organization_id == org_id)
+        .all()
+    )
+    key = catalog_name.casefold()
+    for row in rows:
+        if exclude_id is not None and row.id == exclude_id:
+            continue
+        if payer_catalog_name_from_row(row).casefold() == key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Плательщик с таким именем уже существует",
+            )
+
+
 def _sync_payment_payers(db: Session, org_id: str) -> None:
     """Add historical manual payer snapshots to the reusable directory."""
     rows = (
@@ -56,11 +121,11 @@ def _sync_payment_payers(db: Session, org_id: str) -> None:
         .all()
     )
     existing = {
-        row.name.strip().casefold(): row
+        payer_catalog_name_from_row(row).casefold(): row
         for row in db.query(AutoservicePayer)
         .filter(AutoservicePayer.organization_id == org_id)
         .all()
-        if (row.name or "").strip()
+        if payer_catalog_name_from_row(row)
     }
     changed = False
     for (raw_name,) in rows:
@@ -113,7 +178,8 @@ def list_autoservice_payers(
         .order_by(AutoservicePayer.name.asc(), AutoservicePayer.id.asc())
         .all()
     )
-    return [AutoservicePayerView.model_validate(row) for row in rows]
+    rows.sort(key=lambda row: payer_catalog_name_from_row(row).casefold())
+    return [_payer_view(row) for row in rows]
 
 
 @router.post(
@@ -133,30 +199,14 @@ def create_autoservice_payer(
         AUTOSERVICE_PERMISSION_ORDERS_OWN,
         AUTOSERVICE_PERMISSION_SETTINGS,
     )
-    name = _normalize_name(payload.name)
-    if not name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Введите имя плательщика",
-        )
-    exists = (
-        db.query(AutoservicePayer.id)
-        .filter(
-            AutoservicePayer.organization_id == org_id,
-            AutoservicePayer.name == name,
-        )
-        .first()
-    )
-    if exists:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Плательщик с таким именем уже существует",
-        )
-    row = AutoservicePayer(organization_id=org_id, name=name)
+    row = AutoservicePayer(organization_id=org_id)
+    _apply_payer_payload(row, payload)
+    catalog_name = payer_catalog_name_from_row(row)
+    _ensure_unique_catalog_name(db, org_id, catalog_name)
     db.add(row)
     db.commit()
     db.refresh(row)
-    return AutoservicePayerView.model_validate(row)
+    return _payer_view(row)
 
 
 @router.patch("/autoservice/payers/{payer_id}", response_model=AutoservicePayerView)
@@ -168,30 +218,12 @@ def update_autoservice_payer(
 ):
     org_id = require_autoservice_settings(db, current_user)
     row = _get_org_payer_or_404(db, org_id, payer_id)
-    name = _normalize_name(payload.name)
-    if not name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Введите имя плательщика",
-        )
-    duplicate = (
-        db.query(AutoservicePayer.id)
-        .filter(
-            AutoservicePayer.organization_id == org_id,
-            AutoservicePayer.name == name,
-            AutoservicePayer.id != payer_id,
-        )
-        .first()
-    )
-    if duplicate:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Плательщик с таким именем уже существует",
-        )
-    row.name = name
+    _apply_payer_payload(row, payload)
+    catalog_name = payer_catalog_name_from_row(row)
+    _ensure_unique_catalog_name(db, org_id, catalog_name, exclude_id=row.id)
     db.commit()
     db.refresh(row)
-    return AutoservicePayerView.model_validate(row)
+    return _payer_view(row)
 
 
 @router.delete("/autoservice/payers/{payer_id}", status_code=status.HTTP_204_NO_CONTENT)

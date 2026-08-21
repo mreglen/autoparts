@@ -6,11 +6,19 @@ import {
   getFinanceTodayDate,
   getMonthRangeDefaults,
 } from '../Finance/financeDisplay';
-import { toDateInputValue } from '../../utils/serverDate';
+import { formatServerDateTime, toDateInputValue } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
+import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import { Skeleton } from '../../components/UI';
 import { ConfirmDialog } from '../../components/UI/Modal';
 import PaymentPayerSelect from '../../components/Autoservice/PaymentPayerSelect';
+import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
+import {
+  buildPayersMap,
+  filterFinanceReceipts,
+  financeReceiptPayerLabel,
+  FINANCE_METHOD_LABELS,
+} from '../../utils/financeReceiptSearch';
 import {
   warehouseEmptyShellClass,
   warehousePageClass,
@@ -77,6 +85,163 @@ function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
   );
 }
 
+function FinanceReceiptRows({
+  entries,
+  payers,
+  todayDate,
+  savingPaymentId,
+  savingPayerPaymentId,
+  deletingPaymentId,
+  onPaymentDateSave,
+  onPaymentPayerSave,
+  onDeletePayment,
+  showMethod = false,
+  showMatchHint = false,
+  emptyText = 'Нет поступлений за период',
+}) {
+  if (!entries.length) {
+    return (
+      <p className={`${warehouseEmptyShellClass} text-sm text-gray-500`}>
+        {emptyText}
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-3 md:hidden">
+        {entries.map(({ row, payer, hint }) => (
+          <div
+            key={row.id}
+            className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80"
+          >
+            <FinanceField label="Плательщик">{financeReceiptPayerLabel(row, payer)}</FinanceField>
+            {showMethod ? (
+              <FinanceField label="Способ">{FINANCE_METHOD_LABELS[row.method] || row.method}</FinanceField>
+            ) : null}
+            <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
+            <FinanceField label="Дата">{formatServerDateTime(row.created_at)}</FinanceField>
+            {showMatchHint && hint ? (
+              <p className="text-xs text-indigo-700">{hint}</p>
+            ) : null}
+            {!showMethod ? (
+              <>
+                <FinanceField label="№">{row.sequential_number}</FinanceField>
+                <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="shrink-0 text-gray-500">Плательщик</span>
+                  <PaymentPayerSelect
+                    row={row}
+                    payers={payers}
+                    saving={savingPayerPaymentId === row.id}
+                    onSave={onPaymentPayerSave}
+                    className="min-w-0"
+                  />
+                </div>
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="shrink-0 text-gray-500">Дата</span>
+                  <PaymentReceiptDateField
+                    row={row}
+                    todayDate={todayDate}
+                    saving={savingPaymentId === row.id}
+                    onSave={onPaymentDateSave}
+                  />
+                </div>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => onDeletePayment(row)}
+                    disabled={Boolean(deletingPaymentId)}
+                    className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    Отменить оплату
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-2xl bg-white ring-1 ring-gray-200/80 md:block">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+            <tr>
+              {showMethod ? null : <th className="px-4 py-3 font-medium">№</th>}
+              {showMethod ? null : <th className="px-4 py-3 font-medium">Заказ-наряд</th>}
+              <th className="px-4 py-3 font-medium">Плательщик</th>
+              {showMethod ? <th className="px-4 py-3 font-medium">Способ</th> : null}
+              <th className="px-4 py-3 text-right font-medium">Сумма</th>
+              <th className="px-4 py-3 font-medium">Дата</th>
+              {showMatchHint ? <th className="px-4 py-3 font-medium">Найдено</th> : null}
+              {showMethod ? null : <th className="px-4 py-3 text-right font-medium">Действия</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {entries.map(({ row, payer, hint }) => (
+              <tr key={row.id} className="hover:bg-gray-50/80">
+                {showMethod ? null : (
+                  <td className="px-4 py-3 tabular-nums font-medium text-gray-900">
+                    {row.sequential_number}
+                  </td>
+                )}
+                {showMethod ? null : (
+                  <td className="px-4 py-3 tabular-nums">№ {row.repair_order_number}</td>
+                )}
+                <td className="px-4 py-3">
+                  {showMethod ? (
+                    financeReceiptPayerLabel(row, payer)
+                  ) : (
+                    <PaymentPayerSelect
+                      row={row}
+                      payers={payers}
+                      saving={savingPayerPaymentId === row.id}
+                      onSave={onPaymentPayerSave}
+                    />
+                  )}
+                </td>
+                {showMethod ? (
+                  <td className="px-4 py-3">{FINANCE_METHOD_LABELS[row.method] || row.method}</td>
+                ) : null}
+                <td className="px-4 py-3 text-right font-medium tabular-nums">
+                  {formatFinanceCurrency(row.amount)}
+                </td>
+                <td className="px-4 py-3">
+                  {showMethod ? (
+                    formatServerDateTime(row.created_at)
+                  ) : (
+                    <PaymentReceiptDateField
+                      row={row}
+                      todayDate={todayDate}
+                      saving={savingPaymentId === row.id}
+                      onSave={onPaymentDateSave}
+                    />
+                  )}
+                </td>
+                {showMatchHint ? (
+                  <td className="px-4 py-3 text-gray-600">{hint || '—'}</td>
+                ) : null}
+                {showMethod ? null : (
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onDeletePayment(row)}
+                      disabled={Boolean(deletingPaymentId)}
+                      className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      Отменить
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
 export default function AutoserviceFinancePage() {
   const defaults = useMemo(() => getMonthRangeDefaults(), []);
   const todayDate = useMemo(() => getFinanceTodayDate(), []);
@@ -91,6 +256,8 @@ export default function AutoserviceFinancePage() {
   const [savingPayerPaymentId, setSavingPayerPaymentId] = useState(null);
   const [deletePayment, setDeletePayment] = useState(null);
   const [deletingPaymentId, setDeletingPaymentId] = useState(null);
+  const [searchInput, setSearchInput] = useState('');
+  const searchQuery = useDebouncedValue(searchInput, 280);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,20 +333,48 @@ export default function AutoserviceFinancePage() {
   };
 
   const items = data.items || [];
+  const payersById = useMemo(() => buildPayersMap(payers), [payers]);
+  const searchApplied = Boolean(searchQuery.trim());
+
+  const searchResults = useMemo(
+    () => filterFinanceReceipts(items, payersById, searchQuery, {
+      method: selectedMethod || undefined,
+    }),
+    [items, payersById, searchQuery, selectedMethod],
+  );
+
   const methodStats = useMemo(() => {
+    const sourceItems = searchApplied
+      ? searchResults.map((entry) => entry.row)
+      : items;
     const counts = { card: 0, cash: 0, bank: 0 };
-    items.forEach((row) => {
+    sourceItems.forEach((row) => {
       if (counts[row.method] != null) counts[row.method] += 1;
     });
     return METHOD_BLOCKS.map((block) => ({
       ...block,
-      amount: Number(data.totals?.[block.id] || 0),
+      amount: searchApplied
+        ? searchResults
+          .filter((entry) => entry.row.method === block.id)
+          .reduce((sum, entry) => sum + Number(entry.row.amount || 0), 0)
+        : Number(data.totals?.[block.id] || 0),
       count: counts[block.id],
     }));
-  }, [items, data.totals]);
+  }, [items, data.totals, searchApplied, searchResults]);
 
   const selectedBlock = methodStats.find((block) => block.id === selectedMethod) || null;
-  const selectedItems = selectedMethod ? items.filter((row) => row.method === selectedMethod) : [];
+  const selectedEntries = useMemo(() => {
+    if (searchApplied) return searchResults;
+    if (!selectedMethod) return [];
+    return items
+      .filter((row) => row.method === selectedMethod)
+      .map((row) => ({
+        row,
+        payer: row.payer_id ? payersById.get(row.payer_id) : null,
+        match: null,
+        hint: null,
+      }));
+  }, [searchApplied, searchResults, selectedMethod, items, payersById]);
 
   return (
     <div className={`${warehousePageClass} min-w-0 space-y-4`}>
@@ -253,11 +448,24 @@ export default function AutoserviceFinancePage() {
         <button
           type="button"
           onClick={() => setSelectedMethod(null)}
-          className={tabFilterButtonClass(true)}
+          className={tabFilterButtonClass(!selectedMethod)}
         >
           Поступления
         </button>
       </div>
+
+      <AutoserviceLiveSearchField
+        value={searchInput}
+        onChange={setSearchInput}
+        placeholder="Плательщик, клиент, телефон, заказ-наряд, № поступления"
+        ariaLabel="Поиск поступлений"
+      />
+
+      {searchApplied && !selectedMethod ? (
+        <p className="text-sm text-gray-500">
+          {loading ? 'Поиск…' : `Найдено ${searchResults.length} из ${items.length}`}
+        </p>
+      ) : null}
 
       {loading ? (
         selectedBlock ? (
@@ -308,6 +516,21 @@ export default function AutoserviceFinancePage() {
             ))}
           </div>
         )
+      ) : searchApplied && !selectedMethod ? (
+        <FinanceReceiptRows
+          entries={searchResults}
+          payers={payers}
+          todayDate={todayDate}
+          savingPaymentId={savingPaymentId}
+          savingPayerPaymentId={savingPayerPaymentId}
+          deletingPaymentId={deletingPaymentId}
+          onPaymentDateSave={handlePaymentDateSave}
+          onPaymentPayerSave={handlePaymentPayerSave}
+          onDeletePayment={setDeletePayment}
+          showMethod
+          showMatchHint
+          emptyText="Ничего не найдено"
+        />
       ) : selectedBlock ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -325,119 +548,24 @@ export default function AutoserviceFinancePage() {
               <p className="text-sm font-semibold text-gray-900">{selectedBlock.label}</p>
               <p className="text-xs text-gray-500">
                 {formatFinanceCurrency(selectedBlock.amount)} · {selectedBlock.count} {receiptsWord(selectedBlock.count)}
+                {searchApplied ? ` · по запросу «${searchQuery.trim()}»` : ''}
               </p>
             </div>
           </div>
 
-          <div className="space-y-3 md:hidden">
-            {!selectedItems.length ? (
-              <p className={`${warehouseEmptyShellClass} text-sm text-gray-500`}>
-                Нет поступлений за период
-              </p>
-            ) : (
-              selectedItems.map((row) => (
-                <div
-                  key={row.id}
-                  className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80"
-                >
-                  <FinanceField label="№">{row.sequential_number}</FinanceField>
-                  <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="shrink-0 text-gray-500">Плательщик</span>
-                    <PaymentPayerSelect
-                      row={row}
-                      payers={payers}
-                      saving={savingPayerPaymentId === row.id}
-                      onSave={handlePaymentPayerSave}
-                      className="min-w-0"
-                    />
-                  </div>
-                  <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
-                  <div className="flex justify-between gap-3 text-sm">
-                    <span className="shrink-0 text-gray-500">Дата</span>
-                    <PaymentReceiptDateField
-                      row={row}
-                      todayDate={todayDate}
-                      saving={savingPaymentId === row.id}
-                      onSave={handlePaymentDateSave}
-                    />
-                  </div>
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setDeletePayment(row)}
-                      disabled={Boolean(deletingPaymentId)}
-                      className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      Отменить оплату
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="hidden overflow-x-auto rounded-2xl bg-white ring-1 ring-gray-200/80 md:block">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">№</th>
-                  <th className="px-4 py-3 font-medium">Заказ-наряд</th>
-                  <th className="px-4 py-3 font-medium">Плательщик</th>
-                  <th className="px-4 py-3 text-right font-medium">Сумма</th>
-                  <th className="px-4 py-3 font-medium">Дата</th>
-                  <th className="px-4 py-3 text-right font-medium">Действия</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {!selectedItems.length ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                      Нет поступлений за период
-                    </td>
-                  </tr>
-                ) : (
-                  selectedItems.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50/80">
-                      <td className="px-4 py-3 tabular-nums font-medium text-gray-900">
-                        {row.sequential_number}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums">№ {row.repair_order_number}</td>
-                      <td className="px-4 py-3">
-                        <PaymentPayerSelect
-                          row={row}
-                          payers={payers}
-                          saving={savingPayerPaymentId === row.id}
-                          onSave={handlePaymentPayerSave}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium tabular-nums">
-                        {formatFinanceCurrency(row.amount)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <PaymentReceiptDateField
-                          row={row}
-                          todayDate={todayDate}
-                          saving={savingPaymentId === row.id}
-                          onSave={handlePaymentDateSave}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setDeletePayment(row)}
-                          disabled={Boolean(deletingPaymentId)}
-                          className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-wait disabled:opacity-60"
-                        >
-                          Отменить
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <FinanceReceiptRows
+            entries={selectedEntries}
+            payers={payers}
+            todayDate={todayDate}
+            savingPaymentId={savingPaymentId}
+            savingPayerPaymentId={savingPayerPaymentId}
+            deletingPaymentId={deletingPaymentId}
+            onPaymentDateSave={handlePaymentDateSave}
+            onPaymentPayerSave={handlePaymentPayerSave}
+            onDeletePayment={setDeletePayment}
+            showMatchHint={searchApplied}
+            emptyText={searchApplied ? 'Ничего не найдено' : 'Нет поступлений за период'}
+          />
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-3">

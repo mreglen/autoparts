@@ -2,6 +2,7 @@ export const AUTOSERVICE_PERMISSION = {
   planner: 'autoservice.planner',
   orders: 'autoservice.orders',
   ordersOwn: 'autoservice.orders.own',
+  payrollOwn: 'autoservice.orders.own',
   warehouse: 'autoservice.warehouse',
   finance: 'autoservice.finance',
   reports: 'autoservice.reports',
@@ -28,6 +29,7 @@ export const AUTOSERVICE_SECTION_PERMISSION = {
   inspections: AUTOSERVICE_PERMISSION.inspections,
   finance: AUTOSERVICE_PERMISSION.finance,
   reports: AUTOSERVICE_PERMISSION.reports,
+  payroll: AUTOSERVICE_PERMISSION.payrollOwn,
   warehouse: AUTOSERVICE_PERMISSION.warehouse,
   'warehouse-receipts': AUTOSERVICE_PERMISSION.warehouse,
   'warehouse-expenses': AUTOSERVICE_PERMISSION.warehouse,
@@ -52,6 +54,12 @@ export const AUTOSERVICE_MENU_ITEMS = [
   },
   { id: 'autoservice-finance', permission: AUTOSERVICE_PERMISSION.finance },
   { id: 'autoservice-reports', permission: AUTOSERVICE_PERMISSION.reports },
+  {
+    id: 'autoservice-payroll',
+    permission: AUTOSERVICE_PERMISSION.payrollOwn,
+    anyOf: [AUTOSERVICE_PERMISSION.payrollOwn],
+    employeeOnly: true,
+  },
   { id: 'autoservice-clients', permission: AUTOSERVICE_PERMISSION.clients },
   { id: 'autoservice-inspections', permission: AUTOSERVICE_PERMISSION.inspections },
   { id: 'autoservice-settings', permission: AUTOSERVICE_PERMISSION.settings, settingsOnly: true },
@@ -87,6 +95,9 @@ export function hasAnyAutoservicePermission(user, permissionCodes) {
 }
 
 export function canAccessAutoserviceSection(user, permissionCodes, section) {
+  if (section === 'payroll' && hasAutoserviceBypass(user)) {
+    return false;
+  }
   const code = AUTOSERVICE_SECTION_PERMISSION[section];
   if (!code) return hasAnyAutoservicePermission(user, permissionCodes);
   return hasAnyListedAutoservicePermission(user, permissionCodes, code);
@@ -100,6 +111,9 @@ export function canAccessAutoserviceSettingsPermission(user, permissionCodes) {
 export function getDefaultAutoserviceStaffPath(user, permissionCodes) {
   const first = AUTOSERVICE_MENU_ITEMS.find((item) => {
     if (item.settingsOnly && !canAccessAutoserviceSettingsPermission(user, permissionCodes)) {
+      return false;
+    }
+    if (item.employeeOnly && hasAutoserviceBypass(user)) {
       return false;
     }
     if (item.anyOf?.length) {
@@ -116,6 +130,7 @@ export function getDefaultAutoserviceStaffPath(user, permissionCodes) {
     'autoservice-orders': '/autoservice/orders',
     'autoservice-finance': '/autoservice/finance',
     'autoservice-reports': '/autoservice/reports',
+    'autoservice-payroll': '/autoservice/payroll',
     'autoservice-clients': '/autoservice/clients',
     'autoservice-inspections': '/autoservice/inspections',
     'autoservice-settings': '/autoservice/settings',

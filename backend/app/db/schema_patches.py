@@ -6153,6 +6153,31 @@ def ensure_autoservice_payers() -> None:
             )
         logger.info("Applied autoservice_payers table patch")
 
+    if "autoservice_payers" in inspector.get_table_names():
+        columns = {col["name"] for col in inspector.get_columns("autoservice_payers")}
+        payer_columns = []
+        if "email" not in columns:
+            payer_columns.append("ALTER TABLE autoservice_payers ADD COLUMN email VARCHAR(255)")
+        if "person_type" not in columns:
+            payer_columns.append(
+                "ALTER TABLE autoservice_payers ADD COLUMN person_type VARCHAR(16) NOT NULL DEFAULT 'individual'"
+            )
+        if "legal_name" not in columns:
+            payer_columns.append("ALTER TABLE autoservice_payers ADD COLUMN legal_name VARCHAR(255)")
+        if "address" not in columns:
+            payer_columns.append("ALTER TABLE autoservice_payers ADD COLUMN address TEXT")
+        if "inn" not in columns:
+            payer_columns.append("ALTER TABLE autoservice_payers ADD COLUMN inn VARCHAR(12)")
+        if "kpp" not in columns:
+            payer_columns.append("ALTER TABLE autoservice_payers ADD COLUMN kpp VARCHAR(9)")
+        if "ogrn" not in columns:
+            payer_columns.append("ALTER TABLE autoservice_payers ADD COLUMN ogrn VARCHAR(15)")
+        if payer_columns:
+            with engine.begin() as conn:
+                for stmt in payer_columns:
+                    conn.execute(text(stmt))
+            logger.info("Applied autoservice_payers requisites patch")
+
     if "autoservice_payments" not in inspector.get_table_names():
         return
     columns = {col["name"] for col in inspector.get_columns("autoservice_payments")}

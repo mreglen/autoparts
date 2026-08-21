@@ -67,6 +67,7 @@ function resolveRedirectOnCabinetChange(pathname, nextMode, user) {
             pathname.startsWith('/autoservice/settings') ||
             pathname.startsWith('/autoservice/inspections') ||
             pathname.startsWith('/autoservice/finance') ||
+            pathname.startsWith('/autoservice/payroll') ||
             pathname.startsWith('/autoservice/reports') ||
             pathname.startsWith('/autoservice/warehouse') ||
             pathname.startsWith('/dashboard') ||
@@ -96,6 +97,7 @@ function resolveRedirectOnCabinetChange(pathname, nextMode, user) {
             pathname.startsWith('/autoservice/settings') ||
             pathname.startsWith('/autoservice/inspections') ||
             pathname.startsWith('/autoservice/finance') ||
+            pathname.startsWith('/autoservice/payroll') ||
             pathname.startsWith('/autoservice/reports') ||
             pathname.startsWith('/autoservice/warehouse') ||
             pathname.startsWith('/garage') ||
@@ -310,6 +312,7 @@ export function getPageTitle(pathname) {
         '/autoservice/orders': 'Заказ-наряды',
         '/autoservice/inspections': 'Записи',
         '/autoservice/finance': 'Финансы',
+        '/autoservice/payroll': 'Зарплата',
         '/autoservice/reports': 'Отчёты',
         '/autoservice/settings': 'Настройки автосервиса',
         '/garage': 'Мои авто',

@@ -8,7 +8,7 @@ from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import RepairOrder, RepairOrderWork
-from app.services.autoservice_payroll import compute_org_monthly_payroll, month_bounds
+from app.services.autoservice_payroll import compute_employee_monthly_payroll, compute_org_monthly_payroll, month_bounds
 
 
 def _vehicle(order_id: int):
@@ -43,6 +43,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
             q.order_by.return_value = q
             if model is AutoserviceServiceEmployee:
                 q.all.return_value = employees
+                q.first.return_value = employees[0] if employees else None
             elif model is AutoservicePayrollAccrual:
                 q.all.return_value = accruals
             elif model is RepairOrder:
@@ -220,3 +221,45 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         result = compute_org_monthly_payroll(db, "ORG1", 2026, 8)
         self.assertEqual(result["employees"], [])
         self.assertEqual(result["total"], Decimal("0.00"))
+
+    def test_compute_employee_monthly_payroll_returns_single_employee(self):
+        emp = SimpleNamespace(
+            id=1,
+            name="Иванов",
+            is_active=True,
+            organization_id="ORG1",
+            position="Механик",
+            salary_type="percent_work",
+            salary_amount=Decimal("0.00"),
+            work_percent=Decimal("50.00"),
+        )
+        accruals = [
+            SimpleNamespace(
+                employee_id=1,
+                order_id=10,
+                work_id=501,
+                accrual_type="work_percent",
+                amount=Decimal("150.00"),
+                accrued_at=datetime(2026, 8, 15),
+            ),
+        ]
+        works = [
+            SimpleNamespace(
+                id=501,
+                title="Диагностика",
+                qty=1,
+                unit_price=Decimal("1500.00"),
+                position=1,
+                executors=[SimpleNamespace(employee_id=1, percent=Decimal("10.00"))],
+            ),
+        ]
+        db = self._mock_db([emp], accruals, [_order(10, "RO-010")], works=works)
+
+        result = compute_employee_monthly_payroll(db, "ORG1", 1, 2026, 8)
+
+        self.assertEqual(result["employee_id"], 1)
+        self.assertEqual(result["name"], "Иванов")
+        self.assertEqual(result["total"], Decimal("150.00"))
+        self.assertEqual(result["completed_orders"], 1)
+        self.assertEqual(len(result["orders"]), 1)
+        self.assertEqual(result["orders"][0]["works"][0]["title"], "Диагностика")

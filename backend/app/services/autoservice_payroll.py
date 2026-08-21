@@ -101,8 +101,14 @@ def compute_employee_stats(
     org_id: str,
     employee: AutoserviceServiceEmployee,
     period: str,
+    *,
+    year: int | None = None,
+    month: int | None = None,
 ) -> dict:
-    start, end = _period_bounds(period)
+    if year is not None and month is not None:
+        start, end = month_bounds(year, month)
+    else:
+        start, end = _period_bounds(period)
     accruals = (
         db.query(AutoservicePayrollAccrual)
         .filter(
@@ -359,4 +365,64 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
         "month": month,
         "total": _money(total),
         "employees": rows,
+    }
+
+
+def compute_employee_monthly_payroll(
+    db: Session,
+    org_id: str,
+    employee_id: int,
+    year: int,
+    month: int,
+) -> dict | None:
+    report = compute_org_monthly_payroll(db, org_id, year, month)
+    employee_row = next(
+        (row for row in report["employees"] if row["employee_id"] == employee_id),
+        None,
+    )
+    employee = (
+        db.query(AutoserviceServiceEmployee)
+        .filter(
+            AutoserviceServiceEmployee.id == employee_id,
+            AutoserviceServiceEmployee.organization_id == org_id,
+        )
+        .first()
+    )
+    if not employee:
+        return None
+
+    stats = compute_employee_stats(db, org_id, employee, "month", year=year, month=month)
+    if employee_row:
+        return {
+            "year": year,
+            "month": month,
+            "employee_id": employee.id,
+            "name": employee.name,
+            "position": employee.position,
+            "salary_type": employee.salary_type,
+            "salary_amount": _money(employee.salary_amount),
+            "work_percent": _money(employee.work_percent),
+            "total": employee_row["total"],
+            "completed_orders": employee_row["completed_orders"],
+            "from_works": stats["from_works"],
+            "from_daily": stats["from_daily"],
+            "from_fixed": stats["from_fixed"],
+            "orders": employee_row["orders"],
+        }
+
+    return {
+        "year": year,
+        "month": month,
+        "employee_id": employee.id,
+        "name": employee.name,
+        "position": employee.position,
+        "salary_type": employee.salary_type,
+        "salary_amount": _money(employee.salary_amount),
+        "work_percent": _money(employee.work_percent),
+        "total": Decimal("0.00"),
+        "completed_orders": 0,
+        "from_works": stats["from_works"],
+        "from_daily": stats["from_daily"],
+        "from_fixed": stats["from_fixed"],
+        "orders": [],
     }

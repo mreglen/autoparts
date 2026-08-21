@@ -56,6 +56,7 @@ export const TAB_PATH_MAP = {
     'autoservice-orders': '/autoservice/orders',
     'autoservice-finance': '/autoservice/finance',
     'autoservice-reports': '/autoservice/reports',
+    'autoservice-payroll': '/autoservice/payroll',
     'autoservice-inspections': '/autoservice/inspections',
     'autoservice-settings': '/autoservice/settings',
     'autoservice-warehouse': '/autoservice/warehouse',
@@ -139,6 +140,9 @@ const buildAutoserviceStaffTab = (user, options, hasPermission) => {
             submenu.push({ id: item.id, label: 'Настройки' });
             return;
         }
+        if (item.employeeOnly && (user.is_director || user.is_admin || user.is_seller)) {
+            return;
+        }
 
         const allowed = item.anyOf?.length
             ? item.anyOf.some((code) => can(code))
@@ -167,6 +171,7 @@ const buildAutoserviceStaffTab = (user, options, hasPermission) => {
             'autoservice-orders': 'Заказ-наряд',
             'autoservice-finance': 'Финансы',
             'autoservice-reports': 'Отчёты',
+            'autoservice-payroll': 'Зарплата',
             'autoservice-clients': 'Клиенты',
             'autoservice-inspections': 'Записи',
         };
@@ -360,6 +365,7 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/autoservice/warehouse')) return 'autoservice-warehouse';
     if (path.startsWith('/autoservice/finance')) return 'autoservice-finance';
     if (path.startsWith('/autoservice/reports')) return 'autoservice-reports';
+    if (path.startsWith('/autoservice/payroll')) return 'autoservice-payroll';
     if (path.startsWith('/autoservice/inspections')) return 'autoservice-inspections';
     if (path.startsWith('/autoservice/settings')) return 'autoservice-settings';
     return PATH_TAB_MAP[path] || (user?.is_seller ? 'dashboard' : 'profile');

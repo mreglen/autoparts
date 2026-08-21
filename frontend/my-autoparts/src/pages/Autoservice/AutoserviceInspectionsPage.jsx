@@ -57,10 +57,17 @@ function StatusBadge({ status, className = '' }) {
   );
 }
 
-function StatusPicker({ status, disabled, saving, onChange }) {
-  const [open, setOpen] = useState(false);
+function StatusPicker({ status, disabled, saving, onChange, isOpen, onOpenChange }) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const rootRef = useRef(null);
   const available = STATUS_OPTIONS.filter((option) => option.value !== status);
+  const isControlled = isOpen !== undefined;
+  const open = isControlled ? isOpen : internalOpen;
+
+  const setOpen = (next) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
 
   useEffect(() => {
     if (!open) return undefined;
@@ -84,7 +91,7 @@ function StatusPicker({ status, disabled, saving, onChange }) {
         disabled={disabled || saving}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((value) => !value);
+          setOpen(!open);
         }}
         className="rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:cursor-wait disabled:opacity-60"
         title="Сменить статус"
@@ -110,9 +117,11 @@ function StatusPicker({ status, disabled, saving, onChange }) {
   );
 }
 
-function BookingMobileCard({ row, updatingId, onStatusChange, onView }) {
+function BookingMobileCard({ row, updatingId, onStatusChange, onView, openMenuKey, onOpenMenu }) {
+  const statusOpen = openMenuKey === `status:${row.id}`;
+  const actionsOpen = openMenuKey === `actions:${row.id}`;
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
+    <div className={`border-b border-gray-100 py-3 last:border-b-0 ${statusOpen || actionsOpen ? 'relative z-30' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
           <div className="flex flex-wrap items-center gap-2">
@@ -121,6 +130,8 @@ function BookingMobileCard({ row, updatingId, onStatusChange, onView }) {
               status={row.status}
               saving={updatingId === row.id}
               disabled={updatingId === row.id}
+              isOpen={statusOpen}
+              onOpenChange={(next) => onOpenMenu(next ? `status:${row.id}` : null)}
               onChange={(nextStatus) => onStatusChange(row.id, nextStatus)}
             />
           </div>
@@ -135,6 +146,8 @@ function BookingMobileCard({ row, updatingId, onStatusChange, onView }) {
         </button>
         <div className="shrink-0">
           <ActionsDropdown
+            isOpen={actionsOpen}
+            onOpenChange={(next) => onOpenMenu(next ? `actions:${row.id}` : null)}
             menuClassName="w-40 z-50"
             estimatedMenuHeight={80}
             showLabel={false}
@@ -218,6 +231,8 @@ export default function AutoserviceInspectionsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [viewBooking, setViewBooking] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [openMenuKey, setOpenMenuKey] = useState(null);
+  const menuOpen = Boolean(openMenuKey);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -315,6 +330,7 @@ export default function AutoserviceInspectionsPage() {
         value={statusFilter}
         onChange={(id) => {
           setStatusFilter(id);
+          setOpenMenuKey(null);
           setViewBooking(null);
         }}
       />
@@ -350,7 +366,7 @@ export default function AutoserviceInspectionsPage() {
         </p>
       ) : null}
 
-      <div className="hidden overflow-x-auto md:block">
+      <div className={`hidden w-full md:block ${menuOpen ? 'overflow-visible' : 'overflow-x-auto'}`}>
         <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
           <thead>
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -377,62 +393,71 @@ export default function AutoserviceInspectionsPage() {
                 </td>
               </tr>
             ) : (
-              filteredRows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="cursor-pointer transition-colors hover:bg-gray-50/70"
-                  onDoubleClick={(e) => {
-                    if (e.target.closest('.status-picker') || e.target.closest('.actions-dropdown')) {
-                      return;
-                    }
-                    setViewBooking(row);
-                  }}
-                >
-                  <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-600">
-                    {formatServerDateTime(row.created_at)}
-                  </td>
-                  <td className="py-3 pr-3 align-middle">
-                    <div className="font-medium text-gray-900">{row.name}</div>
-                    {row.phone ? <div className="mt-0.5 text-xs text-gray-500">{row.phone}</div> : null}
-                  </td>
-                  <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">
-                    {formatServerDate(row.preferred_date) || '—'}
-                  </td>
-                  <td
-                    className="hidden max-w-[12rem] truncate py-3 pr-3 align-middle text-gray-700 lg:table-cell"
-                    title={formatVehicleBrief(row.vehicle)}
+              filteredRows.map((row) => {
+                const statusOpen = openMenuKey === `status:${row.id}`;
+                const actionsOpen = openMenuKey === `actions:${row.id}`;
+                const rowMenuOpen = statusOpen || actionsOpen;
+                return (
+                  <tr
+                    key={row.id}
+                    className={`cursor-pointer transition-colors hover:bg-gray-50/70 ${rowMenuOpen ? 'relative z-30' : ''}`}
+                    onDoubleClick={(e) => {
+                      if (e.target.closest('.status-picker') || e.target.closest('.actions-dropdown')) {
+                        return;
+                      }
+                      setViewBooking(row);
+                    }}
                   >
-                    {formatVehicleBrief(row.vehicle)}
-                  </td>
-                  <td className="hidden py-3 pr-3 align-middle text-gray-600 xl:table-cell">
-                    {SOURCE_LABELS[row.source] || row.source || '—'}
-                  </td>
-                  <td className="py-3 pr-3 align-middle">
-                    <StatusPicker
-                      status={row.status}
-                      saving={updatingId === row.id}
-                      disabled={updatingId === row.id}
-                      onChange={(nextStatus) => handleStatusChange(row.id, nextStatus)}
-                    />
-                  </td>
-                  <td className="py-3 text-right align-middle">
-                    <ActionsDropdown
-                      menuClassName="w-40 z-50"
-                      estimatedMenuHeight={80}
-                      showLabel
-                      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-600">
+                      {formatServerDateTime(row.created_at)}
+                    </td>
+                    <td className="py-3 pr-3 align-middle">
+                      <div className="font-medium text-gray-900">{row.name}</div>
+                      {row.phone ? <div className="mt-0.5 text-xs text-gray-500">{row.phone}</div> : null}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">
+                      {formatServerDate(row.preferred_date) || '—'}
+                    </td>
+                    <td
+                      className="hidden max-w-[12rem] truncate py-3 pr-3 align-middle text-gray-700 lg:table-cell"
+                      title={formatVehicleBrief(row.vehicle)}
                     >
-                      <ActionsDropdownItem onClick={() => setViewBooking(row)}>Подробнее</ActionsDropdownItem>
-                    </ActionsDropdown>
-                  </td>
-                </tr>
-              ))
+                      {formatVehicleBrief(row.vehicle)}
+                    </td>
+                    <td className="hidden py-3 pr-3 align-middle text-gray-600 xl:table-cell">
+                      {SOURCE_LABELS[row.source] || row.source || '—'}
+                    </td>
+                    <td className={`py-3 pr-3 align-middle ${statusOpen ? 'relative z-30' : ''}`}>
+                      <StatusPicker
+                        status={row.status}
+                        saving={updatingId === row.id}
+                        disabled={updatingId === row.id}
+                        isOpen={statusOpen}
+                        onOpenChange={(next) => setOpenMenuKey(next ? `status:${row.id}` : null)}
+                        onChange={(nextStatus) => handleStatusChange(row.id, nextStatus)}
+                      />
+                    </td>
+                    <td className={`py-3 text-right align-middle ${actionsOpen ? 'relative z-30' : ''}`}>
+                      <ActionsDropdown
+                        isOpen={actionsOpen}
+                        onOpenChange={(next) => setOpenMenuKey(next ? `actions:${row.id}` : null)}
+                        menuClassName="w-40 z-50"
+                        estimatedMenuHeight={80}
+                        showLabel
+                        buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                      >
+                        <ActionsDropdownItem onClick={() => setViewBooking(row)}>Подробнее</ActionsDropdownItem>
+                      </ActionsDropdown>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      <div className="md:hidden">
+      <div className={`md:hidden ${menuOpen ? 'overflow-visible' : ''}`}>
         {loading ? (
           <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
         ) : filteredRows.length === 0 ? (
@@ -447,6 +472,8 @@ export default function AutoserviceInspectionsPage() {
               updatingId={updatingId}
               onStatusChange={handleStatusChange}
               onView={() => setViewBooking(row)}
+              openMenuKey={openMenuKey}
+              onOpenMenu={setOpenMenuKey}
             />
           ))
         )}

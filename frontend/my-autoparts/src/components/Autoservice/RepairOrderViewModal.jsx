@@ -13,6 +13,8 @@ import {
 } from '../../utils/repairOrderShopPartUtils';
 import { splitVatInclusive } from '../../utils/updDocument';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
+import PayerFormModal from './PayerFormModal';
+import { payerDisplayName, payerSearchText } from '../../utils/autoservicePayerRequisites';
 
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
@@ -109,10 +111,11 @@ function PaymentWizard({
   const filteredPayers = useMemo(() => {
     const list = Array.isArray(payers) ? payers : [];
     if (!queryNorm) return list;
-    return list.filter((row) => String(row.name || '').toLowerCase().includes(queryNorm));
+    return list.filter((row) => payerSearchText(row).includes(queryNorm));
   }, [payers, queryNorm]);
   const exactMatch = (payers || []).some(
-    (row) => String(row.name || '').trim().toLowerCase() === queryNorm,
+    (row) => payerSearchText(row) === queryNorm
+      || String(row.display_name || payerDisplayName(row)).trim().toLowerCase() === queryNorm,
   );
   const canCreatePayer = Boolean(queryNorm) && !exactMatch;
   const [payerMenuOpen, setPayerMenuOpen] = useState(false);
@@ -209,7 +212,7 @@ function PaymentWizard({
                           setPayerMenuOpen(false);
                         }}
                       >
-                        {row.name}
+                        {row.display_name || payerDisplayName(row)}
                       </button>
                     </li>
                   ))
@@ -225,7 +228,7 @@ function PaymentWizard({
                         onPayerCreate();
                       }}
                     >
-                      Создать «{payerQuery.trim()}»
+                      Создать плательщика
                     </button>
                   </li>
                 ) : null}
@@ -553,8 +556,9 @@ export default function RepairOrderViewModal({
   const [payPayerId, setPayPayerId] = useState(null);
   const [payPayerQuery, setPayPayerQuery] = useState('');
   const [payers, setPayers] = useState([]);
+  const [payerCreateOpen, setPayerCreateOpen] = useState(false);
+  const [payerCreateInitial, setPayerCreateInitial] = useState(null);
   const [payersLoading, setPayersLoading] = useState(false);
-  const [payerCreating, setPayerCreating] = useState(false);
   const [paySaving, setPaySaving] = useState(false);
   const [payError, setPayError] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
@@ -587,8 +591,10 @@ export default function RepairOrderViewModal({
 
   const handlePayerQueryChange = useCallback((value) => {
     setPayPayerQuery(value);
+    const query = String(value || '').trim().toLowerCase();
     const match = payers.find(
-      (row) => String(row.name || '').trim().toLowerCase() === String(value || '').trim().toLowerCase(),
+      (row) => payerSearchText(row) === query
+        || String(row.display_name || payerDisplayName(row)).trim().toLowerCase() === query,
     );
     setPayPayerId(match ? match.id : null);
   }, [payers]);
@@ -596,32 +602,30 @@ export default function RepairOrderViewModal({
   const handlePayerSelect = useCallback((row) => {
     if (!row) return;
     setPayPayerId(row.id);
-    setPayPayerQuery(row.name || '');
+    setPayPayerQuery(row.display_name || payerDisplayName(row) || '');
   }, []);
 
-  const handlePayerCreate = useCallback(async () => {
-    const name = payPayerQuery.trim();
-    if (!name) return;
-    setPayerCreating(true);
-    setPayError('');
-    try {
-      const created = await apiRequest('/autoservice/payers', {
-        method: 'POST',
-        body: JSON.stringify({ name }),
-      });
-      setPayers((prev) => {
-        const next = Array.isArray(prev) ? [...prev] : [];
-        if (!next.some((row) => row.id === created.id)) next.push(created);
-        return next.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
-      });
-      setPayPayerId(created.id);
-      setPayPayerQuery(created.name || name);
-    } catch (e) {
-      setPayError(e?.message || 'Не удалось создать плательщика');
-    } finally {
-      setPayerCreating(false);
-    }
+  const handlePayerCreateOpen = useCallback(() => {
+    const query = payPayerQuery.trim();
+    setPayerCreateInitial(query ? { name: query } : null);
+    setPayerCreateOpen(true);
   }, [payPayerQuery]);
+
+  const handlePayerCreated = useCallback((created) => {
+    if (!created) return;
+    setPayers((prev) => {
+      const next = Array.isArray(prev) ? [...prev] : [];
+      if (!next.some((row) => row.id === created.id)) next.push(created);
+      return next.sort((a, b) => String(a.display_name || payerDisplayName(a)).localeCompare(
+        String(b.display_name || payerDisplayName(b)),
+        'ru',
+      ));
+    });
+    setPayPayerId(created.id);
+    setPayPayerQuery(created.display_name || payerDisplayName(created) || '');
+    setPayerCreateOpen(false);
+    setPayerCreateInitial(null);
+  }, []);
 
   const loadPayers = useCallback(async () => {
     setPayersLoading(true);
@@ -896,7 +900,7 @@ export default function RepairOrderViewModal({
           payerQuery={payPayerQuery}
           payers={payers}
           payersLoading={payersLoading}
-          payerCreating={payerCreating}
+          payerCreating={payerCreateOpen}
           saving={paySaving}
           error={payError}
           onMethodChange={(value) => {
@@ -909,7 +913,7 @@ export default function RepairOrderViewModal({
           onPayDateChange={setPayDate}
           onPayerQueryChange={handlePayerQueryChange}
           onPayerSelect={handlePayerSelect}
-          onPayerCreate={handlePayerCreate}
+          onPayerCreate={handlePayerCreateOpen}
           onSubmit={handleSubmitPayment}
         />
       ) : (
@@ -994,6 +998,16 @@ export default function RepairOrderViewModal({
         </a>
       </div>
     </Modal>
+    <PayerFormModal
+      open={payerCreateOpen}
+      mode="create"
+      initialForm={payerCreateInitial}
+      onClose={() => {
+        setPayerCreateOpen(false);
+        setPayerCreateInitial(null);
+      }}
+      onSaved={handlePayerCreated}
+    />
     </>
   );
 }
