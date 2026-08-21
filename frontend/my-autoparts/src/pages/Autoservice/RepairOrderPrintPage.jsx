@@ -16,6 +16,7 @@ import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
 import AutoserviceDocumentClientEditor from '../../components/Autoservice/AutoserviceDocumentClientEditor';
 import AutoservicePrintPreview from '../../components/Autoservice/AutoservicePrintPreview';
 import { downloadPrintSheetPdf, printDocumentSheet } from '../../utils/downloadPrintPdf';
+import { formatRublesInWords, splitVatInclusive } from '../../utils/updDocument';
 import {
   clientRequisitesChanged,
   clientToOrderCustomer,
@@ -29,7 +30,6 @@ const EMPTY_FORM = {
   orderNumber: '',
   receivedDate: '',
   completedDate: '',
-  warrantyNumber: '',
   acceptedBy: '',
   contractorName: '',
   contractorAddress: '',
@@ -61,7 +61,6 @@ const MODAL_FIELDS = [
   { key: 'orderNumber', label: 'Номер заказ-наряда' },
   { key: 'receivedDate', label: 'Дата приема заказа' },
   { key: 'completedDate', label: 'Дата выполнения заказа' },
-  { key: 'warrantyNumber', label: '№ гарантийного талона' },
   { key: 'acceptedBy', label: 'Заказ принял' },
   { key: 'contractorName', label: 'Исполнитель' },
   { key: 'contractorAddress', label: 'Адрес исполнителя' },
@@ -134,21 +133,16 @@ function PrintTable({ columns, children }) {
   );
 }
 
-function TableTotalRow({ label, value }) {
+function PrintMoneySummary({ lines }) {
   return (
-    <tr>
-      <td colSpan={3} className="border-0 p-0" />
-      <td
-        colSpan={2}
-        className="border-0 px-1 py-0.5 text-right align-middle text-[10px] font-semibold"
-      >
-        {label}
-      </td>
-      <td className="h-5 border border-black px-1 py-0.5 text-right align-middle text-[10px] font-bold">
-        {value}
-      </td>
-      <td colSpan={2} className="border-0 p-0" />
-    </tr>
+    <div className="mt-1 ml-auto w-[17rem] space-y-0.5 text-[11px] leading-tight">
+      {lines.map((line) => (
+        <p key={line.label} className={`flex justify-between gap-4 ${line.bold ? 'font-bold' : ''}`}>
+          <span>{line.label}</span>
+          <span>{formatMoney(line.value)}</span>
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -167,13 +161,13 @@ function Cell({ children, className = '', align = 'left', ...props }) {
 
 function SignLine({ label, nameControl }) {
   return (
-    <table className="repair-order-sign-table ml-auto border-collapse">
+    <table className="repair-order-sign-table border-collapse">
       <tbody>
         <tr>
-          <td className="whitespace-nowrap pr-1 align-bottom">{label}</td>
-          <td className="w-20 min-w-[4.5rem] border-b border-black align-bottom">&nbsp;</td>
+          <td className="whitespace-nowrap pr-1.5 align-bottom">{label}</td>
+          <td className="w-40 min-w-[9rem] border-b border-black align-bottom">&nbsp;</td>
           <td className="px-0.5 align-bottom">/</td>
-          <td className="whitespace-nowrap align-bottom">{nameControl}</td>
+          <td className="whitespace-nowrap pl-0.5 align-bottom">{nameControl}</td>
         </tr>
       </tbody>
     </table>
@@ -317,7 +311,16 @@ export default function RepairOrderPrintPage() {
   }, [order, org, orgId, client]);
 
   const totals = useMemo(() => {
-    if (!order) return { worksTotal: 0, shopTotal: 0, grand: 0 };
+    if (!order) {
+      return {
+        worksTotal: 0,
+        shopTotal: 0,
+        grand: 0,
+        worksVat: 0,
+        shopVat: 0,
+        grandVat: 0,
+      };
+    }
     const works = order.works || [];
     const shop = order.shop_parts || [];
     const worksTotal =
@@ -332,7 +335,14 @@ export default function RepairOrderPrintPage() {
         0,
       );
     const grand = order.grand_total ?? worksTotal + shopTotal;
-    return { worksTotal, shopTotal, grand };
+    return {
+      worksTotal,
+      shopTotal,
+      grand,
+      worksVat: splitVatInclusive(worksTotal).vat,
+      shopVat: splitVatInclusive(shopTotal).vat,
+      grandVat: splitVatInclusive(grand).vat,
+    };
   }, [order]);
 
   const missingRequired = REQUIRED_FIELDS.filter(([key]) => !String(form[key] || '').trim());
@@ -454,7 +464,6 @@ export default function RepairOrderPrintPage() {
   const clientParts = order.client_parts || [];
   const workRows = rowsOrEmpty(works);
   const shopRows = rowsOrEmpty(shopParts);
-  const clientRows = rowsOrEmpty(clientParts);
 
   const workColumns = [
     { key: 'n', label: '№', className: 'w-7' },
@@ -464,7 +473,6 @@ export default function RepairOrderPrintPage() {
     { key: 'price', label: 'Цена, руб', className: 'w-[4.5rem]' },
     { key: 'sum', label: 'Сумма, руб', className: 'w-[4.5rem]' },
     { key: 'ex', label: 'Исполнитель', className: 'w-28' },
-    { key: 'sign', label: 'Подпись', className: 'w-16' },
   ];
 
   const materialColumns = [
@@ -474,8 +482,6 @@ export default function RepairOrderPrintPage() {
     { key: 'qty', label: 'Количество', className: 'w-[4.5rem]' },
     { key: 'price', label: 'Цена, руб', className: 'w-[4.5rem]' },
     { key: 'sum', label: 'Сумма, руб', className: 'w-[4.5rem]' },
-    { key: 'ex', label: 'Исполнитель', className: 'w-28' },
-    { key: 'sign', label: 'Подпись', className: 'w-16' },
   ];
 
   return (
@@ -529,9 +535,6 @@ export default function RepairOrderPrintPage() {
             <Field label="Дата выполнения заказа">
               {editControl('completedDate', 'upd-edit-inline min-w-[6rem]')}
             </Field>
-            <Field label="№ гарантийного талона">
-              {editControl('warrantyNumber', 'upd-edit-inline min-w-[6rem]')}
-            </Field>
             <Field label="Заказ принял">
               {editControl('acceptedBy', 'upd-edit-inline min-w-[8rem]')}
             </Field>
@@ -570,9 +573,12 @@ export default function RepairOrderPrintPage() {
                 <span className="font-semibold">Гос. номер</span>{' '}
                 {editControl('vehiclePlate', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
-              <Cell>
-                <span className="font-semibold">VIN</span>{' '}
-                {editControl('vehicleVin', 'upd-edit-inline min-w-[8rem]')}
+              <Cell rowSpan={3} className="align-top">
+                <p className="font-semibold">Описание дефектов / комментарий</p>
+                {editControl('defectComment', 'mt-0.5', {
+                  multiline: true,
+                  style: { minHeight: '5.5rem' },
+                })}
               </Cell>
             </tr>
             <tr>
@@ -584,15 +590,15 @@ export default function RepairOrderPrintPage() {
                 <span className="font-semibold">Пробег автомобиля</span>{' '}
                 {editControl('vehicleMileage', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
-              <Cell rowSpan={2} className="align-top">
-                <p className="font-semibold">Описание дефектов / комментарий</p>
-                {editControl('defectComment', 'mt-0.5', { multiline: true })}
-              </Cell>
             </tr>
             <tr>
-              <Cell colSpan={2}>
+              <Cell>
                 <span className="font-semibold">Год выпуска</span>{' '}
                 {editControl('vehicleYear', 'upd-edit-inline min-w-[4rem]')}
+              </Cell>
+              <Cell>
+                <span className="font-semibold">VIN</span>{' '}
+                {editControl('vehicleVin', 'upd-edit-inline min-w-[8rem]')}
               </Cell>
             </tr>
           </tbody>
@@ -612,11 +618,15 @@ export default function RepairOrderPrintPage() {
                   {w ? formatMoney(w.line_sum ?? lineSum(w.qty, w.unit_price)) : ''}
                 </Cell>
                 <Cell>{w ? workExecutorName(w) : ''}</Cell>
-                <Cell />
               </tr>
             ))}
-            <TableTotalRow label="Стоимость работ, руб" value={formatMoney(totals.worksTotal)} />
           </PrintTable>
+          <PrintMoneySummary
+            lines={[
+              { label: 'Итого работ:', value: totals.worksTotal, bold: true },
+              { label: 'в том числе НДС:', value: totals.worksVat },
+            ]}
+          />
         </section>
 
         <section className="mt-2">
@@ -627,8 +637,6 @@ export default function RepairOrderPrintPage() {
                 return (
                   <tr key={`shop-empty-${index}`}>
                     <Cell align="center">{index + 1}</Cell>
-                    <Cell />
-                    <Cell />
                     <Cell />
                     <Cell />
                     <Cell />
@@ -654,57 +662,67 @@ export default function RepairOrderPrintPage() {
                   <Cell align="center">{qtyLabel}</Cell>
                   <Cell align="right">{formatMoney(clientPrice)}</Cell>
                   <Cell align="right">{formatMoney(sum)}</Cell>
-                  <Cell />
-                  <Cell />
                 </tr>
               );
             })}
-            <TableTotalRow label="Стоимость материалов, руб" value={formatMoney(totals.shopTotal)} />
           </PrintTable>
+          <PrintMoneySummary
+            lines={[
+              { label: 'Итого:', value: totals.shopTotal, bold: true },
+              { label: 'в том числе НДС:', value: totals.shopVat },
+            ]}
+          />
         </section>
 
-        <p className="mt-1.5 text-right text-[12px] font-bold">
-          Итого, за работы и материалы, руб {formatMoney(totals.grand)}
-        </p>
-
-        <section className="mt-2">
-          <h2 className="mb-0.5 text-[12px] font-bold">Материалы заказчика</h2>
-          <table className="w-full max-w-[70%] border-collapse text-[10px] leading-tight">
-            <thead>
-              <tr>
-                <th className="border border-black px-1 py-0.5 text-left font-semibold">
-                  Наименование материала
-                </th>
-                <th className="w-28 border border-black px-1 py-0.5 text-left font-semibold">
-                  Количество
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {clientRows.map((p, index) => (
-                <tr key={p?.id || `client-empty-${index}`}>
-                  <Cell>{p?.title || ''}</Cell>
-                  <Cell align="center">
-                    {p ? `${p.qty} ${formatShopPartUnit(p.unit || 'pcs')}` : ''}
-                  </Cell>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        <footer className="mt-3 space-y-2 text-[11px] leading-snug">
-          <p>
-            Заказ и замененные дефектные детали (остатки материалов) получил. Изделие проверено в
-            моем присутствии.
+        <div className="mt-2 text-[11px] leading-tight">
+          <PrintMoneySummary
+            lines={[
+              { label: 'Итого по заказ-наряду:', value: totals.grand, bold: true },
+              { label: 'в том числе НДС:', value: totals.grandVat },
+            ]}
+          />
+          <p className="mt-1.5">
+            Всего по заказ-наряду: {formatRublesInWords(totals.grand)} в т.ч. НДС{' '}
+            {formatMoney(totals.grandVat)} руб
           </p>
+        </div>
+
+        {clientParts.length > 0 ? (
+          <section className="mt-2">
+            <h2 className="mb-0.5 text-[12px] font-bold">Материалы заказчика</h2>
+            <table className="w-full max-w-[70%] border-collapse text-[10px] leading-tight">
+              <thead>
+                <tr>
+                  <th className="border border-black px-1 py-0.5 text-left font-semibold">
+                    Наименование материала
+                  </th>
+                  <th className="w-28 border border-black px-1 py-0.5 text-left font-semibold">
+                    Количество
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {clientParts.map((p, index) => (
+                  <tr key={p?.id || `client-${index}`}>
+                    <Cell>{p?.title || ''}</Cell>
+                    <Cell align="center">
+                      {p ? `${p.qty} ${formatShopPartUnit(p.unit || 'pcs')}` : ''}
+                    </Cell>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ) : null}
+
+        <footer className="mt-3 text-[11px] leading-snug">
           <table className="w-full border-collapse">
             <tbody>
               <tr>
-                <td className="w-[38%] align-top pt-1">
+                <td className="w-[32%] whitespace-nowrap align-bottom pr-2">
                   Дата {editControl('signDate', 'upd-edit-inline min-w-[7rem]')}
                 </td>
-                <td className="align-top pt-1">
+                <td className="align-bottom pb-1.5">
                   <SignLine
                     label="Подпись заказчика"
                     nameControl={editControl('clientSignName', 'upd-edit-inline')}
@@ -713,7 +731,7 @@ export default function RepairOrderPrintPage() {
               </tr>
               <tr>
                 <td />
-                <td className="align-top pt-1">
+                <td className="align-bottom">
                   <SignLine
                     label="Подпись исполнителя"
                     nameControl={editControl('contractorSignName', 'upd-edit-inline')}

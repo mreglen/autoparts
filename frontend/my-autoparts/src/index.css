@@ -261,6 +261,26 @@ input[type="password"] {
   word-break: break-word;
 }
 
+.repair-order-print-sheet .repair-order-sign-table {
+  width: auto !important;
+  max-width: none !important;
+  table-layout: auto !important;
+  margin-left: auto;
+}
+
+.repair-order-print-sheet .repair-order-sign-table td {
+  width: auto !important;
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: nowrap;
+}
+
+.repair-order-print-sheet .repair-order-sign-table .upd-edit {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none;
+}
+
 /* Предпросмотр документов: масштаб + перетаскивание мышью/пальцем */
 .autoservice-print-preview {
   box-sizing: border-box;
