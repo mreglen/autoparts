@@ -92,7 +92,7 @@ export default function Modal({
             ) : null}
           </div>
         )}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 [-webkit-overflow-scrolling:touch]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 [overflow-anchor:none] [-webkit-overflow-scrolling:touch]">
           {children}
         </div>
         {footer ? (

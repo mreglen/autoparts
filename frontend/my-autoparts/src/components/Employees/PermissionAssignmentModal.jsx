@@ -20,22 +20,26 @@ function formatPermissionError(error) {
   return 'Не удалось загрузить права';
 }
 
+function asPermissionIds(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+}
+
 function PermissionTile({ permission, checked, disabled, onToggle }) {
   return (
-    <label
-      className={`flex min-h-[88px] cursor-pointer flex-col justify-between rounded-sg border p-3 transition-all duration-150 ${
+    <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={checked}
+      onClick={onToggle}
+      className={`flex min-h-[88px] w-full flex-col justify-between rounded-sg border p-3 text-left transition-all duration-150 ${
         checked
           ? 'border-brand-400 bg-brand-50/70 shadow-sg-sm'
           : 'border-line bg-surface hover:border-brand-200 hover:bg-surface-subtle'
-      } ${disabled ? 'pointer-events-none opacity-60' : ''}`}
+      } ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
     >
-      <input
-        type="checkbox"
-        className="sr-only"
-        checked={checked}
-        onChange={onToggle}
-        disabled={disabled}
-      />
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-medium leading-snug text-ink">{permission.name}</span>
         <span
@@ -43,11 +47,11 @@ function PermissionTile({ permission, checked, disabled, onToggle }) {
             checked ? 'border-brand-600 bg-brand-600 text-white' : 'border-line bg-surface'
           }`}
         >
-          {checked && (
+          {checked ? (
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
-          )}
+          ) : null}
         </span>
       </div>
       {permission.code ? (
@@ -55,7 +59,7 @@ function PermissionTile({ permission, checked, disabled, onToggle }) {
           {permission.code}
         </span>
       ) : null}
-    </label>
+    </button>
   );
 }
 
@@ -98,7 +102,7 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
 
   useEffect(() => {
     if (employee && employeePermissions[employee.id]) {
-      setLocalPermissions(employeePermissions[employee.id]);
+      setLocalPermissions(asPermissionIds(employeePermissions[employee.id]));
     } else if (show && employee) {
       setLocalPermissions([]);
     }
@@ -115,24 +119,30 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
   );
 
   const togglePermission = (permissionId) => {
-    setLocalPermissions((prev) =>
-      prev.includes(permissionId)
-        ? prev.filter((id) => id !== permissionId)
-        : [...prev, permissionId],
-    );
+    const id = Number(permissionId);
+    setLocalPermissions((prev) => {
+      const current = asPermissionIds(prev);
+      return current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id];
+    });
   };
 
   const toggleGroup = (groupPermissionIds, selectAll) => {
+    const ids = asPermissionIds(groupPermissionIds);
     setLocalPermissions((prev) => {
+      const current = asPermissionIds(prev);
       if (selectAll) {
-        return [...new Set([...prev, ...groupPermissionIds])];
+        return [...new Set([...current, ...ids])];
       }
-      return prev.filter((id) => !groupPermissionIds.includes(id));
+      return current.filter((id) => !ids.includes(id));
     });
   };
 
   const handleSelectAll = () => {
-    const allIds = permissionGroups.flatMap((group) => group.permissions.map((permission) => permission.id));
+    const allIds = asPermissionIds(
+      permissionGroups.flatMap((group) => group.permissions.map((permission) => permission.id)),
+    );
     setLocalPermissions(allIds);
   };
 
@@ -216,7 +226,7 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
 
           <div className="space-y-5 pb-1">
             {permissionGroups.map((group) => {
-              const groupIds = group.permissions.map((permission) => permission.id);
+              const groupIds = asPermissionIds(group.permissions.map((permission) => permission.id));
               const selectedInGroup = groupIds.filter((id) => localPermissions.includes(id)).length;
               const allInGroup = selectedInGroup === groupIds.length && groupIds.length > 0;
 
@@ -249,7 +259,7 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
                       <PermissionTile
                         key={permission.id}
                         permission={permission}
-                        checked={localPermissions.includes(permission.id)}
+                        checked={localPermissions.includes(Number(permission.id))}
                         disabled={isSaving}
                         onToggle={() => togglePermission(permission.id)}
                       />
