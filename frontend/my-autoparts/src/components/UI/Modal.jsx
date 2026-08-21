@@ -16,6 +16,7 @@ export default function Modal({
   className = '',
   closeVariant = 'close',
   wrapperClassName = '',
+  closeOnBackdrop = true,
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -41,8 +42,10 @@ export default function Modal({
       <button
         type="button"
         className="absolute inset-0 bg-slate-900/40"
-        aria-label="Закрыть"
-        onClick={onClose}
+        aria-label={closeOnBackdrop ? 'Закрыть' : undefined}
+        aria-hidden={!closeOnBackdrop}
+        tabIndex={closeOnBackdrop ? 0 : -1}
+        onClick={closeOnBackdrop ? onClose : undefined}
       />
       <div
         role="dialog"

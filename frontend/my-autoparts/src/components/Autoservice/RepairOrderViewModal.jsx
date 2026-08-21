@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../UI/Modal';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
@@ -98,6 +98,7 @@ function PaymentWizard({
   onAmountChange,
   onPayDateChange,
   onPayerQueryChange,
+  onPayerSelect,
   onPayerCreate,
   onSubmit,
 }) {
@@ -105,14 +106,27 @@ function PaymentWizard({
   const afterPay = Math.max(0, Math.round((remaining - payAmount) * 100) / 100);
   const canSubmit = Boolean(method) && Boolean(payDate) && payAmount > 0 && payAmount <= remaining + 0.005;
   const queryNorm = (payerQuery || '').trim().toLowerCase();
-  const filteredPayers = (payers || []).filter((row) => {
-    if (!queryNorm) return true;
-    return String(row.name || '').toLowerCase().includes(queryNorm);
-  });
+  const filteredPayers = useMemo(() => {
+    const list = Array.isArray(payers) ? payers : [];
+    if (!queryNorm) return list;
+    return list.filter((row) => String(row.name || '').toLowerCase().includes(queryNorm));
+  }, [payers, queryNorm]);
   const exactMatch = (payers || []).some(
     (row) => String(row.name || '').trim().toLowerCase() === queryNorm,
   );
   const canCreatePayer = Boolean(queryNorm) && !exactMatch;
+  const [payerMenuOpen, setPayerMenuOpen] = useState(false);
+  const payerRootRef = useRef(null);
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (payerRootRef.current && !payerRootRef.current.contains(e.target)) {
+        setPayerMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
 
   return (
     <div className="flex min-h-[22rem] flex-col justify-center">
@@ -161,35 +175,65 @@ function PaymentWizard({
             Плательщик
             <span className="ml-1 font-normal text-gray-400">необязательно</span>
           </label>
-          <input
-            type="text"
-            value={payerQuery}
-            onChange={(e) => onPayerQueryChange(e.target.value)}
-            disabled={saving || payerCreating}
-            placeholder="Введите или выберите плательщика"
-            list="autoservice-payers-list"
-            className="mt-1 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
-          />
-          <datalist id="autoservice-payers-list">
-            {filteredPayers.map((row) => (
-              <option key={row.id} value={row.name} />
-            ))}
-          </datalist>
-          {payersLoading ? (
-            <p className="mt-1 text-xs text-gray-400">Загрузка плательщиков…</p>
-          ) : null}
+          <div ref={payerRootRef} className="relative mt-1">
+            <input
+              type="text"
+              value={payerQuery}
+              onChange={(e) => {
+                onPayerQueryChange(e.target.value);
+                setPayerMenuOpen(true);
+              }}
+              onFocus={() => setPayerMenuOpen(true)}
+              disabled={saving || payerCreating || payersLoading}
+              placeholder={payersLoading ? 'Загрузка…' : 'Введите или выберите плательщика'}
+              autoComplete="off"
+              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+            />
+            {payerMenuOpen && !saving && !payerCreating && !payersLoading ? (
+              <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                {filteredPayers.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-gray-400">
+                    {(payers || []).length === 0 ? 'Справочник пуст' : 'Ничего не найдено'}
+                  </li>
+                ) : (
+                  filteredPayers.map((row) => (
+                    <li key={row.id}>
+                      <button
+                        type="button"
+                        className={`block w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 ${
+                          payerId === row.id ? 'bg-indigo-50 font-medium text-indigo-800' : 'text-gray-800'
+                        }`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          onPayerSelect(row);
+                          setPayerMenuOpen(false);
+                        }}
+                      >
+                        {row.name}
+                      </button>
+                    </li>
+                  ))
+                )}
+                {canCreatePayer ? (
+                  <li className="sticky bottom-0 border-t border-gray-100 bg-white">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setPayerMenuOpen(false);
+                        onPayerCreate();
+                      }}
+                    >
+                      Создать «{payerQuery.trim()}»
+                    </button>
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
+          </div>
           {payerId ? (
             <p className="mt-1 text-xs text-emerald-700">Выбран из справочника</p>
-          ) : null}
-          {canCreatePayer ? (
-            <button
-              type="button"
-              disabled={saving || payerCreating}
-              onClick={onPayerCreate}
-              className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-60"
-            >
-              {payerCreating ? 'Создание…' : 'Создать нового плательщика'}
-            </button>
           ) : null}
         </div>
 
@@ -203,7 +247,7 @@ function PaymentWizard({
             value={amount}
             onChange={(e) => onAmountChange(e.target.value)}
             disabled={saving}
-            className="mt-1 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm tabular-nums text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+            className="mt-1 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm tabular-nums text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
         </label>
         <p className="text-sm text-gray-500">
@@ -541,13 +585,52 @@ export default function RepairOrderViewModal({
     && payment.remaining > 0.005
     && normalizedStatus === 'done';
 
+  const handlePayerQueryChange = useCallback((value) => {
+    setPayPayerQuery(value);
+    const match = payers.find(
+      (row) => String(row.name || '').trim().toLowerCase() === String(value || '').trim().toLowerCase(),
+    );
+    setPayPayerId(match ? match.id : null);
+  }, [payers]);
+
+  const handlePayerSelect = useCallback((row) => {
+    if (!row) return;
+    setPayPayerId(row.id);
+    setPayPayerQuery(row.name || '');
+  }, []);
+
+  const handlePayerCreate = useCallback(async () => {
+    const name = payPayerQuery.trim();
+    if (!name) return;
+    setPayerCreating(true);
+    setPayError('');
+    try {
+      const created = await apiRequest('/autoservice/payers', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      });
+      setPayers((prev) => {
+        const next = Array.isArray(prev) ? [...prev] : [];
+        if (!next.some((row) => row.id === created.id)) next.push(created);
+        return next.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+      });
+      setPayPayerId(created.id);
+      setPayPayerQuery(created.name || name);
+    } catch (e) {
+      setPayError(e?.message || 'Не удалось создать плательщика');
+    } finally {
+      setPayerCreating(false);
+    }
+  }, [payPayerQuery]);
+
   const loadPayers = useCallback(async () => {
     setPayersLoading(true);
     try {
       const data = await apiRequest('/autoservice/payers');
       setPayers(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (e) {
       setPayers([]);
+      setPayError(e?.message || 'Не удалось загрузить плательщиков');
     } finally {
       setPayersLoading(false);
     }
@@ -575,38 +658,6 @@ export default function RepairOrderViewModal({
     setPayError('');
     loadPayers();
   }, [payment?.remaining, loadPayers]);
-
-  const handlePayerQueryChange = useCallback((value) => {
-    setPayPayerQuery(value);
-    const match = payers.find(
-      (row) => String(row.name || '').trim().toLowerCase() === String(value || '').trim().toLowerCase(),
-    );
-    setPayPayerId(match ? match.id : null);
-  }, [payers]);
-
-  const handlePayerCreate = useCallback(async () => {
-    const name = payPayerQuery.trim();
-    if (!name) return;
-    setPayerCreating(true);
-    setPayError('');
-    try {
-      const created = await apiRequest('/autoservice/payers', {
-        method: 'POST',
-        body: JSON.stringify({ name }),
-      });
-      setPayers((prev) => {
-        const next = Array.isArray(prev) ? [...prev] : [];
-        if (!next.some((row) => row.id === created.id)) next.push(created);
-        return next.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
-      });
-      setPayPayerId(created.id);
-      setPayPayerQuery(created.name || name);
-    } catch (e) {
-      setPayError(e?.message || 'Не удалось создать плательщика');
-    } finally {
-      setPayerCreating(false);
-    }
-  }, [payPayerQuery]);
 
   const handleAdvanceStatus = useCallback(async (nextStatus) => {
     if (!order?.id) return;
@@ -857,6 +908,7 @@ export default function RepairOrderViewModal({
           onAmountChange={setPayAmount}
           onPayDateChange={setPayDate}
           onPayerQueryChange={handlePayerQueryChange}
+          onPayerSelect={handlePayerSelect}
           onPayerCreate={handlePayerCreate}
           onSubmit={handleSubmitPayment}
         />

@@ -206,7 +206,13 @@ export default function AutoserviceWarehouseAddModal({
   const isWarehouseEdit = mode === 'edit' && editScope === 'warehouse';
 
   return (
-    <Modal open={open} onClose={handleClose} title={modalTitle} size="sm">
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={modalTitle}
+      size="sm"
+      closeOnBackdrop={false}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
           <span className={labelClass}>
