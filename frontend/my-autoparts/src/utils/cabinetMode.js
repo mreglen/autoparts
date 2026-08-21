@@ -25,9 +25,25 @@ function isOrganizationStaff(user) {
   return Boolean(user.is_seller || user.is_director || user.is_employee);
 }
 
+/**
+ * Autoservice shop mechanic/executor: regular site user + limited work pages.
+ * No seller/autoservice cabinet switch — single buyer-style menu.
+ */
+export function isAutoserviceShopEmployee(user) {
+  if (!user) return false;
+  if (user.is_admin || user.is_director || user.is_seller) return false;
+  if (!user.is_employee) return false;
+  return user.organization_is_autoservice === true;
+}
+
 /** Which cabinet modes the user may switch to. */
 export function getAvailableCabinetModes(user, options = {}) {
   if (!user) return [CABINET_MODE_BUYER];
+
+  // Shop employees: one menu (buyer + work pages), no mode switcher.
+  if (isAutoserviceShopEmployee(user)) {
+    return [CABINET_MODE_BUYER];
+  }
 
   const modes = [CABINET_MODE_BUYER];
 
@@ -53,6 +69,7 @@ export function getAvailableCabinetModes(user, options = {}) {
 export function getDefaultCabinetMode(user, options = {}) {
   if (!user) return CABINET_MODE_BUYER;
   if (user.is_admin) return CABINET_MODE_ADMIN;
+  if (isAutoserviceShopEmployee(user)) return CABINET_MODE_BUYER;
   if (isOrganizationStaff(user)) return CABINET_MODE_SELLER;
   return CABINET_MODE_BUYER;
 }

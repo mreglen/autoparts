@@ -8,6 +8,7 @@ import {
 import {
   canAccessAutoserviceSettingsPermission,
   hasAnyAutoservicePermission,
+  isAutoserviceShopEmployee,
 } from './autoservicePermissions';
 
 export function selectShowAutoservice(state) {
@@ -69,11 +70,15 @@ export function canAccessAutoserviceStaffMenu(user, options = {}) {
 
 /**
  * Client-facing autoservice menu (my cars / booking / repair history).
- * Shown only in «Покупатель» cabinet.
+ * Shown in «Покупатель» cabinet. Shop employees also use this cabinet.
  */
 export function canAccessAutoserviceClientMenu(user, options = {}) {
   if (!user) return false;
   const cabinetMode = options.cabinetMode;
+
+  if (isAutoserviceShopEmployee(user)) {
+    return options.showAutoservice === true || options.organizationIsAutoservice === true;
+  }
 
   if (cabinetMode && cabinetMode !== CABINET_MODE_BUYER) {
     return false;
@@ -106,6 +111,7 @@ const AUTOSERVICE_STAFF_PATH_PREFIXES = [
   '/autoservice/inspections',
   '/autoservice/finance',
   '/autoservice/reports',
+  '/autoservice/payroll',
   '/autoservice/warehouse',
 ];
 

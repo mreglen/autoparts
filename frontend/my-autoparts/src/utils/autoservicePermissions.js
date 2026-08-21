@@ -29,7 +29,7 @@ export const AUTOSERVICE_SECTION_PERMISSION = {
   inspections: AUTOSERVICE_PERMISSION.inspections,
   finance: AUTOSERVICE_PERMISSION.finance,
   reports: AUTOSERVICE_PERMISSION.reports,
-  payroll: AUTOSERVICE_PERMISSION.payrollOwn,
+  payroll: AUTOSERVICE_ORDERS_SECTION_CODES,
   warehouse: AUTOSERVICE_PERMISSION.warehouse,
   'warehouse-receipts': AUTOSERVICE_PERMISSION.warehouse,
   'warehouse-expenses': AUTOSERVICE_PERMISSION.warehouse,
@@ -65,8 +65,32 @@ export const AUTOSERVICE_MENU_ITEMS = [
   { id: 'autoservice-settings', permission: AUTOSERVICE_PERMISSION.settings, settingsOnly: true },
 ];
 
+/** Work pages for shop employees (folded into client Autoservice menu). */
+export const AUTOSERVICE_SHOP_EMPLOYEE_WORK_ITEMS = [
+  {
+    id: 'autoservice-orders',
+    label: 'Заказ-наряд',
+    permission: AUTOSERVICE_PERMISSION.orders,
+    anyOf: AUTOSERVICE_ORDERS_SECTION_CODES,
+  },
+  {
+    id: 'autoservice-payroll',
+    label: 'Зарплата',
+    permission: AUTOSERVICE_PERMISSION.payrollOwn,
+    anyOf: AUTOSERVICE_ORDERS_SECTION_CODES,
+  },
+];
+
 export function hasAutoserviceBypass(user) {
   return Boolean(user?.is_admin || user?.is_director || user?.is_seller);
+}
+
+/** Employee of an autoservice org without seller/director roles. */
+export function isAutoserviceShopEmployee(user) {
+  if (!user) return false;
+  if (user.is_admin || user.is_director || user.is_seller) return false;
+  if (!user.is_employee) return false;
+  return user.organization_is_autoservice === true;
 }
 
 export function hasAutoservicePermission(user, permissionCodes, code) {
@@ -78,6 +102,16 @@ export function hasAutoservicePermission(user, permissionCodes, code) {
 export function hasAnyListedAutoservicePermission(user, permissionCodes, codes) {
   const list = Array.isArray(codes) ? codes : [codes];
   return list.some((code) => hasAutoservicePermission(user, permissionCodes, code));
+}
+
+export function getAutoserviceShopEmployeeWorkMenuItems(user, permissionCodes) {
+  if (!isAutoserviceShopEmployee(user)) return [];
+  return AUTOSERVICE_SHOP_EMPLOYEE_WORK_ITEMS.filter((item) => {
+    if (item.anyOf?.length) {
+      return hasAnyListedAutoservicePermission(user, permissionCodes, item.anyOf);
+    }
+    return hasAutoservicePermission(user, permissionCodes, item.permission);
+  }).map((item) => ({ id: item.id, label: item.label }));
 }
 
 export function canAccessRepairOrders(user, permissionCodes) {
@@ -98,6 +132,11 @@ export function canAccessAutoserviceSection(user, permissionCodes, section) {
   if (section === 'payroll' && hasAutoserviceBypass(user)) {
     return false;
   }
+  // Shop employees: only orders (+ form/print) and payroll for now.
+  if (isAutoserviceShopEmployee(user)) {
+    const allowed = new Set(['orders', 'order-form', 'order-print', 'payroll']);
+    if (!allowed.has(section)) return false;
+  }
   const code = AUTOSERVICE_SECTION_PERMISSION[section];
   if (!code) return hasAnyAutoservicePermission(user, permissionCodes);
   return hasAnyListedAutoservicePermission(user, permissionCodes, code);
@@ -109,7 +148,10 @@ export function canAccessAutoserviceSettingsPermission(user, permissionCodes) {
 }
 
 export function getDefaultAutoserviceStaffPath(user, permissionCodes) {
-  const first = AUTOSERVICE_MENU_ITEMS.find((item) => {
+  const menuSource = isAutoserviceShopEmployee(user)
+    ? AUTOSERVICE_SHOP_EMPLOYEE_WORK_ITEMS
+    : AUTOSERVICE_MENU_ITEMS;
+  const first = menuSource.find((item) => {
     if (item.settingsOnly && !canAccessAutoserviceSettingsPermission(user, permissionCodes)) {
       return false;
     }

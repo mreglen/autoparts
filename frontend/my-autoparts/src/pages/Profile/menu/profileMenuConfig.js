@@ -4,7 +4,9 @@ import {
 import {
     AUTOSERVICE_MENU_ITEMS,
     canAccessAutoserviceSettingsPermission,
+    getAutoserviceShopEmployeeWorkMenuItems,
     hasAutoservicePermission,
+    isAutoserviceShopEmployee,
 } from '../../../utils/autoservicePermissions';
 import {
     CABINET_MODE_ADMIN,
@@ -70,6 +72,9 @@ const buildPurchasesSubmenu = () => [
 ];
 
 const buildGlobalSettingsTab = (menuUser, hasPermission) => {
+    if (isAutoserviceShopEmployee(menuUser)) {
+        return { id: 'profile', label: 'Профиль' };
+    }
     if (menuUser.is_employee && !menuUser.is_admin) {
         const settingsSubmenu = [{ id: 'profile', label: 'Профиль' }];
         if (hasPermission('storage-addresses')) {
@@ -113,18 +118,23 @@ const buildGlobalSettingsTab = (menuUser, hasPermission) => {
     };
 };
 
-const buildAutoserviceClientTab = (isClient) => {
-    if (!isClient) {
+const buildAutoserviceClientTab = (isClient, workItems = []) => {
+    const clientSubmenu = isClient
+        ? [
+            { id: 'autoservice-garage', label: 'Мои авто' },
+            { id: 'autoservice-repair-booking', label: 'Запись на ремонт' },
+            { id: 'autoservice-repair-history', label: 'История ремонтов' },
+        ]
+        : [{ id: 'autoservice-welcome', label: 'Стать клиентом' }];
+
+    const submenu = [...clientSubmenu, ...workItems];
+    if (submenu.length === 1 && submenu[0].id === 'autoservice-welcome') {
         return { id: 'autoservice-welcome', label: 'Автосервис' };
     }
     return {
         id: 'autoservice',
         label: 'Автосервис',
-        submenu: [
-            { id: 'autoservice-garage', label: 'Мои авто' },
-            { id: 'autoservice-repair-booking', label: 'Запись на ремонт' },
-            { id: 'autoservice-repair-history', label: 'История ремонтов' },
-        ],
+        submenu,
     };
 };
 
@@ -179,7 +189,7 @@ const buildAutoserviceStaffTab = (user, options, hasPermission) => {
     });
 
     if (submenu.length === 0) return null;
-    return { id: 'autoservice-staff', label: 'Сервис', submenu };
+    return { id: 'autoservice-staff', label: 'Автосервис', submenu };
 };
 
 const buildSalesSubmenu = (menuUser, hasPermission) => {
@@ -235,8 +245,16 @@ const buildBuyerTabs = (user, hasPermission, options) => {
         { id: 'chats', label: 'Сообщения' },
     ];
 
-    if (canAccessAutoserviceClientMenu(user, options)) {
-        tabs.push(buildAutoserviceClientTab(options.isAutoserviceClient === true));
+    const shopEmployee = isAutoserviceShopEmployee(user);
+    const workItems = shopEmployee
+        ? getAutoserviceShopEmployeeWorkMenuItems(user, options.permissionCodes || [])
+        : [];
+    const showClientAutoservice = canAccessAutoserviceClientMenu(user, options) || shopEmployee;
+
+    if (showClientAutoservice) {
+        // Shop employees always get client autoservice entries + work pages in one place.
+        const asClient = shopEmployee || options.isAutoserviceClient === true;
+        tabs.push(buildAutoserviceClientTab(asClient, workItems));
     }
 
     tabs.push({ id: 'profile', label: 'Профиль' });
