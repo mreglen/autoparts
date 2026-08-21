@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_
+from sqlalchemy import exists, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.auth import get_current_user
@@ -12,7 +12,7 @@ from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
-from app.models.organization_employee import OrganizationEmployee
+from app.models.organization_employee import OrganizationEmployee, repair_order_employee_assignees
 from app.models.autoservice_work import AutoserviceWork
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import (
@@ -21,6 +21,7 @@ from app.models.repair_order import (
     RepairOrderShopPart,
     RepairOrderWork,
     RepairOrderWorkExecutor,
+    repair_order_assignees,
 )
 from app.models.product import Product
 from app.models.autoservice_warehouse import AutoserviceWarehouseItem
@@ -472,15 +473,21 @@ def _require_full_orders(db: Session, user: User) -> str:
     return org_id
 
 
-def _assert_own_order_visible(row: RepairOrder, current_user: User, level: str) -> None:
+def _assert_own_order_visible(
+    db: Session,
+    org_id: str,
+    row: RepairOrder,
+    current_user: User,
+    level: str,
+) -> None:
     if level == "full":
         return
-    owner_id = row.created_by_user_id or row.accepted_by_user_id
-    if owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Запись не найдена",
-        )
+    if _user_participates_in_order(db, org_id, row, current_user):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Запись не найдена",
+    )
 
 
 def _get_visible_order_or_404(
@@ -491,8 +498,21 @@ def _get_visible_order_or_404(
     level: str,
 ) -> RepairOrder:
     row = _get_org_order_or_404(db, org_id, order_id)
-    _assert_own_order_visible(row, current_user, level)
+    _assert_own_order_visible(db, org_id, row, current_user, level)
     return row
+
+
+def _organization_employee_id_for_user(db: Session, org_id: str, user_id: int) -> int | None:
+    row = (
+        db.query(OrganizationEmployee.id)
+        .filter(
+            OrganizationEmployee.organization_id == org_id,
+            OrganizationEmployee.user_id == user_id,
+            OrganizationEmployee.is_active.is_(True),
+        )
+        .first()
+    )
+    return int(row[0]) if row else None
 
 
 def _service_employee_id_for_user(db: Session, org_id: str, user_id: int) -> int | None:
@@ -508,6 +528,84 @@ def _service_employee_id_for_user(db: Session, org_id: str, user_id: int) -> int
     if not row or not row.legacy_service_employee_id:
         return None
     return row.legacy_service_employee_id
+
+
+def _user_participates_in_order(
+    db: Session,
+    org_id: str,
+    row: RepairOrder,
+    user: User,
+) -> bool:
+    if row.created_by_user_id == user.id:
+        return True
+    if row.created_by_user_id is None and row.accepted_by_user_id == user.id:
+        return True
+    if any(assignee.id == user.id for assignee in (row.assignees or [])):
+        return True
+
+    service_employee_id = _service_employee_id_for_user(db, org_id, user.id)
+    org_employee_id = _organization_employee_id_for_user(db, org_id, user.id)
+
+    if org_employee_id and any(
+        emp.id == org_employee_id for emp in (row.employee_assignees or [])
+    ):
+        return True
+
+    for work in row.works or []:
+        if work.executor_user_id == user.id:
+            return True
+        for executor in work.executors or []:
+            if service_employee_id and executor.employee_id == service_employee_id:
+                return True
+            if org_employee_id and executor.organization_employee_id == org_employee_id:
+                return True
+    return False
+
+
+def _own_orders_visibility_clause(db: Session, org_id: str, user: User):
+    """Orders the employee created, was assigned to, or executed works on."""
+    clauses = [
+        RepairOrder.created_by_user_id == user.id,
+        (RepairOrder.created_by_user_id.is_(None)) & (RepairOrder.accepted_by_user_id == user.id),
+        exists().where(
+            (repair_order_assignees.c.order_id == RepairOrder.id)
+            & (repair_order_assignees.c.user_id == user.id)
+        ),
+    ]
+
+    org_employee_id = _organization_employee_id_for_user(db, org_id, user.id)
+    if org_employee_id:
+        clauses.append(
+            exists().where(
+                (repair_order_employee_assignees.c.order_id == RepairOrder.id)
+                & (repair_order_employee_assignees.c.organization_employee_id == org_employee_id)
+            )
+        )
+        clauses.append(
+            exists().where(
+                (RepairOrderWork.order_id == RepairOrder.id)
+                & (RepairOrderWorkExecutor.work_id == RepairOrderWork.id)
+                & (RepairOrderWorkExecutor.organization_employee_id == org_employee_id)
+            )
+        )
+
+    service_employee_id = _service_employee_id_for_user(db, org_id, user.id)
+    if service_employee_id:
+        clauses.append(
+            exists().where(
+                (RepairOrderWork.order_id == RepairOrder.id)
+                & (RepairOrderWorkExecutor.work_id == RepairOrderWork.id)
+                & (RepairOrderWorkExecutor.employee_id == service_employee_id)
+            )
+        )
+
+    clauses.append(
+        exists().where(
+            (RepairOrderWork.order_id == RepairOrder.id)
+            & (RepairOrderWork.executor_user_id == user.id)
+        )
+    )
+    return or_(*clauses)
 
 
 def _prepare_own_works(
@@ -1217,13 +1315,7 @@ def list_repair_orders(
         )
     query = _order_query(db).filter(RepairOrder.organization_id == org_id)
     if level == "own":
-        query = query.filter(
-            (RepairOrder.created_by_user_id == current_user.id)
-            | (
-                (RepairOrder.created_by_user_id.is_(None))
-                & (RepairOrder.accepted_by_user_id == current_user.id)
-            )
-        )
+        query = query.filter(_own_orders_visibility_clause(db, org_id, current_user))
     if client_id is not None:
         client = (
             db.query(AutoserviceClient)

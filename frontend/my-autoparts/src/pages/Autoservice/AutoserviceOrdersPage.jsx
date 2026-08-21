@@ -384,10 +384,14 @@ export default function AutoserviceOrdersPage() {
   const pageSubtitle = loading
     ? 'Загрузка…'
     : viewHistory
-      ? `${rows.length} завершённых и отменённых`
+      ? canReview
+        ? `${rows.length} завершённых и отменённых`
+        : `${rows.length} ваших завершённых и отменённых`
       : viewReview
         ? `${rows.length} заявок от сотрудников`
-        : `${rows.length} активных`;
+        : canReview
+          ? `${rows.length} активных`
+          : `${rows.length} ваших активных`;
   const orderTabs = [
     { id: 'active', label: 'Активные' },
     ...(canReview ? [{ id: 'review', label: 'На проверке', count: reviewCount }] : []),
