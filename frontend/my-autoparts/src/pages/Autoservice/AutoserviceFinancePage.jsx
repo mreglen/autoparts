@@ -318,7 +318,7 @@ export default function AutoserviceFinancePage() {
                 >
                   <FinanceField label="№">{row.sequential_number}</FinanceField>
                   <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
-                  <FinanceField label="Клиент">{row.client_name || '—'}</FinanceField>
+                  <FinanceField label="Плательщик">{row.payer_name || row.client_name || '—'}</FinanceField>
                   <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
                   <div className="flex justify-between gap-3 text-sm">
                     <span className="shrink-0 text-gray-500">Дата</span>
@@ -350,7 +350,7 @@ export default function AutoserviceFinancePage() {
                 <tr>
                   <th className="px-4 py-3 font-medium">№</th>
                   <th className="px-4 py-3 font-medium">Заказ-наряд</th>
-                  <th className="px-4 py-3 font-medium">Клиент</th>
+                  <th className="px-4 py-3 font-medium">Плательщик</th>
                   <th className="px-4 py-3 text-right font-medium">Сумма</th>
                   <th className="px-4 py-3 font-medium">Дата</th>
                   <th className="px-4 py-3 text-right font-medium">Действия</th>
@@ -370,7 +370,7 @@ export default function AutoserviceFinancePage() {
                         {row.sequential_number}
                       </td>
                       <td className="px-4 py-3 tabular-nums">№ {row.repair_order_number}</td>
-                      <td className="px-4 py-3">{row.client_name || '—'}</td>
+                      <td className="px-4 py-3">{row.payer_name || row.client_name || '—'}</td>
                       <td className="px-4 py-3 text-right font-medium tabular-nums">
                         {formatFinanceCurrency(row.amount)}
                       </td>

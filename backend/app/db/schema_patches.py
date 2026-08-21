@@ -6114,3 +6114,72 @@ def ensure_repair_orders_review_flow() -> None:
                 pass
     logger.info("Applied repair_orders review-flow patch")
 
+
+def ensure_autoservice_payers() -> None:
+    """Create autoservice_payers and add payer fields on autoservice_payments."""
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+
+    if "autoservice_payers" not in tables:
+        if engine.dialect.name == "postgresql":
+            ddl = """
+            CREATE TABLE autoservice_payers (
+                id SERIAL PRIMARY KEY,
+                organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                name VARCHAR(255) NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_autoservice_payers_org_name UNIQUE (organization_id, name)
+            )
+            """
+        else:
+            ddl = """
+            CREATE TABLE autoservice_payers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                name VARCHAR(255) NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (organization_id, name)
+            )
+            """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_autoservice_payers_organization_id "
+                    "ON autoservice_payers (organization_id)"
+                )
+            )
+        logger.info("Applied autoservice_payers table patch")
+
+    if "autoservice_payments" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("autoservice_payments")}
+    statements = []
+    if "payer_id" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE autoservice_payments ADD COLUMN payer_id INTEGER "
+                "REFERENCES autoservice_payers(id) ON DELETE SET NULL"
+            )
+        else:
+            statements.append("ALTER TABLE autoservice_payments ADD COLUMN payer_id INTEGER")
+    if "payer_name" not in columns:
+        statements.append(
+            "ALTER TABLE autoservice_payments ADD COLUMN payer_name VARCHAR(255)"
+        )
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        if "payer_id" not in columns:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_autoservice_payments_payer_id "
+                    "ON autoservice_payments (payer_id)"
+                )
+            )
+    logger.info("Applied autoservice_payments payer fields patch")
+

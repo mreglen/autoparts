@@ -1630,6 +1630,8 @@ def post_repair_order_payment(
         amount=payload.amount,
         grand_total=grand_total,
         paid_at=payload.paid_at,
+        payer_id=payload.payer_id,
+        payer_name=payload.payer_name,
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)

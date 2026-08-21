@@ -714,7 +714,7 @@ export default function AutoserviceReportsPage() {
                           onOpen={openOrderView}
                         />
                       </ReportField>
-                      <ReportField label="Клиент">{row.client_name || '—'}</ReportField>
+                      <ReportField label="Плательщик">{row.payer_name || row.client_name || '—'}</ReportField>
                       <ReportField label="Способ">{METHOD_LABELS[row.method] || row.method}</ReportField>
                       <ReportField label="Сумма">{formatFinanceCurrency(row.amount)}</ReportField>
                       <ReportField label="Дата">{formatServerDateTime(row.created_at)}</ReportField>
@@ -737,7 +737,7 @@ export default function AutoserviceReportsPage() {
                         />
                       ),
                     },
-                    { key: 'client_name', label: 'Клиент', render: (row) => row.client_name || '—' },
+                    { key: 'payer_name', label: 'Плательщик', render: (row) => row.payer_name || row.client_name || '—' },
                     { key: 'method', label: 'Способ', render: (row) => METHOD_LABELS[row.method] || row.method || '' },
                     { key: 'amount', label: 'Сумма', render: (row) => formatFinanceCurrency(row.amount) },
                     { key: 'created_at', label: 'Дата', render: (row) => row.created_at ? formatServerDateTime(row.created_at) : '' },
@@ -746,7 +746,7 @@ export default function AutoserviceReportsPage() {
                   footer={{
                     sequential_number: 'Итого',
                     repair_order_number: `${payments.count ?? 0} платежей`,
-                    client_name: '',
+                    payer_name: '',
                     method: '',
                     amount: payments.total_amount,
                     created_at: '',

@@ -33,6 +33,7 @@ class FinanceReceiptsXlsxTests(unittest.TestCase):
                     repair_order_id=10,
                     repair_order_number="ЗН-001",
                     client_name="Иван",
+                    payer_name="ООО Плательщик",
                     amount=Decimal("100.00"),
                     method="card",
                     created_at=datetime(2026, 8, 15, 12, 0, 0),
@@ -43,6 +44,7 @@ class FinanceReceiptsXlsxTests(unittest.TestCase):
                     repair_order_id=11,
                     repair_order_number="ЗН-002",
                     client_name="Пётр",
+                    payer_name="Пётр",
                     amount=Decimal("50.00"),
                     method="cash",
                     created_at=datetime(2026, 8, 16, 10, 30, 0),
@@ -64,6 +66,9 @@ class FinanceReceiptsXlsxTests(unittest.TestCase):
         self.assertEqual(wb.sheetnames, ["Сводка", "Платежи"])
         self.assertEqual(wb["Сводка"]["A1"].value, "Платежи автосервиса")
         self.assertEqual(wb["Платежи"]["A1"].value, "№")
+        self.assertEqual(wb["Платежи"]["C1"].value, "Плательщик")
+        self.assertEqual(wb["Платежи"]["C2"].value, "ООО Плательщик")
+        self.assertEqual(wb["Платежи"]["C3"].value, "Пётр")
 
 
 class PayrollReportXlsxTests(unittest.TestCase):

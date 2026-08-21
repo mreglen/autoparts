@@ -11,6 +11,8 @@ class AutoservicePaymentIn(BaseModel):
     method: AutoservicePaymentMethod
     amount: Decimal = Field(gt=0)
     paid_at: Optional[date] = None
+    payer_id: Optional[int] = None
+    payer_name: Optional[str] = Field(None, max_length=255)
 
 
 class AutoservicePaymentMethodTotals(BaseModel):
@@ -25,6 +27,7 @@ class AutoserviceFinanceReceiptRow(BaseModel):
     repair_order_id: int
     repair_order_number: str
     client_name: str
+    payer_name: str
     amount: Decimal
     method: AutoservicePaymentMethod
     created_at: datetime

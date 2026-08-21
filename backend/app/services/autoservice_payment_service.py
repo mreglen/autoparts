@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.autoservice_payment import AutoservicePayment
+from app.models.autoservice_payer import AutoservicePayer
 from app.models.repair_order import RepairOrder
 from app.schemas.autoservice_finance import (
     AutoserviceFinanceReceiptRow,
@@ -31,6 +32,16 @@ def _created_at_for_payment_date(paid_at: date) -> datetime:
     return datetime.combine(paid_at, time(12, 0))
 
 
+def _display_payer_name(payment: AutoservicePayment) -> str:
+    snapshot = (getattr(payment, "payer_name", None) or "").strip()
+    if snapshot:
+        return snapshot
+    order = payment.order
+    if order and order.client and (order.client.name or "").strip():
+        return order.client.name.strip()
+    return "—"
+
+
 def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceReceiptRow:
     method = payment.method if payment.method in _VALID_METHODS else "cash"
     order = payment.order
@@ -41,6 +52,7 @@ def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceRecei
         repair_order_id=payment.repair_order_id,
         repair_order_number=order.order_number if order else str(payment.repair_order_id),
         client_name=client_name,
+        payer_name=_display_payer_name(payment),
         amount=_money(payment.amount),
         method=method,
         created_at=payment.created_at,
@@ -107,6 +119,8 @@ def create_repair_order_payment(
     amount: Decimal,
     grand_total: Decimal,
     paid_at: date | None = None,
+    payer_id: int | None = None,
+    payer_name: str | None = None,
 ) -> AutoservicePayment:
     if method not in _VALID_METHODS:
         raise HTTPException(
@@ -125,6 +139,30 @@ def create_repair_order_payment(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Сумма оплаты превышает остаток к оплате",
         )
+
+    resolved_payer_id = None
+    resolved_payer_name = None
+    if payer_id is not None:
+        payer = (
+            db.query(AutoservicePayer)
+            .filter(
+                AutoservicePayer.id == payer_id,
+                AutoservicePayer.organization_id == org_id,
+            )
+            .first()
+        )
+        if not payer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Плательщик не найден",
+            )
+        resolved_payer_id = payer.id
+        resolved_payer_name = (payer.name or "").strip() or None
+    else:
+        manual_name = (payer_name or "").strip()[:255]
+        if manual_name:
+            resolved_payer_name = manual_name
+
     effective_date = paid_at or date.today()
     created_at = _created_at_for_payment_date(effective_date)
     payment = AutoservicePayment(
@@ -133,6 +171,8 @@ def create_repair_order_payment(
         sequential_number=allocate_autoservice_payment_number(db, org_id),
         method=method,
         amount=pay_amount,
+        payer_id=resolved_payer_id,
+        payer_name=resolved_payer_name,
         created_by_user_id=user_id,
         created_at=created_at,
     )

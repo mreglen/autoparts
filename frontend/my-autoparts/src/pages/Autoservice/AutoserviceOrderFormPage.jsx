@@ -281,16 +281,6 @@ function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
   };
 }
 
-function moveItem(list, index, delta) {
-  const next = index + delta;
-  if (next < 0 || next >= list.length) return list;
-  const copy = [...list];
-  const tmp = copy[index];
-  copy[index] = copy[next];
-  copy[next] = tmp;
-  return copy;
-}
-
 function vehicleSearchText(v) {
   return [v.make, v.model, v.year, v.plate, v.vin].filter(Boolean).join(' ').toLowerCase();
 }
@@ -1872,7 +1862,7 @@ export default function AutoserviceOrderFormPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sg-caption font-medium text-ink-muted">Дата отгрузки</label>
+              <label className="block text-sg-caption font-medium text-ink-muted">Дата поступления запчастей</label>
               <input
                 type="date"
                 className={pillInputClass}
@@ -1971,8 +1961,6 @@ export default function AutoserviceOrderFormPage() {
                     </>
                     )}
                     <div className="flex shrink-0 gap-0.5">
-                      <button type="button" className={rowActionBtnClass} onClick={() => setWorks((p) => moveItem(p, index, -1))}>↑</button>
-                      <button type="button" className={rowActionBtnClass} onClick={() => setWorks((p) => moveItem(p, index, 1))}>↓</button>
                       <button
                         type="button"
                         className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700`}
@@ -2067,12 +2055,6 @@ export default function AutoserviceOrderFormPage() {
                       <option value="kg">кг</option>
                     </select>
                     <div className="flex shrink-0 gap-0.5">
-                      <button type="button" className={rowActionBtnClass} onClick={() => setClientParts((prev) => moveItem(prev, index, -1))}>
-                        ↑
-                      </button>
-                      <button type="button" className={rowActionBtnClass} onClick={() => setClientParts((prev) => moveItem(prev, index, 1))}>
-                        ↓
-                      </button>
                       <button
                         type="button"
                         className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700`}

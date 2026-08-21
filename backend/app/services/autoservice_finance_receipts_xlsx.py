@@ -43,7 +43,7 @@ def _sheet_payments(wb: Workbook, items) -> None:
     headers = [
         "№",
         "Заказ-наряд",
-        "Клиент",
+        "Плательщик",
         "Способ",
         "Сумма, ₽",
         "Дата",
@@ -52,7 +52,7 @@ def _sheet_payments(wb: Workbook, items) -> None:
     for index, row in enumerate(items, start=2):
         ws.cell(row=index, column=1, value=row.sequential_number)
         ws.cell(row=index, column=2, value=row.repair_order_number)
-        ws.cell(row=index, column=3, value=row.client_name)
+        ws.cell(row=index, column=3, value=row.payer_name)
         ws.cell(row=index, column=4, value=METHOD_LABELS.get(row.method, row.method))
         ws.cell(row=index, column=5, value=row.amount)
         ws.cell(row=index, column=6, value=row.created_at)

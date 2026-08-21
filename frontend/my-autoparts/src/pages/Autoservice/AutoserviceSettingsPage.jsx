@@ -177,18 +177,96 @@ function WorkZoneModal({ open, mode, zone, onClose, onSaved }) {
   );
 }
 
+function PayerModal({ open, mode, payer, onClose, onSaved }) {
+  const [name, setName] = useState(payer?.name || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setName(payer?.name || '');
+    setError('');
+    setSaving(false);
+  }, [payer, mode, open]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError('Введите имя');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      if (mode === 'create') {
+        await apiRequest('/autoservice/payers', {
+          method: 'POST',
+          body: JSON.stringify({ name: trimmed }),
+        });
+      } else {
+        await apiRequest(`/autoservice/payers/${payer.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: trimmed }),
+        });
+      }
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={mode === 'create' ? 'Новый плательщик' : 'Изменить плательщика'}
+      size="sm"
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className={btnGhost} disabled={saving}>
+            Отмена
+          </button>
+          <button type="submit" form="payer-form" disabled={saving} className={btnPrimary}>
+            {saving ? '…' : 'Сохранить'}
+          </button>
+        </div>
+      }
+    >
+      <form id="payer-form" onSubmit={handleSubmit}>
+        <label className="block text-sm font-medium text-gray-700">Имя</label>
+        <input
+          autoFocus
+          className={inputClass}
+          placeholder="Имя плательщика"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={255}
+        />
+        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+      </form>
+    </Modal>
+  );
+}
+
 export default function AutoserviceSettingsPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const [tab, setTab] = useState('general');
   const [publicName, setPublicName] = useState('');
   const [publicDescription, setPublicDescription] = useState('');
   const [workZones, setWorkZones] = useState([]);
+  const [payers, setPayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [workZonesLoading, setWorkZonesLoading] = useState(false);
+  const [payersLoading, setPayersLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
   const [zoneModal, setZoneModal] = useState(null);
+  const [payerModal, setPayerModal] = useState(null);
   const [worksOpen, setWorksOpen] = useState(false);
   const [works, setWorks] = useState([]);
   const [worksLoading, setWorksLoading] = useState(false);
@@ -211,6 +289,18 @@ export default function AutoserviceSettingsPage() {
     }
   }, []);
 
+  const loadPayers = useCallback(async () => {
+    setPayersLoading(true);
+    try {
+      const data = await apiRequest('/autoservice/payers');
+      setPayers(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(e?.message || 'Не удалось загрузить плательщиков');
+    } finally {
+      setPayersLoading(false);
+    }
+  }, []);
+
   const loadWorks = useCallback(async () => {
     setWorksLoading(true);
     try {
@@ -227,13 +317,13 @@ export default function AutoserviceSettingsPage() {
     setLoading(true);
     setError('');
     try {
-      await Promise.all([loadSettings(), loadWorkZones(), loadWorks()]);
+      await Promise.all([loadSettings(), loadWorkZones(), loadPayers(), loadWorks()]);
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить настройки');
     } finally {
       setLoading(false);
     }
-  }, [loadSettings, loadWorkZones, loadWorks]);
+  }, [loadSettings, loadWorkZones, loadPayers, loadWorks]);
 
   useEffect(() => {
     if (isReady && isAuthenticated) load();
@@ -270,6 +360,17 @@ export default function AutoserviceSettingsPage() {
     try {
       await apiRequest(`/autoservice/work-zones/${zoneId}`, { method: 'DELETE' });
       await loadWorkZones();
+    } catch (err) {
+      setError(err?.message || 'Не удалось удалить');
+    }
+  };
+
+  const removePayer = async (payerId) => {
+    if (!window.confirm('Удалить плательщика?')) return;
+    setError('');
+    try {
+      await apiRequest(`/autoservice/payers/${payerId}`, { method: 'DELETE' });
+      await loadPayers();
     } catch (err) {
       setError(err?.message || 'Не удалось удалить');
     }
@@ -314,6 +415,7 @@ export default function AutoserviceSettingsPage() {
           { id: 'general', label: 'Общее' },
           { id: 'zones', label: 'Зоны' },
           { id: 'works', label: 'Работы' },
+          { id: 'payers', label: 'Плательщики' },
         ]}
         value={tab}
         onChange={setTab}
@@ -517,6 +619,91 @@ export default function AutoserviceSettingsPage() {
               </div>
             </section>
           ) : null}
+
+          {tab === 'payers' ? (
+            <section>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-gray-500">
+                  {payersLoading ? 'Загрузка…' : `${payers.length} плательщиков`}
+                </p>
+                <button type="button" onClick={() => setPayerModal({ mode: 'create' })} className={btnPrimary}>
+                  Добавить
+                </button>
+              </div>
+              <div className="hidden md:block">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      <th className="py-3 pr-3">Имя</th>
+                      <th className="w-40 py-3 text-right">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {payersLoading ? (
+                      <tr>
+                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                          Загрузка…
+                        </td>
+                      </tr>
+                    ) : payers.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                          Плательщиков пока нет
+                        </td>
+                      </tr>
+                    ) : (
+                      payers.map((payer) => (
+                        <tr key={payer.id} className="transition-colors hover:bg-gray-50/70">
+                          <td className="py-3 pr-3 align-middle font-medium text-gray-900">{payer.name}</td>
+                          <td className="py-3 text-right align-middle">
+                            <ActionsDropdown
+                              menuClassName="w-40 z-50"
+                              estimatedMenuHeight={100}
+                              showLabel
+                              buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                            >
+                              <ActionsDropdownItem onClick={() => setPayerModal({ mode: 'edit', payer })}>
+                                Изменить
+                              </ActionsDropdownItem>
+                              <ActionsDropdownItem danger onClick={() => removePayer(payer.id)}>
+                                Удалить
+                              </ActionsDropdownItem>
+                            </ActionsDropdown>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="md:hidden">
+                {payersLoading ? (
+                  <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+                ) : payers.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-gray-500">Плательщиков пока нет</p>
+                ) : (
+                  payers.map((payer) => (
+                    <div key={payer.id} className="flex items-center justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0">
+                      <p className="min-w-0 truncate text-sm font-semibold text-gray-900">{payer.name}</p>
+                      <ActionsDropdown
+                        menuClassName="w-40 z-50"
+                        estimatedMenuHeight={100}
+                        showLabel={false}
+                        buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50"
+                      >
+                        <ActionsDropdownItem onClick={() => setPayerModal({ mode: 'edit', payer })}>
+                          Изменить
+                        </ActionsDropdownItem>
+                        <ActionsDropdownItem danger onClick={() => removePayer(payer.id)}>
+                          Удалить
+                        </ActionsDropdownItem>
+                      </ActionsDropdown>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          ) : null}
         </>
       )}
 
@@ -535,6 +722,14 @@ export default function AutoserviceSettingsPage() {
         zone={zoneModal?.zone}
         onClose={() => setZoneModal(null)}
         onSaved={loadWorkZones}
+      />
+
+      <PayerModal
+        open={Boolean(payerModal)}
+        mode={payerModal?.mode || 'create'}
+        payer={payerModal?.payer}
+        onClose={() => setPayerModal(null)}
+        onSaved={loadPayers}
       />
     </div>
   );
