@@ -261,6 +261,21 @@ input[type="password"] {
   word-break: break-word;
 }
 
+.repair-order-print-sheet .repair-order-clip {
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.repair-order-print-sheet .repair-order-vehicle-table td {
+  height: 1.15rem;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  line-height: 1.15;
+}
+
 .repair-order-print-sheet .repair-order-sign-table {
   width: auto !important;
   max-width: 100% !important;

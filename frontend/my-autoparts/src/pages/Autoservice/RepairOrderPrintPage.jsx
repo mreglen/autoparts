@@ -467,7 +467,6 @@ export default function RepairOrderPrintPage() {
 
   const workColumns = [
     { key: 'n', label: '№', className: 'w-7' },
-    { key: 'code', label: 'Код', className: 'w-12' },
     { key: 'title', label: 'Наименование работ' },
     { key: 'qty', label: 'Количество', className: 'w-[4.5rem]' },
     { key: 'price', label: 'Цена, руб', className: 'w-[4.5rem]' },
@@ -477,7 +476,7 @@ export default function RepairOrderPrintPage() {
 
   const materialColumns = [
     { key: 'n', label: '№', className: 'w-7' },
-    { key: 'code', label: 'Код', className: 'w-12' },
+    { key: 'code', label: 'Артикул', className: 'w-[6.5rem] repair-order-clip' },
     { key: 'title', label: 'Наименование материала' },
     { key: 'qty', label: 'Количество', className: 'w-[4.5rem]' },
     { key: 'price', label: 'Цена, руб', className: 'w-[4.5rem]' },
@@ -562,41 +561,41 @@ export default function RepairOrderPrintPage() {
           <Field label="Телефон">{editControl('clientPhone', 'upd-edit-inline min-w-[8rem]')}</Field>
         </section>
 
-        <table className="mt-2 w-full border-collapse text-[11px] leading-tight">
+        <table className="repair-order-vehicle-table mt-2 w-full border-collapse text-[11px] leading-none">
           <tbody>
             <tr>
-              <Cell className="w-[33%]">
+              <Cell className="h-auto w-[33%] py-px">
                 <span className="font-semibold">Марка</span>{' '}
                 {editControl('vehicleMake', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
-              <Cell className="w-[27%]">
+              <Cell className="h-auto w-[27%] py-px">
                 <span className="font-semibold">Гос. номер</span>{' '}
                 {editControl('vehiclePlate', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
-              <Cell rowSpan={3} className="align-top">
-                <p className="font-semibold">Описание дефектов / комментарий</p>
+              <Cell rowSpan={3} className="h-auto align-top py-px">
+                <p className="font-semibold leading-none">Описание дефектов / комментарий</p>
                 {editControl('defectComment', 'mt-0.5', {
                   multiline: true,
-                  style: { minHeight: '5.5rem' },
+                  style: { minHeight: '3.4rem' },
                 })}
               </Cell>
             </tr>
             <tr>
-              <Cell>
+              <Cell className="h-auto py-px">
                 <span className="font-semibold">Модель</span>{' '}
                 {editControl('vehicleModel', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
-              <Cell>
+              <Cell className="h-auto py-px">
                 <span className="font-semibold">Пробег автомобиля</span>{' '}
                 {editControl('vehicleMileage', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
             </tr>
             <tr>
-              <Cell>
+              <Cell className="h-auto py-px">
                 <span className="font-semibold">Год выпуска</span>{' '}
                 {editControl('vehicleYear', 'upd-edit-inline min-w-[4rem]')}
               </Cell>
-              <Cell>
+              <Cell className="h-auto py-px">
                 <span className="font-semibold">VIN</span>{' '}
                 {editControl('vehicleVin', 'upd-edit-inline min-w-[8rem]')}
               </Cell>
@@ -610,7 +609,6 @@ export default function RepairOrderPrintPage() {
             {workRows.map((w, index) => (
               <tr key={w?.id || `work-empty-${index}`}>
                 <Cell align="center">{index + 1}</Cell>
-                <Cell align="center">{w ? w.catalog_work_id || w.id || '' : ''}</Cell>
                 <Cell>{w?.title || ''}</Cell>
                 <Cell align="center">{w?.qty ?? ''}</Cell>
                 <Cell align="right">{w ? formatMoney(w.unit_price) : ''}</Cell>
@@ -657,8 +655,12 @@ export default function RepairOrderPrintPage() {
               return (
                 <tr key={p.id || `${p.position}-${p.title}`}>
                   <Cell align="center">{index + 1}</Cell>
-                  <Cell align="center">{code}</Cell>
-                  <Cell>{name}</Cell>
+                  <Cell className="repair-order-clip" title={String(code)}>
+                    {code}
+                  </Cell>
+                  <Cell className="repair-order-clip" title={name}>
+                    {name}
+                  </Cell>
                   <Cell align="center">{qtyLabel}</Cell>
                   <Cell align="right">{formatMoney(clientPrice)}</Cell>
                   <Cell align="right">{formatMoney(sum)}</Cell>
