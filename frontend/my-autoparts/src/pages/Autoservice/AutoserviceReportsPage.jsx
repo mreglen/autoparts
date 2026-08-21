@@ -213,10 +213,10 @@ export default function AutoserviceReportsPage() {
   const canSeePayroll = Boolean(user?.is_director);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const requestedTab = tabParam === 'payroll' || tabParam === 'economics' || tabParam === 'warehouse-stock'
+  const requestedTab = tabParam === 'payroll' || tabParam === 'payments' || tabParam === 'warehouse-stock'
     ? tabParam
-    : 'payments';
-  const tab = requestedTab === 'payroll' && !canSeePayroll ? 'payments' : requestedTab;
+    : 'economics';
+  const tab = requestedTab === 'payroll' && !canSeePayroll ? 'economics' : requestedTab;
 
   const defaults = useMemo(() => getMonthRangeDefaults(), []);
   const todayDate = useMemo(() => getFinanceTodayDate(), []);
@@ -259,11 +259,11 @@ export default function AutoserviceReportsPage() {
 
   const tabs = useMemo(() => {
     const items = [
+      { id: 'economics', label: 'Сводная таблица' },
       { id: 'payments', label: 'Платежи' },
-      { id: 'economics', label: 'Экономика заказ-нарядов' },
       { id: 'warehouse-stock', label: 'Остатки на складе' },
     ];
-    if (canSeePayroll) items.splice(1, 0, { id: 'payroll', label: 'Зарплаты' });
+    if (canSeePayroll) items.splice(2, 0, { id: 'payroll', label: 'Зарплаты' });
     return items;
   }, [canSeePayroll]);
 
@@ -272,8 +272,8 @@ export default function AutoserviceReportsPage() {
       setSearchParams({ tab: 'payroll' });
       return;
     }
-    if (next === 'economics') {
-      setSearchParams({ tab: 'economics' });
+    if (next === 'payments') {
+      setSearchParams({ tab: 'payments' });
       return;
     }
     if (next === 'warehouse-stock') {
@@ -567,7 +567,7 @@ export default function AutoserviceReportsPage() {
       <PageHeader
         className="mb-0"
         title="Отчёты"
-        subtitle="Платежи, зарплаты, экономика заказ-нарядов и остатки склада"
+        subtitle="Сводная таблица, платежи, зарплаты и остатки склада"
         action={
           tab === 'payments' ? (
             <div className="text-right">
@@ -632,7 +632,7 @@ export default function AutoserviceReportsPage() {
       {tab === 'payments' ? (
         <>
           <MobileCollapsibleFilters title="Период">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block min-w-0">
                 <span className="mb-1.5 block text-xs font-medium text-gray-500">Период с</span>
                 <input

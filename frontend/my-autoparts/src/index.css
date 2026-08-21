@@ -290,6 +290,9 @@ input[type="password"] {
 }
 
 .autoservice-print-preview__transform {
+  transform: translate(var(--preview-x, 0px), var(--preview-y, 0px))
+    scale(var(--preview-scale, 1));
+  transform-origin: 0 0;
   will-change: transform;
 }
 
@@ -307,9 +310,24 @@ input[type="password"] {
 }
 
 @media print {
-  .autoservice-print-preview {
-    padding: 0;
-    overflow: visible;
+  /* Предпросмотр масштабирует лист под экран. Печать всегда идёт 1:1 на A4. */
+  .autoservice-print-preview,
+  .autoservice-print-preview__transform {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+    will-change: auto !important;
+    --preview-x: 0px;
+    --preview-y: 0px;
+    --preview-scale: 1;
   }
 }
 
@@ -590,7 +608,7 @@ input[type="password"] {
 
 @page {
   size: A4 portrait;
-  margin: 10mm;
+  margin: 0;
 }
 
 @media print {
@@ -598,8 +616,16 @@ input[type="password"] {
   html.repair-order-print-root body,
   html.repair-order-print-root #root,
   html.repair-order-print-root .repair-order-print-layout,
-  html.repair-order-print-root .repair-order-print-page {
+  html.repair-order-print-root .repair-order-print-page,
+  html.mobile-shell.repair-order-print-root,
+  html.pwa-standalone.repair-order-print-root,
+  html.mobile-shell.repair-order-print-root body,
+  html.pwa-standalone.repair-order-print-root body,
+  html.mobile-shell.repair-order-print-root #root,
+  html.pwa-standalone.repair-order-print-root #root {
     background: #fff !important;
+    color: #000 !important;
+    color-scheme: only light;
     margin: 0 !important;
     padding: 0 !important;
     width: auto !important;
@@ -619,15 +645,35 @@ input[type="password"] {
     display: none !important;
   }
 
-  html.repair-order-print-root .repair-order-print-sheet {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: 0 !important;
+  html.repair-order-print-root .repair-order-print-sheet,
+  html.repair-order-print-root .invoice-schet-sheet {
+    box-sizing: border-box !important;
+    width: 210mm !important;
+    max-width: none !important;
+    min-height: 297mm !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 8mm 10mm !important;
     box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-family: Arial, Helvetica, "Liberation Sans", sans-serif !important;
+    transform: none !important;
+    zoom: 1 !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+  }
+
+  html.repair-order-print-root .repair-order-print-sheet table,
+  html.repair-order-print-root .invoice-schet-sheet table {
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  html.repair-order-print-root .repair-order-print-sheet tr,
+  html.repair-order-print-root .invoice-schet-sheet tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   html.upd-print-root,

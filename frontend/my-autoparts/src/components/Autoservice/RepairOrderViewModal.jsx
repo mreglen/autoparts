@@ -740,6 +740,11 @@ export default function RepairOrderViewModal({
             </MetaItem>
             <MetaItem label="Авто">{vehicleLabel(order.vehicle)}</MetaItem>
             <MetaItem label="Дата">{formatDateTime(order.scheduled_at) || '—'}</MetaItem>
+            <MetaItem label="Пробег">
+              {order.mileage_km != null && order.mileage_km !== ''
+                ? `${Number(order.mileage_km).toLocaleString('ru-RU')} км`
+                : '—'}
+            </MetaItem>
             <MetaItem label="Рабочая зона">{order.work_zone?.name || '—'}</MetaItem>
             {showExecutors ? (
               <MetaItem label="Принял">{order.accepted_by?.name || '—'}</MetaItem>

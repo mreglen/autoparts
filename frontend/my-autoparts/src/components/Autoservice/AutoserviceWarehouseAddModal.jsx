@@ -2,10 +2,9 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import { apiAxios } from '../../utils/apiClient';
+import { getFinanceTodayDate } from '../../pages/Finance/financeDisplay';
 import AutoserviceReceiptSuggestField from './AutoserviceReceiptSuggestField';
-import {
-  pickBestRosskoPart,
-} from '../../pages/AutoParts/NewParts/rosskoHelpers';
+import { pickBestRosskoPart } from '../../pages/AutoParts/NewParts/rosskoHelpers';
 
 const EMPTY_FORM = {
   brand: '',
@@ -14,10 +13,13 @@ const EMPTY_FORM = {
   quantity: '1',
   unit: 'pcs',
   unit_price: '',
+  receipt_date: getFinanceTodayDate(),
 };
 
 const fieldClass =
   'h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-indigo-400 focus:ring-0';
+
+const labelClass = 'mb-1 block text-xs font-medium text-gray-500';
 
 export default function AutoserviceWarehouseAddModal({
   open,
@@ -28,6 +30,7 @@ export default function AutoserviceWarehouseAddModal({
   submitLabel = 'Добавить',
   showRosskoLookup = true,
   showUnitSelector = true,
+  showReceiptDate = false,
   initialValues = null,
   preserveDraftOnClose = false,
   onDraftPersist,
@@ -55,9 +58,10 @@ export default function AutoserviceWarehouseAddModal({
         unit_price: initialValues.unit_price == null || initialValues.unit_price === ''
           ? ''
           : String(initialValues.unit_price),
+        receipt_date: initialValues.receipt_date || getFinanceTodayDate(),
       });
     } else if (!(preserveDraftOnClose && mode === 'add')) {
-      setForm(EMPTY_FORM);
+      setForm({ ...EMPTY_FORM, receipt_date: getFinanceTodayDate() });
     }
     setError('');
     setRosskoLookupError('');
@@ -95,7 +99,7 @@ export default function AutoserviceWarehouseAddModal({
     if (preserveDraftOnClose && mode === 'add') {
       onDraftPersist?.({ ...form });
     } else {
-      setForm(EMPTY_FORM);
+      setForm({ ...EMPTY_FORM, receipt_date: getFinanceTodayDate() });
     }
     setError('');
     setRosskoLookupError('');
@@ -189,9 +193,10 @@ export default function AutoserviceWarehouseAddModal({
         quantity: unit === 'pcs' ? Math.round(quantityRaw) : quantityRaw,
         unit,
         unit_price: unitPrice,
+        receipt_date: showReceiptDate ? (form.receipt_date || getFinanceTodayDate()) : null,
         source: filledFromRossko ? 'rossko' : 'manual',
       });
-      setForm(EMPTY_FORM);
+      setForm({ ...EMPTY_FORM, receipt_date: getFinanceTodayDate() });
       setError('');
       setRosskoLookupError('');
       setRosskoLookupNotice('');
@@ -204,74 +209,78 @@ export default function AutoserviceWarehouseAddModal({
   const modalTitle = mode === 'edit' ? 'Редактировать товар' : title;
   const modalSubmitLabel = mode === 'edit' ? 'Сохранить' : submitLabel;
   const isWarehouseEdit = mode === 'edit' && editScope === 'warehouse';
+  const todayDate = getFinanceTodayDate();
 
   return (
     <Modal open={open} onClose={handleClose} title={modalTitle} size="sm">
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <label className="block text-sm">
-          <span className="font-medium text-gray-700">Бренд</span>
-          <span className="ml-1 text-xs font-normal text-gray-400">необязательно</span>
-          <AutoserviceReceiptSuggestField
-            field="brand"
-            value={form.brand}
-            onValueChange={(value) => patch('brand', value)}
-            onPick={applyReceiptSuggestion}
-            placeholder="Например, Bosch"
-            inputClassName={`mt-1 ${fieldClass}`}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium text-gray-700">Артикул</span>
-          <span className="ml-1 text-xs font-normal text-gray-400">необязательно</span>
-          <div className="mt-1 flex h-10 items-stretch gap-2">
-            <AutoserviceReceiptSuggestField
-              field="article"
-              value={form.article}
-              onValueChange={(value) => patch('article', value)}
-              onPick={applyReceiptSuggestion}
-              placeholder="Например, 0986424794"
-              inputClassName={fieldClass}
-              className="min-w-0 flex-1"
-            />
-            {showRosskoLookup ? (
-              <button
-                type="button"
-                onClick={handleFillFromRossko}
-                disabled={rosskoLookupLoading || !form.article.trim()}
-                className="inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold leading-none text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {rosskoLookupLoading ? 'Поиск…' : 'Найти в Rossko'}
-              </button>
-            ) : null}
-          </div>
-        </label>
-        {showRosskoLookup && rosskoLookupError ? (
-          <p className="text-sm text-red-600">{rosskoLookupError}</p>
-        ) : null}
-        {showRosskoLookup && rosskoLookupNotice ? (
-          <p className="text-sm text-green-700">{rosskoLookupNotice}</p>
-        ) : null}
-        <label className="block text-sm">
-          <span className="font-medium text-gray-700">Наименование</span>
-          <span className="ml-1 text-xs font-normal text-red-500">*</span>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <label className="block">
+          <span className={labelClass}>
+            Наименование <span className="text-red-500">*</span>
+          </span>
           <AutoserviceReceiptSuggestField
             field="name"
             value={form.name}
             onValueChange={(value) => patch('name', value)}
             onPick={applyReceiptSuggestion}
-            placeholder="Например, Колодки тормозные"
-            inputClassName={`mt-1 ${fieldClass}`}
+            placeholder="Колодки тормозные передние"
+            inputClassName={fieldClass}
           />
         </label>
-        <div className={`grid gap-3 ${isWarehouseEdit ? 'grid-cols-2' : showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className={labelClass}>Бренд</span>
+            <AutoserviceReceiptSuggestField
+              field="brand"
+              value={form.brand}
+              onValueChange={(value) => patch('brand', value)}
+              onPick={applyReceiptSuggestion}
+              placeholder="Bosch"
+              inputClassName={fieldClass}
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Артикул</span>
+            <AutoserviceReceiptSuggestField
+              field="article"
+              value={form.article}
+              onValueChange={(value) => patch('article', value)}
+              onPick={applyReceiptSuggestion}
+              placeholder="0986424794"
+              inputClassName={fieldClass}
+            />
+          </label>
+        </div>
+
+        {showRosskoLookup ? (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleFillFromRossko}
+              disabled={rosskoLookupLoading || !form.article.trim()}
+              className="inline-flex h-9 items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {rosskoLookupLoading ? 'Поиск в Rossko…' : 'Заполнить из Rossko'}
+            </button>
+            {rosskoLookupError ? (
+              <p className="text-sm text-red-600">{rosskoLookupError}</p>
+            ) : null}
+            {rosskoLookupNotice ? (
+              <p className="text-sm text-green-700">{rosskoLookupNotice}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className={`grid gap-3 ${isWarehouseEdit ? 'grid-cols-1 sm:grid-cols-2' : showReceiptDate ? 'grid-cols-2 sm:grid-cols-4' : showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {!isWarehouseEdit ? (
-            <label className="block text-sm">
-              <span className="font-medium text-gray-700">Количество</span>
+            <label className="block">
+              <span className={labelClass}>Кол-во</span>
               <input
                 type="number"
                 min={form.unit === 'pcs' ? 1 : 0.001}
                 step={form.unit === 'pcs' ? 1 : 0.001}
-                className={`mt-1 ${fieldClass}`}
+                className={fieldClass}
                 value={form.quantity}
                 onChange={(e) => patch('quantity', e.target.value)}
                 required
@@ -279,10 +288,10 @@ export default function AutoserviceWarehouseAddModal({
             </label>
           ) : null}
           {showUnitSelector ? (
-            <label className="block text-sm">
-              <span className="font-medium text-gray-700">Ед.</span>
+            <label className="block">
+              <span className={labelClass}>Ед.</span>
               <select
-                className={`mt-1 ${fieldClass}`}
+                className={fieldClass}
                 value={form.unit}
                 onChange={(e) => patch('unit', e.target.value)}
               >
@@ -293,40 +302,62 @@ export default function AutoserviceWarehouseAddModal({
             </label>
           ) : null}
           {!isWarehouseEdit ? (
-            <label className="block text-sm">
-              <span className="font-medium text-gray-700">Цена, ₽</span>
+            <label className="block">
+              <span className={labelClass}>Цена, ₽</span>
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                className={`mt-1 ${fieldClass}`}
+                className={fieldClass}
                 value={form.unit_price}
                 onChange={(e) => patch('unit_price', e.target.value)}
                 placeholder="0"
               />
             </label>
           ) : (
-            <label className="block text-sm">
-              <span className="font-medium text-gray-700">Себестоимость, ₽</span>
+            <label className="block">
+              <span className={labelClass}>Себестоимость, ₽</span>
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                className={`mt-1 ${fieldClass}`}
+                className={fieldClass}
                 value={form.unit_price}
                 onChange={(e) => patch('unit_price', e.target.value)}
                 placeholder="0"
               />
             </label>
           )}
+          {showReceiptDate && !isWarehouseEdit ? (
+            <label className="block">
+              <span className={labelClass}>Дата поступления</span>
+              <input
+                type="date"
+                max={todayDate}
+                className={fieldClass}
+                value={form.receipt_date}
+                onChange={(e) => patch('receipt_date', e.target.value)}
+                required
+              />
+            </label>
+          ) : null}
         </div>
+
+        {showReceiptDate && !isWarehouseEdit ? (
+          <p className="text-xs text-gray-500">
+            Эта дата попадёт в документ поступления на склад автосервиса.
+          </p>
+        ) : null}
+
         {isWarehouseEdit ? (
           <p className="text-xs text-gray-500">
             Себестоимость обновит карточку товара. Даты и суммы в уже созданных поступлениях и расходах не изменятся.
           </p>
         ) : null}
+
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <div className="flex justify-end gap-2 pt-1">
+
+        <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
           <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
             Отмена
           </Button>

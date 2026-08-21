@@ -11,6 +11,7 @@ export default function InspectionBookingAddModal({
   onClose,
   onCreated,
   initialPreferredDate = null,
+  workZoneId = null,
   title = 'Запись на осмотр',
 }) {
   const [name, setName] = useState('');
@@ -59,6 +60,7 @@ export default function InspectionBookingAddModal({
           phone,
           preferred_date: preferredDate,
           notes: notes.trim() || null,
+          ...(workZoneId != null ? { work_zone_id: Number(workZoneId) } : {}),
         }),
       });
       onCreated?.(row);

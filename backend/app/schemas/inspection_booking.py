@@ -39,6 +39,7 @@ class InspectionBookingStaffCreate(BaseModel):
     preferred_date: date
     notes: Optional[str] = Field(None, max_length=2000)
     garage_vehicle_id: Optional[int] = Field(None, ge=1)
+    work_zone_id: Optional[int] = Field(None, ge=1)
 
 
 class InspectionBookingPatch(BaseModel):
@@ -58,6 +59,7 @@ class InspectionBookingView(BaseModel):
     status: str
     source: str
     created_by_user_id: Optional[int] = None
+    work_zone_id: Optional[int] = None
     notes: Optional[str] = None
     created_at: datetime
 

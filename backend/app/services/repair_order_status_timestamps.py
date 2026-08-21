@@ -31,3 +31,6 @@ def record_repair_order_status_timestamp(
         return
     timestamp = at or datetime.now(timezone.utc).replace(tzinfo=None)
     setattr(order, field_name, timestamp)
+    if normalized == "completed":
+        # Дата окончания = момент закрытия заказ-наряда
+        order.scheduled_end_at = timestamp

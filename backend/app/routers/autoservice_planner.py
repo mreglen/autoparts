@@ -9,6 +9,7 @@ from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.garage_vehicle import GarageVehicle
+from app.models.inspection_booking import InspectionBooking
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_planner import (
@@ -43,6 +44,7 @@ def _week_start(value: date) -> date:
 def _planner_order(row: RepairOrder) -> PlannerRepairOrder:
     return PlannerRepairOrder(
         id=row.id,
+        kind="order",
         order_number=row.order_number,
         client_id=row.client_id,
         client_name=row.client.name if row.client else "—",
@@ -54,6 +56,40 @@ def _planner_order(row: RepairOrder) -> PlannerRepairOrder:
         work_zone_id=row.work_zone_id,
         work_zone_name=row.work_zone.name if row.work_zone else None,
     )
+
+
+def _planner_inspection(row: InspectionBooking) -> PlannerRepairOrder:
+    return PlannerRepairOrder(
+        id=row.id,
+        kind="inspection",
+        order_number="Осмотр",
+        client_id=row.client_id,
+        client_name=row.name or "—",
+        client_phone=row.phone or "",
+        vehicle=_vehicle_label(row.vehicle),
+        status=row.status,
+        scheduled_at=datetime.combine(row.preferred_date, time.min),
+        scheduled_end_at=None,
+        work_zone_id=row.work_zone_id,
+        work_zone_name=row.work_zone.name if row.work_zone else None,
+        notes=row.notes,
+    )
+
+
+def _place_item(
+    item: PlannerRepairOrder,
+    day_key: date,
+    *,
+    zone_day_map: dict[int | None, dict[date, list[PlannerRepairOrder]]],
+    unassigned_days: dict[date, list[PlannerRepairOrder]],
+    active_zone_ids: set[int],
+) -> None:
+    if day_key not in unassigned_days:
+        return
+    if item.work_zone_id and item.work_zone_id in active_zone_ids:
+        zone_day_map[item.work_zone_id][day_key].append(item)
+    else:
+        unassigned_days[day_key].append(item)
 
 
 @router.get("/autoservice/planner/week", response_model=PlannerWeekResponse)
@@ -97,6 +133,22 @@ def get_planner_week(
         .all()
     )
 
+    inspections = (
+        db.query(InspectionBooking)
+        .options(
+            joinedload(InspectionBooking.vehicle),
+            joinedload(InspectionBooking.work_zone),
+        )
+        .filter(
+            InspectionBooking.organization_id == org_id,
+            InspectionBooking.preferred_date >= day_dates[0],
+            InspectionBooking.preferred_date <= week_end,
+            InspectionBooking.status != "cancelled",
+        )
+        .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
+        .all()
+    )
+
     zone_day_map: dict[int | None, dict[date, list[PlannerRepairOrder]]] = {
         zone.id: {day: [] for day in day_dates} for zone in zones
     }
@@ -104,14 +156,21 @@ def get_planner_week(
 
     active_zone_ids = {zone.id for zone in zones}
     for row in orders:
-        item = _planner_order(row)
-        day_key = row.scheduled_at.date()
-        if day_key not in unassigned_days:
-            continue
-        if row.work_zone_id and row.work_zone_id in active_zone_ids:
-            zone_day_map[row.work_zone_id][day_key].append(item)
-        else:
-            unassigned_days[day_key].append(item)
+        _place_item(
+            _planner_order(row),
+            row.scheduled_at.date(),
+            zone_day_map=zone_day_map,
+            unassigned_days=unassigned_days,
+            active_zone_ids=active_zone_ids,
+        )
+    for row in inspections:
+        _place_item(
+            _planner_inspection(row),
+            row.preferred_date,
+            zone_day_map=zone_day_map,
+            unassigned_days=unassigned_days,
+            active_zone_ids=active_zone_ids,
+        )
 
     zone_rows: list[PlannerWeekZoneRow] = [
         PlannerWeekZoneRow(

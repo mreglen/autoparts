@@ -263,7 +263,7 @@ export default function AutoservicePrintPreview({ children, className = '' }) {
   return (
     <div
       ref={viewportRef}
-      className={`autoservice-print-preview ${dragging ? 'is-dragging' : ''} ${className} print:contents`}
+      className={`autoservice-print-preview ${dragging ? 'is-dragging' : ''} ${className}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={endPointerDrag}
@@ -276,21 +276,20 @@ export default function AutoservicePrintPreview({ children, className = '' }) {
       style={{ cursor: dragging ? 'grabbing' : canPan ? 'grab' : 'default' }}
     >
       <div
-        className="autoservice-print-preview__transform print:contents"
+        className="autoservice-print-preview__transform"
         style={
           metrics.width
             ? {
                 width: metrics.width,
                 height: metrics.height,
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${totalScale})`,
-                transformOrigin: '0 0',
+                '--preview-x': `${pan.x}px`,
+                '--preview-y': `${pan.y}px`,
+                '--preview-scale': String(totalScale),
               }
             : undefined
         }
       >
-        <div ref={sheetRef} className="print:contents">
-          {children}
-        </div>
+        <div ref={sheetRef}>{children}</div>
       </div>
     </div>
   );

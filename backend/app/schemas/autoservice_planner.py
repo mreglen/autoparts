@@ -1,13 +1,16 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+PlannerItemKind = Literal["order", "inspection"]
 
 
 class PlannerRepairOrder(BaseModel):
     id: int
+    kind: PlannerItemKind = "order"
     order_number: str
-    client_id: int
+    client_id: Optional[int] = None
     client_name: str
     client_phone: str
     vehicle: str
@@ -16,6 +19,7 @@ class PlannerRepairOrder(BaseModel):
     scheduled_end_at: Optional[datetime] = None
     work_zone_id: Optional[int] = None
     work_zone_name: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class PlannerWeekDayHeader(BaseModel):

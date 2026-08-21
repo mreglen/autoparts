@@ -6,8 +6,10 @@ import RepairOrderViewModal, { OrderStatusBadge } from '../../components/Autoser
 import PlannerCreateChoiceModal from '../../components/Autoservice/PlannerCreateChoiceModal';
 import PlannerCellContextMenu from '../../components/Autoservice/PlannerCellContextMenu';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
+import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
+import { formatServerDate } from '../../utils/serverDate';
 import {
   addDays,
   getWeekStart,
@@ -18,12 +20,34 @@ import {
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const ORDER_STATUS_STYLES = {
-  pending: 'bg-sky-500 text-white hover:bg-sky-600',
-  in_progress: 'bg-emerald-500 text-white hover:bg-emerald-600',
-  done: 'bg-violet-500 text-white hover:bg-violet-600',
+  pending: 'bg-amber-400 text-amber-950 hover:bg-amber-500',
+  in_progress: 'bg-sky-500 text-white hover:bg-sky-600',
+  done: 'bg-indigo-500 text-white hover:bg-indigo-600',
   completed: 'bg-gray-400 text-white hover:bg-gray-500',
   cancelled: 'bg-gray-300 text-gray-700 line-through hover:bg-gray-400',
 };
+
+const INSPECTION_STATUS_STYLES = {
+  new: 'bg-emerald-500 text-white hover:bg-emerald-600',
+  processed: 'bg-emerald-600 text-white hover:bg-emerald-700',
+  cancelled: 'bg-gray-300 text-gray-700 line-through hover:bg-gray-400',
+};
+
+function plannerItemStyle(item) {
+  if (item?.kind === 'inspection') {
+    return INSPECTION_STATUS_STYLES[item.status] || INSPECTION_STATUS_STYLES.new;
+  }
+  return ORDER_STATUS_STYLES[item?.status] || ORDER_STATUS_STYLES.pending;
+}
+
+function plannerItemTimeLabel(item) {
+  if (item?.kind === 'inspection') return 'Осмотр';
+  return formatOrderClockRange(item);
+}
+
+function plannerItemKey(item) {
+  return `${item.kind || 'order'}-${item.id}`;
+}
 
 function formatDayHeader(isoDate) {
   const parts = String(isoDate).split('-');
@@ -48,7 +72,7 @@ function formatLongDay(isoDate) {
   });
 }
 
-function PlannerDayCell({ orders, onOrderClick, isToday, onContextMenu }) {
+function PlannerDayCell({ orders, onItemClick, isToday, onContextMenu }) {
   const items = useMemo(() => sortDayOrders(orders), [orders]);
   const cellClass = `min-h-[3rem] border-b border-r border-gray-100 transition-colors hover:bg-gray-200/45 ${
     isToday ? 'bg-brand-50/30' : 'bg-white'
@@ -74,18 +98,18 @@ function PlannerDayCell({ orders, onOrderClick, isToday, onContextMenu }) {
       onContextMenu={handleContextMenu}
     >
       {items.map((order) => {
-        const styleClass = ORDER_STATUS_STYLES[order.status] || ORDER_STATUS_STYLES.pending;
+        const styleClass = plannerItemStyle(order);
         const clientName = order.client_name || '—';
         const clientLabel = formatPersonNameWithInitials(clientName);
         return (
           <button
-            key={order.id}
+            key={plannerItemKey(order)}
             type="button"
-            onClick={() => onOrderClick(order.id)}
+            onClick={() => onItemClick(order)}
             className={`w-full rounded-lg px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:text-xs ${styleClass}`}
-            title={`№ ${order.order_number} · ${clientName}`}
+            title={`${order.kind === 'inspection' ? 'Осмотр' : `№ ${order.order_number}`} · ${clientName}`}
           >
-            <span className="block tabular-nums">{formatOrderClockRange(order)}</span>
+            <span className="block tabular-nums">{plannerItemTimeLabel(order)}</span>
             <span className="mt-0.5 block truncate font-normal">{clientLabel}</span>
           </button>
         );
@@ -156,7 +180,7 @@ function MobileDayPlanner({
   todayIso,
   selectedDayIso,
   onSelectDay,
-  onOrderClick,
+  onItemClick,
   onCellContextMenu,
   loading,
 }) {
@@ -228,21 +252,31 @@ function MobileDayPlanner({
                 ) : (
                   <ul className="mt-2 divide-y divide-gray-100">
                     {orders.map((order) => (
-                      <li key={order.id}>
+                      <li key={plannerItemKey(order)}>
                         <button
                           type="button"
-                          onClick={() => onOrderClick(order.id)}
+                          onClick={() => onItemClick(order)}
                           className="flex w-full min-h-11 items-start gap-3 py-2.5 text-left"
                         >
-                          <span className="w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums text-indigo-700">
-                            {formatOrderClockRange(order)}
+                          <span className={`w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums ${
+                            order.kind === 'inspection' ? 'text-emerald-700' : 'text-sky-700'
+                          }`}>
+                            {plannerItemTimeLabel(order)}
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="flex flex-wrap items-center gap-1.5">
                               <span className="text-sm font-medium text-gray-900">
-                                {order.vehicle || 'Авто'}
+                                {order.vehicle && order.vehicle !== '—'
+                                  ? order.vehicle
+                                  : (order.kind === 'inspection' ? 'Осмотр' : 'Авто')}
                               </span>
-                              <OrderStatusBadge status={order.status} />
+                              {order.kind === 'inspection' ? (
+                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
+                                  Осмотр
+                                </span>
+                              ) : (
+                                <OrderStatusBadge status={order.status} />
+                              )}
                             </span>
                             <span className="mt-0.5 block truncate text-sm text-gray-500">
                               {formatPersonNameWithInitials(order.client_name)}
@@ -280,6 +314,8 @@ export default function AutoservicePlannerPage() {
   const [contextMenu, setContextMenu] = useState(null);
   const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
   const [inspectionPrefillDate, setInspectionPrefillDate] = useState(null);
+  const [inspectionPrefillZoneId, setInspectionPrefillZoneId] = useState(null);
+  const [viewInspection, setViewInspection] = useState(null);
 
   const weekStartIso = toIsoDate(weekStart);
   const weekDays = useMemo(
@@ -304,6 +340,14 @@ export default function AutoservicePlannerPage() {
   useEffect(() => {
     if (isReady && isAuthenticated) load();
   }, [isReady, isAuthenticated, load]);
+
+  const handlePlannerItemClick = (item) => {
+    if (item?.kind === 'inspection') {
+      setViewInspection(item);
+      return;
+    }
+    openOrderView(item.id);
+  };
 
   const openOrderView = async (orderId) => {
     setViewOrderLoading(true);
@@ -349,6 +393,7 @@ export default function AutoservicePlannerPage() {
   const beginCreateInspection = useCallback((ctx) => {
     const dayIso = ctx?.dayIso || todayIso;
     setInspectionPrefillDate(dayIso);
+    setInspectionPrefillZoneId(ctx?.zoneId ?? null);
     setInspectionModalOpen(true);
   }, [todayIso]);
 
@@ -422,7 +467,7 @@ export default function AutoservicePlannerPage() {
         todayIso={todayIso}
         selectedDayIso={activeDayIso}
         onSelectDay={setSelectedDayIso}
-        onOrderClick={openOrderView}
+        onItemClick={handlePlannerItemClick}
         onCellContextMenu={handleCellContextMenu}
         loading={loading}
       />
@@ -473,7 +518,7 @@ export default function AutoservicePlannerPage() {
                       <PlannerDayCell
                         key={`${zone.id ?? 'unassigned'}-${dayCell.date}`}
                         orders={dayCell.orders || []}
-                        onOrderClick={openOrderView}
+                        onItemClick={handlePlannerItemClick}
                         isToday={isToday}
                         onContextMenu={({ x, y }) => handleCellContextMenu({
                           x,
@@ -534,8 +579,59 @@ export default function AutoservicePlannerPage() {
         open={inspectionModalOpen}
         onClose={() => setInspectionModalOpen(false)}
         initialPreferredDate={inspectionPrefillDate}
-        onCreated={() => setInspectionModalOpen(false)}
+        workZoneId={inspectionPrefillZoneId}
+        onCreated={() => {
+          setInspectionModalOpen(false);
+          load();
+        }}
       />
+
+      <Modal
+        open={Boolean(viewInspection)}
+        onClose={() => setViewInspection(null)}
+        title="Запись на осмотр"
+        size="sm"
+        footer={
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setViewInspection(null)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Закрыть
+            </button>
+          </div>
+        }
+      >
+        {viewInspection ? (
+          <div className="space-y-3 text-sm text-gray-700">
+            <p>
+              <span className="font-medium text-gray-900">Клиент:</span>{' '}
+              {viewInspection.client_name || '—'}
+            </p>
+            <p>
+              <span className="font-medium text-gray-900">Телефон:</span>{' '}
+              {viewInspection.client_phone || '—'}
+            </p>
+            <p>
+              <span className="font-medium text-gray-900">Дата:</span>{' '}
+              {formatServerDate(viewInspection.scheduled_at) || '—'}
+            </p>
+            {viewInspection.vehicle && viewInspection.vehicle !== '—' ? (
+              <p>
+                <span className="font-medium text-gray-900">Автомобиль:</span>{' '}
+                {viewInspection.vehicle}
+              </p>
+            ) : null}
+            {viewInspection.notes ? (
+              <p>
+                <span className="font-medium text-gray-900">Заметка:</span>{' '}
+                <span className="whitespace-pre-wrap">{viewInspection.notes}</span>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

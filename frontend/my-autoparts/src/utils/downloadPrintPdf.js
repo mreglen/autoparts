@@ -99,6 +99,54 @@ function normalizeTableCells(sheet) {
   });
 }
 
+function copyFormValues(source, target) {
+  const srcFields = source.querySelectorAll('input, textarea, select');
+  const dstFields = target.querySelectorAll('input, textarea, select');
+  srcFields.forEach((el, index) => {
+    const dest = dstFields[index];
+    if (!dest) return;
+    dest.value = el.value;
+    if (el.tagName === 'SELECT') dest.selectedIndex = el.selectedIndex;
+  });
+}
+
+function sheetPageSize(orientation) {
+  if (orientation === 'landscape') {
+    return { page: 'A4 landscape', width: '297mm', height: '210mm' };
+  }
+  return { page: 'A4 portrait', width: '210mm', height: '297mm' };
+}
+
+function waitNextPaint() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+}
+
+function waitForStyles(doc) {
+  const links = [...doc.querySelectorAll('link[rel="stylesheet"]')];
+  if (links.length === 0) return Promise.resolve();
+
+  return Promise.race([
+    Promise.all(
+      links.map(
+        (link) =>
+          new Promise((resolve) => {
+            if (link.sheet) {
+              resolve();
+              return;
+            }
+            link.addEventListener('load', () => resolve(), { once: true });
+            link.addEventListener('error', () => resolve(), { once: true });
+          }),
+      ),
+    ),
+    new Promise((resolve) => {
+      setTimeout(resolve, 1500);
+    }),
+  ]);
+}
+
 function prepareSheetForPdf(clonedDoc, sheet) {
   const style = clonedDoc.createElement('style');
   style.textContent = `
@@ -162,6 +210,130 @@ function prepareSheetForPdf(clonedDoc, sheet) {
   normalizeTableCells(sheet);
 }
 
+function cloneSheetForOutput(source) {
+  const clone = source.cloneNode(true);
+  copyFormValues(source, clone);
+  flattenFormFields(clone);
+  normalizeTableCells(clone);
+  clone.style.boxShadow = 'none';
+  clone.style.margin = '0';
+  clone.style.background = '#fff';
+  clone.style.maxWidth = 'none';
+  clone.style.transform = 'none';
+  return clone;
+}
+
+function copyDocumentStyles(targetDoc) {
+  document.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
+    targetDoc.head.appendChild(node.cloneNode(true));
+  });
+}
+
+function attachA4PrintStyles(targetDoc, orientation) {
+  const { page, width, height } = sheetPageSize(orientation);
+  const style = targetDoc.createElement('style');
+  style.setAttribute('data-a4-print', 'true');
+  style.textContent = `
+    @page {
+      size: ${page};
+      margin: 0;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      color: #000 !important;
+      width: ${width} !important;
+      min-height: ${height} !important;
+      overflow: visible !important;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+      color-adjust: exact;
+      color-scheme: only light;
+    }
+    [data-print-sheet="true"] {
+      box-sizing: border-box !important;
+      width: ${width} !important;
+      max-width: none !important;
+      min-height: ${height} !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      background: #fff !important;
+      color: #000 !important;
+      font-family: Arial, Helvetica, "Liberation Sans", sans-serif !important;
+      transform: none !important;
+      zoom: 1 !important;
+    }
+    .upd-edit,
+    .upd-uv .upd-edit,
+    input,
+    textarea,
+    select {
+      background: transparent !important;
+      color: #000 !important;
+      box-shadow: none !important;
+    }
+  `;
+  targetDoc.head.appendChild(style);
+}
+
+/**
+ * Печать листа в диалоге браузера как настоящий A4, без масштаба экранного предпросмотра.
+ */
+export async function printDocumentSheet(element, { orientation = 'portrait' } = {}) {
+  if (!element) {
+    throw new Error('Нет документа для печати');
+  }
+
+  const { width, height } = sheetPageSize(orientation);
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.setAttribute('title', 'Печать документа');
+  iframe.style.cssText = [
+    'position:fixed',
+    'left:0',
+    'top:0',
+    `width:${width}`,
+    `height:${height}`,
+    'border:0',
+    'opacity:0',
+    'pointer-events:none',
+    'z-index:-1',
+  ].join(';');
+  document.body.appendChild(iframe);
+
+  const frameDoc = iframe.contentDocument;
+  frameDoc.open();
+  frameDoc.write('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body></body></html>');
+  frameDoc.close();
+
+  copyDocumentStyles(frameDoc);
+  attachA4PrintStyles(frameDoc, orientation);
+  frameDoc.body.appendChild(cloneSheetForOutput(element));
+
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    iframe.remove();
+  };
+
+  try {
+    await waitForStyles(frameDoc);
+    if (frameDoc.fonts?.ready) {
+      await frameDoc.fonts.ready.catch(() => {});
+    }
+    await waitNextPaint();
+    iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+  setTimeout(cleanup, 60000);
+}
+
 export async function downloadPrintSheetPdf({
   element,
   filename,
@@ -176,51 +348,83 @@ export async function downloadPrintSheetPdf({
     import('jspdf'),
   ]);
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: '#ffffff',
-    logging: false,
-    scrollX: 0,
-    scrollY: 0,
-    foreignObjectRendering: false,
-    onclone: (clonedDoc) => {
-      clonedDoc
-        .querySelectorAll(
-          '[role="dialog"], .fixed.inset-0, .upd-print-toolbar, .repair-order-print-toolbar',
-        )
-        .forEach((node) => {
-          node.style.display = 'none';
-        });
-      const sheet = clonedDoc.querySelector('[data-print-sheet="true"]') || clonedDoc.body;
-      prepareSheetForPdf(clonedDoc, sheet);
-    },
-  });
+  const { width, height } = sheetPageSize(orientation);
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.cssText = [
+    'position:fixed',
+    'left:-10000px',
+    'top:0',
+    `width:${width}`,
+    'margin:0',
+    'padding:0',
+    'background:#fff',
+    'opacity:1',
+    'pointer-events:none',
+    'z-index:-1',
+  ].join(';');
+  const clone = cloneSheetForOutput(element);
+  clone.style.width = width;
+  clone.style.maxWidth = 'none';
+  clone.style.minHeight = height;
+  host.appendChild(clone);
+  document.body.appendChild(host);
 
-  const pdf = new jsPDF({
-    orientation,
-    unit: 'mm',
-    format: 'a4',
-    compress: true,
-  });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  const imgData = canvas.toDataURL('image/jpeg', 0.95);
-
-  if (imgHeight <= pageHeight) {
-    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
-  } else {
-    let offset = 0;
-    let first = true;
-    while (offset < imgHeight) {
-      if (!first) pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, -offset, imgWidth, imgHeight);
-      offset += pageHeight;
-      first = false;
+  try {
+    if (document.fonts?.ready) {
+      await document.fonts.ready.catch(() => {});
     }
-  }
+    await waitNextPaint();
 
-  pdf.save(`${safePdfName(filename)}.pdf`);
+    const canvasWidth = clone.scrollWidth || clone.offsetWidth;
+    const canvasHeight = clone.scrollHeight || clone.offsetHeight;
+    const canvas = await html2canvas(clone, {
+      scale: 3,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      scrollX: 0,
+      scrollY: 0,
+      width: canvasWidth,
+      height: canvasHeight,
+      windowWidth: canvasWidth,
+      windowHeight: canvasHeight,
+      foreignObjectRendering: false,
+      onclone: (clonedDoc) => {
+        prepareSheetForPdf(
+          clonedDoc,
+          clonedDoc.querySelector('[data-print-sheet="true"]') || clonedDoc.body,
+        );
+      },
+    });
+
+    const pdf = new jsPDF({
+      orientation,
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
+    });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+    if (imgHeight <= pageHeight) {
+      pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+    } else {
+      let offset = 0;
+      let first = true;
+      while (offset < imgHeight) {
+        if (!first) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, -offset, imgWidth, imgHeight);
+        offset += pageHeight;
+        first = false;
+      }
+    }
+
+    pdf.save(`${safePdfName(filename)}.pdf`);
+  } finally {
+    host.remove();
+  }
 }

@@ -102,6 +102,7 @@ class RepairOrderShopPartIn(BaseModel):
     partnumber: Optional[str] = Field(None, max_length=120)
     rossko_brand: Optional[str] = Field(None, max_length=120)
     rossko_partnumber: Optional[str] = Field(None, max_length=120)
+    receipt_date: Optional[date] = None
 
 
 class ManualShopPartUpdate(BaseModel):
@@ -111,6 +112,7 @@ class ManualShopPartUpdate(BaseModel):
     quantity: Decimal = Field(gt=0)
     unit: Literal["pcs", "l", "kg"] = "pcs"
     unit_price: Decimal = Field(ge=0)
+    receipt_date: Optional[date] = None
 
 
 class RepairOrderPurchaseImportIn(BaseModel):
@@ -174,6 +176,7 @@ class RepairOrderShopPartView(BaseModel):
     is_imported: bool = False
     is_manual_editable: bool = False
     stock_max_qty: Optional[int] = None
+    receipt_date: Optional[date] = None
 
 
 class RepairOrderClientShopPartView(BaseModel):
@@ -195,6 +198,7 @@ class RepairOrderCreate(BaseModel):
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
     shipping_date: Optional[date] = None
+    mileage_km: Optional[int] = Field(None, ge=0, le=9_999_999)
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
     work_zone_id: Optional[int] = None
@@ -210,6 +214,7 @@ class RepairOrderUpdate(BaseModel):
     scheduled_at: Optional[datetime] = None
     scheduled_end_at: Optional[datetime] = None
     shipping_date: Optional[date] = None
+    mileage_km: Optional[int] = Field(None, ge=0, le=9_999_999)
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
     work_zone_id: Optional[int] = None
@@ -246,6 +251,7 @@ class RepairOrderStaffView(BaseModel):
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
     shipping_date: Optional[date] = None
+    mileage_km: Optional[int] = None
     accepted_by_user_id: int
     status: str
     created_at: datetime

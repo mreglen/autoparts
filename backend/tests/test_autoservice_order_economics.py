@@ -262,5 +262,5 @@ class AutoserviceOrderEconomicsTests(unittest.TestCase):
 
         wb = load_workbook(BytesIO(content))
         self.assertEqual(wb.sheetnames, ["Сводка", "Заказ-наряды"])
-        self.assertEqual(wb["Сводка"]["A1"].value, "Экономика заказ-нарядов")
+        self.assertEqual(wb["Сводка"]["A1"].value, "Сводная таблица")
         self.assertEqual(wb["Заказ-наряды"]["A1"].value, "Заказ-наряд")

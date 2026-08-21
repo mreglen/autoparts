@@ -89,6 +89,7 @@ export function manualShopPartFormValues(part) {
     quantity: part?.qty ?? 1,
     unit: part?.unit || 'pcs',
     unit_price: part?.unit_price ?? '0',
+    receipt_date: part?.receipt_date || '',
   };
 }
 
@@ -102,6 +103,7 @@ export function applyManualShopPartFormValues(part, values) {
     qty: values.quantity,
     unit: values.unit || 'pcs',
     unit_price: String(values.unit_price ?? 0),
+    receipt_date: values.receipt_date || part?.receipt_date || '',
     source: isRossko
       ? 'rossko'
       : (part?.source === 'autoservice_stock' ? part.source : 'manual'),

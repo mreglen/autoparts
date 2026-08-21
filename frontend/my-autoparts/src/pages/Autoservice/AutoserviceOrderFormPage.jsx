@@ -171,6 +171,7 @@ function emptyShopPart(overrides = {}, defaultMarkupPercent = 0) {
     stock_max_qty: null,
     rossko_brand: '',
     rossko_partnumber: '',
+    receipt_date: '',
     ...overrides,
   };
 }
@@ -287,6 +288,7 @@ function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
     rossko_partnumber: p.rossko_partnumber || '',
     is_imported: Boolean(p.is_imported),
     is_manual_editable: Boolean(p.is_manual_editable),
+    receipt_date: p.receipt_date || '',
   };
 }
 
@@ -883,6 +885,9 @@ function mapOrderToFormState(order) {
     shippingDate: order?.shipping_date
       ? toDateInputValue(order.shipping_date)
       : todayDateInputValue(),
+    mileageKm: order?.mileage_km != null && order?.mileage_km !== ''
+      ? String(order.mileage_km)
+      : '',
     works: (order?.works || []).length
       ? order.works.map((w) => ({
           title: w.title || '',
@@ -974,6 +979,7 @@ export default function AutoserviceOrderFormPage() {
   const [staffComment, setStaffComment] = useState('');
   const [scheduledEndAt, setScheduledEndAt] = useState('');
   const [shippingDate, setShippingDate] = useState(todayDateInputValue);
+  const [mileageKm, setMileageKm] = useState('');
   const [workZoneId, setWorkZoneId] = useState('');
   const [works, setWorks] = useState([]);
   const [clientParts, setClientParts] = useState([]);
@@ -1015,6 +1021,7 @@ export default function AutoserviceOrderFormPage() {
     setWorkZoneId(state.workZoneId);
     setScheduledEndAt(state.scheduledEndAt);
     setShippingDate(state.shippingDate || todayDateInputValue());
+    setMileageKm(state.mileageKm || '');
     setWorks(state.works);
     setClientParts(state.clientParts);
     setShopParts(state.shopParts);
@@ -1361,6 +1368,7 @@ export default function AutoserviceOrderFormPage() {
       source: isRossko ? 'rossko' : 'manual',
       rossko_brand: isRossko ? (values.brand || '') : '',
       rossko_partnumber: isRossko ? (values.article || '') : '',
+      receipt_date: values.receipt_date || '',
       is_manual_editable: true,
     })]);
     setShopPartManualDraft(null);
@@ -1388,6 +1396,7 @@ export default function AutoserviceOrderFormPage() {
               quantity: values.quantity,
               unit: values.unit || 'pcs',
               unit_price: Number(values.unit_price),
+              receipt_date: values.receipt_date || null,
             }),
           },
         );
@@ -1517,6 +1526,7 @@ export default function AutoserviceOrderFormPage() {
     scheduled_at: fromLocalInputValue(scheduledAt),
     scheduled_end_at: scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null,
     shipping_date: shippingDate || null,
+    mileage_km: mileageKm === '' || mileageKm == null ? null : Number(mileageKm),
     client_comment: comment.trim() || null,
     staff_comment: staffComment.trim() || null,
     work_zone_id: workZoneId ? Number(workZoneId) : null,
@@ -1560,6 +1570,9 @@ export default function AutoserviceOrderFormPage() {
           : null,
         rossko_brand: p.source === 'rossko' ? (p.rossko_brand || p.brand || null) : null,
         rossko_partnumber: p.source === 'rossko' ? (p.rossko_partnumber || p.partnumber || null) : null,
+        ...(!p.id && p.source === 'manual' && p.receipt_date
+          ? { receipt_date: p.receipt_date }
+          : {}),
       })),
   });
 
@@ -1572,6 +1585,15 @@ export default function AutoserviceOrderFormPage() {
     const endIso = scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null;
     if (endIso && iso && new Date(endIso) <= new Date(iso)) {
       return 'Время окончания должно быть позже времени начала';
+    }
+    if (mileageKm !== '' && mileageKm != null) {
+      const mileage = Number(mileageKm);
+      if (!Number.isInteger(mileage) || mileage < 0) {
+        return 'Пробег должен быть целым числом ≥ 0';
+      }
+      if (mileage > 9999999) {
+        return 'Пробег слишком большой';
+      }
     }
     for (const w of works) {
       if (!String(w.title || '').trim()) return 'У каждой работы должно быть название';
@@ -1855,6 +1877,21 @@ export default function AutoserviceOrderFormPage() {
                 className={pillInputClass}
                 value={shippingDate}
                 onChange={(e) => setShippingDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sg-caption font-medium text-ink-muted">
+                Пробег, км <span className="font-normal text-gray-400">необязательно</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                className={pillInputClass}
+                value={mileageKm}
+                onChange={(e) => setMileageKm(e.target.value)}
+                placeholder="Например, 85000"
               />
             </div>
           </div>
@@ -2321,6 +2358,7 @@ export default function AutoserviceOrderFormPage() {
         title="Добавить запчасть вручную"
         submitLabel="Добавить в заказ-наряд"
         showUnitSelector
+        showReceiptDate
         preserveDraftOnClose
         initialValues={shopPartManualDraft}
         onDraftPersist={setShopPartManualDraft}
@@ -2332,6 +2370,11 @@ export default function AutoserviceOrderFormPage() {
         onSubmit={handleManualShopPartEdit}
         submitting={shopPartEditSubmitting}
         mode="edit"
+        showReceiptDate={
+          shopPartEditIndex != null
+          && isManualEditableShopPart(shopParts[shopPartEditIndex])
+          && shopParts[shopPartEditIndex]?.source !== 'rossko'
+        }
         initialValues={
           shopPartEditIndex == null
             ? null

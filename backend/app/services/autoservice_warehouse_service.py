@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 
@@ -1288,6 +1288,43 @@ def _shop_part_qty_values(qty, unit: str) -> tuple[Decimal, int]:
     return qty_saved, qty_int
 
 
+def _receipt_doc_date(receipt: AutoserviceWarehouseReceipt | None) -> date | None:
+    if receipt is None:
+        return None
+    created_at = receipt.created_at
+    if isinstance(created_at, datetime):
+        return created_at.date()
+    if isinstance(created_at, date):
+        return created_at
+    return None
+
+
+def set_manual_receipt_date(
+    db: Session,
+    receipt: AutoserviceWarehouseReceipt,
+    doc_date: date,
+) -> None:
+    receipt.created_at = doc_date
+    if not receipt.document_id:
+        db.flush()
+        return
+    doc = (
+        db.query(AutoserviceWarehouseReceiptDoc)
+        .options(joinedload(AutoserviceWarehouseReceiptDoc.lines))
+        .filter(AutoserviceWarehouseReceiptDoc.id == receipt.document_id)
+        .first()
+    )
+    if not doc:
+        db.flush()
+        return
+    lines = doc.lines or []
+    if len(lines) <= 1:
+        doc.doc_date = doc_date
+        for line in lines:
+            line.created_at = doc_date
+    db.flush()
+
+
 def manual_receipt_for_shop_part(
     db: Session,
     *,
@@ -1364,6 +1401,7 @@ def update_manual_shop_part(
     quantity: Decimal,
     unit: str,
     unit_price: Decimal,
+    receipt_date: date | None = None,
 ) -> RepairOrderShopPart:
     from app.services.repair_order_stock_reserve import (
         apply_shop_part_reservation,
@@ -1477,6 +1515,8 @@ def update_manual_shop_part(
 
     receipt.quantity = qty_int
     receipt.unit_price = price
+    if receipt_date is not None:
+        set_manual_receipt_date(db, receipt, receipt_date)
 
     release_shop_part_reservation(db, part)
     part.qty = qty_saved

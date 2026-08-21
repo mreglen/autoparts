@@ -5041,6 +5041,31 @@ def ensure_inspection_bookings_unified() -> None:
         logger.info("Applied inspection_bookings unified indexes patch")
 
 
+def ensure_inspection_bookings_work_zone_column() -> None:
+    """Allow inspection bookings to appear on a planner work zone."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "inspection_bookings" not in tables:
+        return
+    columns = {col["name"] for col in inspector.get_columns("inspection_bookings")}
+    if "work_zone_id" in columns:
+        return
+    zone_ref = (
+        "INTEGER REFERENCES autoservice_work_zones(id)"
+        if "autoservice_work_zones" in tables
+        else "INTEGER"
+    )
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE inspection_bookings ADD COLUMN work_zone_id {zone_ref}"))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_inspection_bookings_work_zone_id "
+                "ON inspection_bookings (work_zone_id)"
+            )
+        )
+    logger.info("Applied inspection_bookings work_zone_id column patch")
+
+
 WORK_ZONES_MIGRATION_MARKER = "autoservice_work_zones_v1"
 
 
@@ -5384,6 +5409,19 @@ def ensure_repair_orders_shipping_date() -> None:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE repair_orders ADD COLUMN shipping_date DATE"))
     logger.info("Applied repair_orders.shipping_date patch")
+
+
+def ensure_repair_orders_mileage_km() -> None:
+    """Add optional mileage_km snapshot at booking time."""
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+    if "mileage_km" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE repair_orders ADD COLUMN mileage_km INTEGER"))
+    logger.info("Applied repair_orders.mileage_km patch")
 
 
 def ensure_autoservice_warehouse_items_unit() -> None:

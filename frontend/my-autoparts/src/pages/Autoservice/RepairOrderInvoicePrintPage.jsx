@@ -13,7 +13,7 @@ import {
 import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
 import AutoserviceDocumentClientEditor from '../../components/Autoservice/AutoserviceDocumentClientEditor';
 import AutoservicePrintPreview from '../../components/Autoservice/AutoservicePrintPreview';
-import { downloadPrintSheetPdf } from '../../utils/downloadPrintPdf';
+import { downloadPrintSheetPdf, printDocumentSheet } from '../../utils/downloadPrintPdf';
 import {
   UPD_UNIT_META,
   formatRublesInWords,
@@ -331,7 +331,7 @@ export default function RepairOrderInvoicePrintPage() {
     setPrintHint('');
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!canPrint) {
       const reasons = missingRequired.map(([, label]) => label);
       if (lines.length === 0) reasons.push('Нет строк работ или материалов');
@@ -339,8 +339,13 @@ export default function RepairOrderInvoicePrintPage() {
       setEditOpen(true);
       return;
     }
-    window.print();
-    saveBank(orgId, form);
+    setPrintHint('');
+    try {
+      await printDocumentSheet(sheetRef.current, { orientation: 'portrait' });
+      saveBank(orgId, form);
+    } catch (e) {
+      setPrintHint(e?.message || 'Не удалось открыть печать');
+    }
   };
 
   const handleDownloadPdf = async () => {

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.auth import get_current_user, get_current_user_optional
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
+from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.garage_vehicle import GarageVehicle
 from app.models.inspection_booking import InspectionBooking
 from app.models.user import User
@@ -104,6 +105,7 @@ def _booking_to_view(row: InspectionBooking) -> InspectionBookingView:
         status=row.status,
         source=row.source,
         created_by_user_id=row.created_by_user_id,
+        work_zone_id=row.work_zone_id,
         notes=row.notes,
         created_at=row.created_at,
     )
@@ -265,6 +267,7 @@ def create_staff_inspection_booking(
     garage_vehicle_id = payload.garage_vehicle_id
     client_id = None
     vehicle = None
+    work_zone_id = None
     if garage_vehicle_id is not None:
         vehicle = (
             db.query(GarageVehicle)
@@ -280,6 +283,22 @@ def create_staff_inspection_booking(
                 detail="Автомобиль не найден",
             )
         client_id = vehicle.client_id
+    if payload.work_zone_id is not None:
+        zone = (
+            db.query(AutoserviceWorkZone)
+            .filter(
+                AutoserviceWorkZone.id == payload.work_zone_id,
+                AutoserviceWorkZone.organization_id == org_id,
+                AutoserviceWorkZone.is_active.is_(True),
+            )
+            .first()
+        )
+        if not zone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Рабочая зона не найдена",
+            )
+        work_zone_id = zone.id
     row = InspectionBooking(
         organization_id=org_id,
         client_id=client_id,
@@ -290,6 +309,7 @@ def create_staff_inspection_booking(
         status="new",
         source="staff",
         created_by_user_id=current_user.id,
+        work_zone_id=work_zone_id,
         notes=notes,
     )
     db.add(row)

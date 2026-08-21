@@ -90,7 +90,9 @@ from app.services.repair_order_stock_reserve import (
     shop_part_stock_max_qty,
 )
 from app.services.autoservice_warehouse_service import (
+    _receipt_doc_date,
     fulfill_autoservice_stock_on_order_complete,
+    manual_receipt_for_shop_part,
     product_available_qty,
     ReceiptDocumentBatch,
     repair_order_receipt_doc_date,
@@ -298,6 +300,11 @@ def _shop_part_view(
             if db is not None and org_id
             else None
         ),
+        receipt_date=(
+            _receipt_doc_date(manual_receipt_for_shop_part(db, org_id=org_id, part=part))
+            if db is not None and org_id
+            else None
+        ),
     )
 
 
@@ -373,6 +380,7 @@ def _to_staff_view(
         scheduled_at=row.scheduled_at,
         scheduled_end_at=row.scheduled_end_at,
         shipping_date=row.shipping_date,
+        mileage_km=row.mileage_km,
         accepted_by_user_id=row.accepted_by_user_id,
         status=row.status,
         created_at=row.created_at,
@@ -843,6 +851,7 @@ def _replace_shop_parts(
                 quantity=qty_int,
                 unit_price=_money(item.unit_price),
                 unit=saved_unit,
+                doc_date=item.receipt_date,
             )
             source = "autoservice_stock"
             autoservice_stock_item_id = wh_item.id
@@ -1192,6 +1201,7 @@ def create_repair_order(
         scheduled_at=scheduled_at,
         scheduled_end_at=scheduled_end_at,
         shipping_date=payload.shipping_date,
+        mileage_km=payload.mileage_km,
         accepted_by_user_id=current_user.id,
         status="pending",
     )
@@ -1236,6 +1246,9 @@ def update_repair_order(
 
     if "shipping_date" in payload.model_fields_set:
         row.shipping_date = payload.shipping_date
+
+    if "mileage_km" in payload.model_fields_set:
+        row.mileage_km = payload.mileage_km
 
     if "client_comment" in payload.model_fields_set:
         comment = payload.client_comment
@@ -1289,6 +1302,7 @@ def update_manual_repair_order_shop_part(
         quantity=payload.quantity,
         unit=payload.unit,
         unit_price=payload.unit_price,
+        receipt_date=payload.receipt_date,
     )
     db.commit()
     return _shop_part_view(part, db=db, org_id=org_id)

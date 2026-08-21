@@ -90,6 +90,7 @@ class RepairOrder(Base):
     )
     scheduled_end_at = Column(DateTime, nullable=True)
     shipping_date = Column(Date, nullable=True)
+    mileage_km = Column(Integer, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime,

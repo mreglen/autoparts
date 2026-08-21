@@ -15,7 +15,7 @@ import {
 import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
 import AutoserviceDocumentClientEditor from '../../components/Autoservice/AutoserviceDocumentClientEditor';
 import AutoservicePrintPreview from '../../components/Autoservice/AutoservicePrintPreview';
-import { downloadPrintSheetPdf } from '../../utils/downloadPrintPdf';
+import { downloadPrintSheetPdf, printDocumentSheet } from '../../utils/downloadPrintPdf';
 import {
   clientRequisitesChanged,
   clientToOrderCustomer,
@@ -42,8 +42,7 @@ const EMPTY_FORM = {
   vehiclePlate: '',
   vehicleVin: '',
   vehicleYear: '',
-  vehicleBodyNumber: '',
-  vehicleEngineNumber: '',
+  vehicleMileage: '',
   defectComment: '',
   signDate: '',
   clientSignName: '',
@@ -73,8 +72,7 @@ const MODAL_FIELDS = [
   { key: 'vehicleYear', label: 'Год выпуска' },
   { key: 'vehiclePlate', label: 'Гос. номер' },
   { key: 'vehicleVin', label: 'VIN' },
-  { key: 'vehicleBodyNumber', label: 'Номер кузова' },
-  { key: 'vehicleEngineNumber', label: 'Номер двигателя' },
+  { key: 'vehicleMileage', label: 'Пробег автомобиля' },
   { key: 'defectComment', label: 'Описание дефектов / комментарий', multiline: true },
   { key: 'signDate', label: 'Дата подписи' },
   { key: 'clientSignName', label: 'Подпись заказчика (ф.и.о.)' },
@@ -239,6 +237,9 @@ function buildAutoForm(order, org, client) {
     vehiclePlate: vehicle.plate || '',
     vehicleVin: vehicle.vin || '',
     vehicleYear: vehicle.year != null ? String(vehicle.year) : '',
+    vehicleMileage: order.mileage_km != null && order.mileage_km !== ''
+      ? `${Number(order.mileage_km).toLocaleString('ru-RU')} км`
+      : '',
     defectComment,
     clientSignName: client?.name || order.client?.name || '',
     contractorSignName: order.accepted_by?.name || org?.director_name || '',
@@ -375,13 +376,18 @@ export default function RepairOrderPrintPage() {
     setPrintHint('');
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!canPrint) {
       setPrintHint(`Заполните: ${missingRequired.map(([, label]) => label).join(', ')}`);
       setEditOpen(true);
       return;
     }
-    window.print();
+    setPrintHint('');
+    try {
+      await printDocumentSheet(sheetRef.current, { orientation: 'portrait' });
+    } catch (e) {
+      setPrintHint(e?.message || 'Не удалось открыть печать');
+    }
   };
 
   const handleDownloadPdf = async () => {
@@ -575,8 +581,8 @@ export default function RepairOrderPrintPage() {
                 {editControl('vehicleModel', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
               <Cell>
-                <span className="font-semibold">Номер кузова</span>{' '}
-                {editControl('vehicleBodyNumber', 'upd-edit-inline min-w-[5rem]')}
+                <span className="font-semibold">Пробег автомобиля</span>{' '}
+                {editControl('vehicleMileage', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
               <Cell rowSpan={2} className="align-top">
                 <p className="font-semibold">Описание дефектов / комментарий</p>
@@ -584,13 +590,9 @@ export default function RepairOrderPrintPage() {
               </Cell>
             </tr>
             <tr>
-              <Cell>
+              <Cell colSpan={2}>
                 <span className="font-semibold">Год выпуска</span>{' '}
                 {editControl('vehicleYear', 'upd-edit-inline min-w-[4rem]')}
-              </Cell>
-              <Cell>
-                <span className="font-semibold">Номер двигателя</span>{' '}
-                {editControl('vehicleEngineNumber', 'upd-edit-inline min-w-[5rem]')}
               </Cell>
             </tr>
           </tbody>

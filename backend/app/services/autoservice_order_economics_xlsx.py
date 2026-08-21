@@ -46,7 +46,7 @@ def _vehicle_label(vehicle: dict | None) -> str:
 def _sheet_summary(wb: Workbook, report: dict, filters: OrderEconomicsFilters) -> None:
     ws = wb.active
     ws.title = "Сводка"
-    ws["A1"] = "Экономика заказ-нарядов"
+    ws["A1"] = "Сводная таблица"
     ws["A1"].font = HEADER_FONT
     ws["A2"] = "Период"
     ws["B2"] = f"{report['date_from']} — {report['date_to']}"

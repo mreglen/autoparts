@@ -28,6 +28,12 @@ class InspectionBooking(Base):
     status = Column(String(32), nullable=False, default="new")
     source = Column(String(32), nullable=False)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    work_zone_id = Column(
+        Integer,
+        ForeignKey("autoservice_work_zones.id"),
+        nullable=True,
+        index=True,
+    )
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
@@ -35,3 +41,4 @@ class InspectionBooking(Base):
     client = relationship("AutoserviceClient", foreign_keys=[client_id])
     vehicle = relationship("GarageVehicle", foreign_keys=[garage_vehicle_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+    work_zone = relationship("AutoserviceWorkZone", foreign_keys=[work_zone_id])
