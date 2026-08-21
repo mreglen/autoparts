@@ -14,8 +14,10 @@ from app.schemas.autoservice_payer import (
     AutoservicePayerView,
 )
 from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_FINANCE,
     AUTOSERVICE_PERMISSION_ORDERS,
     AUTOSERVICE_PERMISSION_ORDERS_OWN,
+    AUTOSERVICE_PERMISSION_REPORTS,
     AUTOSERVICE_PERMISSION_SETTINGS,
     require_any_autoservice_permission,
     require_autoservice_settings,
@@ -42,6 +44,54 @@ def _normalize_name(name: str) -> str:
     return (name or "").strip()[:255]
 
 
+def _sync_payment_payers(db: Session, org_id: str) -> None:
+    """Add historical manual payer snapshots to the reusable directory."""
+    rows = (
+        db.query(AutoservicePayment.payer_name)
+        .filter(
+            AutoservicePayment.organization_id == org_id,
+            AutoservicePayment.payer_name.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    existing = {
+        row.name.strip().casefold(): row
+        for row in db.query(AutoservicePayer)
+        .filter(AutoservicePayer.organization_id == org_id)
+        .all()
+        if (row.name or "").strip()
+    }
+    changed = False
+    for (raw_name,) in rows:
+        name = _normalize_name(raw_name)
+        if not name:
+            continue
+        key = name.casefold()
+        payer = existing.get(key)
+        if payer is None:
+            payer = AutoservicePayer(organization_id=org_id, name=name)
+            db.add(payer)
+            db.flush()
+            existing[key] = payer
+            changed = True
+        updated = (
+            db.query(AutoservicePayment)
+            .filter(
+                AutoservicePayment.organization_id == org_id,
+                AutoservicePayment.payer_id.is_(None),
+                AutoservicePayment.payer_name == raw_name,
+            )
+            .update(
+                {AutoservicePayment.payer_id: payer.id},
+                synchronize_session=False,
+            )
+        )
+        changed = changed or bool(updated)
+    if changed:
+        db.commit()
+
+
 @router.get("/autoservice/payers", response_model=list[AutoservicePayerView])
 def list_autoservice_payers(
     db: Session = Depends(get_db),
@@ -52,8 +102,11 @@ def list_autoservice_payers(
         current_user,
         AUTOSERVICE_PERMISSION_ORDERS,
         AUTOSERVICE_PERMISSION_ORDERS_OWN,
+        AUTOSERVICE_PERMISSION_FINANCE,
+        AUTOSERVICE_PERMISSION_REPORTS,
         AUTOSERVICE_PERMISSION_SETTINGS,
     )
+    _sync_payment_payers(db, org_id)
     rows = (
         db.query(AutoservicePayer)
         .filter(AutoservicePayer.organization_id == org_id)

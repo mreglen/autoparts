@@ -46,12 +46,15 @@ def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceRecei
     method = payment.method if payment.method in _VALID_METHODS else "cash"
     order = payment.order
     client_name = order.client.name if order and order.client else "—"
+    raw_payer_id = getattr(payment, "payer_id", None)
+    payer_id = raw_payer_id if isinstance(raw_payer_id, int) else None
     return AutoserviceFinanceReceiptRow(
         id=payment.id,
         sequential_number=payment.sequential_number,
         repair_order_id=payment.repair_order_id,
         repair_order_number=order.order_number if order else str(payment.repair_order_id),
         client_name=client_name,
+        payer_id=payer_id,
         payer_name=_display_payer_name(payment),
         amount=_money(payment.amount),
         method=method,
@@ -179,6 +182,54 @@ def create_repair_order_payment(
     db.add(payment)
     db.flush()
     return payment
+
+
+def update_autoservice_payment_payer(
+    db: Session,
+    *,
+    org_id: str,
+    payment_id: int,
+    payer_id: int | None,
+) -> AutoserviceFinanceReceiptRow:
+    payment = (
+        db.query(AutoservicePayment)
+        .options(
+            joinedload(AutoservicePayment.order).joinedload(RepairOrder.client),
+        )
+        .filter(
+            AutoservicePayment.id == payment_id,
+            AutoservicePayment.organization_id == org_id,
+        )
+        .first()
+    )
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Поступление не найдено",
+        )
+
+    if payer_id is None:
+        payment.payer_id = None
+        payment.payer_name = None
+    else:
+        payer = (
+            db.query(AutoservicePayer)
+            .filter(
+                AutoservicePayer.id == payer_id,
+                AutoservicePayer.organization_id == org_id,
+            )
+            .first()
+        )
+        if not payer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Плательщик не найден",
+            )
+        payment.payer_id = payer.id
+        payment.payer_name = (payer.name or "").strip() or None
+
+    db.flush()
+    return _finance_receipt_row(payment)
 
 
 def _period_bounds(date_from: date, date_to: date) -> tuple[datetime, datetime]:

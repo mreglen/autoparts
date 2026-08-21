@@ -25,6 +25,7 @@ import {
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
+import PaymentPayerSelect from '../../components/Autoservice/PaymentPayerSelect';
 import RepairOrderViewModal, {
   OrderStatusBadge,
   REPAIR_ORDER_STATUS_LABELS,
@@ -227,6 +228,8 @@ export default function AutoserviceReportsPage() {
   const [paymentsLoading, setPaymentsLoading] = useState(true);
   const [paymentsError, setPaymentsError] = useState('');
   const [payments, setPayments] = useState({ total_amount: 0, count: 0, items: [] });
+  const [paymentPayers, setPaymentPayers] = useState([]);
+  const [savingPayerPaymentId, setSavingPayerPaymentId] = useState(null);
   const [paymentsExporting, setPaymentsExporting] = useState(false);
 
   const [payrollLoading, setPayrollLoading] = useState(false);
@@ -296,7 +299,9 @@ export default function AutoserviceReportsPage() {
     setPaymentsError('');
     try {
       const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+      const payerRows = await apiRequest('/autoservice/payers');
       const response = await apiRequest(`/autoservice/finance/receipts?${params.toString()}`);
+      setPaymentPayers(Array.isArray(payerRows) ? payerRows : []);
       setPayments(response || { total_amount: 0, count: 0, items: [] });
     } catch (e) {
       setPaymentsError(e?.message || 'Не удалось загрузить платежи');
@@ -305,6 +310,25 @@ export default function AutoserviceReportsPage() {
       setPaymentsLoading(false);
     }
   }, [dateFrom, dateTo]);
+
+  const savePaymentPayer = useCallback(async (paymentId, payerId) => {
+    setSavingPayerPaymentId(paymentId);
+    setPaymentsError('');
+    try {
+      const updated = await apiRequest(`/autoservice/finance/receipts/${paymentId}/payer`, {
+        method: 'PATCH',
+        body: JSON.stringify({ payer_id: payerId }),
+      });
+      setPayments((prev) => ({
+        ...prev,
+        items: (prev.items || []).map((row) => (row.id === paymentId ? updated : row)),
+      }));
+    } catch (e) {
+      setPaymentsError(e?.message || 'Не удалось изменить плательщика');
+    } finally {
+      setSavingPayerPaymentId(null);
+    }
+  }, []);
 
   const exportPayments = useCallback(async () => {
     setPaymentsExporting(true);
@@ -714,7 +738,16 @@ export default function AutoserviceReportsPage() {
                           onOpen={openOrderView}
                         />
                       </ReportField>
-                      <ReportField label="Плательщик">{row.payer_name || row.client_name || '—'}</ReportField>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="shrink-0 text-gray-500">Плательщик</span>
+                        <PaymentPayerSelect
+                          row={row}
+                          payers={paymentPayers}
+                          saving={savingPayerPaymentId === row.id}
+                          onSave={savePaymentPayer}
+                          className="min-w-0"
+                        />
+                      </div>
                       <ReportField label="Способ">{METHOD_LABELS[row.method] || row.method}</ReportField>
                       <ReportField label="Сумма">{formatFinanceCurrency(row.amount)}</ReportField>
                       <ReportField label="Дата">{formatServerDateTime(row.created_at)}</ReportField>
@@ -737,7 +770,18 @@ export default function AutoserviceReportsPage() {
                         />
                       ),
                     },
-                    { key: 'payer_name', label: 'Плательщик', render: (row) => row.payer_name || row.client_name || '—' },
+                    {
+                      key: 'payer_name',
+                      label: 'Плательщик',
+                      render: (row) => (
+                        <PaymentPayerSelect
+                          row={row}
+                          payers={paymentPayers}
+                          saving={savingPayerPaymentId === row.id}
+                          onSave={savePaymentPayer}
+                        />
+                      ),
+                    },
                     { key: 'method', label: 'Способ', render: (row) => METHOD_LABELS[row.method] || row.method || '' },
                     { key: 'amount', label: 'Сумма', render: (row) => formatFinanceCurrency(row.amount) },
                     { key: 'created_at', label: 'Дата', render: (row) => row.created_at ? formatServerDateTime(row.created_at) : '' },

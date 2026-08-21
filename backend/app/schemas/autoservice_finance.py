@@ -27,6 +27,7 @@ class AutoserviceFinanceReceiptRow(BaseModel):
     repair_order_id: int
     repair_order_number: str
     client_name: str
+    payer_id: Optional[int] = None
     payer_name: str
     amount: Decimal
     method: AutoservicePaymentMethod
@@ -35,6 +36,10 @@ class AutoserviceFinanceReceiptRow(BaseModel):
 
 class AutoservicePaymentDateUpdate(BaseModel):
     paid_at: date
+
+
+class AutoservicePaymentPayerUpdate(BaseModel):
+    payer_id: Optional[int] = None
 
 
 class AutoserviceFinanceReceiptsResponse(BaseModel):

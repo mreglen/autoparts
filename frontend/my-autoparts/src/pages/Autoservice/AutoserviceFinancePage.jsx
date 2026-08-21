@@ -10,6 +10,7 @@ import { toDateInputValue } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import { Skeleton } from '../../components/UI';
 import { ConfirmDialog } from '../../components/UI/Modal';
+import PaymentPayerSelect from '../../components/Autoservice/PaymentPayerSelect';
 import {
   warehouseEmptyShellClass,
   warehousePageClass,
@@ -84,8 +85,10 @@ export default function AutoserviceFinancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState({ totals: {}, total_amount: 0, count: 0, items: [] });
+  const [payers, setPayers] = useState([]);
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [savingPaymentId, setSavingPaymentId] = useState(null);
+  const [savingPayerPaymentId, setSavingPayerPaymentId] = useState(null);
   const [deletePayment, setDeletePayment] = useState(null);
   const [deletingPaymentId, setDeletingPaymentId] = useState(null);
 
@@ -94,7 +97,9 @@ export default function AutoserviceFinancePage() {
     setError('');
     try {
       const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+      const payerRows = await apiRequest('/autoservice/payers');
       const response = await apiRequest(`/autoservice/finance/receipts?${params.toString()}`);
+      setPayers(Array.isArray(payerRows) ? payerRows : []);
       setData(response || { totals: {}, total_amount: 0, count: 0, items: [] });
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить поступления');
@@ -121,6 +126,25 @@ export default function AutoserviceFinancePage() {
       setError(e?.message || 'Не удалось изменить дату поступления');
     } finally {
       setSavingPaymentId(null);
+    }
+  };
+
+  const handlePaymentPayerSave = async (paymentId, payerId) => {
+    setSavingPayerPaymentId(paymentId);
+    setError('');
+    try {
+      const updated = await apiRequest(`/autoservice/finance/receipts/${paymentId}/payer`, {
+        method: 'PATCH',
+        body: JSON.stringify({ payer_id: payerId }),
+      });
+      setData((prev) => ({
+        ...prev,
+        items: (prev.items || []).map((row) => (row.id === paymentId ? updated : row)),
+      }));
+    } catch (e) {
+      setError(e?.message || 'Не удалось изменить плательщика');
+    } finally {
+      setSavingPayerPaymentId(null);
     }
   };
 
@@ -318,7 +342,16 @@ export default function AutoserviceFinancePage() {
                 >
                   <FinanceField label="№">{row.sequential_number}</FinanceField>
                   <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
-                  <FinanceField label="Плательщик">{row.payer_name || row.client_name || '—'}</FinanceField>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="shrink-0 text-gray-500">Плательщик</span>
+                    <PaymentPayerSelect
+                      row={row}
+                      payers={payers}
+                      saving={savingPayerPaymentId === row.id}
+                      onSave={handlePaymentPayerSave}
+                      className="min-w-0"
+                    />
+                  </div>
                   <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
                   <div className="flex justify-between gap-3 text-sm">
                     <span className="shrink-0 text-gray-500">Дата</span>
@@ -370,7 +403,14 @@ export default function AutoserviceFinancePage() {
                         {row.sequential_number}
                       </td>
                       <td className="px-4 py-3 tabular-nums">№ {row.repair_order_number}</td>
-                      <td className="px-4 py-3">{row.payer_name || row.client_name || '—'}</td>
+                      <td className="px-4 py-3">
+                        <PaymentPayerSelect
+                          row={row}
+                          payers={payers}
+                          saving={savingPayerPaymentId === row.id}
+                          onSave={handlePaymentPayerSave}
+                        />
+                      </td>
                       <td className="px-4 py-3 text-right font-medium tabular-nums">
                         {formatFinanceCurrency(row.amount)}
                       </td>
