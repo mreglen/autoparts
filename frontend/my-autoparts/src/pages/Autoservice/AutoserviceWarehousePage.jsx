@@ -23,6 +23,7 @@ import {
   formatAutoserviceWarehouseQty,
   matchesAutoserviceWarehouseSearch,
 } from '../../utils/autoserviceWarehouseUi';
+import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
 import {
   autoserviceListActionsButtonClass,
   autoserviceListErrorClass,
@@ -697,7 +698,7 @@ export default function AutoserviceWarehousePage() {
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               />
               <span className="mt-1 block text-xs text-gray-500">
-                Доступно: {writeOffItem.available_qty} шт.
+                Доступно: {writeOffItem.available_qty} {formatShopPartUnit(writeOffItem.unit || 'pcs')}
               </span>
             </label>
             <label className="block text-sm">
@@ -746,7 +747,7 @@ export default function AutoserviceWarehousePage() {
                 className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               />
               <span className="mt-1 block text-xs text-gray-500">
-                Доступно: {orderQtyItem.available_qty} шт.
+                Доступно: {orderQtyItem.available_qty} {formatShopPartUnit(orderQtyItem.unit || 'pcs')}
               </span>
             </label>
             <div className="flex justify-end gap-2">

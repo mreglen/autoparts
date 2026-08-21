@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.autoservice_work import AutoserviceWorkCreate, AutoserviceWorkUpdate, AutoserviceWorkView
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_ORDERS,
+    AUTOSERVICE_PERMISSION_ORDERS_OWN,
     AUTOSERVICE_PERMISSION_PLANNER,
     AUTOSERVICE_PERMISSION_SETTINGS,
     require_any_autoservice_permission,
@@ -44,6 +45,7 @@ def list_autoservice_works(
         db,
         current_user,
         AUTOSERVICE_PERMISSION_ORDERS,
+        AUTOSERVICE_PERMISSION_ORDERS_OWN,
         AUTOSERVICE_PERMISSION_PLANNER,
         AUTOSERVICE_PERMISSION_SETTINGS,
     )

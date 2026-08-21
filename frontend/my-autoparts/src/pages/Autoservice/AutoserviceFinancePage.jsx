@@ -9,6 +9,7 @@ import {
 import { toDateInputValue } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import { Skeleton } from '../../components/UI';
+import { ConfirmDialog } from '../../components/UI/Modal';
 import {
   warehouseEmptyShellClass,
   warehousePageClass,
@@ -85,6 +86,8 @@ export default function AutoserviceFinancePage() {
   const [data, setData] = useState({ totals: {}, total_amount: 0, count: 0, items: [] });
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [savingPaymentId, setSavingPaymentId] = useState(null);
+  const [deletePayment, setDeletePayment] = useState(null);
+  const [deletingPaymentId, setDeletingPaymentId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -118,6 +121,23 @@ export default function AutoserviceFinancePage() {
       setError(e?.message || 'Не удалось изменить дату поступления');
     } finally {
       setSavingPaymentId(null);
+    }
+  };
+
+  const handleDeletePaymentConfirm = async () => {
+    if (!deletePayment) return;
+    setDeletingPaymentId(deletePayment.id);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/finance/receipts/${deletePayment.id}`, {
+        method: 'DELETE',
+      });
+      setDeletePayment(null);
+      await load();
+    } catch (e) {
+      setError(e?.message || 'Не удалось отменить оплату');
+    } finally {
+      setDeletingPaymentId(null);
     }
   };
 
@@ -309,6 +329,16 @@ export default function AutoserviceFinancePage() {
                       onSave={handlePaymentDateSave}
                     />
                   </div>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setDeletePayment(row)}
+                      disabled={Boolean(deletingPaymentId)}
+                      className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      Отменить оплату
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -323,12 +353,13 @@ export default function AutoserviceFinancePage() {
                   <th className="px-4 py-3 font-medium">Клиент</th>
                   <th className="px-4 py-3 text-right font-medium">Сумма</th>
                   <th className="px-4 py-3 font-medium">Дата</th>
+                  <th className="px-4 py-3 text-right font-medium">Действия</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {!selectedItems.length ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                       Нет поступлений за период
                     </td>
                   </tr>
@@ -350,6 +381,16 @@ export default function AutoserviceFinancePage() {
                           saving={savingPaymentId === row.id}
                           onSave={handlePaymentDateSave}
                         />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setDeletePayment(row)}
+                          disabled={Boolean(deletingPaymentId)}
+                          className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-wait disabled:opacity-60"
+                        >
+                          Отменить
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -380,6 +421,23 @@ export default function AutoserviceFinancePage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deletePayment)}
+        onClose={() => {
+          if (!deletingPaymentId) setDeletePayment(null);
+        }}
+        onConfirm={handleDeletePaymentConfirm}
+        title="Отменить оплату?"
+        message={
+          deletePayment
+            ? `Поступление № ${deletePayment.sequential_number} на сумму ${formatFinanceCurrency(deletePayment.amount)} по заказ-наряду № ${deletePayment.repair_order_number} будет удалено.`
+            : ''
+        }
+        confirmLabel="Удалить"
+        danger
+        loading={Boolean(deletingPaymentId)}
+      />
     </div>
   );
 }

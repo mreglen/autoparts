@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
@@ -39,6 +39,7 @@ from app.schemas.autoservice_warehouse import (
 from app.services.autoservice_warehouse_service import (
     autoservice_item_available_qty,
     create_autoservice_expense,
+    delete_receipt_document,
     import_purchase_groups_to_warehouse,
     receipt_line_pricing_context,
     receipt_manual_line,
@@ -508,6 +509,20 @@ def update_autoservice_warehouse_receipt_doc(
     db.commit()
     doc = _load_receipt_doc_detail(db, org_id=org_id, doc_id=doc_id)
     return _doc_detail_view(db, doc)
+
+
+@router.delete(
+    "/autoservice/warehouse/receipts/{doc_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_autoservice_warehouse_receipt_doc(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    delete_receipt_document(db, org_id=org_id, doc_id=doc_id)
+    db.commit()
 
 
 @router.patch(

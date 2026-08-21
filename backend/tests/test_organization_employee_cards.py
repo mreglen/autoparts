@@ -19,6 +19,7 @@ from app.services.organization_employee_service import (
     card_to_view,
     create_employee_account,
     create_employee_card,
+    set_card_permissions,
 )
 from app.services.organization_employee_sync import _ensure_payroll_from_legacy, link_service_employee_card
 
@@ -287,6 +288,39 @@ class OrganizationEmployeeCardViewTests(unittest.TestCase):
         card.user = MagicMock(is_director=False)
         view = card_to_view(MagicMock(), card)
         self.assertEqual(view["account_status"], "linked")
+
+
+class SetCardPermissionsTests(unittest.TestCase):
+    def test_set_card_permissions_copies_payload_to_user_account(self):
+        from app.models.user_permission import UserPermission
+        from app.models.organization_employee import OrganizationEmployeePermission
+
+        db = MagicMock()
+        card = SimpleNamespace(id=7, user_id=42)
+        db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(id=1)
+        db.query.return_value.filter.return_value.delete.return_value = 0
+        db.query.return_value.filter.return_value.update.return_value = 0
+        # If the old race is still present, this empty requery would wipe user perms.
+        db.query.return_value.filter.return_value.all.return_value = []
+
+        with patch(
+            "app.services.organization_employee_service._get_card_or_404",
+            return_value=card,
+        ):
+            set_card_permissions(db, "ORG001", 7, [11, 12, 11])
+
+        added_user_ids = [
+            call.args[0].permission_id
+            for call in db.add.call_args_list
+            if isinstance(call.args[0], UserPermission)
+        ]
+        added_card_ids = [
+            call.args[0].permission_id
+            for call in db.add.call_args_list
+            if isinstance(call.args[0], OrganizationEmployeePermission)
+        ]
+        self.assertEqual(added_card_ids, [11, 12])
+        self.assertEqual(added_user_ids, [11, 12])
 
 
 if __name__ == "__main__":

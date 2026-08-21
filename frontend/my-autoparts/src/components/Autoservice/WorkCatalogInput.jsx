@@ -83,7 +83,7 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
               </button>
             </li>
           ))}
-          {!exactMatch && (query || value || '').trim().length >= 2 ? (
+          {!exactMatch && onCreate && (query || value || '').trim().length >= 2 ? (
             <li className="border-t border-line-soft">
               <button
                 type="button"

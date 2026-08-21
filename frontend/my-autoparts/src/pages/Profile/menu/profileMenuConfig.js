@@ -140,7 +140,10 @@ const buildAutoserviceStaffTab = (user, options, hasPermission) => {
             return;
         }
 
-        if (!can(item.permission)) return;
+        const allowed = item.anyOf?.length
+            ? item.anyOf.some((code) => can(code))
+            : can(item.permission);
+        if (!allowed) return;
 
         if (item.submenu?.length) {
             submenu.push({

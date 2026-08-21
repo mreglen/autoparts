@@ -6082,3 +6082,35 @@ def ensure_organization_employees_tables() -> None:
 
     logger.info("Ensured organization employees schema patch")
 
+
+def ensure_repair_orders_review_flow() -> None:
+    """Nullable order_number and created_by_user_id for employee review drafts."""
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+    columns = {col["name"]: col for col in inspector.get_columns("repair_orders")}
+    statements = []
+    if "created_by_user_id" not in columns:
+        statements.append(
+            "ALTER TABLE repair_orders ADD COLUMN created_by_user_id INTEGER"
+            " REFERENCES users(id)"
+        )
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        if statements:
+            conn.execute(
+                text(
+                    "UPDATE repair_orders SET created_by_user_id = accepted_by_user_id "
+                    "WHERE created_by_user_id IS NULL"
+                )
+            )
+        order_col = columns.get("order_number")
+        if order_col is not None and not order_col.get("nullable", True):
+            if conn.dialect.name == "postgresql":
+                conn.execute(text("ALTER TABLE repair_orders ALTER COLUMN order_number DROP NOT NULL"))
+            elif conn.dialect.name == "sqlite":
+                # SQLite keeps NOT NULL on recreate; production is PostgreSQL.
+                pass
+    logger.info("Applied repair_orders review-flow patch")
+

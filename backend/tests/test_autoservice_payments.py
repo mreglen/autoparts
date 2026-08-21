@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from app.services.autoservice_payment_service import (
     batch_paid_amounts,
     create_repair_order_payment,
+    delete_autoservice_payment,
     ensure_order_fully_paid,
     list_finance_receipts,
     order_payment_summary,
@@ -191,6 +192,41 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
         self.assertEqual(result.id, 15)
         self.assertEqual(payment.created_at, datetime(2026, 8, 19, 12, 0))
         db.flush.assert_called_once()
+
+    def test_delete_autoservice_payment_reopens_completed_order(self):
+        db = MagicMock()
+        order = self._order()
+        order.status = "completed"
+        payment = MagicMock(id=15, order=order)
+        db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
+
+        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()), patch(
+            "app.services.autoservice_payment_service.record_repair_order_status_timestamp",
+        ) as record_ts, patch(
+            "app.services.autoservice_payment_service.clear_order_accruals",
+        ) as clear_accruals:
+            delete_autoservice_payment(db, org_id="ORG1", payment_id=15)
+
+        db.delete.assert_called_once_with(payment)
+        self.assertEqual(order.status, "done")
+        record_ts.assert_called_once_with(order, "done")
+        clear_accruals.assert_called_once_with(db, order.id)
+
+    def test_delete_autoservice_payment_keeps_open_order_status(self):
+        db = MagicMock()
+        order = self._order()
+        order.status = "pending"
+        payment = MagicMock(id=16, order=order)
+        db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
+
+        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()), patch(
+            "app.services.autoservice_payment_service.clear_order_accruals",
+        ) as clear_accruals:
+            delete_autoservice_payment(db, org_id="ORG1", payment_id=16)
+
+        db.delete.assert_called_once_with(payment)
+        self.assertEqual(order.status, "pending")
+        clear_accruals.assert_not_called()
 
 
 if __name__ == "__main__":

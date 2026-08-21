@@ -122,6 +122,7 @@ export function ConfirmDialog({
       onClose={onClose}
       title={title}
       size="sm"
+      wrapperClassName="z-[120]"
       footer={(
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="secondary" onClick={onClose} disabled={loading}>

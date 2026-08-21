@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
@@ -11,6 +12,8 @@ import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { buildRepairOrderDuplicatePayload } from '../../utils/repairOrderDuplicate';
 import { formatServerDateTime } from '../../utils/serverDate';
+import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
+import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
 function formatDateTime(value) {
@@ -85,22 +88,31 @@ function OrderActionsMenu({
   onEdit,
   onDuplicate,
   onDelete,
+  onApprove,
   duplicating = false,
+  approveSaving = false,
   showLabel = true,
 }) {
   return (
     <ActionsDropdown
       menuClassName="w-52 z-50"
-      estimatedMenuHeight={204}
+      estimatedMenuHeight={onApprove ? 248 : 204}
       showLabel={showLabel}
-      disabled={duplicating}
+      disabled={duplicating || approveSaving}
       buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60"
     >
+      {onApprove ? (
+        <ActionsDropdownItem onClick={onApprove} disabled={duplicating || approveSaving}>
+          {approveSaving ? 'Принятие…' : 'Принять в работу'}
+        </ActionsDropdownItem>
+      ) : null}
       <ActionsDropdownItem onClick={onView} disabled={duplicating}>Просмотр</ActionsDropdownItem>
       <ActionsDropdownItem onClick={onEdit} disabled={duplicating}>Изменить</ActionsDropdownItem>
-      <ActionsDropdownItem onClick={onDuplicate} disabled={duplicating}>
-        {duplicating ? 'Копирование…' : 'Скопировать и создать'}
-      </ActionsDropdownItem>
+      {onDuplicate ? (
+        <ActionsDropdownItem onClick={onDuplicate} disabled={duplicating}>
+          {duplicating ? 'Копирование…' : 'Скопировать и создать'}
+        </ActionsDropdownItem>
+      ) : null}
       <ActionsDropdownItem onClick={onDelete} disabled={duplicating} danger>
         Удалить
       </ActionsDropdownItem>
@@ -117,14 +129,16 @@ function OrderMobileCard({
   onEdit,
   onDuplicate,
   onDelete,
+  onApprove,
   duplicating = false,
+  approveSaving = false,
 }) {
   return (
     <div className="border-b border-gray-100 py-3 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">№ {row.order_number}</span>
+            <span className="text-sm font-semibold text-gray-900">{repairOrderNumberLabel(row)}</span>
             <StatusPicker
               status={row.status}
               options={statusActions}
@@ -149,7 +163,9 @@ function OrderMobileCard({
             onEdit={onEdit}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
+            onApprove={onApprove}
             duplicating={duplicating}
+            approveSaving={approveSaving}
             showLabel={false}
           />
         </div>
@@ -160,11 +176,16 @@ function OrderMobileCard({
 
 export default function AutoserviceOrdersPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const canReview = canReviewRepairOrders(user, permissionCodes || []);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const viewHistory = searchParams.get('view') === 'history';
+  const viewParam = searchParams.get('view');
+  const viewHistory = viewParam === 'history';
+  const viewReview = viewParam === 'review';
 
   const [rows, setRows] = useState([]);
+  const [reviewCount, setReviewCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
@@ -173,11 +194,12 @@ export default function AutoserviceOrdersPage() {
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
   const [duplicatingId, setDuplicatingId] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
   const [deleteConfirmOrder, setDeleteConfirmOrder] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const prevScopeKeyRef = useRef(null);
 
-  const scope = viewHistory ? 'history' : 'active';
+  const scope = viewReview ? 'review' : viewHistory ? 'history' : 'active';
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -187,14 +209,25 @@ export default function AutoserviceOrdersPage() {
       if (qApplied.trim()) params.set('q', qApplied.trim());
       if (viewHistory && historyStatus) params.set('status', historyStatus);
       const data = await apiRequest(`/autoservice/repair-orders?${params.toString()}`);
-      setRows(Array.isArray(data) ? data : []);
+      const nextRows = Array.isArray(data) ? data : [];
+      setRows(nextRows);
+      if (scope === 'review') {
+        setReviewCount(nextRows.length);
+      } else if (canReview) {
+        try {
+          const reviewData = await apiRequest('/autoservice/repair-orders?scope=review');
+          setReviewCount(Array.isArray(reviewData) ? reviewData.length : 0);
+        } catch {
+          /* count is optional */
+        }
+      }
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить записи');
       setRows([]);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [scope, qApplied, viewHistory, historyStatus]);
+  }, [scope, qApplied, viewHistory, historyStatus, canReview]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
@@ -204,8 +237,15 @@ export default function AutoserviceOrdersPage() {
     load({ silent });
   }, [isReady, isAuthenticated, load, scope, historyStatus, qApplied]);
 
-  const setHistoryMode = (on) => {
-    if (on) setSearchParams({ view: 'history' });
+  useEffect(() => {
+    if (isReady && viewReview && !canReview) {
+      setSearchParams({});
+    }
+  }, [isReady, viewReview, canReview, setSearchParams]);
+
+  const setListView = (id) => {
+    if (id === 'history') setSearchParams({ view: 'history' });
+    else if (id === 'review') setSearchParams({ view: 'review' });
     else setSearchParams({});
     setViewOrder(null);
   };
@@ -226,9 +266,27 @@ export default function AutoserviceOrdersPage() {
     }
   };
 
+  const handleApprove = async (id) => {
+    setApprovingId(id);
+    setError('');
+    try {
+      const updated = await apiRequest(`/autoservice/repair-orders/${id}/approve`, {
+        method: 'POST',
+      });
+      if (viewOrder?.id === id) setViewOrder(updated);
+      await load();
+    } catch (e) {
+      setError(e?.message || 'Не удалось принять заявку');
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
   const statusActions = useMemo(
     () =>
-      viewHistory
+      viewReview
+        ? [{ value: 'cancelled', label: 'Отклонить' }]
+        : viewHistory
         ? [
             { value: 'pending', label: 'Ожидание' },
             { value: 'in_progress', label: 'В работу' },
@@ -241,7 +299,7 @@ export default function AutoserviceOrdersPage() {
             { value: 'completed', label: 'Завершить' },
             { value: 'cancelled', label: 'Отменить' },
           ],
-    [viewHistory],
+    [viewHistory, viewReview],
   );
 
   const statusActionsForRow = useCallback(
@@ -270,6 +328,8 @@ export default function AutoserviceOrdersPage() {
         body: JSON.stringify(buildRepairOrderDuplicatePayload(order)),
       });
       if (viewHistory) {
+        setSearchParams({});
+      } else if (viewReview) {
         setSearchParams({});
       } else {
         await load();
@@ -306,7 +366,7 @@ export default function AutoserviceOrdersPage() {
     (updated) => {
       setViewOrder(updated);
       setRows((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
-      if (updated.status === 'completed' || updated.status === 'cancelled') {
+      if (updated.status === 'completed' || updated.status === 'cancelled' || updated.status === 'pending') {
         load();
       }
     },
@@ -316,23 +376,38 @@ export default function AutoserviceOrdersPage() {
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !user) return null;
 
+  const pageTitle = viewHistory
+    ? 'История заказ-нарядов'
+    : viewReview
+      ? 'На проверке'
+      : 'Заказ-наряды';
+  const pageSubtitle = loading
+    ? 'Загрузка…'
+    : viewHistory
+      ? `${rows.length} завершённых и отменённых`
+      : viewReview
+        ? `${rows.length} заявок от сотрудников`
+        : `${rows.length} активных`;
+  const orderTabs = [
+    { id: 'active', label: 'Активные' },
+    ...(canReview ? [{ id: 'review', label: 'На проверке', count: reviewCount }] : []),
+    { id: 'history', label: 'История' },
+  ];
+  const tabValue = viewReview ? 'review' : viewHistory ? 'history' : 'active';
+
   return (
     <div className="w-full min-w-0">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
-            {viewHistory ? 'История заказ-нарядов' : 'Заказ-наряды'}
+            {pageTitle}
           </h1>
           <p className="mt-0.5 text-sm text-gray-500">
-            {loading
-              ? 'Загрузка…'
-              : viewHistory
-                ? `${rows.length} завершённых и отменённых`
-                : `${rows.length} активных`}
+            {pageSubtitle}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {!viewHistory ? (
+          {!viewHistory && !viewReview ? (
             <button
               type="button"
               onClick={() => navigate('/autoservice/orders/new')}
@@ -348,12 +423,9 @@ export default function AutoserviceOrdersPage() {
         className="mb-4"
         ariaLabel="Разделы заказ-нарядов"
         gapClassName="gap-4"
-        tabs={[
-          { id: 'active', label: 'Активные' },
-          { id: 'history', label: 'История' },
-        ]}
-        value={viewHistory ? 'history' : 'active'}
-        onChange={(id) => setHistoryMode(id === 'history')}
+        tabs={orderTabs}
+        value={tabValue}
+        onChange={setListView}
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -425,7 +497,7 @@ export default function AutoserviceOrdersPage() {
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-12 text-center text-gray-500">
-                  {viewHistory ? 'В истории пока нет заказ-нарядов' : 'Активных заказ-нарядов нет'}
+                  {viewHistory ? 'В истории пока нет заказ-нарядов' : viewReview ? 'Заявок на проверке нет' : 'Активных заказ-нарядов нет'}
                 </td>
               </tr>
             ) : (
@@ -441,7 +513,7 @@ export default function AutoserviceOrdersPage() {
                   }}
                 >
                   <td className="py-3 pr-3 align-middle">
-                    <span className="font-semibold tabular-nums text-gray-900">№ {row.order_number}</span>
+                    <span className="font-semibold tabular-nums text-gray-900">{repairOrderNumberLabel(row)}</span>
                   </td>
                   <td className="py-3 pr-3 align-middle font-medium text-gray-900">{vehicleLabel(row.vehicle)}</td>
                   <td className="py-3 pr-3 align-middle">
@@ -461,9 +533,11 @@ export default function AutoserviceOrdersPage() {
                     <OrderActionsMenu
                       onView={() => setViewOrder(row)}
                       onEdit={() => navigate(`/autoservice/orders/${row.id}/edit`)}
-                      onDuplicate={() => handleDuplicate(row)}
+                      onDuplicate={viewReview ? undefined : () => handleDuplicate(row)}
                       onDelete={() => setDeleteConfirmOrder(row)}
+                      onApprove={viewReview ? () => handleApprove(row.id) : undefined}
                       duplicating={duplicatingId === row.id}
+                      approveSaving={approvingId === row.id}
                     />
                   </td>
                 </tr>
@@ -490,7 +564,7 @@ export default function AutoserviceOrdersPage() {
           </div>
         ) : rows.length === 0 ? (
           <p className="py-10 text-center text-sm text-gray-500">
-            {viewHistory ? 'В истории пока нет заказ-нарядов' : 'Активных заказ-нарядов нет'}
+            {viewHistory ? 'В истории пока нет заказ-нарядов' : viewReview ? 'Заявок на проверке нет' : 'Активных заказ-нарядов нет'}
           </p>
         ) : (
           rows.map((row) => (
@@ -502,9 +576,11 @@ export default function AutoserviceOrdersPage() {
               onStatusChange={handleStatus}
               onView={() => setViewOrder(row)}
               onEdit={() => navigate(`/autoservice/orders/${row.id}/edit`)}
-              onDuplicate={() => handleDuplicate(row)}
+              onDuplicate={viewReview ? undefined : () => handleDuplicate(row)}
               onDelete={() => setDeleteConfirmOrder(row)}
+              onApprove={viewReview ? () => handleApprove(row.id) : undefined}
               duplicating={duplicatingId === row.id}
+              approveSaving={approvingId === row.id}
             />
           ))
         )}
@@ -512,7 +588,7 @@ export default function AutoserviceOrdersPage() {
 
       <RepairOrderViewModal
         order={viewOrder}
-        enablePayment
+        enablePayment={!viewReview && viewOrder?.status !== 'review'}
         onOrderChange={handleOrderUpdated}
         onClose={() => setViewOrder(null)}
         onEdit={(order) => {
@@ -530,7 +606,7 @@ export default function AutoserviceOrdersPage() {
         title="Удалить заказ-наряд?"
         message={
           deleteConfirmOrder
-            ? `Заказ-наряд № ${deleteConfirmOrder.order_number} будет удалён безвозвратно. Запчасти исполнителя вернутся на склад автосервиса.`
+            ? `${repairOrderNumberLabel(deleteConfirmOrder)} будет удалён безвозвратно. Запчасти исполнителя вернутся на склад автосервиса.`
             : ''
         }
         confirmLabel="Удалить"

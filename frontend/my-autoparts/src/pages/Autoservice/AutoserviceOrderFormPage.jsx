@@ -17,6 +17,8 @@ import {
 } from '../../utils/laximoVinCandidate';
 import { normalizeVinForLookupOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
+import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
+import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItemsPickerModal';
 import RepairOrderStockPickerModal from '../../components/Autoservice/RepairOrderStockPickerModal';
@@ -40,6 +42,7 @@ import {
   shopLineSum,
   shopPartDisplayName,
   shopPartPricingOptions,
+  formatShopPartUnit,
   warehouseStockKey,
 } from '../../utils/repairOrderShopPartUtils';
 
@@ -67,11 +70,6 @@ const btnPrimaryClass =
 
 const btnSecondaryClass =
   'inline-flex h-10 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
-
-const lineItemClass = 'rounded-sg border border-line bg-white p-3';
-
-const pillSelectSmClass =
-  'min-w-0 flex-1 rounded-full border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0';
 
 const rowActionBtnClass =
   'inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs text-ink-muted transition hover:bg-gray-200 hover:text-ink-soft';
@@ -171,7 +169,6 @@ function emptyShopPart(overrides = {}, defaultMarkupPercent = 0) {
     stock_max_qty: null,
     rossko_brand: '',
     rossko_partnumber: '',
-    receipt_date: '',
     ...overrides,
   };
 }
@@ -203,7 +200,7 @@ function shopPartNameParts(part) {
 }
 
 const shopPartNameBoxClass =
-  'min-w-0 rounded-sg border border-transparent bg-gray-100 px-3 py-2 text-sm text-ink break-words leading-snug';
+  'flex h-8 min-w-0 w-full items-center rounded-sg border border-transparent bg-gray-100 px-3 text-sm text-ink';
 
 function ShopPartNameField({
   part,
@@ -213,46 +210,39 @@ function ShopPartNameField({
   onChange,
 }) {
   const { primary, secondary } = shopPartNameParts(part);
-  const structured = Boolean(
-    part?.brand || part?.partnumber || part?.rossko_brand || part?.rossko_partnumber,
-  );
-
-  const structuredBody = (
-    <>
-      <span className="block font-medium">{primary}</span>
-      {secondary ? (
-        <span className="mt-0.5 block text-xs text-ink-muted">{secondary}</span>
-      ) : null}
-    </>
-  );
+  const label = [primary, secondary].filter(Boolean).join(' ') || shopPartDisplayName(part) || '—';
 
   if (isManualEditable) {
     return (
       <button
         type="button"
-        className={`w-full text-left ${shopPartNameBoxClass} hover:bg-surface-muted/80`}
+        className={`${shopPartNameBoxClass} text-left hover:bg-surface-muted/80`}
         onClick={onEdit}
-        title="Редактировать товар"
+        title={label}
       >
-        {structured ? structuredBody : (primary || '—')}
+        <span className="block min-w-0 truncate font-medium">{label}</span>
       </button>
     );
   }
 
   if (isNameLocked) {
     return (
-      <div className={`${shopPartNameBoxClass} cursor-default bg-surface-muted/80 opacity-90`}>
-        {structured ? structuredBody : (primary || '—')}
+      <div
+        className={`${shopPartNameBoxClass} cursor-default bg-surface-muted/80 opacity-90`}
+        title={label}
+      >
+        <span className="block min-w-0 truncate font-medium">{label}</span>
       </div>
     );
   }
 
   return (
     <input
-      className={`w-full ${shopPartNameBoxClass} focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0`}
+      className={`${shopPartNameBoxClass} focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0`}
       placeholder="Бренд, артикул, наименование"
       value={shopPartLineValue(part)}
       onChange={onChange}
+      title={shopPartLineValue(part)}
     />
   );
 }
@@ -288,7 +278,6 @@ function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
     rossko_partnumber: p.rossko_partnumber || '',
     is_imported: Boolean(p.is_imported),
     is_manual_editable: Boolean(p.is_manual_editable),
-    receipt_date: p.receipt_date || '',
   };
 }
 
@@ -946,6 +935,9 @@ export default function AutoserviceOrderFormPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isReady, isAuthenticated, user } = useAuthReady();
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const canReviewOrders = canReviewRepairOrders(user, permissionCodes || []);
+  const ownMode = Boolean(user?.is_employee) && !canReviewOrders;
   const storedClientMarkupPercent = useSelector(
     (state) => Number(state.clientMarkup.percent) || 0,
   );
@@ -1368,7 +1360,6 @@ export default function AutoserviceOrderFormPage() {
       source: isRossko ? 'rossko' : 'manual',
       rossko_brand: isRossko ? (values.brand || '') : '',
       rossko_partnumber: isRossko ? (values.article || '') : '',
-      receipt_date: values.receipt_date || '',
       is_manual_editable: true,
     })]);
     setShopPartManualDraft(null);
@@ -1396,7 +1387,6 @@ export default function AutoserviceOrderFormPage() {
               quantity: values.quantity,
               unit: values.unit || 'pcs',
               unit_price: Number(values.unit_price),
-              receipt_date: values.receipt_date || null,
             }),
           },
         );
@@ -1450,14 +1440,15 @@ export default function AutoserviceOrderFormPage() {
         .filter((p) => warehouseStockKey(p) === stockKey)
         .reduce((sum, p) => sum + (Number(p.qty) || 0), 0);
       const available = Math.max(0, (Number(item.available_qty) || 0) - usedQty);
+      const unit = item.unit === 'l' || item.unit === 'kg' ? item.unit : 'pcs';
       const qty = Math.min(quantity, available);
-      if (qty < 1) return prev;
+      if (unit === 'pcs' ? qty < 1 : qty < 0.001) return prev;
       return [...prev, makeEmptyShopPart({
         title: item.name || item.article || 'Запчасть',
         brand: item.brand || '',
         partnumber: item.article || '',
         qty,
-        unit: 'pcs',
+        unit,
         unit_price: String(item.unit_price ?? 0),
         source: 'autoservice_stock',
         autoservice_stock_item_id: item.id,
@@ -1548,7 +1539,9 @@ export default function AutoserviceOrderFormPage() {
       qty: Number(p.qty),
       unit: p.unit || 'pcs',
     })),
-    shop_parts: shopParts
+    shop_parts: ownMode
+      ? []
+      : shopParts
       .filter((p) => !p.pending_import)
       .map((p) => ({
         ...(p.id ? { id: p.id } : {}),
@@ -1570,18 +1563,17 @@ export default function AutoserviceOrderFormPage() {
           : null,
         rossko_brand: p.source === 'rossko' ? (p.rossko_brand || p.brand || null) : null,
         rossko_partnumber: p.source === 'rossko' ? (p.rossko_partnumber || p.partnumber || null) : null,
-        ...(!p.id && p.source === 'manual' && p.receipt_date
-          ? { receipt_date: p.receipt_date }
-          : {}),
       })),
   });
 
   const validateForm = () => {
-    if (!clientId || !vehicleId || !scheduledAt) {
-      return 'Выберите клиента, автомобиль и дату записи';
+    if (!clientId || !vehicleId || (!ownMode && !scheduledAt)) {
+      return ownMode
+        ? 'Выберите клиента и автомобиль'
+        : 'Выберите клиента, автомобиль и дату записи';
     }
     const iso = fromLocalInputValue(scheduledAt);
-    if (!iso) return 'Некорректная дата записи';
+    if (!ownMode && !iso) return 'Некорректная дата записи';
     const endIso = scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null;
     if (endIso && iso && new Date(endIso) <= new Date(iso)) {
       return 'Время окончания должно быть позже времени начала';
@@ -1610,7 +1602,7 @@ export default function AutoserviceOrderFormPage() {
         return 'Количество запчасти должно быть целым числом ≥ 1';
       }
     }
-    for (const p of shopParts) {
+    for (const p of ownMode ? [] : shopParts) {
       if (
         p.client_unit_price_override !== ''
         && p.client_unit_price_override != null
@@ -1633,7 +1625,7 @@ export default function AutoserviceOrderFormPage() {
         && p.stock_max_qty != null
         && Number(p.qty) > Number(p.stock_max_qty)
       ) {
-        return `Количество «${shopPartDisplayName(p)}» не может превышать ${p.stock_max_qty} шт.`;
+        return `Количество «${shopPartDisplayName(p)}» не может превышать ${p.stock_max_qty} ${formatShopPartUnit(p.unit || 'pcs')}`;
       }
       if (Number.isNaN(Number(p.unit_price)) || Number(p.unit_price) < 0) {
         return 'Цена ЗЧ исполнителя должна быть ≥ 0';
@@ -1731,12 +1723,16 @@ export default function AutoserviceOrderFormPage() {
   if (!isAuthenticated || !user) return null;
 
   const pageTitle = isEdit
-    ? `Редактирование записи №${orderNumber ?? orderId}`
-    : 'Новая запись';
+    ? ownMode
+      ? `Заявка ${repairOrderNumberLabel({ id: orderId, order_number: orderNumber })}`
+      : `Редактирование записи №${orderNumber ?? orderId}`
+    : ownMode
+      ? 'Новая заявка'
+      : 'Новая запись';
 
   if (orderLoading || metaLoading || !formInitialized) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto w-full px-1 py-8 sm:px-2 lg:-mx-4 lg:px-2">
         <button type="button" onClick={goBack} className={linkActionClass}>
           ← Назад
         </button>
@@ -1747,7 +1743,7 @@ export default function AutoserviceOrderFormPage() {
 
   if (orderError) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="mx-auto w-full px-1 py-8 sm:px-2 lg:-mx-4 lg:px-2">
         <button type="button" onClick={goBack} className={linkActionClass}>
           ← Назад
         </button>
@@ -1760,7 +1756,7 @@ export default function AutoserviceOrderFormPage() {
 
   return (
     <div className="min-h-screen bg-white">
-    <div className="mx-auto max-w-4xl px-4 py-6 pb-28">
+    <div className="mx-auto w-full px-1 py-6 pb-28 sm:px-2 lg:-mx-4 lg:px-2">
       <header className="mb-6">
         <button type="button" onClick={goBack} className={linkActionClass}>
           ← Назад
@@ -1786,6 +1782,7 @@ export default function AutoserviceOrderFormPage() {
             <div>
               <div className="flex items-end justify-between gap-2">
                 <label className="block text-sg-caption font-medium text-ink-muted">Клиент</label>
+                {ownMode ? null : (
                 <button
                   type="button"
                   onClick={() => setAddClientOpen(true)}
@@ -1793,6 +1790,7 @@ export default function AutoserviceOrderFormPage() {
                 >
                   Добавить
                 </button>
+                )}
               </div>
               <SearchableSelect
                 value={clientId}
@@ -1807,6 +1805,7 @@ export default function AutoserviceOrderFormPage() {
             <div>
               <div className="flex items-end justify-between gap-2">
                 <label className="block text-sg-caption font-medium text-ink-muted">Автомобиль</label>
+                {ownMode ? null : (
                 <button
                   type="button"
                   onClick={() => setAddVehicleOpen(true)}
@@ -1815,6 +1814,7 @@ export default function AutoserviceOrderFormPage() {
                 >
                   Добавить
                 </button>
+                )}
               </div>
               <SearchableSelect
                 value={vehicleId}
@@ -1833,7 +1833,8 @@ export default function AutoserviceOrderFormPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Запись">
+        <SectionCard title={ownMode ? 'Заявка' : 'Запись'}>
+          {ownMode ? null : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sg-caption font-medium text-ink-muted">Дата записи</label>
@@ -1879,6 +1880,9 @@ export default function AutoserviceOrderFormPage() {
                 onChange={(e) => setShippingDate(e.target.value)}
               />
             </div>
+          </div>
+          )}
+          <div className={`${ownMode ? '' : 'mt-4 '}grid gap-4 sm:grid-cols-2`}>
             <div>
               <label className="block text-sg-caption font-medium text-ink-muted">
                 Пробег, км <span className="font-normal text-gray-400">необязательно</span>
@@ -1923,8 +1927,8 @@ export default function AutoserviceOrderFormPage() {
           ) : (
             <div className="space-y-2">
               {works.map((w, index) => (
-                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2.5 py-2">
-                  <div className="flex min-w-0 items-center gap-1.5">
+                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2 py-1.5">
+                  <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
                     <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">{index + 1}</span>
                     <div className="min-w-0 flex-1">
                       <WorkCatalogInput
@@ -1932,9 +1936,40 @@ export default function AutoserviceOrderFormPage() {
                         catalogWorkId={w.catalog_work_id}
                         options={workCatalog}
                         onChange={(patch) => updateWork(index, patch)}
-                        onCreate={(name) => createCatalogWork(name, index)}
+                        onCreate={ownMode ? undefined : (name) => createCatalogWork(name, index)}
                       />
                     </div>
+                    <input
+                      type="number"
+                      min={1}
+                      className="h-8 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
+                      placeholder={ownMode ? 'Н/ч' : 'Кол-во'}
+                      value={w.qty}
+                      onChange={(e) => updateWork(index, { qty: e.target.value })}
+                    />
+                    {ownMode ? null : (
+                    <>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      className="h-8 w-[5.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
+                      placeholder="0"
+                      value={w.unit_price}
+                      onChange={(e) => updateWork(index, { unit_price: e.target.value })}
+                    />
+                    <span className="w-[5.75rem] shrink-0 text-right text-sm font-medium tabular-nums text-ink">
+                      {formatMoney(lineSum(w.qty, w.unit_price))} ₽
+                    </span>
+                    <button
+                      type="button"
+                      className="shrink-0 whitespace-nowrap text-xs font-medium text-brand-600 hover:text-brand-700"
+                      onClick={() => addWorkExecutor(index)}
+                    >
+                      + сотрудник
+                    </button>
+                    </>
+                    )}
                     <div className="flex shrink-0 gap-0.5">
                       <button type="button" className={rowActionBtnClass} onClick={() => setWorks((p) => moveItem(p, index, -1))}>↑</button>
                       <button type="button" className={rowActionBtnClass} onClick={() => setWorks((p) => moveItem(p, index, 1))}>↓</button>
@@ -1947,36 +1982,7 @@ export default function AutoserviceOrderFormPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 pl-5">
-                    <input
-                      type="number"
-                      min={1}
-                      className="h-8 w-16 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
-                      placeholder="Кол-во"
-                      value={w.qty}
-                      onChange={(e) => updateWork(index, { qty: e.target.value })}
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      className="h-8 w-24 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
-                      placeholder="0"
-                      value={w.unit_price}
-                      onChange={(e) => updateWork(index, { unit_price: e.target.value })}
-                    />
-                    <span className="text-xs tabular-nums text-ink-muted">
-                      {formatMoney(lineSum(w.qty, w.unit_price))} ₽
-                    </span>
-                    <button
-                      type="button"
-                      className="ml-auto text-xs font-medium text-brand-600 hover:text-brand-700"
-                      onClick={() => addWorkExecutor(index)}
-                    >
-                      + сотрудник
-                    </button>
-                  </div>
-                  {(w.executors || []).length > 0 ? (
+                  {(ownMode ? [] : (w.executors || [])).length > 0 ? (
                     <div className="mt-1.5 min-w-0 space-y-1 pl-5">
                       {(w.executors || []).map((ex, execIndex) => (
                         <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">
@@ -2029,28 +2035,13 @@ export default function AutoserviceOrderFormPage() {
           {clientParts.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет запчастей клиента</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {clientParts.map((p, index) => (
-                <div key={index} className={lineItemClass}>
-                  <div className="mb-2 flex items-center justify-between text-xs text-ink-muted">
-                    <span>№ {index + 1}</span>
-                    <div className="flex gap-1">
-                      <button type="button" className={rowActionBtnClass} onClick={() => setClientParts((prev) => moveItem(prev, index, -1))}>
-                        ↑
-                      </button>
-                      <button type="button" className={rowActionBtnClass} onClick={() => setClientParts((prev) => moveItem(prev, index, 1))}>
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-danger-600 hover:text-danger-700"
-                        onClick={() => setClientParts((prev) => prev.filter((_, i) => i !== index))}
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2 py-1.5">
+                  <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
+                    <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">
+                      {index + 1}
+                    </span>
                     <input
                       className={`min-w-0 flex-1 ${pillInputSmClass}`}
                       placeholder="Название"
@@ -2061,13 +2052,13 @@ export default function AutoserviceOrderFormPage() {
                       type="number"
                       min={1}
                       step={1}
-                      className={`w-24 shrink-0 ${pillInputSmClass}`}
+                      className="h-8 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
                       placeholder="Кол-во"
                       value={p.qty}
                       onChange={(e) => updatePart(index, { qty: e.target.value })}
                     />
                     <select
-                      className={`w-20 shrink-0 ${pillSelectSmClass}`}
+                      className="h-8 w-[4.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
                       value={p.unit || 'pcs'}
                       onChange={(e) => updatePart(index, { unit: e.target.value })}
                     >
@@ -2075,6 +2066,21 @@ export default function AutoserviceOrderFormPage() {
                       <option value="l">л</option>
                       <option value="kg">кг</option>
                     </select>
+                    <div className="flex shrink-0 gap-0.5">
+                      <button type="button" className={rowActionBtnClass} onClick={() => setClientParts((prev) => moveItem(prev, index, -1))}>
+                        ↑
+                      </button>
+                      <button type="button" className={rowActionBtnClass} onClick={() => setClientParts((prev) => moveItem(prev, index, 1))}>
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700`}
+                        onClick={() => setClientParts((prev) => prev.filter((_, i) => i !== index))}
+                      >
+                        ×
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -2085,6 +2091,7 @@ export default function AutoserviceOrderFormPage() {
           </div>
         </SectionCard>
 
+        {!ownMode ? (
         <SectionCard
           title="Запчасти исполнителя"
           action={clientMarkupEnabled ? (
@@ -2121,10 +2128,10 @@ export default function AutoserviceOrderFormPage() {
                 return (
                   <div
                     key={p.id || `shop-part-${index}`}
-                    className="min-w-0 rounded-sg border border-line bg-white px-2.5 py-2"
+                    className="min-w-0 rounded-sg border border-line bg-white px-2 py-1.5"
                   >
-                    <div className="flex min-w-0 items-start gap-1.5">
-                      <span className="mt-2 w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">
+                    <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
+                      <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">
                         {index + 1}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -2142,31 +2149,19 @@ export default function AutoserviceOrderFormPage() {
                           })}
                         />
                       </div>
-                      <button
-                        type="button"
-                        className={`${rowActionBtnClass} mt-1.5 shrink-0 text-danger-600 hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-50`}
-                        aria-label={isImported ? 'Убрать из заказ-наряда' : 'Удалить'}
-                        disabled={detachingShopPartId === p.id}
-                        onClick={() => removeShopPart(index)}
-                      >
-                        ×
-                      </button>
-                    </div>
-
-                    <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 pl-5">
                       <input
                         type="number"
                         min={qtyMin}
                         max={isWarehouseLinked && p.stock_max_qty != null ? p.stock_max_qty : undefined}
                         step={qtyStep}
-                        className={`w-16 ${shopPartControlInputClass}${isQtyLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
+                        className={`w-14 ${shopPartControlInputClass}${isQtyLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
                         value={qtyValue}
                         readOnly={isQtyLocked}
                         disabled={isQtyLocked}
                         aria-label="Количество"
                         title={
                           isWarehouseLinked && p.stock_max_qty != null
-                            ? `Доступно не более ${p.stock_max_qty} шт.`
+                            ? `Доступно не более ${p.stock_max_qty} ${formatShopPartUnit(p.unit || 'pcs')}`
                             : undefined
                         }
                         onChange={(e) => {
@@ -2187,7 +2182,7 @@ export default function AutoserviceOrderFormPage() {
                         }}
                       />
                       <select
-                        className={`w-[4.5rem] ${shopPartControlSelectClass}${isUnitLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
+                        className={`w-[4.25rem] ${shopPartControlSelectClass}${isUnitLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
                         value={p.unit || 'pcs'}
                         disabled={isUnitLocked}
                         aria-label="Единица измерения"
@@ -2201,7 +2196,7 @@ export default function AutoserviceOrderFormPage() {
                         type="number"
                         min={0}
                         step="0.01"
-                        className={`w-24 ${shopPartControlInputClass}`}
+                        className={`w-[5.25rem] ${shopPartControlInputClass}`}
                         value={p.client_unit_price_override ?? ''}
                         placeholder={formatRubles(automaticClientUnit)}
                         aria-label="Клиентская цена"
@@ -2209,10 +2204,19 @@ export default function AutoserviceOrderFormPage() {
                           client_unit_price_override: e.target.value,
                         })}
                       />
-                      <span className="text-xs tabular-nums text-ink-muted">₽</span>
-                      <span className="ml-auto text-sm font-medium tabular-nums text-ink">
+                      <span className="shrink-0 text-xs tabular-nums text-ink-muted">₽</span>
+                      <span className="w-[5.75rem] shrink-0 text-right text-sm font-medium tabular-nums text-ink">
                         {formatRubles(lineTotal)} ₽
                       </span>
+                      <button
+                        type="button"
+                        className={`${rowActionBtnClass} shrink-0 text-danger-600 hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-50`}
+                        aria-label={isImported ? 'Убрать из заказ-наряда' : 'Удалить'}
+                        disabled={detachingShopPartId === p.id}
+                        onClick={() => removeShopPart(index)}
+                      >
+                        ×
+                      </button>
                     </div>
                   </div>
                 );
@@ -2226,18 +2230,25 @@ export default function AutoserviceOrderFormPage() {
             <SectionAddLink onClick={() => setShopPartAddMenuOpen(true)} />
           </div>
         </SectionCard>
+        ) : null}
 
       </form>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-2 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 sm:px-3 lg:px-4">
+        <div className="mx-auto flex w-full max-w-sg-content items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-ink">
-              Итого {formatMoney(grandTotal)} ₽
+              {ownMode ? 'Заявка на проверку' : `Итого ${formatMoney(grandTotal)} ₽`}
             </p>
+            {ownMode ? (
+              <p className="truncate text-xs text-ink-muted">
+                После сохранения заявка появится у приёмщика во вкладке «На проверке»
+              </p>
+            ) : (
             <p className="truncate text-xs text-ink-muted">
               работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)}
             </p>
+            )}
           </div>
           <div className="flex shrink-0 gap-2">
             <button type="button" onClick={goBack} className={btnSecondaryClass}>
@@ -2249,17 +2260,17 @@ export default function AutoserviceOrderFormPage() {
               disabled={saving}
               className={btnPrimaryClass}
             >
-              {saving ? 'Сохранение…' : 'Сохранить'}
+              {saving ? 'Сохранение…' : ownMode ? 'Отправить на проверку' : 'Сохранить'}
             </button>
           </div>
         </div>
       </div>
 
-      {addClientOpen ? (
+      {addClientOpen && !ownMode ? (
         <AddClientModal onClose={() => setAddClientOpen(false)} onCreated={handleClientCreated} />
       ) : null}
 
-      {addVehicleOpen && clientId ? (
+      {addVehicleOpen && clientId && !ownMode ? (
         <GarageQuickAddModal
           clientId={clientId}
           onClose={() => setAddVehicleOpen(false)}
@@ -2358,7 +2369,6 @@ export default function AutoserviceOrderFormPage() {
         title="Добавить запчасть вручную"
         submitLabel="Добавить в заказ-наряд"
         showUnitSelector
-        showReceiptDate
         preserveDraftOnClose
         initialValues={shopPartManualDraft}
         onDraftPersist={setShopPartManualDraft}
@@ -2370,11 +2380,6 @@ export default function AutoserviceOrderFormPage() {
         onSubmit={handleManualShopPartEdit}
         submitting={shopPartEditSubmitting}
         mode="edit"
-        showReceiptDate={
-          shopPartEditIndex != null
-          && isManualEditableShopPart(shopParts[shopPartEditIndex])
-          && shopParts[shopPartEditIndex]?.source !== 'rossko'
-        }
         initialValues={
           shopPartEditIndex == null
             ? null

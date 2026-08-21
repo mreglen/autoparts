@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,7 @@ from app.services.autoservice_order_economics_xlsx import build_order_economics_
 from app.services.autoservice_warehouse_stock_report import WarehouseStockReportFilters, build_warehouse_stock_report
 from app.services.autoservice_warehouse_stock_report_xlsx import build_warehouse_stock_workbook_bytes
 from app.services.autoservice_payment_service import (
+    delete_autoservice_payment,
     list_finance_receipts,
     update_autoservice_payment_date,
 )
@@ -81,6 +82,20 @@ def patch_autoservice_finance_receipt_date(
     )
     db.commit()
     return row
+
+
+@router.delete(
+    "/autoservice/finance/receipts/{payment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_autoservice_finance_receipt(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_FINANCE)
+    delete_autoservice_payment(db, org_id=org_id, payment_id=payment_id)
+    db.commit()
 
 
 @router.get("/autoservice/finance/receipts.xlsx")

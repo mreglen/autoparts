@@ -6,10 +6,13 @@ from fastapi import HTTPException
 from app.models.user import User
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_ORDERS,
+    AUTOSERVICE_PERMISSION_ORDERS_OWN,
     AUTOSERVICE_PERMISSION_PLANNER,
     has_autoservice_permission,
+    orders_access_level,
     require_any_autoservice_permission,
     require_autoservice_permission,
+    require_orders_access,
 )
 
 
@@ -88,6 +91,36 @@ class AutoserviceAccessHelperTests(unittest.TestCase):
                 )
 
         self.assertEqual(org_id, "org-auto")
+
+    def test_orders_access_level_full_before_own(self):
+        db = MagicMock()
+        user = _employee_user()
+
+        with patch(
+            "app.utils.autoservice_access.has_autoservice_permission",
+            side_effect=lambda _db, _user, code: code in (
+                AUTOSERVICE_PERMISSION_ORDERS,
+                AUTOSERVICE_PERMISSION_ORDERS_OWN,
+            ),
+        ):
+            self.assertEqual(orders_access_level(db, user), "full")
+
+    def test_require_orders_access_own_for_employee(self):
+        db = MagicMock()
+        user = _employee_user()
+
+        with patch(
+            "app.utils.autoservice_access.require_autoservice_staff",
+            return_value="org-auto",
+        ):
+            with patch(
+                "app.utils.autoservice_access.has_autoservice_permission",
+                side_effect=lambda _db, _user, code: code == AUTOSERVICE_PERMISSION_ORDERS_OWN,
+            ):
+                org_id, level = require_orders_access(db, user)
+
+        self.assertEqual(org_id, "org-auto")
+        self.assertEqual(level, "own")
 
 
 if __name__ == "__main__":

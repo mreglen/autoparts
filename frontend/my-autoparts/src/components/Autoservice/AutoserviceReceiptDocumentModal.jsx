@@ -218,7 +218,13 @@ function ReceiptLineRow({
   );
 }
 
-export default function AutoserviceReceiptDocumentModal({ docId, onClose, onUpdated }) {
+export default function AutoserviceReceiptDocumentModal({
+  docId,
+  onClose,
+  onUpdated,
+  onDeleteRequest,
+  deleting = false,
+}) {
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -340,16 +346,31 @@ export default function AutoserviceReceiptDocumentModal({ docId, onClose, onUpda
       title={doc?.number ? `Поступление ${doc.number}` : 'Поступление'}
       size="xl"
       closeVariant="back"
-      headerActions={docDateChanged ? (
-        <Button
-          type="button"
-          size="sm"
-          loading={savingDocDate}
-          onClick={saveDocDate}
-        >
-          Сохранить
-        </Button>
-      ) : null}
+      headerActions={(
+        <div className="flex items-center gap-2">
+          {onDeleteRequest && doc ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              disabled={deleting || savingDocDate}
+              onClick={() => onDeleteRequest(doc)}
+            >
+              Удалить
+            </Button>
+          ) : null}
+          {docDateChanged ? (
+            <Button
+              type="button"
+              size="sm"
+              loading={savingDocDate}
+              onClick={saveDocDate}
+            >
+              Сохранить
+            </Button>
+          ) : null}
+        </div>
+      )}
     >
       {loading ? (
         <div className="space-y-4 py-2">

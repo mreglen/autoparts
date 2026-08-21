@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatAutoserviceWarehouseMoney, autoserviceWarehouseItemLabel } from '../../utils/autoserviceWarehouseUi';
+import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
 import { warehousePrimaryButtonClass, warehouseSecondaryButtonClass } from '../../utils/warehouseListUi';
 
 export default function RepairOrderStockPickerModal({
@@ -59,11 +60,17 @@ export default function RepairOrderStockPickerModal({
   if (!open) return null;
 
   const selected = items.find((item) => item.id === selectedId);
+  const selectedUnit = selected?.unit === 'l' || selected?.unit === 'kg' ? selected.unit : 'pcs';
   const maxQty = selected?.available_qty ?? selected?.quantity ?? 1;
+  const qtyStep = selectedUnit === 'pcs' ? 1 : 0.001;
+  const qtyMin = selectedUnit === 'pcs' ? 1 : 0.001;
 
   const handleConfirm = () => {
     if (!selected) return;
-    const quantity = Math.max(1, Math.min(Number(qty) || 1, maxQty));
+    const raw = Number(qty);
+    const quantity = selectedUnit === 'pcs'
+      ? Math.max(1, Math.min(Math.round(raw || 1), maxQty))
+      : Math.max(qtyMin, Math.min(Number.isFinite(raw) ? raw : qtyMin, maxQty));
     onSelect?.(mapSelection(selected, quantity));
     onClose?.();
   };
@@ -93,6 +100,7 @@ export default function RepairOrderStockPickerModal({
             items.map((item) => {
               const label = autoserviceWarehouseItemLabel(item);
               const available = item.available_qty ?? item.quantity ?? 0;
+              const unitLabel = formatShopPartUnit(item.unit || 'pcs');
               return (
                 <button
                   key={item.id}
@@ -108,7 +116,7 @@ export default function RepairOrderStockPickerModal({
                   <div className="min-w-0">
                     <div className="font-medium text-gray-900">{label || '—'}</div>
                     <div className="mt-0.5 text-xs text-gray-500">
-                      Доступно: {available} шт.
+                      Доступно: {available} {unitLabel}
                     </div>
                   </div>
                   <div className="shrink-0 font-semibold tabular-nums text-gray-900">
@@ -124,12 +132,16 @@ export default function RepairOrderStockPickerModal({
             <span className="font-medium text-gray-700">Количество</span>
             <input
               type="number"
-              min="1"
+              min={qtyMin}
               max={maxQty}
+              step={qtyStep}
               value={qty}
               onChange={(event) => setQty(event.target.value)}
               className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
+            <span className="mt-1 block text-xs text-gray-500">
+              Доступно: {maxQty} {formatShopPartUnit(selectedUnit)}
+            </span>
           </label>
         ) : null}
         <div className="flex justify-end gap-2">

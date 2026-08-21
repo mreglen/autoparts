@@ -19,6 +19,7 @@ from app.services.autoservice_work_zone_helpers import next_work_zone_name
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS,
     AUTOSERVICE_PERMISSION_ORDERS,
+    AUTOSERVICE_PERMISSION_ORDERS_OWN,
     AUTOSERVICE_PERMISSION_PLANNER,
     AUTOSERVICE_PERMISSION_SETTINGS,
     require_any_autoservice_permission,
@@ -53,6 +54,7 @@ def list_autoservice_work_zones(
         current_user,
         AUTOSERVICE_PERMISSION_PLANNER,
         AUTOSERVICE_PERMISSION_ORDERS,
+        AUTOSERVICE_PERMISSION_ORDERS_OWN,
         AUTOSERVICE_PERMISSION_INSPECTIONS,
         AUTOSERVICE_PERMISSION_SETTINGS,
     )

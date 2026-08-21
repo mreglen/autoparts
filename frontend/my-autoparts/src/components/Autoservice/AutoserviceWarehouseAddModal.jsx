@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import { apiAxios } from '../../utils/apiClient';
-import { getFinanceTodayDate } from '../../pages/Finance/financeDisplay';
 import AutoserviceReceiptSuggestField from './AutoserviceReceiptSuggestField';
 import { pickBestRosskoPart } from '../../pages/AutoParts/NewParts/rosskoHelpers';
 
@@ -13,7 +12,6 @@ const EMPTY_FORM = {
   quantity: '1',
   unit: 'pcs',
   unit_price: '',
-  receipt_date: getFinanceTodayDate(),
 };
 
 const fieldClass =
@@ -30,7 +28,6 @@ export default function AutoserviceWarehouseAddModal({
   submitLabel = 'Добавить',
   showRosskoLookup = true,
   showUnitSelector = true,
-  showReceiptDate = false,
   initialValues = null,
   preserveDraftOnClose = false,
   onDraftPersist,
@@ -58,10 +55,9 @@ export default function AutoserviceWarehouseAddModal({
         unit_price: initialValues.unit_price == null || initialValues.unit_price === ''
           ? ''
           : String(initialValues.unit_price),
-        receipt_date: initialValues.receipt_date || getFinanceTodayDate(),
       });
     } else if (!(preserveDraftOnClose && mode === 'add')) {
-      setForm({ ...EMPTY_FORM, receipt_date: getFinanceTodayDate() });
+      setForm({ ...EMPTY_FORM });
     }
     setError('');
     setRosskoLookupError('');
@@ -99,7 +95,7 @@ export default function AutoserviceWarehouseAddModal({
     if (preserveDraftOnClose && mode === 'add') {
       onDraftPersist?.({ ...form });
     } else {
-      setForm({ ...EMPTY_FORM, receipt_date: getFinanceTodayDate() });
+      setForm({ ...EMPTY_FORM });
     }
     setError('');
     setRosskoLookupError('');
@@ -193,10 +189,9 @@ export default function AutoserviceWarehouseAddModal({
         quantity: unit === 'pcs' ? Math.round(quantityRaw) : quantityRaw,
         unit,
         unit_price: unitPrice,
-        receipt_date: showReceiptDate ? (form.receipt_date || getFinanceTodayDate()) : null,
         source: filledFromRossko ? 'rossko' : 'manual',
       });
-      setForm({ ...EMPTY_FORM, receipt_date: getFinanceTodayDate() });
+      setForm({ ...EMPTY_FORM });
       setError('');
       setRosskoLookupError('');
       setRosskoLookupNotice('');
@@ -209,7 +204,6 @@ export default function AutoserviceWarehouseAddModal({
   const modalTitle = mode === 'edit' ? 'Редактировать товар' : title;
   const modalSubmitLabel = mode === 'edit' ? 'Сохранить' : submitLabel;
   const isWarehouseEdit = mode === 'edit' && editScope === 'warehouse';
-  const todayDate = getFinanceTodayDate();
 
   return (
     <Modal open={open} onClose={handleClose} title={modalTitle} size="sm">
@@ -272,7 +266,7 @@ export default function AutoserviceWarehouseAddModal({
           </div>
         ) : null}
 
-        <div className={`grid gap-3 ${isWarehouseEdit ? 'grid-cols-1 sm:grid-cols-2' : showReceiptDate ? 'grid-cols-2 sm:grid-cols-4' : showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <div className={`grid gap-3 ${isWarehouseEdit ? 'grid-cols-1 sm:grid-cols-2' : showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
           {!isWarehouseEdit ? (
             <label className="block">
               <span className={labelClass}>Кол-во</span>
@@ -328,26 +322,7 @@ export default function AutoserviceWarehouseAddModal({
               />
             </label>
           )}
-          {showReceiptDate && !isWarehouseEdit ? (
-            <label className="block">
-              <span className={labelClass}>Дата поступления</span>
-              <input
-                type="date"
-                max={todayDate}
-                className={fieldClass}
-                value={form.receipt_date}
-                onChange={(e) => patch('receipt_date', e.target.value)}
-                required
-              />
-            </label>
-          ) : null}
         </div>
-
-        {showReceiptDate && !isWarehouseEdit ? (
-          <p className="text-xs text-gray-500">
-            Эта дата попадёт в документ поступления на склад автосервиса.
-          </p>
-        ) : null}
 
         {isWarehouseEdit ? (
           <p className="text-xs text-gray-500">

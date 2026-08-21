@@ -14,6 +14,7 @@ from app.models.autoservice_warehouse import (
     AutoserviceWarehouseItem,
     AutoserviceWarehouseReceipt,
     AutoserviceWarehouseReceiptDoc,
+    AutoserviceWarehouseReturnRequest,
 )
 from app.models.garage_new_orders import GarageNewOrder, GarageNewOrderItem
 from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
@@ -1133,6 +1134,142 @@ def update_receipt_doc_date(
         line.created_at = doc_date
     db.flush()
     return doc
+
+
+def delete_receipt_document(db: Session, *, org_id: str, doc_id: int) -> None:
+    from app.services.repair_order_stock_reserve import release_shop_part_reservation
+
+    doc = (
+        db.query(AutoserviceWarehouseReceiptDoc)
+        .options(
+            joinedload(AutoserviceWarehouseReceiptDoc.lines).joinedload(
+                AutoserviceWarehouseReceipt.item
+            )
+        )
+        .filter(
+            AutoserviceWarehouseReceiptDoc.id == doc_id,
+            AutoserviceWarehouseReceiptDoc.organization_id == org_id,
+        )
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Документ поступления не найден")
+
+    lines = list(doc.lines or [])
+    receipt_ids = [line.id for line in lines if line.id is not None]
+    if receipt_ids:
+        has_return = (
+            db.query(AutoserviceWarehouseReturnRequest)
+            .filter(AutoserviceWarehouseReturnRequest.receipt_id.in_(receipt_ids))
+            .first()
+        )
+        if has_return:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя удалить поступление: по позициям оформлен возврат",
+            )
+
+    item_ids = {line.item_id for line in lines if line.item_id}
+    locked_items: dict[int, AutoserviceWarehouseItem] = {}
+    if item_ids:
+        locked_items = {
+            item.id: item
+            for item in (
+                db.query(AutoserviceWarehouseItem)
+                .filter(
+                    AutoserviceWarehouseItem.id.in_(item_ids),
+                    AutoserviceWarehouseItem.organization_id == org_id,
+                )
+                .with_for_update()
+                .all()
+            )
+        }
+
+    qty_by_item: dict[int, int] = {}
+    for line in lines:
+        if int(getattr(line, "returned_qty", 0) or 0) or int(
+            getattr(line, "return_reserved_qty", 0) or 0
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя удалить поступление: по позициям оформлен возврат",
+            )
+
+        linked_parts = (
+            db.query(RepairOrderShopPart)
+            .filter(RepairOrderShopPart.warehouse_receipt_id == line.id)
+            .all()
+        )
+        for part in linked_parts:
+            if part.source == "autoservice_stock":
+                release_shop_part_reservation(db, part)
+                part.source = "manual"
+                part.autoservice_stock_item_id = None
+            part.warehouse_receipt_id = None
+
+        if (line.cart_item_type or "") == "my_parts" and line.cart_item_id:
+            product = db.query(Product).filter(Product.id == line.cart_item_id).first()
+            if product:
+                product.quantity = int(product.quantity or 0) + int(line.quantity or 0)
+
+        if line.item_id:
+            qty_by_item[line.item_id] = qty_by_item.get(line.item_id, 0) + int(
+                line.quantity or 0
+            )
+
+    for item_id, reverse_qty in qty_by_item.items():
+        item = locked_items.get(item_id)
+        if not item:
+            continue
+        new_qty = int(item.quantity or 0) - reverse_qty
+        protected = int(item.reserved_qty or 0) + int(
+            getattr(item, "return_reserved_qty", 0) or 0
+        )
+        if new_qty < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя удалить поступление: позиции уже списаны со склада",
+            )
+        if new_qty < protected:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя удалить поступление: позиции уже используются в заказ-нарядах",
+            )
+        item.quantity = new_qty
+
+    db.delete(doc)
+    db.flush()
+
+    for item in locked_items.values():
+        remaining_receipts = (
+            db.query(AutoserviceWarehouseReceipt)
+            .filter(AutoserviceWarehouseReceipt.item_id == item.id)
+            .first()
+        )
+        remaining_expenses = (
+            db.query(AutoserviceWarehouseExpense)
+            .filter(AutoserviceWarehouseExpense.item_id == item.id)
+            .first()
+        )
+        reserved = int(item.reserved_qty or 0) + int(
+            getattr(item, "return_reserved_qty", 0) or 0
+        )
+        if remaining_receipts or remaining_expenses or reserved:
+            continue
+        if int(item.quantity or 0) != 0:
+            continue
+        leftover_parts = (
+            db.query(RepairOrderShopPart)
+            .filter(RepairOrderShopPart.autoservice_stock_item_id == item.id)
+            .all()
+        )
+        for part in leftover_parts:
+            if part.source == "autoservice_stock":
+                part.source = "manual"
+            part.autoservice_stock_item_id = None
+        db.delete(item)
+
+    db.flush()
 
 
 def update_receipt_line_details(

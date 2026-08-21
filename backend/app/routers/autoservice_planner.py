@@ -131,7 +131,7 @@ def get_planner_week(
             RepairOrder.organization_id == org_id,
             RepairOrder.scheduled_at >= range_start,
             RepairOrder.scheduled_at < range_end,
-            RepairOrder.status != "cancelled",
+            RepairOrder.status.notin_(("cancelled", "review")),
         )
         .order_by(RepairOrder.scheduled_at.asc(), RepairOrder.id.asc())
         .all()

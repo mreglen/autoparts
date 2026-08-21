@@ -12,6 +12,7 @@ import {
   shopPartPricingOptions,
 } from '../../utils/repairOrderShopPartUtils';
 import { splitVatInclusive } from '../../utils/updDocument';
+import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
@@ -19,6 +20,7 @@ export const REPAIR_ORDER_STATUS_LABELS = {
   done: 'Выполнен',
   completed: 'Закрыт',
   cancelled: 'Отменён',
+  review: 'На проверке',
   accepted: 'Ожидание',
   ready: 'Закрыт',
   issued: 'Закрыт',
@@ -37,6 +39,7 @@ const STATUS_STYLES = {
   done: 'bg-violet-50 text-violet-800 ring-violet-200',
   completed: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
   cancelled: 'bg-gray-100 text-gray-600 ring-gray-200',
+  review: 'bg-orange-50 text-orange-800 ring-orange-200',
   accepted: 'bg-amber-50 text-amber-800 ring-amber-200',
   ready: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
   issued: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
@@ -222,7 +225,7 @@ function OrderStatusProgress({
   onComplete,
 }) {
   const normalized = normalizeRepairOrderStatus(status);
-  if (!enablePayment || status === 'cancelled' || normalized === 'completed') {
+  if (!enablePayment || status === 'cancelled' || normalized === 'completed' || normalized === 'review') {
     return null;
   }
 
@@ -593,7 +596,9 @@ export default function RepairOrderViewModal({
         order ? (
           <div className="space-y-1 pr-2">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="text-base font-semibold text-gray-900">Заказ-наряд №{order.order_number}</h2>
+              <h2 className="text-base font-semibold text-gray-900">
+                {order.status === 'review' ? repairOrderNumberLabel(order) : `Заказ-наряд ${repairOrderNumberLabel(order)}`}
+              </h2>
               <OrderStatusBadge status={order.status} />
               <OrderStatusProgress
                 status={order.status}

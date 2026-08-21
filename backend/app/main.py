@@ -64,6 +64,7 @@ from app.db.schema_patches import (
     ensure_repair_order_status_timestamps,
     ensure_repair_orders_shipping_date,
     ensure_repair_orders_mileage_km,
+    ensure_repair_orders_review_flow,
     ensure_organization_employees_tables,
     ensure_autoservice_warehouse_items_unit,
     ensure_group_chat_columns,
@@ -279,6 +280,7 @@ try:
     ensure_repair_order_status_timestamps()
     ensure_repair_orders_shipping_date()
     ensure_repair_orders_mileage_km()
+    ensure_repair_orders_review_flow()
     ensure_organization_employees_tables()
     from app.db.database import SessionLocal
     from app.services.organization_employee_sync import backfill_organization_employee_cards
@@ -287,6 +289,8 @@ try:
         backfill_db = SessionLocal()
         try:
             backfill_organization_employee_cards(backfill_db)
+            from app.routers.employees import _ensure_default_permissions
+            _ensure_default_permissions(backfill_db)
         finally:
             backfill_db.close()
     except Exception:

@@ -1,6 +1,7 @@
 export const AUTOSERVICE_PERMISSION = {
   planner: 'autoservice.planner',
   orders: 'autoservice.orders',
+  ordersOwn: 'autoservice.orders.own',
   warehouse: 'autoservice.warehouse',
   finance: 'autoservice.finance',
   reports: 'autoservice.reports',
@@ -11,11 +12,16 @@ export const AUTOSERVICE_PERMISSION = {
 
 export const AUTOSERVICE_PERMISSION_CODES = Object.values(AUTOSERVICE_PERMISSION);
 
+export const AUTOSERVICE_ORDERS_SECTION_CODES = [
+  AUTOSERVICE_PERMISSION.orders,
+  AUTOSERVICE_PERMISSION.ordersOwn,
+];
+
 export const AUTOSERVICE_SECTION_PERMISSION = {
   planner: AUTOSERVICE_PERMISSION.planner,
-  orders: AUTOSERVICE_PERMISSION.orders,
-  'order-form': AUTOSERVICE_PERMISSION.orders,
-  'order-print': AUTOSERVICE_PERMISSION.orders,
+  orders: AUTOSERVICE_ORDERS_SECTION_CODES,
+  'order-form': AUTOSERVICE_ORDERS_SECTION_CODES,
+  'order-print': AUTOSERVICE_ORDERS_SECTION_CODES,
   'order-upd-print': AUTOSERVICE_PERMISSION.orders,
   'order-invoice-print': AUTOSERVICE_PERMISSION.orders,
   clients: AUTOSERVICE_PERMISSION.clients,
@@ -30,7 +36,11 @@ export const AUTOSERVICE_SECTION_PERMISSION = {
 
 export const AUTOSERVICE_MENU_ITEMS = [
   { id: 'autoservice-planner', permission: AUTOSERVICE_PERMISSION.planner },
-  { id: 'autoservice-orders', permission: AUTOSERVICE_PERMISSION.orders },
+  {
+    id: 'autoservice-orders',
+    permission: AUTOSERVICE_PERMISSION.orders,
+    anyOf: AUTOSERVICE_ORDERS_SECTION_CODES,
+  },
   {
     id: 'autoservice-warehouse-group',
     permission: AUTOSERVICE_PERMISSION.warehouse,
@@ -57,6 +67,19 @@ export function hasAutoservicePermission(user, permissionCodes, code) {
   return Boolean(permissionCodes?.includes(code));
 }
 
+export function hasAnyListedAutoservicePermission(user, permissionCodes, codes) {
+  const list = Array.isArray(codes) ? codes : [codes];
+  return list.some((code) => hasAutoservicePermission(user, permissionCodes, code));
+}
+
+export function canAccessRepairOrders(user, permissionCodes) {
+  return hasAnyListedAutoservicePermission(user, permissionCodes, AUTOSERVICE_ORDERS_SECTION_CODES);
+}
+
+export function canReviewRepairOrders(user, permissionCodes) {
+  return hasAutoservicePermission(user, permissionCodes, AUTOSERVICE_PERMISSION.orders);
+}
+
 export function hasAnyAutoservicePermission(user, permissionCodes) {
   if (hasAutoserviceBypass(user)) return true;
   if (!user?.is_employee) return false;
@@ -66,7 +89,7 @@ export function hasAnyAutoservicePermission(user, permissionCodes) {
 export function canAccessAutoserviceSection(user, permissionCodes, section) {
   const code = AUTOSERVICE_SECTION_PERMISSION[section];
   if (!code) return hasAnyAutoservicePermission(user, permissionCodes);
-  return hasAutoservicePermission(user, permissionCodes, code);
+  return hasAnyListedAutoservicePermission(user, permissionCodes, code);
 }
 
 export function canAccessAutoserviceSettingsPermission(user, permissionCodes) {
@@ -78,6 +101,9 @@ export function getDefaultAutoserviceStaffPath(user, permissionCodes) {
   const first = AUTOSERVICE_MENU_ITEMS.find((item) => {
     if (item.settingsOnly && !canAccessAutoserviceSettingsPermission(user, permissionCodes)) {
       return false;
+    }
+    if (item.anyOf?.length) {
+      return hasAnyListedAutoservicePermission(user, permissionCodes, item.anyOf);
     }
     return hasAutoservicePermission(user, permissionCodes, item.permission);
   });

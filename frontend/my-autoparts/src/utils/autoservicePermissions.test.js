@@ -43,7 +43,20 @@ describe('autoservicePermissions', () => {
 
   it('returns first available staff path for employee', () => {
     expect(getDefaultAutoserviceStaffPath(employee, [AUTOSERVICE_PERMISSION.clients])).toBe('/autoservice/clients');
+    expect(getDefaultAutoserviceStaffPath(employee, [AUTOSERVICE_PERMISSION.ordersOwn])).toBe('/autoservice/orders');
     expect(getDefaultAutoserviceStaffPath(employee, [])).toBe('/garage');
+  });
+
+  it('lets own-order employees open the orders section', () => {
+    expect(
+      canAccessAutoserviceSection(employee, [AUTOSERVICE_PERMISSION.ordersOwn], 'orders'),
+    ).toBe(true);
+    expect(
+      canAccessAutoserviceSection(employee, [AUTOSERVICE_PERMISSION.ordersOwn], 'order-form'),
+    ).toBe(true);
+    expect(
+      canAccessAutoserviceSection(employee, [AUTOSERVICE_PERMISSION.ordersOwn], 'order-print'),
+    ).toBe(true);
   });
 });
 
@@ -83,5 +96,21 @@ describe('autoservice staff menu filtering', () => {
       'autoservice-orders',
       'autoservice-clients',
     ]);
+  });
+
+  it('shows orders menu for employees with own-order permission', () => {
+    const options = {
+      showAutoservice: true,
+      autoserviceOrganizationId: 'org-1',
+      cabinetMode: CABINET_MODE_AUTOSERVICE,
+      organizationIsAutoservice: true,
+      permissionCodes: [AUTOSERVICE_PERMISSION.ordersOwn],
+    };
+
+    const tabs = getAvailableTabs(employee, options.permissionCodes, options);
+    const staffTab = tabs.find((tab) => tab.id === 'autoservice-staff');
+
+    expect(staffTab).toBeTruthy();
+    expect(staffTab.submenu.map((item) => item.id)).toEqual(['autoservice-orders']);
   });
 });

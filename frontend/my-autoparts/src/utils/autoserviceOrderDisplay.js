@@ -23,6 +23,12 @@ export function formatOrderClockRange(order) {
   return start;
 }
 
+export function repairOrderNumberLabel(order) {
+  if (order?.order_number) return `№ ${order.order_number}`;
+  if (order?.id) return `Заявка #${order.id}`;
+  return 'Заявка';
+}
+
 export function formatPersonNameWithInitials(name) {
   const text = String(name || '').trim();
   if (!text || text === '—') return '—';

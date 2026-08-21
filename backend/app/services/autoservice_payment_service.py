@@ -14,6 +14,8 @@ from app.schemas.autoservice_finance import (
     AutoserviceFinanceReceiptsResponse,
     AutoservicePaymentMethodTotals,
 )
+from app.services.autoservice_payroll import clear_order_accruals
+from app.services.repair_order_status_timestamps import record_repair_order_status_timestamp
 
 _TWOPLACES = Decimal("0.01")
 _VALID_METHODS = {"card", "cash", "bank"}
@@ -214,3 +216,32 @@ def update_autoservice_payment_date(
     payment.created_at = _created_at_for_payment_date(paid_at)
     db.flush()
     return _finance_receipt_row(payment)
+
+
+def delete_autoservice_payment(
+    db: Session,
+    *,
+    org_id: str,
+    payment_id: int,
+) -> None:
+    payment = (
+        db.query(AutoservicePayment)
+        .options(joinedload(AutoservicePayment.order))
+        .filter(
+            AutoservicePayment.id == payment_id,
+            AutoservicePayment.organization_id == org_id,
+        )
+        .first()
+    )
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Поступление не найдено",
+        )
+    order = payment.order
+    db.delete(payment)
+    db.flush()
+    if order and order.status in ("completed", "ready", "issued"):
+        order.status = "done"
+        record_repair_order_status_timestamp(order, "done")
+        clear_order_accruals(db, order.id)

@@ -54,7 +54,7 @@ class RepairOrder(Base):
         nullable=False,
         index=True,
     )
-    order_number = Column(String(32), nullable=False, index=True)
+    order_number = Column(String(32), nullable=True, index=True)
     client_id = Column(
         Integer,
         ForeignKey("autoservice_clients.id"),
@@ -74,6 +74,12 @@ class RepairOrder(Base):
         Integer,
         ForeignKey("users.id"),
         nullable=False,
+        index=True,
+    )
+    created_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True,
         index=True,
     )
     status = Column(String(32), nullable=False, default="accepted")
@@ -103,6 +109,7 @@ class RepairOrder(Base):
     client = relationship("AutoserviceClient", foreign_keys=[client_id])
     vehicle = relationship("GarageVehicle", foreign_keys=[vehicle_id])
     accepted_by = relationship("User", foreign_keys=[accepted_by_user_id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
     work_zone = relationship("AutoserviceWorkZone", foreign_keys=[work_zone_id])
     assignees = relationship(
         "User",

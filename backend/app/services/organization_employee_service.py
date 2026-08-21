@@ -319,37 +319,52 @@ def archive_employee_card(db: Session, org_id: str, card_id: int) -> None:
     db.commit()
 
 
-def get_card_permissions(db: Session, org_id: str, card_id: int) -> list[int]:
-    card = _get_card_or_404(db, org_id, card_id)
-    if card.user_id:
-        rows = db.query(UserPermission.permission_id).filter(UserPermission.user_id == card.user_id).all()
-        return [row[0] for row in rows]
+def _card_permission_ids(db: Session, card_id: int) -> list[int]:
     rows = (
-        db.query(OrganizationEmployeePermission.permission_id)
-        .filter(OrganizationEmployeePermission.organization_employee_id == card.id)
+        db.query(OrganizationEmployeePermission)
+        .filter(OrganizationEmployeePermission.organization_employee_id == card_id)
         .all()
     )
-    return [row[0] for row in rows]
+    return [row.permission_id for row in rows]
+
+
+def _user_permission_ids(db: Session, user_id: int) -> list[int]:
+    rows = db.query(UserPermission).filter(UserPermission.user_id == user_id).all()
+    return [row.permission_id for row in rows]
+
+
+def _replace_user_permissions(db: Session, user_id: int, permission_ids: list[int]) -> None:
+    db.query(UserPermission).filter(UserPermission.user_id == user_id).delete(
+        synchronize_session=False
+    )
+    for perm_id in permission_ids:
+        db.add(UserPermission(user_id=user_id, permission_id=perm_id))
+
+
+def get_card_permissions(db: Session, org_id: str, card_id: int) -> list[int]:
+    card = _get_card_or_404(db, org_id, card_id)
+    card_ids = _card_permission_ids(db, card.id)
+    if not card.user_id:
+        return card_ids
+    user_ids = _user_permission_ids(db, card.user_id)
+    if set(card_ids) != set(user_ids):
+        # Heal accounts that lost UserPermission rows after a previous save race.
+        _replace_user_permissions(db, card.user_id, card_ids)
+        db.commit()
+    return card_ids
 
 
 def _sync_card_permissions_to_user(db: Session, card: OrganizationEmployee, user_id: int) -> None:
-    perm_ids = [
-        row.permission_id
-        for row in db.query(OrganizationEmployeePermission)
-        .filter(OrganizationEmployeePermission.organization_employee_id == card.id)
-        .all()
-    ]
-    db.query(UserPermission).filter(UserPermission.user_id == user_id).delete()
-    for perm_id in perm_ids:
-        db.add(UserPermission(user_id=user_id, permission_id=perm_id))
+    _replace_user_permissions(db, user_id, _card_permission_ids(db, card.id))
 
 
 def set_card_permissions(db: Session, org_id: str, card_id: int, permission_ids: list[int]) -> None:
     card = _get_card_or_404(db, org_id, card_id)
     db.query(OrganizationEmployeePermission).filter(
         OrganizationEmployeePermission.organization_employee_id == card.id
-    ).delete()
-    for perm_id in permission_ids:
+    ).delete(synchronize_session=False)
+    valid_ids: list[int] = []
+    for perm_id in dict.fromkeys(permission_ids):
         if db.query(Permission).filter(Permission.id == perm_id).first():
             db.add(
                 OrganizationEmployeePermission(
@@ -357,8 +372,9 @@ def set_card_permissions(db: Session, org_id: str, card_id: int, permission_ids:
                     permission_id=perm_id,
                 )
             )
+            valid_ids.append(perm_id)
     if card.user_id:
-        _sync_card_permissions_to_user(db, card, card.user_id)
+        _replace_user_permissions(db, card.user_id, valid_ids)
         db.query(UserSession).filter(
             UserSession.user_id == card.user_id,
             UserSession.is_active.is_(True),

@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 
 ACTIVE_STATUSES = ("pending", "in_progress", "done")
 HISTORY_STATUSES = ("completed", "cancelled")
-ALL_STATUSES = ACTIVE_STATUSES + HISTORY_STATUSES
+REVIEW_STATUSES = ("review",)
+ALL_STATUSES = ACTIVE_STATUSES + HISTORY_STATUSES + REVIEW_STATUSES
 # Legacy aliases kept for migration/display
 LEGACY_STATUS_MAP = {
     "accepted": "pending",
@@ -195,7 +196,7 @@ class RepairOrderClientShopPartView(BaseModel):
 class RepairOrderCreate(BaseModel):
     client_id: int
     vehicle_id: int
-    scheduled_at: datetime
+    scheduled_at: Optional[datetime] = None
     scheduled_end_at: Optional[datetime] = None
     shipping_date: Optional[date] = None
     mileage_km: Optional[int] = Field(None, ge=0, le=9_999_999)
@@ -241,7 +242,7 @@ class RepairOrderAutoserviceStockImportIn(BaseModel):
 class RepairOrderStaffView(BaseModel):
     id: int
     organization_id: str
-    order_number: str
+    order_number: Optional[str] = None
     client_id: int
     vehicle_id: int
     client_comment: Optional[str] = None
@@ -253,12 +254,14 @@ class RepairOrderStaffView(BaseModel):
     shipping_date: Optional[date] = None
     mileage_km: Optional[int] = None
     accepted_by_user_id: int
+    created_by_user_id: Optional[int] = None
     status: str
     created_at: datetime
     updated_at: datetime
     client: RepairOrderClientBrief
     vehicle: RepairOrderVehicleBrief
     accepted_by: RepairOrderUserBrief
+    created_by: Optional[RepairOrderUserBrief] = None
     assignees: list[RepairOrderUserBrief] = Field(default_factory=list)
     works: list[RepairOrderWorkView] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartView] = Field(default_factory=list)
@@ -273,7 +276,7 @@ class RepairOrderStaffView(BaseModel):
 
 class RepairOrderClientView(BaseModel):
     id: int
-    order_number: str
+    order_number: Optional[str] = None
     vehicle_id: int
     client_comment: Optional[str] = None
     work_zone_id: Optional[int] = None

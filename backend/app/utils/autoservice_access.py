@@ -18,6 +18,7 @@ from app.utils.site_settings_db import autoservice_enabled
 
 AUTOSERVICE_PERMISSION_PLANNER = "autoservice.planner"
 AUTOSERVICE_PERMISSION_ORDERS = "autoservice.orders"
+AUTOSERVICE_PERMISSION_ORDERS_OWN = "autoservice.orders.own"
 AUTOSERVICE_PERMISSION_WAREHOUSE = "autoservice.warehouse"
 AUTOSERVICE_PERMISSION_FINANCE = "autoservice.finance"
 AUTOSERVICE_PERMISSION_REPORTS = "autoservice.reports"
@@ -28,6 +29,7 @@ AUTOSERVICE_PERMISSION_SETTINGS = "autoservice.settings"
 AUTOSERVICE_PERMISSION_CODES = (
     AUTOSERVICE_PERMISSION_PLANNER,
     AUTOSERVICE_PERMISSION_ORDERS,
+    AUTOSERVICE_PERMISSION_ORDERS_OWN,
     AUTOSERVICE_PERMISSION_WAREHOUSE,
     AUTOSERVICE_PERMISSION_FINANCE,
     AUTOSERVICE_PERMISSION_REPORTS,
@@ -75,6 +77,25 @@ def require_any_autoservice_permission(db: Session, user: User, *codes: str) -> 
 
 def require_autoservice_settings(db: Session, user: User) -> str:
     return require_autoservice_permission(db, user, AUTOSERVICE_PERMISSION_SETTINGS)
+
+
+def orders_access_level(db: Session, user: User) -> str | None:
+    if has_autoservice_permission(db, user, AUTOSERVICE_PERMISSION_ORDERS):
+        return "full"
+    if has_autoservice_permission(db, user, AUTOSERVICE_PERMISSION_ORDERS_OWN):
+        return "own"
+    return None
+
+
+def require_orders_access(db: Session, user: User) -> tuple[str, str]:
+    org_id = require_autoservice_staff(db, user)
+    level = orders_access_level(db, user)
+    if not level:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет доступа к заказ-нарядам",
+        )
+    return org_id, level
 
 
 def require_autoservice_enabled(db: Session) -> None:
