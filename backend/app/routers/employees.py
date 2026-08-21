@@ -67,6 +67,14 @@ def _ensure_default_permissions(db: Session) -> None:
         {"code": "inventory.create", "name": "Инвентаризация: создание"},
         {"code": "inventory.adjust", "name": "Инвентаризация: подсчёт"},
         {"code": "inventory.complete", "name": "Инвентаризация: завершение"},
+        {"code": "autoservice.planner", "name": "Планировщик"},
+        {"code": "autoservice.orders", "name": "Заказ-наряды"},
+        {"code": "autoservice.warehouse", "name": "Склад автосервиса"},
+        {"code": "autoservice.finance", "name": "Финансы автосервиса"},
+        {"code": "autoservice.reports", "name": "Отчёты автосервиса"},
+        {"code": "autoservice.clients", "name": "Клиенты автосервиса"},
+        {"code": "autoservice.inspections", "name": "Записи автосервиса"},
+        {"code": "autoservice.settings", "name": "Настройки автосервиса"},
     ]
     for perm in defaults:
         existing = db.query(Permission).filter(Permission.code == perm["code"]).first()

@@ -20,9 +20,10 @@ from app.schemas.inspection_booking import (
     InspectionBookingView,
 )
 from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_INSPECTIONS,
     normalize_phone_or_400,
     related_autoservice_client_ids,
-    require_autoservice_staff,
+    require_autoservice_permission,
     require_my_active_autoservice_client,
 )
 from app.utils.org_access import resolve_autoservice_organization_id
@@ -217,7 +218,7 @@ def list_inspection_bookings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
     q = (
         db.query(InspectionBooking)
         .options(joinedload(InspectionBooking.vehicle))
@@ -261,7 +262,7 @@ def create_staff_inspection_booking(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
     phone = _normalize_phone_or_400(payload.phone)
     notes = (payload.notes or "").strip() or None
     garage_vehicle_id = payload.garage_vehicle_id
@@ -330,7 +331,7 @@ def patch_inspection_booking(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
     data = payload.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(

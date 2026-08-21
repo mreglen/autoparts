@@ -21,6 +21,12 @@ const PERMISSION_GROUP_DEFS = [
     match: (code) => code.startsWith('finance.'),
   },
   {
+    id: 'autoservice',
+    title: 'Автосервис',
+    description: 'Планировщик, заказ-наряды, склад, клиенты',
+    match: (code) => code.startsWith('autoservice.'),
+  },
+  {
     id: 'settings',
     title: 'Настройки',
     description: 'Печать, интеграции, адреса',

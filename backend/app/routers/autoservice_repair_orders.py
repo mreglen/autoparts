@@ -59,9 +59,10 @@ from app.schemas.repair_order import (
 )
 from app.schemas.autoservice_finance import AutoservicePaymentIn
 from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_ORDERS,
     display_client_phone,
     related_autoservice_client_ids,
-    require_autoservice_staff,
+    require_autoservice_permission,
     require_my_active_autoservice_client,
     user_display_name,
 )
@@ -962,7 +963,7 @@ def get_repair_order_work_zones_meta(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     zones = _list_active_work_zones(db, org_id)
     return RepairOrderWorkZonesMeta(
         work_zones=[RepairOrderWorkZoneBrief.model_validate(z) for z in zones],
@@ -978,7 +979,7 @@ def search_warehouse_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     term = (q or "").strip()
     query = db.query(Product).filter(Product.organization_id == org_id)
     if term:
@@ -1015,7 +1016,7 @@ def list_repair_order_service_employee_options(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     rows = (
         db.query(AutoserviceServiceEmployee)
         .join(
@@ -1049,7 +1050,7 @@ def list_repair_order_staff_options(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     users = (
         db.query(User)
         .filter(
@@ -1120,7 +1121,7 @@ def list_repair_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     if scope not in ("active", "history", "all"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1169,7 +1170,7 @@ def get_repair_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     row = _get_org_order_or_404(db, org_id, order_id)
     return _to_staff_view(db, row)
 
@@ -1184,7 +1185,7 @@ def create_repair_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     _get_client_and_vehicle(db, org_id, payload.client_id, payload.vehicle_id)
     assignees = _resolve_assignees(db, org_id, payload.assignee_user_ids)
     scheduled_at = _normalize_dt(payload.scheduled_at)
@@ -1227,7 +1228,7 @@ def update_repair_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     row = _get_org_order_or_404(db, org_id, order_id)
 
     client_id = payload.client_id if payload.client_id is not None else row.client_id
@@ -1289,7 +1290,7 @@ def update_manual_repair_order_shop_part(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     _get_org_order_or_404(db, org_id, order_id)
     part = update_manual_shop_part(
         db,
@@ -1318,7 +1319,7 @@ def detach_imported_repair_order_shop_part(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     detach_imported_shop_part_from_repair_order(
         db,
         org_id=org_id,
@@ -1340,7 +1341,7 @@ def import_repair_order_purchase_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     row = _get_org_order_or_404(db, org_id, order_id)
     append_purchase_items_to_repair_order(
         db,
@@ -1364,7 +1365,7 @@ def import_autoservice_stock_to_repair_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     row = _get_org_order_or_404(db, org_id, order_id)
     if row.status in HISTORY_STATUSES:
         raise HTTPException(
@@ -1392,7 +1393,7 @@ def remove_repair_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     delete_repair_order(db, org_id=org_id, order_id=order_id)
     db.commit()
 
@@ -1407,7 +1408,7 @@ def patch_repair_order_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     row = _get_org_order_or_404(db, org_id, order_id)
     if payload.status not in ALL_STATUSES:
         raise HTTPException(
@@ -1448,7 +1449,7 @@ def post_repair_order_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     row = _get_org_order_or_404(db, org_id, order_id)
     grand_total = _order_grand_total(row)
     create_repair_order_payment(

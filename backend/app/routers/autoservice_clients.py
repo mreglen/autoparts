@@ -26,6 +26,7 @@ from app.schemas.autoservice_client import (
     AutoserviceClientView,
 )
 from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_CLIENTS,
     display_client_phone,
     is_missing_phone_placeholder,
     missing_phone_placeholder,
@@ -33,7 +34,7 @@ from app.utils.autoservice_access import (
     normalize_phone_optional_or_400,
     require_autoservice_enabled,
     require_autoservice_org_id,
-    require_autoservice_staff,
+    require_autoservice_permission,
     storage_phone_or_placeholder,
     user_display_name,
 )
@@ -445,7 +446,7 @@ def list_autoservice_clients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_CLIENTS)
     query = db.query(AutoserviceClient).filter(AutoserviceClient.organization_id == org_id)
     query = _apply_client_search_filter(query, org_id, q)
     rows = query.order_by(
@@ -467,7 +468,7 @@ def create_autoservice_client_staff(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_CLIENTS)
     phone = storage_phone_or_placeholder(payload.phone)
     name = payload.name.strip()
 
@@ -511,7 +512,7 @@ def update_autoservice_client_staff(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_CLIENTS)
     row = _get_org_client_or_404(db, org_id, client_id)
     data = payload.model_dump(exclude_unset=True)
     is_guest = row.user_id is None
@@ -572,7 +573,7 @@ def create_autoservice_client_account(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_CLIENTS)
     row = _get_org_client_or_404(db, org_id, client_id)
 
     if row.user_id is not None:

@@ -22,6 +22,10 @@ import {
   canAccessAutoserviceClientMenu,
 } from './utils/autoservicePublic';
 import {
+  canAccessAutoserviceSection,
+  getDefaultAutoserviceStaffPath,
+} from './utils/autoservicePermissions';
+import {
   getCabinetMode,
   getDefaultPathForCabinetMode,
 } from './utils/cabinetMode';
@@ -286,12 +290,14 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
   const showAutoservice = useShowAutoservice();
   const autoserviceOrganizationId = useAutoserviceOrganizationId();
   const user = useSelector((state) => state.auth.user);
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const cabinetMode = getCabinetMode(user, { autoserviceOrganizationId });
   const accessOptions = {
     showAutoservice,
     autoserviceOrganizationId,
     cabinetMode,
     organizationIsAutoservice: Boolean(user?.organization_is_autoservice),
+    permissionCodes: permissionCodes || [],
   };
 
   if (!showAutoservice && !user?.is_admin) {
@@ -301,7 +307,10 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
     return <Navigate to="/garage" replace />;
   }
   if (settingsOnly && !canAccessAutoserviceSettings(user, accessOptions)) {
-    return <Navigate to="/autoservice/orders" replace />;
+    return <Navigate to={getDefaultAutoserviceStaffPath(user, permissionCodes || [])} replace />;
+  }
+  if (!canAccessAutoserviceSection(user, permissionCodes || [], section)) {
+    return <Navigate to={getDefaultAutoserviceStaffPath(user, permissionCodes || [])} replace />;
   }
   if (section === 'planner') {
     return (

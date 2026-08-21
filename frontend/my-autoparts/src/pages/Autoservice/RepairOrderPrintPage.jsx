@@ -165,7 +165,7 @@ function SignLine({ label, nameControl }) {
       <tbody>
         <tr>
           <td className="whitespace-nowrap pr-1.5 align-bottom">{label}</td>
-          <td className="w-40 min-w-[9rem] border-b border-black align-bottom">&nbsp;</td>
+          <td className="w-28 min-w-[6.5rem] border-b border-black align-bottom">&nbsp;</td>
           <td className="px-0.5 align-bottom">/</td>
           <td className="whitespace-nowrap pl-0.5 align-bottom">{nameControl}</td>
         </tr>
@@ -719,13 +719,15 @@ export default function RepairOrderPrintPage() {
           <table className="w-full border-collapse">
             <tbody>
               <tr>
-                <td className="w-[32%] whitespace-nowrap align-bottom pr-2">
+                <td className="w-[22%] whitespace-nowrap align-bottom pr-2">
                   Дата {editControl('signDate', 'upd-edit-inline min-w-[7rem]')}
                 </td>
                 <td className="align-bottom pb-1.5">
                   <SignLine
                     label="Подпись заказчика"
-                    nameControl={editControl('clientSignName', 'upd-edit-inline')}
+                    nameControl={editControl('clientSignName', 'upd-edit-inline', {
+                      size: Math.max(18, String(form.clientSignName || '').length),
+                    })}
                   />
                 </td>
               </tr>
@@ -734,7 +736,9 @@ export default function RepairOrderPrintPage() {
                 <td className="align-bottom">
                   <SignLine
                     label="Подпись исполнителя"
-                    nameControl={editControl('contractorSignName', 'upd-edit-inline')}
+                    nameControl={editControl('contractorSignName', 'upd-edit-inline', {
+                      size: Math.max(18, String(form.contractorSignName || '').length),
+                    })}
                   />
                 </td>
               </tr>

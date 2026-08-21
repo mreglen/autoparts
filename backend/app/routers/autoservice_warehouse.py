@@ -47,7 +47,7 @@ from app.services.autoservice_warehouse_service import (
     update_receipt_doc_date,
     update_receipt_line_details,
 )
-from app.utils.autoservice_access import require_autoservice_staff
+from app.utils.autoservice_access import AUTOSERVICE_PERMISSION_WAREHOUSE, require_autoservice_permission
 from app.utils.autoservice_warehouse_supplier import resolve_autoservice_supplier_display_name
 from app.services.autoservice_warehouse_return_service import (
     create_warehouse_return,
@@ -203,7 +203,7 @@ def list_autoservice_warehouse_purchase_lots(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     return list_purchase_lots(db, org_id=org_id)
 
 
@@ -217,7 +217,7 @@ def create_autoservice_warehouse_return(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     row = create_warehouse_return(
         db,
         org_id=org_id,
@@ -247,7 +247,7 @@ def list_autoservice_warehouse_returns(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     return [
         serialize_warehouse_return(row)
         for row in list_warehouse_returns(db, org_id=org_id)
@@ -264,7 +264,7 @@ def update_own_autoservice_warehouse_return(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     if payload.status_code != "cancelled":
         raise HTTPException(
             status_code=403,
@@ -290,7 +290,7 @@ def list_autoservice_warehouse_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     query = db.query(AutoserviceWarehouseItem).filter(
         AutoserviceWarehouseItem.organization_id == org_id,
     )
@@ -321,7 +321,7 @@ def patch_autoservice_warehouse_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     item = update_autoservice_warehouse_item(
         db,
         org_id=org_id,
@@ -344,7 +344,7 @@ def list_autoservice_warehouse_receipts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     rows = (
         db.query(AutoserviceWarehouseReceiptDoc)
         .options(
@@ -374,7 +374,7 @@ def suggest_autoservice_warehouse_receipts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     term = (q or "").strip()
     query = (
         db.query(AutoserviceWarehouseReceipt, AutoserviceWarehouseItem)
@@ -435,7 +435,7 @@ def get_autoservice_warehouse_receipt_doc(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     doc = (
         db.query(AutoserviceWarehouseReceiptDoc)
         .options(
@@ -498,7 +498,7 @@ def update_autoservice_warehouse_receipt_doc(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     update_receipt_doc_date(
         db,
         org_id=org_id,
@@ -521,7 +521,7 @@ def update_autoservice_warehouse_receipt_line(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     update_receipt_line_details(
         db,
         org_id=org_id,
@@ -569,7 +569,7 @@ def update_autoservice_warehouse_receipt_line_price(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     fields_set = payload.model_fields_set
     update_manual_receipt_line_prices(
         db,
@@ -616,7 +616,7 @@ def list_autoservice_warehouse_expenses(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     rows = (
         db.query(AutoserviceWarehouseExpense)
         .options(
@@ -660,7 +660,7 @@ def import_purchases_to_autoservice_warehouse(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     added, skipped, not_found = import_purchase_groups_to_warehouse(
         db,
         org_id=org_id,
@@ -684,7 +684,7 @@ def create_autoservice_warehouse_receipt(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     qty_dec = Decimal(str(payload.quantity))
     if payload.unit == "pcs":
         if qty_dec != qty_dec.to_integral_value():
@@ -746,7 +746,7 @@ def create_autoservice_warehouse_expense(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
     expense = create_autoservice_expense(
         db,
         org_id=org_id,

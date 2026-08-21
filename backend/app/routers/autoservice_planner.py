@@ -19,7 +19,11 @@ from app.schemas.autoservice_planner import (
     PlannerWeekZoneDay,
     PlannerWeekZoneRow,
 )
-from app.utils.autoservice_access import display_client_phone, require_autoservice_staff
+from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_PLANNER,
+    display_client_phone,
+    require_autoservice_permission,
+)
 
 router = APIRouter(tags=["Autoservice planner"])
 
@@ -98,7 +102,7 @@ def get_planner_week(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
     start = _week_start(week_start)
     day_dates = [start + timedelta(days=offset) for offset in range(7)]
     week_end = day_dates[-1]

@@ -8,7 +8,13 @@ from app.db.database import get_db
 from app.models.autoservice_work import AutoserviceWork
 from app.models.user import User
 from app.schemas.autoservice_work import AutoserviceWorkCreate, AutoserviceWorkUpdate, AutoserviceWorkView
-from app.utils.autoservice_access import require_autoservice_director, require_autoservice_staff
+from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_ORDERS,
+    AUTOSERVICE_PERMISSION_PLANNER,
+    AUTOSERVICE_PERMISSION_SETTINGS,
+    require_any_autoservice_permission,
+    require_autoservice_settings,
+)
 
 router = APIRouter(tags=["Autoservice works"])
 
@@ -34,7 +40,13 @@ def list_autoservice_works(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_ORDERS,
+        AUTOSERVICE_PERMISSION_PLANNER,
+        AUTOSERVICE_PERMISSION_SETTINGS,
+    )
     query = db.query(AutoserviceWork).filter(AutoserviceWork.organization_id == org_id)
     if not include_inactive:
         query = query.filter(AutoserviceWork.is_active.is_(True))
@@ -55,7 +67,12 @@ def create_autoservice_work(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_ORDERS,
+        AUTOSERVICE_PERMISSION_SETTINGS,
+    )
     name = payload.name.strip()
     exists = (
         db.query(AutoserviceWork.id)
@@ -96,7 +113,7 @@ def update_autoservice_work(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_director(db, current_user)
+    org_id = require_autoservice_settings(db, current_user)
     row = _get_org_work_or_404(db, org_id, work_id)
     if payload.name is not None:
         name = payload.name.strip()
@@ -129,7 +146,7 @@ def delete_autoservice_work(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_director(db, current_user)
+    org_id = require_autoservice_settings(db, current_user)
     row = _get_org_work_or_404(db, org_id, work_id)
     row.is_active = False
     db.commit()

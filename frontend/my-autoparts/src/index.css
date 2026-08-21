@@ -263,13 +263,14 @@ input[type="password"] {
 
 .repair-order-print-sheet .repair-order-sign-table {
   width: auto !important;
-  max-width: none !important;
+  max-width: 100% !important;
   table-layout: auto !important;
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .repair-order-print-sheet .repair-order-sign-table td {
   width: auto !important;
+  overflow: visible;
   overflow-wrap: normal;
   word-break: normal;
   white-space: nowrap;
@@ -278,7 +279,8 @@ input[type="password"] {
 .repair-order-print-sheet .repair-order-sign-table .upd-edit {
   width: auto !important;
   min-width: 0 !important;
-  max-width: none;
+  max-width: none !important;
+  overflow: visible;
 }
 
 /* Предпросмотр документов: масштаб + перетаскивание мышью/пальцем */

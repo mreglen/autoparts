@@ -13,7 +13,7 @@ from app.schemas.autoservice_document_buyer import (
     AutoserviceDocumentBuyerUpdate,
     AutoserviceDocumentBuyerView,
 )
-from app.utils.autoservice_access import require_autoservice_staff
+from app.utils.autoservice_access import AUTOSERVICE_PERMISSION_ORDERS, require_autoservice_permission
 
 router = APIRouter(tags=["Autoservice document buyers"])
 
@@ -45,7 +45,7 @@ def list_document_buyers(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     query = db.query(AutoserviceDocumentBuyer).filter(
         AutoserviceDocumentBuyer.organization_id == org_id,
     )
@@ -68,7 +68,7 @@ def get_document_buyer(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     return AutoserviceDocumentBuyerView.model_validate(_get_org_buyer_or_404(db, org_id, buyer_id))
 
 
@@ -82,7 +82,7 @@ def create_document_buyer(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     row = AutoserviceDocumentBuyer(
         organization_id=org_id,
         name=payload.name.strip(),
@@ -103,7 +103,7 @@ def update_document_buyer(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_ORDERS)
     row = _get_org_buyer_or_404(db, org_id, buyer_id)
     if payload.name is not None:
         name = payload.name.strip()

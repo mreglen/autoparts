@@ -9,9 +9,72 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.organization import Organization
 from app.models.autoservice_client import AutoserviceClient
+from app.models.permission import Permission
+from app.models.user_permission import UserPermission
 from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.phone import normalize_to_storage_format
 from app.utils.site_settings_db import autoservice_enabled
+
+
+AUTOSERVICE_PERMISSION_PLANNER = "autoservice.planner"
+AUTOSERVICE_PERMISSION_ORDERS = "autoservice.orders"
+AUTOSERVICE_PERMISSION_WAREHOUSE = "autoservice.warehouse"
+AUTOSERVICE_PERMISSION_FINANCE = "autoservice.finance"
+AUTOSERVICE_PERMISSION_REPORTS = "autoservice.reports"
+AUTOSERVICE_PERMISSION_CLIENTS = "autoservice.clients"
+AUTOSERVICE_PERMISSION_INSPECTIONS = "autoservice.inspections"
+AUTOSERVICE_PERMISSION_SETTINGS = "autoservice.settings"
+
+AUTOSERVICE_PERMISSION_CODES = (
+    AUTOSERVICE_PERMISSION_PLANNER,
+    AUTOSERVICE_PERMISSION_ORDERS,
+    AUTOSERVICE_PERMISSION_WAREHOUSE,
+    AUTOSERVICE_PERMISSION_FINANCE,
+    AUTOSERVICE_PERMISSION_REPORTS,
+    AUTOSERVICE_PERMISSION_CLIENTS,
+    AUTOSERVICE_PERMISSION_INSPECTIONS,
+    AUTOSERVICE_PERMISSION_SETTINGS,
+)
+
+
+def has_autoservice_permission(db: Session, user: User, code: str) -> bool:
+    if user.is_admin or user.is_director or user.is_seller:
+        return True
+    if not user.is_employee:
+        return False
+    q = (
+        db.query(Permission.code)
+        .join(UserPermission, UserPermission.permission_id == Permission.id)
+        .filter(UserPermission.user_id == user.id, Permission.code == code)
+    )
+    return db.query(q.exists()).scalar() is True
+
+
+def require_autoservice_permission(db: Session, user: User, code: str) -> str:
+    org_id = require_autoservice_staff(db, user)
+    if has_autoservice_permission(db, user, code):
+        return org_id
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Нет доступа к этому разделу автосервиса",
+    )
+
+
+def require_any_autoservice_permission(db: Session, user: User, *codes: str) -> str:
+    org_id = require_autoservice_staff(db, user)
+    if user.is_admin or user.is_director or user.is_seller:
+        return org_id
+    for code in codes:
+        if has_autoservice_permission(db, user, code):
+            return org_id
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Нет доступа к этому разделу автосервиса",
+    )
+
+
+def require_autoservice_settings(db: Session, user: User) -> str:
+    return require_autoservice_permission(db, user, AUTOSERVICE_PERMISSION_SETTINGS)
 
 
 def require_autoservice_enabled(db: Session) -> None:

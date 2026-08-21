@@ -6,14 +6,15 @@ import {
   saveEmployeePermissions,
 } from '../../redux/slices/OrganizationSlice';
 import { groupPermissionsForGrid } from './permissionGridGroups';
+import { Badge, Button, Card, EmptyState, Modal, Skeleton } from '../UI';
 
 function PermissionTile({ permission, checked, disabled, onToggle }) {
   return (
     <label
-      className={`flex min-h-[88px] cursor-pointer flex-col justify-between rounded-xl border-2 p-3 transition-all duration-150 ${
+      className={`flex min-h-[88px] cursor-pointer flex-col justify-between rounded-sg border p-3 transition-all duration-150 ${
         checked
-          ? 'border-indigo-500 bg-indigo-50/70 shadow-sm'
-          : 'border-gray-200 bg-white hover:border-indigo-200 hover:bg-gray-50/80'
+          ? 'border-brand-400 bg-brand-50/70 shadow-sg-sm'
+          : 'border-line bg-surface hover:border-brand-200 hover:bg-surface-subtle'
       } ${disabled ? 'pointer-events-none opacity-60' : ''}`}
     >
       <input
@@ -24,10 +25,10 @@ function PermissionTile({ permission, checked, disabled, onToggle }) {
         disabled={disabled}
       />
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-medium leading-snug text-gray-900">{permission.name}</span>
+        <span className="text-sm font-medium leading-snug text-ink">{permission.name}</span>
         <span
           className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 ${
-            checked ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300 bg-white'
+            checked ? 'border-brand-600 bg-brand-600 text-white' : 'border-line bg-surface'
           }`}
         >
           {checked && (
@@ -38,11 +39,28 @@ function PermissionTile({ permission, checked, disabled, onToggle }) {
         </span>
       </div>
       {permission.code && (
-        <span className="mt-2 truncate font-mono text-[11px] text-gray-400" title={permission.code}>
+        <span className="mt-2 truncate font-mono text-[11px] text-ink-muted" title={permission.code}>
           {permission.code}
         </span>
       )}
     </label>
+  );
+}
+
+function PermissionGridSkeleton() {
+  return (
+    <div className="space-y-6">
+      {Array.from({ length: 3 }).map((_, groupIndex) => (
+        <Card key={`sk-group-${groupIndex}`} padding="sm">
+          <Skeleton className="mb-4 h-4 w-40" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((__, tileIndex) => (
+              <Skeleton key={`sk-tile-${groupIndex}-${tileIndex}`} className="h-[88px] rounded-sg" />
+            ))}
+          </div>
+        </Card>
+      ))}
+    </div>
   );
 }
 
@@ -76,19 +94,19 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
 
   const permissionGroups = useMemo(
     () => groupPermissionsForGrid(permissions),
-    [permissions]
+    [permissions],
   );
 
   const totalCount = useMemo(
-    () => permissionGroups.reduce((sum, g) => sum + g.permissions.length, 0),
-    [permissionGroups]
+    () => permissionGroups.reduce((sum, group) => sum + group.permissions.length, 0),
+    [permissionGroups],
   );
 
   const togglePermission = (permissionId) => {
     setLocalPermissions((prev) =>
       prev.includes(permissionId)
         ? prev.filter((id) => id !== permissionId)
-        : [...prev, permissionId]
+        : [...prev, permissionId],
     );
   };
 
@@ -102,7 +120,7 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
   };
 
   const handleSelectAll = () => {
-    const allIds = permissionGroups.flatMap((g) => g.permissions.map((p) => p.id));
+    const allIds = permissionGroups.flatMap((group) => group.permissions.map((permission) => permission.id));
     setLocalPermissions(allIds);
   };
 
@@ -118,166 +136,123 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
         orgId,
         cardId: employee.id,
         permissionIds: localPermissions,
-      })
+      }),
     );
 
     if (saveEmployeePermissions.fulfilled.match(resultAction)) {
       onClose();
     } else {
-      alert('Ошибка при сохранении прав: ' + (resultAction.payload || 'Неизвестная ошибка'));
+      alert(`Ошибка при сохранении прав: ${resultAction.payload || 'Неизвестная ошибка'}`);
     }
   };
 
   const isLoading = loadingPermissions || loadingEmployeePermissions;
   const isSaving = savingEmployeePermissions;
 
-  if (!show || !employee) return null;
+  if (!employee) return null;
 
   const employeeName = [employee.last_name, employee.first_name].filter(Boolean).join(' ');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Права доступа</h3>
-            <p className="mt-1 text-sm text-gray-500">{employeeName || 'Сотрудник'}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Закрыть"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <Modal
+      open={show}
+      onClose={onClose}
+      size="xl"
+      className="max-h-[92vh]"
+      title={
+        <div>
+          <h2 className="text-base font-semibold text-ink">Права доступа</h2>
+          <p className="mt-0.5 text-sm text-ink-muted">{employeeName || 'Сотрудник'}</p>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-                <svg
-                  className="h-8 w-8 animate-spin text-indigo-600"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm text-gray-600">Загрузка прав доступа...</p>
-            </div>
-          ) : permissionsError ? (
-            <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{permissionsError}</p>
-          ) : totalCount === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">Нет доступных прав</p>
-          ) : (
-            <>
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-3">
-                <p className="text-sm text-gray-600">
-                  Выбрано{' '}
-                  <span className="font-semibold text-gray-900">{localPermissions.length}</span>
-                  {' '}из {totalCount}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSelectAll}
-                    disabled={isSaving}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Выбрать все
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClearAll}
-                    disabled={isSaving}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Снять все
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                {permissionGroups.map((group) => {
-                  const groupIds = group.permissions.map((p) => p.id);
-                  const selectedInGroup = groupIds.filter((id) => localPermissions.includes(id)).length;
-                  const allInGroup = selectedInGroup === groupIds.length && groupIds.length > 0;
-
-                  return (
-                    <section key={group.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-3">
-                        <div>
-                          <h4 className="text-sm font-semibold text-gray-900">{group.title}</h4>
-                          {group.description && (
-                            <p className="mt-0.5 text-xs text-gray-500">{group.description}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">
-                            {selectedInGroup}/{groupIds.length}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={isSaving}
-                            onClick={() => toggleGroup(groupIds, !allInGroup)}
-                            className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                          >
-                            {allInGroup ? 'Снять раздел' : 'Весь раздел'}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {group.permissions.map((permission) => (
-                          <PermissionTile
-                            key={permission.id}
-                            permission={permission}
-                            checked={localPermissions.includes(permission.id)}
-                            disabled={isSaving}
-                            onToggle={() => togglePermission(permission.id)}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="flex flex-col-reverse gap-3 border-t border-gray-100 bg-gray-50/50 px-6 py-4 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            disabled={isSaving}
-          >
+      }
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
             Отмена
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className={`rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-colors ${
-              isSaving ? 'cursor-not-allowed bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'
-            }`}
-            disabled={isSaving || isLoading}
-          >
-            {isSaving ? 'Сохранение...' : 'Сохранить права'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+          <Button onClick={handleSave} loading={isSaving} disabled={isLoading}>
+            Сохранить права
+          </Button>
+        </>
+      }
+    >
+      {isLoading ? (
+        <PermissionGridSkeleton />
+      ) : permissionsError ? (
+        <EmptyState
+          illustration="error"
+          title="Не удалось загрузить права"
+          description={permissionsError}
+        />
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="Нет доступных прав"
+          description="Каталог прав пока пуст. Обратитесь к администратору."
+        />
+      ) : (
+        <>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-sg border border-line bg-surface-subtle px-4 py-3">
+            <Badge tone="brand">
+              Выбрано {localPermissions.length} из {totalCount}
+            </Badge>
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={handleSelectAll} disabled={isSaving}>
+                Выбрать все
+              </Button>
+              <Button size="sm" variant="secondary" onClick={handleClearAll} disabled={isSaving}>
+                Снять все
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            {permissionGroups.map((group) => {
+              const groupIds = group.permissions.map((permission) => permission.id);
+              const selectedInGroup = groupIds.filter((id) => localPermissions.includes(id)).length;
+              const allInGroup = selectedInGroup === groupIds.length && groupIds.length > 0;
+
+              return (
+                <Card key={group.id} padding="sm">
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-ink">{group.title}</h4>
+                      {group.description ? (
+                        <p className="mt-0.5 text-xs text-ink-muted">{group.description}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone="neutral">
+                        {selectedInGroup}/{groupIds.length}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={isSaving}
+                        onClick={() => toggleGroup(groupIds, !allInGroup)}
+                      >
+                        {allInGroup ? 'Снять раздел' : 'Весь раздел'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {group.permissions.map((permission) => (
+                      <PermissionTile
+                        key={permission.id}
+                        permission={permission}
+                        checked={localPermissions.includes(permission.id)}
+                        disabled={isSaving}
+                        onToggle={() => togglePermission(permission.id)}
+                      />
+                    ))}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </Modal>
   );
 };
 

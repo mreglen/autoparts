@@ -16,7 +16,14 @@ from app.schemas.autoservice_work_zone import (
     AutoserviceWorkZoneView,
 )
 from app.services.autoservice_work_zone_helpers import next_work_zone_name
-from app.utils.autoservice_access import require_autoservice_director, require_autoservice_staff
+from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_INSPECTIONS,
+    AUTOSERVICE_PERMISSION_ORDERS,
+    AUTOSERVICE_PERMISSION_PLANNER,
+    AUTOSERVICE_PERMISSION_SETTINGS,
+    require_any_autoservice_permission,
+    require_autoservice_settings,
+)
 
 router = APIRouter(tags=["Autoservice work zones"])
 
@@ -41,7 +48,14 @@ def list_autoservice_work_zones(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_PLANNER,
+        AUTOSERVICE_PERMISSION_ORDERS,
+        AUTOSERVICE_PERMISSION_INSPECTIONS,
+        AUTOSERVICE_PERMISSION_SETTINGS,
+    )
     query = db.query(AutoserviceWorkZone).filter(AutoserviceWorkZone.organization_id == org_id)
     if not include_archived:
         query = query.filter(AutoserviceWorkZone.is_active.is_(True))
@@ -62,7 +76,7 @@ def create_autoservice_work_zone(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_director(db, current_user)
+    org_id = require_autoservice_settings(db, current_user)
     default_name, sort_order = next_work_zone_name(db, org_id)
     name = (payload.name or "").strip() or default_name
     exists = (
@@ -97,7 +111,7 @@ def update_autoservice_work_zone(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_director(db, current_user)
+    org_id = require_autoservice_settings(db, current_user)
     row = _get_org_zone_or_404(db, org_id, zone_id)
     name = payload.name.strip()
     if not name:
@@ -131,7 +145,7 @@ def delete_autoservice_work_zone(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_director(db, current_user)
+    org_id = require_autoservice_settings(db, current_user)
     row = _get_org_zone_or_404(db, org_id, zone_id)
     used = (
         db.query(RepairOrder.id)

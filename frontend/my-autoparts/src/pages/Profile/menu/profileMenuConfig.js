@@ -1,7 +1,11 @@
 import {
-    canAccessAutoserviceSettings,
     canAccessAutoserviceClientMenu,
 } from '../../../utils/autoservicePublic';
+import {
+    AUTOSERVICE_MENU_ITEMS,
+    canAccessAutoserviceSettingsPermission,
+    hasAutoservicePermission,
+} from '../../../utils/autoservicePermissions';
 import {
     CABINET_MODE_ADMIN,
     CABINET_MODE_AUTOSERVICE,
@@ -123,27 +127,50 @@ const buildAutoserviceClientTab = (isClient) => {
     };
 };
 
-const buildAutoserviceStaffTab = (user, options) => {
-    const submenu = [
-        { id: 'autoservice-planner', label: 'Планировщик' },
-        { id: 'autoservice-orders', label: 'Заказ-наряд' },
-        {
-            id: 'autoservice-warehouse-group',
-            label: 'Склад',
-            submenu: [
-                { id: 'autoservice-warehouse', label: 'Склад автосервиса' },
-                { id: 'autoservice-warehouse-receipts', label: 'Поступления' },
-                { id: 'autoservice-warehouse-expenses', label: 'Расходы' },
-            ],
-        },
-        { id: 'autoservice-finance', label: 'Финансы' },
-        { id: 'autoservice-reports', label: 'Отчёты' },
-        { id: 'autoservice-clients', label: 'Клиенты' },
-        { id: 'autoservice-inspections', label: 'Записи' },
-    ];
-    if (canAccessAutoserviceSettings(user, options)) {
-        submenu.push({ id: 'autoservice-settings', label: 'Настройки' });
-    }
+const buildAutoserviceStaffTab = (user, options, hasPermission) => {
+    const permissionCodes = options.permissionCodes || [];
+    const can = (code) => hasAutoservicePermission(user, permissionCodes, code);
+
+    const submenu = [];
+
+    AUTOSERVICE_MENU_ITEMS.forEach((item) => {
+        if (item.settingsOnly) {
+            if (!canAccessAutoserviceSettingsPermission(user, permissionCodes)) return;
+            submenu.push({ id: item.id, label: 'Настройки' });
+            return;
+        }
+
+        if (!can(item.permission)) return;
+
+        if (item.submenu?.length) {
+            submenu.push({
+                id: item.id,
+                label: 'Склад',
+                submenu: item.submenu.map((child) => ({
+                    id: child.id,
+                    label:
+                        child.id === 'autoservice-warehouse'
+                            ? 'Склад автосервиса'
+                            : child.id === 'autoservice-warehouse-receipts'
+                              ? 'Поступления'
+                              : 'Расходы',
+                })),
+            });
+            return;
+        }
+
+        const labels = {
+            'autoservice-planner': 'Планировщик',
+            'autoservice-orders': 'Заказ-наряд',
+            'autoservice-finance': 'Финансы',
+            'autoservice-reports': 'Отчёты',
+            'autoservice-clients': 'Клиенты',
+            'autoservice-inspections': 'Записи',
+        };
+        submenu.push({ id: item.id, label: labels[item.id] || item.id });
+    });
+
+    if (submenu.length === 0) return null;
     return { id: 'autoservice-staff', label: 'Сервис', submenu };
 };
 
@@ -246,6 +273,11 @@ const buildSellerTabs = (user, hasPermission, options) => {
 };
 
 const buildAutoserviceTabs = (user, hasPermission, options) => {
+    const autoserviceAccessOptions = {
+        ...options,
+        permissionCodes: options.permissionCodes || [],
+    };
+    const staffTab = buildAutoserviceStaffTab(user, autoserviceAccessOptions, hasPermission);
     const tabs = [
         { id: 'dashboard', label: 'Сводка' },
         {
@@ -253,8 +285,10 @@ const buildAutoserviceTabs = (user, hasPermission, options) => {
             label: 'Покупки',
             submenu: buildPurchasesSubmenu(),
         },
-        buildAutoserviceStaffTab(user, options),
     ];
+    if (staffTab) {
+        tabs.push(staffTab);
+    }
 
     tabs.push(buildGlobalSettingsTab(user, hasPermission));
     return tabs;
@@ -371,6 +405,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
         autoserviceOrganizationId,
         cabinetMode,
         organizationIsAutoservice: options.organizationIsAutoservice === true,
+        permissionCodes,
     };
 
     if (!user) return [];

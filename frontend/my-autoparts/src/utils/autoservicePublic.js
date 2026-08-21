@@ -5,6 +5,10 @@ import {
   CABINET_MODE_BUYER,
   CABINET_MODE_SELLER,
 } from './cabinetMode';
+import {
+  canAccessAutoserviceSettingsPermission,
+  hasAnyAutoservicePermission,
+} from './autoservicePermissions';
 
 export function selectShowAutoservice(state) {
   return state.publicInfo.showAutoservice === true;
@@ -31,6 +35,7 @@ export function canAccessAutoserviceStaffMenu(user, options = {}) {
   if (!user) return false;
   const orgIsAutoservice = options.organizationIsAutoservice === true;
   const cabinetMode = options.cabinetMode;
+  const permissionCodes = options.permissionCodes || [];
 
   if (user.is_admin) {
     if (
@@ -44,14 +49,22 @@ export function canAccessAutoserviceStaffMenu(user, options = {}) {
   }
 
   if (orgIsAutoservice) {
-    return Boolean(user.is_director || user.is_seller || user.is_employee);
+    if (user.is_director || user.is_seller) return true;
+    if (user.is_employee) {
+      return hasAnyAutoservicePermission(user, permissionCodes);
+    }
+    return false;
   }
 
   const orgId = options.autoserviceOrganizationId;
   if (!orgId) return false;
   if (options.showAutoservice !== true) return false;
   if (user.organization_id !== orgId) return false;
-  return Boolean(user.is_director || user.is_seller || user.is_employee);
+  if (user.is_director || user.is_seller) return true;
+  if (user.is_employee) {
+    return hasAnyAutoservicePermission(user, permissionCodes);
+  }
+  return false;
 }
 
 /**
@@ -101,10 +114,10 @@ export function isAutoserviceStaffPath(pathname) {
   return AUTOSERVICE_STAFF_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-/** Settings submenu: director of the autoservice org (incl. admin-director). */
+/** Settings submenu: director or explicit autoservice.settings permission. */
 export function canAccessAutoserviceSettings(user, options = {}) {
   if (!canAccessAutoserviceStaffMenu(user, options)) return false;
-  return Boolean(user.is_director);
+  return canAccessAutoserviceSettingsPermission(user, options.permissionCodes || []);
 }
 
 export const BECOME_CLIENT_CONFIRM = (publicName) =>

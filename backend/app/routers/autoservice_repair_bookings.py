@@ -21,9 +21,10 @@ from app.schemas.repair_booking import (
     RepairBookingView,
 )
 from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_INSPECTIONS,
     normalize_phone_or_400,
     related_autoservice_client_ids,
-    require_autoservice_staff,
+    require_autoservice_permission,
     require_my_active_autoservice_client,
 )
 
@@ -152,7 +153,7 @@ def create_repair_booking_staff(
     current_user: User = Depends(get_current_user),
 ):
     """Legacy alias — creates a unified inspection booking."""
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
     name = payload.name.strip()
     phone = normalize_phone_or_400(payload.phone)
     garage_vehicle_id = payload.garage_vehicle_id
@@ -235,7 +236,7 @@ def list_repair_bookings(
     current_user: User = Depends(get_current_user),
 ):
     """Legacy alias — lists unified inspection bookings for staff."""
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
     query = (
         db.query(InspectionBooking)
         .options(joinedload(InspectionBooking.vehicle))
@@ -270,7 +271,7 @@ def patch_repair_booking(
     current_user: User = Depends(get_current_user),
 ):
     """Legacy alias — updates a unified inspection booking."""
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
     data = payload.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(

@@ -38,7 +38,12 @@ from app.services.autoservice_payment_service import (
 )
 from app.services.autoservice_payroll import compute_org_monthly_payroll
 from app.services.autoservice_payroll_report_xlsx import build_payroll_report_workbook_bytes
-from app.utils.autoservice_access import require_autoservice_director, require_autoservice_staff
+from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_FINANCE,
+    AUTOSERVICE_PERMISSION_REPORTS,
+    require_autoservice_director,
+    require_autoservice_permission,
+)
 
 router = APIRouter(tags=["Autoservice finance"])
 
@@ -53,7 +58,7 @@ def get_autoservice_finance_receipts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_FINANCE)
     return list_finance_receipts(db, org_id=org_id, date_from=date_from, date_to=date_to)
 
 
@@ -67,7 +72,7 @@ def patch_autoservice_finance_receipt_date(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_FINANCE)
     row = update_autoservice_payment_date(
         db,
         org_id=org_id,
@@ -85,7 +90,7 @@ def export_autoservice_finance_receipts_xlsx(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_FINANCE)
     content = build_finance_receipts_workbook_bytes(db, org_id, date_from, date_to)
     filename = f"autoservice_payments_{date_from.isoformat()}_{date_to.isoformat()}.xlsx"
     return Response(
@@ -145,7 +150,7 @@ def get_autoservice_order_economics_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_REPORTS)
     filters = OrderEconomicsFilters(
         date_from=date_from,
         date_to=date_to,
@@ -172,7 +177,7 @@ def export_autoservice_order_economics_xlsx(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_REPORTS)
     filters = OrderEconomicsFilters(
         date_from=date_from,
         date_to=date_to,
@@ -201,7 +206,7 @@ def get_autoservice_warehouse_stock_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_REPORTS)
     filters = WarehouseStockReportFilters(
         year=year,
         month=month,
@@ -228,7 +233,7 @@ def export_autoservice_warehouse_stock_xlsx(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_REPORTS)
     filters = WarehouseStockReportFilters(
         year=year,
         month=month,

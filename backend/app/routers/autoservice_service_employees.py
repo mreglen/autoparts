@@ -16,7 +16,14 @@ from app.schemas.autoservice_service_employee import (
 )
 from app.services.autoservice_payroll import compute_employee_stats
 from app.services.organization_employee_sync import link_service_employee_card
-from app.utils.autoservice_access import require_autoservice_director, require_autoservice_staff
+from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_ORDERS,
+    AUTOSERVICE_PERMISSION_PLANNER,
+    AUTOSERVICE_PERMISSION_SETTINGS,
+    require_any_autoservice_permission,
+    require_autoservice_director,
+    require_autoservice_settings,
+)
 
 router = APIRouter(tags=["Autoservice service employees"])
 
@@ -41,7 +48,13 @@ def list_service_employees(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_ORDERS,
+        AUTOSERVICE_PERMISSION_PLANNER,
+        AUTOSERVICE_PERMISSION_SETTINGS,
+    )
     query = db.query(AutoserviceServiceEmployee).filter(
         AutoserviceServiceEmployee.organization_id == org_id,
     )
@@ -61,7 +74,7 @@ def create_service_employee(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_staff(db, current_user)
+    org_id = require_autoservice_settings(db, current_user)
     row = AutoserviceServiceEmployee(
         organization_id=org_id,
         name=payload.name.strip(),
@@ -90,7 +103,7 @@ def update_service_employee(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_director(db, current_user)
+    org_id = require_autoservice_settings(db, current_user)
     row = _get_org_employee_or_404(db, org_id, employee_id)
     if payload.name is not None:
         name = payload.name.strip()
@@ -120,7 +133,7 @@ def bulk_update_work_percent(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_director(db, current_user)
+    org_id = require_autoservice_settings(db, current_user)
     db.query(AutoserviceServiceEmployee).filter(
         AutoserviceServiceEmployee.organization_id == org_id,
         AutoserviceServiceEmployee.is_active.is_(True),
