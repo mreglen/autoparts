@@ -6,7 +6,19 @@ import {
   saveEmployeePermissions,
 } from '../../redux/slices/OrganizationSlice';
 import { groupPermissionsForGrid } from './permissionGridGroups';
-import { Badge, Button, Card, EmptyState, Modal, Skeleton } from '../UI';
+import Modal from '../UI/Modal';
+import Button from '../UI/Button';
+import Card from '../UI/Card';
+import Badge from '../UI/Badge';
+import EmptyState from '../UI/EmptyState';
+import { Skeleton } from '../UI/Skeleton';
+
+function formatPermissionError(error) {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  if (typeof error === 'object' && error.message) return String(error.message);
+  return 'Не удалось загрузить права';
+}
 
 function PermissionTile({ permission, checked, disabled, onToggle }) {
   return (
@@ -38,11 +50,11 @@ function PermissionTile({ permission, checked, disabled, onToggle }) {
           )}
         </span>
       </div>
-      {permission.code && (
+      {permission.code ? (
         <span className="mt-2 truncate font-mono text-[11px] text-ink-muted" title={permission.code}>
           {permission.code}
         </span>
-      )}
+      ) : null}
     </label>
   );
 }
@@ -93,7 +105,7 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
   }, [employee, employeePermissions, show]);
 
   const permissionGroups = useMemo(
-    () => groupPermissionsForGrid(permissions),
+    () => groupPermissionsForGrid(Array.isArray(permissions) ? permissions : []),
     [permissions],
   );
 
@@ -142,47 +154,44 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
     if (saveEmployeePermissions.fulfilled.match(resultAction)) {
       onClose();
     } else {
-      alert(`Ошибка при сохранении прав: ${resultAction.payload || 'Неизвестная ошибка'}`);
+      alert(`Ошибка при сохранении прав: ${formatPermissionError(resultAction.payload) || 'Неизвестная ошибка'}`);
     }
   };
 
+  if (!show || !employee) return null;
+
   const isLoading = loadingPermissions || loadingEmployeePermissions;
   const isSaving = savingEmployeePermissions;
-
-  if (!employee) return null;
-
   const employeeName = [employee.last_name, employee.first_name].filter(Boolean).join(' ');
+  const errorMessage = formatPermissionError(permissionsError);
 
   return (
     <Modal
       open={show}
       onClose={onClose}
       size="xl"
-      className="max-h-[92vh]"
-      title={
-        <div>
-          <h2 className="text-base font-semibold text-ink">Права доступа</h2>
-          <p className="mt-0.5 text-sm text-ink-muted">{employeeName || 'Сотрудник'}</p>
-        </div>
-      }
-      footer={
-        <>
+      className="relative z-10 max-h-[92vh] text-ink"
+      title="Права доступа"
+      footer={(
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={onClose} disabled={isSaving}>
             Отмена
           </Button>
           <Button onClick={handleSave} loading={isSaving} disabled={isLoading}>
             Сохранить права
           </Button>
-        </>
-      }
+        </div>
+      )}
     >
+      <p className="mb-4 text-sm text-ink-muted">{employeeName || 'Сотрудник'}</p>
+
       {isLoading ? (
         <PermissionGridSkeleton />
-      ) : permissionsError ? (
+      ) : errorMessage ? (
         <EmptyState
           illustration="error"
           title="Не удалось загрузить права"
-          description={permissionsError}
+          description={errorMessage}
         />
       ) : totalCount === 0 ? (
         <EmptyState
@@ -205,7 +214,7 @@ const PermissionAssignmentModal = ({ show, employee, orgId, onClose }) => {
             </div>
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-5 pb-1">
             {permissionGroups.map((group) => {
               const groupIds = group.permissions.map((permission) => permission.id);
               const selectedInGroup = groupIds.filter((id) => localPermissions.includes(id)).length;

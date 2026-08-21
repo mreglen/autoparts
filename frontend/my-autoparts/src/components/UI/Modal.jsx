@@ -49,7 +49,7 @@ export default function Modal({
         aria-modal="true"
         aria-label={typeof title === 'string' ? title : undefined}
         className={cx(
-          'relative flex w-full max-h-[min(92dvh,100%)] flex-col overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:max-h-[85vh] sm:rounded-sg-lg',
+          'relative z-10 flex w-full max-h-[min(92dvh,100%)] flex-col overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:max-h-[85vh] sm:rounded-sg-lg',
           width,
           className,
         )}

@@ -202,7 +202,7 @@ export const fetchPermissions = createAsyncThunk(
             const result = await apiRequest('/employees/permissions/all');
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка загрузки прав');
+            return rejectWithValue(err?.message || err?.detail || 'Ошибка загрузки прав');
         }
     }
 );
