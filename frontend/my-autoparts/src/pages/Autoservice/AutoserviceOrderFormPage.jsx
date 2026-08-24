@@ -26,6 +26,13 @@ import AutoserviceWarehouseAddModal from '../../components/Autoservice/Autoservi
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import {
+  clearRepairOrderCartDraft,
+  importCartItemsToRepairOrder,
+  mapCartItemsToShopParts,
+  readRepairOrderCartDraft,
+  saveRepairOrderCartDraft,
+} from '../../utils/repairOrderCartDraft';
+import {
   clearRepairOrderPurchaseDraft,
   importPurchaseGroupsToRepairOrder,
   mapPurchaseItemsToShopParts,
@@ -857,6 +864,9 @@ function shopPartRowKey(part, index) {
   if (part?.pending_import && part.purchase_item_id != null) {
     return `shop-part-pending-${part.purchase_order_type}-${part.purchase_item_id}`;
   }
+  if (part?.pending_cart_import && part.cart_item_id != null) {
+    return `shop-part-cart-pending-${part.cart_item_type}-${part.cart_item_id}`;
+  }
   return `shop-part-draft-${index}`;
 }
 
@@ -929,6 +939,7 @@ function mapOrderToFormState(order) {
           rossko_brand: p.rossko_brand || '',
           rossko_partnumber: p.rossko_partnumber || '',
           is_imported: Boolean(p.is_imported),
+          is_in_cart: Boolean(p.is_in_cart),
           is_manual_editable: Boolean(p.is_manual_editable),
         }))
       : [],
@@ -986,6 +997,7 @@ export default function AutoserviceOrderFormPage() {
   const [clientParts, setClientParts] = useState([]);
   const [shopParts, setShopParts] = useState([]);
   const [pendingPurchaseGroups, setPendingPurchaseGroups] = useState([]);
+  const [pendingCartItems, setPendingCartItems] = useState([]);
   const [shopPartAddMenuOpen, setShopPartAddMenuOpen] = useState(false);
   const [purchasePickerOpen, setPurchasePickerOpen] = useState(false);
   const [myPartsPickerOpen, setMyPartsPickerOpen] = useState(false);
@@ -1111,6 +1123,12 @@ export default function AutoserviceOrderFormPage() {
           initial.shopParts = draft.groups.flatMap((group) => (
             mapPurchaseItemsToShopParts(group.items, clientMarkupPercent)
           ));
+        } else {
+          const cartDraft = readRepairOrderCartDraft();
+          if (cartDraft?.items?.length) {
+            setPendingCartItems(cartDraft.items);
+            initial.shopParts = mapCartItemsToShopParts(cartDraft.items, clientMarkupPercent);
+          }
         }
         applyFormState(initial);
         setFormInitialized(true);
@@ -1327,6 +1345,21 @@ export default function AutoserviceOrderFormPage() {
         const next = removeItemFromPurchaseDraftGroups(prev, part);
         if (isCreate) {
           persistPurchaseDraftGroups(next);
+        }
+        return next;
+      });
+    }
+    if (part?.pending_cart_import) {
+      setPendingCartItems((prev) => {
+        const next = prev.filter(
+          (item) => !(item.id === part.cart_item_id && item.itemType === part.cart_item_type),
+        );
+        if (isCreate) {
+          if (next.length) {
+            saveRepairOrderCartDraft({ items: next });
+          } else {
+            clearRepairOrderCartDraft();
+          }
         }
         return next;
       });
@@ -1577,7 +1610,7 @@ export default function AutoserviceOrderFormPage() {
     shop_parts: ownMode
       ? []
       : shopParts
-      .filter((p) => !p.pending_import)
+      .filter((p) => !p.pending_import && !p.pending_cart_import)
       .map((p) => ({
         ...(p.id ? { id: p.id } : {}),
         title: p.title.trim(),
@@ -1646,7 +1679,7 @@ export default function AutoserviceOrderFormPage() {
       ) {
         return 'Итоговая цена ЗЧ исполнителя должна быть ≥ 0';
       }
-      if (p.pending_import) continue;
+      if (p.pending_import || p.pending_cart_import) continue;
       if (!String(p.title || '').trim()) {
         return 'У каждой запчасти исполнителя должно быть наименование';
       }
@@ -1696,6 +1729,13 @@ export default function AutoserviceOrderFormPage() {
           })
           .filter((group) => group.itemIds.length > 0)
         : [];
+      const cartItemsToImport = isCreate
+        ? pendingCartItems.filter((item) => shopParts.some(
+          (part) => part.pending_cart_import
+            && part.cart_item_id === item.id
+            && part.cart_item_type === item.itemType,
+        ))
+        : [];
       const goToSavedOrder = () => {
         navigate('/autoservice/orders');
       };
@@ -1712,38 +1752,54 @@ export default function AutoserviceOrderFormPage() {
           body: JSON.stringify(body),
         });
         let saved = created;
-        if (created?.id && groupsToImport.length) {
+        if (created?.id && (groupsToImport.length || cartItemsToImport.length)) {
           saveLinkedRepairOrder(created);
           try {
-            const itemPriceOverrides = Object.fromEntries(
-              shopParts
-                .filter((part) => (
-                  part.pending_import
-                  && part.purchase_item_id
-                  && part.client_unit_price_override !== ''
-                  && part.client_unit_price_override != null
-                ))
-                .map((part) => [
-                  part.purchase_item_id,
-                  Number(part.client_unit_price_override),
-                ]),
-            );
-            const updated = await importPurchaseGroupsToRepairOrder(
-              apiRequest,
-              created.id,
-              groupsToImport,
-              clientMarkupPercent,
-              itemPriceOverrides,
-            );
-            saved = updated || created;
+            if (groupsToImport.length) {
+              const itemPriceOverrides = Object.fromEntries(
+                shopParts
+                  .filter((part) => (
+                    part.pending_import
+                    && part.purchase_item_id
+                    && part.client_unit_price_override !== ''
+                    && part.client_unit_price_override != null
+                  ))
+                  .map((part) => [
+                    part.purchase_item_id,
+                    Number(part.client_unit_price_override),
+                  ]),
+              );
+              const updated = await importPurchaseGroupsToRepairOrder(
+                apiRequest,
+                created.id,
+                groupsToImport,
+                clientMarkupPercent,
+                itemPriceOverrides,
+              );
+              saved = updated || created;
+            }
+            if (cartItemsToImport.length) {
+              const updated = await importCartItemsToRepairOrder(
+                apiRequest,
+                created.id,
+                cartItemsToImport.map((item) => ({
+                  id: item.id,
+                  type: item.itemType,
+                })),
+                clientMarkupPercent,
+              );
+              saved = updated || saved;
+            }
             saveLinkedRepairOrder(saved);
           } catch (importErr) {
-            setError(importErr?.message || 'Заказ-наряд создан, но импорт из заказов не удался');
+            setError(importErr?.message || 'Заказ-наряд создан, но импорт позиций не удался');
             clearRepairOrderPurchaseDraft();
+            clearRepairOrderCartDraft();
             navigate(`/autoservice/orders/${created.id}/edit`);
             return;
           }
           clearRepairOrderPurchaseDraft();
+          clearRepairOrderCartDraft();
         }
         goToSavedOrder();
       }
@@ -2175,6 +2231,11 @@ export default function AutoserviceOrderFormPage() {
                             rossko_partnumber: '',
                           })}
                         />
+                        {p.is_in_cart || p.pending_cart_import ? (
+                          <span className="mt-0.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                            В корзине
+                          </span>
+                        ) : null}
                       </div>
                       <input
                         type="number"

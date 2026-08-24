@@ -77,13 +77,13 @@ function OfferSkeleton({ rows = 3 }) {
 
 function UsedSkeleton({ count = 4 }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="animate-pulse overflow-hidden rounded-lg border border-gray-100">
-          <div className="aspect-square bg-gray-100" />
-          <div className="space-y-2 p-2">
-            <div className="h-3 w-full rounded bg-gray-100" />
-            <div className="h-3 w-1/2 rounded bg-gray-100" />
+        <div key={i} className="animate-pulse overflow-hidden rounded-md border border-gray-100">
+          <div className="aspect-[4/3] bg-gray-100" />
+          <div className="space-y-1 p-1.5">
+            <div className="h-2.5 w-full rounded bg-gray-100" />
+            <div className="h-2.5 w-1/2 rounded bg-gray-100" />
           </div>
         </div>
       ))}
@@ -299,7 +299,7 @@ export default function VinCatalogPartDrawer({
                 <UsedSkeleton count={5} />
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
                     {previewItems(usedItems, usedExpanded).map((p) => {
                       const img = productImage(p);
                       const href = buildPartDetailPath(p);
@@ -310,19 +310,21 @@ export default function VinCatalogPartDrawer({
                           href={href}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="overflow-hidden rounded-lg border border-gray-200 transition hover:border-indigo-300"
+                          className="overflow-hidden rounded-md border border-gray-200 transition hover:border-indigo-300"
                         >
-                          <div className="flex aspect-square items-center justify-center bg-gray-50">
+                          <div className="flex aspect-[4/3] items-center justify-center bg-gray-50">
                             {img ? (
                               <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
                             ) : (
-                              <span className="text-xs text-gray-400">Нет фото</span>
+                              <span className="text-[10px] text-gray-400">Нет фото</span>
                             )}
                           </div>
-                          <div className="p-2">
-                            <p className="truncate text-xs text-gray-700">{p.name || p.article || 'Товар'}</p>
+                          <div className="p-1.5">
+                            <p className="truncate text-[11px] leading-tight text-gray-700">
+                              {p.name || p.article || 'Товар'}
+                            </p>
                             {price != null ? (
-                              <p className="mt-0.5 text-sm font-semibold text-gray-900">{formatPrice(price)} ₽</p>
+                              <p className="mt-0.5 text-xs font-semibold text-gray-900">{formatPrice(price)} ₽</p>
                             ) : null}
                           </div>
                         </a>

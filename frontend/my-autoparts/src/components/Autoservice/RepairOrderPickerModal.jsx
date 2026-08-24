@@ -27,6 +27,7 @@ export default function RepairOrderPickerModal({
   linkedRepairOrder = null,
   onImported,
   onPickOrder,
+  onCreateNew,
   title,
   showCreateNew = true,
 }) {
@@ -130,6 +131,10 @@ export default function RepairOrderPickerModal({
   };
 
   const handleCreateNew = () => {
+    if (onCreateNew) {
+      onCreateNew();
+      return;
+    }
     const draftGroups = groups.map((group) => ({
       orderType: group.orderType,
       itemIds: group.itemIds,

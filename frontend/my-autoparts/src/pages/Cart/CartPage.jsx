@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { apiRequest } from '../../utils/apiClient';
+import {
+  importCartItemsToRepairOrder,
+  saveRepairOrderCartDraft,
+  snapshotCartItems,
+} from '../../utils/repairOrderCartDraft';
+import { canAccessRepairOrders } from '../../utils/autoservicePermissions';
+import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
 import {
   selectCart,
   selectCartLoading,
@@ -15,9 +23,11 @@ import {
   setActiveNewPartsBasket,
   renameNewPartsBasket,
   deleteNewPartsBasket,
+  createNewPartsBasket,
+  moveNewPartsItemsToBasket,
 } from '../../redux/slices/CartSlice';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
-import { setNewPartsCheckoutItemIds, clearNewPartsCheckoutItemIds, readNewPartsDeliverInParts, setNewPartsDeliverInParts } from '../../utils/newPartsCheckout';
+import { setNewPartsCheckoutItemIds, clearNewPartsCheckoutItemIds, readNewPartsDeliverInPartsMap, setNewPartsDeliverInParts } from '../../utils/newPartsCheckout';
 import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
@@ -202,6 +212,10 @@ function CartTableBlock({
   onQuantityChange,
   onRemove,
   onRemoveSelected,
+  onMoveSelected,
+  showMoveAction = false,
+  onAddToRepairOrder,
+  showRepairOrderAction = false,
   onCheckout,
   onCheckoutSelected,
   onClearAll,
@@ -263,6 +277,16 @@ function CartTableBlock({
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {someSelected ? (
             <>
+              {showMoveAction && onMoveSelected ? (
+                <Button variant="secondary" size="sm" onClick={onMoveSelected}>
+                  Переместить
+                </Button>
+              ) : null}
+              {showRepairOrderAction && onAddToRepairOrder ? (
+                <Button variant="secondary" size="sm" onClick={onAddToRepairOrder}>
+                  В заказ-наряд
+                </Button>
+              ) : null}
               <Button variant="secondary" size="sm" onClick={onRemoveSelected}>
                 Удалить выбранное
               </Button>
@@ -369,9 +393,15 @@ export default function CartPage() {
   const clientMarkup = useSelector((state) => state.clientMarkup);
   const clientMarkupEnabled = canUseClientMarkup(user);
   const clientMarkupPercent = clientMarkupEnabled ? (Number(clientMarkup.percent) || 0) : 0;
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
   const showPurchaseInCart = clientMarkupEnabled
     && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH
     && clientMarkup.showPurchaseInCart;
+
+  const canAddToRepairOrder = useMemo(
+    () => isAuthorized && canAccessRepairOrders(user, permissionCodes),
+    [isAuthorized, permissionCodes, user],
+  );
 
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -380,16 +410,27 @@ export default function CartPage() {
   const [renameValue, setRenameValue] = useState('');
   const [renameSaving, setRenameSaving] = useState(false);
   const [renameError, setRenameError] = useState('');
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveSourceBasketId, setMoveSourceBasketId] = useState(null);
+  const [moveItemIds, setMoveItemIds] = useState([]);
+  const [moveSaving, setMoveSaving] = useState(false);
+  const [moveError, setMoveError] = useState('');
+  const [moveNewBasketName, setMoveNewBasketName] = useState('');
+  const [repairOrderOpen, setRepairOrderOpen] = useState(false);
+  const [repairOrderItems, setRepairOrderItems] = useState([]);
   const pendingCheckoutRef = useRef(null);
-  const [deliverInParts, setDeliverInParts] = useState(() => readNewPartsDeliverInParts());
+  const [deliverInPartsByBasket, setDeliverInPartsByBasket] = useState(() => readNewPartsDeliverInPartsMap());
 
   useEffect(() => {
     dispatch(fetchCart());
   }, [dispatch]);
 
-  const handleDeliverInPartsChange = useCallback((checked) => {
-    setDeliverInParts(checked);
-    setNewPartsDeliverInParts(checked);
+  const handleDeliverInPartsChange = useCallback((basketId, checked) => {
+    setNewPartsDeliverInParts(basketId, checked);
+    setDeliverInPartsByBasket((prev) => ({
+      ...prev,
+      [String(basketId)]: checked,
+    }));
   }, []);
 
   const mapNewItem = useCallback((item) => ({
@@ -662,6 +703,133 @@ export default function CartPage() {
     }
   };
 
+  const openMoveModal = useCallback((basketId, items) => {
+    const ids = items.filter((item) => selectedItems.has(item.id)).map((item) => item.id);
+    if (!ids.length) return;
+    setMoveSourceBasketId(basketId);
+    setMoveItemIds(ids);
+    setMoveNewBasketName('');
+    setMoveError('');
+    setMoveOpen(true);
+  }, [selectedItems]);
+
+  const closeMoveModal = useCallback(() => {
+    if (moveSaving) return;
+    setMoveOpen(false);
+    setMoveSourceBasketId(null);
+    setMoveItemIds([]);
+    setMoveNewBasketName('');
+    setMoveError('');
+  }, [moveSaving]);
+
+  const finalizeMove = useCallback(async (targetBasketId) => {
+    if (!targetBasketId || !moveItemIds.length) return;
+    setMoveSaving(true);
+    setMoveError('');
+    try {
+      await dispatch(moveNewPartsItemsToBasket({
+        itemIds: moveItemIds,
+        basketId: targetBasketId,
+      })).unwrap();
+      setSelectedItems((prev) => {
+        const next = new Set(prev);
+        moveItemIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      closeMoveModal();
+    } catch (err) {
+      setMoveError(typeof err === 'string' ? err : 'Не удалось переместить позиции');
+    } finally {
+      setMoveSaving(false);
+    }
+  }, [closeMoveModal, dispatch, moveItemIds]);
+
+  const handleMoveToBasket = useCallback((targetBasketId) => {
+    if (targetBasketId === moveSourceBasketId) return;
+    finalizeMove(targetBasketId);
+  }, [finalizeMove, moveSourceBasketId]);
+
+  const handleCreateBasketAndMove = useCallback(async (e) => {
+    e.preventDefault();
+    const name = moveNewBasketName.trim();
+    if (!name) {
+      setMoveError('Укажите название новой корзины');
+      return;
+    }
+    setMoveSaving(true);
+    setMoveError('');
+    try {
+      const created = await dispatch(createNewPartsBasket({ name })).unwrap();
+      if (!created?.id) {
+        throw new Error('Не удалось создать корзину');
+      }
+      await dispatch(moveNewPartsItemsToBasket({
+        itemIds: moveItemIds,
+        basketId: created.id,
+      })).unwrap();
+      setSelectedItems((prev) => {
+        const next = new Set(prev);
+        moveItemIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      closeMoveModal();
+    } catch (err) {
+      setMoveError(typeof err === 'string' ? err : 'Не удалось создать корзину или переместить позиции');
+    } finally {
+      setMoveSaving(false);
+    }
+  }, [closeMoveModal, dispatch, moveItemIds, moveNewBasketName]);
+
+  const moveTargetBaskets = useMemo(() => (
+    [...newPartsBaskets]
+      .filter((basket) => basket.id !== moveSourceBasketId)
+      .sort((a, b) => {
+        if (a.is_default) return -1;
+        if (b.is_default) return 1;
+        return a.name.localeCompare(b.name, 'ru');
+      })
+  ), [moveSourceBasketId, newPartsBaskets]);
+
+  const moveSourceBasket = useMemo(
+    () => newPartsBaskets.find((b) => b.id === moveSourceBasketId) || null,
+    [moveSourceBasketId, newPartsBaskets],
+  );
+
+  const openRepairOrderModal = useCallback((items) => {
+    const selected = items.filter((item) => selectedItems.has(item.id));
+    if (!selected.length) return;
+    setRepairOrderItems(selected);
+    setRepairOrderOpen(true);
+  }, [selectedItems]);
+
+  const closeRepairOrderModal = useCallback(() => {
+    setRepairOrderOpen(false);
+    setRepairOrderItems([]);
+  }, []);
+
+  const handleImportToRepairOrder = useCallback(async (orderId) => {
+    await importCartItemsToRepairOrder(
+      apiRequest,
+      orderId,
+      repairOrderItems,
+      clientMarkupPercent,
+    );
+    setSelectedItems((prev) => {
+      const next = new Set(prev);
+      repairOrderItems.forEach((item) => next.delete(item.id));
+      return next;
+    });
+  }, [clientMarkupPercent, repairOrderItems]);
+
+  const handleCreateRepairOrderFromCart = useCallback(() => {
+    saveRepairOrderCartDraft({
+      items: snapshotCartItems(repairOrderItems),
+      createdAt: Date.now(),
+    });
+    closeRepairOrderModal();
+    navigate('/autoservice/orders/new', { state: { fromCartImport: true } });
+  }, [closeRepairOrderModal, navigate, repairOrderItems]);
+
   const handleAuthSuccess = useCallback(() => {
     setIsAuthModalOpen(false);
     const pending = pendingCheckoutRef.current;
@@ -763,6 +931,10 @@ export default function CartPage() {
                     .filter((item) => selectedItems.has(item.id))
                     .forEach((item) => handleRemoveItem(item.id));
                 }}
+                onMoveSelected={() => openMoveModal(basket.id, items)}
+                showMoveAction
+                onAddToRepairOrder={() => openRepairOrderModal(items)}
+                showRepairOrderAction={canAddToRepairOrder}
                 onCheckout={() => handleNewPartsCheckout(basket.id)}
                 onCheckoutSelected={() => handleNewPartsCheckoutSelected(basket.id, items)}
                 onClearAll={() => handleClearNewPartsBasket(basket, items)}
@@ -776,8 +948,8 @@ export default function CartPage() {
                 formatItemPrice={formatNewPartPrice}
                 quantityUpdatingIds={quantityUpdatingIds}
                 showSupplierDeliveryOption
-                deliverInParts={deliverInParts}
-                onDeliverInPartsChange={handleDeliverInPartsChange}
+                deliverInParts={Boolean(deliverInPartsByBasket[String(basket.id)])}
+                onDeliverInPartsChange={(checked) => handleDeliverInPartsChange(basket.id, checked)}
               />
             );
           })}
@@ -803,6 +975,8 @@ export default function CartPage() {
                   .filter((item) => selectedItems.has(item.id))
                   .forEach((item) => handleRemoveItem(item.id));
               }}
+              onAddToRepairOrder={() => openRepairOrderModal(items)}
+              showRepairOrderAction={canAddToRepairOrder}
               onCheckout={() => saveUsedOrderAndNavigate(items, seller)}
               onCheckoutSelected={() => {
                 const selected = items.filter((item) => selectedItems.has(item.id));
@@ -860,6 +1034,115 @@ export default function CartPage() {
           </div>
         </form>
       </Modal>
+
+      <Modal
+        open={moveOpen}
+        onClose={closeMoveModal}
+        title="Переместить в корзину"
+        size="sm"
+        footer={
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={closeMoveModal} disabled={moveSaving}>
+              Отмена
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-ink-muted">
+            {moveItemIds.length
+              ? `Выбрано позиций: ${moveItemIds.length}`
+              : 'Выберите позиции для перемещения'}
+            {moveSourceBasket ? (
+              <span className="block mt-1">
+                Из корзины «{moveSourceBasket.name}»
+              </span>
+            ) : null}
+          </p>
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+              Куда переместить
+            </p>
+            <div className="max-h-48 space-y-1 overflow-y-auto rounded-sg border border-line p-1">
+              {moveTargetBaskets.map((basket) => (
+                <div
+                  key={basket.id}
+                  className="flex items-center gap-1 rounded-md hover:bg-surface-muted/60"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleMoveToBasket(basket.id)}
+                    disabled={moveSaving}
+                    className="min-w-0 flex-1 px-2 py-2 text-left text-sm text-ink transition disabled:opacity-50"
+                  >
+                    <span className="truncate">{basket.name}</span>
+                    {basket.is_default ? (
+                      <span className="ml-2 text-xs text-ink-muted">основная</span>
+                    ) : null}
+                  </button>
+                  {!basket.is_default ? (
+                    <button
+                      type="button"
+                      onClick={() => openRenameModal(basket)}
+                      disabled={moveSaving}
+                      className="shrink-0 px-2 py-2 text-ink-muted transition hover:text-brand-600 disabled:opacity-50"
+                      aria-label={`Переименовать «${basket.name}»`}
+                      title="Переименовать"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                        />
+                      </svg>
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              {!moveTargetBaskets.length ? (
+                <p className="px-2 py-3 text-sm text-ink-muted">Нет других корзин</p>
+              ) : null}
+            </div>
+          </div>
+
+          <form onSubmit={handleCreateBasketAndMove} className="border-t border-line pt-4">
+            <p className="text-sm font-medium text-ink">Создать новую корзину</p>
+            <div className="mt-2">
+              <FieldLabel htmlFor="move-new-basket-input">Название</FieldLabel>
+              <Input
+                id="move-new-basket-input"
+                value={moveNewBasketName}
+                onChange={(e) => setMoveNewBasketName(e.target.value)}
+                maxLength={100}
+                disabled={moveSaving}
+                placeholder="Например, Peugeot 408 VIN"
+                error={Boolean(moveError && !moveNewBasketName.trim())}
+              />
+            </div>
+            <Button
+              type="submit"
+              className="mt-3 w-full"
+              loading={moveSaving}
+              disabled={!moveNewBasketName.trim()}
+            >
+              Создать и переместить
+            </Button>
+          </form>
+
+          {moveError ? <p className="text-xs text-danger-600">{moveError}</p> : null}
+        </div>
+      </Modal>
+
+      <RepairOrderPickerModal
+        open={repairOrderOpen}
+        onClose={closeRepairOrderModal}
+        title="Добавить в заказ-наряд"
+        onPickOrder={handleImportToRepairOrder}
+        onCreateNew={handleCreateRepairOrderFromCart}
+      />
     </div>
   );
 }

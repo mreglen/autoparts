@@ -509,7 +509,14 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
               return (
                 <tr key={p.id || `${p.position}-${p.title}`}>
                   <td className="py-1.5 pr-3 tabular-nums text-gray-500">{p.position}</td>
-                  <td className="py-1.5 pr-3 font-medium text-gray-900">{name}</td>
+                  <td className="py-1.5 pr-3 font-medium text-gray-900">
+                    <span>{name}</span>
+                    {p.is_in_cart ? (
+                      <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                        В корзине
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="py-1.5 pr-3 tabular-nums">{qtyLabel}</td>
                   <td className="py-1.5 pr-3 tabular-nums">{unitLabel}</td>
                   <td className="py-1.5 pr-3 tabular-nums">{formatMoney(clientPrice)}</td>

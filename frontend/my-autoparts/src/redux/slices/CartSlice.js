@@ -166,6 +166,24 @@ export const renameNewPartsBasket = createAsyncThunk(
     }
 );
 
+export const moveNewPartsItemsToBasket = createAsyncThunk(
+    'cart/moveNewPartsItemsToBasket',
+    async ({ itemIds, basketId }, { rejectWithValue, dispatch }) => {
+        try {
+            const response = await apiAxios.post('/cart/new-parts/move', {
+                item_ids: itemIds,
+                basket_id: basketId,
+            });
+            dispatch(fetchCart());
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка перемещения позиций'
+            );
+        }
+    }
+);
+
 export const deleteNewPartsBasket = createAsyncThunk(
     'cart/deleteNewPartsBasket',
     async (basketId, { rejectWithValue, dispatch }) => {

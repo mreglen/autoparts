@@ -8,6 +8,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.carts import UsedPartsCart
+from app.services.repair_order_cart_import import (
+    CART_ITEM_TYPE_USED,
+    clear_repair_order_cart_links,
+)
 from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
 from app.models.product import Product
 from app.models.user import User as UserModel
@@ -125,6 +129,11 @@ def _remove_used_cart_items(
         UsedPartsCart.user_id == user_id,
         UsedPartsCart.id.in_(used_cart_item_ids),
     ).delete(synchronize_session=False)
+    clear_repair_order_cart_links(
+        db,
+        cart_item_type=CART_ITEM_TYPE_USED,
+        cart_item_ids=used_cart_item_ids,
+    )
 
 
 def create_used_orders_from_payload(

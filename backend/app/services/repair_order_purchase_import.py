@@ -285,7 +285,10 @@ def append_purchase_items_to_repair_order(
 
 
 def shop_part_is_imported(part: RepairOrderShopPart) -> bool:
-    return bool(part.cart_item_type and part.cart_item_id is not None)
+    return (
+        part.cart_item_type in ("new", "used")
+        and part.cart_item_id is not None
+    )
 
 
 def detach_imported_shop_part_from_repair_order(

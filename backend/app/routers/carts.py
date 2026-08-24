@@ -21,6 +21,7 @@ from app.schemas.carts import (
     CartItemResponse,
     CartResponse,
     CreateBasketRequest,
+    MoveNewPartsItemsRequest,
     NewPartsBasketResponse,
     NewPartsCartItem,
     RenameBasketRequest,
@@ -745,6 +746,174 @@ def rename_new_parts_basket(
     db.commit()
     db.refresh(basket)
     return _build_new_parts_basket_response(basket, items)
+
+
+def _move_user_new_parts_items(
+    db: Session,
+    cart_id: int,
+    user_id: int,
+    item_ids: list[int],
+    target_basket_id: int,
+) -> set[int]:
+    if not item_ids:
+        raise HTTPException(status_code=400, detail="Не выбраны позиции для перемещения")
+
+    target_basket = resolve_user_basket(db, cart_id, user_id, target_basket_id)
+    source_basket_ids: set[int] = set()
+
+    for item_id in item_ids:
+        cart_item = db.query(NewPartsCart).filter(
+            NewPartsCart.id == item_id,
+            NewPartsCart.cart_id == cart_id,
+            NewPartsCart.user_id == user_id,
+        ).first()
+        if not cart_item:
+            raise HTTPException(status_code=404, detail=f"Позиция {item_id} не найдена в корзине")
+
+        if cart_item.basket_id == target_basket.id:
+            continue
+
+        if cart_item.basket_id:
+            source_basket_ids.add(cart_item.basket_id)
+
+        existing_item = db.query(NewPartsCart).filter(
+            NewPartsCart.cart_id == cart_id,
+            NewPartsCart.basket_id == target_basket.id,
+            NewPartsCart.stock_id == cart_item.stock_id,
+            NewPartsCart.brand == cart_item.brand,
+            NewPartsCart.partnumber == cart_item.partnumber,
+            NewPartsCart.id != cart_item.id,
+        ).first()
+
+        if existing_item:
+            merged_max = _merge_new_parts_max(existing_item.max_quantity, cart_item.max_quantity)
+            existing_item.max_quantity = merged_max
+            existing_item.quantity = _cap_to_max(
+                existing_item.quantity + cart_item.quantity,
+                merged_max,
+            )
+            existing_item.price = cart_item.price
+            if cart_item.purchase_price is not None:
+                existing_item.purchase_price = cart_item.purchase_price
+            if cart_item.delivery is not None:
+                existing_item.delivery = cart_item.delivery
+            if cart_item.delivery_start is not None:
+                existing_item.delivery_start = cart_item.delivery_start
+            if cart_item.delivery_end is not None:
+                existing_item.delivery_end = cart_item.delivery_end
+            existing_item.updated_at = datetime.utcnow()
+            db.delete(cart_item)
+        else:
+            cart_item.basket_id = target_basket.id
+            cart_item.updated_at = datetime.utcnow()
+
+    for source_basket_id in source_basket_ids:
+        maybe_delete_empty_non_default_user_basket(db, cart_id, user_id, source_basket_id)
+
+    return source_basket_ids
+
+
+def _move_guest_new_parts_items(
+    db: Session,
+    guest_cart_id: int,
+    item_ids: list[int],
+    target_basket_id: int,
+) -> set[int]:
+    if not item_ids:
+        raise HTTPException(status_code=400, detail="Не выбраны позиции для перемещения")
+
+    target_basket = resolve_guest_basket(db, guest_cart_id, target_basket_id)
+    source_basket_ids: set[int] = set()
+
+    for item_id in item_ids:
+        cart_item = db.query(GuestNewPartsCart).filter(
+            GuestNewPartsCart.id == item_id,
+            GuestNewPartsCart.guest_cart_id == guest_cart_id,
+        ).first()
+        if not cart_item:
+            raise HTTPException(status_code=404, detail=f"Позиция {item_id} не найдена в корзине")
+
+        if cart_item.basket_id == target_basket.id:
+            continue
+
+        if cart_item.basket_id:
+            source_basket_ids.add(cart_item.basket_id)
+
+        existing_item = db.query(GuestNewPartsCart).filter(
+            GuestNewPartsCart.guest_cart_id == guest_cart_id,
+            GuestNewPartsCart.basket_id == target_basket.id,
+            GuestNewPartsCart.stock_id == cart_item.stock_id,
+            GuestNewPartsCart.brand == cart_item.brand,
+            GuestNewPartsCart.partnumber == cart_item.partnumber,
+            GuestNewPartsCart.id != cart_item.id,
+        ).first()
+
+        if existing_item:
+            merged_max = _merge_new_parts_max(existing_item.max_quantity, cart_item.max_quantity)
+            existing_item.max_quantity = merged_max
+            existing_item.quantity = _cap_to_max(
+                existing_item.quantity + cart_item.quantity,
+                merged_max,
+            )
+            existing_item.price = cart_item.price
+            if cart_item.purchase_price is not None:
+                existing_item.purchase_price = cart_item.purchase_price
+            if cart_item.delivery is not None:
+                existing_item.delivery = cart_item.delivery
+            if cart_item.delivery_start is not None:
+                existing_item.delivery_start = cart_item.delivery_start
+            if cart_item.delivery_end is not None:
+                existing_item.delivery_end = cart_item.delivery_end
+            existing_item.updated_at = datetime.utcnow()
+            db.delete(cart_item)
+        else:
+            cart_item.basket_id = target_basket.id
+            cart_item.updated_at = datetime.utcnow()
+
+    for source_basket_id in source_basket_ids:
+        maybe_delete_empty_non_default_guest_basket(db, guest_cart_id, source_basket_id)
+
+    return source_basket_ids
+
+
+@router.post("/new-parts/move", response_model=CartResponse)
+def move_new_parts_items(
+    payload: MoveNewPartsItemsRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional),
+):
+    """Переместить выбранные позиции новых запчастей в другую корзину."""
+    unique_item_ids = list(dict.fromkeys(payload.item_ids))
+    if not unique_item_ids:
+        raise HTTPException(status_code=400, detail="Не выбраны позиции для перемещения")
+
+    if current_user:
+        cart = get_or_create_user_cart(db, current_user.id)
+        _move_user_new_parts_items(
+            db,
+            cart.id,
+            current_user.id,
+            unique_item_ids,
+            payload.basket_id,
+        )
+        db.commit()
+        cart = db.query(Cart).options(
+            selectinload(Cart.new_parts_items),
+            selectinload(Cart.used_parts_items).selectinload(UsedPartsCart.product).selectinload(Product.organization),
+        ).filter(Cart.user_id == current_user.id).first()
+        return _build_user_cart_response(cart, db)
+
+    guest_cart = get_or_create_guest_cart(db, request, response)
+    _move_guest_new_parts_items(db, guest_cart.id, unique_item_ids, payload.basket_id)
+    touch_guest_cart(db, guest_cart)
+    db.commit()
+    guest_token = get_guest_token_from_request(request)
+    guest_cart = load_guest_cart_with_items(db, guest_token) if guest_token else guest_cart
+    if not guest_cart:
+        guest_cart = get_or_create_guest_cart(db, request, response)
+    return _build_guest_cart_response(guest_cart, db)
 
 
 @router.delete("/new-parts/baskets/{basket_id}", status_code=204)

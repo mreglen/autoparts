@@ -40,6 +40,7 @@ from app.schemas.repair_order import (
     RepairOrderClientView,
     RepairOrderClientWorkView,
     RepairOrderPurchaseImportIn,
+    RepairOrderCartImportIn,
     RepairOrderCreate,
     RepairOrderWorkZoneBrief,
     RepairOrderWorkZonesMeta,
@@ -75,7 +76,11 @@ from app.services.autoservice_payment_service import (
     ensure_order_fully_paid,
     order_payment_summary,
 )
-from app.services.repair_order_cart_import import shop_part_display_name
+from app.services.repair_order_cart_import import (
+    append_cart_items_to_repair_order,
+    shop_part_display_name,
+    shop_part_is_in_cart,
+)
 from app.services.repair_order_delete import delete_repair_order
 from app.services.repair_order_purchase_import import (
     append_purchase_items_to_repair_order,
@@ -292,6 +297,7 @@ def _shop_part_view(
         rossko_brand=part.rossko_brand,
         rossko_partnumber=part.rossko_partnumber,
         is_imported=shop_part_is_imported(part),
+        is_in_cart=shop_part_is_in_cart(db, part) if db is not None else False,
         is_manual_editable=(
             shop_part_is_manual_editable(db, org_id=org_id, part=part)
             if db is not None and org_id
@@ -1549,6 +1555,30 @@ def detach_imported_repair_order_shop_part(
         org_id=org_id,
         order_id=order_id,
         part_id=part_id,
+    )
+    db.commit()
+    row = _get_org_order_or_404(db, org_id, order_id)
+    return _to_staff_view(db, row)
+
+
+@router.post(
+    "/autoservice/repair-orders/{order_id}/cart-items",
+    response_model=RepairOrderStaffView,
+)
+def import_repair_order_cart_items(
+    order_id: int,
+    payload: RepairOrderCartImportIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = _require_full_orders(db, current_user)
+    row = _get_org_order_or_404(db, org_id, order_id)
+    append_cart_items_to_repair_order(
+        db,
+        order=row,
+        org_id=org_id,
+        user=current_user,
+        payload=payload,
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)

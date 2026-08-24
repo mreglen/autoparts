@@ -32,25 +32,59 @@ export function clearNewPartsCheckoutItemIds() {
   }
 }
 
-export function setNewPartsDeliverInParts(value) {
+function basketKey(basketId) {
+  return String(basketId);
+}
+
+export function readNewPartsDeliverInPartsMap() {
   try {
-    sessionStorage.setItem(NEW_PARTS_DELIVER_IN_PARTS_KEY, value ? '1' : '0');
+    const raw = sessionStorage.getItem(NEW_PARTS_DELIVER_IN_PARTS_KEY);
+    if (!raw) return {};
+    if (raw === '0' || raw === '1') {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).map(([key, value]) => [String(key), Boolean(value)]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function readNewPartsDeliverInParts(basketId) {
+  if (basketId == null) return false;
+  const map = readNewPartsDeliverInPartsMap();
+  return Boolean(map[basketKey(basketId)]);
+}
+
+export function setNewPartsDeliverInParts(basketId, value) {
+  if (basketId == null) return;
+  try {
+    const map = readNewPartsDeliverInPartsMap();
+    map[basketKey(basketId)] = Boolean(value);
+    sessionStorage.setItem(NEW_PARTS_DELIVER_IN_PARTS_KEY, JSON.stringify(map));
   } catch {
     // ignore
   }
 }
 
-export function readNewPartsDeliverInParts() {
+export function clearNewPartsDeliverInParts(basketId) {
   try {
-    return sessionStorage.getItem(NEW_PARTS_DELIVER_IN_PARTS_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function clearNewPartsDeliverInParts() {
-  try {
-    sessionStorage.removeItem(NEW_PARTS_DELIVER_IN_PARTS_KEY);
+    if (basketId == null) {
+      sessionStorage.removeItem(NEW_PARTS_DELIVER_IN_PARTS_KEY);
+      return;
+    }
+    const map = readNewPartsDeliverInPartsMap();
+    delete map[basketKey(basketId)];
+    if (!Object.keys(map).length) {
+      sessionStorage.removeItem(NEW_PARTS_DELIVER_IN_PARTS_KEY);
+    } else {
+      sessionStorage.setItem(NEW_PARTS_DELIVER_IN_PARTS_KEY, JSON.stringify(map));
+    }
   } catch {
     // ignore
   }

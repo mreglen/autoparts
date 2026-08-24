@@ -159,12 +159,20 @@ export default function NewPartsOrderRegistration() {
   const [placedOrder, setPlacedOrder] = useState(null);
   const [unpaidConfirmOpen, setUnpaidConfirmOpen] = useState(false);
   const skipEmptyCartRedirectRef = useRef(false);
-  const [deliverInParts, setDeliverInParts] = useState(() => readNewPartsDeliverInParts());
+  const [deliverInParts, setDeliverInParts] = useState(false);
+
+  useEffect(() => {
+    if (activeBasketId) {
+      setDeliverInParts(readNewPartsDeliverInParts(activeBasketId));
+    }
+  }, [activeBasketId]);
 
   const handleDeliverInPartsChange = useCallback((checked) => {
     setDeliverInParts(checked);
-    setNewPartsDeliverInParts(checked);
-  }, []);
+    if (activeBasketId) {
+      setNewPartsDeliverInParts(activeBasketId, checked);
+    }
+  }, [activeBasketId]);
 
   useEffect(() => {
     if (!isReady) return;

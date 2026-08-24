@@ -40,6 +40,10 @@ class ShopPartImportedFlagTests(unittest.TestCase):
         part = MagicMock(cart_item_type="new", cart_item_id=15)
         self.assertTrue(shop_part_is_imported(part))
 
+    def test_cart_linked_part_not_imported(self):
+        part = MagicMock(cart_item_type="cart_new", cart_item_id=15)
+        self.assertFalse(shop_part_is_imported(part))
+
     def test_manual_part_not_imported(self):
         part = MagicMock(cart_item_type=None, cart_item_id=None)
         self.assertFalse(shop_part_is_imported(part))

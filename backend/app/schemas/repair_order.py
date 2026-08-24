@@ -123,6 +123,16 @@ class RepairOrderPurchaseImportIn(BaseModel):
     item_price_overrides: dict[int, Decimal] = Field(default_factory=dict)
 
 
+class RepairOrderCartImportItemIn(BaseModel):
+    item_id: int
+    item_type: Literal["new", "used"]
+
+
+class RepairOrderCartImportIn(BaseModel):
+    items: list[RepairOrderCartImportItemIn] = Field(min_length=1)
+    markup_percent: Decimal = Field(default=Decimal("0"), ge=0, le=500)
+
+
 class RepairOrderWorkView(BaseModel):
     id: int
     position: int
@@ -175,6 +185,7 @@ class RepairOrderShopPartView(BaseModel):
     rossko_brand: Optional[str] = None
     rossko_partnumber: Optional[str] = None
     is_imported: bool = False
+    is_in_cart: bool = False
     is_manual_editable: bool = False
     stock_max_qty: Optional[int] = None
     receipt_date: Optional[date] = None

@@ -60,6 +60,11 @@ class RenameBasketRequest(BaseModel):
     name: str
 
 
+class MoveNewPartsItemsRequest(BaseModel):
+    item_ids: list[int]
+    basket_id: int
+
+
 class CartResponse(BaseModel):
     id: int
     user_id: Optional[int] = None

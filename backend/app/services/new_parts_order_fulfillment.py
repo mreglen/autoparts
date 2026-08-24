@@ -10,6 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.models.carts.new_parts_cart import NewPartsCart
 from app.models.garage_new_orders import GarageNewOrder, GarageNewOrderItem
+from app.services.repair_order_cart_import import (
+    CART_ITEM_TYPE_NEW,
+    clear_repair_order_cart_links,
+)
 from app.services.new_parts_seo_card_service import find_active_new_part_card_by_brand_article
 from app.models.organization import Organization
 from app.models.user import User as UserModel
@@ -177,6 +181,11 @@ async def fulfill_new_parts_order(
 
         cart_ids = [item.id for item in cart_items if getattr(item, "id", None)]
         if cart_ids:
+            clear_repair_order_cart_links(
+                db,
+                cart_item_type=CART_ITEM_TYPE_NEW,
+                cart_item_ids=cart_ids,
+            )
             db.query(NewPartsCart).filter(NewPartsCart.id.in_(cart_ids)).delete(
                 synchronize_session=False
             )
