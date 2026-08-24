@@ -399,7 +399,7 @@ export default function AutoserviceFinancePage() {
                 {data.count ?? 0}
               </div>
             )}
-            <div className="mt-1.5 text-xs text-gray-500 sm:text-sm">Записей</div>
+            <div className="mt-1.5 text-xs text-gray-500 sm:text-sm">Платежей</div>
           </div>
         </div>
       </div>

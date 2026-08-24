@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../../utils/apiClient';
 import { formatFinanceCurrency } from '../Finance/financeDisplay';
@@ -90,6 +90,18 @@ export default function AutoserviceMyPayrollPage() {
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const monthInputRef = useRef(null);
+
+  const openMonthPicker = useCallback((event) => {
+    const input = monthInputRef.current;
+    if (!input || typeof input.showPicker !== 'function') return;
+    event?.preventDefault();
+    try {
+      input.showPicker();
+    } catch {
+      /* native picker already open or not allowed */
+    }
+  }, []);
 
   const parsedMonth = useMemo(() => parseMonthValue(monthValue), [monthValue]);
 
@@ -139,13 +151,37 @@ export default function AutoserviceMyPayrollPage() {
         </div>
         <label className="block min-w-[11rem] shrink-0">
           <span className="mb-1.5 block text-xs font-medium text-gray-500">Месяц</span>
-          <input
-            type="month"
-            value={monthValue}
-            max={currentMonthValue()}
-            onChange={(e) => setMonthValue(e.target.value || currentMonthValue())}
-            className={warehousePillControlClass}
-          />
+          <span className="relative block">
+            <span
+              className={`${warehousePillControlClass} pointer-events-none flex items-center justify-between gap-2 pr-3 capitalize`}
+              aria-hidden="true"
+            >
+              {formatMonthLabel(monthValue)}
+              <svg className="h-4 w-4 shrink-0 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            </span>
+            <input
+              ref={monthInputRef}
+              type="month"
+              value={monthValue}
+              max={currentMonthValue()}
+              onChange={(e) => setMonthValue(e.target.value || currentMonthValue())}
+              onPointerDown={openMonthPicker}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  openMonthPicker(e);
+                }
+              }}
+              className="absolute inset-0 cursor-pointer opacity-0"
+              aria-label="Месяц"
+            />
+          </span>
         </label>
       </div>
 

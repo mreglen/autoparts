@@ -139,7 +139,7 @@ function WeekToolbar({
       <button
         type="button"
         onClick={onToday}
-        className="hidden h-9 rounded-lg px-3 text-sm font-medium text-gray-700 transition hover:bg-white md:inline-flex md:items-center"
+        className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg px-3 text-sm font-medium text-gray-700 transition hover:bg-white md:h-9"
       >
         Сегодня
       </button>

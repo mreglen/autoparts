@@ -183,7 +183,7 @@ const buildAutoserviceStaffTab = (user, options, hasPermission) => {
             'autoservice-reports': 'Отчёты',
             'autoservice-payroll': 'Зарплата',
             'autoservice-clients': 'Клиенты',
-            'autoservice-inspections': 'Записи',
+            'autoservice-inspections': 'Заявки',
         };
         submenu.push({ id: item.id, label: labels[item.id] || item.id });
     });

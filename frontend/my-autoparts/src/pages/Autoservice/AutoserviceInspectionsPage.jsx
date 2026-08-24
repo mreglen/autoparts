@@ -299,7 +299,7 @@ export default function AutoserviceInspectionsPage() {
     <div className="w-full min-w-0">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Записи</h1>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Заявки</h1>
           <p className="mt-0.5 text-sm text-gray-500">
             {loading
               ? 'Загрузка…'
@@ -319,7 +319,7 @@ export default function AutoserviceInspectionsPage() {
 
       <UnderlineTabs
         className="mb-4"
-        ariaLabel="Фильтр записей по статусу"
+        ariaLabel="Фильтр заявок по статусу"
         gapClassName="gap-4"
         tabs={[
           { id: 'all', label: 'Все' },
@@ -340,7 +340,7 @@ export default function AutoserviceInspectionsPage() {
           value={q}
           onChange={setQ}
           placeholder="Имя, телефон, авто или комментарий"
-          ariaLabel="Поиск записей"
+          ariaLabel="Поиск заявок"
         />
         <button
           type="button"

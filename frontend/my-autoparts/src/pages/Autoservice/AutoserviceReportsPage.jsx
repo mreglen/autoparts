@@ -262,7 +262,7 @@ export default function AutoserviceReportsPage() {
 
   const tabs = useMemo(() => {
     const items = [
-      { id: 'economics', label: 'Сводная таблица' },
+      { id: 'economics', label: 'Экономика' },
       { id: 'payments', label: 'Платежи' },
       { id: 'warehouse-stock', label: 'Остатки на складе' },
     ];
@@ -591,7 +591,7 @@ export default function AutoserviceReportsPage() {
       <PageHeader
         className="mb-0"
         title="Отчёты"
-        subtitle="Сводная таблица, платежи, зарплаты и остатки склада"
+        subtitle="Экономика, платежи, зарплаты и остатки склада"
         action={
           tab === 'payments' ? (
             <div className="text-right">

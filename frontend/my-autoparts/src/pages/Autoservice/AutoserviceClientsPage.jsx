@@ -32,7 +32,7 @@ function AccountBadge({ userId }) {
   if (userId) {
     return (
       <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
-        Есть
+        С аккаунтом
       </span>
     );
   }
@@ -290,7 +290,7 @@ function ClientBookingRow({ row, onOpen }) {
       >
         <div className="min-w-0">
           <p className="text-sm font-medium text-gray-900">
-            {formatServerDate(row.preferred_date) || 'Запись'}
+            {formatServerDate(row.preferred_date) || 'Заявка'}
           </p>
           <p className="mt-0.5 text-xs text-gray-500">
             {BOOKING_SOURCE_LABELS[row.source] || row.source || '—'}
@@ -314,7 +314,7 @@ function ClientBookingViewModal({ booking, onClose }) {
     <Modal
       open={Boolean(booking)}
       onClose={onClose}
-      title={`Запись · ${formatServerDate(booking.preferred_date) || booking.name || ''}`}
+      title={`Заявка · ${formatServerDate(booking.preferred_date) || booking.name || ''}`}
       size="md"
       wrapperClassName="z-[120]"
       footer={
@@ -521,7 +521,7 @@ function ClientProfileModal({
     const email = guestEmail;
     if (
       !window.confirm(
-        `Создать личный кабинет и отправить пароль на ${email}?\n\nКлиент сможет входить на сайт и видеть свои заказ-наряды и записи.`,
+        `Создать личный кабинет и отправить пароль на ${email}?\n\nКлиент сможет входить на сайт и видеть свои заказ-наряды и заявки.`,
       )
     ) {
       return;
@@ -556,7 +556,7 @@ function ClientProfileModal({
     { id: 'profile', label: 'Профиль' },
     { id: 'vehicles', label: 'Автомобили', count: loading ? undefined : vehicles.length },
     { id: 'orders', label: 'Заказ-наряды', count: ordersLoading ? undefined : orders.length },
-    { id: 'bookings', label: 'Записи', count: bookingsLoading ? undefined : bookings.length },
+    { id: 'bookings', label: 'Заявки', count: bookingsLoading ? undefined : bookings.length },
   ];
   const filteredOrders = vehicleOrderFilterId ? orders.filter((row) => row.vehicle_id === vehicleOrderFilterId) : orders;
   const filteredVehicle = vehicleOrderFilterId
@@ -746,7 +746,7 @@ function ClientProfileModal({
           ) : null}
 
           {section === 'bookings' && !editing ? (
-            <ClientHistoryList loading={bookingsLoading} empty="Записей нет">
+            <ClientHistoryList loading={bookingsLoading} empty="Заявок нет">
               {bookings.length
                 ? bookings.map((row) => (
                     <ClientBookingRow key={row.id} row={row} onOpen={setViewBooking} />
@@ -1336,7 +1336,7 @@ export default function AutoserviceClientsPage() {
         <AutoserviceLiveSearchField
           value={q}
           onChange={setQ}
-          placeholder="Имя, телефон, авто, VIN, заказ-наряд, запись, ИНН…"
+          placeholder="Имя, телефон, авто, VIN, заказ-наряд, заявка, ИНН…"
           ariaLabel="Поиск клиентов"
         />
         <button

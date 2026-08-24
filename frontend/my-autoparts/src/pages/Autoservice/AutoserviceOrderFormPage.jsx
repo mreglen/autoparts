@@ -1094,7 +1094,7 @@ export default function AutoserviceOrderFormPage() {
       applyFormState(mapOrderToFormState(order));
       setFormInitialized(true);
     } catch (err) {
-      setOrderError(err?.message || 'Не удалось загрузить запись');
+      setOrderError(err?.message || 'Не удалось загрузить заказ-наряд');
     } finally {
       setOrderLoading(false);
     }
@@ -1816,10 +1816,10 @@ export default function AutoserviceOrderFormPage() {
   const pageTitle = isEdit
     ? ownMode
       ? `Заказ-наряд ${repairOrderNumberLabel({ id: orderId, order_number: orderNumber })}`
-      : `Редактирование записи №${orderNumber ?? orderId}`
+      : `Редактирование заказ-наряда №${orderNumber ?? orderId}`
     : ownMode
       ? 'Новый заказ-наряд'
-      : 'Новая запись';
+      : 'Новый заказ-наряд';
 
   if (orderLoading || metaLoading || !formInitialized) {
     return (
@@ -1924,7 +1924,7 @@ export default function AutoserviceOrderFormPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title={ownMode ? 'Заказ-наряд' : 'Запись'}>
+        <SectionCard title="Заказ-наряд">
           {ownMode ? null : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
