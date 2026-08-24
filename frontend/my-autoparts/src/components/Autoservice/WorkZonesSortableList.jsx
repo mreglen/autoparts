@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ActionsDropdown, { ActionsDropdownItem } from '../ActionsDropdown/ActionsDropdown';
 
+function sameZoneId(a, b) {
+  return String(a) === String(b);
+}
+
 function reorderItems(items, activeId, overId) {
-  if (activeId == null || overId == null || activeId === overId) return items;
-  const oldIndex = items.findIndex((item) => item.id === activeId);
-  const newIndex = items.findIndex((item) => item.id === overId);
+  if (activeId == null || overId == null || sameZoneId(activeId, overId)) return items;
+  const oldIndex = items.findIndex((item) => sameZoneId(item.id, activeId));
+  const newIndex = items.findIndex((item) => sameZoneId(item.id, overId));
   if (oldIndex < 0 || newIndex < 0) return items;
   const next = [...items];
   const [moved] = next.splice(oldIndex, 1);
@@ -21,6 +25,22 @@ function DragHandleIcon() {
       <circle cx="15" cy="12" r="1.4" fill="currentColor" />
       <circle cx="9" cy="17" r="1.4" fill="currentColor" />
       <circle cx="15" cy="17" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+function ChevronUpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
     </svg>
   );
 }
@@ -43,6 +63,9 @@ function ZoneActions({ zone, onEdit, onRemove, compact = false }) {
   );
 }
 
+const reorderControlClass =
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-50 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-40';
+
 export default function WorkZonesSortableList({
   zones,
   loading = false,
@@ -55,109 +78,170 @@ export default function WorkZonesSortableList({
   const [draggingId, setDraggingId] = useState(null);
   const [overId, setOverId] = useState(null);
   const listRef = useRef(null);
-  const dragStateRef = useRef(null);
+  const itemsRef = useRef(items);
+  const dragRef = useRef(null);
+  const overIdRef = useRef(null);
+  const onReorderRef = useRef(onReorder);
 
   useEffect(() => {
     setItems(zones);
   }, [zones]);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    onReorderRef.current = onReorder;
+  }, [onReorder]);
 
   const findRowIdFromPoint = useCallback((clientX, clientY) => {
     const element = document.elementFromPoint(clientX, clientY);
     const row = element?.closest('[data-zone-row-id]');
     if (!row || !listRef.current?.contains(row)) return null;
     const raw = row.getAttribute('data-zone-row-id');
+    if (raw == null || raw === '') return null;
     const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : null;
+    return Number.isFinite(parsed) ? parsed : raw;
   }, []);
 
-  const finishDrag = useCallback(async (activeId, targetId) => {
-    setDraggingId(null);
-    setOverId(null);
-    dragStateRef.current = null;
-    if (activeId == null || targetId == null || activeId === targetId) return;
-    const next = reorderItems(items, activeId, targetId);
-    if (next === items) return;
+  const applyReorder = useCallback(async (next) => {
     setItems(next);
-    await onReorder?.(next);
-  }, [items, onReorder]);
+    itemsRef.current = next;
+    await onReorderRef.current?.(next);
+  }, []);
 
-  const handlePointerMove = useCallback((event) => {
-    const drag = dragStateRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const targetId = findRowIdFromPoint(event.clientX, event.clientY);
-    if (targetId != null && targetId !== drag.activeId) {
-      setOverId(targetId);
-    }
-  }, [findRowIdFromPoint]);
+  const moveByIndex = useCallback((index, delta) => {
+    if (disabled || loading) return;
+    const current = itemsRef.current;
+    const newIndex = index + delta;
+    if (newIndex < 0 || newIndex >= current.length) return;
+    const next = [...current];
+    [next[index], next[newIndex]] = [next[newIndex], next[index]];
+    applyReorder(next);
+  }, [applyReorder, disabled, loading]);
 
-  const handlePointerUp = useCallback((event) => {
-    const drag = dragStateRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    window.removeEventListener('pointermove', handlePointerMove);
-    window.removeEventListener('pointerup', handlePointerUp);
-    window.removeEventListener('pointercancel', handlePointerUp);
-    const targetId = findRowIdFromPoint(event.clientX, event.clientY) ?? overId ?? drag.activeId;
-    finishDrag(drag.activeId, targetId);
-  }, [findRowIdFromPoint, finishDrag, handlePointerMove, overId]);
+  useEffect(() => {
+    const finishDrag = (event) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+
+      dragRef.current = null;
+      setDraggingId(null);
+      setOverId(null);
+
+      const targetId = findRowIdFromPoint(event.clientX, event.clientY)
+        ?? overIdRef.current
+        ?? drag.activeId;
+      overIdRef.current = null;
+
+      if (targetId == null || sameZoneId(drag.activeId, targetId)) return;
+
+      const next = reorderItems(itemsRef.current, drag.activeId, targetId);
+      if (next === itemsRef.current) return;
+      applyReorder(next);
+    };
+
+    const onPointerMove = (event) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const targetId = findRowIdFromPoint(event.clientX, event.clientY);
+      if (targetId != null && !sameZoneId(targetId, drag.activeId)) {
+        overIdRef.current = targetId;
+        setOverId(targetId);
+      }
+    };
+
+    const onPointerEnd = (event) => {
+      finishDrag(event);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerEnd);
+    window.addEventListener('pointercancel', onPointerEnd);
+
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerEnd);
+      window.removeEventListener('pointercancel', onPointerEnd);
+    };
+  }, [applyReorder, findRowIdFromPoint]);
 
   const startDrag = useCallback((event, zoneId) => {
     if (disabled || loading) return;
     event.preventDefault();
     event.stopPropagation();
-    dragStateRef.current = { activeId: zoneId, pointerId: event.pointerId };
+    dragRef.current = { activeId: zoneId, pointerId: event.pointerId };
+    overIdRef.current = zoneId;
     setDraggingId(zoneId);
     setOverId(zoneId);
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
-  }, [disabled, loading, handlePointerMove, handlePointerUp]);
-
-  useEffect(() => () => {
-    window.removeEventListener('pointermove', handlePointerMove);
-    window.removeEventListener('pointerup', handlePointerUp);
-    window.removeEventListener('pointercancel', handlePointerUp);
-  }, [handlePointerMove, handlePointerUp]);
-
-  const displayItems = items;
+  }, [disabled, loading]);
 
   if (loading) {
     return <p className="py-12 text-center text-sm text-gray-500">Загрузка…</p>;
   }
 
-  if (!displayItems.length) {
+  if (!items.length) {
     return <p className="py-12 text-center text-sm text-gray-500">Зон пока нет</p>;
   }
 
   return (
     <div ref={listRef}>
-      <div className="hidden border-b border-gray-200 pb-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 md:grid md:grid-cols-[2.5rem_minmax(0,1fr)_10rem] md:gap-3">
-        <span aria-hidden />
+      <div className="hidden border-b border-gray-200 pb-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 md:grid md:grid-cols-[7.5rem_minmax(0,1fr)_10rem] md:gap-3">
+        <span>Порядок</span>
         <span>Название</span>
         <span className="text-right">Действия</span>
       </div>
 
       <div className="divide-y divide-gray-100">
-        {displayItems.map((zone) => {
-          const isDragging = draggingId === zone.id;
-          const isOver = overId === zone.id && draggingId != null && draggingId !== zone.id;
+        {items.map((zone, index) => {
+          const isDragging = sameZoneId(draggingId, zone.id);
+          const isOver = overId != null
+            && draggingId != null
+            && sameZoneId(overId, zone.id)
+            && !sameZoneId(draggingId, zone.id);
+          const canMoveUp = !disabled && !loading && index > 0;
+          const canMoveDown = !disabled && !loading && index < items.length - 1;
+
           return (
             <div
               key={zone.id}
               data-zone-row-id={zone.id}
-              className={`grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 py-3 transition-colors md:grid-cols-[2.5rem_minmax(0,1fr)_10rem] ${
+              className={`grid grid-cols-[7.5rem_minmax(0,1fr)_auto] items-center gap-3 py-3 transition-colors md:grid-cols-[7.5rem_minmax(0,1fr)_10rem] ${
                 isDragging ? 'opacity-60' : ''
               } ${isOver ? 'bg-indigo-50/80' : 'hover:bg-gray-50/70'}`}
             >
-              <button
-                type="button"
-                aria-label={`Перетащить ${zone.name}`}
-                disabled={disabled || loading}
-                onPointerDown={(event) => startDrag(event, zone.id)}
-                className="inline-flex h-9 w-9 touch-none cursor-grab items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <DragHandleIcon />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label={`Перетащить ${zone.name}`}
+                  disabled={disabled || loading}
+                  onPointerDown={(event) => startDrag(event, zone.id)}
+                  className="inline-flex h-9 w-9 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <DragHandleIcon />
+                </button>
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    aria-label={`Поднять ${zone.name}`}
+                    disabled={!canMoveUp}
+                    onClick={() => moveByIndex(index, -1)}
+                    className={reorderControlClass}
+                  >
+                    <ChevronUpIcon />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Опустить ${zone.name}`}
+                    disabled={!canMoveDown}
+                    onClick={() => moveByIndex(index, 1)}
+                    className={reorderControlClass}
+                  >
+                    <ChevronDownIcon />
+                  </button>
+                </div>
+              </div>
               <p className="min-w-0 truncate text-sm font-semibold text-gray-900 md:font-medium">{zone.name}</p>
               <div className="justify-self-end">
                 <div className="hidden md:block">

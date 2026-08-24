@@ -21,6 +21,7 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseExpenseView,
     AutoserviceWarehouseImportResult,
     AutoserviceWarehouseItemView,
+    AutoserviceWarehouseItemReservationView,
     AutoserviceWarehouseItemUpdate,
     AutoserviceWarehouseManualReceiptIn,
     AutoserviceWarehouseReceiptDocDetailView,
@@ -41,6 +42,7 @@ from app.services.autoservice_warehouse_service import (
     create_autoservice_expense,
     delete_receipt_document,
     import_purchase_groups_to_warehouse,
+    list_autoservice_warehouse_item_reservations,
     receipt_line_pricing_context,
     receipt_manual_line,
     update_autoservice_warehouse_item,
@@ -288,6 +290,7 @@ def update_own_autoservice_warehouse_return(
 def list_autoservice_warehouse_items(
     q: str = Query("", max_length=120),
     available_only: bool = Query(False),
+    exclude_zero_qty: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -307,9 +310,29 @@ def list_autoservice_warehouse_items(
         AutoserviceWarehouseItem.name.asc(),
         AutoserviceWarehouseItem.id.asc(),
     ).limit(200).all()
+    if exclude_zero_qty:
+        rows = [row for row in rows if int(row.quantity or 0) > 0]
     if available_only:
         rows = [row for row in rows if autoservice_item_available_qty(row) > 0]
     return [_item_view(row) for row in rows]
+
+
+@router.get(
+    "/autoservice/warehouse/items/{item_id}/reservations",
+    response_model=list[AutoserviceWarehouseItemReservationView],
+)
+def get_autoservice_warehouse_item_reservations(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows = list_autoservice_warehouse_item_reservations(
+        db,
+        org_id=org_id,
+        item_id=item_id,
+    )
+    return [AutoserviceWarehouseItemReservationView.model_validate(row) for row in rows]
 
 
 @router.patch(

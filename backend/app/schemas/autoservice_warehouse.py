@@ -20,6 +20,14 @@ class AutoserviceWarehouseItemView(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AutoserviceWarehouseItemReservationView(BaseModel):
+    repair_order_id: int
+    repair_order_number: Optional[str] = None
+    order_status: str
+    qty: Decimal
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+
+
 class AutoserviceWarehouseItemUpdate(BaseModel):
     brand: str = Field("", max_length=120)
     article: str = Field("", max_length=120)

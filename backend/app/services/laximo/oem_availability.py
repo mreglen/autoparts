@@ -130,14 +130,17 @@ def _lookup_rossko(oem: str) -> dict[str, Any]:
             if pn and (pn == norm or norm in pn or pn in norm):
                 matched.append(part)
         use_parts = matched or parts
-        min_prices = [p for p in (_rossko_part_min_price(x) for x in use_parts) if p]
-        stock_sum = sum(_rossko_part_stock_count(x) for x in use_parts)
-        sample = use_parts[0]
+        in_stock = [part for part in use_parts if _rossko_part_stock_count(part) > 0]
+        if not in_stock:
+            return empty
+        min_prices = [p for p in (_rossko_part_min_price(x) for x in in_stock) if p]
+        stock_sum = sum(_rossko_part_stock_count(x) for x in in_stock)
+        sample = in_stock[0]
         brand = sample.get("brand") or sample.get("manufacturer")
         article = sample.get("partnumber") or sample.get("article")
         return {
-            "available": True,
-            "count": max(stock_sum, len(use_parts)),
+            "available": stock_sum > 0,
+            "count": stock_sum,
             "min_price": min(min_prices) if min_prices else None,
             "sample": {
                 "brand": brand,

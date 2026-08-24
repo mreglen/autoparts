@@ -6,7 +6,7 @@ import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../../redux/slices/ClientMarkupSl
 import { canUseClientMarkup, computeClientPrices } from '../../../utils/clientMarkupUtils';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
-import { mapPartToStocksData } from '../NewParts/rosskoHelpers';
+import { mapPartToStocksData, dedupeRosskoParts, rosskoPartDedupeKey } from '../NewParts/rosskoHelpers';
 import {
   formatDeliveryParts,
   formatPriceRub,
@@ -33,9 +33,7 @@ function getDeliverySortTime(stock) {
 }
 
 function partGroupKey(part) {
-  const brand = String(part?.brand || '').trim();
-  const number = String(part?.partnumber || part?.article || '').trim();
-  return String(part?.guid || '').trim() || `${brand}|${number}`;
+  return rosskoPartDedupeKey(part);
 }
 
 function DeliveryCell({ deliveryStart, deliveryEnd }) {
@@ -110,8 +108,9 @@ function CartQtyControl({ quantity, maxQty, onAdd, onRemove, disabled }) {
 }
 
 function buildPartGroups(parts) {
-  const list = Array.isArray(parts) ? parts : [];
+  const list = dedupeRosskoParts(Array.isArray(parts) ? parts : []);
   const groups = [];
+  const seenGroupKeys = new Set();
 
   list.forEach((part) => {
     const brand = String(part?.brand || '').trim();
@@ -123,8 +122,12 @@ function buildPartGroups(parts) {
 
     if (!stocks.length) return;
 
+    const key = partGroupKey(part);
+    if (!key || key === '|' || seenGroupKeys.has(key)) return;
+    seenGroupKeys.add(key);
+
     groups.push({
-      key: partGroupKey(part),
+      key,
       part,
       brand,
       number,

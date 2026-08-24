@@ -3,9 +3,8 @@ import { createPortal } from 'react-dom';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { buildPartDetailPath } from '../../../utils/partRoutes';
 import {
-  getRosskoParts,
-  mapPartToStocksData,
   normalizeArticle,
+  searchRosskoPartsForOem,
   splitRosskoOriginalAndAnalogs,
 } from '../NewParts/rosskoHelpers';
 import VinCatalogOffersTable from './VinCatalogOffersTable';
@@ -92,16 +91,13 @@ function UsedSkeleton({ count = 4 }) {
   );
 }
 
-function hasOfferStock(part) {
-  return mapPartToStocksData(part).length > 0;
-}
-
 export default function VinCatalogPartDrawer({
   detail,
   onClose,
   loadUsedProducts,
   vinBasketId = null,
   ensureVinBasket = null,
+  vehicleBrand = '',
 }) {
   const open = Boolean(detail);
   const [isVisible, setIsVisible] = useState(false);
@@ -166,13 +162,11 @@ export default function VinCatalogPartDrawer({
     setRosskoLoading(true);
     (async () => {
       try {
-        const response = await apiAxiosUnauth.post('/rossko/GetSearch', {
-          text: oem,
-          delivery_id: '000000001',
-          address_id: 176458,
-        });
+        const parts = await searchRosskoPartsForOem(
+          (path, body) => apiAxiosUnauth.post(path, body),
+          { oem, brandHint: vehicleBrand },
+        );
         if (cancelled) return;
-        const parts = getRosskoParts(response?.data || response).filter(hasOfferStock);
         const { originals, analogs } = splitRosskoOriginalAndAnalogs(parts, oemNorm);
         setSimilarParts(originals);
         setAnalogParts(analogs);
@@ -188,7 +182,7 @@ export default function VinCatalogPartDrawer({
     return () => {
       cancelled = true;
     };
-  }, [open, oem, oemNorm]);
+  }, [open, oem, oemNorm, vehicleBrand]);
 
   useEffect(() => {
     if (!open || !oem || !loadUsedProducts) return undefined;

@@ -8,6 +8,7 @@ from typing import Literal
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 
 from app.models.autoservice_warehouse import (
     AutoserviceWarehouseExpense,
@@ -901,6 +902,71 @@ def autoservice_item_available_qty(item: AutoserviceWarehouseItem) -> int:
         int(item.quantity or 0)
         - int(item.reserved_qty or 0)
         - int(getattr(item, "return_reserved_qty", 0) or 0),
+    )
+
+
+def list_autoservice_warehouse_item_reservations(
+    db: Session,
+    *,
+    org_id: str,
+    item_id: int,
+) -> list[dict]:
+    item = (
+        db.query(AutoserviceWarehouseItem)
+        .filter(
+            AutoserviceWarehouseItem.id == item_id,
+            AutoserviceWarehouseItem.organization_id == org_id,
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Позиция не найдена")
+
+    receipt_ids = [
+        row.id
+        for row in db.query(AutoserviceWarehouseReceipt.id).filter(
+            AutoserviceWarehouseReceipt.item_id == item_id,
+        ).all()
+    ]
+    link_filters = [RepairOrderShopPart.autoservice_stock_item_id == item_id]
+    if receipt_ids:
+        link_filters.append(RepairOrderShopPart.warehouse_receipt_id.in_(receipt_ids))
+
+    parts = (
+        db.query(RepairOrderShopPart, RepairOrder)
+        .join(RepairOrder, RepairOrderShopPart.order_id == RepairOrder.id)
+        .filter(
+            RepairOrder.organization_id == org_id,
+            RepairOrderShopPart.source.in_(("autoservice_stock", "warehouse")),
+            or_(*link_filters),
+        )
+        .order_by(RepairOrder.order_number.asc(), RepairOrder.id.asc())
+        .all()
+    )
+
+    aggregated: dict[int, dict] = {}
+    default_unit = getattr(item, "unit", None) or "pcs"
+    for part, order in parts:
+        qty = Decimal(str(part.qty or 0))
+        if qty <= 0:
+            continue
+        bucket = aggregated.get(order.id)
+        if bucket is None:
+            bucket = {
+                "repair_order_id": order.id,
+                "repair_order_number": order.order_number,
+                "order_status": order.status,
+                "qty": Decimal("0"),
+                "unit": part.unit or default_unit,
+            }
+            aggregated[order.id] = bucket
+        bucket["qty"] += qty
+        if part.unit:
+            bucket["unit"] = part.unit
+
+    return sorted(
+        aggregated.values(),
+        key=lambda row: (row["repair_order_number"] or "", row["repair_order_id"]),
     )
 
 

@@ -73,6 +73,26 @@ export function clearLinkedRepairOrder() {
   }
 }
 
+export function removeItemFromPurchaseDraftGroups(groups, part) {
+  if (!part?.pending_import || part.purchase_item_id == null) return groups || [];
+  return (groups || [])
+    .map((group) => {
+      if (group.orderType !== part.purchase_order_type) return group;
+      const itemIds = group.itemIds.filter((id) => id !== part.purchase_item_id);
+      const items = group.items.filter((item) => item.id !== part.purchase_item_id);
+      return { ...group, itemIds, items };
+    })
+    .filter((group) => group.itemIds.length > 0);
+}
+
+export function persistPurchaseDraftGroups(groups) {
+  if (!groups?.length) {
+    clearRepairOrderPurchaseDraft();
+    return;
+  }
+  saveRepairOrderPurchaseDraft({ groups });
+}
+
 export function buildPurchaseImportPayload({
   orderType,
   itemIds,

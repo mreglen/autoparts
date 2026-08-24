@@ -7,8 +7,10 @@ import {
   mapPurchaseItemsToShopParts,
   purchaseItemsAlreadyOnRepairOrder,
   purchaseSelectionKey,
+  persistPurchaseDraftGroups,
   readLinkedRepairOrder,
   readRepairOrderPurchaseDraft,
+  removeItemFromPurchaseDraftGroups,
   saveLinkedRepairOrder,
   saveRepairOrderPurchaseDraft,
 } from './repairOrderPurchaseDraft';
@@ -113,6 +115,38 @@ describe('repairOrderPurchaseDraft', () => {
       [{ items: [{ repairOrderId: 42 }, { repairOrderId: 7 }] }],
       42,
     )).toBe(false);
+  });
+
+  it('removes pending purchase item from draft groups', () => {
+    const groups = [
+      {
+        orderType: 'new',
+        itemIds: [1, 2],
+        items: [{ id: 1 }, { id: 2 }],
+      },
+      {
+        orderType: 'used',
+        itemIds: [5],
+        items: [{ id: 5 }],
+      },
+    ];
+    const next = removeItemFromPurchaseDraftGroups(groups, {
+      pending_import: true,
+      purchase_order_type: 'new',
+      purchase_item_id: 2,
+    });
+    expect(next).toHaveLength(2);
+    expect(next[0].itemIds).toEqual([1]);
+    expect(next[1].itemIds).toEqual([5]);
+  });
+
+  it('persists or clears purchase draft groups', () => {
+    persistPurchaseDraftGroups([
+      { orderType: 'new', itemIds: [1], items: [{ id: 1 }] },
+    ]);
+    expect(readRepairOrderPurchaseDraft()?.groups).toHaveLength(1);
+    persistPurchaseDraftGroups([]);
+    expect(readRepairOrderPurchaseDraft()).toBeNull();
   });
 });
 

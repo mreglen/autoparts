@@ -24,11 +24,14 @@ import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItems
 import RepairOrderStockPickerModal from '../../components/Autoservice/RepairOrderStockPickerModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
+import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import {
   clearRepairOrderPurchaseDraft,
   importPurchaseGroupsToRepairOrder,
   mapPurchaseItemsToShopParts,
+  persistPurchaseDraftGroups,
   readRepairOrderPurchaseDraft,
+  removeItemFromPurchaseDraftGroups,
   saveLinkedRepairOrder,
 } from '../../utils/repairOrderPurchaseDraft';
 import {
@@ -849,6 +852,21 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
   );
 }
 
+function shopPartRowKey(part, index) {
+  if (part?.id) return `shop-part-${part.id}`;
+  if (part?.pending_import && part.purchase_item_id != null) {
+    return `shop-part-pending-${part.purchase_order_type}-${part.purchase_item_id}`;
+  }
+  return `shop-part-draft-${index}`;
+}
+
+function shopPartRemoveMessage(part) {
+  if (part?.is_imported || part?.pending_import) {
+    return 'Убрать позицию из заказ-наряда? Товар останется на складе автосервиса, резерв будет снят.';
+  }
+  return 'Удалить запчасть из заказ-наряда?';
+}
+
 function mapOrderToFormState(order) {
   return {
     clientId: order?.client_id ? String(order.client_id) : '',
@@ -992,6 +1010,7 @@ export default function AutoserviceOrderFormPage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [detachingShopPartId, setDetachingShopPartId] = useState(null);
+  const [shopPartRemoveConfirm, setShopPartRemoveConfirm] = useState(null);
   const plannerPrefillRef = useRef(location.state);
   const createInitRef = useRef(false);
 
@@ -1301,19 +1320,41 @@ export default function AutoserviceOrderFormPage() {
     setShopParts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
 
-  const removeShopPart = useCallback(async (index) => {
+  const removeShopPartLocally = useCallback((index, part) => {
+    setShopParts((prev) => prev.filter((_, i) => i !== index));
+    if (part?.pending_import) {
+      setPendingPurchaseGroups((prev) => {
+        const next = removeItemFromPurchaseDraftGroups(prev, part);
+        if (isCreate) {
+          persistPurchaseDraftGroups(next);
+        }
+        return next;
+      });
+    }
+  }, [isCreate]);
+
+  const requestRemoveShopPart = useCallback((index) => {
     const part = shopParts[index];
     if (!part) return;
+    setShopPartRemoveConfirm({ index, part });
+  }, [shopParts]);
 
-    const isImportedSaved = Boolean(part.is_imported && part.id);
-    const isPendingImport = Boolean(part.pending_import);
+  const confirmRemoveShopPart = useCallback(async () => {
+    const pending = shopPartRemoveConfirm;
+    if (!pending) return;
+
+    const { index, part } = pending;
+    const isImportedSaved = Boolean(part.is_imported && part.id && !part.pending_import);
 
     if (isImportedSaved) {
-      const confirmed = window.confirm(
-        'Убрать позицию из заказ-наряда? Товар останется на складе автосервиса, резерв будет снят.',
-      );
-      if (!confirmed || !isEdit || !orderId) return;
+      if (!isEdit || !orderId) {
+        setShopPartRemoveConfirm(null);
+        return;
+      }
 
+      const previousShopParts = shopParts;
+      removeShopPartLocally(index, part);
+      setShopPartRemoveConfirm(null);
       setDetachingShopPartId(part.id);
       setError('');
       try {
@@ -1323,6 +1364,7 @@ export default function AutoserviceOrderFormPage() {
         );
         applyFormState(mapOrderToFormState(order));
       } catch (err) {
+        setShopParts(previousShopParts);
         setError(err?.message || 'Не удалось убрать позицию из заказ-наряда');
       } finally {
         setDetachingShopPartId(null);
@@ -1330,15 +1372,16 @@ export default function AutoserviceOrderFormPage() {
       return;
     }
 
-    if (isPendingImport) {
-      const confirmed = window.confirm(
-        'Убрать позицию из заказ-наряда? Товар останётся на складе автосервиса.',
-      );
-      if (!confirmed) return;
-    }
-
-    setShopParts((prev) => prev.filter((_, i) => i !== index));
-  }, [shopParts, isEdit, orderId, applyFormState]);
+    removeShopPartLocally(index, part);
+    setShopPartRemoveConfirm(null);
+  }, [
+    shopPartRemoveConfirm,
+    shopParts,
+    isEdit,
+    orderId,
+    removeShopPartLocally,
+    applyFormState,
+  ]);
 
   const handleManualShopPartAdd = (values) => {
     const isRossko = values.source === 'rossko';
@@ -2111,7 +2154,7 @@ export default function AutoserviceOrderFormPage() {
 
                 return (
                   <div
-                    key={p.id || `shop-part-${index}`}
+                    key={shopPartRowKey(p, index)}
                     className="min-w-0 rounded-sg border border-line bg-white px-2 py-1.5"
                   >
                     <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
@@ -2197,7 +2240,7 @@ export default function AutoserviceOrderFormPage() {
                         className={`${rowActionBtnClass} shrink-0 text-danger-600 hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-50`}
                         aria-label={isImported ? 'Убрать из заказ-наряда' : 'Удалить'}
                         disabled={detachingShopPartId === p.id}
-                        onClick={() => removeShopPart(index)}
+                        onClick={() => requestRemoveShopPart(index)}
                       >
                         ×
                       </button>
@@ -2366,6 +2409,25 @@ export default function AutoserviceOrderFormPage() {
             ? null
             : manualShopPartFormValues(shopParts[shopPartEditIndex])
         }
+      />
+
+      <ConfirmationModal
+        isOpen={Boolean(shopPartRemoveConfirm)}
+        onClose={() => {
+          if (detachingShopPartId) return;
+          setShopPartRemoveConfirm(null);
+        }}
+        onConfirm={confirmRemoveShopPart}
+        title={shopPartRemoveConfirm?.part?.is_imported || shopPartRemoveConfirm?.part?.pending_import
+          ? 'Убрать из заказ-наряда'
+          : 'Удалить запчасть'}
+        message={shopPartRemoveConfirm ? shopPartRemoveMessage(shopPartRemoveConfirm.part) : ''}
+        confirmText={shopPartRemoveConfirm?.part?.is_imported || shopPartRemoveConfirm?.part?.pending_import
+          ? 'Убрать'
+          : 'Удалить'}
+        cancelText="Отмена"
+        danger
+        isLoading={Boolean(detachingShopPartId)}
       />
     </div>
     </div>

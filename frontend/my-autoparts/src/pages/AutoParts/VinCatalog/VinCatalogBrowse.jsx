@@ -432,6 +432,7 @@ export default function VinCatalogBrowse({
         loadUsedProducts={loadUsedProducts}
         vinBasketId={vinBasketId}
         ensureVinBasket={ensureVinBasket}
+        vehicleBrand={vehicle?.make || ''}
       />
     </div>
   );

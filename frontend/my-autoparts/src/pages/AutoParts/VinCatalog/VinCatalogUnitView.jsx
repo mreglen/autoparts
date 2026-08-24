@@ -27,8 +27,8 @@ function AvailCell({ row, loading }) {
   const used = row.used?.count ?? 0;
   const rossko = row.rossko?.count ?? 0;
   const parts = [];
-  if (rossko > 0 || row.rossko?.available) parts.push(rossko > 0 ? `нов. ${rossko}` : 'нов.');
-  if (used > 0 || row.used?.available) parts.push(used > 0 ? `б/у ${used}` : 'б/у');
+  if (rossko > 0) parts.push(`нов. ${rossko}`);
+  if (used > 0) parts.push(`б/у ${used}`);
   if (!parts.length) return <span className="text-gray-400">нет</span>;
   return <span className="text-xs font-medium text-emerald-700">{parts.join(' · ')}</span>;
 }

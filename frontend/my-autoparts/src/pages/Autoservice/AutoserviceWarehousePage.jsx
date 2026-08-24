@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -23,7 +24,8 @@ import {
   formatAutoserviceWarehouseQty,
   matchesAutoserviceWarehouseSearch,
 } from '../../utils/autoserviceWarehouseUi';
-import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
+import { formatShopPartUnit, formatShopPartQty } from '../../utils/repairOrderShopPartUtils';
+import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import {
   autoserviceListActionsButtonClass,
   autoserviceListErrorClass,
@@ -46,6 +48,20 @@ import {
   autoserviceListTrClickableClass,
   warehouseSecondaryButtonClass,
 } from '../../utils/warehouseListUi';
+
+const REPAIR_ORDER_STATUS_LABELS = {
+  review: 'На проверке',
+  accepted: 'Принят',
+  open: 'Открыт',
+  in_progress: 'В работе',
+  done: 'Выполнен',
+  completed: 'Завершён',
+  cancelled: 'Отменён',
+};
+
+function formatReservationQty(qty, unit = 'pcs') {
+  return `${formatShopPartQty(qty, unit)} ${formatShopPartUnit(unit)}`;
+}
 
 function WarehouseItemActionsMenu({
   canAct,
@@ -168,13 +184,16 @@ export default function AutoserviceWarehousePage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [returnLot, setReturnLot] = useState(null);
+  const [reservations, setReservations] = useState([]);
+  const [reservationsLoading, setReservationsLoading] = useState(false);
+  const [reservationsError, setReservationsError] = useState('');
 
   const loadItems = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const [data, lots] = await Promise.all([
-        apiRequest('/autoservice/warehouse/items'),
+        apiRequest('/autoservice/warehouse/items?exclude_zero_qty=true'),
         apiRequest('/autoservice/warehouse/purchase-lots'),
       ]);
       setItems(Array.isArray(data) ? data : []);
@@ -191,6 +210,36 @@ export default function AutoserviceWarehousePage() {
     if (!userHasAutoserviceOrganization(user)) return;
     loadItems();
   }, [isReady, isAuthenticated, user, loadItems]);
+
+  useEffect(() => {
+    if (!detailsItem?.id) {
+      setReservations([]);
+      setReservationsLoading(false);
+      setReservationsError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setReservationsLoading(true);
+    setReservationsError('');
+    apiRequest(`/autoservice/warehouse/items/${detailsItem.id}/reservations`)
+      .then((data) => {
+        if (cancelled) return;
+        setReservations(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setReservations([]);
+        setReservationsError(err?.message || 'Не удалось загрузить резерв');
+      })
+      .finally(() => {
+        if (!cancelled) setReservationsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detailsItem?.id]);
 
   const filteredItems = useMemo(
     () => items.filter((item) => matchesAutoserviceWarehouseSearch(item, searchQuery)),
@@ -664,6 +713,48 @@ export default function AutoserviceWarehousePage() {
                 </dd>
               </div>
             </dl>
+
+            {Number(detailsItem.reserved_qty) > 0 ? (
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-gray-900">Резерв в заказ-нарядах</h3>
+                {reservationsLoading ? (
+                  <p className="text-sm text-gray-500">Загрузка…</p>
+                ) : reservationsError ? (
+                  <p className="text-sm text-red-600" role="alert">{reservationsError}</p>
+                ) : reservations.length === 0 ? (
+                  <p className="text-sm text-gray-500">Нет активных резервов в заказ-нарядах</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200">
+                    {reservations.map((row) => (
+                      <li
+                        key={row.repair_order_id}
+                        className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            to={`/autoservice/orders/${row.repair_order_id}/edit`}
+                            className="font-medium text-indigo-700 hover:text-indigo-900"
+                            onClick={() => setDetailsItem(null)}
+                          >
+                            {repairOrderNumberLabel({
+                              id: row.repair_order_id,
+                              order_number: row.repair_order_number,
+                            })}
+                          </Link>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {REPAIR_ORDER_STATUS_LABELS[row.order_status] || row.order_status}
+                          </p>
+                        </div>
+                        <span className="shrink-0 tabular-nums font-medium text-gray-900">
+                          {formatReservationQty(row.qty, row.unit || detailsItem.unit || 'pcs')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="secondary" onClick={() => openEditItem(detailsItem)}>
                 Редактировать

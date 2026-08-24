@@ -11,6 +11,8 @@ import {
   getRosskoStockCount,
   getRosskoMinPrice,
   getRosskoEarliestDelivery,
+  dedupeRosskoParts,
+  rosskoPartDedupeKey,
 } from './rosskoHelpers';
 
 const toSafeText = (value, fallback = '') => {
@@ -40,11 +42,20 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
   const rosskoSort = searchParams.get('sort') || 'price_asc';
   const showAnalogs = searchParams.get('show_analogs') !== '0';
 
-  let rawParts = partsData?.PartsList?.Part;
-  if (!Array.isArray(rawParts)) {
-    rawParts = rawParts ? [rawParts] : [];
-  }
-  const allParts = rawParts;
+  const allParts = useMemo(() => {
+    let raw = partsData?.PartsList?.Part;
+    if (!Array.isArray(raw)) raw = raw ? [raw] : [];
+    return dedupeRosskoParts(raw);
+  }, [partsData]);
+
+  const mainPartKeys = useMemo(() => {
+    const keys = new Set();
+    allParts.forEach((part) => {
+      const key = rosskoPartDedupeKey(part);
+      if (key && key !== '|') keys.add(key);
+    });
+    return keys;
+  }, [allParts]);
 
   const filterRosskoPart = useCallback((part) => {
     if (selectedBrands.length > 0 && !selectedBrands.includes(part?.brand)) return false;
@@ -86,8 +97,11 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
         crosses.push(...crossParts);
       }
     });
-    return crosses;
-  }, [allParts]);
+    return dedupeRosskoParts(crosses).filter((part) => {
+      const key = rosskoPartDedupeKey(part);
+      return key && key !== '|' && !mainPartKeys.has(key);
+    });
+  }, [allParts, mainPartKeys]);
 
   const filteredCrossParts = useMemo(
     () => sortRosskoParts(allCrossParts.filter(filterRosskoPart)),

@@ -76,6 +76,16 @@ export const mapPartToStocksData = (part) => {
     }));
 };
 
+export function mapPartToInStockData(part) {
+  return mapPartToStocksData(part).filter(
+    (stock) => stock?.price && stock.price !== 0 && (stock.available_count || 0) > 0,
+  );
+}
+
+export function hasRosskoInStock(part) {
+  return mapPartToInStockData(part).length > 0;
+}
+
 export const QUICK_SEARCH_CHIPS = [
   'W712/75',
   'тормозные колодки',
@@ -100,6 +110,66 @@ export const getRosskoParts = (data) => {
   return Array.isArray(parts) ? parts : [parts];
 };
 
+export function rosskoPartDedupeKey(part) {
+  const guid = String(part?.guid || '').trim();
+  if (guid) return guid;
+  const brand = String(part?.brand || '').trim();
+  const article = getPartArticleNorm(part);
+  return `${brand}|${article}`;
+}
+
+function rosskoStocksArray(part) {
+  const stocks = part?.stocks?.stock;
+  if (!stocks) return [];
+  return Array.isArray(stocks) ? stocks : [stocks];
+}
+
+function mergeRosskoPartStocks(existingPart, incomingPart) {
+  if (!existingPart || !incomingPart) return existingPart || incomingPart;
+  const byId = new Map();
+  [...rosskoStocksArray(existingPart), ...rosskoStocksArray(incomingPart)].forEach((stock) => {
+    if (!stock || stock.id == null) return;
+    const id = String(stock.id);
+    const prev = byId.get(id);
+    if (!prev) {
+      byId.set(id, stock);
+      return;
+    }
+    const prevCount = parseInt(prev.count, 10) || 0;
+    const nextCount = parseInt(stock.count, 10) || 0;
+    if (nextCount > prevCount) {
+      byId.set(id, stock);
+    }
+  });
+  const merged = Array.from(byId.values());
+  if (!merged.length) return existingPart;
+  return {
+    ...existingPart,
+    stocks: { stock: merged.length === 1 ? merged[0] : merged },
+  };
+}
+
+/** Remove duplicate Rossko parts (same guid or brand+article), merge warehouse stocks. */
+export function dedupeRosskoParts(parts) {
+  const list = Array.isArray(parts) ? parts : [];
+  const byKey = new Map();
+  const order = [];
+
+  list.forEach((part) => {
+    if (!part || typeof part !== 'object') return;
+    const key = rosskoPartDedupeKey(part);
+    if (!key || key === '|') return;
+    if (!byKey.has(key)) {
+      byKey.set(key, part);
+      order.push(key);
+      return;
+    }
+    byKey.set(key, mergeRosskoPartStocks(byKey.get(key), part));
+  });
+
+  return order.map((key) => byKey.get(key));
+}
+
 /** Analog / cross parts nested under a Rossko Part. */
 export const collectRosskoCrossParts = (part) => {
   let crossParts = part?.crosses?.Part;
@@ -113,12 +183,9 @@ export const collectRosskoAnalogs = (parts) => {
   const out = [];
   list.forEach((part) => {
     collectRosskoCrossParts(part).forEach((cross) => {
-      const guid = String(cross?.guid || '').trim();
-      const key =
-        guid
-        || `${String(cross?.brand || '').trim()}|${normalizeArticle(cross?.partnumber || cross?.article)}`;
+      const key = rosskoPartDedupeKey(cross);
       if (!key || key === '|' || seen.has(key)) return;
-      if (!mapPartToStocksData(cross).length) return;
+      if (!hasRosskoInStock(cross)) return;
       seen.add(key);
       out.push(cross);
     });
@@ -130,11 +197,19 @@ export function getPartArticleNorm(part) {
   return normalizeArticle(part?.partnumber || part?.article || part?.oem);
 }
 
-/** Part matches catalog OEM by article (top-level or cross). */
-export function isRosskoOriginalOemPart(part, oemNorm) {
+export function rosskoPartMatchesOem(part, oemNorm) {
   if (!oemNorm) return false;
   const candidates = [part?.partnumber, part?.article, part?.oem];
-  return candidates.some((value) => normalizeArticle(value) === oemNorm);
+  return candidates.some((value) => {
+    const pn = normalizeArticle(value);
+    if (!pn) return false;
+    return pn === oemNorm || pn.includes(oemNorm) || oemNorm.includes(pn);
+  });
+}
+
+/** Part matches catalog OEM by article (top-level or cross). */
+export function isRosskoOriginalOemPart(part, oemNorm) {
+  return rosskoPartMatchesOem(part, oemNorm);
 }
 
 /** Top-level Rossko hits plus crosses with available stock, deduped. */
@@ -145,9 +220,8 @@ export function collectRosskoOfferParts(parts) {
 
   const add = (part) => {
     if (!part || typeof part !== 'object') return;
-    if (!mapPartToStocksData(part).length) return;
-    const guid = String(part?.guid || '').trim();
-    const key = guid || `${String(part?.brand || '').trim()}|${getPartArticleNorm(part)}`;
+    if (!hasRosskoInStock(part)) return;
+    const key = rosskoPartDedupeKey(part);
     if (!key || key === '|' || seen.has(key)) return;
     seen.add(key);
     out.push(part);
@@ -216,4 +290,46 @@ export const buildRosskoLookupText = (article, brand) => {
   const brandTrimmed = String(brand || '').trim();
   return brandTrimmed ? `${brandTrimmed} ${articleTrimmed}` : articleTrimmed;
 };
+
+export function buildRosskoOemSearchQueries(oem, brandHint) {
+  const trimmed = String(oem || '').trim();
+  if (!trimmed) return [];
+  const queries = [trimmed];
+  const brand = String(brandHint || '').trim();
+  if (brand) {
+    queries.push(buildRosskoLookupText(trimmed, brand));
+  }
+  const normalized = normalizeArticle(trimmed);
+  if (normalized && normalized !== trimmed) {
+    queries.push(normalized);
+    if (brand) queries.push(buildRosskoLookupText(normalized, brand));
+  }
+  return [...new Set(queries.map((entry) => entry.trim()).filter(Boolean))];
+}
+
+export async function searchRosskoParts(apiPost, {
+  text,
+  delivery_id = '000000001',
+  address_id = 176458,
+}) {
+  const response = await apiPost('/rossko/GetSearch', { text, delivery_id, address_id });
+  return getRosskoParts(response?.data || response);
+}
+
+export async function searchRosskoPartsForOem(apiPost, {
+  oem,
+  brandHint = '',
+  delivery_id = '000000001',
+  address_id = 176458,
+}) {
+  const queries = buildRosskoOemSearchQueries(oem, brandHint);
+  let merged = [];
+  for (const text of queries) {
+    const parts = await searchRosskoParts(apiPost, { text, delivery_id, address_id });
+    if (!parts.length) continue;
+    merged = dedupeRosskoParts([...merged, ...parts]);
+    if (merged.some(hasRosskoInStock)) break;
+  }
+  return merged;
+}
 
