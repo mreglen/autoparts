@@ -4,6 +4,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import Modal from '../../components/UI/Modal';
 import PayerFormModal from '../../components/Autoservice/PayerFormModal';
+import WorkZonesSortableList from '../../components/Autoservice/WorkZonesSortableList';
 import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 import { payerDisplayName, personTypeLabel } from '../../utils/autoservicePayerRequisites';
@@ -198,6 +199,7 @@ export default function AutoserviceSettingsPage() {
   const [worksOpen, setWorksOpen] = useState(false);
   const [works, setWorks] = useState([]);
   const [worksLoading, setWorksLoading] = useState(false);
+  const [zonesReordering, setZonesReordering] = useState(false);
 
   const loadSettings = useCallback(async () => {
     const data = await apiRequest('/autoservice/settings');
@@ -290,6 +292,24 @@ export default function AutoserviceSettingsPage() {
       await loadWorkZones();
     } catch (err) {
       setError(err?.message || 'Не удалось удалить');
+    }
+  };
+
+  const reorderWorkZones = async (nextZones) => {
+    setWorkZones(nextZones);
+    setZonesReordering(true);
+    setError('');
+    try {
+      const data = await apiRequest('/autoservice/work-zones/reorder', {
+        method: 'PUT',
+        body: JSON.stringify({ zone_ids: nextZones.map((zone) => zone.id) }),
+      });
+      setWorkZones(Array.isArray(data) ? data : nextZones);
+    } catch (err) {
+      await loadWorkZones();
+      setError(err?.message || 'Не удалось сохранить порядок зон');
+    } finally {
+      setZonesReordering(false);
     }
   };
 
@@ -401,84 +421,22 @@ export default function AutoserviceSettingsPage() {
             <section>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-gray-500">
-                  {workZonesLoading ? 'Загрузка…' : `${workZones.length} зон`}
+                  {workZonesLoading
+                    ? 'Загрузка…'
+                    : `${workZones.length} зон${zonesReordering ? ' · сохранение порядка…' : ''}`}
                 </p>
                 <button type="button" onClick={() => setZoneModal({ mode: 'create' })} className={btnPrimary}>
                   Добавить
                 </button>
               </div>
-              <div className="hidden md:block">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead>
-                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      <th className="py-3 pr-3">Название</th>
-                      <th className="w-40 py-3 text-right">Действия</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {workZonesLoading ? (
-                      <tr>
-                        <td colSpan={2} className="py-12 text-center text-gray-500">
-                          Загрузка…
-                        </td>
-                      </tr>
-                    ) : workZones.length === 0 ? (
-                      <tr>
-                        <td colSpan={2} className="py-12 text-center text-gray-500">
-                          Зон пока нет
-                        </td>
-                      </tr>
-                    ) : (
-                      workZones.map((zone) => (
-                        <tr key={zone.id} className="transition-colors hover:bg-gray-50/70">
-                          <td className="py-3 pr-3 align-middle font-medium text-gray-900">{zone.name}</td>
-                          <td className="py-3 text-right align-middle">
-                            <ActionsDropdown
-                              menuClassName="w-40 z-50"
-                              estimatedMenuHeight={100}
-                              showLabel
-                              buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-                            >
-                              <ActionsDropdownItem onClick={() => setZoneModal({ mode: 'edit', zone })}>
-                                Изменить
-                              </ActionsDropdownItem>
-                              <ActionsDropdownItem danger onClick={() => removeWorkZone(zone.id)}>
-                                Удалить
-                              </ActionsDropdownItem>
-                            </ActionsDropdown>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="md:hidden">
-                {workZonesLoading ? (
-                  <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
-                ) : workZones.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-gray-500">Зон пока нет</p>
-                ) : (
-                  workZones.map((zone) => (
-                    <div key={zone.id} className="flex items-center justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0">
-                      <p className="min-w-0 truncate text-sm font-semibold text-gray-900">{zone.name}</p>
-                      <ActionsDropdown
-                        menuClassName="w-40 z-50"
-                        estimatedMenuHeight={100}
-                        showLabel={false}
-                        buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50"
-                      >
-                        <ActionsDropdownItem onClick={() => setZoneModal({ mode: 'edit', zone })}>
-                          Изменить
-                        </ActionsDropdownItem>
-                        <ActionsDropdownItem danger onClick={() => removeWorkZone(zone.id)}>
-                          Удалить
-                        </ActionsDropdownItem>
-                      </ActionsDropdown>
-                    </div>
-                  ))
-                )}
-              </div>
+              <WorkZonesSortableList
+                zones={workZones}
+                loading={workZonesLoading}
+                disabled={zonesReordering}
+                onReorder={reorderWorkZones}
+                onEdit={(zone) => setZoneModal({ mode: 'edit', zone })}
+                onRemove={removeWorkZone}
+              />
             </section>
           ) : null}
 
