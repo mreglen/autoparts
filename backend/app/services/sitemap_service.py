@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Iterable
@@ -36,7 +37,8 @@ def get_seo_sitemap_daily_url_limit() -> int:
 PRODUCTS_SITEMAP_CACHE_KEY = "products"
 NEW_PARTS_SITEMAP_CACHE_KEY = "new_parts"
 NEW_PARTS_SITEMAP_PAGE_CACHE_PREFIX = "new_parts_p"
-NEW_PARTS_SITEMAP_MAX_URLS = 50000
+# Keep child files small (~1MB) so crawlers/browsers do not time out on 10MB+ XML.
+NEW_PARTS_SITEMAP_MAX_URLS = 5000
 NEW_BRANDS_SITEMAP_CACHE_KEY = "new_brands"
 NEW_CATEGORIES_SITEMAP_CACHE_KEY = "new_categories"
 USED_BRANDS_SITEMAP_CACHE_KEY = "used_brands"
@@ -49,6 +51,15 @@ logger = logging.getLogger(__name__)
 
 def _new_parts_page_cache_key(page: int) -> str:
     return f"{NEW_PARTS_SITEMAP_PAGE_CACHE_PREFIX}{page}"
+
+
+_SITEMAP_URL_BLOCK_RE = re.compile(r"  <url>.*?</url>", re.DOTALL)
+
+
+def _extract_sitemap_url_blocks(xml_content: str) -> list[str]:
+    if not xml_content:
+        return []
+    return _SITEMAP_URL_BLOCK_RE.findall(xml_content)
 
 
 def _empty_urlset_xml() -> str:
@@ -139,6 +150,131 @@ def _count_new_parts_page_caches(db: Session) -> int:
         if suffix.isdigit():
             page_numbers.append(int(suffix))
     return max(page_numbers) if page_numbers else 0
+
+
+def _persist_new_parts_sitemap_index(
+    db: Session,
+    *,
+    site_origin: str,
+    page_count: int,
+    total_url_count: int,
+) -> NewPartsSitemapSnapshot:
+    generated_at = datetime.now(timezone.utc)
+    index_xml = _build_new_parts_sitemap_index_xml(
+        site_origin,
+        page_count=page_count,
+        generated_at=generated_at,
+    )
+    return _persist_sitemap_cache(
+        db,
+        cache_key=NEW_PARTS_SITEMAP_CACHE_KEY,
+        xml_content=index_xml,
+        url_count=total_url_count,
+    )
+
+
+def _collect_cached_new_parts_url_blocks(db: Session, index_row: SeoSitemapCache) -> list[str]:
+    if "<sitemapindex" not in (index_row.xml_content or ""):
+        return _extract_sitemap_url_blocks(index_row.xml_content or "")
+
+    blocks: list[str] = []
+    page_count = _count_new_parts_page_caches(db)
+    for page in range(1, page_count + 1):
+        page_row = _get_sitemap_cache_row(db, _new_parts_page_cache_key(page))
+        if page_row is None or not page_row.xml_content:
+            continue
+        blocks.extend(_extract_sitemap_url_blocks(page_row.xml_content))
+    return blocks
+
+
+def _write_new_parts_pages_from_blocks(
+    db: Session,
+    *,
+    site_origin: str,
+    blocks: list[str],
+) -> NewPartsSitemapSnapshot:
+    if not blocks:
+        _delete_new_parts_page_caches(db, keep_pages=0)
+        return _persist_sitemap_cache(
+            db,
+            cache_key=NEW_PARTS_SITEMAP_CACHE_KEY,
+            xml_content=_empty_urlset_xml(),
+            url_count=0,
+        )
+
+    pages: list[tuple[str, int]] = []
+    for start in range(0, len(blocks), NEW_PARTS_SITEMAP_MAX_URLS):
+        chunk = blocks[start:start + NEW_PARTS_SITEMAP_MAX_URLS]
+        pages.append((_build_urlset_xml(chunk), len(chunk)))
+
+    if len(pages) == 1:
+        _delete_new_parts_page_caches(db, keep_pages=0)
+        return _persist_sitemap_cache(
+            db,
+            cache_key=NEW_PARTS_SITEMAP_CACHE_KEY,
+            xml_content=pages[0][0],
+            url_count=pages[0][1],
+        )
+
+    for page_num, (xml_content, url_count) in enumerate(pages, start=1):
+        _persist_sitemap_cache(
+            db,
+            cache_key=_new_parts_page_cache_key(page_num),
+            xml_content=xml_content,
+            url_count=url_count,
+        )
+    _delete_new_parts_page_caches(db, keep_pages=len(pages))
+    return _persist_new_parts_sitemap_index(
+        db,
+        site_origin=site_origin,
+        page_count=len(pages),
+        total_url_count=len(blocks),
+    )
+
+
+def _new_parts_cache_needs_repage(db: Session, index_row: SeoSitemapCache) -> bool:
+    if "<sitemapindex" not in (index_row.xml_content or ""):
+        return int(index_row.url_count or 0) > NEW_PARTS_SITEMAP_MAX_URLS
+
+    page_count = _count_new_parts_page_caches(db)
+    if page_count <= 0:
+        return True
+    for page in range(1, page_count + 1):
+        page_row = _get_sitemap_cache_row(db, _new_parts_page_cache_key(page))
+        if page_row is None or not page_row.xml_content:
+            return True
+        if int(page_row.url_count or 0) > NEW_PARTS_SITEMAP_MAX_URLS:
+            return True
+    return False
+
+
+def ensure_new_parts_sitemap_pages_sized(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> NewPartsSitemapSnapshot | None:
+    """
+    If cached child pages exceed NEW_PARTS_SITEMAP_MAX_URLS, split them in-place
+    from cached XML (no full DB card scan). Returns updated index snapshot or None.
+    """
+    row = get_new_parts_sitemap_cache_row(db)
+    if row is None or not row.xml_content:
+        return None
+    if not _new_parts_cache_needs_repage(db, row):
+        return None
+
+    site_origin = _resolve_origin(db, preferred_host_url)
+    blocks = _collect_cached_new_parts_url_blocks(db, row)
+    if not blocks and "<sitemapindex" in row.xml_content:
+        # Broken page cache: fall back to full rebuild.
+        return rebuild_new_parts_sitemap_cache(db, preferred_host_url=preferred_host_url)
+
+    logger.info(
+        "Repaging new parts sitemap cache: urls=%s max_per_page=%s",
+        len(blocks),
+        NEW_PARTS_SITEMAP_MAX_URLS,
+    )
+    return _write_new_parts_pages_from_blocks(db, site_origin=site_origin, blocks=blocks)
 
 
 @dataclass(frozen=True)
@@ -880,12 +1016,13 @@ def append_new_part_card_to_sitemap_cache(
 
     site_origin = _resolve_origin(db, preferred_host_url)
     loc, entry = _new_part_sitemap_url_block(site_origin, card)
+    ensure_new_parts_sitemap_pages_sized(db, preferred_host_url=preferred_host_url)
     row = get_new_parts_sitemap_cache_row(db)
     if row is None or not row.xml_content:
         rebuild_new_parts_sitemap_cache(db, preferred_host_url=preferred_host_url)
         return True
 
-    if loc in row.xml_content:
+    if loc in (row.xml_content or ""):
         return True
 
     if "<sitemapindex" in row.xml_content:
@@ -898,12 +1035,28 @@ def append_new_part_card_to_sitemap_cache(
             last_row is None
             or not last_row.xml_content
             or "</urlset>" not in last_row.xml_content
-            or int(last_row.url_count or 0) >= NEW_PARTS_SITEMAP_MAX_URLS
         ):
             rebuild_new_parts_sitemap_cache(db, preferred_host_url=preferred_host_url)
             return True
         if loc in last_row.xml_content:
             return True
+
+        if int(last_row.url_count or 0) >= NEW_PARTS_SITEMAP_MAX_URLS:
+            new_page = page_count + 1
+            _persist_sitemap_cache(
+                db,
+                cache_key=_new_parts_page_cache_key(new_page),
+                xml_content=_build_urlset_xml([entry]),
+                url_count=1,
+            )
+            _persist_new_parts_sitemap_index(
+                db,
+                site_origin=site_origin,
+                page_count=new_page,
+                total_url_count=int(row.url_count or 0) + 1,
+            )
+            return True
+
         xml_content = last_row.xml_content.replace("</urlset>", f"{entry}\n</urlset>", 1)
         _persist_sitemap_cache(
             db,
@@ -920,7 +1073,25 @@ def append_new_part_card_to_sitemap_cache(
         return True
 
     if int(row.url_count or 0) >= NEW_PARTS_SITEMAP_MAX_URLS:
-        rebuild_new_parts_sitemap_cache(db, preferred_host_url=preferred_host_url)
+        # Promote current single urlset to page 1 and start page 2.
+        _persist_sitemap_cache(
+            db,
+            cache_key=_new_parts_page_cache_key(1),
+            xml_content=row.xml_content,
+            url_count=int(row.url_count or 0),
+        )
+        _persist_sitemap_cache(
+            db,
+            cache_key=_new_parts_page_cache_key(2),
+            xml_content=_build_urlset_xml([entry]),
+            url_count=1,
+        )
+        _persist_new_parts_sitemap_index(
+            db,
+            site_origin=site_origin,
+            page_count=2,
+            total_url_count=int(row.url_count or 0) + 1,
+        )
         return True
 
     if "</urlset>" not in row.xml_content:
@@ -1313,6 +1484,10 @@ def get_new_parts_sitemap_snapshot(
     *,
     preferred_host_url: str | None = None,
 ) -> NewPartsSitemapSnapshot:
+    resized = ensure_new_parts_sitemap_pages_sized(db, preferred_host_url=preferred_host_url)
+    if resized is not None:
+        return resized
+
     row = get_new_parts_sitemap_cache_row(db)
     if row is not None and row.xml_content:
         if (
@@ -1332,23 +1507,22 @@ def get_new_parts_sitemap_page_snapshot(
 ) -> NewPartsSitemapSnapshot:
     if page < 1:
         raise ValueError("page must be >= 1")
-    row = get_new_parts_sitemap_cache_row(db)
-    if row is None or not row.xml_content:
-        rebuild_new_parts_sitemap_cache(db, preferred_host_url=preferred_host_url)
-    elif "<sitemapindex" not in (row.xml_content or ""):
-        if page != 1:
-            raise ValueError("new parts sitemap is not paginated")
-        return get_new_parts_sitemap_snapshot(db, preferred_host_url=preferred_host_url)
+
+    ensure_new_parts_sitemap_pages_sized(db, preferred_host_url=preferred_host_url)
 
     page_row = _get_sitemap_cache_row(db, _new_parts_page_cache_key(page))
     if page_row is not None and page_row.xml_content:
         return _snapshot_from_cache_row(page_row)
 
-    rebuild_new_parts_sitemap_cache(db, preferred_host_url=preferred_host_url)
-    page_row = _get_sitemap_cache_row(db, _new_parts_page_cache_key(page))
-    if page_row is None or not page_row.xml_content:
-        raise ValueError(f"new parts sitemap page {page} not found")
-    return _snapshot_from_cache_row(page_row)
+    row = get_new_parts_sitemap_cache_row(db)
+    if row is not None and row.xml_content and "<sitemapindex" not in row.xml_content:
+        if page != 1:
+            raise ValueError("new parts sitemap is not paginated")
+        return _snapshot_from_cache_row(row)
+
+    # Missing page: avoid synchronous full rebuild (minutes / proxy timeouts).
+    # Daily Celery rebuild / admin SEO rebuild will restore pages.
+    raise ValueError(f"new parts sitemap page {page} not found")
 
 
 def get_new_brands_sitemap_snapshot(

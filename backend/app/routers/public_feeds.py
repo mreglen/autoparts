@@ -27,13 +27,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/feeds", tags=["Public feeds"])
 
 _SITEMAP_CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
+_SITEMAP_MEDIA_TYPE = "application/xml; charset=utf-8"
 
 
 def _xml_response(content: str, *, last_modified=None) -> Response:
     headers = dict(_SITEMAP_CACHE_HEADERS)
     if last_modified is not None:
         headers["Last-Modified"] = format_datetime(last_modified, usegmt=True)
-    return Response(content=content, media_type="application/xml", headers=headers)
+    return Response(content=content, media_type=_SITEMAP_MEDIA_TYPE, headers=headers)
 
 
 @router.get("/yandex/used.yml")
@@ -70,7 +71,7 @@ def public_products_sitemap(db: Session = Depends(get_db)):
         return _xml_response(xml)
 
 
-@router.get("/sitemap-new-parts.xml")
+@router.api_route("/sitemap-new-parts.xml", methods=["GET", "HEAD"])
 def public_new_parts_sitemap(db: Session = Depends(get_db)):
     try:
         row = get_or_create_yandex_integration(db)
@@ -86,7 +87,7 @@ def public_new_parts_sitemap(db: Session = Depends(get_db)):
         return _xml_response(xml)
 
 
-@router.get("/sitemap-new-parts-{page}.xml")
+@router.api_route("/sitemap-new-parts-{page}.xml", methods=["GET", "HEAD"])
 def public_new_parts_sitemap_page(page: int, db: Session = Depends(get_db)):
     try:
         row = get_or_create_yandex_integration(db)

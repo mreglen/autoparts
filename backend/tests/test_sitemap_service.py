@@ -469,15 +469,17 @@ class SitemapCacheTests(unittest.TestCase):
 
 class NewPartsSitemapPaginationTests(unittest.TestCase):
     def test_build_new_parts_sitemap_pages_splits_at_limit(self):
-        entries = ["  <url><loc>https://svoygarage.ru/p</loc></url>"] * 50001
+        from app.services.sitemap_service import NEW_PARTS_SITEMAP_MAX_URLS
+
+        entries = ["  <url><loc>https://svoygarage.ru/p</loc></url>"] * (NEW_PARTS_SITEMAP_MAX_URLS + 1)
         with patch(
             "app.services.sitemap_service._collect_new_parts_sitemap_entries",
             return_value=entries,
         ):
             pages, total = build_new_parts_sitemap_pages(MagicMock())
-        self.assertEqual(total, 50001)
+        self.assertEqual(total, NEW_PARTS_SITEMAP_MAX_URLS + 1)
         self.assertEqual(len(pages), 2)
-        self.assertEqual(pages[0][1], 50000)
+        self.assertEqual(pages[0][1], NEW_PARTS_SITEMAP_MAX_URLS)
         self.assertEqual(pages[1][1], 1)
 
     @patch("app.services.sitemap_service._sitemap_index_lastmod_line", return_value="    <lastmod>2026-08-10</lastmod>\n")
@@ -490,6 +492,53 @@ class NewPartsSitemapPaginationTests(unittest.TestCase):
         self.assertIn("<sitemapindex", xml)
         self.assertIn("sitemap-new-parts-1.xml", xml)
         self.assertIn("sitemap-new-parts-2.xml", xml)
+
+    def test_extract_and_write_pages_from_blocks(self):
+        from app.services.sitemap_service import (
+            NEW_PARTS_SITEMAP_MAX_URLS,
+            _extract_sitemap_url_blocks,
+            _write_new_parts_pages_from_blocks,
+        )
+
+        blocks = [
+            f"  <url>\n    <loc>https://svoygarage.ru/p/{i}</loc>\n  </url>"
+            for i in range(NEW_PARTS_SITEMAP_MAX_URLS + 3)
+        ]
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + "\n".join(blocks)
+            + "\n</urlset>\n"
+        )
+        self.assertEqual(len(_extract_sitemap_url_blocks(xml)), NEW_PARTS_SITEMAP_MAX_URLS + 3)
+
+        persisted = []
+
+        def fake_persist(db, *, cache_key, xml_content, url_count):
+            persisted.append((cache_key, url_count, xml_content))
+            row = MagicMock(
+                cache_key=cache_key,
+                xml_content=xml_content,
+                url_count=url_count,
+                generated_at=datetime.now(timezone.utc),
+            )
+            from app.services.sitemap_service import _snapshot_from_cache_row
+            return _snapshot_from_cache_row(row)
+
+        db = MagicMock()
+        with patch("app.services.sitemap_service._persist_sitemap_cache", side_effect=fake_persist), \
+             patch("app.services.sitemap_service._delete_new_parts_page_caches"):
+            snapshot = _write_new_parts_pages_from_blocks(
+                db,
+                site_origin="https://svoygarage.ru",
+                blocks=blocks,
+            )
+        self.assertEqual(snapshot.url_count, NEW_PARTS_SITEMAP_MAX_URLS + 3)
+        self.assertIn("<sitemapindex", snapshot.xml_content)
+        page_persists = [p for p in persisted if p[0].startswith("new_parts_p")]
+        self.assertEqual(len(page_persists), 2)
+        self.assertEqual(page_persists[0][1], NEW_PARTS_SITEMAP_MAX_URLS)
+        self.assertEqual(page_persists[1][1], 3)
 
 
 class SummarizeSitePageCountsTests(unittest.TestCase):
