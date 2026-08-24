@@ -17,7 +17,7 @@ import {
   deleteNewPartsBasket,
 } from '../../redux/slices/CartSlice';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
-import { setNewPartsCheckoutItemIds, clearNewPartsCheckoutItemIds } from '../../utils/newPartsCheckout';
+import { setNewPartsCheckoutItemIds, clearNewPartsCheckoutItemIds, readNewPartsDeliverInParts, setNewPartsDeliverInParts } from '../../utils/newPartsCheckout';
 import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
@@ -215,6 +215,9 @@ function CartTableBlock({
   formatItemPrice = formatNewPartPrice,
   checkoutLabel = 'Оформить заказ',
   quantityUpdatingIds = [],
+  showSupplierDeliveryOption = false,
+  deliverInParts = false,
+  onDeliverInPartsChange,
 }) {
   const allSelected = items.length > 0 && items.every((item) => selectedItems.has(item.id));
   const someSelected = items.some((item) => selectedItems.has(item.id));
@@ -276,6 +279,27 @@ function CartTableBlock({
           </Button>
         </div>
       </header>
+
+      {showSupplierDeliveryOption ? (
+        <div className="border-b border-brand-200 bg-surface px-3 py-3 sm:px-4">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={deliverInParts}
+              onChange={(e) => onDeliverInPartsChange?.(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-ink">Доставлять частями</span>
+              <span className="mt-0.5 block text-xs leading-snug text-ink-muted">
+                {deliverInParts
+                  ? 'Позиции будут отправляться по мере поступления на склад Rossko.'
+                  : 'По умолчанию все позиции одной поставкой на наш склад.'}
+              </span>
+            </span>
+          </label>
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] border-collapse text-left">
@@ -357,10 +381,16 @@ export default function CartPage() {
   const [renameSaving, setRenameSaving] = useState(false);
   const [renameError, setRenameError] = useState('');
   const pendingCheckoutRef = useRef(null);
+  const [deliverInParts, setDeliverInParts] = useState(() => readNewPartsDeliverInParts());
 
   useEffect(() => {
     dispatch(fetchCart());
   }, [dispatch]);
+
+  const handleDeliverInPartsChange = useCallback((checked) => {
+    setDeliverInParts(checked);
+    setNewPartsDeliverInParts(checked);
+  }, []);
 
   const mapNewItem = useCallback((item) => ({
     id: item.id,
@@ -745,6 +775,9 @@ export default function CartPage() {
                 showClientMarkupControl={clientMarkupEnabled}
                 formatItemPrice={formatNewPartPrice}
                 quantityUpdatingIds={quantityUpdatingIds}
+                showSupplierDeliveryOption
+                deliverInParts={deliverInParts}
+                onDeliverInPartsChange={handleDeliverInPartsChange}
               />
             );
           })}

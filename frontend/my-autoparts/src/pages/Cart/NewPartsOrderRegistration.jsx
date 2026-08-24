@@ -18,6 +18,9 @@ import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import {
   clearNewPartsCheckoutItemIds,
   readNewPartsCheckoutItemIds,
+  readNewPartsDeliverInParts,
+  setNewPartsDeliverInParts,
+  clearNewPartsDeliverInParts,
 } from '../../utils/newPartsCheckout';
 import { formatNewPartMoney, truncateRubles } from '../../pages/AutoParts/NewParts/newPartStockUtils';
 import {
@@ -156,6 +159,12 @@ export default function NewPartsOrderRegistration() {
   const [placedOrder, setPlacedOrder] = useState(null);
   const [unpaidConfirmOpen, setUnpaidConfirmOpen] = useState(false);
   const skipEmptyCartRedirectRef = useRef(false);
+  const [deliverInParts, setDeliverInParts] = useState(() => readNewPartsDeliverInParts());
+
+  const handleDeliverInPartsChange = useCallback((checked) => {
+    setDeliverInParts(checked);
+    setNewPartsDeliverInParts(checked);
+  }, []);
 
   useEffect(() => {
     if (!isReady) return;
@@ -361,7 +370,7 @@ export default function NewPartsOrderRegistration() {
       recipient_name: normalizeFullName(recipient.fullName),
       recipient_phone: recipient.phone,
       recipient_email: normalizeEmail(recipient.email),
-      deliver_in_parts: false,
+      deliver_in_parts: deliverInParts,
       basket_id: activeBasketId || undefined,
     };
 
@@ -401,6 +410,7 @@ export default function NewPartsOrderRegistration() {
     recipient,
     resolvedPickupAddress,
     activeBasketId,
+    deliverInParts,
   ]);
 
   const validateBeforeSubmit = () => {
@@ -475,6 +485,7 @@ export default function NewPartsOrderRegistration() {
     try {
       const result = await dispatch(createNewPartsOrder(buildOrderPayload())).unwrap();
       clearNewPartsCheckoutItemIds();
+      clearNewPartsDeliverInParts();
       setUnpaidConfirmOpen(false);
       setPlacedOrder({
         orderId: result.order_id,
@@ -560,6 +571,28 @@ export default function NewPartsOrderRegistration() {
             <span className="font-medium text-gray-700">Итого</span>
             <span className="text-lg font-bold text-gray-900">{formatMoney(orderTotal)}</span>
           </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Поставка от Rossko"
+          subtitle="Как собрать позиции на наш склад перед отправкой вам"
+        >
+          <label className="flex cursor-pointer items-start gap-3 rounded-sg border border-line bg-surface-muted/40 p-4">
+            <input
+              type="checkbox"
+              checked={deliverInParts}
+              onChange={(e) => handleDeliverInPartsChange(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+            />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-ink">Доставлять частями</span>
+              <span className="mt-1 block text-sm leading-relaxed text-ink-muted">
+                {deliverInParts
+                  ? 'Каждая позиция будет отправляться на наш склад по мере поступления у Rossko.'
+                  : 'Все позиции одной поставкой на наш склад — рекомендуется, если нужен один комплект.'}
+              </span>
+            </span>
+          </label>
         </SectionCard>
 
         <SectionCard title="Получатель" subtitle="Контакты для связи по заказу">

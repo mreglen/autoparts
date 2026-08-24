@@ -258,6 +258,17 @@ export default function SalesGarageOrderCard({
                   Rossko №{rosskoOrderId}
                 </span>
               )}
+              {isNew && (
+                <span
+                  className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ${
+                    order.deliver_in_parts
+                      ? 'bg-sky-50 text-sky-900 ring-sky-100'
+                      : 'bg-emerald-50 text-emerald-900 ring-emerald-100'
+                  }`}
+                >
+                  {order.deliver_in_parts ? 'Доставка частями' : 'Доставка вместе'}
+                </span>
+              )}
               {isNew && rosskoSyncError && (
                 <span className="inline-flex items-center rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-800 ring-1 ring-orange-100">
                   Статус поставщика временно недоступен

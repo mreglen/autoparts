@@ -13,6 +13,7 @@ import {
 } from '../../redux/slices/CartSlice';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { formatNewPartMoney } from '../AutoParts/NewParts/newPartStockUtils';
+import { clearNewPartsCheckoutItemIds, clearNewPartsDeliverInParts } from '../../utils/newPartsCheckout';
 
 const formatPrice = (price) => formatNewPartMoney(price);
 
@@ -61,6 +62,8 @@ export default function NewPartsPaymentPage() {
     useEffect(() => {
         if (session?.status === 'fulfilled' && session?.garage_order_id) {
             dispatch(fetchCart());
+            clearNewPartsCheckoutItemIds();
+            clearNewPartsDeliverInParts();
         }
     }, [session?.status, session?.garage_order_id, dispatch]);
 
