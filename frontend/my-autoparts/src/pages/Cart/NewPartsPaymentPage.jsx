@@ -10,7 +10,7 @@ import {
     selectPaymentSession,
     selectPaymentSessionError,
     selectPaymentSessionLoading,
-} from '../../redux/slices/CartSlice';
+} from '../../redux/slices/CartSlice';{14EFD325-EAB2-44A9-A5AE-F1FE61391A50}.png
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { formatNewPartMoney } from '../AutoParts/NewParts/newPartStockUtils';
 import { clearNewPartsCheckoutItemIds, clearNewPartsDeliverInParts } from '../../utils/newPartsCheckout';
