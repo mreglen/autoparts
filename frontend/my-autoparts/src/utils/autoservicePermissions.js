@@ -69,7 +69,7 @@ export const AUTOSERVICE_MENU_ITEMS = [
 export const AUTOSERVICE_SHOP_EMPLOYEE_WORK_ITEMS = [
   {
     id: 'autoservice-orders',
-    label: 'Заказ-наряд',
+    label: 'Заказ-наряды',
     permission: AUTOSERVICE_PERMISSION.orders,
     anyOf: AUTOSERVICE_ORDERS_SECTION_CODES,
   },

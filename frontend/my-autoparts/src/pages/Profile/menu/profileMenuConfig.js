@@ -178,7 +178,7 @@ const buildAutoserviceStaffTab = (user, options, hasPermission) => {
 
         const labels = {
             'autoservice-planner': 'Планировщик',
-            'autoservice-orders': 'Заказ-наряд',
+            'autoservice-orders': 'Заказ-наряды',
             'autoservice-finance': 'Финансы',
             'autoservice-reports': 'Отчёты',
             'autoservice-payroll': 'Зарплата',

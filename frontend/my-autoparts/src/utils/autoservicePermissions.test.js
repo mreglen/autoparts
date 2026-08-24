@@ -92,7 +92,7 @@ describe('autoservice shop employee single menu', () => {
     expect(canAccessAutoserviceStaffMenu(employee, options)).toBe(true);
     expect(canAccessAutoserviceClientMenu(employee, options)).toBe(true);
     expect(getAutoserviceShopEmployeeWorkMenuItems(employee, options.permissionCodes)).toEqual([
-      { id: 'autoservice-orders', label: 'Заказ-наряд' },
+      { id: 'autoservice-orders', label: 'Заказ-наряды' },
       { id: 'autoservice-payroll', label: 'Зарплата' },
     ]);
 
