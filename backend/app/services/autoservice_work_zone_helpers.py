@@ -9,6 +9,39 @@ from sqlalchemy.orm import Session
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 
 
+def reorder_work_zones(db: Session, org_id: str, zone_ids: list[int]) -> list[AutoserviceWorkZone]:
+    if not zone_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите порядок рабочих зон",
+        )
+    if len(set(zone_ids)) != len(zone_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Список зон содержит повторы",
+        )
+
+    active_rows = (
+        db.query(AutoserviceWorkZone)
+        .filter(
+            AutoserviceWorkZone.organization_id == org_id,
+            AutoserviceWorkZone.is_active.is_(True),
+        )
+        .all()
+    )
+    active_by_id = {row.id: row for row in active_rows}
+    if set(zone_ids) != set(active_by_id.keys()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Список зон не совпадает с активными рабочими зонами",
+        )
+
+    for index, zone_id in enumerate(zone_ids, start=1):
+        active_by_id[zone_id].sort_order = index
+    db.commit()
+    return sorted(active_rows, key=lambda row: (row.sort_order, row.id))
+
+
 def next_work_zone_name(db: Session, org_id: str) -> tuple[str, int]:
     max_sort = (
         db.query(func.max(AutoserviceWorkZone.sort_order))

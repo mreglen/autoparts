@@ -29,3 +29,7 @@ class AutoserviceWorkZoneCreate(BaseModel):
 
 class AutoserviceWorkZoneUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+
+
+class AutoserviceWorkZoneReorder(BaseModel):
+    zone_ids: list[int] = Field(min_length=1)

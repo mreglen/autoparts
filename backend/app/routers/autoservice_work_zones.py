@@ -12,10 +12,11 @@ from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_work_zone import (
     AutoserviceWorkZoneCreate,
+    AutoserviceWorkZoneReorder,
     AutoserviceWorkZoneUpdate,
     AutoserviceWorkZoneView,
 )
-from app.services.autoservice_work_zone_helpers import next_work_zone_name
+from app.services.autoservice_work_zone_helpers import next_work_zone_name, reorder_work_zones
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS,
     AUTOSERVICE_PERMISSION_ORDERS,
@@ -104,6 +105,17 @@ def create_autoservice_work_zone(
     db.commit()
     db.refresh(row)
     return AutoserviceWorkZoneView.model_validate(row)
+
+
+@router.put("/autoservice/work-zones/reorder", response_model=list[AutoserviceWorkZoneView])
+def reorder_autoservice_work_zones(
+    payload: AutoserviceWorkZoneReorder,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_settings(db, current_user)
+    rows = reorder_work_zones(db, org_id, payload.zone_ids)
+    return [AutoserviceWorkZoneView.model_validate(row) for row in rows]
 
 
 @router.patch("/autoservice/work-zones/{zone_id}", response_model=AutoserviceWorkZoneView)
