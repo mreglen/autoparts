@@ -119,7 +119,11 @@ export default function AnalyticsPage() {
   if (!user.is_admin) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="mx-auto max-w-7xl space-y-4 max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
+      <div className="md:hidden rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Детальная аналитика и таблицы — рекомендуем на экране ≥1024px (desktop).
+      </div>
+
       <header className="sticky top-0 z-10 -mx-1 border-b border-gray-100 bg-white/95 px-1 pb-4 pt-1 backdrop-blur supports-[backdrop-filter]:bg-white/80">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-bold text-gray-900">Аналитика</h1>
@@ -149,9 +153,23 @@ export default function AnalyticsPage() {
         />
       )}
 
-      {viewMode === 'iterations' && <QueryReviewTab />}
+      {viewMode === 'iterations' && (
+        <>
+          <div className="md:hidden rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Итерации и массовые правки — рекомендуем на desktop ≥1024px.
+          </div>
+          <QueryReviewTab />
+        </>
+      )}
 
-      {viewMode === 'seo' && <SeoTab />}
+      {viewMode === 'seo' && (
+        <>
+          <div className="md:hidden rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            SEO-инструменты и таблицы — рекомендуем на desktop ≥1024px.
+          </div>
+          <SeoTab />
+        </>
+      )}
     </div>
   );
 }

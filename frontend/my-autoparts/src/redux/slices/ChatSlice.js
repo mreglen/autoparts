@@ -287,7 +287,9 @@ const chatSlice = createSlice({
         
         // Добавить сообщение через WebSocket
         addWebSocketMessage: (state, action) => {
-            const message = action.payload;
+            const payload = action.payload?.message ? action.payload : { message: action.payload, currentUserId: null };
+            const message = payload.message;
+            const currentUserId = payload.currentUserId;
             
             // Добавляем сообщение в текущий чат
             if (state.currentChat && state.currentChat.id === message.chat_id) {
@@ -330,7 +332,14 @@ const chatSlice = createSlice({
             if (chatIndex !== -1) {
                 state.chats[chatIndex].last_message = message;
                 state.chats[chatIndex].updated_at = message.created_at;
-                
+
+                const isActiveChat = state.currentChat?.id === message.chat_id;
+                const isIncoming = currentUserId != null && message.sender_id !== currentUserId;
+                if (isIncoming && !isActiveChat) {
+                    const prev = Number(state.chats[chatIndex].unread_count) || 0;
+                    state.chats[chatIndex].unread_count = prev + 1;
+                }
+
                 // Перемещаем чат наверх списка
                 const chat = state.chats[chatIndex];
                 state.chats.splice(chatIndex, 1);
@@ -441,10 +450,11 @@ const chatSlice = createSlice({
 
             // Обновляем последнее сообщение в списке чатов (для галочки в списке)
             const chatIndex = state.chats.findIndex((c) => c.id === chat_id);
-            if (chatIndex !== -1 && state.chats[chatIndex].last_message) {
-                if (message_ids.includes(state.chats[chatIndex].last_message.id)) {
+            if (chatIndex !== -1) {
+                if (state.chats[chatIndex].last_message && message_ids.includes(state.chats[chatIndex].last_message.id)) {
                     state.chats[chatIndex].last_message.is_read = true;
                 }
+                state.chats[chatIndex].unread_count = 0;
             }
         }
     },
@@ -532,6 +542,11 @@ const chatSlice = createSlice({
                 state.messages.sort((a, b) => 
                     new Date(a.created_at) - new Date(b.created_at)
                 );
+
+                const chatIndex = state.chats.findIndex((c) => Number(c.id) === Number(chatId));
+                if (chatIndex !== -1) {
+                    state.chats[chatIndex].unread_count = 0;
+                }
             })
             .addCase(fetchChatMessages.rejected, (state, action) => {
                 state.loading = false;
@@ -770,7 +785,10 @@ export const connectWebSocket = (userId) => (dispatch, getState) => {
         }
         
         if (data.type === 'message') {
-            dispatch(addWebSocketMessage(data));
+            dispatch(addWebSocketMessage({
+                message: data,
+                currentUserId: getState().auth?.user?.id,
+            }));
             notifyIncomingMessage(dispatch, getState, data);
             dispatch(fetchUnreadCount());
         } else if (data.type === 'messages_read') {

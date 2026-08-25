@@ -101,7 +101,7 @@ export const OrganizationCard = ({ group, onClick }) => {
         <button
             type="button"
             onClick={onClick}
-            className="w-full text-left bg-white border border-gray-200 rounded-xl p-4 transition-shadow hover:shadow-md hover:border-indigo-200"
+            className="w-full text-left bg-white border border-gray-200 rounded-xl p-4 transition-shadow hover:shadow-md hover:border-indigo-200 min-h-11"
         >
             <div className="flex gap-4">
                 <div className="w-16 h-16 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -141,7 +141,6 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
     const isRejected = product.moderationKind === 'rejected';
     const menuHeight = isRejected ? 56 : 160;
     const desktopActionsPlacement = useActionsDropdownPlacement(showActions, menuHeight);
-    const mobileActionsPlacement = useActionsDropdownPlacement(showActions, menuHeight);
 
     const normalizedProduct = normalizeProductMedia(product);
     const photoUrl = getFirstMediaUrl(normalizedProduct);
@@ -305,25 +304,10 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
             </tr>
     ) : (
             <div
-                className="bg-white rounded-lg shadow-sm border border-gray-200 mb-3"
+                className="bg-white rounded-lg shadow-sm border border-gray-200 mb-3 overflow-hidden"
                 onDoubleClick={handleRowDoubleClick}
             >
-                <div className="flex items-center justify-end p-3 border-b border-gray-100">
-                    <div ref={mobileActionsPlacement.anchorRef} className="relative moderation-actions-dropdown">
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                            </svg>
-                            <span>Действия</span>
-                        </button>
-                        {showActions && renderActionsMenu(buildActionsDropdownMenuClassName(mobileActionsPlacement.openUp, 'w-48 z-50 moderation-actions-dropdown'))}
-                    </div>
-                </div>
-                <div className="p-4 cursor-pointer">
+                <div className="p-4 cursor-pointer" onClick={() => onView(product)}>
                     <div className="flex gap-3">
                         <div
                             className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer"
@@ -376,6 +360,33 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
                             </p>
                         </div>
                     </div>
+                </div>
+                <div className="border-t border-gray-100 p-3 flex flex-col gap-2">
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onView(product); }}
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                        Просмотреть
+                    </button>
+                    {!isRejected ? (
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); onApprove(product.id); }}
+                                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-green-600 px-4 text-sm font-semibold text-white hover:bg-green-700"
+                            >
+                                Принять
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); onReject(product); }}
+                                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700"
+                            >
+                                Отклонить
+                            </button>
+                        </div>
+                    ) : null}
                 </div>
             </div>
     );

@@ -255,12 +255,30 @@ const avitoChatSlice = createSlice({
         }
         state.messages = action.payload.messages || [];
         state.selectedChatId = action.payload.chatId;
+
+        const markRead = markReadFromArg(action.meta.arg);
+        if (markRead) {
+          const idx = state.chats.findIndex((c) => String(c.id) === String(action.payload.chatId));
+          if (idx !== -1) {
+            state.chats[idx].unread_count = 0;
+            state.chats[idx].has_unread_messages = false;
+          }
+        }
       })
       .addCase(fetchAvitoMessages.rejected, (state, action) => {
         if (!silentFromArg(action.meta.arg)) {
           state.loading = false;
         }
         state.error = action.payload;
+      })
+      .addCase(markAvitoChatRead.fulfilled, (state, action) => {
+        const chatId = action.payload?.chatId;
+        if (chatId == null) return;
+        const idx = state.chats.findIndex((c) => String(c.id) === String(chatId));
+        if (idx !== -1) {
+          state.chats[idx].unread_count = 0;
+          state.chats[idx].has_unread_messages = false;
+        }
       })
       .addCase(fetchAvitoChatDetail.pending, (state, action) => {
         if (!silentFromArg(action.meta.arg)) {

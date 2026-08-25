@@ -7,6 +7,7 @@ import {
     registerApiFailure,
     registerApiSuccess,
 } from './apiOutageGuard';
+import { assertOnlineForMutation } from './networkStatus';
 
 
 const normalizeBaseUrl = (url) => {
@@ -81,6 +82,60 @@ export const getWebSocketBaseUrl = () => {
 let authTokenCache = typeof localStorage !== 'undefined'
     ? localStorage.getItem('token')
     : null;
+
+const REFRESH_TOKEN_KEY = 'refresh_token';
+let refreshInFlight = null;
+
+export const getRefreshToken = () => {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+};
+
+export const setRefreshToken = (token) => {
+    if (typeof localStorage === 'undefined') return;
+    if (token) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, token);
+    } else {
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+};
+
+export const clearAuthTokens = () => {
+    setAuthToken(null);
+    setRefreshToken(null);
+};
+
+export async function refreshAccessToken() {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return null;
+    if (refreshInFlight) return refreshInFlight;
+
+    refreshInFlight = (async () => {
+        try {
+            const response = await fetch(`${API_BASE}/auth/refresh`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refreshToken }),
+            });
+            if (!response.ok) return null;
+            const data = await response.json();
+            if (data.access_token) {
+                setAuthToken(data.access_token);
+            }
+            if (data.refresh_token) {
+                setRefreshToken(data.refresh_token);
+            }
+            return data.access_token || null;
+        } catch {
+            return null;
+        } finally {
+            refreshInFlight = null;
+        }
+    })();
+
+    return refreshInFlight;
+}
 
 export const getAuthToken = () => {
     if (authTokenCache) return authTokenCache;
@@ -281,6 +336,9 @@ export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
     }
 
     const { timeoutMs, ...requestOptions } = options;
+    const method = requestOptions.method || 'GET';
+    assertOnlineForMutation(method);
+
     const url = `${API_BASE}${endpoint}`;
     const timed = withRequestTimeout(requestOptions, timeoutMs ?? API_REQUEST_TIMEOUT_MS);
     const defaultOptions = {
@@ -309,6 +367,13 @@ export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
     const guestTokenFromResponse = response.headers.get(GUEST_CART_HEADER_NAME);
     if (guestTokenFromResponse) {
         setGuestCartToken(guestTokenFromResponse);
+    }
+
+    if (response.status === 401 && retryCount === 0 && !endpoint.includes('/auth/refresh')) {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+            return apiRequest(endpoint, options, retryCount + 1);
+        }
     }
 
     if (!response.ok) {
@@ -370,6 +435,9 @@ export const apiRequestUnauth = async (endpoint, options = {}) => {
 
 
 export const apiRequestFormData = async (endpoint, formData, options = {}, retryCount = 0) => {
+    const method = options.method || 'POST';
+    assertOnlineForMutation(method);
+
     const url = `${API_BASE}${endpoint}`;
     const timed = withRequestTimeout(options);
 
@@ -396,6 +464,13 @@ export const apiRequestFormData = async (endpoint, formData, options = {}, retry
         throw err;
     }
     clearRequestTimeout(timed.timeoutId);
+
+    if (response.status === 401 && retryCount === 0 && !endpoint.includes('/auth/refresh')) {
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+            return apiRequestFormData(endpoint, formData, options, retryCount + 1);
+        }
+    }
 
     if (!response.ok) {
         if (retryCount < 1 && isRetryableStatus(response.status)) {
@@ -426,6 +501,7 @@ export const apiAxios = axios.create({
 
 
 apiAxios.interceptors.request.use((config) => {
+    assertOnlineForMutation(config.method);
     const token = getAuthToken();
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -446,8 +522,19 @@ apiAxios.interceptors.response.use(
         }
         return response;
     },
-    (error) => {
+    async (error) => {
         const status = error.response?.status;
+        const config = error.config;
+
+        if (status === 401 && config && !config.__authRetried && !String(config.url || '').includes('/auth/refresh')) {
+            config.__authRetried = true;
+            const newToken = await refreshAccessToken();
+            if (newToken) {
+                config.headers.Authorization = `Bearer ${newToken}`;
+                return apiAxios(config);
+            }
+        }
+
         if (isRetryableStatus(status)) {
             registerApiFailure(status);
         }

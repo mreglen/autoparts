@@ -1,13 +1,108 @@
-const CACHE_NAME = 'autoparts-v1';
+const CACHE_NAME = 'autoparts-shell-v2';
+
+const PRECACHE_ASSETS = /*__PRECACHE__*/[
+  '/',
+  '/index.html',
+  '/offline.html',
+  '/manifest.json',
+  '/favicons/android-chrome-192x192.png',
+  '/favicons/android-chrome-512x512.png',
+  '/img/LogoWithoutBg.png',
+];
+
+const OFFLINE_URL = '/offline.html';
+
+function isApiRequest(url) {
+  return url.pathname.startsWith('/server/api/') || url.pathname.startsWith('/api/');
+}
+
+function isStaticAsset(pathname) {
+  return (
+    pathname.startsWith('/static/')
+    || pathname.startsWith('/favicons/')
+    || pathname.startsWith('/img/')
+    || pathname.endsWith('.js')
+    || pathname.endsWith('.css')
+    || pathname.endsWith('.woff2')
+  );
+}
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install', (event) => {
-  console.log('[SW] Service Worker installed');
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_ASSETS))
+      .then(() => self.skipWaiting())
+      .catch((err) => {
+        console.warn('[SW] Precache failed:', err);
+      }),
+  );
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Service Worker activated');
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) => Promise.all(
+      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)),
+    )).then(() => clients.claim()),
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch (_) {
+    return;
+  }
+
+  if (url.origin !== self.location.origin) return;
+
+  if (isApiRequest(url)) {
+    return;
+  }
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy));
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match('/index.html');
+          if (cached) return cached;
+          const offline = await caches.match(OFFLINE_URL);
+          return offline || Response.error();
+        }),
+    );
+    return;
+  }
+
+  if (isStaticAsset(url.pathname)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        const network = fetch(request)
+          .then((response) => {
+            if (response && response.status === 200) {
+              const copy = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+            }
+            return response;
+          })
+          .catch(() => cached);
+        return cached || network;
+      }),
+    );
+  }
 });
 
 function buildNotificationTag(data) {
@@ -45,7 +140,8 @@ function resolveNotificationUrl(data) {
     return '/autoservice/planner';
   }
   if (data.chatId) {
-    return `/chats?chatId=${data.chatId}`;
+    const source = data.source || data.chatSource || 'garage';
+    return `/chats?source=${encodeURIComponent(source)}&chatId=${data.chatId}`;
   }
   return '/';
 }
@@ -66,8 +162,6 @@ function pathsShareSection(targetPath, clientPath) {
 }
 
 self.addEventListener('push', (event) => {
-  console.log('[SW] Push received:', event.data);
-
   const data = event.data ? event.data.json() : {};
   const targetUrl = resolveNotificationUrl(data);
   const title = data.title || 'Уведомление';
@@ -92,7 +186,21 @@ self.addEventListener('push', (event) => {
     requireInteraction: false,
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    (async () => {
+      await self.registration.showNotification(title, options);
+      const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      windowClients.forEach((client) => {
+        client.postMessage({
+          type: 'NOTIFICATION_RECEIVED',
+          title,
+          body: options.body,
+          url: targetUrl,
+          at: Date.now(),
+        });
+      });
+    })(),
+  );
 });
 
 function extractChatIdFromUrl(url) {
@@ -102,8 +210,6 @@ function extractChatIdFromUrl(url) {
 }
 
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification clicked');
-
   event.notification.close();
 
   const data = event.notification.data || {};

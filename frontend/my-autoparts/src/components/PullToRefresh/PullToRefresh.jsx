@@ -1,46 +1,62 @@
 import React, { useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useStore } from 'react-redux';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchPartTypes } from '../../redux/slices/PartTypeSlice';
 import { isMyPartsFormRoute } from '../../utils/partRoutes';
-import { showSplashBeforeReload } from '../../utils/appSplash';
+import { runMobileRouteRefresh } from '../../utils/mobileRouteRefresh';
+import { isPullToRefreshDisabled, isPullToRefreshFormOnly } from '../../utils/pullToRefreshPolicy';
+import { Z_MOBILE_HEADER } from '../../constants/mobileTokens';
 
 const SOFT_REFRESH_MIN_MS = 350;
-const AUTOSERVICE_DOCUMENT_PATH_RE = /^\/autoservice\/orders\/\d+\/print(\/upd|\/invoice)?$/;
 
 export default function PullToRefresh() {
   const location = useLocation();
   const dispatch = useDispatch();
-  const organizationId = useSelector((state) => state.auth.user?.organization_id);
-  const disablePullToRefresh = AUTOSERVICE_DOCUMENT_PATH_RE.test(location.pathname);
+  const store = useStore();
+  const organizationId = store.getState()?.auth?.user?.organization_id;
+  const pathname = location.pathname;
+  const disabled = isPullToRefreshDisabled(pathname, location.search);
+  const formOnly = isPullToRefreshFormOnly(pathname);
 
   const onRefresh = useCallback(async () => {
-    if (!isMyPartsFormRoute(location.pathname)) {
-      await showSplashBeforeReload();
-      window.location.reload();
+    if (isMyPartsFormRoute(pathname)) {
+      const startedAt = Date.now();
+      const tasks = [dispatch(fetchPartTypes())];
+      if (organizationId) {
+        tasks.push(dispatch(fetchStorageLocations(organizationId)));
+      }
+      await Promise.allSettled(tasks);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < SOFT_REFRESH_MIN_MS) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, SOFT_REFRESH_MIN_MS - elapsed);
+        });
+      }
+      return;
+    }
+
+    if (formOnly) {
       return;
     }
 
     const startedAt = Date.now();
-    const tasks = [dispatch(fetchPartTypes())];
-    if (organizationId) {
-      tasks.push(dispatch(fetchStorageLocations(organizationId)));
-    }
-    await Promise.allSettled(tasks);
-
-    const minMs = isMyPartsFormRoute(location.pathname) ? 0 : SOFT_REFRESH_MIN_MS;
+    await runMobileRouteRefresh({
+      pathname,
+      dispatch,
+      getState: store.getState,
+    });
     const elapsed = Date.now() - startedAt;
-    if (minMs > 0 && elapsed < minMs) {
+    if (elapsed < SOFT_REFRESH_MIN_MS) {
       await new Promise((resolve) => {
-        setTimeout(resolve, minMs - elapsed);
+        setTimeout(resolve, SOFT_REFRESH_MIN_MS - elapsed);
       });
     }
-  }, [dispatch, location.pathname, organizationId]);
+  }, [dispatch, formOnly, organizationId, pathname, store]);
 
   const { distance, refreshing, threshold, isActive } = usePullToRefresh({
-    enabled: !disablePullToRefresh,
+    enabled: !disabled && !formOnly,
     onRefresh,
   });
 
@@ -50,12 +66,15 @@ export default function PullToRefresh() {
 
   const progress = Math.min(distance / threshold, 1);
   const ready = distance >= threshold;
-  const onFormPage = isMyPartsFormRoute(location.pathname);
+  const onFormPage = isMyPartsFormRoute(pathname);
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 z-30 flex justify-center lg:hidden"
-      style={{ top: 'calc(env(safe-area-inset-top, 0px) + 3.75rem)' }}
+      className="pointer-events-none fixed inset-x-0 flex justify-center lg:hidden"
+      style={{
+        zIndex: Z_MOBILE_HEADER - 1,
+        top: 'var(--sg-mobile-header-h)',
+      }}
       aria-live="polite"
       aria-hidden={distance <= 0 && !refreshing}
     >

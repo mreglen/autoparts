@@ -7,6 +7,7 @@ import { normalizeImageUrl, pickListImageUrlNormalized, buildListImageUrlFallbac
 import { stripHtmlTags } from '../../utils/text';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI, fetchMyProductDrafts, deleteProductDraft, submitProductDraft, selectMyProductsTotal, selectMyProductsTotalQuantity, selectMyProductsTotalValue, selectMyProductsPage, selectMyProductsHasMore, selectMyProductsLoadingMore, selectMyProductsFilterKey, selectDraftItems, selectDraftLoading, selectDraftError } from '../../redux/slices/ProductSlice';
 import { formatDraftTitle } from '../../utils/productDraftUtils';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations, fetchEmployees } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCellsBatch, fetchStorageCells, invalidateProductStorageCells } from '../../redux/slices/StorageCellsSlice';
@@ -2068,6 +2069,55 @@ function MyParts() {
     dispatch(fetchMyProductDrafts());
     draftsHydratedRef.current = true;
   }, [activeTab, isReady, user?.id, dispatch]);
+
+  const refreshMyPartsData = useCallback(() => {
+    if (!isReady || !user?.id) return;
+
+    if (activeTab === 'in-stock' && user?.organization_id) {
+      dispatch(fetchMyProducts(buildMyProductsRequest({
+        page: 1,
+        storage: inStockFilters.storage,
+        cell: inStockFilters.cell,
+        cellValue: inStockFilters.cellValue,
+        responsible: inStockFilters.responsible,
+        q: inStockDebouncedSearch,
+        sort: inStockFilters.sort,
+        stock: stockFilter,
+        noPhoto: noPhotoFilter,
+      })));
+      dispatch(invalidateProductStorageCells([]));
+    } else if (activeTab === 'pending') {
+      loadModerationParts({ background: false });
+    } else if (activeTab === 'drafts') {
+      dispatch(fetchMyProductDrafts());
+    }
+  }, [
+    activeTab,
+    dispatch,
+    inStockDebouncedSearch,
+    inStockFilters.cell,
+    inStockFilters.cellValue,
+    inStockFilters.responsible,
+    inStockFilters.sort,
+    inStockFilters.storage,
+    isReady,
+    loadModerationParts,
+    noPhotoFilter,
+    stockFilter,
+    user?.id,
+    user?.organization_id,
+  ]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      const path = event.detail?.pathname || '';
+      if (path === '/my-parts' || path.startsWith('/my-parts?')) {
+        refreshMyPartsData();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [refreshMyPartsData]);
 
   useEffect(() => {
     if (pendingIdsNeedingCells.length === 0) return undefined;

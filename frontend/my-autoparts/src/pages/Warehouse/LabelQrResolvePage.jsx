@@ -105,12 +105,20 @@ export default function LabelQrResolvePage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-10 text-center">
+      <div className="mx-auto max-w-lg px-4 py-10 text-center max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
         <h1 className="text-xl font-semibold text-gray-900">Запчасть не найдена</h1>
         <p className="mt-2 text-sm text-gray-600">{error}</p>
-        <Link to="/my-parts" className="mt-6 inline-block text-indigo-600 hover:underline">
-          К моим запчастям
-        </Link>
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <Link
+            to="/warehouse/scan"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            Открыть сканер
+          </Link>
+          <Link to="/my-parts" className="text-sm text-indigo-600 hover:underline">
+            К моим запчастям
+          </Link>
+        </div>
       </div>
     );
   }

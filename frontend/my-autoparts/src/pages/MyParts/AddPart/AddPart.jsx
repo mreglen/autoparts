@@ -52,7 +52,10 @@ import {
   readDraftSessionCache,
   writeDraftSessionCache,
   clearDraftSessionCache,
+  readPartFormSessionCache,
+  clearPartFormSessionCache,
 } from '../../../utils/productDraftUtils';
+import usePartFormLocalCache from '../../../hooks/usePartFormLocalCache';
 
 import VehicleModal from './VehicleModal';
 import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
@@ -343,6 +346,8 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
             })
             .catch(() => {});
         }
+        markApiLoaded();
+        tryRestoreFromCache(readPartFormSessionCache('resubmit', resubmitId));
       })
       .catch((err) => {
         if (!cancelled) {
@@ -428,6 +433,8 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         } catch {
           // Ячейки хранения не обязательны для открытия формы
         }
+        markApiLoaded();
+        tryRestoreFromCache(readPartFormSessionCache('pending', editPendingId));
       })
       .catch(async (err) => {
         if (cancelled) return;
@@ -479,6 +486,42 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         .catch(() => {});
     }
   }, []);
+
+  const localCacheMode = resubmitMode
+    ? 'resubmit'
+    : editPendingMode
+      ? 'pending'
+      : draftMode && routeDraftId
+        ? 'draft'
+        : isDraftFlow
+          ? 'add'
+          : null;
+  const localCacheId = resubmitMode
+    ? resubmitId
+    : editPendingMode
+      ? editPendingId
+      : draftMode && routeDraftId
+        ? routeDraftId
+        : isDraftFlow
+          ? (draftIdRef.current || 'new')
+          : null;
+
+  const getLocalFormSnapshot = useCallback(() => ({
+    formData,
+    photos,
+    videos,
+    cellQuantities,
+    vehicle: selectedVehicle,
+    vehicleId: selectedVehicle?.id ?? null,
+  }), [formData, photos, videos, cellQuantities, selectedVehicle]);
+
+  const { markApiLoaded, tryRestoreFromCache, flushCache } = usePartFormLocalCache({
+    mode: localCacheMode || 'add',
+    cacheId: localCacheId,
+    enabled: Boolean(localCacheMode && localCacheId && isReady && canAccess && !loadingFormData),
+    getSnapshot: getLocalFormSnapshot,
+    onRestore: applyDraftSnapshot,
+  });
 
   useEffect(() => {
     if (!draftMode || !routeDraftId) return undefined;
@@ -1273,6 +1316,8 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         }
 
         navigate('/my-parts?tab=pending');
+        clearPartFormSessionCache('pending', editPendingId);
+        flushCache();
         return;
       }
 
@@ -1294,6 +1339,8 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         }
 
         navigate('/my-parts?tab=pending');
+        clearPartFormSessionCache('resubmit', resubmitId);
+        flushCache();
         return;
       }
 
@@ -1376,14 +1423,16 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
       : '/my-parts';
 
   const draftStatusLabel = draftSaveStatus === 'saving'
-    ? 'Сохранение черновика…'
+    ? (isDraftFlow ? 'Сохранение черновика…' : 'Сохранение…')
     : draftSaveStatus === 'saved'
-      ? 'Черновик сохранён'
+      ? (isDraftFlow ? 'Черновик сохранён' : 'Сохранено локально')
       : draftSaveStatus === 'error'
-        ? 'Не удалось сохранить черновик'
+        ? (isDraftFlow ? 'Не удалось сохранить черновик' : 'Не удалось сохранить локально')
         : isDraftFlow
           ? 'Изменения сохраняются автоматически'
-          : '';
+          : (editPendingMode || resubmitMode)
+            ? 'Изменения сохраняются на устройстве'
+            : '';
 
   return (
     <div className={`${warehousePageClass} relative mx-auto max-w-3xl max-md:pb-32`}>
@@ -1400,9 +1449,18 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
       )}
       <div className="space-y-1">
         <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">{pageTitle}</h1>
-        {isDraftFlow && draftStatusLabel ? (
+        {draftStatusLabel ? (
           <p className={`text-sm ${draftSaveStatus === 'error' ? 'text-red-600' : 'text-gray-500'}`}>
             {draftStatusLabel}
+            {draftSaveStatus === 'error' && isDraftFlow ? (
+              <button
+                type="button"
+                onClick={() => flushCache()}
+                className="ml-2 text-brand-600 underline hover:text-brand-800"
+              >
+                Повторить
+              </button>
+            ) : null}
           </p>
         ) : null}
       </div>

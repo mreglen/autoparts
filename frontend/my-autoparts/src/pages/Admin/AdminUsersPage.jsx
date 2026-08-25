@@ -19,6 +19,7 @@ import {
     labelEventType,
     parseDetails,
 } from './auditDisplay';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 function roleBadges(user) {
     const badges = [];
@@ -59,6 +60,16 @@ export default function AdminUsersPage() {
         }
         dispatch(fetchAdminUsers());
     }, [isReady, user, navigate, dispatch]);
+
+    useEffect(() => {
+        const onPullRefresh = (event) => {
+            if (event.detail?.pathname === '/admin/users') {
+                dispatch(fetchAdminUsers());
+            }
+        };
+        window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+        return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    }, [dispatch]);
 
     useEffect(() => {
         const handleClickOutside = (e) => {

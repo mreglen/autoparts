@@ -33,7 +33,7 @@ import {
 } from '../../utils/warehouseListUi';
 
 const iconBtnClass =
-  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-50';
 
 function cellsCountLabel(count) {
   const n = Number(count) || 0;

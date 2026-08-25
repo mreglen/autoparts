@@ -9,6 +9,7 @@ import {
   getMonthRangeDefaults,
 } from '../Finance/financeDisplay';
 import { formatServerDateTime } from '../../utils/serverDate';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import {
   DataTable,
@@ -568,6 +569,18 @@ export default function AutoserviceReportsPage() {
       setSearchParams({}, { replace: true });
     }
   }, [requestedTab, canSeePayroll, setSearchParams]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname !== '/autoservice/reports') return;
+      if (tab === 'payments') loadPayments();
+      else if (tab === 'payroll') loadPayroll();
+      else if (tab === 'economics') loadEconomics();
+      else if (tab === 'warehouse-stock') loadWarehouseStock();
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [tab, loadPayments, loadPayroll, loadEconomics, loadWarehouseStock]);
 
   const paymentItems = payments.items || [];
   const payrollRows = payroll.employees || [];

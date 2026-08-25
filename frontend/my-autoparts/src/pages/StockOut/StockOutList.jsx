@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { fetchStockOuts, createReturn } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchMyProducts } from '../../redux/slices/ProductSlice';
@@ -17,8 +17,10 @@ import {
   warehousePillButtonClass,
   warehousePillControlClass,
   warehousePrimaryButtonClass,
+  warehouseSecondaryButtonClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
+import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import {
   formatStockOutMoney,
@@ -30,6 +32,7 @@ import {
   STOCK_OUT_SORT_OPTIONS,
   STOCK_OUT_TYPE_FILTERS,
 } from '../../utils/stockOutUi';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 export const StockOutList = () => {
   const navigate = useNavigate();
@@ -57,6 +60,7 @@ export const StockOutList = () => {
     user?.is_admin ||
     user?.is_seller ||
     (user?.is_employee && permissionCodes && permissionCodes.includes('stock-out'));
+  const canScanQr = userHasWarehouseQrAccess(user, permissionCodes);
 
   useEffect(() => {
     if (user === undefined || user === null) {
@@ -81,6 +85,16 @@ export const StockOutList = () => {
       dispatch(fetchStorageLocations(user.organization_id));
     }
   }, [dispatch, user, authChecked, hasPermission, loadStockOuts]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/stock-out') {
+        loadStockOuts();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [loadStockOuts]);
 
   const sortedStockOuts = useMemo(
     () => sortStockOutItems(stockOuts, sortOrder),
@@ -219,7 +233,24 @@ export const StockOutList = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {!loading && !error && totalInList > 0 && (
-            <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
+            <>
+              <div className="grid w-full grid-cols-3 gap-2 rounded-xl bg-gray-50 px-3 py-2.5 ring-1 ring-gray-200/80 sm:hidden">
+                <div className="text-center">
+                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.count}</div>
+                  <div className="text-[11px] text-gray-500">Записей</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.salesCount}</div>
+                  <div className="text-[11px] text-gray-500">Продажи</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
+                    {formatStockOutMoney(stats.totalValue)}
+                  </div>
+                  <div className="text-[11px] text-gray-500">На сумму</div>
+                </div>
+              </div>
+              <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
               <div>
                 <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.count}</div>
                 <div className="text-[11px] text-gray-500">Записей</div>
@@ -235,7 +266,13 @@ export const StockOutList = () => {
                 <div className="text-[11px] text-gray-500">На сумму</div>
               </div>
             </div>
+            </>
           )}
+          {canScanQr ? (
+            <Link to="/warehouse/scan" className={warehouseSecondaryButtonClass}>
+              Сканировать QR
+            </Link>
+          ) : null}
           <button type="button" onClick={() => navigate('/my-parts')} className={warehousePrimaryButtonClass}>
             Мои запчасти
           </button>
@@ -303,7 +340,7 @@ export const StockOutList = () => {
           </div>
         )}
 
-        <div className={warehouseToolbarClass}>
+        <div className={`${warehouseToolbarClass} max-[400px]:flex-col max-[400px]:items-stretch`}>
           {displayStockOuts.length > 0 && (
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-gray-700 ring-1 ring-gray-200">
               <input
@@ -337,14 +374,14 @@ export const StockOutList = () => {
               <button
                 type="button"
                 onClick={handleReturnSelected}
-                className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-700"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-700 sm:ml-auto sm:w-auto"
               >
                 Вернуть на склад
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedItems([])}
-                className="inline-flex h-9 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
               >
                 Снять выделение
               </button>

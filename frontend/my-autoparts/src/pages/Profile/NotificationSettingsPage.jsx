@@ -12,6 +12,14 @@ import {
   profilePageShell,
   profilePrimaryBtn,
 } from './profileUi';
+import { isPwaStandalone } from '../../utils/pwaStandalone';
+
+function isIosSafari() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return iOS && !/CriOS|FxiOS|EdgiOS/.test(ua);
+}
 
 const DEFAULT_PREFS = {
   orders: { push: true, email: true },
@@ -213,6 +221,7 @@ export default function NotificationSettingsPage() {
     () => hasAnyPushEnabled(prefs) && !hasPushSubscription,
     [prefs, hasPushSubscription],
   );
+  const showIosInstallHint = isIosSafari() && !isPwaStandalone();
 
   if (!isReady) {
     return <NotificationsSkeleton />;
@@ -244,6 +253,17 @@ export default function NotificationSettingsPage() {
 
   return (
     <div className={profilePageShell}>
+      {showIosInstallHint ? (
+        <ProfileBlock className="mb-4">
+          <div className="px-4 py-4">
+            <p className="text-[15px] font-medium text-gray-900">Push на iPhone и iPad</p>
+            <p className="mt-1 text-sm leading-relaxed text-gray-600">
+              В Safari push работает только после добавления сайта на экран «Домой»: «Поделиться» → «На экран Домой», затем откройте приложение с иконки и включите уведомления здесь.
+            </p>
+          </div>
+        </ProfileBlock>
+      ) : null}
+
       <ProfileBlock>
         <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3.5">
           <div>

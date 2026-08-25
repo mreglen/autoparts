@@ -5,6 +5,7 @@ from app.db.schema_patches import (
     ensure_avito_order_fulfillment_columns,
     ensure_event_log_audit_columns,
     ensure_user_public_code,
+    ensure_user_session_refresh_columns,
     ensure_garage_used_order_item_fulfillment_columns,
     ensure_garage_used_order_item_payment_columns,
     ensure_garage_order_delivery_columns,
@@ -300,6 +301,7 @@ try:
     ensure_autoservice_warehouse_items_unit()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
+    ensure_user_session_refresh_columns()
     ensure_group_chat_columns()
     ensure_chat_created_by_column()
     ensure_seo_product_url_exports_table()

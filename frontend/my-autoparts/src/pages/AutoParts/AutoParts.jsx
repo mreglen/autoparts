@@ -39,6 +39,7 @@ import { buildAutoPartsSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import { normalizeVinForSearchOrNull, queryLooksLikeVin } from '../../utils/laximoVin';
+import { navigateToVinCatalog } from '../../utils/vinCatalogNavigation';
 import { fetchPublicSiteConfig } from '../../redux/slices/PublicInfoSlice';
 
 const UsedPartsList = React.lazy(() => import('./UsedParts/UsedPartsList'));
@@ -159,7 +160,7 @@ function AutoParts() {
   }, [searchParams, navigate, location.pathname]);
 
   const handleVinScanConfirm = useCallback((vin) => {
-    navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+    navigateToVinCatalog(navigate, vin);
   }, [navigate]);
 
   const handleNewPartsSearch = useCallback(async (text) => {
@@ -167,7 +168,7 @@ function AutoParts() {
     if (!trimmed) return;
     const vin = normalizeVinForSearchOrNull(trimmed);
     if (vin) {
-      navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+      navigateToVinCatalog(navigate, vin);
       return;
     }
     dispatch(setSearchQuery(trimmed));
@@ -182,7 +183,7 @@ function AutoParts() {
     const trimmed = text.trim();
     const vin = normalizeVinForSearchOrNull(trimmed);
     if (vin) {
-      navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`, { replace });
+      navigateToVinCatalog(navigate, vin, { replace });
       return;
     }
     if (trimmed) {
@@ -262,7 +263,7 @@ function AutoParts() {
   useEffect(() => {
     const vin = normalizeVinForSearchOrNull(urlQuery || '');
     if (!vin) return;
-    navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`, { replace: true });
+    navigateToVinCatalog(navigate, vin, { replace: true });
   }, [urlQuery, navigate]);
 
   // Sync activeTab with URL on initial load
@@ -442,8 +443,15 @@ function AutoParts() {
     return (
       <div className="mt-5 text-center py-10 px-4">
         <PageSeoHelmet seo={seo} />
-        <p className="text-base sm:text-lg text-red-600">Ошибка загрузки данных</p>
+        <p className="text-base sm:text-lg text-red-600">Не удалось загрузить предложения</p>
         <p className="text-sm text-gray-500 mt-2">{error}</p>
+        <button
+          type="button"
+          onClick={() => dispatch(fetchSearchResults({ text: effectiveQuery }))}
+          className="mt-4 min-h-11 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+        >
+          Повторить
+        </button>
       </div>
     );
   }
@@ -480,7 +488,7 @@ function AutoParts() {
         )}
 
         {/* Переключатель вкладок */}
-        <div className="mb-3 sm:mb-6 max-lg:px-3 max-lg:py-2">
+        <div className="mb-3 sm:mb-6 max-lg:px-3 max-lg:py-1">
         <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {showNewAutoparts && (
@@ -514,6 +522,7 @@ function AutoParts() {
                 onClick={() => setShowSortDropdown((prev) => !prev)}
                 className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 active:bg-gray-300 sm:px-4 sm:py-2"
                 title="Сортировка"
+                aria-label="Сортировка"
                 aria-expanded={showSortDropdown}
                 aria-haspopup="menu"
               >
@@ -523,7 +532,7 @@ function AutoParts() {
               </button>
 
               {showSortDropdown && (
-                <div className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                <div className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg" role="menu" aria-label="Сортировка">
                   <button
                     type="button"
                     onClick={() => applyNewPartsSort('price_asc')}
@@ -593,6 +602,7 @@ function AutoParts() {
                   onClick={() => setShowSortDropdown((prev) => !prev)}
                   className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 active:bg-gray-300 sm:px-4 sm:py-2"
                   title="Сортировка"
+                  aria-label="Сортировка"
                   aria-expanded={showSortDropdown}
                   aria-haspopup="menu"
                 >
@@ -602,7 +612,7 @@ function AutoParts() {
                 </button>
 
                 {showSortDropdown && (
-                  <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                  <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg" role="menu" aria-label="Сортировка">
                   <button
                     type="button"
                     onClick={() => applyUsedSort('price_asc')}

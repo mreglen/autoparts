@@ -282,7 +282,7 @@ export default function SalesGarageOrderCard({
                     onRefreshSupplierStatus(order.id);
                   }}
                   disabled={supplierRefreshLoading}
-                  className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   {supplierRefreshLoading ? 'Обновление…' : 'Обновить статус поставщика'}
                 </button>
@@ -330,7 +330,7 @@ export default function SalesGarageOrderCard({
                       e.stopPropagation();
                       onOpenCancelPayment?.(order);
                     }}
-                    className="inline-flex rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600"
+                    className="inline-flex min-h-11 items-center rounded-full bg-emerald-500 px-3 text-sm font-semibold text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600"
                     title="Отменить оплату"
                   >
                     Оплачено
@@ -342,7 +342,7 @@ export default function SalesGarageOrderCard({
                       e.stopPropagation();
                       onOpenPayment?.(order);
                     }}
-                    className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200"
+                    className="inline-flex min-h-11 items-center rounded-full bg-amber-100 px-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200"
                     title="Оплатить оставшиеся позиции"
                   >
                     Частично
@@ -354,7 +354,7 @@ export default function SalesGarageOrderCard({
                       e.stopPropagation();
                       onOpenPayment?.(order);
                     }}
-                    className="inline-flex rounded-full bg-amber-400 px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500"
+                    className="inline-flex min-h-11 items-center rounded-full bg-amber-400 px-3 text-sm font-semibold text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500"
                   >
                     Оплата
                   </button>
@@ -397,7 +397,7 @@ export default function SalesGarageOrderCard({
                     }
                     onUpdateStatus(order.id, primaryCta.status, null);
                   }}
-                  className="inline-flex items-center rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700"
                 >
                   {primaryCta.label}
                 </button>
@@ -511,7 +511,7 @@ export default function SalesGarageOrderCard({
                               e.stopPropagation();
                               onOpenCancelItemPayment?.(order, item);
                             }}
-                            className="inline-flex rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600"
+                            className="inline-flex min-h-11 items-center rounded-full bg-emerald-500 px-3 text-sm font-semibold text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600"
                             title="Отменить оплату позиции"
                           >
                             Оплачено
@@ -523,7 +523,7 @@ export default function SalesGarageOrderCard({
                               e.stopPropagation();
                               onOpenItemPayment?.(order, item);
                             }}
-                            className="inline-flex rounded-full bg-amber-400 px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500"
+                            className="inline-flex min-h-11 items-center rounded-full bg-amber-400 px-3 text-sm font-semibold text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500"
                           >
                             Оплата
                           </button>
@@ -541,7 +541,7 @@ export default function SalesGarageOrderCard({
                               }
                               onOpenItemConfirm?.(order, item, orderType);
                             }}
-                            className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700"
                           >
                             Подтвердить
                           </button>
@@ -551,7 +551,7 @@ export default function SalesGarageOrderCard({
                               e.stopPropagation();
                               onRejectItem?.(order, item, orderType);
                             }}
-                            className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-red-200 bg-white px-3 text-sm font-medium text-red-700 hover:bg-red-50"
                           >
                             Не подтверждён
                           </button>
@@ -564,7 +564,7 @@ export default function SalesGarageOrderCard({
                             e.stopPropagation();
                             onOpenUnconfirmItem?.(order, item);
                           }}
-                          className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
+                          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-500 px-3 text-sm font-semibold text-white hover:bg-emerald-600"
                           title="Отменить подтверждение позиции"
                         >
                           Подтверждено
@@ -577,7 +577,7 @@ export default function SalesGarageOrderCard({
                             e.stopPropagation();
                             onOpenUnconfirmItem?.(order, item);
                           }}
-                          className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 text-sm font-semibold text-red-700 hover:bg-red-100"
                           title="Отменить отказ по позиции"
                         >
                           Не подтверждён

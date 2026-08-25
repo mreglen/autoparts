@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useDebouncedCallback } from '../../hooks/useDebouncedCallback';
+import { navigateToVinCatalog } from '../../utils/vinCatalogNavigation';
 import VinScanModal from '../VinScanner/VinScanModal';
 import VinScanTriggerButton from '../VinScanner/VinScanTriggerButton';
 
@@ -79,12 +80,12 @@ export default function MobileCompactSearch({
             onVinScanConfirm(vin);
             return;
         }
-        navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+        navigateToVinCatalog(navigate, vin);
     };
 
     const rightPadding = enableVinScan
-        ? (showClear ? 'pr-20' : 'pr-14')
-        : (showClear ? 'pr-16' : 'pr-10');
+        ? (showClear ? 'pr-[5.5rem]' : 'pr-[4.25rem]')
+        : (showClear ? 'pr-[4.25rem]' : 'pr-11');
 
     return (
         <>
@@ -108,14 +109,14 @@ export default function MobileCompactSearch({
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     placeholder={placeholder}
                     disabled={isSearching}
-                    className={`h-9 w-full rounded-full border border-gray-200 bg-white pl-9 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${rightPadding} ${inputClassName}`}
+                    className={`h-11 w-full rounded-full border border-gray-200 bg-white pl-9 text-base text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${rightPadding} ${inputClassName}`}
                 />
                 {showClear ? (
                     <button
                         type="button"
                         onClick={handleClear}
                         disabled={isSearching}
-                        className={`absolute top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:text-gray-600 disabled:opacity-40 ${enableVinScan ? 'right-14' : 'right-9'}`}
+                        className={`absolute top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:text-gray-600 disabled:opacity-40 ${enableVinScan ? 'right-[2.75rem]' : 'right-11'}`}
                         aria-label="Очистить поиск"
                     >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -128,14 +129,14 @@ export default function MobileCompactSearch({
                         compact
                         onClick={() => setVinScanOpen(true)}
                         disabled={isSearching}
-                        className="absolute right-9 top-1/2 h-7 w-7 -translate-y-1/2"
+                        className="absolute right-11 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center"
                     />
                 ) : null}
                 <button
                     type="button"
                     onClick={handleSearch}
                     disabled={isSearching || !searchTerm.trim()}
-                    className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-indigo-600 disabled:opacity-40"
+                    className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-indigo-600 disabled:opacity-40"
                     aria-label="Найти"
                 >
                     {isSearching ? (

@@ -27,6 +27,7 @@ import {
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
 import { SkeletonHeaderStats, SkeletonListCards } from '../../components/UI';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 const ACTIVE_STATUSES = new Set([
   'pending',
@@ -218,6 +219,16 @@ export default function PurchasesOrdersPage() {
     };
   }, [isReady, isAuthenticated, fetchAll]);
 
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/purchases/orders') {
+        fetchAll(true);
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [fetchAll]);
+
   const allOrdersPool = useMemo(
     () => buildUnifiedOrders(usedOrders, newOrders, [], { canViewNewOrders: true, avitoProActive: false }),
     [usedOrders, newOrders],
@@ -399,7 +410,7 @@ export default function PurchasesOrdersPage() {
   }
 
   return (
-    <div className={`${warehousePageClass} min-w-0 space-y-4`}>
+    <div className={`${warehousePageClass} min-w-0 space-y-4 max-lg:pb-[var(--sg-mobile-bottom-nav-total)]`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Мои заказы</h1>
         {showInitialSkeleton ? <SkeletonHeaderStats /> : !error ? <OrdersHeaderStats stats={stats} formatPrice={formatPrice} /> : null}

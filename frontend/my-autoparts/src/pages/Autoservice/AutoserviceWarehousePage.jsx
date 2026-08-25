@@ -26,6 +26,7 @@ import {
 } from '../../utils/autoserviceWarehouseUi';
 import { formatShopPartUnit, formatShopPartQty } from '../../utils/repairOrderShopPartUtils';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   autoserviceListActionsButtonClass,
   autoserviceListErrorClass,
@@ -210,6 +211,16 @@ export default function AutoserviceWarehousePage() {
     if (!userHasAutoserviceOrganization(user)) return;
     loadItems();
   }, [isReady, isAuthenticated, user, loadItems]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/autoservice/warehouse') {
+        loadItems();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [loadItems]);
 
   useEffect(() => {
     if (!detailsItem?.id) {

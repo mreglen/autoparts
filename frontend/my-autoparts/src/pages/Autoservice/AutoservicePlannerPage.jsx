@@ -16,6 +16,7 @@ import {
   sortDayOrders,
   toIsoDate,
 } from '../../utils/autoservicePlannerLayout';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
@@ -182,6 +183,7 @@ function MobileDayPlanner({
   onSelectDay,
   onItemClick,
   onCellContextMenu,
+  onAddInZone,
   loading,
 }) {
   const selectedIndex = dayHeaders.findIndex(
@@ -246,7 +248,19 @@ function MobileDayPlanner({
                   });
                 }}
               >
-                <h2 className="text-base font-semibold text-gray-900">{zone.name}</h2>
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-base font-semibold text-gray-900">{zone.name}</h2>
+                  {onAddInZone ? (
+                    <button
+                      type="button"
+                      onClick={() => onAddInZone({ dayIso: selectedDayIso, zoneId: zone.id ?? null })}
+                      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-lg font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                      aria-label={`Добавить в ${zone.name}`}
+                    >
+                      +
+                    </button>
+                  ) : null}
+                </div>
                 {orders.length === 0 ? (
                   <p className="mt-2 text-sm text-gray-400">Нет записей</p>
                 ) : (
@@ -340,6 +354,16 @@ export default function AutoservicePlannerPage() {
   useEffect(() => {
     if (isReady && isAuthenticated) load();
   }, [isReady, isAuthenticated, load]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/autoservice/planner') {
+        load();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [load]);
 
   const handlePlannerItemClick = (item) => {
     if (item?.kind === 'inspection') {
@@ -469,6 +493,7 @@ export default function AutoservicePlannerPage() {
         onSelectDay={setSelectedDayIso}
         onItemClick={handlePlannerItemClick}
         onCellContextMenu={handleCellContextMenu}
+        onAddInZone={openCreateChoice}
         loading={loading}
       />
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useId } from 'react';
 import { warehousePillControlClass } from '../../utils/warehouseListUi';
 
 export const SEARCHABLE_PILL_ADD_VALUE = '__add__';
@@ -20,6 +20,7 @@ export default function SearchablePillSelect({
 }) {
   const rootRef = useRef(null);
   const inputRef = useRef(null);
+  const listboxId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -58,6 +59,10 @@ export default function SearchablePillSelect({
 
   const displayValue = open ? query : selected?.label || '';
 
+  const activeOptionId = open && filtered.length > 0
+    ? `${listboxId}-opt-${String(filtered[0].value).replace(/[^a-zA-Z0-9_-]/g, '_')}`
+    : undefined;
+
   const handleSelect = (nextValue) => {
     if (nextValue === SEARCHABLE_PILL_ADD_VALUE) {
       setOpen(false);
@@ -70,6 +75,8 @@ export default function SearchablePillSelect({
     setQuery('');
   };
 
+  const optionId = (optionValue) => `${listboxId}-opt-${String(optionValue).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
   return (
     <div ref={rootRef} className={`relative min-w-0 ${className}`}>
       <input
@@ -79,6 +86,9 @@ export default function SearchablePillSelect({
         role="combobox"
         aria-label={ariaLabel}
         aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-controls={open ? listboxId : undefined}
+        aria-activedescendant={activeOptionId}
         aria-autocomplete="list"
         disabled={disabled || loading}
         placeholder={loading ? 'Загрузка…' : placeholder}
@@ -109,11 +119,12 @@ export default function SearchablePillSelect({
 
       {open && !disabled && !loading ? (
         <ul
+          id={listboxId}
           role="listbox"
           aria-label={ariaLabel}
           className="absolute left-0 z-40 mt-1.5 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg"
         >
-          <li role="option" aria-selected={value === ''}>
+          <li role="option" id={`${listboxId}-opt-empty`} aria-selected={value === ''}>
             <button
               type="button"
               className={`flex w-full px-4 py-2.5 text-left text-sm transition hover:bg-gray-50 ${
@@ -132,7 +143,7 @@ export default function SearchablePillSelect({
             filtered.map((option) => {
               const isSelected = String(option.value) === String(value);
               return (
-                <li key={option.value} role="option" aria-selected={isSelected}>
+                <li key={option.value} role="option" id={optionId(option.value)} aria-selected={isSelected}>
                   <button
                     type="button"
                     className={`flex w-full px-4 py-2.5 text-left text-sm transition hover:bg-gray-50 ${
@@ -152,6 +163,7 @@ export default function SearchablePillSelect({
             <li className="sticky bottom-0 border-t border-gray-100 bg-white">
               <button
                 type="button"
+                id={`${listboxId}-opt-add`}
                 className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-indigo-600 transition hover:bg-indigo-50"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => handleSelect(SEARCHABLE_PILL_ADD_VALUE)}

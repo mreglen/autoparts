@@ -1,4 +1,92 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Z_MODAL } from '../../constants/mobileTokens';
+import { useChatMediaBlobUrl, downloadChatMedia } from '../../utils/chatMediaAuth';
+
+function LightboxMediaContent({ media, imageLoaded, setImageLoaded, chatInfo, onImageClick, onVideoClick }) {
+  const needsAuth = Boolean(media?.id != null && !media?.url);
+  const { url: blobUrl, loading, error } = useChatMediaBlobUrl(media?.id, { enabled: needsAuth });
+  const src = media?.url || blobUrl;
+  const isImage = media?.media_type === 'image';
+  const isVideo = media?.media_type === 'video';
+
+  if (needsAuth && loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <svg className="h-12 w-12 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (!src || error) {
+    return <p className="text-white text-center">Не удалось загрузить медиа</p>;
+  }
+
+  if (isImage) {
+    return (
+      <div className="relative">
+        {!imageLoaded && (
+          <div className="flex items-center justify-center">
+            <svg className="animate-spin h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </div>
+        )}
+        <img
+          src={src}
+          alt={media.original_filename || 'Изображение'}
+          className={`max-w-full max-h-[90vh] object-contain transition-opacity duration-300 ${
+            chatInfo?.isAvito && (chatInfo?.linkedProductId || chatInfo?.contextUrl) ? 'cursor-pointer hover:opacity-90' : ''
+          } ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
+          onLoad={() => setImageLoaded(true)}
+          onClick={onImageClick}
+        />
+      </div>
+    );
+  }
+
+  if (isVideo) {
+    return (
+      <video
+        controls
+        src={src}
+        className={`max-w-full max-h-[90vh] object-contain ${
+          chatInfo?.isAvito && (chatInfo?.linkedProductId || chatInfo?.contextUrl) ? 'cursor-pointer hover:opacity-90' : ''
+        }`}
+        autoPlay
+        onClick={onVideoClick}
+      >
+        Ваш браузер не поддерживает воспроизведение видео.
+      </video>
+    );
+  }
+
+  return (
+    <div className="text-white text-center">
+      <svg className="w-20 h-20 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+      <p className="text-lg mb-2">Этот тип медиа не поддерживается</p>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (needsAuth && media?.id) {
+            downloadChatMedia(media.id, media.original_filename);
+          } else if (src) {
+            window.open(src, '_blank', 'noopener,noreferrer');
+          }
+        }}
+        className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Скачать файл
+      </button>
+    </div>
+  );
+}
 
 /**
  * Универсальный компонент для просмотра медиа из чата в модальном окне
@@ -150,7 +238,8 @@ const MediaLightbox = ({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] bg-black bg-opacity-95 flex items-center justify-center"
+      className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center"
+      style={{ zIndex: Z_MODAL }}
       onClick={handleBackdropClick}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -217,61 +306,15 @@ const MediaLightbox = ({
 
       {/* Контент */}
       <div className="relative max-w-full max-h-full flex items-center justify-center p-4">
-        {isImage && (
-          <div className="relative">
-            {!imageLoaded && (
-              <div className="flex items-center justify-center">
-                <svg className="animate-spin h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              </div>
-            )}
-            <img
-              src={currentMedia.url}
-              alt={currentMedia.original_filename || 'Изображение'}
-              className={`max-w-full max-h-[90vh] object-contain transition-opacity duration-300 ${
-                chatInfo?.isAvito && (chatInfo?.linkedProductId || chatInfo?.contextUrl) ? 'cursor-pointer hover:opacity-90' : ''
-              } ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
-              onLoad={() => setImageLoaded(true)}
-              onError={(e) => {
-                console.error('Failed to load image:', currentMedia.url);
-              }}
-              onClick={handleImageClick}
-            />
-          </div>
-        )}
-
-        {isVideo && (
-          <video
-            controls
-            src={currentMedia.url}
-            className={`max-w-full max-h-[90vh] object-contain ${
-              chatInfo?.isAvito && (chatInfo?.linkedProductId || chatInfo?.contextUrl) ? 'cursor-pointer hover:opacity-90' : ''
-            }`}
-            autoPlay
-            onClick={handleVideoClick}
-          >
-            Ваш браузер не поддерживает воспроизведение видео.
-          </video>
-        )}
-
-        {/* Если тип медиа не поддерживается */}
-        {!isImage && !isVideo && (
-          <div className="text-white text-center">
-            <svg className="w-20 h-20 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="text-lg mb-2">Этот тип медиа не поддерживается</p>
-            <a
-              href={currentMedia.url}
-              download={currentMedia.original_filename}
-              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Скачать файл
-            </a>
-          </div>
+        {(isImage || isVideo || currentMedia) && (
+          <LightboxMediaContent
+            media={currentMedia}
+            imageLoaded={imageLoaded}
+            setImageLoaded={setImageLoaded}
+            chatInfo={chatInfo}
+            onImageClick={handleImageClick}
+            onVideoClick={handleVideoClick}
+          />
         )}
       </div>
 

@@ -16,10 +16,20 @@ from app.schemas.auth import (
     VerifyCode,
     Token,
     LoginResponse,
+    RefreshTokenRequest,
 )
 from app.schemas.pending_seller import SellerRegisterRequest, SellerRegisterResponse
 from app.core.security import get_password_hash
-from app.core.auth import authenticate_user, create_access_token, get_current_user, oauth2_scheme, cleanup_old_user_sessions
+from app.core.auth import (
+    authenticate_user,
+    create_access_token,
+    get_current_user,
+    oauth2_scheme,
+    cleanup_old_user_sessions,
+    issue_auth_token_pair,
+    build_token_data_for_user,
+    refresh_auth_tokens,
+)
 from app.models.user_session import UserSession
 from app.db.database import get_db
 from app.services.laximo.gate import laximo_cat_ready
@@ -248,18 +258,18 @@ def register_confirm(data: VerifyCode, request: Request, response: Response, db:
 
     # Создаем токен с сессией
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email},
-        expires_delta=access_token_expires,
+    access_token, refresh_token = issue_auth_token_pair(
         db=db,
         user=user,
+        token_data={"sub": user.email},
         device_info="Registration",
-        ip_address=None
+        ip_address=None,
+        expires_delta=access_token_expires,
     )
     
     # Clean up old sessions for this user (IP is None during registration)
     merge_guest_cart_from_request(db, request, response, user.id)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -300,28 +310,16 @@ def login(
     })
 
     # Формируем данные для токена
-    token_data = {"sub": user.email}
-    
-    # Если пользователь является сотрудником, добавляем права доступа в токен
-    if user.is_employee:
-        from app.models.permission import Permission
-        user_permissions = db.query(UserPermission, Permission).join(
-            Permission, UserPermission.permission_id == Permission.id
-        ).filter(
-            UserPermission.user_id == user.id
-        ).all()
-        # Store both permission IDs and codes for easy checking
-        token_data["user_permissions"] = [up.UserPermission.permission_id for up in user_permissions]
-        token_data["permission_codes"] = [up.Permission.code for up in user_permissions]
+    token_data = build_token_data_for_user(db, user)
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data=token_data,
-        expires_delta=access_token_expires,
+    access_token, refresh_token = issue_auth_token_pair(
         db=db,
         user=user,
+        token_data=token_data,
         device_info=device_info,
-        ip_address=ip_address
+        ip_address=ip_address,
+        expires_delta=access_token_expires,
     )
     
     # Clean up old sessions for this user from the same IP
@@ -332,8 +330,18 @@ def login(
         merge_guest_cart_from_request(db, request, response, user.id)
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user": build_user_profile_response(user),
+    }
+
+@router.post("/refresh", response_model=Token)
+def refresh_tokens(data: RefreshTokenRequest, db: Session = Depends(get_db)):
+    access_token, refresh_token = refresh_auth_tokens(db, data.refresh_token.strip())
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
     }
 
 @router.get("/profile", response_model=UserResponse)
@@ -475,13 +483,13 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
 
         # Создаем токен с сессией
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.email},
-            expires_delta=access_token_expires,
+        access_token, refresh_token = issue_auth_token_pair(
             db=db,
             user=user,
+            token_data={"sub": user.email},
             device_info="Registration Complete",
-            ip_address=request.client.host if request else None
+            ip_address=request.client.host if request else None,
+            expires_delta=access_token_expires,
         )
         
         # Clean up old sessions for this user from the same IP
@@ -491,7 +499,7 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
 
         if request is not None and response is not None:
             merge_guest_cart_from_request(db, request, response, user.id)
-        return {"access_token": access_token, "token_type": "bearer"}
+        return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
     except HTTPException:
         db.rollback()

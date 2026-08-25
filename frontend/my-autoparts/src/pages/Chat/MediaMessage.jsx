@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { API_BASE } from '../../utils/apiClient';
+import { Z_MODAL } from '../../constants/mobileTokens';
+import { downloadChatMedia, useChatMediaBlobUrl } from '../../utils/chatMediaAuth';
 
 const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -62,39 +63,34 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
     }
   };
 
-  // Получаем URL для медиа
-  const getMediaUrl = (mediaItem) => {
-    // Если это временное медиа, возвращаем пустую строку
-    if (mediaItem.id?.toString().startsWith('temp_')) {
-      return '';
-    }
-    // Добавляем токен как query parameter для <img> тегов
-    const token = localStorage.getItem('token');
-    return `${API_BASE}/chats/media/${mediaItem.id}?token=${encodeURIComponent(token)}`;
-  };
+  // Получаем URL для медиа через Authorization header (без token в query)
+  const isTemp = media.id?.toString().startsWith('temp_');
+  const { url: mediaUrl, error: mediaUrlError, loading: mediaUrlLoading } = useChatMediaBlobUrl(
+    media.id,
+    { thumbnail: false, enabled: !isTemp },
+  );
+  const { url: thumbUrl } = useChatMediaBlobUrl(
+    media.id,
+    { thumbnail: Boolean(media.thumbnail_path), enabled: !isTemp && Boolean(media.thumbnail_path) },
+  );
+  const thumbnailUrl = thumbUrl || mediaUrl;
+  const fullUrl = mediaUrl;
+  const imageLoadFailed = imageError || mediaUrlError;
 
-  // Получаем URL для thumbnail
-  const getThumbnailUrl = (mediaItem) => {
-    // Если это временное медиа, возвращаем пустую строку
-    if (mediaItem.id?.toString().startsWith('temp_')) {
-      return '';
+  const handleDocumentDownload = async (e) => {
+    e.preventDefault();
+    try {
+      await downloadChatMedia(media.id, media.original_filename || 'document');
+    } catch (err) {
+      console.error('Document download failed', err);
     }
-    // Добавляем токен как query parameter для <img> тегов
-    const token = localStorage.getItem('token');
-    if (mediaItem.thumbnail_path) {
-      return `${API_BASE}/chats/media/${mediaItem.id}/thumbnail?token=${encodeURIComponent(token)}`;
-    }
-    return getMediaUrl(mediaItem);
   };
 
   // Отображение изображения
   const renderImage = (mediaItem) => {
-    const thumbnailUrl = getThumbnailUrl(mediaItem);
-    const fullUrl = getMediaUrl(mediaItem);
-
     return (
       <div className="relative">
-        {/* Always render the image */}
+        {thumbnailUrl ? (
         <img
           src={thumbnailUrl}
           alt={mediaItem.original_filename || 'Изображение'}
@@ -104,18 +100,16 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
           style={{ maxHeight: '340px', objectFit: 'contain' }}
           onClick={() => setShowFullImage(true)}
           onLoad={() => {
-            console.log('✅ Image loaded successfully:', thumbnailUrl);
             setImageLoaded(true);
             setImageError(false);
           }}
-          onError={(e) => {
-            console.error('❌ Failed to load image:', thumbnailUrl);
-            console.error('Media item:', mediaItem);
+          onError={() => {
             setImageError(true);
             setImageLoaded(false);
           }}
         />
-        {imageError && (
+        ) : null}
+        {imageLoadFailed && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-200 rounded-lg p-4">
             <svg className="w-12 h-12 text-red-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -132,7 +126,7 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
             </button>
           </div>
         )}
-        {!imageLoaded && !imageError && (
+        {!imageLoaded && !imageLoadFailed && (mediaUrlLoading || !thumbnailUrl) && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg">
             <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -192,9 +186,10 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
         )}
             
         {/* Lightbox для полного изображения */}
-        {showFullImage && (
+        {showFullImage && fullUrl && (
           <div
-            className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4"
+            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-90 p-4"
+            style={{ zIndex: Z_MODAL }}
             onClick={() => setShowFullImage(false)}
           >
             <div className="relative max-w-full max-h-full">
@@ -224,15 +219,13 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
 
   // Отображение видео
   const renderVideo = (mediaItem) => {
-    const thumbnailUrl = getThumbnailUrl(mediaItem);
-    const videoUrl = getMediaUrl(mediaItem);
-
+    const videoUrl = mediaUrl;
     return (
       <div className="relative">
-        {/* Always render the video */}
+        {videoUrl ? (
         <video
           controls
-          poster={thumbnailUrl}
+          poster={thumbnailUrl || undefined}
           className="max-w-full rounded-lg"
           style={{ maxHeight: '340px' }}
           preload="metadata"
@@ -240,6 +233,14 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
           <source src={videoUrl} type={mediaItem.mime_type} />
           Ваш браузер не поддерживает воспроизведение видео.
         </video>
+        ) : mediaUrlLoading ? (
+          <div className="flex h-40 items-center justify-center rounded-lg bg-gray-200">
+            <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </div>
+        ) : null}
         
         {/* Overlay for processing state - shown on top of the video */}
         {mediaItem.is_processing && (
@@ -310,8 +311,6 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
 
   // Отображение документа
   const renderDocument = (mediaItem) => {
-    const fileUrl = getMediaUrl(mediaItem);
-    
     // Определяем иконку по типу файла
     const getFileIcon = () => {
       const mimeType = mediaItem.mime_type;
@@ -398,10 +397,10 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
 
     return (
       <div className="relative">
-        <a
-          href={fileUrl}
-          download={mediaItem.original_filename}
-          className="flex items-center gap-2.5 p-2.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+        <button
+          type="button"
+          onClick={handleDocumentDownload}
+          className="flex w-full items-center gap-2.5 rounded-lg border border-gray-200 bg-white p-2.5 text-left transition-colors hover:bg-gray-50"
           title="Нажмите для скачивания"
         >
           {getFileIcon()}
@@ -416,7 +415,7 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
           <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-        </a>
+        </button>
       </div>
     );
   };
@@ -427,9 +426,8 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
   } else if (media.media_type === 'video') {
     return renderVideo(media);
   } else if (media.media_type === 'voice') {
-    // Устаревшие записи в БД: только воспроизведение, без отправки новых
     return (
-      <audio controls className="max-w-[260px]" preload="metadata" src={getMediaUrl(media)} />
+      <audio controls className="max-w-[260px]" preload="metadata" src={mediaUrl || undefined} />
     );
   } else if (media.media_type === 'document') {
     return renderDocument(media);

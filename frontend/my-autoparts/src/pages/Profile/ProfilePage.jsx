@@ -267,6 +267,7 @@ export default function ProfilePage() {
     showMyParts ? { to: '/my-parts', label: 'Мои запчасти', icon: <IconParts /> } : null,
     { to: '/purchases/orders', label: 'Заказы', icon: <IconBag /> },
     { to: '/profile/notifications', label: 'Уведомления', icon: <IconBell /> },
+    { to: '/profile/notification-center', label: 'История push', icon: <IconBell /> },
   ].filter(Boolean);
 
   const quickActionsGridClass =

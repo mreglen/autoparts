@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+import { navigateToVinCatalog } from '../../utils/vinCatalogNavigation';
+import { normalizeVinForSearchOrNull } from '../../utils/laximoVin';
+import VinScanModal from '../../components/VinScanner/VinScanModal';
+import VinScanTriggerButton from '../../components/VinScanner/VinScanTriggerButton';
 import ReviewsSection from '../../components/Reviews/ReviewsSection';
 import FeaturedLandingsSection from '../../components/Seo/FeaturedLandingsSection';
 import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
@@ -43,6 +48,18 @@ function Main() {
   const showSiteReviews = useShowSiteReviews();
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
+  const [vinScanOpen, setVinScanOpen] = useState(false);
+  const [homeRefreshKey, setHomeRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/') {
+        setHomeRefreshKey((key) => key + 1);
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, []);
 
   const autopartsPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
   const seo = buildHomeSeo();
@@ -53,8 +70,20 @@ function Main() {
     const trimmed = query.trim();
     if (!trimmed || busy) return;
     setBusy(true);
+    const vin = normalizeVinForSearchOrNull(trimmed);
+    if (vin) {
+      navigateToVinCatalog(navigate, vin);
+      setBusy(false);
+      return;
+    }
     navigate(`/find?q=${encodeURIComponent(trimmed)}`);
     setBusy(false);
+  };
+
+  const handleVinScanConfirm = (vin) => {
+    setVinScanOpen(false);
+    setQuery(vin);
+    navigateToVinCatalog(navigate, vin);
   };
 
   const scrollToSellerForm = (e) => {
@@ -102,7 +131,12 @@ function Main() {
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder={COPY.searchPlaceholder}
                       disabled={busy}
-                      className="min-h-14 w-full rounded-sg border border-line-strong bg-surface-muted py-3 pl-12 pr-4 text-base text-ink shadow-inner placeholder:text-ink-faint focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+                      className="min-h-14 w-full rounded-sg border border-line-strong bg-surface-muted py-3 pl-12 pr-14 text-base text-ink shadow-inner placeholder:text-ink-faint focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-60"
+                    />
+                    <VinScanTriggerButton
+                      onClick={() => setVinScanOpen(true)}
+                      disabled={busy}
+                      className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center"
                     />
                   </div>
                   <Button type="submit" size="lg" disabled={busy || !query.trim()} loading={busy} className="min-h-14 sm:px-7">
@@ -180,7 +214,7 @@ function Main() {
       </section>
 
       <div className="bg-surface-muted">
-        <FeaturedLandingsSection />
+        <FeaturedLandingsSection key={homeRefreshKey} />
       </div>
 
       <section className="border-y border-line bg-surface py-12 md:py-16">
@@ -270,6 +304,12 @@ function Main() {
       </section>
 
       <YandexWebmasterCounter />
+
+      <VinScanModal
+        open={vinScanOpen}
+        onClose={() => setVinScanOpen(false)}
+        onConfirm={handleVinScanConfirm}
+      />
     </div>
   );
 }

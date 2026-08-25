@@ -16,6 +16,7 @@ import { resolveProductQrScan } from '../../utils/resolveProductQrScan';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useWarehousePermissions, usePermissionCodes } from '../../hooks/useWarehousePermissions';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { Z_MOBILE_STICKY_FOOTER, MOBILE_STICKY_BOTTOM_OFFSET } from '../../constants/mobileTokens';
 
 function ActionButton({ children, onClick, to, variant = 'default', disabled = false }) {
   const base = 'flex min-h-12 flex-1 items-center justify-center rounded-xl px-3 py-3 text-sm font-semibold transition-colors disabled:opacity-50';
@@ -344,7 +345,14 @@ const SellerPartCardPage = () => {
       </div>
 
       {perms.isStaff && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-3 py-3 backdrop-blur">
+        <div
+          className="fixed inset-x-0 border-t border-gray-200 bg-white/95 px-3 py-3 backdrop-blur"
+          style={{
+            zIndex: Z_MOBILE_STICKY_FOOTER,
+            bottom: MOBILE_STICKY_BOTTOM_OFFSET,
+            paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+          }}
+        >
           <div className="mx-auto flex max-w-3xl flex-wrap gap-2">
             {perms.canPrint && (
               <ActionButton onClick={() => setPrintModalOpen(true)}>Печать</ActionButton>

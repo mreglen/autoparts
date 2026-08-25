@@ -13,6 +13,7 @@ import {
 } from '../../utils/apiClient';
 import ProgressiveProductImage from '../../components/ProductMedia/ProgressiveProductImage';
 import { stripHtmlTags } from '../../utils/text';
+import { buildChatsQueryUrl } from '../../utils/resolveActiveChatParams';
 import { buildPartDetailPath, parsePartDetailParam, partDetailPathsMatch } from '../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildProductSeo, seoFromPartMetaResponse, buildProductStructuredDataBlocks, buildProductPhotoAlt, buildProductUsedCatalogPath } from '../../utils/productSeo';
@@ -46,6 +47,8 @@ import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
 import { getUsedPurchaseActions } from '../../utils/usedPurchaseMode';
 import { mapLaximoApplicableVehicles } from '../../utils/fitmentDisplay';
 import { Badge, Button, EmptyState, Modal, SkeletonCard } from '../../components/UI';
+import ProductDetailStickyBar from '../../components/ProductDetail/ProductDetailStickyBar';
+import { MOBILE_PRODUCT_STICKY_SCROLL_PAD } from '../../constants/mobileTokens';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -150,6 +153,7 @@ const PartDetail = () => {
   const trackedPartViewRef = useRef(null);
   const recordedEngagementViewRef = useRef(null);
   const canonicalRedirectRef = useRef(null);
+  const mobileGalleryTouchStartX = useRef(null);
 
   const routeIdentityKey = useMemo(() => {
     if (extractedProductId) {
@@ -724,7 +728,7 @@ const PartDetail = () => {
       });
 
       // Переходим на страницу чата
-      navigate(`/chats/${result.id}`);
+      navigate(buildChatsQueryUrl({ chatId: result.id, source: 'garage' }));
     } catch (error) {
       console.error('Ошибка создания чата:', error);
       alert('Не удалось создать чат. Попробуйте позже.');
@@ -994,6 +998,33 @@ const PartDetail = () => {
   const mobileHeroIsVideo = Boolean(mobileHeroItem && isVideo(mobileHeroItem));
   const sellerPhoneDigits = sellerOrg?.phone ? sellerOrg.phone.replace(/\D/g, '') : '';
 
+  const goToPreviousMedia = () => {
+    setCurrentMainMediaIndex((prev) => (prev > 0 ? prev - 1 : allMediaItems.length - 1));
+  };
+
+  const goToNextMedia = () => {
+    setCurrentMainMediaIndex((prev) => (prev < allMediaItems.length - 1 ? prev + 1 : 0));
+  };
+
+  const handleMobileGalleryTouchStart = (event) => {
+    mobileGalleryTouchStartX.current = event.touches?.[0]?.clientX ?? null;
+  };
+
+  const handleMobileGalleryTouchEnd = (event) => {
+    const startX = mobileGalleryTouchStartX.current;
+    mobileGalleryTouchStartX.current = null;
+    if (startX == null || allMediaItems.length <= 1) return;
+    const endX = event.changedTouches?.[0]?.clientX;
+    if (endX == null) return;
+    const delta = endX - startX;
+    if (Math.abs(delta) < 40) return;
+    if (delta > 0) {
+      goToPreviousMedia();
+    } else {
+      goToNextMedia();
+    }
+  };
+
   const renderMediaThumbnails = (className = '') => {
     if (allMediaItems.length <= 1) return null;
     return (
@@ -1121,7 +1152,7 @@ const PartDetail = () => {
   );
 
   return (
-    <div className={showMobileStickyCta ? 'max-md:pb-32' : undefined}>
+    <div className={showMobileStickyCta ? MOBILE_PRODUCT_STICKY_SCROLL_PAD : undefined}>
       <PartProductSeoHelmet seo={seo} structuredDataBlocks={structuredDataBlocks} product={currentProduct} />
 
       <div className="relative bg-surface-subtle md:hidden">
@@ -1129,6 +1160,8 @@ const PartDetail = () => {
           <div
             className="relative min-h-[52dvh] max-h-[62dvh] cursor-pointer"
             onClick={() => handleOpenMediaModal(currentMainMediaIndex)}
+            onTouchStart={handleMobileGalleryTouchStart}
+            onTouchEnd={handleMobileGalleryTouchEnd}
           >
             {mobileHeroIsVideo ? (
               <div className="relative min-h-[52dvh] max-h-[62dvh]">
@@ -1163,10 +1196,10 @@ const PartDetail = () => {
               <>
                 <button
                   type="button"
-                  className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink-soft shadow-sg-sm backdrop-blur"
+                  className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface/80 text-ink-soft shadow-sg-sm backdrop-blur"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setCurrentMainMediaIndex((prev) => (prev > 0 ? prev - 1 : allMediaItems.length - 1));
+                    goToPreviousMedia();
                   }}
                   aria-label="Предыдущее фото"
                 >
@@ -1176,10 +1209,10 @@ const PartDetail = () => {
                 </button>
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-surface/80 p-2 text-ink-soft shadow-sg-sm backdrop-blur"
+                  className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-surface/80 text-ink-soft shadow-sg-sm backdrop-blur"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setCurrentMainMediaIndex((prev) => (prev < allMediaItems.length - 1 ? prev + 1 : 0));
+                    goToNextMedia();
                   }}
                   aria-label="Следующее фото"
                 >
@@ -1187,7 +1220,10 @@ const PartDetail = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
-                <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white">
+                <div
+                  className="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white"
+                  aria-live="polite"
+                >
                   {currentMainMediaIndex + 1}/{allMediaItems.length}
                 </div>
               </>
@@ -1203,7 +1239,7 @@ const PartDetail = () => {
           <button
             type="button"
             onClick={handleBackToList}
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-surface/80 text-ink-soft shadow-sg-sm backdrop-blur"
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface/80 text-ink-soft shadow-sg-sm backdrop-blur"
             aria-label="Назад"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1215,7 +1251,7 @@ const PartDetail = () => {
               productId={currentProduct.id}
               size="sm"
               showLabel={false}
-              className="h-10 w-10 min-h-0 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
+              className="h-11 w-11 min-h-11 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
             />
             <ShareButton
               url={seo.canonicalUrl}
@@ -1223,7 +1259,7 @@ const PartDetail = () => {
               text={shareText}
               showLabel={false}
               size="sm"
-              className="h-10 w-10 min-h-0 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
+              className="h-11 w-11 min-h-11 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
             />
           </div>
         </div>
@@ -1340,10 +1376,7 @@ const PartDetail = () => {
       ) : null}
 
       {showMobileStickyCta ? (
-        <div
-          className="fixed inset-x-0 z-[44] border-t border-line bg-surface/95 px-4 py-3 shadow-[0_-6px_24px_rgba(0,0,0,0.08)] backdrop-blur supports-[backdrop-filter]:bg-surface/90 md:hidden"
-          style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
-        >
+        <ProductDetailStickyBar>
           <div className="flex gap-2">
             {canShowBuyNow ? (
               <Button
@@ -1369,7 +1402,7 @@ const PartDetail = () => {
               </Button>
             ) : null}
           </div>
-        </div>
+        </ProductDetailStickyBar>
       ) : null}
     </div>
   );

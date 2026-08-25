@@ -5,6 +5,7 @@ import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { login as loginThunk, fetchProfile } from '../../../redux/slices/AuthSlice';
 import { fetchCart } from '../../../redux/slices/CartSlice';
 import { trackFormField, trackFormSubmit } from '../../../utils/siteAnalytics';
+import MobileFormField from '../../../components/MobileFormField/MobileFormField';
 
 function resolveAuthRedirectPath(from) {
     if (typeof from === 'string' && from.startsWith('/')) {
@@ -16,7 +17,7 @@ function resolveAuthRedirectPath(from) {
 export default function Login() {
     const [loginValue, setLoginValue] = useState('');
     const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false); // <-- added
+    const [showPassword, setShowPassword] = useState(false);
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const location = useLocation();
@@ -43,58 +44,65 @@ export default function Login() {
             </div>
 
             {error && (
-                <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-200">
+                <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-200" role="alert">
                     {error}
                 </div>
             )}
 
-            <div>
-
+            <MobileFormField label="Email или телефон" htmlFor="auth-login" required>
                 <input
+                    id="auth-login"
                     type="text"
+                    name="login"
                     value={loginValue}
                     onChange={(e) => setLoginValue(e.target.value)}
                     onBlur={() => {
                         if (loginValue.trim()) trackFormField('auth_login', 'login');
                     }}
                     placeholder="Email или телефон"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                    autoComplete="username"
+                    inputMode="email"
+                    className="w-full px-4 py-2.5 max-md:min-h-11 max-md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                     required
                 />
-            </div>
-      
-            <div className="relative">
-                <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Пароль"
-                    autoComplete="current-password"
-                    className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
-                    required
-                />
-                <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                    aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
-                >
-                    {showPassword ? (
-                        <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                    ) : (
-                        <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                    )}
-                </button>
-            </div>
+            </MobileFormField>
+
+            <MobileFormField label="Пароль" htmlFor="auth-password" required>
+                <div className="relative">
+                    <input
+                        id="auth-password"
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Пароль"
+                        autoComplete="current-password"
+                        className="w-full px-4 py-2.5 pr-12 max-md:min-h-11 max-md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
+                        required
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 flex min-h-11 min-w-11 items-center justify-center pr-1 text-gray-500 hover:text-gray-700"
+                        aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                    >
+                        {showPassword ? (
+                            <img src="/img/hide.svg" alt="" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" aria-hidden="true" />
+                        ) : (
+                            <img src="/img/show.svg" alt="" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" aria-hidden="true" />
+                        )}
+                    </button>
+                </div>
+            </MobileFormField>
+
             <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-60"
+                className="w-full min-h-11 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-60"
             >
                 {loading ? 'Вход...' : 'Войти'}
             </button>
 
-            {/* Ссылка на восстановление пароля */}
             <div className="text-center">
                 <RouterLink
                     to="/auth/password-reset"

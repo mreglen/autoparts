@@ -19,6 +19,7 @@ import {
   updateCartItemQuantity,
 } from '../../../redux/slices/CartSlice';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
+import VinCatalogOfferMobileCard from './VinCatalogOfferMobileCard';
 
 function toSafeInt(value, fallback = 1) {
   const n = Number(value);
@@ -425,7 +426,22 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
   }
 
   return (
-    <div className="-mx-1 overflow-x-auto">
+    <>
+      <div className="md:hidden space-y-3">
+        {groups.map((group) => (
+          <VinCatalogOfferMobileCard
+            key={group.key}
+            group={group}
+            siteMarkupPercent={siteMarkupPercent}
+            clientMarkupPercent={clientMarkupPercent}
+            showBothPrices={showBothPrices}
+            onOpenPart={onOpenPart}
+            vinBasketId={vinBasketId}
+            ensureVinBasket={ensureVinBasket}
+          />
+        ))}
+      </div>
+      <div className="hidden md:block -mx-1 overflow-x-auto">
       <table className="min-w-[840px] w-full table-fixed border-collapse text-left">
         <colgroup>
           <col style={{ width: '108px' }} />
@@ -467,7 +483,8 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }
 

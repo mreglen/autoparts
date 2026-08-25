@@ -24,6 +24,7 @@ import {
 } from './dashboardUtils';
 import SellerOnboardingPanel from './SellerOnboardingPanel';
 import { warehousePageClass } from '../../utils/warehouseListUi';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -268,6 +269,16 @@ export default function DashboardPage() {
     if (isReady && canAccess) loadDashboard();
   }, [isReady, canAccess, loadDashboard]);
 
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/dashboard') {
+        loadDashboard();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [loadDashboard]);
+
   const quickActions = useMemo(() => {
     const actions = [];
     if (canViewSales) {
@@ -296,6 +307,13 @@ export default function DashboardPage() {
       });
     }
     if (canViewFinance) {
+      actions.push({
+        label: 'Финансы',
+        description: 'Отчёты за период',
+        href: '/finance',
+        icon: ICONS.sales,
+        tone: 'brand',
+      });
       actions.push({
         label: 'Продажи',
         description: 'История продаж',

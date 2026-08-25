@@ -5,6 +5,7 @@ import { logout } from '../../redux/slices/AuthSlice';
 import { selectCartSummary } from '../../redux/slices/CartSlice';
 import { fetchAdminOrganizationPhone } from '../../redux/slices/PublicInfoSlice';
 import { fetchUnreadCount } from '../../redux/slices/ChatSlice';
+import { selectTotalUnreadCount } from '../../utils/chatUnread';
 import Search from './Search/Search';
 import { useShowSiteReviews, useShowYandexBadge } from '../../utils/siteReviewsPublic';
 import HeaderYandexBadge from '../../components/Seo/HeaderYandexBadge';
@@ -57,8 +58,7 @@ export default function Navigation() {
   const { user, token } = useSelector((state) => state.auth);
   const cartData = useSelector(selectCartSummary);
   const { adminOrganizationPhone } = useSelector((state) => state.publicInfo);
-  const { chats } = useSelector((state) => state.chats);
-  const { chats: avitoChats } = useSelector((state) => state.avitoChats);
+  const totalUnreadCount = useSelector(selectTotalUnreadCount);
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const showSiteReviews = useShowSiteReviews();
   const showYandexBadge = useShowYandexBadge();
@@ -111,28 +111,6 @@ export default function Navigation() {
   const firstName = user?.first_name || 'Пользователь';
   const fullName = `${user?.last_name || ''} ${user?.first_name || ''} ${user?.patronymic || ''}`.trim();
   const profilePath = '/profile';
-
-  const garageUnreadCount = useMemo(() => {
-    if (!chats?.length) return 0;
-    return chats.reduce((total, chat) => {
-      if (chat.unread_count) return total + chat.unread_count;
-      if (chat.last_message && !chat.last_message.is_read && chat.last_message.sender_id !== user?.id) {
-        return total + 1;
-      }
-      return total;
-    }, 0);
-  }, [chats, user?.id]);
-
-  const avitoUnreadCount = useMemo(() => {
-    if (!avitoChats?.length) return 0;
-    return avitoChats.reduce((total, chat) => {
-      if (chat.unread_count) return total + chat.unread_count;
-      if (chat.has_unread_messages) return total + 1;
-      return total;
-    }, 0);
-  }, [avitoChats]);
-
-  const totalUnreadCount = garageUnreadCount + avitoUnreadCount;
 
   const formatCartLine = (count, price) => {
     const amount = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(price);

@@ -57,8 +57,8 @@ export default function ShareButton({
 
   const sizeClasses =
     size === 'sm'
-      ? 'min-h-9 gap-1.5 px-2.5 py-1.5 text-xs'
-      : 'min-h-10 gap-2 px-3 py-2 text-sm';
+      ? (showLabel ? 'min-h-9 gap-1.5 px-2.5 py-1.5 text-xs' : 'min-h-11 min-w-11 gap-0 p-0')
+      : (showLabel ? 'min-h-10 gap-2 px-3 py-2 text-sm' : 'min-h-11 min-w-11 gap-0 p-0');
 
   return (
     <div className="relative inline-flex flex-col items-end">

@@ -1,4 +1,6 @@
 {
+  "id": "/",
+  "lang": "ru",
   "short_name": "Свой Гараж",
   "name": "Свой Гараж",
   "description": "Платформа автозапчастей",
@@ -39,6 +41,32 @@
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any"
+    },
+    {
+      "src": "favicons/android-chrome-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "favicons/android-chrome-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Каталог",
+      "short_name": "Каталог",
+      "url": "/autoparts/new",
+      "icons": [{ "src": "favicons/android-chrome-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Корзина",
+      "short_name": "Корзина",
+      "url": "/cart",
+      "icons": [{ "src": "favicons/android-chrome-192x192.png", "sizes": "192x192" }]
     }
   ]
 }

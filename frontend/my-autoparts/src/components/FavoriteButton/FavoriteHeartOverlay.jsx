@@ -35,6 +35,7 @@ export default function FavoriteHeartOverlay({
   productId,
   rossko,
   className = '',
+  variant = 'overlay',
 }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -135,6 +136,10 @@ export default function FavoriteHeartOverlay({
 
   if (!favoriteKey) return null;
 
+  const positionClasses = variant === 'inline'
+    ? 'relative inline-flex'
+    : 'absolute right-2 top-2';
+
   return (
     <button
       type="button"
@@ -149,7 +154,7 @@ export default function FavoriteHeartOverlay({
       disabled={loading || isLoading}
       aria-pressed={isFavorite}
       aria-label={isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
-      className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-gray-200/80 bg-white/90 shadow-sm backdrop-blur-sm transition-colors hover:bg-white disabled:opacity-50 ${className}`}
+      className={`${positionClasses} z-10 flex h-11 w-11 items-center justify-center rounded-full border border-gray-200/80 bg-white/90 shadow-sm backdrop-blur-sm transition-colors hover:bg-white disabled:opacity-50 ${className}`}
     >
       <HeartIcon filled={isFavorite} className="h-4 w-4" />
     </button>

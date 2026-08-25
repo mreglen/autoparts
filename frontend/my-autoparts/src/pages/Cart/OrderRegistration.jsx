@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { clearCart } from '../../redux/slices/CartSlice';
@@ -21,6 +21,13 @@ import { trackFormField, trackFormSubmit, trackConversion, CONVERSION_EVENTS } f
 import CheckoutPaymentAndOffer from '../../components/Legal/CheckoutPaymentAndOffer';
 import { PageHeader } from '../../components/UI/SectionHeader';
 import Button from '../../components/UI/Button';
+import ProductDetailStickyBar from '../../components/ProductDetail/ProductDetailStickyBar';
+import { MOBILE_PRODUCT_STICKY_SCROLL_PAD } from '../../constants/mobileTokens';
+import {
+  clearUsedCheckoutDraft,
+  readUsedCheckoutDraft,
+  saveUsedCheckoutDraft,
+} from '../../utils/checkoutDraft';
 
 function formatApiErrorDetail(detail) {
   if (!detail) return 'Ошибка при оформлении заказа. Попробуйте еще раз.';
@@ -47,7 +54,7 @@ function buildSuccessMessage(data) {
 }
 
 const inputClass = (hasError) =>
-  `block w-full rounded-sg border px-3 py-2.5 text-sm shadow-sg-sm outline-none transition focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 ${
+  `block w-full rounded-sg border px-3 py-2.5 text-sm max-md:text-base shadow-sg-sm outline-none transition focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 ${
     hasError ? 'border-danger-400 bg-danger-50/40' : 'border-line bg-surface'
   }`;
 
@@ -159,6 +166,7 @@ export default function OrderRegistration() {
   const [acceptedOffer, setAcceptedOffer] = useState(false);
   const [showOfferError, setShowOfferError] = useState(false);
   const [buyerComment, setBuyerComment] = useState('');
+  const draftHydratedRef = useRef(false);
 
   const hasUsedItems = selectedItems.length > 0;
 
@@ -309,7 +317,40 @@ export default function OrderRegistration() {
   }, [selectedDeliveryOption]);
 
   useEffect(() => {
-    if (!isReady || !user) return;
+    if (deliveryOptionsLoading || draftHydratedRef.current) return;
+    const draft = readUsedCheckoutDraft();
+    if (!draft) return;
+    draftHydratedRef.current = true;
+    if (draft.recipient) setRecipient((prev) => ({ ...prev, ...draft.recipient }));
+    if (draft.selectedRegionId) setSelectedRegionId(String(draft.selectedRegionId));
+    if (draft.selectedDeliveryOptionId) {
+      setSelectedDeliveryOptionId(String(draft.selectedDeliveryOptionId));
+    }
+    if (draft.deliveryAddress) setDeliveryAddress(draft.deliveryAddress);
+    if (draft.buyerComment) setBuyerComment(draft.buyerComment);
+    if (typeof draft.acceptedOffer === 'boolean') setAcceptedOffer(draft.acceptedOffer);
+  }, [deliveryOptionsLoading]);
+
+  useEffect(() => {
+    saveUsedCheckoutDraft({
+      recipient,
+      selectedRegionId,
+      selectedDeliveryOptionId,
+      deliveryAddress,
+      buyerComment,
+      acceptedOffer,
+    });
+  }, [
+    recipient,
+    selectedRegionId,
+    selectedDeliveryOptionId,
+    deliveryAddress,
+    buyerComment,
+    acceptedOffer,
+  ]);
+
+  useEffect(() => {
+    if (!isReady || !user || draftHydratedRef.current) return;
     setRecipient((prev) => {
       const fullName = [user.last_name, user.first_name, user.patronymic]
         .filter(Boolean)
@@ -444,6 +485,7 @@ export default function OrderRegistration() {
 
       dispatch(clearCart());
       localStorage.removeItem('orderData');
+      clearUsedCheckoutDraft();
 
       setOrderSuccess({
         message: buildSuccessMessage(response.data),
@@ -605,7 +647,7 @@ export default function OrderRegistration() {
   );
 
   return (
-    <div className="max-md:mt-0 mt-5 pb-28 md:pb-8">
+    <div className={`max-md:mt-0 mt-5 md:pb-8 ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
       {!orderSuccess && (
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -915,22 +957,22 @@ export default function OrderRegistration() {
       )}
 
       {!orderSuccess && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur md:hidden pb-safe-bottom">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs text-gray-500">К оплате</p>
-              <p className="text-lg font-bold text-gray-900">{formatPrice(calculateTotal())}</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleSubmitOrder}
-              disabled={submitting || !isFormValid}
-              className="shrink-0 rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {submitting ? '...' : 'Оформить'}
-            </button>
-          </div>
-        </div>
+        <ProductDetailStickyBar
+          ariaLabel="Действия с заказом"
+          priceLabel="К оплате"
+          priceValue={formatPrice(calculateTotal())}
+          className="md:hidden"
+        >
+          <Button
+            type="button"
+            onClick={handleSubmitOrder}
+            disabled={submitting || !isFormValid}
+            loading={submitting}
+            className="min-h-11 w-full flex-1"
+          >
+            Оформить
+          </Button>
+        </ProductDetailStickyBar>
       )}
     </div>
   );

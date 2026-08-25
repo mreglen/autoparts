@@ -8,6 +8,7 @@ import {
 } from '../../../redux/slices/RosskoSlice';
 import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
 import { queryLooksLikeVin, normalizeVinForSearchOrNull } from '../../../utils/laximoVin';
+import { navigateToVinCatalog } from '../../../utils/vinCatalogNavigation';
 import VinScanModal from '../../../components/VinScanner/VinScanModal';
 import VinScanTriggerButton from '../../../components/VinScanner/VinScanTriggerButton';
 
@@ -56,7 +57,7 @@ function Search() {
     const vin = normalizeVinForSearchOrNull(trimmedTerm);
     if (vin) {
       setIsSearching(false);
-      navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+      navigateToVinCatalog(navigate, vin);
       return;
     }
 
@@ -96,7 +97,7 @@ function Search() {
   const handleVinScanConfirm = useCallback((vin) => {
     setVinScanOpen(false);
     setSearchTerm(vin);
-    navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+    navigateToVinCatalog(navigate, vin);
   }, [navigate]);
 
   const handleClear = useCallback(() => {

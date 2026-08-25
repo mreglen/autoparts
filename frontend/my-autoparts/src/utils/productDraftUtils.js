@@ -162,3 +162,60 @@ export function clearDraftSessionCache(draftId) {
     // ignore
   }
 }
+
+const PART_FORM_PREFIX = 'sg:part-form:';
+
+export function partFormCacheKey(mode, id) {
+  const safeMode = String(mode || 'edit');
+  const safeId = id != null ? String(id) : 'new';
+  return `${PART_FORM_PREFIX}${safeMode}:${safeId}`;
+}
+
+export function buildPartFormSnapshot(snapshot) {
+  if (!snapshot) return null;
+  return {
+    ...snapshot,
+    savedAt: snapshot.savedAt || Date.now(),
+  };
+}
+
+export function readPartFormSessionCache(mode, id) {
+  try {
+    const raw = sessionStorage.getItem(partFormCacheKey(mode, id));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writePartFormSessionCache(mode, id, snapshot) {
+  if (!snapshot) return;
+  try {
+    sessionStorage.setItem(
+      partFormCacheKey(mode, id),
+      JSON.stringify(buildPartFormSnapshot(snapshot)),
+    );
+  } catch {
+    // sessionStorage may be unavailable
+  }
+}
+
+export function clearPartFormSessionCache(mode, id) {
+  try {
+    sessionStorage.removeItem(partFormCacheKey(mode, id));
+  } catch {
+    // ignore
+  }
+}
+
+export function partFormSnapshotHasContent(snapshot) {
+  if (!snapshot) return false;
+  const payload = buildProductDraftPayload({
+    formData: snapshot.formData,
+    photos: snapshot.photos,
+    videos: snapshot.videos,
+    selectedVehicle: snapshot.vehicle,
+    cellQuantities: snapshot.cellQuantities || snapshot.cellValues,
+  });
+  return draftPayloadHasContent(payload);
+}

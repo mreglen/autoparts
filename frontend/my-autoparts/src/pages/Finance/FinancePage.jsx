@@ -20,6 +20,7 @@ import {
   warehousePrimaryButtonClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 const TABS = [
   { id: 'summary', label: 'Сводка' },
@@ -30,7 +31,7 @@ const TABS = [
 ];
 
 const tabFilterButtonClass = (active) =>
-  `inline-flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
+  `inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
     active
       ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200'
       : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
@@ -205,6 +206,16 @@ export default function FinancePage() {
     }
   }, [hasPermission, user?.organization_id, loadData, navigate]);
 
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/finance' && user?.organization_id) {
+        loadData();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [loadData, user?.organization_id]);
+
   const handleExport = async () => {
     if (!user?.organization_id) return;
     setExporting(true);
@@ -335,18 +346,32 @@ export default function FinancePage() {
       </div>
 
       {activeTab === 'sales' ? (
-        <div className={warehouseToolbarClass}>
-          {CHANNEL_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setChannel(opt.value)}
-              className={channelFilterButtonClass(channel === opt.value)}
+        <>
+          <div className={`${warehouseToolbarClass} hidden sm:flex`}>
+            {CHANNEL_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setChannel(opt.value)}
+                className={channelFilterButtonClass(channel === opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <label className="block sm:hidden">
+            <span className="mb-1.5 block text-xs font-medium text-gray-500">Канал продаж</span>
+            <select
+              value={channel}
+              onChange={(e) => setChannel(e.target.value)}
+              className={warehousePillControlClass}
             >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+              {CHANNEL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
+        </>
       ) : null}
 
       {loading && !summary ? (

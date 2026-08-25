@@ -1,7 +1,7 @@
 // src/layouts/ProfileWithMenuLayout.jsx
 import { useEffect, useMemo, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { fetchPendingProducts } from '../redux/slices/ModerationProductsSlice';
 import { fetchPendingSellers } from '../redux/slices/ModerationSlice';
 import { fetchSalesMenuCounts } from '../redux/slices/SalesMenuCountsSlice';
@@ -11,18 +11,16 @@ import {
 } from '../redux/slices/AutoserviceClientSlice';
 import { selectShowAutoservice } from '../utils/autoservicePublic';
 import { apiAxios } from '../utils/apiClient';
-import Navigation from '../pages/Navigation/Navigation';
-import MobileHeader from '../components/MobileHeader/MobileHeader';
-import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
-import MobileSideMenu from '../components/MobileSideMenu/MobileSideMenu';
 import ProfileMenuTabs from '../pages/Profile/menu/ProfileMenuTabs';
 import { useAuthReady } from '../hooks/useAuthReady';
 import { useMobileMenuShell } from '../hooks/useMobileMenuShell';
+import useScrollResetOnNavigate from '../hooks/useScrollResetOnNavigate';
 import AuthLoadingScreen from '../components/AuthLoadingScreen/AuthLoadingScreen';
 import useCartSync from '../hooks/useCartSync';
-import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
-import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
 import NotificationsBanner from '../components/NotificationsBanner/NotificationsBanner';
+import MobileShellFrame from './MobileShellFrame';
+import { getCabinetLayoutProfile, getCabinetMainClasses } from '../utils/layoutProfiles';
+import { resolveActiveChatParams } from '../utils/resolveActiveChatParams';
 import { normalizeNewPartsCustomerStatus } from '../utils/garageOrderUi';
 import { TERMINAL_RETURN_STATUSES } from '../utils/returnStatusUi';
 
@@ -43,15 +41,21 @@ export default function ProfileWithMenuLayout() {
     const dispatch = useDispatch();
     const { isReady, user } = useAuthReady();
     useCartSync();
+    useScrollResetOnNavigate();
     const permissionCodes = useSelector((state) => state.auth.permissionCodes);
     const moderationProducts = useSelector((state) => state.moderationProducts);
     const moderation = useSelector((state) => state.moderation);
     const salesMenuCounts = useSelector((state) => state.salesMenuCounts);
     const showAutoservice = useSelector(selectShowAutoservice);
     const location = useLocation();
-  const [purchasesMenuCounts, setPurchasesMenuCounts] = useState({ orders: 0, returns: 0 });
+    const routeParams = useParams();
+    const [searchParams] = useSearchParams();
+    const [purchasesMenuCounts, setPurchasesMenuCounts] = useState({ orders: 0, returns: 0 });
 
-    const isChatsPage = location.pathname.startsWith('/chats');
+    const chatParams = resolveActiveChatParams(location.pathname, searchParams, routeParams);
+    const cabinetProfile = getCabinetLayoutProfile(location.pathname, chatParams.chatId);
+    const isChatsPage = cabinetProfile.isChatsPage;
+    const isMobileActiveChat = cabinetProfile.isActiveChat;
     const isPrintPage = /\/print(\/|$)/.test(location.pathname);
 
     const canFetchSalesCounts = useMemo(() => {
@@ -166,17 +170,11 @@ export default function ProfileWithMenuLayout() {
 
     if (!isReady) {
         return (
-            <div className="min-h-screen max-w-full overflow-x-hidden bg-surface">
-                <div className="hidden lg:block">
-                    <Navigation />
-                </div>
-                <MobileHeader onMenuClick={() => {}} />
-                <div className="hidden lg:block h-[var(--sg-desktop-header-h)] shrink-0" aria-hidden="true" />
-                <div className="lg:hidden h-[var(--sg-mobile-header-h)] shrink-0" aria-hidden="true" />
+            <MobileShellFrame onMenuClick={() => {}} showBottomChrome={false}>
                 <main className="mx-auto w-full max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 py-12 sm:px-6 lg:px-8">
                     <AuthLoadingScreen className="h-48" />
                 </main>
-            </div>
+            </MobileShellFrame>
         );
     }
 
@@ -188,40 +186,27 @@ export default function ProfileWithMenuLayout() {
         );
     }
 
+    const mainClassName = getCabinetMainClasses({ isChatsPage, isMobileActiveChat });
+
     return (
-        <div className="min-h-screen max-w-full overflow-x-hidden bg-surface pb-[4.5rem] lg:pb-0">
-            <HeaderBadgeHeightSync />
-            <div className="hidden lg:block">
-                <Navigation />
-            </div>
-
-            <MobileHeader onMenuClick={openMenu} />
-
-            <div className="hidden lg:block h-[var(--sg-desktop-header-h)] shrink-0" aria-hidden="true" />
-            <div className="lg:hidden h-[var(--sg-mobile-header-h)] shrink-0" aria-hidden="true" />
-
-            {location.pathname === '/profile' ? <NotificationsBanner /> : null}
-
-            <MobileSideMenu
-                isOpen={isMobileMenuOpen}
-                onClose={closeMenu}
-                tabs={tabs}
-                activeTab={activeTab}
-                onTabChange={handleTabChange}
-                badgeCounts={badgeCounts}
-                showCabinetModeSwitch={showCabinetModeSwitch}
-                cabinetMode={cabinetMode}
-                availableCabinetModes={availableCabinetModes}
-                onCabinetModeChange={setCabinetMode}
-            />
-
-            <main
-                className={`mx-auto ${
-                    isChatsPage
-                        ? 'max-w-full max-lg:px-0 max-lg:py-0 px-4 py-6 sm:px-6 sm:py-8 lg:flex lg:max-h-[calc(100dvh-var(--sg-desktop-header-h))] lg:min-h-0 lg:flex-col lg:overflow-hidden lg:px-8 lg:py-4 lg:max-w-sg-content'
-                        : 'max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8'
-                }`}
-            >
+        <MobileShellFrame
+            mobileHeaderHidden={cabinetProfile.hideMobileHeader}
+            onMenuClick={openMenu}
+            beforeMain={location.pathname === '/profile' ? <NotificationsBanner /> : null}
+            sideMenuProps={{
+                isOpen: isMobileMenuOpen,
+                onClose: closeMenu,
+                tabs,
+                activeTab,
+                onTabChange: handleTabChange,
+                badgeCounts,
+                showCabinetModeSwitch,
+                cabinetMode,
+                availableCabinetModes,
+                onCabinetModeChange: setCabinetMode,
+            }}
+        >
+            <main className={mainClassName}>
                 <div
                     className={`grid min-h-0 grid-cols-1 lg:grid-cols-[minmax(15.5rem,17.5rem)_1fr] lg:items-start ${
                         isChatsPage
@@ -251,9 +236,6 @@ export default function ProfileWithMenuLayout() {
                     </div>
                 </div>
             </main>
-
-            <InstallPwaPrompt />
-            <MobileBottomNav />
-        </div>
+        </MobileShellFrame>
     );
 }

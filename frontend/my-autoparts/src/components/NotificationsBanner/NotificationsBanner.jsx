@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
+import { isPwaStandalone } from '../../utils/pwaStandalone';
+
+function isIosSafari() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return iOS && !/CriOS|FxiOS|EdgiOS/.test(ua);
+}
 
 /**
  * Soft prompt to enable browser push notifications.
@@ -28,6 +36,8 @@ export default function NotificationsBanner({ className = '' }) {
 
   if (!visible) return null;
 
+  const iosHint = isIosSafari() && !isPwaStandalone();
+
   return (
     <div className={`px-3 pt-3 sm:px-1 lg:px-2 ${className}`.trim()}>
       <div className="mx-auto max-w-7xl rounded-xl border border-gray-200 bg-white px-3.5 py-3 shadow-sm sm:px-4">
@@ -52,7 +62,9 @@ export default function NotificationsBanner({ className = '' }) {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-gray-900">Включите уведомления</p>
             <p className="mt-0.5 text-sm leading-snug text-gray-600">
-              Чтобы не пропустить заказы и сообщения в чате.
+              {iosHint
+                ? 'На iPhone добавьте сайт на экран «Домой», затем включите push в настройках профиля.'
+                : 'Чтобы не пропустить заказы и сообщения в чате.'}
             </p>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <Link

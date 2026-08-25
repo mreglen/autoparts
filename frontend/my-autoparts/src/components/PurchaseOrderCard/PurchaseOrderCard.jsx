@@ -166,7 +166,7 @@ export default function PurchaseOrderCard({
                   <button
                     type="button"
                     onClick={() => onReturnRequest(order)}
-                    className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                    className="inline-flex min-h-11 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-900 hover:bg-amber-100"
                   >
                     Запросить возврат
                   </button>
@@ -258,7 +258,7 @@ export default function PurchaseOrderCard({
           ) : null}
           {selectable && items.length > 0 ? (
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+              <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-gray-600">
                 <input
                   type="checkbox"
                   checked={items.every((item) => selectedItemKeys.has(`${orderType}:${order.id}:${item.id}`))}
@@ -270,7 +270,7 @@ export default function PurchaseOrderCard({
                     el.indeterminate = some && !all;
                   }}
                   onChange={() => onToggleAllItems?.(orderType, order.id, items)}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-5 w-5 shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 Выбрать всё
               </label>
@@ -282,7 +282,7 @@ export default function PurchaseOrderCard({
                       type="button"
                       onClick={() => onAddToAutoserviceWarehouse(orderType, order.id, items)}
                       disabled={warehouseActionLoading}
-                      className="inline-flex items-center rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-700 shadow-sm transition hover:bg-indigo-50 disabled:opacity-60"
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-indigo-200 bg-white px-3 text-sm font-medium text-indigo-700 shadow-sm transition hover:bg-indigo-50 disabled:opacity-60"
                     >
                       {warehouseActionLabel}
                     </button>
@@ -291,7 +291,7 @@ export default function PurchaseOrderCard({
                     <button
                       type="button"
                       onClick={() => onAddToRepairOrder(orderType, order.id, items)}
-                      className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-700"
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700"
                     >
                       {repairOrderActionLabel}
                     </button>
@@ -315,14 +315,14 @@ export default function PurchaseOrderCard({
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
                       {selectable ? (
-                        <label className="mb-2 flex items-start gap-2">
+                        <label className="mb-2 flex min-h-11 items-start gap-3">
                           <input
                             type="checkbox"
                             checked={selectedItemKeys.has(selectionKey)}
                             onChange={() => onToggleItem?.(orderType, order.id, item)}
-                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            className="mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           />
-                          <span className="text-xs text-gray-500">Выбрать позицию</span>
+                          <span className="text-sm text-gray-500">Выбрать позицию</span>
                         </label>
                       ) : null}
                       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">

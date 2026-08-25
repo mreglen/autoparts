@@ -3,7 +3,9 @@ import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectCartSummary } from '../../redux/slices/CartSlice';
+import { selectTotalUnreadCount } from '../../utils/chatUnread';
 import { usePwaStandalone } from '../../utils/pwaStandalone';
+import { Z_MOBILE_BOTTOM_NAV } from '../../constants/mobileTokens';
 
 const EMPTY_CART_SUMMARY = { itemCount: 0, totalPrice: 0 };
 
@@ -78,6 +80,33 @@ const navItems = [
     },
 ];
 
+function NavIcon({ item, active, badge }) {
+    return (
+        <span
+            className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
+                active ? 'bg-brand-50' : ''
+            }`}
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={active ? 2.25 : 2}
+                aria-hidden="true"
+            >
+                {item.icon}
+            </svg>
+            {badge > 0 && (
+                <span className="absolute -right-1 -top-1 flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {badge > 99 ? '99+' : badge}
+                </span>
+            )}
+        </span>
+    );
+}
+
 function NavItemButton({ item, isActive, onClick, badge }) {
     return (
         <button
@@ -85,30 +114,13 @@ function NavItemButton({ item, isActive, onClick, badge }) {
             onClick={onClick}
             aria-label={item.label}
             aria-current={isActive ? 'page' : undefined}
-            className={`flex min-h-[48px] flex-1 items-center justify-center rounded-lg px-1 transition-colors ${
+            className={`flex min-h-[48px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 transition-colors ${
                 isActive ? 'text-brand-600' : 'text-ink-faint active:text-brand-600'
             }`}
         >
-            <span
-                className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
-                    isActive ? 'bg-brand-50' : ''
-                }`}
-            >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-7 w-7"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={isActive ? 2.25 : 2}
-                >
-                    {item.icon}
-                </svg>
-                {badge > 0 && (
-                    <span className="absolute -right-1 -top-1 flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                        {badge > 99 ? '99+' : badge}
-                    </span>
-                )}
+            <NavIcon item={item} active={isActive} badge={badge} />
+            <span className={`max-w-[4.5rem] truncate text-[10px] font-medium leading-tight ${isActive ? 'text-brand-600' : 'text-ink-faint'}`}>
+                {item.label}
             </span>
         </button>
     );
@@ -119,34 +131,23 @@ function NavItemLink({ item, isActive, badge }) {
         <NavLink
             to={item.to}
             aria-label={item.label}
-            className={`flex min-h-[48px] flex-1 items-center justify-center rounded-lg px-1 transition-colors ${
-                isActive ? 'text-brand-600' : 'text-ink-faint active:text-brand-600'
-            }`}
+            aria-current={isActive ? 'page' : undefined}
+            className={({ isActive: linkActive }) => {
+                const active = isActive || linkActive;
+                return `flex min-h-[48px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 transition-colors ${
+                    active ? 'text-brand-600' : 'text-ink-faint active:text-brand-600'
+                }`;
+            }}
         >
             {({ isActive: linkActive }) => {
                 const active = isActive || linkActive;
                 return (
-                    <span
-                        className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
-                            active ? 'bg-brand-50' : ''
-                        }`}
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-7 w-7"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={active ? 2.25 : 2}
-                        >
-                            {item.icon}
-                        </svg>
-                        {badge > 0 && (
-                            <span className="absolute -right-1 -top-1 flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                                {badge > 99 ? '99+' : badge}
-                            </span>
-                        )}
-                    </span>
+                    <>
+                        <NavIcon item={item} active={active} badge={badge} />
+                        <span className={`max-w-[4.5rem] truncate text-[10px] font-medium leading-tight ${active ? 'text-brand-600' : 'text-ink-faint'}`}>
+                            {item.label}
+                        </span>
+                    </>
                 );
             }}
         </NavLink>
@@ -157,8 +158,7 @@ export default function MobileBottomNav() {
     const { user, token } = useSelector((state) => state.auth);
     const isAuthenticated = Boolean(token && user);
     const cartData = useSelector(selectCartSummary) || EMPTY_CART_SUMMARY;
-    const { chats } = useSelector((state) => state.chats);
-    const { chats: avitoChats } = useSelector((state) => state.avitoChats);
+    const totalUnreadCount = useSelector(selectTotalUnreadCount);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -168,28 +168,6 @@ export default function MobileBottomNav() {
         if (isPwa) items = items.filter((item) => item.id !== 'home');
         return items;
     }, [isAuthenticated, isPwa]);
-
-    const garageUnreadCount = React.useMemo(() => {
-        if (!chats || chats.length === 0) return 0;
-        return chats.reduce((total, chat) => {
-            if (chat.unread_count) return total + chat.unread_count;
-            if (chat.last_message && !chat.last_message.is_read && chat.last_message.sender_id !== user?.id) {
-                return total + 1;
-            }
-            return total;
-        }, 0);
-    }, [chats, user?.id]);
-
-    const avitoUnreadCount = React.useMemo(() => {
-        if (!avitoChats || avitoChats.length === 0) return 0;
-        return avitoChats.reduce((total, chat) => {
-            if (chat.unread_count) return total + chat.unread_count;
-            if (chat.has_unread_messages) return total + 1;
-            return total;
-        }, 0);
-    }, [avitoChats]);
-
-    const totalUnreadCount = garageUnreadCount + avitoUnreadCount;
 
     const getBadge = (id) => {
         if (id === 'cart') return cartData.itemCount;
@@ -208,7 +186,8 @@ export default function MobileBottomNav() {
 
     return (
         <nav
-            className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 pb-safe"
+            className="lg:hidden fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 pb-safe"
+            style={{ zIndex: Z_MOBILE_BOTTOM_NAV }}
             aria-label="Основная навигация"
         >
             <div className={`grid gap-0 px-1 pt-1 ${gridColsClass}`}>

@@ -11,6 +11,7 @@ import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import { Skeleton } from '../../components/UI';
 import { ConfirmDialog } from '../../components/UI/Modal';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import PaymentPayerSelect from '../../components/Autoservice/PaymentPayerSelect';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import {
@@ -278,6 +279,16 @@ export default function AutoserviceFinancePage() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/autoservice/finance') {
+        load();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
   }, [load]);
 
   const handlePaymentDateSave = async (paymentId, paidAt) => {

@@ -1,34 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
 import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
 import { normalizeInternalCodeForCompare } from '../../utils/internalCode';
 import { apiAxios } from '../../utils/apiClient';
 import { formatProductStorageInline } from '../../utils/labelPrintDisplay';
+import Modal from '../UI/Modal';
 import QrScanFrameOverlay from '../QrScanner/QrScanFrameOverlay';
+import { useQrFrameTracker, QR_SCAN_HOST_CLASS } from '../QrScanner/useQrFrameTracker';
 import {
-  QR_SCAN_CAMERA_CONFIG,
-  QR_SCAN_HOST_CLASS,
-  useQrFrameTracker,
-} from '../QrScanner/useQrFrameTracker';
+  QrTorchButton,
+  triggerScanErrorHaptic,
+  triggerScanSuccessHaptic,
+  useQrScannerCamera,
+} from '../QrScanner/useQrScannerCamera';
 
 const SCANNER_ID = 'garage-item-confirm-qr-scanner';
-
-async function stopScannerSafe(scanner) {
-  if (!scanner) return;
-  try {
-    const state = typeof scanner.getState === 'function' ? scanner.getState() : null;
-    if (state == null || state === 2 || state === 3) {
-      await scanner.stop();
-    }
-  } catch (_) {
-    /* already stopped */
-  }
-  try {
-    scanner.clear();
-  } catch (_) {
-    /* DOM already gone */
-  }
-}
 
 function looksLikeInternalCode(value) {
   const trimmed = String(value || '').trim();
@@ -37,11 +22,6 @@ function looksLikeInternalCode(value) {
   return compact.length >= 6;
 }
 
-/**
- * Real bug: warehouse labels often encode /my-parts/edit-pending/{pendingId}.
- * pendingId ≠ product.id, so comparing only product_id always fails.
- * Also full URL must not be treated as an internal code.
- */
 async function verifyScanInput(
   raw,
   expectedProductId,
@@ -59,7 +39,6 @@ async function verifyScanInput(
   const expectedPendingId = sourcePendingId != null ? Number(sourcePendingId) : null;
   const parsed = parseSellerPartCardQr(trimmed);
 
-  // 1) /seller/part-card/{id}, /part/{id}, numeric id — works without productCard
   const scannedProductId = parsed?.productId
     ?? (/^\d+$/.test(trimmed) ? parseInt(trimmed, 10) : null);
   if (
@@ -80,7 +59,6 @@ async function verifyScanInput(
     return { ok: false, message: 'Подождите, загружаются данные товара…' };
   }
 
-  // 2) /qr/label/{internal_code} or typed internal code
   const scannedCode = normalizeInternalCodeForCompare(
     parsed?.internalCode || (looksLikeInternalCode(trimmed) ? trimmed : ''),
   );
@@ -88,7 +66,6 @@ async function verifyScanInput(
     return { ok: true };
   }
 
-  // 2b) Resolve /qr/label/CODE via API if local compare failed (e.g. formatting)
   if (parsed?.type === 'label-code' && parsed.internalCode) {
     try {
       const response = await apiAxios.get(
@@ -111,7 +88,6 @@ async function verifyScanInput(
     }
   }
 
-  // 3) Legacy label: /my-parts/edit-pending/{pendingId}
   if (parsed?.type === 'edit-pending' && parsed.id) {
     if (
       Number.isFinite(expectedPendingId)
@@ -201,12 +177,11 @@ export default function ItemConfirmScanModal({
   onConfirm,
 }) {
   const [shellOpen, setShellOpen] = useState(false);
-  const [mode, setMode] = useState('entry'); // entry | confirm
+  const [mode, setMode] = useState('entry');
   const [entryError, setEntryError] = useState('');
   const [cameraError, setCameraError] = useState('');
   const [cameraActive, setCameraActive] = useState(true);
   const [manualId, setManualId] = useState('');
-  const html5QrCodeRef = useRef(null);
   const scanLockRef = useRef(false);
   const scanViewportRef = useRef(null);
   const expectedProductIdRef = useRef(null);
@@ -214,11 +189,26 @@ export default function ItemConfirmScanModal({
   const expectedSourcePendingIdRef = useRef(null);
   const productCardLoadingRef = useRef(productCardLoading);
   const isSubmittingRef = useRef(isSubmitting);
+  const confirmLockRef = useRef(false);
   const handleScanResultRef = useRef(null);
 
   const frameActive = Boolean(
     shellOpen && isOpen && mode === 'entry' && cameraActive && !cameraError,
   );
+
+  const { stopCamera, torchSupported, torchOn, toggleTorch } = useQrScannerCamera({
+    active: frameActive,
+    scannerElementId: SCANNER_ID,
+    scanLockRef,
+    blockedRef: isSubmittingRef,
+    onCameraError: () => {
+      setCameraError('Не удалось открыть камеру. Разрешите доступ или введите код вручную.');
+    },
+    onDecode: async (decodedText) => {
+      await handleScanResultRef.current?.(decodedText, { fromScanner: true });
+    },
+  });
+
   const scanFrame = useQrFrameTracker({
     active: frameActive,
     containerRef: scanViewportRef,
@@ -227,6 +217,9 @@ export default function ItemConfirmScanModal({
 
   useEffect(() => {
     isSubmittingRef.current = isSubmitting;
+    if (!isSubmitting) {
+      confirmLockRef.current = false;
+    }
   }, [isSubmitting]);
 
   useEffect(() => {
@@ -251,35 +244,30 @@ export default function ItemConfirmScanModal({
     if (!verification.ok) {
       setEntryError(verification.message);
       if (fromScanner) {
+        triggerScanErrorHaptic();
         scanLockRef.current = false;
+      } else {
+        triggerScanErrorHaptic();
       }
       return;
     }
 
     if (fromScanner) {
-      const active = html5QrCodeRef.current;
-      html5QrCodeRef.current = null;
-      await stopScannerSafe(active);
+      triggerScanSuccessHaptic();
+      await stopCamera();
       setCameraActive(false);
+    } else {
+      triggerScanSuccessHaptic();
     }
 
     setEntryError('');
     setMode('confirm');
     scanLockRef.current = false;
-  }, []);
+  }, [stopCamera]);
 
   useEffect(() => {
     handleScanResultRef.current = handleScanResult;
   }, [handleScanResult]);
-
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -293,9 +281,7 @@ export default function ItemConfirmScanModal({
 
     let cancelled = false;
     (async () => {
-      const active = html5QrCodeRef.current;
-      html5QrCodeRef.current = null;
-      await stopScannerSafe(active);
+      await stopCamera();
       if (cancelled) return;
       setMode('entry');
       setEntryError('');
@@ -309,68 +295,13 @@ export default function ItemConfirmScanModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
-
-  // Mirror WarehouseScanPage: start once, fixed 250×250 qrbox, no CSS video hacks.
-  useEffect(() => {
-    if (!shellOpen || !isOpen || mode !== 'entry' || !cameraActive) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    let scanner;
-
-    const start = async () => {
-      await new Promise((r) => setTimeout(r, 50));
-      if (cancelled) return;
-
-      const el = document.getElementById(SCANNER_ID);
-      if (!el) {
-        setCameraError('Не удалось открыть камеру. Разрешите доступ или введите код вручную.');
-        return;
-      }
-
-      el.innerHTML = '';
-      scanner = new Html5Qrcode(SCANNER_ID);
-      html5QrCodeRef.current = scanner;
-
-      try {
-        await scanner.start(
-          { facingMode: 'environment' },
-          QR_SCAN_CAMERA_CONFIG,
-          async (decodedText) => {
-            if (cancelled || scanLockRef.current || isSubmittingRef.current) return;
-            scanLockRef.current = true;
-            await handleScanResultRef.current?.(decodedText, { fromScanner: true });
-          },
-          () => {}
-        );
-      } catch (_) {
-        if (!cancelled) {
-          setCameraError('Не удалось открыть камеру. Разрешите доступ или введите код вручную.');
-          html5QrCodeRef.current = null;
-          await stopScannerSafe(scanner);
-        }
-      }
-    };
-
-    start();
-
-    return () => {
-      cancelled = true;
-      const active = html5QrCodeRef.current || scanner;
-      html5QrCodeRef.current = null;
-      stopScannerSafe(active);
-    };
-  }, [shellOpen, isOpen, mode, cameraActive]);
+  }, [isOpen, stopCamera]);
 
   const handleClose = useCallback(async () => {
-    const active = html5QrCodeRef.current;
-    html5QrCodeRef.current = null;
-    await stopScannerSafe(active);
+    await stopCamera();
     setCameraActive(false);
     onClose?.();
-  }, [onClose]);
+  }, [onClose, stopCamera]);
 
   const restartEntry = () => {
     setEntryError('');
@@ -402,6 +333,12 @@ export default function ItemConfirmScanModal({
     await handleScanResult(trimmed, { fromScanner: false });
   };
 
+  const handleConfirm = () => {
+    if (isSubmitting || confirmLockRef.current) return;
+    confirmLockRef.current = true;
+    onConfirm?.();
+  };
+
   const parsedManual = parseSellerPartCardQr(manualId.trim());
   const manualLooksLikeProductId = Boolean(parsedManual?.productId) || /^\d+$/.test(manualId.trim());
   const manualSubmitDisabled = isSubmitting
@@ -415,123 +352,29 @@ export default function ItemConfirmScanModal({
   const partnumber = item.partnumber || item.product?.partnumber;
   const expectedProductId = item.product_id ?? productCard?.id;
 
+  const modalTitle = (
+    <div className="min-w-0">
+      <div className="text-sm font-semibold text-gray-900 sm:text-base">Подтверждение позиции</div>
+      <p className="truncate text-xs font-medium text-gray-800 sm:text-sm">{title}</p>
+      {(brand || partnumber) && (
+        <p className="truncate text-[11px] text-gray-500">
+          {[brand, partnumber].filter(Boolean).join(' · ')}
+        </p>
+      )}
+    </div>
+  );
+
   return (
-    <div
-      className={`fixed inset-0 z-[100] flex bg-black/50 ${
-        isOpen ? '' : 'pointer-events-none opacity-0'
-      } sm:items-center sm:justify-center sm:p-4`}
-      aria-hidden={!isOpen}
-    >
-      {/* Mobile: fullscreen. Desktop: centered card. */}
-      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:h-auto sm:max-h-[min(92dvh,640px)] sm:max-w-md sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-xl">
-        <div
-          className="flex shrink-0 items-start justify-between gap-2 border-b border-gray-100 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-5 sm:pt-3"
-        >
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-gray-900 sm:text-base">Подтверждение позиции</h3>
-            <p className="truncate text-xs font-medium text-gray-800 sm:text-sm">{title}</p>
-            {(brand || partnumber) && (
-              <p className="truncate text-[11px] text-gray-500">
-                {[brand, partnumber].filter(Boolean).join(' · ')}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Закрыть"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 sm:px-5 sm:py-3">
-          {mode === 'entry' ? (
-            <>
-              <div
-                ref={scanViewportRef}
-                className="relative mx-auto w-full max-h-[36dvh] min-h-0 flex-1 overflow-hidden rounded-xl border border-gray-200 bg-black sm:max-h-[280px] sm:min-h-[240px]"
-              >
-                <div
-                  id={SCANNER_ID}
-                  className={`${QR_SCAN_HOST_CLASS} absolute inset-0 h-full w-full ${!cameraActive ? 'invisible' : ''}`}
-                />
-                {frameActive ? (
-                  <QrScanFrameOverlay frame={scanFrame} hint="Наведите на QR этикетки" />
-                ) : null}
-                {!cameraActive ? (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-gray-900 text-sm text-white">
-                    Камера остановлена
-                  </div>
-                ) : null}
-              </div>
-
-              {cameraError ? (
-                <div className="mt-1.5 shrink-0 space-y-0.5">
-                  <p className="text-[11px] text-amber-700">{cameraError}</p>
-                  <button
-                    type="button"
-                    onClick={restartCamera}
-                    className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700"
-                  >
-                    Повторить
-                  </button>
-                </div>
-              ) : null}
-
-              <form onSubmit={handleManualSubmit} className="mt-2 shrink-0">
-                <label className="mb-0.5 block text-[11px] font-medium text-gray-600" htmlFor="item-confirm-manual-id">
-                  Внутренний код
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="item-confirm-manual-id"
-                    type="text"
-                    value={manualId}
-                    onChange={(e) => {
-                      setManualId(e.target.value);
-                      if (entryError) setEntryError('');
-                    }}
-                    placeholder={productCard?.internal_code || 'XXXX-AAAAA'}
-                    className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    disabled={isSubmitting}
-                    autoComplete="off"
-                    enterKeyHint="done"
-                  />
-                  <button
-                    type="submit"
-                    disabled={manualSubmitDisabled}
-                    className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    OK
-                  </button>
-                </div>
-              </form>
-
-              {(entryError || error) ? (
-                <p className="mt-1 shrink-0 text-[11px] text-red-600">{entryError || error}</p>
-              ) : null}
-            </>
-          ) : (
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
-              <div className="w-full rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-6 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Товар совпал</p>
-                <p className="mt-2 text-base font-medium text-gray-900">
-                  {productCard?.internal_code ? (
-                    <span className="font-mono">{productCard.internal_code}</span>
-                  ) : (
-                    <>ID {expectedProductId}</>
-                  )}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="shrink-0 border-t border-gray-100 bg-white px-3 pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:pt-3 sm:pb-3">
+    <Modal
+      open={shellOpen && isOpen}
+      onClose={handleClose}
+      title={modalTitle}
+      size="md"
+      wrapperClassName="p-0 max-lg:pb-0 sm:p-4"
+      className="h-[100dvh] max-h-[100dvh] w-full max-w-none rounded-none sm:h-auto sm:max-h-[min(92dvh,640px)] sm:max-w-md sm:rounded-2xl"
+      closeOnBackdrop={false}
+      footer={(
+        <div>
           <WarehouseFooter
             productCard={productCard}
             productCardLoading={productCardLoading}
@@ -541,7 +384,7 @@ export default function ItemConfirmScanModal({
             {mode === 'entry' ? (
               <button
                 type="button"
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 onClick={handleClose}
                 disabled={isSubmitting}
               >
@@ -551,7 +394,7 @@ export default function ItemConfirmScanModal({
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
                   onClick={restartEntry}
                   disabled={isSubmitting}
                 >
@@ -559,8 +402,8 @@ export default function ItemConfirmScanModal({
                 </button>
                 <button
                   type="button"
-                  className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                  onClick={onConfirm}
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                  onClick={handleConfirm}
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? '…' : 'Подтвердить'}
@@ -569,7 +412,95 @@ export default function ItemConfirmScanModal({
             )}
           </div>
         </div>
+      )}
+    >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden -mx-1 px-1">
+        {mode === 'entry' ? (
+          <>
+            <div
+              ref={scanViewportRef}
+              className="relative mx-auto w-full max-h-[36dvh] min-h-[200px] flex-1 overflow-hidden rounded-xl border border-gray-200 bg-black sm:max-h-[280px] sm:min-h-[240px]"
+            >
+              <div
+                id={SCANNER_ID}
+                className={`${QR_SCAN_HOST_CLASS} absolute inset-0 h-full w-full ${!cameraActive ? 'invisible' : ''}`}
+              />
+              {frameActive ? (
+                <QrScanFrameOverlay frame={scanFrame} hint="Наведите на QR этикетки" />
+              ) : null}
+              {frameActive && torchSupported ? (
+                <div className="absolute right-2 top-2 z-30">
+                  <QrTorchButton supported={torchSupported} on={torchOn} onToggle={toggleTorch} />
+                </div>
+              ) : null}
+              {!cameraActive ? (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-gray-900 text-sm text-white">
+                  Камера остановлена
+                </div>
+              ) : null}
+            </div>
+
+            {cameraError ? (
+              <div className="mt-1.5 shrink-0 space-y-0.5">
+                <p className="text-[11px] text-amber-700">{cameraError}</p>
+                <button
+                  type="button"
+                  onClick={restartCamera}
+                  className="inline-flex min-h-11 items-center text-[11px] font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  Повторить
+                </button>
+              </div>
+            ) : null}
+
+            <form onSubmit={handleManualSubmit} className="mt-2 shrink-0">
+              <label className="mb-0.5 block text-[11px] font-medium text-gray-600" htmlFor="item-confirm-manual-id">
+                Внутренний код
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="item-confirm-manual-id"
+                  type="text"
+                  value={manualId}
+                  onChange={(e) => {
+                    setManualId(e.target.value);
+                    if (entryError) setEntryError('');
+                  }}
+                  placeholder={productCard?.internal_code || 'XXXX-AAAAA'}
+                  className="min-h-11 min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 max-md:text-base"
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                  enterKeyHint="done"
+                />
+                <button
+                  type="submit"
+                  disabled={manualSubmitDisabled}
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  OK
+                </button>
+              </div>
+            </form>
+
+            {(entryError || error) ? (
+              <p className="mt-1 shrink-0 text-[11px] text-red-600" role="alert">{entryError || error}</p>
+            ) : null}
+          </>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-4">
+            <div className="w-full rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-6 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Товар совпал</p>
+              <p className="mt-2 text-base font-medium text-gray-900">
+                {productCard?.internal_code ? (
+                  <span className="font-mono">{productCard.internal_code}</span>
+                ) : (
+                  <>ID {expectedProductId}</>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

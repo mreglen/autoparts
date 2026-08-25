@@ -4,21 +4,30 @@ import { useDispatch, useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import { SkeletonListCards } from '../../components/UI';
+import { ConfirmDialog, SkeletonListCards } from '../../components/UI';
 import { subscribeToPushNotifications } from '../../redux/slices/ChatSlice';
 import { fetchSalesMenuCounts } from '../../redux/slices/SalesMenuCountsSlice';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   AVITO_RETURN_STATUS_LABELS,
+  AVITO_RETURN_TRANSITION_OPTIONS,
   SELLER_NEXT_STATUSES,
   getReturnReasonLabel,
   getReturnStatusColor,
   getReturnStatusLabel,
 } from '../../utils/returnStatusUi';
 
+const fieldClass =
+  'w-full min-h-11 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm max-md:text-base text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30';
+
+const actionButtonClass =
+  'inline-flex min-h-11 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50';
+
 function SiteReturnCard({ item, onStatusChange }) {
   const [status, setStatus] = useState(item.status_code);
   const [sellerNote, setSellerNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmRejectOpen, setConfirmRejectOpen] = useState(false);
 
   const nextOptions = SELLER_NEXT_STATUSES[item.status_code] || [];
 
@@ -28,71 +37,94 @@ function SiteReturnCard({ item, onStatusChange }) {
       await onStatusChange(item.id, status, sellerNote);
     } finally {
       setSaving(false);
+      setConfirmRejectOpen(false);
     }
+  };
+
+  const handleSaveClick = () => {
+    if (status === 'rejected') {
+      setConfirmRejectOpen(true);
+      return;
+    }
+    handleSave();
   };
 
   const order = item.order;
 
   return (
-    <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap justify-between gap-3">
-        <div>
-          <p className="text-xs text-gray-500">Заявка №{item.id} · Заказ №{item.order_id}</p>
-          <p className="font-semibold text-gray-900">{getReturnReasonLabel(item.reason)}</p>
-          {order && (
-            <p className="text-sm text-gray-600 mt-1">
-              {order.buyer_name} · {order.buyer_phone}
-            </p>
-          )}
+    <>
+      <article className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap justify-between gap-3">
+          <div>
+            <p className="text-xs text-gray-500">Заявка №{item.id} · Заказ №{item.order_id}</p>
+            <p className="font-semibold text-gray-900">{getReturnReasonLabel(item.reason)}</p>
+            {order && (
+              <p className="mt-1 text-sm text-gray-600">
+                {order.buyer_name} · {order.buyer_phone}
+              </p>
+            )}
+          </div>
+          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ring-1 ${getReturnStatusColor(item.status_code)}`}>
+            {getReturnStatusLabel(item.status_code)}
+          </span>
         </div>
-        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ring-1 ${getReturnStatusColor(item.status_code)}`}>
-          {getReturnStatusLabel(item.status_code)}
-        </span>
-      </div>
-      {item.comment && <p className="mt-2 text-sm text-gray-700">{item.comment}</p>}
-      {item.attachments?.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {item.attachments.map((a) => (
-            <a key={a.id} href={a.file_url} target="_blank" rel="noreferrer">
-              <img src={a.file_url} alt="" className="h-14 w-14 rounded object-cover border" />
-            </a>
-          ))}
-        </div>
-      )}
-      {nextOptions.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          >
-            <option value={item.status_code}>{getReturnStatusLabel(item.status_code)} (текущий)</option>
-            {nextOptions.map((s) => (
-              <option key={s} value={s}>{getReturnStatusLabel(s)}</option>
+        {item.comment && <p className="mt-2 text-sm text-gray-700">{item.comment}</p>}
+        {item.attachments?.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {item.attachments.map((a) => (
+              <a key={a.id} href={a.file_url} target="_blank" rel="noreferrer">
+                <img src={a.file_url} alt="" className="h-14 w-14 rounded border object-cover" />
+              </a>
             ))}
-          </select>
-          {(status === 'rejected' || sellerNote) && (
-            <textarea
-              value={sellerNote}
-              onChange={(e) => setSellerNote(e.target.value)}
-              placeholder="Комментарий продавца (обязателен при отклонении)"
-              rows={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          )}
-          {status !== item.status_code && (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={handleSave}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+          </div>
+        )}
+        {nextOptions.length > 0 && (
+          <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className={fieldClass}
             >
-              {saving ? 'Сохранение…' : 'Обновить статус'}
-            </button>
-          )}
-        </div>
-      )}
-    </article>
+              <option value={item.status_code}>{getReturnStatusLabel(item.status_code)} (текущий)</option>
+              {nextOptions.map((s) => (
+                <option key={s} value={s}>{getReturnStatusLabel(s)}</option>
+              ))}
+            </select>
+            {(status === 'rejected' || sellerNote) && (
+              <textarea
+                value={sellerNote}
+                onChange={(e) => setSellerNote(e.target.value)}
+                placeholder="Комментарий продавца (обязателен при отклонении)"
+                rows={2}
+                className={`${fieldClass} min-h-[88px] resize-y`}
+              />
+            )}
+            {status !== item.status_code && (
+              <button
+                type="button"
+                disabled={saving || (status === 'rejected' && !sellerNote.trim())}
+                onClick={handleSaveClick}
+                className={actionButtonClass}
+              >
+                {saving ? 'Сохранение…' : 'Обновить статус'}
+              </button>
+            )}
+          </div>
+        )}
+      </article>
+
+      <ConfirmDialog
+        open={confirmRejectOpen}
+        onClose={() => setConfirmRejectOpen(false)}
+        onConfirm={handleSave}
+        title="Отклонить возврат?"
+        message="Покупатель получит отказ. Комментарий будет отправлен вместе с решением."
+        confirmLabel="Отклонить"
+        cancelLabel="Назад"
+        danger
+        loading={saving}
+      />
+    </>
   );
 }
 
@@ -108,80 +140,107 @@ function WarehouseReturnCard({ item, onStatusChange }) {
   const [nextStatus, setNextStatus] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmRejectOpen, setConfirmRejectOpen] = useState(false);
   const options = WAREHOUSE_NEXT_STATUSES[item.status_code] || [];
+
+  const applyStatus = async () => {
+    setSaving(true);
+    try {
+      await onStatusChange(item.id, nextStatus, note);
+      setNextStatus('');
+      setNote('');
+    } finally {
+      setSaving(false);
+      setConfirmRejectOpen(false);
+    }
+  };
+
+  const handleApplyClick = () => {
+    if (nextStatus === 'rejected') {
+      setConfirmRejectOpen(true);
+      return;
+    }
+    applyStatus();
+  };
+
   return (
-    <article className="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4">
-      <div className="flex flex-wrap justify-between gap-3">
-        <div>
-          <p className="text-xs text-gray-500">
-            Склад автосервиса · заявка №{item.id} · заказ №{item.source_order_id}
-          </p>
-          <p className="font-semibold text-gray-900">{item.name}</p>
-          <p className="mt-1 text-sm text-gray-600">
-            {item.supplier_name} · {item.quantity} шт.
-          </p>
-          <p className="mt-1 text-xs text-gray-500">{getReturnReasonLabel(item.reason)}</p>
+    <>
+      <article className="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4">
+        <div className="flex flex-wrap justify-between gap-3">
+          <div>
+            <p className="text-xs text-gray-500">
+              Склад автосервиса · заявка №{item.id} · заказ №{item.source_order_id}
+            </p>
+            <p className="font-semibold text-gray-900">{item.name}</p>
+            <p className="mt-1 text-sm text-gray-600">
+              {item.supplier_name} · {item.quantity} шт.
+            </p>
+            <p className="mt-1 text-xs text-gray-500">{getReturnReasonLabel(item.reason)}</p>
+          </div>
+          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ring-1 ${getReturnStatusColor(item.status_code)}`}>
+            {getReturnStatusLabel(item.status_code)}
+          </span>
         </div>
-        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ring-1 ${getReturnStatusColor(item.status_code)}`}>
-          {getReturnStatusLabel(item.status_code)}
-        </span>
-      </div>
-      {item.processing_mode === 'manual' ? (
-        <p className="mt-2 text-xs font-medium text-amber-700">Ручная обработка поставщиком</p>
-      ) : null}
-      {item.comment ? <p className="mt-3 text-sm text-gray-700">{item.comment}</p> : null}
-      {item.photo_urls?.length ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {item.photo_urls.map((url) => (
-            <a key={url} href={url} target="_blank" rel="noreferrer">
-              <img src={url} alt="" className="h-14 w-14 rounded-lg border object-cover" />
-            </a>
-          ))}
-        </div>
-      ) : null}
-      {options.length ? (
-        <div className="mt-4 space-y-2 border-t border-indigo-100 pt-4">
-          <select
-            value={nextStatus}
-            onChange={(event) => setNextStatus(event.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          >
-            <option value="">Выберите следующий статус</option>
-            {options.map((statusCode) => (
-              <option key={statusCode} value={statusCode}>
-                {getReturnStatusLabel(statusCode)}
-              </option>
+        {item.processing_mode === 'manual' ? (
+          <p className="mt-2 text-xs font-medium text-amber-700">Ручная обработка поставщиком</p>
+        ) : null}
+        {item.comment ? <p className="mt-3 text-sm text-gray-700">{item.comment}</p> : null}
+        {item.photo_urls?.length ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {item.photo_urls.map((url) => (
+              <a key={url} href={url} target="_blank" rel="noreferrer">
+                <img src={url} alt="" className="h-14 w-14 rounded-lg border object-cover" />
+              </a>
             ))}
-          </select>
-          {nextStatus === 'rejected' ? (
-            <textarea
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="Причина отклонения"
-              rows={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-          ) : null}
-          <button
-            type="button"
-            disabled={!nextStatus || saving || (nextStatus === 'rejected' && !note.trim())}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await onStatusChange(item.id, nextStatus, note);
-                setNextStatus('');
-                setNote('');
-              } finally {
-                setSaving(false);
-              }
-            }}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-          >
-            {saving ? 'Сохранение…' : 'Обновить статус'}
-          </button>
-        </div>
-      ) : null}
-    </article>
+          </div>
+        ) : null}
+        {options.length ? (
+          <div className="mt-4 space-y-2 border-t border-indigo-100 pt-4">
+            <select
+              value={nextStatus}
+              onChange={(event) => setNextStatus(event.target.value)}
+              className={fieldClass}
+            >
+              <option value="">Выберите следующий статус</option>
+              {options.map((statusCode) => (
+                <option key={statusCode} value={statusCode}>
+                  {getReturnStatusLabel(statusCode)}
+                </option>
+              ))}
+            </select>
+            {nextStatus === 'rejected' ? (
+              <textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="Причина отклонения"
+                rows={2}
+                className={`${fieldClass} min-h-[88px] resize-y`}
+              />
+            ) : null}
+            <button
+              type="button"
+              disabled={!nextStatus || saving || (nextStatus === 'rejected' && !note.trim())}
+              onClick={handleApplyClick}
+              className={actionButtonClass}
+            >
+              {saving ? 'Сохранение…' : 'Обновить статус'}
+            </button>
+          </div>
+        ) : null}
+      </article>
+
+      <ConfirmDialog
+        open={confirmRejectOpen}
+        onClose={() => setConfirmRejectOpen(false)}
+        onConfirm={applyStatus}
+        title="Отклонить возврат?"
+        message="Заявка со склада автосервиса будет отклонена с указанной причиной."
+        confirmLabel="Отклонить"
+        cancelLabel="Назад"
+        danger
+        loading={saving}
+      />
+    </>
   );
 }
 
@@ -207,7 +266,7 @@ function AvitoReturnCard({ order, onAcceptReturn, onTransition }) {
           value={terminal}
           onChange={(e) => setTerminal(e.target.value)}
           placeholder="Номер отделения Почты России"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          className={fieldClass}
         />
         <button
           type="button"
@@ -220,20 +279,20 @@ function AvitoReturnCard({ order, onAcceptReturn, onTransition }) {
               setBusy(false);
             }
           }}
-          className="rounded-lg bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-700 disabled:opacity-50"
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-orange-600 px-4 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50 sm:w-auto"
         >
           Принять возврат (Почта России)
         </button>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <select
             value={transition}
             onChange={(e) => setTransition(e.target.value)}
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className={`${fieldClass} sm:flex-1`}
           >
-            <option value="">Transition…</option>
-            <option value="in_transit_return">in_transit_return</option>
-            <option value="on_delivery_return">on_delivery_return</option>
-            <option value="returned">returned</option>
+            <option value="">Следующий этап возврата</option>
+            {AVITO_RETURN_TRANSITION_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <button
             type="button"
@@ -246,7 +305,7 @@ function AvitoReturnCard({ order, onAcceptReturn, onTransition }) {
                 setBusy(false);
               }
             }}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             Применить
           </button>
@@ -266,6 +325,7 @@ export default function SalesReturnsPage() {
   const [avitoReturns, setAvitoReturns] = useState([]);
   const [warehouseReturns, setWarehouseReturns] = useState([]);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState('');
 
   const hasPermission = user?.is_admin || user?.is_seller
     || (user?.is_employee && permissionCodes?.includes('sales.returns'));
@@ -305,6 +365,16 @@ export default function SalesReturnsPage() {
     if (isReady && hasPermission) load();
   }, [isReady, hasPermission, load]);
 
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/sales/returns') {
+        load();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [load]);
+
   const handleStatusChange = async (returnId, statusCode, sellerNote) => {
     await apiAxios.patch(`/sales/returns/${returnId}/status`, {
       status_code: statusCode,
@@ -318,7 +388,7 @@ export default function SalesReturnsPage() {
     await apiAxios.post(`/sales/avito-orders/${orderId}/accept-return`, {
       terminal_number: terminal,
     });
-    alert('Запрос на принятие возврата отправлен в Avito');
+    setNotice('Запрос на принятие возврата отправлен в Avito');
     load();
   };
 
@@ -330,8 +400,8 @@ export default function SalesReturnsPage() {
     load();
   };
 
-  const handleAvitoTransition = async (orderId, transition) => {
-    await apiAxios.post(`/sales/avito-orders/${orderId}/transition`, { transition });
+  const handleAvitoTransition = async (orderId, transitionValue) => {
+    await apiAxios.post(`/sales/avito-orders/${orderId}/transition`, { transition: transitionValue });
     load();
   };
 
@@ -339,20 +409,25 @@ export default function SalesReturnsPage() {
   if (!hasPermission) return null;
 
   return (
-    <div className="mt-4 sm:mt-5 px-4 sm:px-0 pb-10 space-y-8">
+    <div className="mt-4 space-y-8 px-4 pb-[var(--sg-mobile-bottom-nav-total,4rem)] sm:mt-5 sm:px-0 sm:pb-10">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Возвраты</h1>
+        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Возвраты</h1>
         <p className="mt-1 text-sm text-gray-600">Заявки покупателей и возвраты Avito</p>
       </div>
 
       {error && <p className="text-red-600">{error}</p>}
+      {notice ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {notice}
+        </div>
+      ) : null}
 
       {loading ? (
         <SkeletonListCards count={3} />
       ) : (
         <>
           <section>
-            <h2 className="text-lg font-bold text-gray-900 mb-3">Заявки с сайта</h2>
+            <h2 className="mb-3 text-lg font-bold text-gray-900">Заявки с сайта</h2>
             {siteReturns.length === 0 && (
               <p className="text-sm text-gray-500">Нет заявок на возврат</p>
             )}
@@ -364,7 +439,7 @@ export default function SalesReturnsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-gray-900 mb-3">
+            <h2 className="mb-3 text-lg font-bold text-gray-900">
               Возвраты со склада автосервиса
             </h2>
             {warehouseReturns.length === 0 ? (
@@ -382,7 +457,7 @@ export default function SalesReturnsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-gray-900 mb-3">Avito</h2>
+            <h2 className="mb-3 text-lg font-bold text-gray-900">Avito</h2>
             {avitoReturns.length === 0 && (
               <p className="text-sm text-gray-500">Нет заказов Avito в статусе возврата</p>
             )}

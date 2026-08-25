@@ -1,29 +1,29 @@
-import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Outlet, useLocation, useSearchParams } from 'react-router-dom';
-import Navigation from '../pages/Navigation/Navigation';
-import MobileHeader from '../components/MobileHeader/MobileHeader';
-import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
-import MobileSideMenu from '../components/MobileSideMenu/MobileSideMenu';
-import { useMobileMenuShell } from '../hooks/useMobileMenuShell';
-import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
+import { Outlet, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs/Breadcrumbs';
 import { usePageBreadcrumbs } from '../hooks/usePageBreadcrumbs';
 import AvitoProExpiredBanner from '../components/AvitoProExpiredBanner/AvitoProExpiredBanner';
 import { useAvitoAccountStatus } from '../hooks/useAvitoAccountStatus';
 import useCartSync from '../hooks/useCartSync';
-import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
-import { getPublicLayoutProfile } from '../utils/layoutProfiles';
+import useScrollResetOnNavigate from '../hooks/useScrollResetOnNavigate';
+import { useMobileMenuShell } from '../hooks/useMobileMenuShell';
+import MobileShellFrame from './MobileShellFrame';
+import { getPublicLayoutProfile, getPublicMainClasses } from '../utils/layoutProfiles';
+import { resolveActiveChatParams } from '../utils/resolveActiveChatParams';
 
 export default function MainLayout() {
     const location = useLocation();
+    const routeParams = useParams();
     const [searchParams] = useSearchParams();
     const { user } = useSelector((state) => state.auth);
     useCartSync();
+    useScrollResetOnNavigate();
     const breadcrumbItems = usePageBreadcrumbs();
-    const layoutProfile = getPublicLayoutProfile(location.pathname);
+
+    const chatParams = resolveActiveChatParams(location.pathname, searchParams, routeParams);
+    const layoutProfile = getPublicLayoutProfile(location.pathname, chatParams.chatId);
     const isPartPage = layoutProfile.isPartPage;
-    const isNewPartDetailPage = /^\/autoparts\/new\/part\/[^/]+$/.test(location.pathname);
+    const isNewPartDetailPage = layoutProfile.isNewPartDetail;
     const isSeoLandingPage = /^\/autoparts\/(new|used)\/(brand|category|geo)\/[^/]+$/.test(
         location.pathname,
     );
@@ -31,10 +31,9 @@ export default function MainLayout() {
         enabled: Boolean(user?.organization_id),
     });
 
-    const isAutopartsPage = location.pathname.startsWith('/autoparts');
     const isVinCatalogPage = layoutProfile.isVinCatalog;
     const isChatsPage = layoutProfile.isChatsPage;
-    const isMobileActiveChat = isChatsPage && Boolean(searchParams.get('chatId'));
+    const isMobileActiveChat = layoutProfile.isActiveChat;
     const isFullBleedAmbientPage = layoutProfile.isFullBleedAmbient;
 
     const {
@@ -52,65 +51,36 @@ export default function MainLayout() {
         showCabinetModeSwitch,
     } = useMobileMenuShell(user);
 
-    useEffect(() => {
-        const pathname = location.pathname;
-        const isAutoserviceDocumentEditing = /^\/autoservice\/orders\/\d+(\/edit|\/print(\/upd|\/invoice)?|\/print\/upd|\/print\/invoice)$/.test(
-            pathname,
-        );
-
-        // When navigating between document editor/print routes, users expect to stay at the same scroll position.
-        if (!isAutoserviceDocumentEditing) {
-            window.scrollTo(0, 0);
-        }
-    }, [location.pathname]);
+    const mainClassName = getPublicMainClasses({
+        isFullBleedAmbientPage,
+        isChatsPage,
+        isMobileActiveChat,
+        isPartPage,
+        isNewPartDetailPage,
+        isVinCatalogPage,
+        isAutopartsPage: layoutProfile.isAutopartsPage,
+    });
 
     return (
-        <div className="min-h-screen max-w-full overflow-x-hidden bg-surface pb-[4.5rem] lg:pb-0">
-            <HeaderBadgeHeightSync />
-            <div className="hidden lg:block">
-                <Navigation />
-            </div>
-
-            <MobileHeader onMenuClick={openMenu} hidden={isMobileActiveChat || isPartPage} />
-
-            <div className="hidden lg:block h-[var(--sg-desktop-header-h)] shrink-0" aria-hidden="true" />
-            <div
-                className={`lg:hidden h-[var(--sg-mobile-header-h)] shrink-0 ${isMobileActiveChat || isPartPage ? 'hidden' : ''}`}
-                aria-hidden="true"
-            />
-
-            <MobileSideMenu
-                isOpen={isMobileMenuOpen}
-                onClose={closeMenu}
-                tabs={tabs}
-                activeTab={activeTab}
-                onTabChange={handleTabChange}
-                guestContent={token ? null : guestContent}
-                showCabinetModeSwitch={showCabinetModeSwitch}
-                cabinetMode={cabinetMode}
-                availableCabinetModes={availableCabinetModes}
-                onCabinetModeChange={setCabinetMode}
-            />
-
-            <main
-                className={`mx-auto ${
-                    isFullBleedAmbientPage
-                        ? 'max-w-none bg-surface px-0 py-0 min-h-[calc(100dvh-var(--sg-mobile-header-h)-4.5rem)] lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]'
-                        : isChatsPage
-                        ? `max-w-sg-content max-lg:px-0 max-lg:py-0 max-lg:overflow-hidden px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${
-                            isMobileActiveChat
-                              ? 'max-lg:h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))]'
-                              : 'max-lg:h-[calc(100dvh-var(--sg-mobile-header-h)-4.5rem-env(safe-area-inset-bottom,0px))]'
-                          } lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]`
-                        : isPartPage
-                        ? 'max-w-sg-content max-lg:px-0 max-lg:py-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-lg:min-h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))]'
-                        : isVinCatalogPage
-                        ? 'max-w-sg-content max-lg:px-0 max-lg:py-0 px-4 sm:px-6 lg:px-8 py-2 sm:py-3'
-                        : isAutopartsPage
-                        ? 'max-w-sg-content max-lg:px-0 max-lg:py-2 px-4 sm:px-6 lg:px-8 py-6 sm:py-8'
-                        : 'max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8'
-                }`}
-            >
+        <MobileShellFrame
+            mobileHeaderHidden={layoutProfile.hideMobileHeader}
+            onMenuClick={openMenu}
+            showBottomChrome={!isMobileActiveChat}
+            reserveBottomNavSpace={!isMobileActiveChat}
+            sideMenuProps={{
+                isOpen: isMobileMenuOpen,
+                onClose: closeMenu,
+                tabs,
+                activeTab,
+                onTabChange: handleTabChange,
+                guestContent: token ? null : guestContent,
+                showCabinetModeSwitch,
+                cabinetMode,
+                availableCabinetModes,
+                onCabinetModeChange: setCabinetMode,
+            }}
+        >
+            <main className={`mx-auto ${mainClassName}`}>
                 {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage && !isNewPartDetailPage && !isChatsPage && !isVinCatalogPage ? (
                     <div className={isFullBleedAmbientPage ? 'mx-auto max-w-sg-content px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8' : undefined}>
                         <Breadcrumbs items={breadcrumbItems} includeJsonLd={!isPartPage} />
@@ -119,9 +89,6 @@ export default function MainLayout() {
                 <AvitoProExpiredBanner status={avitoAccountStatus} />
                 <Outlet />
             </main>
-
-            <InstallPwaPrompt />
-            <MobileBottomNav />
-        </div>
+        </MobileShellFrame>
     );
 }

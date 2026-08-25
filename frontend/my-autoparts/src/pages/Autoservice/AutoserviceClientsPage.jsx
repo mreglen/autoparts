@@ -4,8 +4,9 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import Modal from '../../components/UI/Modal';
-import { UnderlineTabs } from '../../components/UI';
+import Modal, { ConfirmDialog } from '../../components/UI/Modal';
+import { Skeleton, UnderlineTabs } from '../../components/UI';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import RepairOrderViewModal, {
   OrderStatusBadge,
   vehicleLabel,
@@ -27,6 +28,29 @@ import {
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+
+function ClientMobileCard({ row, hint, onOpen }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(row)}
+      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/30"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-semibold text-gray-900">{row.name}</p>
+          <p className="mt-0.5 truncate text-sm text-gray-600">{row.phone || '—'}</p>
+          {hint ? (
+            <p className="mt-1 truncate text-xs text-indigo-600" title={hint}>
+              Найдено по: {hint}
+            </p>
+          ) : null}
+        </div>
+        <AccountBadge userId={row.user_id} />
+      </div>
+    </button>
+  );
+}
 
 function AccountBadge({ userId }) {
   if (userId) {
@@ -390,6 +414,7 @@ function ClientProfileModal({
   const [viewOrder, setViewOrder] = useState(null);
   const [viewBooking, setViewBooking] = useState(null);
   const [creatingAccount, setCreatingAccount] = useState(false);
+  const [createAccountConfirmOpen, setCreateAccountConfirmOpen] = useState(false);
   const [accountMessage, setAccountMessage] = useState('');
   const [vehicleOrderFilterId, setVehicleOrderFilterId] = useState(null);
 
@@ -407,6 +432,7 @@ function ClientProfileModal({
     setViewOrder(null);
     setViewBooking(null);
     setCreatingAccount(false);
+    setCreateAccountConfirmOpen(false);
     setAccountMessage('');
     setVehicleOrderFilterId(null);
   }, [open, clientId]);
@@ -518,14 +544,6 @@ function ClientProfileModal({
 
   const handleCreateAccount = async () => {
     if (!client?.id || !canCreateAccount) return;
-    const email = guestEmail;
-    if (
-      !window.confirm(
-        `Создать личный кабинет и отправить пароль на ${email}?\n\nКлиент сможет входить на сайт и видеть свои заказ-наряды и заявки.`,
-      )
-    ) {
-      return;
-    }
 
     setError('');
     setAccountMessage('');
@@ -549,6 +567,7 @@ function ClientProfileModal({
       setError(err?.message || 'Не удалось создать аккаунт');
     } finally {
       setCreatingAccount(false);
+      setCreateAccountConfirmOpen(false);
     }
   };
 
@@ -584,7 +603,7 @@ function ClientProfileModal({
           {canCreateAccount && (section === 'profile' || editing) ? (
             <button
               type="button"
-              onClick={handleCreateAccount}
+              onClick={() => setCreateAccountConfirmOpen(true)}
               disabled={saving || creatingAccount}
               className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
             >
@@ -772,6 +791,18 @@ function ClientProfileModal({
       }}
     />
     <ClientBookingViewModal booking={viewBooking} onClose={() => setViewBooking(null)} />
+    <ConfirmDialog
+      open={createAccountConfirmOpen}
+      onClose={() => {
+        if (!creatingAccount) setCreateAccountConfirmOpen(false);
+      }}
+      onConfirm={handleCreateAccount}
+      title="Создать личный кабинет?"
+      message={`Отправить пароль на ${guestEmail}? Клиент сможет входить на сайт и видеть свои заказ-наряды и заявки.`}
+      confirmLabel="Создать аккаунт"
+      cancelLabel="Отмена"
+      loading={creatingAccount}
+    />
     </>
   );
 }
@@ -1288,6 +1319,16 @@ export default function AutoserviceClientsPage() {
     }
   }, [isReady, isAuthenticated, load]);
 
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/autoservice/clients') {
+        load();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [load]);
+
   const openClientVehicles = async (client) => {
     if (!client?.id) return;
     setVehiclesModalClient(client);
@@ -1326,7 +1367,7 @@ export default function AutoserviceClientsPage() {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
         >
           Добавить
         </button>
@@ -1342,7 +1383,7 @@ export default function AutoserviceClientsPage() {
         <button
           type="button"
           onClick={load}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
           title="Обновить"
           aria-label="Обновить"
         >
@@ -1363,7 +1404,7 @@ export default function AutoserviceClientsPage() {
         </p>
       ) : null}
 
-      <div className="overflow-x-auto">
+      <div className="hidden overflow-x-auto md:block">
         <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
           <thead>
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -1414,6 +1455,31 @@ export default function AutoserviceClientsPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="md:hidden">
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={`client-sk-${i}`} className="h-20 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-gray-500">
+            {qApplied.trim() ? 'Ничего не найдено' : 'Клиентов пока нет'}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((row) => (
+              <ClientMobileCard
+                key={row.id}
+                row={row}
+                hint={hiddenMatchHint(row, qApplied)}
+                onOpen={openClientVehicles}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <AddClientModal

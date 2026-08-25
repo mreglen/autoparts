@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiAxios, apiRequestFormData } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import { SkeletonListCards } from '../../components/UI';
-import { MOBILE_STICKY_BOTTOM_OFFSET } from '../../constants/mobileTokens';
+import { Modal, SkeletonListCards } from '../../components/UI';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   RETURN_REASONS,
   TERMINAL_RETURN_STATUSES,
@@ -77,43 +77,46 @@ function ReturnCreateModal({ orders, activeOrderIds, initialOrderId, onClose, on
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="return-create-modal-title"
-    >
-      <div
-        className="flex w-full max-w-lg max-h-[92dvh] sm:max-h-[90vh] flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
-          <div className="min-w-0">
-            <h2 id="return-create-modal-title" className="text-lg font-bold text-gray-900">
-              Заявка на возврат
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Только для б/у заказов с сайта (до 14 дней после получения).
-            </p>
-          </div>
+    <Modal
+      open
+      onClose={onClose}
+      title="Заявка на возврат"
+      size="sm"
+      footer={eligibleOrders.length === 0 ? (
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full min-h-12 rounded-xl border border-gray-300 text-base font-medium text-gray-700"
+        >
+          Закрыть
+        </button>
+      ) : (
+        <div className="flex gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Закрыть"
+            className="min-h-12 flex-1 rounded-xl border border-gray-300 text-base font-medium text-gray-700"
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            Отмена
+          </button>
+          <button
+            type="submit"
+            form="return-create-form"
+            disabled={submitting}
+            className="min-h-12 flex-[2] rounded-xl bg-indigo-600 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {submitting ? 'Отправка…' : 'Отправить заявку'}
           </button>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {eligibleOrders.length === 0 ? (
-            <p className="text-sm text-amber-700">Нет заказов, доступных для возврата.</p>
-          ) : (
-            <form id="return-create-form" onSubmit={handleSubmit} className="space-y-4">
+      )}
+    >
+      <p className="mb-4 text-sm text-gray-600">
+        Только для б/у заказов с сайта (до 14 дней после получения).
+      </p>
+      {eligibleOrders.length === 0 ? (
+        <p className="text-sm text-amber-700">Нет заказов, доступных для возврата.</p>
+      ) : (
+        <form id="return-create-form" onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Заказ</label>
                 <select
@@ -159,40 +162,8 @@ function ReturnCreateModal({ orders, activeOrderIds, initialOrderId, onClose, on
               </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
             </form>
-          )}
-        </div>
-
-        <div className="shrink-0 border-t border-gray-100 bg-white px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          {eligibleOrders.length === 0 ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full min-h-12 rounded-xl border border-gray-300 text-base font-medium text-gray-700"
-            >
-              Закрыть
-            </button>
-          ) : (
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="min-h-12 flex-1 rounded-xl border border-gray-300 text-base font-medium text-gray-700"
-              >
-                Отмена
-              </button>
-              <button
-                type="submit"
-                form="return-create-form"
-                disabled={submitting}
-                className="min-h-12 flex-[2] rounded-xl bg-indigo-600 text-base font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {submitting ? 'Отправка…' : 'Отправить заявку'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }
 
@@ -314,6 +285,16 @@ export default function PurchasesReturnsPage() {
     if (isReady && isAuthenticated) load();
   }, [isReady, isAuthenticated, load]);
 
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/purchases/returns') {
+        load();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [load]);
+
   const activeOrderIds = useMemo(() => {
     const ids = new Set();
     returns.forEach((r) => {
@@ -326,8 +307,7 @@ export default function PurchasesReturnsPage() {
 
   return (
     <div
-      className="mt-4 sm:mt-5 px-4 sm:px-0 space-y-6 max-lg:pb-[var(--sg-mobile-page-bottom-pad)]"
-      style={{ '--sg-mobile-page-bottom-pad': MOBILE_STICKY_BOTTOM_OFFSET }}
+      className="mt-4 sm:mt-5 px-4 sm:px-0 space-y-6 max-lg:pb-[var(--sg-mobile-bottom-nav-total)]"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

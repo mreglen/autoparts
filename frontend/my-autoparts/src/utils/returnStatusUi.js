@@ -65,4 +65,11 @@ export const AVITO_RETURN_STATUS_LABELS = {
   in_dispute: 'Спор',
   in_transit_return: 'Возврат в пути',
   on_delivery_return: 'Доставка возврата',
+  returned: 'Возвращён',
 };
+
+export const AVITO_RETURN_TRANSITION_OPTIONS = [
+  { value: 'in_transit_return', label: 'Возврат в пути' },
+  { value: 'on_delivery_return', label: 'Доставка возврата' },
+  { value: 'returned', label: 'Возвращён покупателю' },
+];

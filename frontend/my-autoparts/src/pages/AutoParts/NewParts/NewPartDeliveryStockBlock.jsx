@@ -32,7 +32,7 @@ function StockMobileCard({ stock, markupPercent }) {
   );
 }
 
-export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
+export default function NewPartDeliveryStockBlock({ stocks, inStock, compactMobile = false }) {
   const markupPercent = useNewPartsMarkupPercent('auto');
   const summary = summarizeStocks(stocks, markupPercent);
 
@@ -57,7 +57,7 @@ export default function NewPartDeliveryStockBlock({ stocks, inStock }) {
         Доставка по России.
       </p>
 
-      <div className="mt-4 space-y-3 md:hidden">
+      <div className={`mt-4 space-y-3 ${compactMobile ? 'max-lg:hidden' : ''} md:hidden`}>
         {summary.active.map((stock) => (
           <StockMobileCard key={stock.stock_id} stock={stock} markupPercent={markupPercent} />
         ))}

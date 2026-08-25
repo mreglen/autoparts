@@ -39,8 +39,16 @@ import { extractCityFromAddress } from '../../../utils/organizationCity';
 import { slugifyBrand } from '../../../utils/slugUtils';
 import NewPartHorizontalScroll from './NewPartHorizontalScroll';
 import NewPartDetailThumb from './NewPartDetailThumb';
+import NewPartDetailMobileGallery from './NewPartDetailMobileGallery';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import useDeferredMount from '../../../hooks/useDeferredMount';
+import { useNewPartCartActions } from './useNewPartCartActions';
+import NewPartCartQuantityControl from './NewPartCartQuantityControl';
+import ProductDetailStickyBar from '../../../components/ProductDetail/ProductDetailStickyBar';
+import ShareButton from '../../../components/ShareButton/ShareButton';
+import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
+import { MOBILE_PRODUCT_STICKY_SCROLL_PAD } from '../../../constants/mobileTokens';
+import { formatDeliveryTimeText } from './newPartStockUtils';
 import {
   PART_DETAIL_CACHE,
   readPartDetailCache,
@@ -500,6 +508,8 @@ export default function NewPartDetailPage() {
     }
   }, [navigate, backToListPath]);
 
+  const cartActions = useNewPartCartActions({ part: livePart, stocksData: liveStocks });
+
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-3 py-6 sm:px-4">
@@ -589,6 +599,7 @@ export default function NewPartDetailPage() {
       sectionType="available"
       uniqueId={`detail-${numericCardId}`}
       isDetailView
+      hideMobileCartCta
     />
   ) : (
     <EmptyState
@@ -598,8 +609,13 @@ export default function NewPartDetailPage() {
     />
   );
 
+  const showStickyCart = hasLiveStocks && inStock && cartActions.mainStock;
+  const stickyDeliveryMeta = cartActions.mainStock
+    ? formatDeliveryTimeText(cartActions.mainStock.delivery_start, cartActions.mainStock.delivery_end)
+    : '';
+
   return (
-    <div className="mx-auto max-w-6xl px-3 py-4 max-md:pb-28 sm:px-4 sm:py-6">
+    <div className={`mx-auto max-w-6xl sm:px-4 sm:py-6 ${showStickyCart ? MOBILE_PRODUCT_STICKY_SCROLL_PAD : 'max-md:pb-28'} px-0 py-0 lg:px-3 lg:py-4`}>
       <PageSeoHelmet seo={seo} />
       <Helmet>
         {structuredDataBlocks.map((block) => (
@@ -609,13 +625,56 @@ export default function NewPartDetailPage() {
         ))}
       </Helmet>
 
-      <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
+      <div className="relative bg-surface-subtle lg:hidden">
+        <NewPartDetailMobileGallery
+          imageUrl={card?.image_url}
+          attribution={card?.image_attribution}
+          alt={`${brand} ${article}`}
+        />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface/80 text-ink-soft shadow-sg-sm backdrop-blur"
+            aria-label="Назад"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="pointer-events-auto flex items-center gap-2">
+            <FavoriteHeartOverlay
+              variant="inline"
+              rossko={{
+                brand,
+                partnumber: article,
+                guid: livePart?.guid,
+                title: pageH1,
+                minPrice: cartActions.mainPrice,
+              }}
+            />
+            <ShareButton
+              url={canonicalUrl}
+              title={pageH1}
+              text={partDescription || pageH1}
+              showLabel={false}
+              size="sm"
+              className="h-11 w-11 min-h-11 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="px-3 py-4 lg:px-0">
+      <div className="max-lg:hidden">
+        <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
+      </div>
 
       <Button
         variant="ghost"
         size="sm"
         onClick={handleBackToList}
-        className="-ml-2 mt-2"
+        className="-ml-2 mt-2 max-lg:hidden"
       >
         ← К поиску
       </Button>
@@ -627,6 +686,7 @@ export default function NewPartDetailPage() {
               imageUrl={card?.image_url}
               attribution={card?.image_attribution}
               alt={`${brand} ${article}`}
+              className="hidden lg:flex"
             />
             <div className="min-w-0 flex-1">
               <h1 className="text-xl font-bold leading-snug text-ink sm:text-2xl">{pageH1}</h1>
@@ -668,7 +728,7 @@ export default function NewPartDetailPage() {
       </section>
 
       <div className="mt-6 space-y-6">
-        <NewPartDeliveryStockBlock stocks={liveStocks} inStock={inStock} />
+        <NewPartDeliveryStockBlock stocks={liveStocks} inStock={inStock} compactMobile={showStickyCart} />
 
         <PartDetailAboutBlock bodyDescription={bodyDescription} isNew />
         <PartDetailFitmentBlock
@@ -718,6 +778,26 @@ export default function NewPartDetailPage() {
           )}
         </section>
       </div>
+      </div>
+
+      {showStickyCart ? (
+        <ProductDetailStickyBar
+          priceLabel="Цена"
+          priceValue={`${cartActions.mainPrice} ₽`}
+          meta={stickyDeliveryMeta !== '—' ? stickyDeliveryMeta : undefined}
+        >
+          <div className="flex justify-end">
+            <NewPartCartQuantityControl
+              quantity={cartActions.mainQuantity}
+              onAdd={() => cartActions.handleAddToCart(cartActions.mainStock)}
+              onRemove={() => cartActions.handleRemoveFromCart(cartActions.mainStock)}
+              disabled={cartActions.disabledControl}
+              noStock={cartActions.mainStockInfo.noStock}
+              loading={cartActions.addingToCart}
+            />
+          </div>
+        </ProductDetailStickyBar>
+      ) : null}
     </div>
   );
 }

@@ -87,7 +87,7 @@ function VoicePlayer({ src, isOwn }) {
         type="button"
         onClick={togglePlay}
         disabled={!isLoaded}
-        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+        className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center transition-all ${
           isOwn
             ? 'bg-white/20 hover:bg-white/30 text-white disabled:opacity-50'
             : 'bg-blue-100 hover:bg-blue-200 text-blue-600 disabled:opacity-50'

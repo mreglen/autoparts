@@ -313,6 +313,17 @@ export default function DromIntegrationPage() {
         )}
       </div>
 
+      <div className="md:hidden">
+        <InlineNotice tone="info">
+          <p className="text-xs text-ink-muted">
+            Массовый экспорт и загрузка номенклатуры удобнее на ПК.{' '}
+            <Link to="/settings/integration/drom/nomenclature" className="font-medium text-brand-700 underline">
+              Номенклатура Drom
+            </Link>
+          </p>
+        </InlineNotice>
+      </div>
+
       {error ? (
         <InlineNotice tone="error" onClose={() => setError(null)}>
           <p className="whitespace-pre-wrap">{error}</p>

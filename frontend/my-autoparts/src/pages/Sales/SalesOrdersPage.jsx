@@ -9,7 +9,9 @@ import SalesOrdersEmptyState from '../../components/SalesOrders/SalesOrdersEmpty
 import PickupVerifyModal from '../../components/SalesOrders/PickupVerifyModal';
 import ItemConfirmScanModal from '../../components/SalesOrders/ItemConfirmScanModal';
 import OrderPaymentModal from '../../components/SalesOrders/OrderPaymentModal';
-import ConfirmModal from '../../components/ConfirmModal';
+import Modal, { ConfirmDialog } from '../../components/UI/Modal';
+import Button from '../../components/UI/Button';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import OrderSourceBadge from '../../components/Orders/OrderSourceBadge';
 import {
   warehousePageClass,
@@ -52,8 +54,11 @@ const STATUS_FILTER_OPTIONS = [
   { id: 'rejected', label: 'Отменённые' },
 ];
 
+const modalFieldClass =
+  'mt-1 w-full min-h-11 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm max-md:text-base text-gray-900 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20';
+
 const statusFilterButtonClass = (active) =>
-  `inline-flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
+  `inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
     active
       ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200'
       : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
@@ -324,6 +329,17 @@ export default function SalesOrdersPage() {
     if (!hasPermission) return;
     fetchAll();
   }, [hasPermission, fetchAll]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      const path = event.detail?.pathname || '';
+      if (path === '/warehouse-sales' || path.startsWith('/warehouse-sales?')) {
+        fetchAll(true);
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [fetchAll]);
 
   useEffect(() => {
     if (!hasPermission) return;
@@ -1286,6 +1302,11 @@ export default function SalesOrdersPage() {
     [usedOrders.length, newOrders.length, avitoOrders.length, canViewNewOrders, avitoProActive]
   );
 
+  const avitoWarehouseRetryCount = useMemo(
+    () => (avitoProActive ? avitoOrders.filter((order) => getAvitoWarehouseCanRetry(order)).length : 0),
+    [avitoOrders, avitoProActive],
+  );
+
   if (!hasPermission) {
     return null;
   }
@@ -1294,7 +1315,12 @@ export default function SalesOrdersPage() {
     <div className={`${warehousePageClass} min-w-0 space-y-4`}>
       <div className="space-y-3">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Заказы</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Заказы</h1>
+            {refreshing ? (
+              <span className="text-sm text-gray-500" aria-live="polite">Обновление…</span>
+            ) : null}
+          </div>
           {loading ? <SkeletonHeaderStats /> : !error ? <OrdersHeaderStats stats={stats} formatPrice={formatPrice} /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-3" aria-label="Источники заказов">
@@ -1377,10 +1403,19 @@ export default function SalesOrdersPage() {
           <button
             type="button"
             onClick={() => fetchAll()}
-            className="mt-4 inline-flex rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            className="mt-3 min-h-11 rounded-xl bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700"
           >
-            Попробовать снова
+            Повторить
           </button>
+        </div>
+      )}
+
+      {!loading && !error && avitoWarehouseRetryCount > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {avitoWarehouseRetryCount}{' '}
+          {avitoWarehouseRetryCount === 1 ? 'заказ Avito требует' : 'заказов Avito требуют'}
+          {' '}
+          повторной отправки на склад. Откройте карточку и нажмите «Повторить».
         </div>
       )}
 
@@ -1485,152 +1520,137 @@ export default function SalesOrdersPage() {
         </>
       )}
 
-        {cncPrepareModal.isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
-              <h3 className="text-lg font-semibold text-gray-900">Подготовка CNC заказа</h3>
-              <p className="mt-2 text-sm text-gray-600">
-                Заполните данные для передачи заказа покупателю перед подтверждением получения.
-              </p>
-              <label className="mt-4 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-address">
-                Адрес получения
-              </label>
-              <input
-                id="cnc-prepare-address"
-                type="text"
-                value={cncPrepareModal.address}
-                onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, address: e.target.value, error: '' }))}
-                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                placeholder="г Екатеринбург, ул Фруктовая, 17"
-                autoFocus
-              />
-              <label className="mt-3 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-booking">
-                Срок бронирования (дни)
-              </label>
-              <input
-                id="cnc-prepare-booking"
-                type="number"
-                min="1"
-                value={cncPrepareModal.bookingPeriod}
-                onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, bookingPeriod: e.target.value, error: '' }))}
-                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-              />
-              <label className="mt-3 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-details">
-                Комментарий покупателю
-              </label>
-              <textarea
-                id="cnc-prepare-details"
-                value={cncPrepareModal.details}
-                onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, details: e.target.value, error: '' }))}
-                rows={3}
-                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                placeholder="Могу передать товар с 13:00 до 18:00"
-              />
-              {cncPrepareModal.error && (
-                <div className="mt-2 text-sm text-red-600">{cncPrepareModal.error}</div>
-              )}
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  onClick={closeCncPrepareModal}
-                  disabled={cncPrepareModal.isSubmitting}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={submitCncPrepare}
-                  disabled={cncPrepareModal.isSubmitting}
-                >
-                  {cncPrepareModal.isSubmitting ? 'Сохраняем...' : 'Подготовить'}
-                </button>
-              </div>
+        <Modal
+          open={cncPrepareModal.isOpen}
+          onClose={closeCncPrepareModal}
+          title="Подготовка CNC заказа"
+          size="sm"
+          footer={(
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={closeCncPrepareModal} disabled={cncPrepareModal.isSubmitting}>
+                Отмена
+              </Button>
+              <Button variant="accent" onClick={submitCncPrepare} loading={cncPrepareModal.isSubmitting}>
+                {cncPrepareModal.isSubmitting ? 'Сохраняем...' : 'Подготовить'}
+              </Button>
             </div>
-          </div>
-        )}
-        {receiveCodeModal.isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
-              <h3 className="text-lg font-semibold text-gray-900">Выдача Avito · 4 цифры</h3>
-              {receiveCodeModal.step === 'hint' && (
-                <div className="mt-3 space-y-1 text-sm text-gray-600">
-                  {(() => {
-                    const hint = getCncReceiveHint(receiveCodeModal.order);
-                    return (
-                      <>
-                        {hint.marketplaceId ? <p>№ {hint.marketplaceId}</p> : null}
-                        {hint.address ? <p>{hint.address}</p> : null}
-                        {hint.receiveBefore ? <p>до {formatDate(hint.receiveBefore)}</p> : null}
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-              {receiveCodeModal.step === 'code' && (
+          )}
+        >
+          <p className="text-sm text-gray-600">
+            Заполните данные для передачи заказа покупателю перед подтверждением получения.
+          </p>
+          <label className="mt-4 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-address">
+            Адрес получения
+          </label>
+          <input
+            id="cnc-prepare-address"
+            type="text"
+            value={cncPrepareModal.address}
+            onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, address: e.target.value, error: '' }))}
+            className={modalFieldClass}
+            placeholder="г Екатеринбург, ул Фруктовая, 17"
+          />
+          <label className="mt-3 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-booking">
+            Срок бронирования (дни)
+          </label>
+          <input
+            id="cnc-prepare-booking"
+            type="number"
+            min="1"
+            value={cncPrepareModal.bookingPeriod}
+            onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, bookingPeriod: e.target.value, error: '' }))}
+            className={modalFieldClass}
+          />
+          <label className="mt-3 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-details">
+            Комментарий покупателю
+          </label>
+          <textarea
+            id="cnc-prepare-details"
+            value={cncPrepareModal.details}
+            onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, details: e.target.value, error: '' }))}
+            rows={3}
+            className={`${modalFieldClass} min-h-[88px] resize-y`}
+            placeholder="Могу передать товар с 13:00 до 18:00"
+          />
+          {cncPrepareModal.error ? (
+            <div className="mt-2 text-sm text-red-600">{cncPrepareModal.error}</div>
+          ) : null}
+        </Modal>
+
+        <Modal
+          open={receiveCodeModal.isOpen}
+          onClose={closeReceiveCodeModal}
+          title="Выдача Avito · 4 цифры"
+          size="sm"
+          footer={(
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={closeReceiveCodeModal} disabled={receiveCodeModal.isSubmitting}>
+                Отмена
+              </Button>
+              {receiveCodeModal.step === 'hint' ? (
+                <Button
+                  variant="accent"
+                  onClick={() => setReceiveCodeModal((prev) => ({ ...prev, step: 'code', error: '' }))}
+                >
+                  Ввести код
+                </Button>
+              ) : (
                 <>
-                  <p className="mt-2 text-sm text-gray-500">Код покупателя Avito</p>
-                  <input
-                    id="receive-confirm-code"
-                    type="text"
-                    inputMode="numeric"
-                    value={receiveCodeModal.confirmCode}
-                    onChange={(e) => setReceiveCodeModal((prev) => ({
-                      ...prev,
-                      confirmCode: e.target.value.replace(/\D/g, '').slice(0, 4),
-                      error: '',
-                    }))}
-                    className="mt-3 w-full rounded-xl border border-gray-300 px-3 py-3 text-center font-mono text-2xl font-semibold tracking-[0.35em] text-gray-900 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                    placeholder="····"
-                    autoFocus
-                  />
+                  <Button
+                    variant="secondary"
+                    onClick={() => setReceiveCodeModal((prev) => ({ ...prev, step: 'hint', error: '' }))}
+                    disabled={receiveCodeModal.isSubmitting}
+                  >
+                    Назад
+                  </Button>
+                  <Button
+                    variant="accent"
+                    onClick={submitReceiveCodeTransition}
+                    loading={receiveCodeModal.isSubmitting}
+                    disabled={String(receiveCodeModal.confirmCode || '').trim().length !== 4}
+                  >
+                    {receiveCodeModal.isSubmitting ? 'Проверка…' : 'Выдать'}
+                  </Button>
                 </>
               )}
-              {receiveCodeModal.error && (
-                <div className="mt-2 text-sm text-red-600">{receiveCodeModal.error}</div>
-              )}
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  onClick={closeReceiveCodeModal}
-                  disabled={receiveCodeModal.isSubmitting}
-                >
-                  Отмена
-                </button>
-                {receiveCodeModal.step === 'hint' ? (
-                  <button
-                    type="button"
-                    className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-                    onClick={() => setReceiveCodeModal((prev) => ({ ...prev, step: 'code', error: '' }))}
-                  >
-                    Ввести код
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setReceiveCodeModal((prev) => ({ ...prev, step: 'hint', error: '' }))}
-                      disabled={receiveCodeModal.isSubmitting}
-                    >
-                      Назад
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      onClick={submitReceiveCodeTransition}
-                      disabled={receiveCodeModal.isSubmitting || String(receiveCodeModal.confirmCode || '').trim().length !== 4}
-                    >
-                      {receiveCodeModal.isSubmitting ? 'Проверка…' : 'Выдать'}
-                    </button>
-                  </>
-                )}
-              </div>
             </div>
-          </div>
-        )}
+          )}
+        >
+          {receiveCodeModal.step === 'hint' ? (
+            <div className="space-y-1 text-sm text-gray-600">
+              {(() => {
+                const hint = getCncReceiveHint(receiveCodeModal.order);
+                return (
+                  <>
+                    {hint.marketplaceId ? <p>№ {hint.marketplaceId}</p> : null}
+                    {hint.address ? <p>{hint.address}</p> : null}
+                    {hint.receiveBefore ? <p>до {formatDate(hint.receiveBefore)}</p> : null}
+                  </>
+                );
+              })()}
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-gray-500">Код покупателя Avito</p>
+              <input
+                id="receive-confirm-code"
+                type="text"
+                inputMode="numeric"
+                value={receiveCodeModal.confirmCode}
+                onChange={(e) => setReceiveCodeModal((prev) => ({
+                  ...prev,
+                  confirmCode: e.target.value.replace(/\D/g, '').slice(0, 4),
+                  error: '',
+                }))}
+                className="mt-3 w-full min-h-11 rounded-xl border border-gray-300 px-3 py-3 text-center font-mono text-2xl font-semibold tracking-[0.35em] text-gray-900 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                placeholder="····"
+              />
+            </>
+          )}
+          {receiveCodeModal.error ? (
+            <div className="mt-2 text-sm text-red-600">{receiveCodeModal.error}</div>
+          ) : null}
+        </Modal>
 
         <PickupVerifyModal
           isOpen={pickupModal.isOpen}
@@ -1668,8 +1688,8 @@ export default function SalesOrdersPage() {
           onConfirm={submitOrderPayment}
         />
 
-        <ConfirmModal
-          isOpen={cancelPaymentModal.isOpen}
+        <ConfirmDialog
+          open={cancelPaymentModal.isOpen}
           onClose={closeCancelPaymentModal}
           onConfirm={submitCancelPayment}
           title="Отмена оплаты"
@@ -1678,19 +1698,26 @@ export default function SalesOrdersPage() {
               ? 'Отменить оплату позиции?'
               : 'Отменить оплату заказа?'
           }
-          confirmText="Отменить"
-          cancelText="Назад"
-          type="danger"
+          confirmLabel="Отменить"
+          cancelLabel="Назад"
+          danger
         />
 
-        <ConfirmModal
-          isOpen={unpaidIssueModal.isOpen}
+        <Modal
+          open={unpaidIssueModal.isOpen}
           onClose={closeUnpaidIssueModal}
-          onConfirm={confirmUnpaidIssue}
           title="Выдать заказ?"
-          confirmText="Выдать"
-          cancelText="Назад"
-          type="warning"
+          size="sm"
+          footer={(
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={closeUnpaidIssueModal}>
+                Назад
+              </Button>
+              <Button variant="primary" onClick={confirmUnpaidIssue}>
+                Выдать
+              </Button>
+            </div>
+          )}
         >
           <p className="text-sm text-gray-600">Есть неоплаченные позиции:</p>
           <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
@@ -1708,17 +1735,17 @@ export default function SalesOrdersPage() {
               );
             })}
           </ul>
-        </ConfirmModal>
+        </Modal>
 
-        <ConfirmModal
-          isOpen={unconfirmItemModal.isOpen}
+        <ConfirmDialog
+          open={unconfirmItemModal.isOpen}
           onClose={closeUnconfirmItemModal}
           onConfirm={submitUnconfirmItem}
           title="Отмена позиции"
           message="Вы точно хотите отменить позицию?"
-          confirmText="Да, отменить позицию"
-          cancelText="Отмена"
-          type="danger"
+          confirmLabel="Да, отменить позицию"
+          cancelLabel="Отмена"
+          danger
         />
     </div>
   );

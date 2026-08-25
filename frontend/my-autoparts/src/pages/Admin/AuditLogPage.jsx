@@ -14,105 +14,92 @@ import {
   parseDetails,
 } from './auditDisplay';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
+import Modal from '../../components/UI/Modal';
+import Button from '../../components/UI/Button';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 function AuditDetailModal({ event, meta, onClose }) {
   if (!event) return null;
   const details = parseDetails(event);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+    <Modal
+      open={Boolean(event)}
+      onClose={onClose}
+      title={`Событие #${event.id}`}
+      size="lg"
+      footer={(
+        <Button type="button" variant="primary" className="w-full sm:w-auto" onClick={onClose}>
+          Закрыть
+        </Button>
+      )}
+    >
+      <p className="mb-4 text-sm text-gray-500">{formatAuditDate(event.created_at)}</p>
+      <div className="space-y-4 text-sm">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Событие #{event.id}</h3>
-            <p className="mt-1 text-sm text-gray-500">{formatAuditDate(event.created_at)}</p>
+            <span className="text-gray-500">Категория</span>
+            <p className="font-medium">{labelCategory(event.category, meta)}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Закрыть"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 text-sm">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <span className="text-gray-500">Категория</span>
-              <p className="font-medium">{labelCategory(event.category, meta)}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Тип</span>
-              <p className="font-medium">{labelEventType(event.event_type, meta)}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Пользователь</span>
-              <p className="font-medium">{event.actor_name || event.email || '—'}</p>
-              {event.user_public_code && (
-                <p className="text-xs text-gray-500 font-mono">ID {event.user_public_code}</p>
-              )}
-            </div>
-            <div>
-              <span className="text-gray-500">Организация</span>
-              <p className="font-medium">{event.organization_name || event.organization_id || '—'}</p>
-              {event.organization_id && event.organization_name && (
-                <p className="text-xs font-mono text-gray-500">{event.organization_id}</p>
-              )}
-            </div>
-            <div>
-              <span className="text-gray-500">IP</span>
-              <p className="font-medium font-mono">{event.ip_address || '—'}</p>
-            </div>
-            {event.entity_type && (
-              <div className="sm:col-span-2">
-                <span className="text-gray-500">Объект</span>
-                <p className="font-medium font-mono">
-                  {event.entity_type} #{event.entity_id}
-                </p>
-              </div>
+          <div>
+            <span className="text-gray-500">Тип</span>
+            <p className="font-medium">{labelEventType(event.event_type, meta)}</p>
+          </div>
+          <div>
+            <span className="text-gray-500">Пользователь</span>
+            <p className="font-medium">{event.actor_name || event.email || '—'}</p>
+            {event.user_public_code && (
+              <p className="text-xs text-gray-500 font-mono">ID {event.user_public_code}</p>
             )}
           </div>
-          {event.summary && (
-            <div>
-              <span className="text-gray-500">Описание</span>
-              <p className="mt-1 rounded-lg bg-gray-50 p-3 text-gray-800">{event.summary}</p>
+          <div>
+            <span className="text-gray-500">Организация</span>
+            <p className="font-medium">{event.organization_name || event.organization_id || '—'}</p>
+            {event.organization_id && event.organization_name && (
+              <p className="text-xs font-mono text-gray-500">{event.organization_id}</p>
+            )}
+          </div>
+          <div>
+            <span className="text-gray-500">IP</span>
+            <p className="font-medium font-mono">{event.ip_address || '—'}</p>
+          </div>
+          {event.entity_type && (
+            <div className="sm:col-span-2">
+              <span className="text-gray-500">Объект</span>
+              <p className="font-medium font-mono">
+                {event.entity_type} #{event.entity_id}
+              </p>
             </div>
           )}
+        </div>
+        {event.summary && (
           <div>
-            <span className="text-gray-500">Детали</span>
-            <div className="mt-2 rounded-lg border border-gray-100 bg-white p-4">
-              {details != null ? (
-                <AuditDetailsStructured data={details} />
-              ) : (
-                <p className="text-gray-500">—</p>
-              )}
-            </div>
-            {details != null && (
-              <details className="mt-3">
-                <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-700">
-                  Показать технические данные (JSON)
-                </summary>
-                <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-gray-900 p-3 text-xs text-green-100">
-                  {JSON.stringify(details, null, 2)}
-                </pre>
-              </details>
+            <span className="text-gray-500">Описание</span>
+            <p className="mt-1 rounded-lg bg-gray-50 p-3 text-gray-800">{event.summary}</p>
+          </div>
+        )}
+        <div>
+          <span className="text-gray-500">Детали</span>
+          <div className="mt-2 rounded-lg border border-gray-100 bg-white p-4">
+            {details != null ? (
+              <AuditDetailsStructured data={details} />
+            ) : (
+              <p className="text-gray-500">—</p>
             )}
           </div>
-        </div>
-        <div className="border-t border-gray-100 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            Закрыть
-          </button>
+          {details != null && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-700">
+                Показать технические данные (JSON)
+              </summary>
+              <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-gray-900 p-3 text-xs text-green-100">
+                {JSON.stringify(details, null, 2)}
+              </pre>
+            </details>
+          )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -197,6 +184,16 @@ export default function AuditLogPage() {
   useEffect(() => {
     if (hasAccess) loadEvents();
   }, [hasAccess, loadEvents]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/admin/audit-log') {
+        loadEvents();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [loadEvents]);
 
   if (!user) return <Navigate to="/auth" replace />;
   if (!hasAccess) return <Navigate to="/" replace />;

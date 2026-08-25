@@ -46,6 +46,13 @@ import DeliveryFastIcon from '../../components/icons/DeliveryFastIcon';
 import PickupIcon from '../../components/icons/PickupIcon';
 import { PageHeader } from '../../components/UI/SectionHeader';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import ProductDetailStickyBar from '../../components/ProductDetail/ProductDetailStickyBar';
+import { MOBILE_PRODUCT_STICKY_SCROLL_PAD } from '../../constants/mobileTokens';
+import {
+  clearNewCheckoutDraft,
+  readNewCheckoutDraft,
+  saveNewCheckoutDraft,
+} from '../../utils/checkoutDraft';
 
 function formatApiErrorDetail(detail) {
   if (!detail) return 'Ошибка при оформлении заказа. Попробуйте ещё раз.';
@@ -56,7 +63,7 @@ function formatApiErrorDetail(detail) {
 const formatMoney = (value) => formatNewPartMoney(value);
 
 const inputClass = (hasError) =>
-  `block w-full rounded-sg border px-3 py-2.5 text-sm shadow-sg-sm outline-none transition focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 ${
+  `block w-full rounded-sg border px-3 py-2.5 text-sm max-md:text-base shadow-sg-sm outline-none transition focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 ${
     hasError ? 'border-danger-400 bg-danger-50/40' : 'border-line bg-surface'
   }`;
 
@@ -159,6 +166,7 @@ export default function NewPartsOrderRegistration() {
   const [placedOrder, setPlacedOrder] = useState(null);
   const [unpaidConfirmOpen, setUnpaidConfirmOpen] = useState(false);
   const skipEmptyCartRedirectRef = useRef(false);
+  const draftHydratedRef = useRef(false);
   const [deliverInParts, setDeliverInParts] = useState(false);
 
   useEffect(() => {
@@ -184,8 +192,44 @@ export default function NewPartsOrderRegistration() {
       return;
     }
     dispatch(fetchCart());
-    return () => clearNewPartsCheckoutItemIds();
   }, [isReady, user, navigate, dispatch, location.pathname, location.search]);
+
+  useEffect(() => {
+    if (draftHydratedRef.current) return;
+    const draft = readNewCheckoutDraft();
+    if (!draft) return;
+    draftHydratedRef.current = true;
+    if (draft.recipient) setRecipient((prev) => ({ ...prev, ...draft.recipient }));
+    if (draft.fulfillmentMode) setFulfillmentMode(draft.fulfillmentMode);
+    if (draft.deliveryRegion) setDeliveryRegion(draft.deliveryRegion);
+    if (draft.pvzMethod) setPvzMethod(draft.pvzMethod);
+    if (draft.deliveryAddress) setDeliveryAddress(draft.deliveryAddress);
+    if (draft.pickupAddress) setPickupAddress(draft.pickupAddress);
+    if (typeof draft.acceptedOffer === 'boolean') setAcceptedOffer(draft.acceptedOffer);
+    if (typeof draft.deliverInParts === 'boolean') setDeliverInParts(draft.deliverInParts);
+  }, []);
+
+  useEffect(() => {
+    saveNewCheckoutDraft({
+      recipient,
+      fulfillmentMode,
+      deliveryRegion,
+      pvzMethod,
+      deliveryAddress,
+      pickupAddress,
+      acceptedOffer,
+      deliverInParts,
+    });
+  }, [
+    recipient,
+    fulfillmentMode,
+    deliveryRegion,
+    pvzMethod,
+    deliveryAddress,
+    pickupAddress,
+    acceptedOffer,
+    deliverInParts,
+  ]);
 
   const checkoutItemIds = useMemo(() => readNewPartsCheckoutItemIds(), []);
 
@@ -291,8 +335,9 @@ export default function NewPartsOrderRegistration() {
   }, [user]);
 
   useEffect(() => {
-    if (!isReady || !user) return;
+    if (!isReady || !user || draftHydratedRef.current) return;
     setRecipient((prev) => {
+      if (prev.fullName && prev.phone && prev.email) return prev;
       const fullName = [user.last_name, user.first_name, user.patronymic]
         .filter(Boolean)
         .join(' ')
@@ -494,6 +539,7 @@ export default function NewPartsOrderRegistration() {
       const result = await dispatch(createNewPartsOrder(buildOrderPayload())).unwrap();
       clearNewPartsCheckoutItemIds();
       clearNewPartsDeliverInParts();
+      clearNewCheckoutDraft();
       setUnpaidConfirmOpen(false);
       setPlacedOrder({
         orderId: result.order_id,
@@ -539,7 +585,7 @@ export default function NewPartsOrderRegistration() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-6 pb-16 sm:py-8">
+    <div className={`mx-auto w-full max-w-2xl px-4 py-6 sm:py-8 md:pb-8 ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
       <Link
         to="/cart"
         className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted transition hover:text-brand-600"
@@ -773,28 +819,61 @@ export default function NewPartsOrderRegistration() {
             }}
             showError={showOfferError}
           />
+          <div className="max-lg:hidden">
+            <button
+              type="button"
+              onClick={handlePay}
+              disabled={submitting}
+              className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-3.5 text-base font-semibold text-white shadow-md transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitting && submitMode === 'pay'
+                ? 'Переход к оплате…'
+                : `Оплатить ${formatMoney(orderTotal)}`}
+            </button>
+            {allowUnpaidCheckout && (
+              <button
+                type="button"
+                onClick={handleUnpaidCheckoutClick}
+                disabled={submitting}
+                className="mt-3 w-full rounded-xl border border-line bg-surface px-4 py-3.5 text-base font-semibold text-ink shadow-sg-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting && submitMode === 'unpaid' ? 'Оформление…' : 'Оформить без оплаты'}
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <ProductDetailStickyBar
+        ariaLabel="Действия с заказом"
+        priceLabel="К оплате"
+        priceValue={formatMoney(orderTotal)}
+        meta={`${selectedItems.length} поз.`}
+        className="lg:hidden"
+      >
+        <div className="flex flex-col gap-2">
           <button
             type="button"
             onClick={handlePay}
             disabled={submitting}
-            className="mt-4 w-full rounded-xl bg-brand-600 px-4 py-3.5 text-base font-semibold text-white shadow-md transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 w-full rounded-xl bg-brand-600 px-4 text-base font-semibold text-white shadow-md transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting && submitMode === 'pay'
               ? 'Переход к оплате…'
               : `Оплатить ${formatMoney(orderTotal)}`}
           </button>
-          {allowUnpaidCheckout && (
+          {allowUnpaidCheckout ? (
             <button
               type="button"
               onClick={handleUnpaidCheckoutClick}
               disabled={submitting}
-              className="mt-3 w-full rounded-xl border border-line bg-surface px-4 py-3.5 text-base font-semibold text-ink shadow-sg-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting && submitMode === 'unpaid' ? 'Оформление…' : 'Оформить без оплаты'}
             </button>
-          )}
-        </section>
-      </div>
+          ) : null}
+        </div>
+      </ProductDetailStickyBar>
 
       <ConfirmationModal
         isOpen={unpaidConfirmOpen}

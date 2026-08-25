@@ -1,7 +1,8 @@
 import React, { useMemo, useCallback } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { selectRosskoItems, selectSearchQuery, selectRosskoStatus } from '../../../redux/slices/RosskoSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectRosskoItems, selectSearchQuery, selectRosskoStatus, selectRosskoError, fetchSearchResults } from '../../../redux/slices/RosskoSlice';
+import { Button } from '../../../components/UI';
 import NewPartsEmptyResults from './NewPartsEmptyResults';
 import NewPartsFiltersForm from './NewPartsFiltersForm';
 import UsedPartsSearchCount from './UsedPartsSearchCount';
@@ -28,12 +29,14 @@ const toSafeText = (value, fallback = '') => {
 };
 
 const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
+  const dispatch = useDispatch();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const partsData = useSelector(selectRosskoItems);
   const searchQuery = useSelector(selectSearchQuery);
   const status = useSelector(selectRosskoStatus);
+  const error = useSelector(selectRosskoError);
 
   const selectedBrands = searchParams.getAll('brand');
   const priceMin = searchParams.get('vmin') || '';
@@ -145,6 +148,23 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
     </>
   );
 
+  if (status === 'failed' && safeSearchQuery) {
+    return (
+      <div className="mt-8 flex flex-col items-center px-4 text-center">
+        <p className="text-base text-red-600">Не удалось загрузить предложения</p>
+        {error ? <p className="mt-2 text-sm text-gray-500">{String(error)}</p> : null}
+        <Button
+          type="button"
+          variant="primary"
+          className="mt-4 min-h-11"
+          onClick={() => dispatch(fetchSearchResults({ text: safeSearchQuery }))}
+        >
+          Повторить
+        </Button>
+      </div>
+    );
+  }
+
   if (status === 'succeeded' && !hasResults) {
     return <NewPartsEmptyResults query={searchQuery} onSearch={onSearch} />;
   }
@@ -164,7 +184,7 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
         </p>
         <Link
           to={{ pathname: '/autoparts/new/filters', search: location.search }}
-          className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden"
+          className="inline-flex min-h-11 items-center rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden"
         >
           Фильтры
         </Link>

@@ -11,6 +11,11 @@ import LabelStorageCellsPreview from '../../../components/LabelPrint/LabelStorag
 import { buildStorageCellsForLabel } from '../../../utils/labelPrintDisplay';
 import { getLabelQrUrl } from '../../../utils/labelQrUrl';
 import { formatInternalCodeDisplay } from '../../../utils/internalCode';
+import Modal from '../../../components/UI/Modal';
+import Button from '../../../components/UI/Button';
+
+const fieldClass =
+  'w-full min-h-11 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm max-md:text-base text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30';
 
 const MM_TO_PX = 96 / 25.4;
 const PRINTER_POLL_MS = 4000;
@@ -150,10 +155,10 @@ function LabelPreview({ widthMm, heightMm, selectedPart, storageCellsForLabel })
         className="bg-white border border-gray-300 box-border shadow-sm"
         style={{
           width: `${designMm.w * MM_TO_PX}px`,
-          height: basePx.h,
+          height: `${designMm.h * MM_TO_PX}px`,
           transform: `scale(${scale})`,
           transformOrigin: 'center center',
-          overflow: 'hidden'
+          overflow: 'hidden',
         }}
       >
         <div
@@ -438,134 +443,122 @@ const PrintReceiptModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/55 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl border border-gray-100 overflow-hidden relative"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Печать этикетки"
+      size="lg"
+      footer={(
+        <Button
           type="button"
-          onClick={onClose}
-          className="absolute top-1.5 right-1.5 text-gray-400 hover:text-gray-600 transition-colors z-20 rounded-full p-1 hover:bg-gray-100"
-          aria-label="Закрыть"
+          variant="primary"
+          className="w-full sm:w-auto"
+          onClick={handlePrint}
+          disabled={!canPrint}
+          loading={printing}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <div className="p-4 sm:p-5 pt-3">
-          <div className="space-y-3 flex flex-col justify-start">
-            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50/70">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Принтер
-              </label>
-              {loading ? (
-                <div className="text-sm text-gray-500">Загрузка списка принтеров...</div>
-              ) : loadError ? (
-                <div className="text-sm text-red-600">
-                  {typeof loadError === 'string' ? loadError : 'Ошибка загрузки'}
-                  <button
-                    type="button"
-                    onClick={() => loadPrinters({ silent: false })}
-                    className="ml-2 text-indigo-600 underline hover:text-indigo-800"
-                  >
-                    Обновить
-                  </button>
-                </div>
-              ) : printers.length === 0 ? (
-                <div className="text-sm text-orange-600 space-y-2">
-                  <p>
-                    Принтеры не настроены. Запустите агент печати на компьютере с принтером и выберите принтер в настройках.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => loadPrinters({ silent: false })}
-                      className="text-indigo-600 underline hover:text-indigo-800"
-                    >
-                      Обновить
-                    </button>
-                    <Link
-                      to="/settings/printers"
-                      onClick={onClose}
-                      className="text-indigo-600 underline hover:text-indigo-800"
-                    >
-                      Перейти в настройки печати
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <select
-                  value={selectedPrinterId}
-                  onChange={(e) => handleSelectPrinter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          {printing
+            ? 'Отправка...'
+            : parsedPrintCopies
+              ? `Распечатать (${parsedPrintCopies} шт.)`
+              : 'Распечатать'}
+        </Button>
+      )}
+    >
+      <div className="space-y-3">
+        <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3">
+          <label className="mb-2 block text-sm font-semibold text-gray-700">
+            Принтер
+          </label>
+          {loading ? (
+            <div className="text-sm text-gray-500">Загрузка списка принтеров...</div>
+          ) : loadError ? (
+            <div className="text-sm text-red-600">
+              {typeof loadError === 'string' ? loadError : 'Ошибка загрузки'}
+              <button
+                type="button"
+                onClick={() => loadPrinters({ silent: false })}
+                className="ml-2 text-indigo-600 underline hover:text-indigo-800"
+              >
+                Обновить
+              </button>
+            </div>
+          ) : printers.length === 0 ? (
+            <div className="space-y-2 text-sm text-orange-600">
+              <p>
+                Принтеры не настроены. Запустите агент печати на компьютере с принтером и выберите принтер в настройках.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => loadPrinters({ silent: false })}
+                  className="text-indigo-600 underline hover:text-indigo-800"
                 >
-                  <option value="">Выберите принтер</option>
-                  {printers.map((printer) => (
-                    <option
-                      key={printer.id}
-                      value={printer.id}
-                      disabled={!printer.is_online}
-                    >
-                      {printer.name}
-                      {printer.is_default ? ' (По умолчанию)' : ''}
-                      {printer.is_current ? ' · текущий' : ''}
-                      {!printer.is_online ? ' · офлайн' : ''}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50/70">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Количество этикеток
-                <span className="font-normal text-gray-500">
-                  {' '}
-                  · остаток {partQuantity.toLocaleString('ru-RU')} шт.
-                </span>
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                value={printCopiesInput}
-                onChange={handleCopiesChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-
-            <div className="p-2 rounded-xl bg-white border border-gray-200">
-              <div className="flex justify-center items-center w-full">
-                <LabelPreview
-                  widthMm={labelWidthMm}
-                  heightMm={labelHeightMm}
-                  selectedPart={selectedPart}
-                  storageCellsForLabel={storageCellsForLabel}
-                />
+                  Обновить
+                </button>
+                <Link
+                  to="/settings/printers"
+                  onClick={onClose}
+                  className="text-indigo-600 underline hover:text-indigo-800"
+                >
+                  Перейти в настройки печати
+                </Link>
               </div>
             </div>
+          ) : (
+            <select
+              value={selectedPrinterId}
+              onChange={(e) => handleSelectPrinter(e.target.value)}
+              className={fieldClass}
+            >
+              <option value="">Выберите принтер</option>
+              {printers.map((printer) => (
+                <option
+                  key={printer.id}
+                  value={printer.id}
+                  disabled={!printer.is_online}
+                >
+                  {printer.name}
+                  {printer.is_default ? ' (По умолчанию)' : ''}
+                  {printer.is_current ? ' · текущий' : ''}
+                  {!printer.is_online ? ' · офлайн' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
 
-            <button
-                type="button"
-                onClick={handlePrint}
-                disabled={!canPrint}
-                className={`w-full px-4 py-2.5 rounded-lg font-semibold transition-colors ${!canPrint
-                  ? 'bg-indigo-400 text-white cursor-not-allowed'
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                  }`}
-              >
-                {printing
-                  ? 'Отправка...'
-                  : parsedPrintCopies
-                    ? `Распечатать (${parsedPrintCopies} шт.)`
-                    : 'Распечатать'}
-              </button>
-          </div>
+        <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3">
+          <label className="mb-2 block text-sm font-semibold text-gray-700">
+            Количество этикеток
+            <span className="font-normal text-gray-500">
+              {' '}
+              · остаток {partQuantity.toLocaleString('ru-RU')} шт.
+            </span>
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={printCopiesInput}
+            onChange={handleCopiesChange}
+            className={fieldClass}
+          />
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-2">
+          <LabelPreview
+            widthMm={labelWidthMm}
+            heightMm={labelHeightMm}
+            selectedPart={selectedPart}
+            storageCellsForLabel={storageCellsForLabel}
+          />
+          <p className="mt-2 px-1 text-center text-[11px] text-gray-500">
+            На экране — приблизительный масштаб. На печати: {labelWidthMm}×{labelHeightMm} мм.
+          </p>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 

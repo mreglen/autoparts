@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import { ConfirmDialog } from '../../components/UI/Modal';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { PageHeader } from '../../components/UI/SectionHeader';
 import Card from '../../components/UI/Card';
 import { Badge } from '../../components/UI/Badge';
 import Button from '../../components/UI/Button';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   disableAutoserviceOrganization,
   fetchAutoserviceConnectedOrgs,
@@ -31,6 +32,10 @@ export default function AutoserviceApplicationsPage() {
   const [toggleOrgId, setToggleOrgId] = useState(null);
   const [toggleToPaused, setToggleToPaused] = useState(true);
 
+  const refresh = useCallback(() => {
+    dispatch(fetchAutoserviceConnectedOrgs());
+  }, [dispatch]);
+
   useEffect(() => {
     if (!isReady) return;
     if (!user?.is_admin) navigate('/', { replace: true });
@@ -38,13 +43,19 @@ export default function AutoserviceApplicationsPage() {
 
   useEffect(() => {
     if (isReady && user?.is_admin) {
-      dispatch(fetchAutoserviceConnectedOrgs());
+      refresh();
     }
-  }, [dispatch, isReady, user?.is_admin]);
+  }, [isReady, user?.is_admin, refresh]);
 
-  const refresh = () => {
-    dispatch(fetchAutoserviceConnectedOrgs());
-  };
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/moderation/autoservice-applications') {
+        refresh();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [refresh]);
 
   const handleDisable = async () => {
     if (!disableOrgId) return;
@@ -67,7 +78,7 @@ export default function AutoserviceApplicationsPage() {
   if (!isReady || !user?.is_admin) return null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
       <PageHeader
         title="Регистрация автосервиса"
         subtitle="Подключённые автосервисы и управление тарифом"
@@ -112,7 +123,6 @@ export default function AutoserviceApplicationsPage() {
                   <div className="flex flex-wrap justify-end gap-2">
                     {org.is_paused ? (
                       <Button
-                        size="sm"
                         variant="secondary"
                         onClick={() => {
                           setToggleOrgId(org.organization_id);
@@ -124,7 +134,6 @@ export default function AutoserviceApplicationsPage() {
                       </Button>
                     ) : (
                       <Button
-                        size="sm"
                         variant="secondary"
                         onClick={() => {
                           setToggleOrgId(org.organization_id);
@@ -136,7 +145,6 @@ export default function AutoserviceApplicationsPage() {
                       </Button>
                     )}
                     <Button
-                      size="sm"
                       variant="secondary"
                       onClick={() => setDisableOrgId(org.organization_id)}
                       disabled={actionLoading}
@@ -151,16 +159,18 @@ export default function AutoserviceApplicationsPage() {
         )}
       </section>
 
-      <ConfirmationModal
-        isOpen={Boolean(disableOrgId)}
+      <ConfirmDialog
+        open={Boolean(disableOrgId)}
         onClose={() => setDisableOrgId(null)}
         onConfirm={handleDisable}
         title="Отключить автосервис?"
         message="Организация потеряет доступ к автосервисному кабинету. Продавец продолжит работать как обычно."
-        confirmText="Отключить"
+        confirmLabel="Отключить"
+        danger
+        loading={actionLoading}
       />
-      <ConfirmationModal
-        isOpen={Boolean(toggleOrgId)}
+      <ConfirmDialog
+        open={Boolean(toggleOrgId)}
         onClose={() => setToggleOrgId(null)}
         onConfirm={handleTogglePause}
         title={toggleToPaused ? 'Приостановить автосервис?' : 'Возобновить автосервис?'}
@@ -169,7 +179,8 @@ export default function AutoserviceApplicationsPage() {
             ? 'Автосервис будет приостановлен: наценка на новые запчасти станет как у обычного продавца.'
             : 'Автосервис будет возобновлен: наценка на новые запчасти станет автосервисной (7%).'
         }
-        confirmText={toggleToPaused ? 'Приостановить' : 'Возобновить'}
+        confirmLabel={toggleToPaused ? 'Приостановить' : 'Возобновить'}
+        loading={actionLoading}
       />
     </div>
   );

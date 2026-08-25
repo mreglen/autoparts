@@ -293,7 +293,7 @@ export default function VinCatalogBrowse({
           <span className="text-xs font-medium text-emerald-700">в гараже</span>
         ) : null}
         {!token && inGarage === false ? (
-          <Link to="/login" className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+          <Link to="/auth" className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
             Войти
           </Link>
         ) : null}
@@ -303,7 +303,7 @@ export default function VinCatalogBrowse({
         <button
           type="button"
           onClick={() => setMobileTreeOpen((v) => !v)}
-          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800"
+          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800"
         >
           {mobileTreeOpen ? 'Скрыть разделы' : 'Разделы'}
         </button>
@@ -352,13 +352,13 @@ export default function VinCatalogBrowse({
                     <label className="block text-sm text-gray-700">{cond.name || `Параметр ${idx + 1}`}</label>
                     {isInput ? (
                       <input
-                        className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm max-md:min-h-11 max-md:text-base"
                         value={filterStep.answers[idx] || ''}
                         onChange={(e) => onSetFilterAnswer(idx, e.target.value)}
                       />
                     ) : (
                       <select
-                        className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm max-md:min-h-11 max-md:text-base"
                         value={filterStep.answers[idx] || ''}
                         onChange={(e) => onSetFilterAnswer(idx, e.target.value)}
                       >

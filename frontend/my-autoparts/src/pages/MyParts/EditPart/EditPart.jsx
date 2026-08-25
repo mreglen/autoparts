@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateProduct, uploadPhotos, uploadMedia, clearProductError, resetProducts, fetchProduct, deleteProductPhotos, deleteProductVideos, deleteProductVideo } from '../../../redux/slices/ProductSlice';
@@ -20,9 +20,15 @@ import {
   hasPartFormErrors,
   partFieldClass,
   partFieldLabelClass,
+  partTextareaClass,
   scrollToFirstPartFormError,
   validatePartForm,
 } from '../../../utils/partFormValidation';
+import {
+  clearPartFormSessionCache,
+  readPartFormSessionCache,
+} from '../../../utils/productDraftUtils';
+import usePartFormLocalCache from '../../../hooks/usePartFormLocalCache';
 
 const EditPart = () => {
   const navigate = useNavigate();
@@ -157,6 +163,38 @@ const EditPart = () => {
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [uploadedTempFiles, setUploadedTempFiles] = useState([]); // Track uploaded temp filenames
   const [uploadProgress, setUploadProgress] = useState({}); // Track upload status by file index
+
+  const restoreLocalSnapshot = useCallback((snapshot) => {
+    if (!snapshot) return;
+    if (snapshot.formData) setFormData(snapshot.formData);
+    if (snapshot.existingPhotos) setExistingPhotos(snapshot.existingPhotos);
+    if (snapshot.existingVideos) setExistingVideos(snapshot.existingVideos);
+    if (snapshot.photos) setPhotos(snapshot.photos);
+    if (snapshot.videos) setVideos(snapshot.videos);
+    if (snapshot.cellValues) setCellValues(snapshot.cellValues);
+    else if (snapshot.cellQuantities) setCellValues(snapshot.cellQuantities);
+    if (snapshot.vehicle) setSelectedVehicle(snapshot.vehicle);
+  }, []);
+
+  const getLocalFormSnapshot = useCallback(() => ({
+    formData,
+    existingPhotos,
+    existingVideos,
+    photos,
+    videos,
+    cellValues,
+    cellQuantities: cellValues,
+    vehicle: selectedVehicle,
+    vehicleId: selectedVehicle?.id ?? null,
+  }), [formData, existingPhotos, existingVideos, photos, videos, cellValues, selectedVehicle]);
+
+  const { markApiLoaded, tryRestoreFromCache, flushCache } = usePartFormLocalCache({
+    mode: 'edit',
+    cacheId: id,
+    enabled: Boolean(id && productLoaded && isReady && canAccess),
+    getSnapshot: getLocalFormSnapshot,
+    onRestore: restoreLocalSnapshot,
+  });
   
   // Состояние для медиа модалки
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -223,7 +261,10 @@ const EditPart = () => {
       }
 
       loadProductStorageCells(productId);
-  }, [currentProduct, productLoaded, dispatch, id]);
+
+      markApiLoaded();
+      tryRestoreFromCache(readPartFormSessionCache('edit', id));
+  }, [currentProduct, productLoaded, dispatch, id, markApiLoaded, tryRestoreFromCache]);
   
   // Refresh storage cell data when storage cells are modified
   // This ensures we get updated data after additions/deletions
@@ -1034,6 +1075,8 @@ const EditPart = () => {
 
       // Очищаем выбранные фото после успешного сохранения
       setSelectedPhotosForRemoval([]);
+      clearPartFormSessionCache('edit', id);
+      flushCache();
 
       navigate('/my-parts');
     } catch (err) {
@@ -1171,7 +1214,7 @@ const EditPart = () => {
             value={formData.description}
             onChange={handleInputChange}
             rows="4"
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partTextareaClass()}
             placeholder="Введите описание запчасти..."
           />
           {!aiDescriptionLoading && aiDescriptionAccess?.show_ui && (
@@ -1257,7 +1300,7 @@ const EditPart = () => {
                         <div className="relative">
                           <video
                             src={normalizedUrl}
-                            className="w-12 h-12 object-cover rounded"
+                            className="h-11 w-11 object-cover rounded"
                             controls={false}
                             muted
                             playsInline

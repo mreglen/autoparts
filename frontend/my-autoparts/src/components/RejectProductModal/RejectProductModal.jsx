@@ -1,92 +1,59 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import Modal from '../UI/Modal';
+import Button from '../UI/Button';
 
 const RejectProductModal = ({ isOpen, onClose, onReject, productName }) => {
-    const [reason, setReason] = useState('');
-    const [error, setError] = useState('');
+  const [reason, setReason] = useState('');
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        onReject(reason.trim());
-        setReason('');
-        setError('');
-    };
+  useEffect(() => {
+    if (!isOpen) setReason('');
+  }, [isOpen]);
 
-    const handleClose = () => {
-        setReason('');
-        setError('');
-        onClose();
-    };
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onReject(reason.trim());
+    setReason('');
+  };
 
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[110] p-4">
-            <div className="bg-white rounded-lg max-w-md w-full mx-4">
-                <div className="p-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                            Отклонить запчасть
-                        </h3>
-                        <button
-                            onClick={handleClose}
-                            className="text-gray-400 hover:text-gray-600"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                    
-                    {productName && (
-                        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                            <p className="text-sm text-gray-600">Запчасть:</p>
-                            <p className="font-medium text-gray-900">{productName}</p>
-                        </div>
-                    )}
-                    
-                    <form onSubmit={handleSubmit}>
-                        <div className="mb-4">
-                            <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">
-                                Комментарий (необязательно)
-                            </label>
-                            <textarea
-                                id="reason"
-                                value={reason}
-                                onChange={(e) => {
-                                    setReason(e.target.value);
-                                    if (error) setError('');
-                                }}
-                                rows="4"
-                                className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                                    error ? 'border-red-500' : 'border-gray-300'
-                                }`}
-                                placeholder="Укажите причину отклонения, если нужно..."
-                            />
-                            {error && (
-                                <p className="mt-1 text-sm text-red-600">{error}</p>
-                            )}
-                        </div>
-                        
-                        <div className="flex gap-3 pt-4">
-                            <button
-                                type="submit"
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors"
-                            >
-                                Отклонить
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleClose}
-                                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded-md transition-colors"
-                            >
-                                Отмена
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+  return (
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Отклонить запчасть"
+      size="sm"
+      footer={(
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button type="submit" form="reject-product-form" variant="danger" className="w-full sm:w-auto">
+            Отклонить
+          </Button>
         </div>
-    );
+      )}
+    >
+      {productName ? (
+        <div className="mb-4 rounded-lg bg-gray-50 p-3">
+          <p className="text-sm text-gray-600">Запчасть:</p>
+          <p className="font-medium text-gray-900">{productName}</p>
+        </div>
+      ) : null}
+
+      <form id="reject-product-form" onSubmit={handleSubmit}>
+        <label htmlFor="reject-product-reason" className="mb-2 block text-sm font-medium text-gray-700">
+          Комментарий (необязательно)
+        </label>
+        <textarea
+          id="reject-product-reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={4}
+          className="w-full min-h-[6rem] rounded-xl border border-gray-300 px-3 py-2 text-sm max-md:text-base focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          placeholder="Укажите причину отклонения, если нужно..."
+        />
+      </form>
+    </Modal>
+  );
 };
 
 export default RejectProductModal;

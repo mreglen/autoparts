@@ -3,6 +3,21 @@
   --sg-yandex-badge-h: 0px;
   --sg-mobile-header-h: calc(3.75rem + var(--sg-yandex-badge-h) + env(safe-area-inset-top, 0px));
   --sg-desktop-header-h: calc(2.25rem + 4.25rem + 2px + var(--sg-yandex-badge-h));
+
+  /* Sync with src/constants/mobileTokens.js */
+  --sg-mobile-bottom-nav-h: 3.5rem;
+  --sg-mobile-bottom-nav-safe-pad: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  --sg-mobile-bottom-nav-total: calc(var(--sg-mobile-bottom-nav-h) + var(--sg-mobile-bottom-nav-safe-pad));
+  --sg-mobile-sticky-bottom-offset: calc(var(--sg-mobile-bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+
+  --sg-z-mobile-header: 40;
+  --sg-z-mobile-sticky-footer: 45;
+  --sg-z-mobile-pwa-prompt: 48;
+  --sg-z-mobile-bottom-nav: 50;
+  --sg-z-cookie-banner: 56;
+  --sg-z-mobile-drawer: 60;
+  --sg-z-modal: 110;
+  --sg-z-context-menu: 120;
 }
 
 html.sg-yandex-badge-on {
@@ -228,6 +243,29 @@ input[type="password"] {
 
 .pt-safe-top {
   padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Mobile shell: page padding above bottom nav (sync mobileTokens MOBILE_PAGE_BOTTOM_PAD) */
+.pb-mobile-nav {
+  padding-bottom: var(--sg-mobile-bottom-nav-total);
+}
+
+@media (min-width: 1024px) {
+  .pb-mobile-nav {
+    padding-bottom: 0;
+  }
+}
+
+.sg-mobile-sticky-footer {
+  position: fixed;
+  inset-inline: 0;
+  bottom: var(--sg-mobile-sticky-bottom-offset);
+  z-index: var(--sg-z-mobile-sticky-footer);
+}
+
+.sg-pwa-prompt-offset {
+  bottom: var(--sg-mobile-sticky-bottom-offset);
+  margin-bottom: 0.5rem;
 }
 
 /* Ensure full height works correctly on mobile */

@@ -1,3 +1,4 @@
+/** @deprecated Unused — active mobile cards live in `ModerationProductRow` (`productModerationShared.jsx`). */
 import React, { useState } from 'react';
 import { normalizeImageUrl } from '../../utils/apiClient';
 

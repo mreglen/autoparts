@@ -5,9 +5,10 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
-import Modal from '../../components/UI/Modal';
+import Modal, { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   candidateLabel,
   mapCandidateToGarageCreatePayload,
@@ -245,6 +246,7 @@ export default function GaragePage() {
   const [editVehicle, setEditVehicle] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   const loadVehicles = useCallback(async () => {
     setVehiclesLoading(true);
@@ -271,6 +273,16 @@ export default function GaragePage() {
       loadVehicles();
     }
   }, [isReady, isAuthenticated, isClient, loadVehicles]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/garage') {
+        loadVehicles();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [loadVehicles]);
 
   const openAdd = useCallback(() => {
     setAddStep('vin');
@@ -524,12 +536,12 @@ export default function GaragePage() {
   };
 
   const handleDeleteVehicle = async (id) => {
-    if (!window.confirm('Удалить автомобиль из гаража?')) return;
     setDeletingId(id);
     setPageError(null);
     try {
       await apiRequest(`/autoservice/garage/vehicles/${id}`, { method: 'DELETE' });
       setVehicles((prev) => prev.filter((v) => v.id !== id));
+      setDeleteConfirmId(null);
     } catch (err) {
       setPageError(err?.message || 'Не удалось удалить');
     } finally {
@@ -681,7 +693,7 @@ export default function GaragePage() {
                       disabled={deletingId === v.id}
                     >
                       <ActionsDropdownItem onClick={() => setEditVehicle(v)}>Изменить</ActionsDropdownItem>
-                      <ActionsDropdownItem danger onClick={() => handleDeleteVehicle(v.id)}>
+                      <ActionsDropdownItem danger onClick={() => setDeleteConfirmId(v.id)}>
                         {deletingId === v.id ? 'Удаление…' : 'Удалить'}
                       </ActionsDropdownItem>
                     </ActionsDropdown>
@@ -709,7 +721,7 @@ export default function GaragePage() {
               vehicle={v}
               deletingId={deletingId}
               onEdit={() => setEditVehicle(v)}
-              onDelete={() => handleDeleteVehicle(v.id)}
+              onDelete={() => setDeleteConfirmId(v.id)}
             />
           ))
         )}
@@ -858,6 +870,20 @@ export default function GaragePage() {
           />
         ) : null}
       </Modal>
+
+      <ConfirmDialog
+        open={deleteConfirmId != null}
+        onClose={() => {
+          if (!deletingId) setDeleteConfirmId(null);
+        }}
+        onConfirm={() => handleDeleteVehicle(deleteConfirmId)}
+        title="Удалить автомобиль?"
+        message="Автомобиль будет удалён из гаража."
+        confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        danger
+        loading={Boolean(deletingId)}
+      />
     </div>
   );
 }

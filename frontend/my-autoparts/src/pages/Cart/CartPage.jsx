@@ -9,6 +9,7 @@ import {
 } from '../../utils/repairOrderCartDraft';
 import { canAccessRepairOrders } from '../../utils/autoservicePermissions';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
+import useNetworkStatus from '../../hooks/useNetworkStatus';
 import {
   selectCart,
   selectCartLoading,
@@ -32,6 +33,8 @@ import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
 import EmptyState from '../../components/UI/EmptyState';
+import ResponsiveDataView from '../../components/ResponsiveDataView/ResponsiveDataView';
+import CartItemMobileCard from './CartItemMobileCard';
 import { FieldLabel, Input } from '../../components/UI/Field';
 import { PageHeader } from '../../components/UI/SectionHeader';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../redux/slices/ClientMarkupSlice';
@@ -91,7 +94,7 @@ function QuantityStepper({ quantity, onDecrease, onIncrease, max, disabled = fal
         type="button"
         onClick={onDecrease}
         disabled={disabled || atMin}
-        className="flex h-8 w-7 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
+        className="flex h-11 w-11 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
         aria-label="Уменьшить"
       >
         −
@@ -100,7 +103,7 @@ function QuantityStepper({ quantity, onDecrease, onIncrease, max, disabled = fal
         type="text"
         readOnly
         value={quantity}
-        className="h-8 w-9 border-x border-line bg-surface text-center text-sm font-medium text-ink"
+        className="h-11 w-10 border-x border-line bg-surface text-center text-sm font-medium text-ink"
         aria-label="Количество"
         title={max > 0 ? `Доступно: ${max}` : undefined}
       />
@@ -108,7 +111,7 @@ function QuantityStepper({ quantity, onDecrease, onIncrease, max, disabled = fal
         type="button"
         onClick={onIncrease}
         disabled={disabled || atMax}
-        className="flex h-8 w-7 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
+        className="flex h-11 w-11 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
         aria-label="Увеличить"
         title={atMax ? `Максимум ${max} шт.` : undefined}
       >
@@ -191,7 +194,7 @@ function CartTableRow({
         <button
           type="button"
           onClick={() => onRemove(item.id)}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-muted transition hover:bg-danger-50 hover:text-danger-600"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md text-ink-muted transition hover:bg-danger-50 hover:text-danger-600"
           aria-label="Удалить"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -200,6 +203,83 @@ function CartTableRow({
         </button>
       </td>
     </tr>
+  );
+}
+
+function CartBlockMobileMenu({
+  someSelected,
+  showMoveAction,
+  onMoveSelected,
+  showRepairOrderAction,
+  onAddToRepairOrder,
+  onRemoveSelected,
+  onClearAll,
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const actions = [
+    someSelected && showMoveAction && onMoveSelected
+      ? { label: 'Переместить', onClick: onMoveSelected }
+      : null,
+    someSelected && showRepairOrderAction && onAddToRepairOrder
+      ? { label: 'В заказ-наряд', onClick: onAddToRepairOrder }
+      : null,
+    someSelected
+      ? { label: 'Удалить выбранное', onClick: onRemoveSelected, danger: true }
+      : null,
+    { label: 'Очистить корзину', onClick: onClearAll, danger: true },
+  ].filter(Boolean);
+
+  if (!actions.length) return null;
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sg border border-line bg-surface px-3 text-sm font-medium text-ink transition hover:bg-surface-muted"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Дополнительные действия"
+      >
+        ⋯
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-10 mt-1 min-w-[12rem] overflow-hidden rounded-sg border border-line bg-surface py-1 shadow-lg"
+        >
+          {actions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                action.onClick?.();
+              }}
+              className={`block w-full px-4 py-2.5 text-left text-sm transition hover:bg-surface-muted ${
+                action.danger ? 'text-danger-600' : 'text-ink'
+              }`}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -233,6 +313,7 @@ function CartTableBlock({
   deliverInParts = false,
   onDeliverInPartsChange,
 }) {
+  const { offline } = useNetworkStatus();
   const allSelected = items.length > 0 && items.every((item) => selectedItems.has(item.id));
   const someSelected = items.some((item) => selectedItems.has(item.id));
   const selectedCount = items.filter((item) => selectedItems.has(item.id)).length;
@@ -252,8 +333,8 @@ function CartTableBlock({
 
   return (
     <section className="overflow-hidden rounded-sg border-2 border-brand-200 bg-surface shadow-sm">
-      <header className="flex flex-wrap items-center gap-3 border-b border-brand-200 bg-brand-100 px-3 py-3 sm:px-4">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      <header className="border-b border-brand-200 bg-brand-100 px-3 py-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2">
           <h2 className="truncate text-base font-semibold text-ink sm:text-lg">{title}</h2>
           {canRename && onRename ? (
             <button
@@ -272,9 +353,32 @@ function CartTableBlock({
               </svg>
             </button>
           ) : null}
+          <p className="hidden text-lg font-bold text-ink md:ml-auto md:block">{formatItemPrice(displayTotal)}</p>
         </div>
-        <p className="text-lg font-bold text-ink sm:ml-auto">{formatItemPrice(displayTotal)}</p>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+
+        {/* Mobile toolbar */}
+        <div className="mt-3 flex items-center gap-2 md:hidden">
+          <p className="text-lg font-bold text-ink">{formatItemPrice(displayTotal)}</p>
+          <Button
+            className="min-h-11 flex-1"
+            disabled={offline}
+            onClick={someSelected ? onCheckoutSelected : onCheckout}
+          >
+            {someSelected ? `Оформить (${selectedCount})` : checkoutLabel}
+          </Button>
+          <CartBlockMobileMenu
+            someSelected={someSelected}
+            showMoveAction={showMoveAction}
+            onMoveSelected={onMoveSelected}
+            showRepairOrderAction={showRepairOrderAction}
+            onAddToRepairOrder={onAddToRepairOrder}
+            onRemoveSelected={onRemoveSelected}
+            onClearAll={onClearAll}
+          />
+        </div>
+
+        {/* Desktop toolbar */}
+        <div className="mt-3 hidden flex-wrap items-center gap-2 md:mt-0 md:flex md:w-auto md:justify-end">
           {someSelected ? (
             <>
               {showMoveAction && onMoveSelected ? (
@@ -290,7 +394,7 @@ function CartTableBlock({
               <Button variant="secondary" size="sm" onClick={onRemoveSelected}>
                 Удалить выбранное
               </Button>
-              <Button variant="soft" size="sm" onClick={onCheckoutSelected}>
+              <Button variant="soft" size="sm" disabled={offline} onClick={onCheckoutSelected}>
                 Оформить выбранное ({selectedCount})
               </Button>
             </>
@@ -298,7 +402,7 @@ function CartTableBlock({
           <Button variant="secondary" size="sm" onClick={onClearAll}>
             Очистить
           </Button>
-          <Button size="sm" onClick={onCheckout}>
+          <Button size="sm" disabled={offline} onClick={onCheckout}>
             {checkoutLabel}
           </Button>
         </div>
@@ -325,56 +429,99 @@ function CartTableBlock({
         </div>
       ) : null}
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-left">
-          <thead>
-            <tr className="border-b border-line bg-surface-muted/60 text-xs font-medium uppercase tracking-wide text-ink-muted">
-              <th className="w-10 px-2 py-2.5">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected && !allSelected;
-                  }}
-                  onChange={onSelectAll}
-                  className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
-                  aria-label={`Выбрать все в ${title}`}
-                />
-              </th>
-              <th className="px-2 py-2.5">Запчасть</th>
-              <th className="px-2 py-2.5">Наименование</th>
-              {showDeliveryColumn ? <th className="px-2 py-2.5">Доставка</th> : null}
-              <th className="px-2 py-2.5 text-right">
-                <span className="inline-flex items-center justify-end gap-1.5">
-                  {showClientMarkupControl ? <ClientMarkupPopover /> : null}
-                  <span>Цена, ₽</span>
-                </span>
-              </th>
-              <th className="px-2 py-2.5">Кол-во</th>
-              <th className="px-2 py-2.5 text-right">Стоимость, ₽</th>
-              <th className="w-10 px-2 py-2.5" aria-hidden />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <CartTableRow
-                key={item.id}
-                item={item}
-                selected={selectedItems.has(item.id)}
-                onSelect={() => onItemSelect(item.id)}
-                onQuantityChange={onQuantityChange}
-                onRemove={onRemove}
-                showDeliveryColumn={showDeliveryColumn}
-                clientMarkupEnabled={clientMarkupEnabled}
-                clientMarkupPercent={clientMarkupPercent}
-                showBothPrices={showBothPrices}
-                formatItemPrice={formatItemPrice}
-                quantityBusy={quantityUpdatingIds.includes(item.id)}
+      <ResponsiveDataView
+        isEmpty={false}
+        renderDesktop={() => (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-left">
+              <thead>
+                <tr className="border-b border-line bg-surface-muted/60 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                  <th className="w-10 px-2 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someSelected && !allSelected;
+                      }}
+                      onChange={onSelectAll}
+                      className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+                      aria-label={`Выбрать все в ${title}`}
+                    />
+                  </th>
+                  <th className="px-2 py-2.5">Запчасть</th>
+                  <th className="px-2 py-2.5">Наименование</th>
+                  {showDeliveryColumn ? <th className="px-2 py-2.5">Доставка</th> : null}
+                  <th className="px-2 py-2.5 text-right">
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      {showClientMarkupControl ? <ClientMarkupPopover /> : null}
+                      <span>Цена, ₽</span>
+                    </span>
+                  </th>
+                  <th className="px-2 py-2.5">Кол-во</th>
+                  <th className="px-2 py-2.5 text-right">Стоимость, ₽</th>
+                  <th className="w-10 px-2 py-2.5" aria-hidden />
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <CartTableRow
+                    key={item.id}
+                    item={item}
+                    selected={selectedItems.has(item.id)}
+                    onSelect={() => onItemSelect(item.id)}
+                    onQuantityChange={onQuantityChange}
+                    onRemove={onRemove}
+                    showDeliveryColumn={showDeliveryColumn}
+                    clientMarkupEnabled={clientMarkupEnabled}
+                    clientMarkupPercent={clientMarkupPercent}
+                    showBothPrices={showBothPrices}
+                    formatItemPrice={formatItemPrice}
+                    quantityBusy={quantityUpdatingIds.includes(item.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        renderMobile={() => (
+          <>
+            <div className="flex items-center gap-2 border-b border-line bg-surface-muted/40 px-3 py-2">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someSelected && !allSelected;
+                }}
+                onChange={onSelectAll}
+                className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+                aria-label={`Выбрать все в ${title}`}
               />
-            ))}
-          </tbody>
-        </table>
-      </div>
+              <span className="text-xs font-medium text-ink-muted">Выбрать все</span>
+            </div>
+            <div className="space-y-3 p-3">
+              {items.map((item) => (
+                <CartItemMobileCard
+                  key={item.id}
+                  item={item}
+                  selected={selectedItems.has(item.id)}
+                  onSelect={() => onItemSelect(item.id)}
+                  onQuantityChange={onQuantityChange}
+                  onRemove={onRemove}
+                  showDeliveryColumn={showDeliveryColumn}
+                  clientMarkupEnabled={clientMarkupEnabled}
+                  clientMarkupPercent={clientMarkupPercent}
+                  showBothPrices={showBothPrices}
+                  formatItemPrice={formatItemPrice}
+                  quantityBusy={quantityUpdatingIds.includes(item.id)}
+                  checkoutPrice={checkoutPrice}
+                  clientPrice={clientPrice}
+                  getMaxAllowedQuantity={getMaxAllowedQuantity}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      />
     </section>
   );
 }

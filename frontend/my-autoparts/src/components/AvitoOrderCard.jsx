@@ -185,7 +185,7 @@ export function AvitoOrderCard({
                   onBlur={() => onEditStatus(null)}
                   onClick={(e) => e.stopPropagation()}
                   disabled={Boolean(transitionLoadingByOrderId?.[order.id]) || transitionOptions.length === 0}
-                  className="max-w-[12rem] rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs font-medium focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  className="max-w-[12rem] min-h-11 rounded-lg border border-gray-300 bg-white px-2 text-sm font-medium focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                   autoFocus
                 >
                   <option value="" disabled>
@@ -209,7 +209,7 @@ export function AvitoOrderCard({
                     }
                   }}
                   disabled={Boolean(transitionLoadingByOrderId?.[order.id])}
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium transition hover:opacity-90 disabled:opacity-60 ${getAvitoStatusColor(order.avito_status_code)}`}
+                  className={`inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium transition hover:opacity-90 disabled:opacity-60 ${getAvitoStatusColor(order.avito_status_code)}`}
                   title="Изменить статус"
                 >
                   {transitionLoadingByOrderId?.[order.id]
@@ -248,7 +248,7 @@ export function AvitoOrderCard({
                   onRetryWarehouse(order);
                 }}
                 disabled={Boolean(warehouseRetryLoadingByOrderId?.[order.id])}
-                className="inline-flex shrink-0 items-center justify-center rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-700 disabled:opacity-50"
+                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-amber-600 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-amber-700 disabled:opacity-50"
               >
                 {warehouseRetryLoadingByOrderId?.[order.id]
                   ? 'Проводим склад…'

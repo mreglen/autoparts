@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useParams, useLocation } from 'react-router-dom';
 import {
   connectWebSocket,
   disconnectWebSocket,
@@ -15,12 +15,25 @@ import {
   setReplyToMessage,
   clearIncomingChatAlert,
 } from '../../redux/slices/ChatSlice';
-import { fetchAvitoMessengerEnabled, setSelectedAvitoChatId, fetchAvitoMessages, fetchAvitoChatDetail, sendAvitoMessage, fetchAvitoChats, fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
+import {
+  fetchAvitoMessengerEnabled,
+  setSelectedAvitoChatId,
+  fetchAvitoMessages,
+  fetchAvitoChatDetail,
+  sendAvitoMessage,
+  fetchAvitoChats,
+  fetchAvitoChatProductLink,
+  markAvitoChatRead,
+} from '../../redux/slices/AvitoChatSlice';
+import { resolveActiveChatParams, buildChatsQueryUrl } from '../../utils/resolveActiveChatParams';
+import { getUnifiedChatUnreadCount } from '../../utils/chatUnread';
+import useVisualViewportInset from '../../hooks/useVisualViewportInset';
+import { useChatMediaBlobUrl } from '../../utils/chatMediaAuth';
 import MediaLightbox from './MediaLightbox';
+import VoicePlayer from './VoicePlayer';
 import ReplyPreview from './ReplyPreview';
 import SwipeableMessage from './SwipeableMessage';
 import ReplyArrow from './ReplyArrow';
-import { API_BASE } from '../../utils/apiClient';
 import UserAvatar from '../../components/UserAvatar/UserAvatar';
 import ChatParticipantsPanel from './ChatParticipantsPanel';
 import CreateGroupChatModal from './CreateGroupChatModal';
@@ -136,6 +149,55 @@ function SourceBadge({ source, className = '' }) {
   );
 }
 
+function GarageChatMediaPreview({ mediaItem, onOpen }) {
+  const { url, loading, error } = useChatMediaBlobUrl(mediaItem.id, {
+    enabled: !mediaItem.is_processing,
+  });
+
+  if (mediaItem.is_processing) {
+    return (
+      <div className="flex h-32 items-center justify-center rounded-lg bg-black/5">
+        <svg className="h-6 w-6 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <div className="h-32 animate-pulse rounded-lg bg-gray-100" />;
+  }
+
+  if (error || !url) {
+    return <p className="text-xs text-gray-400">Не удалось загрузить медиа</p>;
+  }
+
+  if (mediaItem.media_type === 'image') {
+    return (
+      <img
+        src={url}
+        alt=""
+        className="max-h-64 max-w-full cursor-pointer rounded-lg object-contain transition-opacity hover:opacity-90"
+        onClick={() => onOpen(mediaItem.id)}
+      />
+    );
+  }
+
+  if (mediaItem.media_type === 'video') {
+    return (
+      <video
+        controls
+        src={url}
+        className="max-h-64 max-w-full cursor-pointer rounded-lg"
+        onClick={() => onOpen(mediaItem.id)}
+      />
+    );
+  }
+
+  return null;
+}
+
 function ChatEmptyState({ icon, title, subtitle, action }) {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
@@ -198,6 +260,8 @@ function ChatPanelHeader({ onBack, avatar, title, subtitle, subtitleAction, badg
 const ChatsHubPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const routeParams = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useSelector((state) => state.auth);
   const { chats: garageChats, currentChat, loading: garageLoading, error: garageError, incomingChatAlert } = useSelector((state) => state.chats);
@@ -213,9 +277,16 @@ const ChatsHubPage = () => {
     sending: avitoSending,
   } = useSelector((state) => state.avitoChats);
   
-  const avitoChatId = searchParams.get('avitoChatId');
-  const activeChatSource = searchParams.get('source');
-  const activeChatId = searchParams.get('chatId');
+  const {
+    chatId: activeChatId,
+    source: activeChatSource,
+    avitoChatId,
+    needsPathCanonicalization,
+    pathChatId,
+  } = useMemo(
+    () => resolveActiveChatParams(location.pathname, searchParams, routeParams),
+    [location.pathname, searchParams, routeParams],
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [createChatOpen, setCreateChatOpen] = useState(false);
@@ -232,12 +303,25 @@ const ChatsHubPage = () => {
   useEffect(() => {
     if (!user?.id) return;
     dispatch(connectWebSocket(user.id));
-    dispatch(subscribeToPushNotifications({ prompt: true }));
+    dispatch(subscribeToPushNotifications({ prompt: false }));
 
     return () => {
       dispatch(disconnectWebSocket());
     };
   }, [dispatch, user?.id]);
+
+  useEffect(() => {
+    if (!needsPathCanonicalization || !pathChatId) return;
+    const source = searchParams.get('source') || 'garage';
+    navigate(
+      buildChatsQueryUrl({
+        chatId: pathChatId,
+        source,
+        avitoChatId: searchParams.get('avitoChatId'),
+      }),
+      { replace: true },
+    );
+  }, [needsPathCanonicalization, pathChatId, searchParams, navigate]);
 
   useEffect(() => {
     if (!incomingChatAlert) return undefined;
@@ -729,6 +813,7 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
     : (chat.last_message?.sender_id === currentUserId);
 
   const placeholderLetter = (title && title.charAt(0).toUpperCase()) || 'Ч';
+  const unreadCount = getUnifiedChatUnreadCount({ ...chat, _source: source }, currentUserId);
 
   // Handler for photo click - navigate to product
   const handlePhotoClick = async (e) => {
@@ -833,7 +918,7 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className={`truncate text-[15px] ${Number(chat.unread_count) > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
+              <h3 className={`truncate text-[15px] ${unreadCount > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
                 {title}
               </h3>
               {!isAvito && !isGroupRow && chat.product_name && (
@@ -860,16 +945,16 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
                   <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                 </svg>
               )}
-              <p className={`truncate text-sm ${Number(chat.unread_count) > 0 ? 'font-medium text-gray-800' : 'text-gray-500'}`}>
+              <p className={`truncate text-sm ${unreadCount > 0 ? 'font-medium text-gray-800' : 'text-gray-500'}`}>
                 {lastMessageIsMine ? `Вы: ${lastMessageText}` : lastMessageText}
               </p>
             </div>
           )}
         </div>
 
-        {Number(chat.unread_count) > 0 && (
+        {unreadCount > 0 && (
           <span className="mt-1 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[11px] font-bold text-white">
-            {chat.unread_count > 99 ? '99+' : chat.unread_count}
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </div>
@@ -881,6 +966,7 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
 function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDeleted }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const keyboardInset = useVisualViewportInset();
   const { user } = useSelector((state) => state.auth);
   const { messages, currentChat, wsConnected, typingByChatId } = useSelector((state) => state.chats);
   const replyToMessage = useSelector(state => state.chats.replyToMessage);
@@ -1012,16 +1098,14 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
   // Получаем все медиа из всех сообщений чата
   const allChatMedia = useMemo(() => {
     const mediaList = [];
-    const token = localStorage.getItem('token');
-    
-    messages.forEach(message => {
+
+    messages.forEach((message) => {
       if (message.media && message.media.length > 0) {
-        message.media.forEach(mediaItem => {
+        message.media.forEach((mediaItem) => {
           if (mediaItem.media_type === 'image' || mediaItem.media_type === 'video') {
             mediaList.push({
               id: mediaItem.id,
               messageId: message.id,
-              url: `${API_BASE}/chats/media/${mediaItem.id}?token=${encodeURIComponent(token)}`,
               media_type: mediaItem.media_type,
               original_filename: mediaItem.original_filename,
             });
@@ -1029,7 +1113,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
         });
       }
     });
-    
+
     return mediaList;
   }, [messages]);
 
@@ -1310,22 +1394,10 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
                           <div className="mt-2 space-y-2">
                             {message.media.map((mediaItem) => (
                               <div key={mediaItem.id}>
-                                {mediaItem.media_type === 'image' && (
-                                  <img 
-                                    src={`${API_BASE}/chats/media/${mediaItem.id}?token=${encodeURIComponent(localStorage.getItem('token'))}`}
-                                    alt="" 
-                                    className="max-w-full rounded-lg max-h-64 object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => openMediaLightbox(mediaItem.id)}
-                                  />
-                                )}
-                                {mediaItem.media_type === 'video' && (
-                                  <video 
-                                    controls 
-                                    src={`${API_BASE}/chats/media/${mediaItem.id}?token=${encodeURIComponent(localStorage.getItem('token'))}`}
-                                    className="max-w-full rounded-lg max-h-64 cursor-pointer"
-                                    onClick={() => openMediaLightbox(mediaItem.id)}
-                                  />
-                                )}
+                                <GarageChatMediaPreview
+                                  mediaItem={mediaItem}
+                                  onOpen={openMediaLightbox}
+                                />
                               </div>
                             ))}
                           </div>
@@ -1383,6 +1455,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
       <form
         onSubmit={handleSendMessage}
         className="flex-shrink-0 border-t border-gray-200/80 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur-sm sm:p-4"
+        style={{ marginBottom: keyboardInset > 0 ? `${keyboardInset}px` : undefined }}
       >
         {/* Reply Preview */}
         {replyToMessage && (
@@ -1472,6 +1545,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
 // Панель чата Авито
 function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
   const dispatch = useDispatch();
+  const keyboardInset = useVisualViewportInset();
   const { messages, chatDetail, chatDetailLoading, sending } = useSelector((state) => state.avitoChats);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
@@ -1486,6 +1560,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
     dispatch(fetchAvitoMessages(chatId));
     dispatch(fetchAvitoChatDetail(chatId));
     dispatch(fetchAvitoChatProductLink(chatId));
+    dispatch(markAvitoChatRead(chatId));
   }, [dispatch, chatId]);
 
   useEffect(() => {
@@ -1587,11 +1662,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
               </div>
             )}
             {message.voice_url ? (
-              <audio 
-                controls 
-                src={message.voice_url} 
-                className={`w-full max-w-xs my-1 ${isOwn ? 'opacity-95' : ''}`} 
-              />
+              <VoicePlayer src={message.voice_url} isOwn={isOwn} />
             ) : null}
             {(mt === 'image' || mt === 'voice' || mt === 'file') && !showText && urls.length === 0 && !message.voice_url ? (
               <p className={`text-sm ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>[вложение]</p>
@@ -1668,6 +1739,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
       <form
         onSubmit={handleSendMessage}
         className="flex-shrink-0 border-t border-gray-200/80 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur-sm sm:p-4"
+        style={{ marginBottom: keyboardInset > 0 ? `${keyboardInset}px` : undefined }}
       >
         <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-1.5 focus-within:border-brand-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500/15">
           <input

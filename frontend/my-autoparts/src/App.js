@@ -3,10 +3,13 @@ import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
-import { setAuthToken } from './utils/apiClient';
+import { clearAuthTokens } from './utils/apiClient';
 import { subscribeToPushNotifications } from './redux/slices/ChatSlice';
 import { fetchPublicSiteConfig, fetchSiteQuickLinks } from './redux/slices/PublicInfoSlice';
 
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
+import { captureBoundaryError } from './utils/sentry';
+import AuthSessionRenew from './components/AuthSessionRenew/AuthSessionRenew';
 import RouteFallback from './components/RouteFallback';
 import RequireAuth from './components/auth/RequireAuth';
 import CookieBanner from './components/Legal/CookieBanner';
@@ -67,6 +70,7 @@ const ProductNotFound = lazy(() => import('./pages/Chat/ProductNotFound'));
 // Lazy: кабинет продавца
 const ProfilePage = lazy(() => import('./pages/Profile/ProfilePage'));
 const NotificationSettingsPage = lazy(() => import('./pages/Profile/NotificationSettingsPage'));
+const NotificationCenterPage = lazy(() => import('./pages/Profile/NotificationCenterPage'));
 const MyParts = lazy(() => import('./pages/MyParts/MyParts'));
 const AddPart = lazy(() => import('./pages/MyParts/AddPart/AddPart'));
 const EditPart = lazy(() => import('./pages/MyParts/EditPart/EditPart'));
@@ -449,7 +453,7 @@ function App() {
         }
       } catch (error) {
         if (String(error || '').includes('401') || String(error || '').includes('Unauthorized')) {
-          setAuthToken(null);
+          clearAuthTokens();
           dispatch(logout());
         }
       }
@@ -461,8 +465,10 @@ function App() {
   }, [dispatch, token, user]);
 
   return (
-    <BrowserRouter>
-      <PullToRefresh />
+    <ErrorBoundary onError={captureBoundaryError}>
+      <BrowserRouter>
+        <AuthSessionRenew />
+        <PullToRefresh />
       <CookieBanner />
       <ServiceWorkerNavigationHandler />
       <SiteAnalyticsTracker />
@@ -620,6 +626,14 @@ function App() {
             element={(
               <LazyRoute>
                 <NotificationSettingsPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/profile/notification-center"
+            element={(
+              <LazyRoute>
+                <NotificationCenterPage />
               </LazyRoute>
             )}
           />
@@ -1112,7 +1126,8 @@ function App() {
           />
         </Route>
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

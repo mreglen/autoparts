@@ -1,7 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../redux/slices/AuthSlice';
+import { Z_MOBILE_DRAWER } from '../../constants/mobileTokens';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import ProfileMenuTabs from '../../pages/Profile/menu/ProfileMenuTabs';
 import PublicSiteMenuLinks from './PublicSiteMenuLinks';
 
@@ -25,6 +27,8 @@ export default function MobileSideMenu({
     const { user, token } = useSelector((state) => state.auth);
     const [isVisible, setIsVisible] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
+    const asideRef = useRef(null);
+    const closeButtonRef = useRef(null);
 
     const requestClose = useCallback(() => {
         onClose();
@@ -54,19 +58,16 @@ export default function MobileSideMenu({
         const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
 
-        const onKeyDown = (event) => {
-            if (event.key === 'Escape') {
-                requestClose();
-            }
-        };
-
-        window.addEventListener('keydown', onKeyDown);
-
         return () => {
             document.body.style.overflow = previousOverflow;
-            window.removeEventListener('keydown', onKeyDown);
         };
-    }, [isVisible, requestClose]);
+    }, [isVisible]);
+
+    useFocusTrap(asideRef, {
+        active: isVisible,
+        initialFocusRef: closeButtonRef,
+        onEscape: requestClose,
+    });
 
     if (!isVisible) return null;
 
@@ -81,15 +82,23 @@ export default function MobileSideMenu({
     };
 
     return (
-        <div className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true" aria-label="Меню">
+        <div
+            className="lg:hidden fixed inset-0"
+            style={{ zIndex: Z_MOBILE_DRAWER }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Меню"
+        >
             <button
                 type="button"
                 aria-label="Закрыть меню"
+                tabIndex={-1}
                 className={`absolute inset-0 bg-black/45 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
                 onClick={requestClose}
             />
 
             <aside
+                ref={asideRef}
                 className={`absolute top-0 right-0 flex h-[100dvh] w-[min(320px,88vw)] flex-col bg-white shadow-2xl ${
                     isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'
                 }`}
@@ -97,6 +106,7 @@ export default function MobileSideMenu({
                 <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 pt-safe-top">
                     <h2 className="text-lg font-bold text-gray-900">Меню</h2>
                     <button
+                        ref={closeButtonRef}
                         type="button"
                         onClick={requestClose}
                         className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 active:bg-gray-100"
@@ -119,7 +129,7 @@ export default function MobileSideMenu({
                     >
                         <div className="flex items-center gap-3">
                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-lg font-semibold text-white">
-                                {(firstName || 'П').charAt(0).toUpperCase()}
+                                {(firstName || 'P').charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0 flex-1">
                                 <p className="truncate font-semibold text-gray-900">{fullName}</p>

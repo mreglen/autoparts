@@ -14,6 +14,7 @@ import { buildRepairOrderDuplicatePayload } from '../../utils/repairOrderDuplica
 import { formatServerDateTime } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
 function formatDateTime(value) {
@@ -236,6 +237,17 @@ export default function AutoserviceOrdersPage() {
     prevScopeKeyRef.current = scopeKey;
     load({ silent });
   }, [isReady, isAuthenticated, load, scope, historyStatus, qApplied]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      const path = event.detail?.pathname || '';
+      if (path === '/autoservice/orders' || path.startsWith('/autoservice/orders?')) {
+        load({ silent: true });
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [load]);
 
   useEffect(() => {
     if (isReady && viewReview && !canReview) {

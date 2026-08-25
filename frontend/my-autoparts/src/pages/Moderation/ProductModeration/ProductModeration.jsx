@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { fetchPendingProducts } from '../../../redux/slices/ModerationProductsSlice.js';
 import { buildOrganizations, EmptyState, OrganizationCard } from './productModerationShared.jsx';
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../../utils/mobileRouteRefresh';
 
 const ProductModeration = () => {
     const dispatch = useDispatch();
@@ -13,6 +14,12 @@ const ProductModeration = () => {
 
     const { pendingProducts, loading } = useSelector((state) => state.moderationProducts);
 
+    const reloadProducts = useCallback(() => {
+        if (user?.is_admin) {
+            dispatch(fetchPendingProducts());
+        }
+    }, [dispatch, user?.is_admin]);
+
     useEffect(() => {
         if (!user || !user.is_admin) {
             navigate('/');
@@ -20,9 +27,18 @@ const ProductModeration = () => {
     }, [user, navigate]);
 
     useEffect(() => {
-        if (!user?.is_admin) return;
-        dispatch(fetchPendingProducts());
-    }, [dispatch, isReady, user?.is_admin]);
+        reloadProducts();
+    }, [reloadProducts]);
+
+    useEffect(() => {
+        const onPullRefresh = (event) => {
+            if (event.detail?.pathname === '/moderation/products') {
+                reloadProducts();
+            }
+        };
+        window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+        return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    }, [reloadProducts]);
 
     const organizationGroups = useMemo(
         () => buildOrganizations(pendingProducts, []).filter((group) => group.pending.length > 0),

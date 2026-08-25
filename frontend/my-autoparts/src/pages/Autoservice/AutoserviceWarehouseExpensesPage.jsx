@@ -7,6 +7,7 @@ import { Skeleton } from '../../components/UI';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   autoserviceListErrorClass,
   autoserviceListHeaderSubtitleClass,
@@ -79,6 +80,16 @@ export default function AutoserviceWarehouseExpensesPage() {
     if (!userHasAutoserviceOrganization(user)) return;
     loadData();
   }, [isReady, isAuthenticated, user, loadData]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/autoservice/warehouse/expenses') {
+        loadData();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [loadData]);
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

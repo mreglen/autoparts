@@ -31,6 +31,7 @@ import {
 } from '../../utils/vinCameraControls';
 
 const MODES = {
+  INTRO: 'intro',
   SCAN: 'scan',
   CONFIRM: 'confirm',
   ERROR: 'error',
@@ -97,7 +98,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
   const [torchOn, setTorchOn] = useState(false);
 
   const resetState = useCallback(() => {
-    setMode(MODES.SCAN);
+    setMode(MODES.INTRO);
     setCameraError('');
     setProcessing(false);
     setVinDraft('');
@@ -352,6 +353,19 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     warmupVinOcrWorker().then(() => setEngineReady(true)).catch(() => setEngineReady(true));
   }, [resetState]);
 
+  const handleContinueToScan = useCallback(() => {
+    setCameraError('');
+    setMessage('');
+    setMode(MODES.SCAN);
+  }, []);
+
+  const handleManualEntry = useCallback(() => {
+    stopMediaStream(streamRef);
+    setVinDraft('');
+    setMessage('');
+    setMode(MODES.CONFIRM);
+  }, []);
+
   const handleContinue = useCallback(() => {
     const next = normalizeVinForLookupOrNull(vinDraft) || normalizeVinOrNull(vinDraft);
     if (!next) {
@@ -381,6 +395,22 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
       size="md"
       footer={(
         <div className="flex flex-wrap justify-end gap-2">
+          {mode === MODES.INTRO ? (
+            <>
+              <Button variant="secondary" onClick={handleClose}>
+                Отмена
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                С фото
+              </Button>
+              <Button variant="primary" onClick={handleContinueToScan}>
+                Продолжить
+              </Button>
+            </>
+          ) : null}
           {mode === MODES.SCAN ? (
             <>
               <Button variant="secondary" onClick={handleClose} disabled={processing}>
@@ -413,6 +443,12 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
               <Button variant="secondary" onClick={handleClose}>
                 Отмена
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Загрузить фото
+              </Button>
               <Button variant="primary" onClick={handleRetry}>
                 Попробовать снова
               </Button>
@@ -430,8 +466,30 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
         onChange={handleFileChange}
       />
 
+      {mode === MODES.INTRO ? (
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-700">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h3l1.5-2h9L18 7h3a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V8a1 1 0 011-1z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 17a4 4 0 100-8 4 4 0 000 8z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Для распознавания VIN нужен доступ к камере</p>
+              <ul className="mt-3 space-y-2 text-sm text-gray-600">
+                <li>Наведите номер в белую рамку на экране камеры</li>
+                <li>Можно загрузить фото с номером кузова</li>
+                <li>Перед поиском вы проверите и при необходимости исправите VIN</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {mode === MODES.SCAN ? (
         <div className="space-y-3">
+          <div aria-live="polite" aria-atomic="true" className="sr-only">{liveStatusText}</div>
           <div className="relative min-h-[280px] overflow-hidden rounded-xl border border-gray-200 bg-black">
             <video
               ref={videoRef}
@@ -480,7 +538,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
         <div className="space-y-4">
           <p className="text-sm text-gray-600">Проверьте распознанный VIN и при необходимости исправьте:</p>
           <input
-            className="block w-full rounded-lg border border-gray-300 px-4 py-3 font-mono text-lg tracking-[0.2em] shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="block w-full rounded-lg border border-gray-300 px-4 py-3 font-mono text-lg tracking-[0.2em] shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 max-md:min-h-11 max-md:text-base"
             value={vinDraft}
             onChange={(e) => setVinDraft(sanitizeVinInput(e.target.value))}
             maxLength={VIN_INPUT_MAX_LENGTH}
@@ -514,8 +572,29 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
         <div className="space-y-3">
           <p className="text-sm text-red-600">{cameraError || message || 'Не удалось распознать VIN'}</p>
           <p className="text-sm text-gray-600">
-            Наведите номер в рамку ещё раз, нажмите «Считать сейчас» или загрузите фото.
+            Наведите номер в рамку ещё раз, загрузите фото или введите VIN вручную.
           </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="primary"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full sm:w-auto"
+            >
+              Загрузить фото
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleManualEntry}
+              className="w-full sm:w-auto"
+            >
+              Ввести VIN вручную
+            </Button>
+          </div>
+          {typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent) ? (
+            <p className="text-xs text-gray-500">
+              Если доступ к камере запрещён: Настройки → Safari → Камера → Разрешить для этого сайта.
+            </p>
+          ) : null}
         </div>
       ) : null}
     </Modal>

@@ -94,6 +94,11 @@ export default function ConversionsTab({
         />
       </div>
 
+      <div className="md:hidden rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+        Воронки, источники и детальные таблицы — откройте на desktop для полного отчёта.
+      </div>
+
+      <div className="hidden md:block space-y-4">
       <FunnelSection funnel={funnel} />
       <SourcesSection sources={sources} />
       <LandingConversionSection landings={landings} />
@@ -104,6 +109,7 @@ export default function ConversionsTab({
           <ActivityTrend activity={trendRows} />
         </Section>
       ) : null}
+      </div>
 
       <Section
         title="Все страницы"

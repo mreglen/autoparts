@@ -11,7 +11,7 @@ export default function NewPartDetailThumb({ imageUrl, attribution, alt, classNa
 
   return (
     <div
-      className={`flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-subtle sm:h-24 sm:w-24 ${className}`}
+      className={`flex aspect-square h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-subtle sm:h-24 sm:w-24 ${className}`}
     >
       {src ? (
         <img

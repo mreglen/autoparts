@@ -1,6 +1,6 @@
 // src/redux/slices/AuthSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { apiRequest, apiRequestFormData, setAuthToken } from '../../utils/apiClient';
+import { apiRequest, apiRequestFormData, setAuthToken, setRefreshToken, clearAuthTokens, refreshAccessToken } from '../../utils/apiClient';
 import { updateProfile } from './UserSlice';
 import { clearCart } from './CartSlice';
 import { disconnectWebSocket, unsubscribeFromPushNotifications } from './ChatSlice';
@@ -63,6 +63,9 @@ export const completeRegistration = createAsyncThunk(
             });
             localStorage.setItem('token', result.access_token);
             setAuthToken(result.access_token);
+            if (result.refresh_token) {
+                setRefreshToken(result.refresh_token);
+            }
             return result;
         } catch (err) {
             return rejectWithValue(err?.response?.data?.detail || err?.message || 'An error occurred');
@@ -100,6 +103,9 @@ export const login = createAsyncThunk(
 
             localStorage.setItem('token', result.access_token);
             setAuthToken(result.access_token);
+            if (result.refresh_token) {
+                setRefreshToken(result.refresh_token);
+            }
             return result;
         } catch (err) {
             return rejectWithValue(err?.response?.data?.detail || err?.message || 'Ошибка входа');
@@ -121,10 +127,25 @@ export const fetchProfile = createAsyncThunk(
     }
 );
 
+export const refreshSession = createAsyncThunk(
+    'auth/refreshSession',
+    async (_, { rejectWithValue }) => {
+        try {
+            const accessToken = await refreshAccessToken();
+            if (!accessToken) {
+                return rejectWithValue('Refresh-токен недействителен');
+            }
+            return { access_token: accessToken };
+        } catch (err) {
+            return rejectWithValue(err?.message || 'Не удалось обновить сессию');
+        }
+    }
+);
+
 export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
     await dispatch(unsubscribeFromPushNotifications());
     dispatch(disconnectWebSocket());
-    setAuthToken(null);
+    clearAuthTokens();
     dispatch(clearCart());
 });
 
@@ -334,6 +355,9 @@ const authSlice = createSlice({
                 state.profileLoading = false;
                 state.token = action.payload.access_token;
                 setAuthToken(action.payload.access_token);
+                if (action.payload.refresh_token) {
+                    setRefreshToken(action.payload.refresh_token);
+                }
                 if (action.payload.user) {
                     state.user = action.payload.user;
                 }
@@ -376,7 +400,19 @@ const authSlice = createSlice({
                     state.token = null;
                     state.userPermissions = null;
                     state.permissionCodes = null;
-                    setAuthToken(null);
+                    clearAuthTokens();
+                }
+            })
+            // refreshSession
+            .addCase(refreshSession.fulfilled, (state, action) => {
+                state.token = action.payload.access_token;
+                setAuthToken(action.payload.access_token);
+                const decodedToken = decodeToken(action.payload.access_token);
+                if (decodedToken?.user_permissions) {
+                    state.userPermissions = decodedToken.user_permissions;
+                }
+                if (decodedToken?.permission_codes) {
+                    state.permissionCodes = decodedToken.permission_codes;
                 }
             })
             // logout

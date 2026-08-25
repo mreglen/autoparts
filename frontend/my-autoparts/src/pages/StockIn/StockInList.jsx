@@ -11,8 +11,10 @@ import {
   warehousePageClass,
   warehousePillControlClass,
   warehousePrimaryButtonClass,
+  warehouseSecondaryButtonClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
+import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import { fetchStockIns } from '../../redux/slices/StockInSlice';
 import {
@@ -22,6 +24,7 @@ import {
   sortStockInDocs,
   STOCK_IN_SORT_OPTIONS,
 } from '../../utils/stockInUi';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 const StockInList = () => {
   const navigate = useNavigate();
@@ -43,6 +46,7 @@ const StockInList = () => {
     user?.is_admin ||
     user?.is_seller ||
     (user?.is_employee && permissionCodes && permissionCodes.includes('stock-in'));
+  const canScanQr = userHasWarehouseQrAccess(user, permissionCodes);
 
   useEffect(() => {
     if (authChecked && hasPermission) {
@@ -66,6 +70,16 @@ const StockInList = () => {
       /* error in redux */
     }
   }, [dispatch]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/stock-in') {
+        loadStockIns();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [loadStockIns]);
 
   const sortedStockIns = useMemo(
     () => sortStockInDocs(stockIns, sortOrder),
@@ -135,7 +149,24 @@ const StockInList = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {!loading && !error && totalInList > 0 && (
-            <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
+            <>
+              <div className="grid w-full grid-cols-3 gap-2 rounded-xl bg-gray-50 px-3 py-2.5 ring-1 ring-gray-200/80 sm:hidden">
+                <div className="text-center">
+                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.count}</div>
+                  <div className="text-[11px] text-gray-500">Документов</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.totalQty}</div>
+                  <div className="text-[11px] text-gray-500">Принято, шт.</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
+                    {formatStockInMoney(stats.totalValue)}
+                  </div>
+                  <div className="text-[11px] text-gray-500">На сумму</div>
+                </div>
+              </div>
+              <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
               <div>
                 <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.count}</div>
                 <div className="text-[11px] text-gray-500">Документов</div>
@@ -151,7 +182,13 @@ const StockInList = () => {
                 <div className="text-[11px] text-gray-500">На сумму</div>
               </div>
             </div>
+            </>
           )}
+          {canScanQr ? (
+            <Link to="/warehouse/scan" className={warehouseSecondaryButtonClass}>
+              Сканировать QR
+            </Link>
+          ) : null}
           <Link to="/my-parts" className={warehousePrimaryButtonClass}>
             Мои запчасти
           </Link>

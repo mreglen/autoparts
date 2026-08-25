@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { Navigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
@@ -388,20 +389,38 @@ function AdminPanelPage() {
     'flex items-center gap-3 cursor-pointer select-none rounded-lg px-1 py-2.5 hover:bg-gray-50';
 
   return (
-    <div className="max-w-4xl pb-10">
+    <div className="max-w-4xl pb-10 max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
       <h1 className="text-2xl font-bold text-gray-900 mb-4">Настройки</h1>
+
+      <div className="mb-6 md:hidden rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+        <p className="text-sm font-medium text-gray-900">Быстрые ссылки</p>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/moderation/products" className="inline-flex min-h-11 items-center rounded-lg bg-white px-3 text-sm font-medium text-indigo-700 ring-1 ring-indigo-100">
+            Модерация
+          </Link>
+          <Link to="/admin/users" className="inline-flex min-h-11 items-center rounded-lg bg-white px-3 text-sm font-medium text-indigo-700 ring-1 ring-indigo-100">
+            Пользователи
+          </Link>
+          <Link to="/admin/audit-log" className="inline-flex min-h-11 items-center rounded-lg bg-white px-3 text-sm font-medium text-indigo-700 ring-1 ring-indigo-100">
+            Журнал
+          </Link>
+        </div>
+        <p className="text-xs text-gray-500">
+          Разделы ниже — длинный scroll; таблицы с горизонтальным скроллом удобнее на desktop.
+        </p>
+      </div>
 
       <nav
         aria-label="Содержание"
         className="sticky top-0 z-20 mb-6 rounded-xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur"
       >
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory">
           {ADMIN_TOC.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => scrollToAdminSection(item.id)}
-              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-800"
+              className="snap-start shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 min-h-11 text-sm font-medium text-gray-700 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-800"
             >
               {item.label}
             </button>
@@ -550,6 +569,9 @@ function AdminPanelPage() {
           ) : (
             <div className="space-y-4">
               <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <p className="md:hidden px-3 py-2 text-xs text-gray-500 border-b border-gray-100">
+                  Таблица — горизонтальный скролл; полное управление удобнее на ПК.
+                </p>
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50 text-left text-gray-500">
                     <tr>

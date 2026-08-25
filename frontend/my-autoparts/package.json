@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",
+    "@sentry/react": "^9.17.0",
     "@tanstack/react-virtual": "^3.14.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.8.0",
@@ -25,8 +26,11 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "react-scripts build && node scripts/inject-sw-precache.js",
     "test": "react-scripts test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -48,8 +52,12 @@
     ]
   },
   "devDependencies": {
+    "@lhci/cli": "^0.14.0",
+    "@playwright/test": "^1.49.1",
     "autoprefixer": "^10.4.21",
+    "jest-axe": "^11.0.0",
     "postcss": "^8.5.6",
+    "serve": "^14.2.4",
     "tailwindcss": "^3.4.17"
   }
 }

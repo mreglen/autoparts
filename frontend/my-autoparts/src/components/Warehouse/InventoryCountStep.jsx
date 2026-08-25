@@ -137,7 +137,7 @@ function CountLineRow({ line, saving, onSave, onMatchExpected }) {
           min="0"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          className="w-full md:w-24 h-9 px-2 border border-gray-300 rounded-lg text-sm text-right"
+          className="w-full md:w-24 min-h-11 px-2 border border-gray-300 rounded-lg text-sm text-right max-md:text-base"
         />
       </div>
       <div className="mt-2 md:mt-0 md:col-span-4 flex flex-wrap justify-end gap-2">
@@ -145,7 +145,7 @@ function CountLineRow({ line, saving, onSave, onMatchExpected }) {
           type="button"
           disabled={saving}
           onClick={() => onSave(line.id, value)}
-          className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center px-3 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
         >
           {saving ? '…' : 'Сохранить'}
         </button>
@@ -153,7 +153,7 @@ function CountLineRow({ line, saving, onSave, onMatchExpected }) {
           type="button"
           disabled={saving}
           onClick={onMatchExpected}
-          className="px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="inline-flex min-h-11 items-center justify-center px-3 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
         >
           Как в учёте
         </button>

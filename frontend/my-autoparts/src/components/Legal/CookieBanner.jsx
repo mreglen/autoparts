@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Z_COOKIE_BANNER } from '../../constants/mobileTokens';
 
 const LS_KEY = 'cookie_consent_accepted';
 
@@ -35,9 +36,10 @@ export default function CookieBanner() {
 
   return (
     <div
-      className={`fixed inset-x-0 z-[56] border-t border-gray-200 bg-white/95 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm bottom-0 ${
-        isAuthRoute ? '' : 'max-lg:bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))]'
+      className={`fixed inset-x-0 border-t border-gray-200 bg-white/95 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm bottom-0 ${
+        isAuthRoute ? '' : 'max-lg:bottom-[var(--sg-mobile-sticky-bottom-offset)]'
       }`}
+      style={{ zIndex: Z_COOKIE_BANNER }}
       role="dialog"
       aria-live="polite"
       aria-label="Уведомление об использовании cookie"

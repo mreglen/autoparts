@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -9,16 +9,15 @@ import {
 } from '../../../redux/slices/ModerationProductsSlice.js';
 import { fetchSellers } from '../../../redux/slices/SellerSlice';
 import RejectProductModal from '../../../components/RejectProductModal/RejectProductModal.jsx';
-import SuccessModal from '../../../components/SuccessModal/SuccessModal.jsx';
-import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal.jsx';
-import ErrorModal from '../../../components/ErrorModal/ErrorModal.jsx';
 import MediaModal from '../../../components/MediaModal/MediaModal.jsx';
+import { ConfirmDialog } from '../../../components/UI/Modal.jsx';
 import { ModerationProductViewModal } from '../../Profile/SellerWorkspaceDetailModals.jsx';
 import { normalizeProductMedia, formatMediaForModal, getMediaItemUrl } from '../../../utils/mediaHelpers.js';
 import { normalizeImageUrl } from '../../../utils/apiClient.js';
 import { buildOrganizations, ProductTable } from './productModerationShared.jsx';
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../../utils/mobileRouteRefresh';
 
 function resolveSellerIdForOrganization(sellers, organizationId) {
     if (!organizationId || organizationId === 'unknown') return null;
@@ -84,18 +83,31 @@ export default function OrganizationProductModerationPage() {
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [rejectTarget, setRejectTarget] = useState(null);
-    const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-    const [successModalData, setSuccessModalData] = useState({ title: '', message: '' });
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [confirmModalData, setConfirmModalData] = useState({ title: '', message: '', onConfirm: null });
-    const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
-    const [errorModalData, setErrorModalData] = useState({ title: '', message: '' });
+    const [approveTargetId, setApproveTargetId] = useState(null);
+    const [approveLoading, setApproveLoading] = useState(false);
+    const [notice, setNotice] = useState('');
+    const [noticeIsError, setNoticeIsError] = useState(false);
 
-    useEffect(() => {
+    const reloadProducts = useCallback(() => {
         if (!user?.is_admin) return;
         dispatch(fetchPendingProducts());
+    }, [dispatch, user?.is_admin]);
+
+    useEffect(() => {
+        reloadProducts();
         if (!sellers.length) dispatch(fetchSellers());
-    }, [dispatch, user?.is_admin, sellers.length]);
+    }, [reloadProducts, dispatch, sellers.length]);
+
+    useEffect(() => {
+        const onPullRefresh = (event) => {
+            const path = event.detail?.pathname || '';
+            if (path === '/moderation/products' || path.startsWith('/moderation/products/')) {
+                reloadProducts();
+            }
+        };
+        window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+        return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    }, [reloadProducts]);
 
     const organizationGroups = useMemo(
         () => buildOrganizations(pendingProducts, []),
@@ -126,33 +138,32 @@ export default function OrganizationProductModerationPage() {
 
     useEffect(() => {
         if (error) {
-            setErrorModalData({ title: 'Ошибка', message: error });
-            setIsErrorModalOpen(true);
+            setNotice(error);
+            setNoticeIsError(true);
             dispatch(clearModerationError());
         }
     }, [error, dispatch]);
 
-    const handleApprove = async (productId) => {
-        setConfirmModalData({
-            title: 'Одобрить запчасть',
-            message: 'Вы уверены, что хотите одобрить эту запчасть?',
-            onConfirm: async () => {
-                try {
-                    await dispatch(approveProduct(productId)).unwrap();
-                    if (viewProduct?.id === productId && viewProduct?.moderationKind === 'pending') {
-                        setViewProduct(null);
-                    }
-                    setSuccessModalData({
-                        title: 'Успешно!',
-                        message: 'Запчасть успешно одобрена и добавлена в каталог',
-                    });
-                    setIsSuccessModalOpen(true);
-                } catch {
-                    /* handled via redux */
-                }
-            },
-        });
-        setIsConfirmModalOpen(true);
+    const handleApprove = (productId) => {
+        setApproveTargetId(productId);
+    };
+
+    const handleApproveConfirm = async () => {
+        if (!approveTargetId) return;
+        setApproveLoading(true);
+        try {
+            await dispatch(approveProduct(approveTargetId)).unwrap();
+            if (viewProduct?.id === approveTargetId && viewProduct?.moderationKind === 'pending') {
+                setViewProduct(null);
+            }
+            setNotice('Запчасть успешно одобрена и добавлена в каталог');
+            setNoticeIsError(false);
+        } catch {
+            /* handled via redux */
+        } finally {
+            setApproveLoading(false);
+            setApproveTargetId(null);
+        }
     };
 
     const handleRejectClick = (product) => {
@@ -190,8 +201,8 @@ export default function OrganizationProductModerationPage() {
                 productId: target.id,
                 reason,
             })).unwrap();
-            setSuccessModalData({ title: 'Успешно!', message: 'Запчасть отклонена' });
-            setIsSuccessModalOpen(true);
+            setNotice('Запчасть отклонена');
+            setNoticeIsError(false);
             setIsRejectModalOpen(false);
             setRejectTarget(null);
             if (viewProduct?.id === target.id && viewProduct?.moderationKind === 'pending') {
@@ -222,12 +233,12 @@ export default function OrganizationProductModerationPage() {
     const logoUrl = organization.logo_organization ? normalizeImageUrl(organization.logo_organization) : null;
 
     return (
-        <div className="max-w-7xl mx-auto p-6">
+        <div className="max-w-7xl mx-auto p-6 max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
             <div className="mb-6">
                 <button
                     type="button"
                     onClick={() => navigate('/moderation/products')}
-                    className="text-sm text-indigo-600 hover:text-indigo-800 mb-2"
+                    className="inline-flex min-h-11 items-center text-sm text-indigo-600 hover:text-indigo-800 mb-2"
                 >
                     ← К организациям
                 </button>
@@ -262,13 +273,26 @@ export default function OrganizationProductModerationPage() {
                             onClick={() => navigate(`/sellers/${sellerId}/workspace`, {
                                 state: { from: `/moderation/products/${organizationId}` },
                             })}
-                            className="shrink-0 px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50"
+                            className="inline-flex min-h-11 shrink-0 items-center justify-center px-4 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50"
                         >
                             Рабочий стол продавца
                         </button>
                     )}
                 </div>
             </div>
+
+            {notice ? (
+                <div
+                    className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                        noticeIsError
+                            ? 'border-red-100 bg-red-50 text-red-800'
+                            : 'border-green-100 bg-green-50 text-green-800'
+                    }`}
+                    role="status"
+                >
+                    {notice}
+                </div>
+            ) : null}
 
             {loading && !selectedGroup ? (
                 <div className="text-center py-12">
@@ -284,7 +308,7 @@ export default function OrganizationProductModerationPage() {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Поиск по артикулу, названию, internal_code"
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full min-h-11 pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm max-md:text-base focus:ring-indigo-500 focus:border-indigo-500"
                             />
                             <svg
                                 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
@@ -298,7 +322,7 @@ export default function OrganizationProductModerationPage() {
                         <select
                             value={sortOrder}
                             onChange={(e) => setSortOrder(e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            className="min-h-11 px-3 py-2 border border-gray-300 rounded-lg text-sm max-md:text-base focus:ring-indigo-500 focus:border-indigo-500"
                         >
                             <option value="date_desc">Сначала новые</option>
                             <option value="date_asc">Сначала старые</option>
@@ -327,6 +351,16 @@ export default function OrganizationProductModerationPage() {
                 productName={rejectTarget?.name}
             />
 
+            <ConfirmDialog
+                open={Boolean(approveTargetId)}
+                onClose={() => setApproveTargetId(null)}
+                onConfirm={handleApproveConfirm}
+                title="Одобрить запчасть"
+                message="Вы уверены, что хотите одобрить эту запчасть?"
+                confirmLabel="Одобрить"
+                loading={approveLoading}
+            />
+
             <ModerationProductViewModal
                 product={viewProduct}
                 isOpen={Boolean(viewProduct)}
@@ -341,28 +375,6 @@ export default function OrganizationProductModerationPage() {
                 onClose={() => setMediaModalOpen(false)}
                 mediaItems={currentMediaItems}
                 initialIndex={currentMediaIndex}
-            />
-
-            <SuccessModal
-                isOpen={isSuccessModalOpen}
-                onClose={() => setIsSuccessModalOpen(false)}
-                title={successModalData.title}
-                message={successModalData.message}
-            />
-
-            <ConfirmModal
-                isOpen={isConfirmModalOpen}
-                onClose={() => setIsConfirmModalOpen(false)}
-                title={confirmModalData.title}
-                message={confirmModalData.message}
-                onConfirm={confirmModalData.onConfirm}
-            />
-
-            <ErrorModal
-                isOpen={isErrorModalOpen}
-                onClose={() => setIsErrorModalOpen(false)}
-                title={errorModalData.title}
-                message={errorModalData.message}
             />
         </div>
     );

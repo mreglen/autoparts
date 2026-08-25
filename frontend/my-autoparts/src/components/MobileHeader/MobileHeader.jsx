@@ -8,6 +8,7 @@ import HeaderYandexBadge from '../Seo/HeaderYandexBadge';
 import CitySelectModal from '../CitySelectModal/CitySelectModal';
 import { useSelectedCity } from '../../hooks/useSelectedCity';
 import { PWA_START_PATH, usePwaStandalone } from '../../utils/pwaStandalone';
+import { Z_MOBILE_HEADER } from '../../constants/mobileTokens';
 import { Button } from '../UI';
 import {
   HeaderAvatar,
@@ -77,7 +78,8 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
   return (
     <>
       <header
-        className={`lg:hidden fixed inset-x-0 top-0 z-40 border-b border-line bg-surface pt-safe-top ${hidden ? 'hidden' : ''}`}
+        className={`lg:hidden fixed inset-x-0 top-0 border-b border-line bg-surface pt-safe-top ${hidden ? 'hidden' : ''}`}
+        style={{ zIndex: Z_MOBILE_HEADER }}
       >
         {showYandexBadge ? <HeaderYandexBadge /> : null}
         <div className="flex h-[3.75rem] items-center gap-2.5 px-4 sm:px-6">

@@ -24,7 +24,14 @@ import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItems
 import RepairOrderStockPickerModal from '../../components/Autoservice/RepairOrderStockPickerModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
-import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import Modal, { ConfirmDialog } from '../../components/UI/Modal';
+import { Z_MOBILE_STICKY_FOOTER, MOBILE_PRODUCT_STICKY_SCROLL_PAD } from '../../constants/mobileTokens';
+import {
+  clearRepairOrderFormDraft,
+  readRepairOrderFormDraft,
+  repairOrderFormSnapshotHasContent,
+  writeRepairOrderFormDraft,
+} from '../../utils/repairOrderFormDraft';
 import {
   clearRepairOrderCartDraft,
   importCartItemsToRepairOrder,
@@ -77,13 +84,16 @@ function SectionAddLink({ onClick, label = '+ Добавить' }) {
 }
 
 const btnPrimaryClass =
-  'inline-flex h-10 items-center justify-center rounded-full bg-brand-600 px-5 text-sm font-semibold text-white shadow-sg-sm transition hover:bg-brand-700 disabled:opacity-60';
+  'inline-flex min-h-11 items-center justify-center rounded-full bg-brand-600 px-5 text-sm font-semibold text-white shadow-sg-sm transition hover:bg-brand-700 disabled:opacity-60';
 
 const btnSecondaryClass =
-  'inline-flex h-10 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
+  'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
+
+const lineItemRowClass =
+  'flex min-w-0 flex-col gap-2 md:flex-row md:flex-nowrap md:items-center md:gap-1.5';
 
 const rowActionBtnClass =
-  'inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs text-ink-muted transition hover:bg-gray-200 hover:text-ink-soft';
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-gray-100 text-sm text-ink-muted transition hover:bg-gray-200 hover:text-ink-soft';
 
 function FieldLabel({ children, action }) {
   return (
@@ -310,30 +320,6 @@ function SectionCard({ title, children, action }) {
   );
 }
 
-function Modal({ title, children, onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" className="absolute inset-0 bg-black/40" aria-label="Закрыть" onClick={onClose} />
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-sg-lg bg-surface shadow-sg-lg ring-1 ring-line">
-        <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
-          <h3 className="text-sg-subtitle text-ink">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-1.5 text-ink-faint hover:bg-surface-subtle hover:text-ink-soft"
-            aria-label="Закрыть"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
-}
-
 function SearchableSelect({
   value,
   onChange,
@@ -496,7 +482,7 @@ function AddClientModal({ onClose, onCreated }) {
   };
 
   return (
-    <Modal title="Добавить клиента" onClose={onClose}>
+    <Modal open title="Добавить клиента" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sg-caption font-medium text-ink-muted">ФИО</label>
@@ -579,7 +565,7 @@ function AddEmployeeModal({ onClose, onCreated }) {
   };
 
   return (
-    <Modal title="Добавить сотрудника" onClose={onClose}>
+    <Modal open title="Добавить сотрудника" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sg-caption font-medium text-ink-muted">Имя</label>
@@ -727,7 +713,7 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
   };
 
   return (
-    <Modal title="Добавить автомобиль" onClose={onClose}>
+    <Modal open title="Добавить автомобиль" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {notice ? (
           <SoftServiceNotice
@@ -1023,6 +1009,7 @@ export default function AutoserviceOrderFormPage() {
   const [saving, setSaving] = useState(false);
   const [detachingShopPartId, setDetachingShopPartId] = useState(null);
   const [shopPartRemoveConfirm, setShopPartRemoveConfirm] = useState(null);
+  const [lineDeleteConfirm, setLineDeleteConfirm] = useState(null);
   const plannerPrefillRef = useRef(location.state);
   const createInitRef = useRef(false);
 
@@ -1040,6 +1027,34 @@ export default function AutoserviceOrderFormPage() {
     setClientParts(state.clientParts);
     setShopParts(state.shopParts);
   }, []);
+
+  const captureFormSnapshot = useCallback(() => ({
+    clientId,
+    vehicleId,
+    scheduledAt,
+    comment,
+    staffComment,
+    workZoneId,
+    scheduledEndAt,
+    shippingDate,
+    mileageKm,
+    works,
+    clientParts,
+    shopParts,
+  }), [
+    clientId,
+    vehicleId,
+    scheduledAt,
+    comment,
+    staffComment,
+    workZoneId,
+    scheduledEndAt,
+    shippingDate,
+    mileageKm,
+    works,
+    clientParts,
+    shopParts,
+  ]);
 
   const loadClients = useCallback(async (query = '') => {
     const q = String(query || '').trim();
@@ -1130,11 +1145,40 @@ export default function AutoserviceOrderFormPage() {
             initial.shopParts = mapCartItemsToShopParts(cartDraft.items, clientMarkupPercent);
           }
         }
+        const formDraft = readRepairOrderFormDraft('create');
+        if (formDraft?.form && repairOrderFormSnapshotHasContent(formDraft.form)) {
+          const { shopParts: draftShopParts, ...restDraft } = formDraft.form;
+          Object.assign(initial, restDraft);
+          const hasImportShopParts = Boolean(draft?.groups?.length)
+            || Boolean(readRepairOrderCartDraft()?.items?.length);
+          if (!hasImportShopParts && draftShopParts?.length) {
+            initial.shopParts = draftShopParts;
+          }
+        }
         applyFormState(initial);
         setFormInitialized(true);
       }
     }
-  }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState]);
+  }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState, clientMarkupPercent]);
+
+  useEffect(() => {
+    if (!formInitialized || (!isCreate && !isEdit)) return undefined;
+    const mode = isEdit ? 'edit' : 'create';
+    const draftOrderId = isEdit ? orderId : null;
+    const timer = setTimeout(() => {
+      writeRepairOrderFormDraft(mode, draftOrderId, captureFormSnapshot());
+    }, 400);
+    const flushDraft = () => {
+      writeRepairOrderFormDraft(mode, draftOrderId, captureFormSnapshot());
+    };
+    window.addEventListener('pagehide', flushDraft);
+    document.addEventListener('visibilitychange', flushDraft);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('pagehide', flushDraft);
+      document.removeEventListener('visibilitychange', flushDraft);
+    };
+  }, [formInitialized, isCreate, isEdit, orderId, captureFormSnapshot]);
 
   useEffect(() => {
     if (!isCreate || !formInitialized || metaLoading || clients.length === 0) return;
@@ -1737,6 +1781,7 @@ export default function AutoserviceOrderFormPage() {
         ))
         : [];
       const goToSavedOrder = () => {
+        clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null);
         navigate('/autoservice/orders');
       };
 
@@ -1846,8 +1891,8 @@ export default function AutoserviceOrderFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-    <div className="mx-auto w-full px-1 py-6 pb-28 sm:px-2 lg:-mx-4 lg:px-2">
+    <div className={`min-h-screen bg-white ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
+    <div className="mx-auto w-full px-1 py-6 pb-28 sm:px-2 lg:-mx-4 lg:px-2 max-lg:pb-36">
       <header className="mb-6">
         <button type="button" onClick={goBack} className={linkActionClass}>
           ← Назад
@@ -2019,7 +2064,7 @@ export default function AutoserviceOrderFormPage() {
             <div className="space-y-2">
               {works.map((w, index) => (
                 <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2 py-1.5">
-                  <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
+                  <div className={lineItemRowClass}>
                     <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">{index + 1}</span>
                     <div className="min-w-0 flex-1">
                       <WorkCatalogInput
@@ -2065,7 +2110,7 @@ export default function AutoserviceOrderFormPage() {
                       <button
                         type="button"
                         className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700`}
-                        onClick={() => setWorks((p) => p.filter((_, i) => i !== index))}
+                        onClick={() => setLineDeleteConfirm({ type: 'work', index })}
                       >
                         ×
                       </button>
@@ -2127,7 +2172,7 @@ export default function AutoserviceOrderFormPage() {
             <div className="space-y-2">
               {clientParts.map((p, index) => (
                 <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2 py-1.5">
-                  <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
+                  <div className={lineItemRowClass}>
                     <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">
                       {index + 1}
                     </span>
@@ -2159,7 +2204,7 @@ export default function AutoserviceOrderFormPage() {
                       <button
                         type="button"
                         className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700`}
-                        onClick={() => setClientParts((prev) => prev.filter((_, i) => i !== index))}
+                        onClick={() => setLineDeleteConfirm({ type: 'clientPart', index })}
                       >
                         ×
                       </button>
@@ -2213,7 +2258,7 @@ export default function AutoserviceOrderFormPage() {
                     key={shopPartRowKey(p, index)}
                     className="min-w-0 rounded-sg border border-line bg-white px-2 py-1.5"
                   >
-                    <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
+                    <div className={lineItemRowClass}>
                       <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">
                         {index + 1}
                       </span>
@@ -2322,7 +2367,10 @@ export default function AutoserviceOrderFormPage() {
 
       </form>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-2 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 sm:px-3 lg:px-4">
+      <div
+        className="fixed inset-x-0 bottom-[var(--sg-mobile-sticky-bottom-offset)] z-[45] border-t border-line bg-surface/95 px-2 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 sm:px-3 lg:bottom-0 lg:px-4"
+        style={{ zIndex: Z_MOBILE_STICKY_FOOTER }}
+      >
         <div className="mx-auto flex w-full max-w-sg-content items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-ink">
@@ -2472,23 +2520,41 @@ export default function AutoserviceOrderFormPage() {
         }
       />
 
-      <ConfirmationModal
-        isOpen={Boolean(shopPartRemoveConfirm)}
+      <ConfirmDialog
+        open={Boolean(shopPartRemoveConfirm)}
         onClose={() => {
-          if (detachingShopPartId) return;
-          setShopPartRemoveConfirm(null);
+          if (!detachingShopPartId) setShopPartRemoveConfirm(null);
         }}
         onConfirm={confirmRemoveShopPart}
         title={shopPartRemoveConfirm?.part?.is_imported || shopPartRemoveConfirm?.part?.pending_import
           ? 'Убрать из заказ-наряда'
           : 'Удалить запчасть'}
         message={shopPartRemoveConfirm ? shopPartRemoveMessage(shopPartRemoveConfirm.part) : ''}
-        confirmText={shopPartRemoveConfirm?.part?.is_imported || shopPartRemoveConfirm?.part?.pending_import
+        confirmLabel={shopPartRemoveConfirm?.part?.is_imported || shopPartRemoveConfirm?.part?.pending_import
           ? 'Убрать'
           : 'Удалить'}
-        cancelText="Отмена"
+        cancelLabel="Отмена"
         danger
-        isLoading={Boolean(detachingShopPartId)}
+        loading={Boolean(detachingShopPartId)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(lineDeleteConfirm)}
+        onClose={() => setLineDeleteConfirm(null)}
+        onConfirm={() => {
+          if (!lineDeleteConfirm) return;
+          if (lineDeleteConfirm.type === 'work') {
+            setWorks((prev) => prev.filter((_, i) => i !== lineDeleteConfirm.index));
+          } else {
+            setClientParts((prev) => prev.filter((_, i) => i !== lineDeleteConfirm.index));
+          }
+          setLineDeleteConfirm(null);
+        }}
+        title="Удалить позицию?"
+        message="Строка будет удалена из заказ-наряда."
+        confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        danger
       />
     </div>
     </div>

@@ -6208,3 +6208,36 @@ def ensure_autoservice_payers() -> None:
             )
     logger.info("Applied autoservice_payments payer fields patch")
 
+
+def ensure_user_session_refresh_columns() -> None:
+    """Add refresh token columns to user_sessions if missing."""
+    inspector = inspect(engine)
+    if "user_sessions" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("user_sessions")}
+    statements = []
+
+    if "refresh_token_hash" not in columns:
+        statements.append("ALTER TABLE user_sessions ADD COLUMN refresh_token_hash VARCHAR(64)")
+    if "refresh_expires_at" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append("ALTER TABLE user_sessions ADD COLUMN refresh_expires_at TIMESTAMPTZ")
+        else:
+            statements.append("ALTER TABLE user_sessions ADD COLUMN refresh_expires_at DATETIME")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_user_sessions_refresh_token_hash "
+                "ON user_sessions (refresh_token_hash)"
+            )
+        )
+
+    logger.info("Applied user_sessions refresh token columns patch: %s", statements)
+

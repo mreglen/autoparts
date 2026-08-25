@@ -12,12 +12,13 @@ import {
 } from '../../redux/slices/AuthSlice';
 import { fetchCart } from '../../redux/slices/CartSlice';
 import RegistrationLegalConsent from '../Legal/RegistrationLegalConsent';
+import Modal from '../UI/Modal';
 
 const inputClass =
-  'w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+  'w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm max-md:text-base min-h-11 text-gray-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20';
 
 const tabBase =
-  'flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition';
+  'flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition min-h-11';
 
 function formatPhoneInputValue(raw) {
   let digits = String(raw || '').replace(/\D/g, '');
@@ -171,203 +172,189 @@ export default function CartAuthModal({ isOpen, onClose, onAuthSuccess }) {
     }
   }, [code, dispatch, onAuthSuccess, registerForm]);
 
-  if (!isOpen) return null;
+  const modalTitle = (
+    <div>
+      <h2 className="text-xl font-bold text-gray-900">Оформить заказ</h2>
+      <p className="mt-1 text-sm font-normal text-gray-500">
+        Войдите или зарегистрируйтесь
+      </p>
+    </div>
+  );
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Оформить заказ</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Войдите или зарегистрируйтесь
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Закрыть"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+    <Modal open={isOpen} onClose={onClose} title={modalTitle} size="sm">
+      <div className="mb-5 flex gap-2 rounded-2xl bg-gray-100 p-1">
+        <button
+          type="button"
+          onClick={() => {
+            setTab('login');
+            setLocalError('');
+          }}
+          className={`${tabBase} ${tab === 'login' ? 'bg-white text-brand-700 shadow-sm' : 'text-gray-600'}`}
+        >
+          Вход
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTab('register');
+            setLocalError('');
+            dispatch(setIsBuyer(true));
+          }}
+          className={`${tabBase} ${tab === 'register' ? 'bg-white text-brand-700 shadow-sm' : 'text-gray-600'}`}
+        >
+          Регистрация
+        </button>
+      </div>
+
+      {visibleError ? (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          {visibleError}
         </div>
+      ) : null}
 
-        <div className="mb-5 flex gap-2 rounded-2xl bg-gray-100 p-1">
+      {tab === 'login' ? (
+        <form onSubmit={handleLoginSubmit} className="space-y-4">
+          <input
+            type="text"
+            value={loginForm.login}
+            onChange={(e) => setLoginForm((prev) => ({ ...prev, login: e.target.value }))}
+            placeholder="Email или телефон"
+            className={inputClass}
+            autoComplete="username"
+            required
+          />
+          <input
+            type="password"
+            value={loginForm.password}
+            onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
+            placeholder="Пароль"
+            className={inputClass}
+            autoComplete="current-password"
+            required
+          />
           <button
-            type="button"
-            onClick={() => {
-              setTab('login');
-              setLocalError('');
-            }}
-            className={`${tabBase} ${tab === 'login' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600'}`}
+            type="submit"
+            disabled={loading}
+            className="min-h-11 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
-            Вход
+            {loading ? 'Вход…' : 'Войти'}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTab('register');
-              setLocalError('');
-              dispatch(setIsBuyer(true));
-            }}
-            className={`${tabBase} ${tab === 'register' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-600'}`}
-          >
-            Регистрация
-          </button>
-        </div>
-
-        {visibleError ? (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {visibleError}
-          </div>
-        ) : null}
-
-        {tab === 'login' ? (
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
+        </form>
+      ) : registerStep === 'form' ? (
+        <form onSubmit={handleSendCode} className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input
               type="text"
-              value={loginForm.login}
-              onChange={(e) => setLoginForm((prev) => ({ ...prev, login: e.target.value }))}
-              placeholder="Email или телефон"
+              value={registerForm.first_name}
+              onChange={(e) => setRegisterForm((prev) => ({ ...prev, first_name: e.target.value }))}
+              placeholder="Имя"
               className={inputClass}
-              autoComplete="username"
+              required
+            />
+            <input
+              type="text"
+              value={registerForm.last_name}
+              onChange={(e) => setRegisterForm((prev) => ({ ...prev, last_name: e.target.value }))}
+              placeholder="Фамилия"
+              className={inputClass}
+            />
+          </div>
+          <input
+            type="email"
+            value={registerForm.email}
+            onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))}
+            placeholder="Email"
+            className={inputClass}
+            autoComplete="email"
+            required
+          />
+          <input
+            type="tel"
+            value={registerForm.phone}
+            onChange={(e) => setRegisterForm((prev) => ({ ...prev, phone: formatPhoneInputValue(e.target.value) }))}
+            placeholder="+7 (___) ___-__-__"
+            className={inputClass}
+            autoComplete="tel"
+            required
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <input
+              type="password"
+              value={registerForm.password}
+              onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))}
+              placeholder="Пароль"
+              className={inputClass}
+              autoComplete="new-password"
               required
             />
             <input
               type="password"
-              value={loginForm.password}
-              onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
-              placeholder="Пароль"
+              value={registerForm.password_repeat}
+              onChange={(e) => setRegisterForm((prev) => ({ ...prev, password_repeat: e.target.value }))}
+              placeholder="Повторите пароль"
               className={inputClass}
-              autoComplete="current-password"
+              autoComplete="new-password"
               required
             />
+          </div>
+          <RegistrationLegalConsent
+            accepted={acceptedConsent}
+            onChange={(value) => {
+              setAcceptedConsent(value);
+              if (value) setShowConsentError(false);
+            }}
+            showError={showConsentError}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="min-h-11 w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+          >
+            {loading ? 'Отправка…' : 'Продолжить'}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleVerifyAndComplete} className="space-y-4">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+            Код отправлен на <span className="font-medium text-gray-900">{registerForm.email}</span>
+          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            value={code}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
+              dispatch(updateCode(digits));
+            }}
+            placeholder="Код из email"
+            className={`${inputClass} text-center font-mono text-lg tracking-[0.25em]`}
+            autoComplete="one-time-code"
+            required
+          />
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setRegisterStep('form');
+                setLocalError('');
+                dispatch(updateCode(''));
+              }}
+              className="min-h-11 flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Назад
+            </button>
             <button
               type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+              disabled={loading || emailVerification.status === 'verified'}
+              className="min-h-11 flex-1 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
             >
-              {loading ? 'Вход…' : 'Войти'}
+              {loading ? 'Подтверждение…' : 'Зарегистрироваться'}
             </button>
-          </form>
-        ) : registerStep === 'form' ? (
-          <form onSubmit={handleSendCode} className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input
-                type="text"
-                value={registerForm.first_name}
-                onChange={(e) => setRegisterForm((prev) => ({ ...prev, first_name: e.target.value }))}
-                placeholder="Имя"
-                className={inputClass}
-                required
-              />
-              <input
-                type="text"
-                value={registerForm.last_name}
-                onChange={(e) => setRegisterForm((prev) => ({ ...prev, last_name: e.target.value }))}
-                placeholder="Фамилия"
-                className={inputClass}
-              />
-            </div>
-            <input
-              type="email"
-              value={registerForm.email}
-              onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))}
-              placeholder="Email"
-              className={inputClass}
-              autoComplete="email"
-              required
-            />
-            <input
-              type="tel"
-              value={registerForm.phone}
-              onChange={(e) => setRegisterForm((prev) => ({ ...prev, phone: formatPhoneInputValue(e.target.value) }))}
-              placeholder="+7 (___) ___-__-__"
-              className={inputClass}
-              autoComplete="tel"
-              required
-            />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <input
-                type="password"
-                value={registerForm.password}
-                onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))}
-                placeholder="Пароль"
-                className={inputClass}
-                autoComplete="new-password"
-                required
-              />
-              <input
-                type="password"
-                value={registerForm.password_repeat}
-                onChange={(e) => setRegisterForm((prev) => ({ ...prev, password_repeat: e.target.value }))}
-                placeholder="Повторите пароль"
-                className={inputClass}
-                autoComplete="new-password"
-                required
-              />
-            </div>
-            <RegistrationLegalConsent
-              accepted={acceptedConsent}
-              onChange={(value) => {
-                setAcceptedConsent(value);
-                if (value) setShowConsentError(false);
-              }}
-              showError={showConsentError}
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {loading ? 'Отправка…' : 'Продолжить'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyAndComplete} className="space-y-4">
-            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-              Код отправлен на <span className="font-medium text-gray-900">{registerForm.email}</span>
-            </div>
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              value={code}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
-                dispatch(updateCode(digits));
-              }}
-              placeholder="Код из email"
-              className={`${inputClass} text-center font-mono text-lg tracking-[0.25em]`}
-              autoComplete="one-time-code"
-              required
-            />
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setRegisterStep('form');
-                  setLocalError('');
-                  dispatch(updateCode(''));
-                }}
-                className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-              >
-                Назад
-              </button>
-              <button
-                type="submit"
-                disabled={loading || emailVerification.status === 'verified'}
-                className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {loading ? 'Подтверждение…' : 'Зарегистрироваться'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 }

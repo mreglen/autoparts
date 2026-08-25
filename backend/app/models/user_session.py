@@ -9,6 +9,8 @@ class UserSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     session_token = Column(String(255), unique=True, nullable=False, index=True)
+    refresh_token_hash = Column(String(64), nullable=True, index=True)
+    refresh_expires_at = Column(DateTime(timezone=True), nullable=True)
     device_info = Column(String(255))  # Информация об устройстве (опционально)
     ip_address = Column(String(45))    # IPv4 или IPv6 адрес
     is_active = Column(Boolean, default=True)

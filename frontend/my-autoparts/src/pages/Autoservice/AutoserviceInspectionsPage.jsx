@@ -10,6 +10,7 @@ import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
+import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 const STATUS_LABELS = {
   new: 'В ожидании',
@@ -254,6 +255,16 @@ export default function AutoserviceInspectionsPage() {
       load();
     }
   }, [isReady, isAuthenticated, load]);
+
+  useEffect(() => {
+    const onPullRefresh = (event) => {
+      if (event.detail?.pathname === '/autoservice/inspections') {
+        load();
+      }
+    };
+    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
+  }, [load]);
 
   const filteredRows = useMemo(() => {
     const query = qApplied.trim().toLowerCase();

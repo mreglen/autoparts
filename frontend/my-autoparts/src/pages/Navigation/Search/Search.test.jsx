@@ -116,7 +116,7 @@ describe('Search clear button', () => {
     renderSearch();
     fireEvent.click(screen.getByLabelText('Распознать VIN'));
     fireEvent.click(screen.getByText('Confirm VIN'));
-    expect(mockNavigate).toHaveBeenCalledWith('/autoparts/vin?vin=JHMGD18908S212467');
+    expect(mockNavigate).toHaveBeenCalledWith('/autoparts/vin?vin=JHMGD18908S212467', {});
     expect(screen.getByRole('searchbox')).toHaveValue('JHMGD18908S212467');
   });
 });

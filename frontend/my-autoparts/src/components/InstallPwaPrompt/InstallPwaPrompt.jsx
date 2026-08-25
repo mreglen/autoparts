@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import useIsNarrowMobile from '../../hooks/useIsNarrowMobile';
+import { Z_MOBILE_PWA_PROMPT } from '../../constants/mobileTokens';
 
 const LS_KEY = 'pwa_install_dismissed';
 
@@ -71,10 +72,8 @@ export default function InstallPwaPrompt() {
 
   return (
     <div
-      className="lg:hidden fixed inset-x-3 z-[48] rounded-xl border border-indigo-100 bg-white p-3 shadow-lg"
-      style={{
-        bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px) + 4.25rem)',
-      }}
+      className="sg-pwa-prompt-offset lg:hidden fixed inset-x-3 rounded-xl border border-indigo-100 bg-white p-3 shadow-lg"
+      style={{ zIndex: Z_MOBILE_PWA_PROMPT }}
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
