@@ -10,12 +10,17 @@ import {
 import { extractVinFromOcrText, extractVinCandidatesFromOcrText } from '../../utils/extractVinFromOcrText';
 import {
   recognizeVinFromCanvas,
-  recognizeVinFromCanvasThorough,
   recognizeVinFromImageSource,
   warmupVinOcrWorker,
 } from '../../utils/vinOcr';
 import { assessVinFrameQuality, isExtremelyPoorVinFrame } from '../../utils/vinFrameQuality';
-import { VinScanConsensus, consensusProgressLabel } from '../../utils/vinScanConsensus';
+import { VinScanConsensus } from '../../utils/vinScanConsensus';
+import {
+  getCameraVideoConstraints,
+  getVinScanTiming,
+  isMobileVinScanDevice,
+  liveScanStatusLabel,
+} from '../../utils/vinScanMobile';
 import {
   createVinBarcodeDetector,
   scanVinBarcodeFromSource,
@@ -30,8 +35,6 @@ const MODES = {
   CONFIRM: 'confirm',
   ERROR: 'error',
 };
-
-const LIVE_SCAN_MS = 420;
 
 function stopMediaStream(streamRef) {
   const stream = streamRef.current;
@@ -77,8 +80,10 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
   const streamRef = useRef(null);
   const fileInputRef = useRef(null);
   const liveBusyRef = useRef(false);
+  const liveTickRef = useRef(0);
   const consensusRef = useRef(new VinScanConsensus());
   const barcodeDetectorRef = useRef(null);
+  const isMobileRef = useRef(isMobileVinScanDevice());
 
   const [mode, setMode] = useState(MODES.SCAN);
   const [cameraError, setCameraError] = useState('');
@@ -132,11 +137,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
+        video: getCameraVideoConstraints(),
         audio: false,
       });
       streamRef.current = stream;
@@ -221,26 +222,26 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     return confirmVin(vin);
   }, [confirmVin]);
 
-  const processCapturedCanvas = useCallback(async (canvas, { thorough = false } = {}) => {
+  const processCapturedCanvas = useCallback(async (canvas, { profile = 'live' } = {}) => {
+    const isManual = profile === 'manual';
     const quality = assessVinFrameQuality(canvas);
     if (!quality.ok) {
       setScanHint(quality.hint || 'Поднесите камеру ближе');
-      if (!thorough && isExtremelyPoorVinFrame(quality)) {
+      if (profile === 'live' && isExtremelyPoorVinFrame(quality)) {
         return false;
       }
     } else {
-      setScanHint(thorough ? 'Считываем рамку…' : '');
+      setScanHint(isManual ? 'Считываем рамку…' : '');
     }
 
-    const text = thorough
-      ? await recognizeVinFromCanvasThorough(canvas)
-      : await recognizeVinFromCanvas(canvas);
-
-    return applyOcrText(text, { fromLive: !thorough, allowPartial: thorough });
+    const text = await recognizeVinFromCanvas(canvas, { profile });
+    return applyOcrText(text, { fromLive: profile === 'live', allowPartial: isManual });
   }, [applyOcrText]);
 
   useEffect(() => {
     if (!open || mode !== MODES.SCAN || !engineReady || processing) return undefined;
+
+    const { liveIntervalMs, barcodeEveryNTicks } = getVinScanTiming();
 
     const tick = async () => {
       if (liveBusyRef.current) return;
@@ -249,10 +250,12 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
 
       liveBusyRef.current = true;
       try {
-        if (await tryBarcodeScan(video)) return;
-
+        liveTickRef.current += 1;
         const canvas = captureFrame(video, guideRef.current);
         if (!canvas) return;
+
+        const shouldScanBarcode = liveTickRef.current % barcodeEveryNTicks === 0;
+        if (shouldScanBarcode && await tryBarcodeScan(canvas)) return;
 
         const quality = assessVinFrameQuality(canvas);
         if (!quality.ok) {
@@ -263,7 +266,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
           setScanHint('');
         }
 
-        await processCapturedCanvas(canvas, { thorough: false });
+        await processCapturedCanvas(canvas, { profile: 'live' });
       } catch (_) {
         /* keep scanning */
       } finally {
@@ -271,11 +274,12 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
       }
     };
 
-    const id = window.setInterval(tick, LIVE_SCAN_MS);
+    const id = window.setInterval(tick, liveIntervalMs);
     tick();
     return () => {
       window.clearInterval(id);
       liveBusyRef.current = false;
+      liveTickRef.current = 0;
     };
   }, [open, mode, engineReady, processing, tryBarcodeScan, processCapturedCanvas]);
 
@@ -286,15 +290,15 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     setProcessing(true);
     setScanHint('Считываем рамку…');
     try {
-      if (await tryBarcodeScan(video)) return;
-
       const canvas = captureFrame(video, guideRef.current);
       if (!canvas) {
         setScanHint('Не удалось захватить кадр');
         return;
       }
 
-      const ok = await processCapturedCanvas(canvas, { thorough: true });
+      if (await tryBarcodeScan(canvas)) return;
+
+      const ok = await processCapturedCanvas(canvas, { profile: 'manual' });
       if (!ok) {
         setMessage('Не удалось распознать VIN. Попробуйте другой угол или загрузите фото.');
         setVinDraft('');
@@ -361,12 +365,13 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
 
   const canContinue = Boolean(normalizeVinForLookupOrNull(vinDraft) || normalizeVinOrNull(vinDraft));
 
-  const liveStatusText = (() => {
-    if (!engineReady) return 'Готовим распознавание…';
-    if (processing) return 'Считываем рамку…';
-    if (scanHint) return scanHint;
-    return consensusProgressLabel(scanProgress);
-  })();
+  const liveStatusText = liveScanStatusLabel({
+    engineReady,
+    processing,
+    scanHint,
+    scanProgress,
+    mobile: isMobileRef.current,
+  });
 
   return (
     <Modal

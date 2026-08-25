@@ -1,14 +1,13 @@
+import { getVinOcrProfile } from './vinScanMobile';
+
 let workerPromise = null;
 let idleTimer = null;
 
 const IDLE_TERMINATE_MS = 120000;
-const MIN_OCR_WIDTH = 1200;
-const MAX_OCR_WIDTH = 1800;
 /** Include lowercase: VINs on screens/docs are often not uppercase. I/O/Q stay so we can map them to 1/0. */
 const VIN_OCR_WHITELIST = 'ABCDEFGHJKLMNPRSTUVWXYZabcdefghjklmnprstuvwxyzIOQioq0123456789';
 const DEFAULT_PSM = '7';
 const FALLBACK_PSM = '13';
-const BLOCK_PSM = '6';
 
 function bumpIdleTimer() {
   if (typeof window === 'undefined') return;
@@ -97,7 +96,6 @@ function canvasMeanGray(data) {
 }
 
 function removeHorizontalFormLines(data, width, height) {
-  // Single-line VIN crops and STS rows look like form lines — do not strip them.
   if (height < 200 || width / Math.max(height, 1) > 4) return;
 
   for (let y = 0; y < height; y += 1) {
@@ -185,13 +183,16 @@ function reduceScreenMoiré(sourceCanvas) {
   return out;
 }
 
-function upscaleGrayCanvas(sourceCanvas) {
+function upscaleGrayCanvas(sourceCanvas, profile) {
   if (!sourceCanvas?.width || !sourceCanvas?.height) return sourceCanvas;
 
-  const denoised = reduceScreenMoiré(sourceCanvas);
+  const denoised = profile.skipMoiré ? sourceCanvas : reduceScreenMoiré(sourceCanvas);
   const srcW = denoised.width;
   const srcH = denoised.height;
-  const scale = Math.min(MAX_OCR_WIDTH / srcW, Math.max(MIN_OCR_WIDTH / srcW, 2.6));
+  const scale = Math.min(
+    profile.maxTargetWidth / srcW,
+    Math.max(profile.minTargetWidth / srcW, profile.maxScale),
+  );
   const width = Math.max(1, Math.round(srcW * scale));
   const height = Math.max(1, Math.round(srcH * scale));
 
@@ -244,22 +245,8 @@ function binarizeCanvas(sourceCanvas) {
   return canvas;
 }
 
-export function rotateCanvas(sourceCanvas, degrees = 90) {
-  if (!sourceCanvas?.width || !sourceCanvas?.height) return sourceCanvas;
-  const swap = degrees === 90 || degrees === 270;
-  const canvas = document.createElement('canvas');
-  canvas.width = swap ? sourceCanvas.height : sourceCanvas.width;
-  canvas.height = swap ? sourceCanvas.width : sourceCanvas.height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return sourceCanvas;
-  ctx.translate(canvas.width / 2, canvas.height / 2);
-  ctx.rotate((degrees * Math.PI) / 180);
-  ctx.drawImage(sourceCanvas, -sourceCanvas.width / 2, -sourceCanvas.height / 2);
-  return canvas;
-}
-
-export function preprocessVinCanvas(sourceCanvas) {
-  return padCanvas(upscaleGrayCanvas(sourceCanvas));
+function preprocessVinCanvas(sourceCanvas, profile) {
+  return padCanvas(upscaleGrayCanvas(sourceCanvas, profile), profile.pad);
 }
 
 export function cropVinBand(sourceCanvas, { yRatio = 0.35, heightRatio = 0.3 } = {}) {
@@ -305,9 +292,17 @@ async function recognizeWithPsm(worker, canvas, psm) {
   return text;
 }
 
-export async function recognizeVinFromCanvas(sourceCanvas, { thorough = false, tryPsm13 = false } = {}) {
+function resolveProfile(options = {}) {
+  if (options.profileOptions) return options.profileOptions;
+  if (options.profile) return getVinOcrProfile(options.profile);
+  if (options.thorough) return getVinOcrProfile('manual');
+  return getVinOcrProfile('live');
+}
+
+export async function recognizeVinFromCanvas(sourceCanvas, options = {}) {
+  const profile = resolveProfile(options);
   const worker = await getWorker();
-  const gray = preprocessVinCanvas(sourceCanvas);
+  const gray = preprocessVinCanvas(sourceCanvas, profile);
   const mean = (() => {
     const ctx = gray.getContext('2d');
     if (!ctx) return 128;
@@ -318,55 +313,47 @@ export async function recognizeVinFromCanvas(sourceCanvas, { thorough = false, t
   const first = mean < 118 ? invertCanvas(gray) : gray;
   let text = await recognizePrepared(worker, first);
   bumpIdleTimer();
-  if (compactLen(text) >= 11 && !thorough) return text;
 
-  const second = mean < 118 ? gray : invertCanvas(gray);
-  text = pickLongerText(text, await recognizePrepared(worker, second));
-  if (compactLen(text) >= 17 && !thorough) {
-    bumpIdleTimer();
+  if (profile.maxPasses <= 1) {
     return text;
   }
 
-  text = pickLongerText(text, await recognizePrepared(worker, binarizeCanvas(first)));
+  if (compactLen(text) >= 17) {
+    return text;
+  }
+
+  let passes = 1;
+
+  const second = mean < 118 ? gray : invertCanvas(gray);
+  text = pickLongerText(text, await recognizePrepared(worker, second));
   bumpIdleTimer();
+  passes += 1;
 
-  if (thorough && compactLen(text) < 17) {
-    text = pickLongerText(text, await recognizePrepared(worker, binarizeCanvas(second)));
-    bumpIdleTimer();
+  if (compactLen(text) >= 17 || passes >= profile.maxPasses) {
+    return text;
   }
 
-  if ((thorough || tryPsm13) && compactLen(text) < 17) {
+  if (profile.allowBinarize && compactLen(text) < 11) {
+    text = pickLongerText(text, await recognizePrepared(worker, binarizeCanvas(first)));
+    bumpIdleTimer();
+    passes += 1;
+  }
+
+  if (profile.allowPsmFallback && compactLen(text) < 11 && passes < profile.maxPasses) {
     text = pickLongerText(text, await recognizeWithPsm(worker, first, FALLBACK_PSM));
-    bumpIdleTimer();
-  }
-
-  if (thorough && compactLen(text) < 17) {
-    text = pickLongerText(text, await recognizeWithPsm(worker, first, BLOCK_PSM));
     bumpIdleTimer();
   }
 
   return text;
 }
 
+/** @deprecated Use recognizeVinFromCanvas(canvas, { profile: 'manual' }) */
 export async function recognizeVinFromCanvasThorough(sourceCanvas) {
-  const variants = [
-    sourceCanvas,
-    cropVinBand(sourceCanvas, { yRatio: 0.08, heightRatio: 0.32 }),
-    cropVinBand(sourceCanvas, { yRatio: 0.35, heightRatio: 0.3 }),
-    rotateCanvas(sourceCanvas, 90),
-    rotateCanvas(sourceCanvas, 270),
-  ];
-
-  let bestText = '';
-  for (const variant of variants) {
-    const text = await recognizeVinFromCanvas(variant, { thorough: true, tryPsm13: true });
-    bestText = pickLongerText(bestText, text);
-    if (compactLen(bestText) >= 17) break;
-  }
-  return bestText;
+  return recognizeVinFromCanvas(sourceCanvas, { profile: 'manual' });
 }
 
 export async function recognizeVinFromImageSource(imageSource) {
+  const profile = getVinOcrProfile('photo');
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas not supported');
@@ -377,7 +364,7 @@ export async function recognizeVinFromImageSource(imageSource) {
     throw new Error('Invalid image dimensions');
   }
 
-  const maxSide = 2000;
+  const maxSide = profile.photoMaxSide || 1600;
   const scale = Math.min(1, maxSide / Math.max(width, height));
   width = Math.round(width * scale);
   height = Math.round(height * scale);
@@ -386,19 +373,21 @@ export async function recognizeVinFromImageSource(imageSource) {
   canvas.height = height;
   ctx.drawImage(imageSource, 0, 0, width, height);
 
-  const bands = [
+  const allBands = [
     canvas,
     cropVinBand(canvas, { yRatio: 0.14, heightRatio: 0.1 }),
-    cropVinBand(canvas, { yRatio: 0.22, heightRatio: 0.1 }),
     cropVinBand(canvas, { yRatio: 0.38, heightRatio: 0.1 }),
     cropVinBand(canvas, { yRatio: 0.44, heightRatio: 0.12 }),
     cropVinBand(canvas, { yRatio: 0.35, heightRatio: 0.3 }),
-    cropVinBand(canvas, { yRatio: 0.12, heightRatio: 0.28 }),
   ];
+  const bands = allBands.slice(0, profile.maxPhotoBands || 3);
 
   let bestText = '';
   for (const band of bands) {
-    bestText = pickLongerText(bestText, await recognizeVinFromCanvas(band, { thorough: true, tryPsm13: true }));
+    bestText = pickLongerText(
+      bestText,
+      await recognizeVinFromCanvas(band, { profileOptions: profile, profile: 'photo' }),
+    );
     if (compactLen(bestText) >= 17) break;
   }
   return bestText;

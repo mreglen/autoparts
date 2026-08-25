@@ -1,4 +1,6 @@
 import { VIN_MAX_LENGTH, VIN_MIN_LENGTH } from './laximoVin';
+import { vinCheckDigitValid } from './vinCheckDigit';
+import { isMobileVinScanDevice } from './vinScanMobile';
 
 const DEFAULT_HISTORY_SIZE = 7;
 const MIN_FRAMES_FULL = 2;
@@ -42,6 +44,13 @@ function buildConsensusForLength(readings, targetLength) {
   return chars.join('');
 }
 
+export function canInstantAcceptVin(vin) {
+  const text = String(vin || '').toUpperCase().trim();
+  if (!isMobileVinScanDevice()) return false;
+  if (text.length !== VIN_MAX_LENGTH) return false;
+  return vinCheckDigitValid(text) === true;
+}
+
 export class VinScanConsensus {
   constructor(maxSize = DEFAULT_HISTORY_SIZE) {
     this.maxSize = maxSize;
@@ -57,6 +66,11 @@ export class VinScanConsensus {
     if (text.length < VIN_MIN_LENGTH || text.length > VIN_MAX_LENGTH) {
       return null;
     }
+
+    if (canInstantAcceptVin(text)) {
+      return text;
+    }
+
     this.readings.push(text);
     if (this.readings.length > this.maxSize) {
       this.readings.shift();
