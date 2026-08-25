@@ -49,6 +49,3 @@ class GarageVehicle(Base):
 
     client = relationship("AutoserviceClient", foreign_keys=[client_id])
     organization = relationship("Organization", foreign_keys=[organization_id])
-
-    client = relationship("AutoserviceClient", foreign_keys=[client_id])
-    organization = relationship("Organization", foreign_keys=[organization_id])

@@ -47,6 +47,25 @@ from app.models.yandex_oauth_state import YandexOAuthState
 from app.models.chat import Chat, Message, ChatParticipant
 from app.models.part_type import PartType
 from app.models.new_parts_seo_card import NewPartsSeoCard
+# Autoservice graph must be registered for Celery ORM (seo sync, digests, etc.)
+from app.models.autoservice_client import AutoserviceClient
+from app.models.autoservice_work_zone import AutoserviceWorkZone
+from app.models.autoservice_work import AutoserviceWork
+from app.models.autoservice_service_employee import AutoserviceServiceEmployee
+from app.models.autoservice_payer import AutoservicePayer
+from app.models.autoservice_payment import AutoservicePayment
+from app.models.autoservice_warehouse import AutoserviceWarehouseItem
+from app.models.organization_employee import OrganizationEmployee
+from app.models.garage_vehicle import GarageVehicle
+from app.models.inspection_booking import InspectionBooking
+from app.models.repair_booking import RepairBooking
+from app.models.repair_order import (
+    RepairOrder,
+    RepairOrderWork,
+    RepairOrderWorkExecutor,
+    RepairOrderClientPart,
+    RepairOrderShopPart,
+)
 from app.models.user_engagement import (
     UserFavorite,
     UserProductView,
