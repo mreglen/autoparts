@@ -54,14 +54,19 @@ export default function Modal({
   return createPortal(
     <div
       className={cx(
-        'fixed inset-0 flex items-end justify-center p-0 max-lg:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:items-center sm:p-4 lg:pb-0',
+        // pointer-events-none: bottom-nav strip stays tappable; pb reserves space so sheet/footer stay above nav
+        'pointer-events-none fixed inset-0 flex items-end justify-center p-0 max-lg:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:items-center sm:p-4 lg:pb-0',
         wrapperClassName,
       )}
       style={{ zIndex: wrapperZIndex }}
     >
       <button
         type="button"
-        className="absolute inset-0 bg-slate-900/40"
+        className={cx(
+          'pointer-events-auto absolute inset-x-0 top-0 bg-slate-900/40',
+          // Leave MobileBottomNav undimmed on mobile/tablet shell (< lg)
+          'bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-0',
+        )}
         aria-label={closeOnBackdrop ? 'Закрыть' : undefined}
         aria-hidden={!closeOnBackdrop}
         tabIndex={-1}
@@ -74,7 +79,7 @@ export default function Modal({
         aria-labelledby={hasStringTitle ? titleId : undefined}
         aria-label={!hasStringTitle && typeof title === 'string' ? title : undefined}
         className={cx(
-          'relative z-10 flex w-full max-h-[min(92dvh,100%)] flex-col overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:max-h-[85vh] sm:rounded-sg-lg',
+          'pointer-events-auto relative z-10 flex w-full max-h-full flex-col overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:max-h-[85vh] sm:rounded-sg-lg',
           width,
           className,
         )}
@@ -123,7 +128,7 @@ export default function Modal({
           {children}
         </div>
         {footer ? (
-          <div className="shrink-0 border-t border-line px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="shrink-0 border-t border-line px-5 py-4">
             {footer}
           </div>
         ) : null}

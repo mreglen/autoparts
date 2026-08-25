@@ -67,7 +67,7 @@ Bottom-fixed layers (low → high):
 | Bottom navigation | 50 | `Z_MOBILE_BOTTOM_NAV` |
 | Cookie banner | 56 | `Z_COOKIE_BANNER` |
 | Mobile side menu | 60 | `Z_MOBILE_DRAWER` |
-| Modal | 110 | `Z_MODAL` |
+| Modal | 110 | `Z_MODAL` — на mobile/tablet затемнение не перекрывает bottom nav |
 | Context menu | 120 | `Z_CONTEXT_MENU` |
 
 New fixed overlays must use tokens from `mobileTokens.js` — не добавлять ad-hoc `z-[…]`.

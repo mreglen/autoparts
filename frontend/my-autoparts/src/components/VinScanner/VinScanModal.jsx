@@ -527,9 +527,6 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
               ) : null}
             </div>
           </div>
-          <p className="text-sm text-gray-600">
-            Поместите номер в белую рамку. Поддерживаются штрихкод на наклейке и текстовый VIN — после распознавания можно проверить и исправить.
-          </p>
           {cameraError ? <p className="text-sm text-red-600">{cameraError}</p> : null}
         </div>
       ) : null}
