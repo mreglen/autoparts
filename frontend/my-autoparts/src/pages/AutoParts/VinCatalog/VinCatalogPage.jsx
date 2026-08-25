@@ -12,7 +12,9 @@ import { fetchPublicSiteConfig } from '../../../redux/slices/PublicInfoSlice';
 import VinCatalogBrowse from './VinCatalogBrowse';
 import VinScanModal from '../../../components/VinScanner/VinScanModal';
 import VinScanTriggerButton from '../../../components/VinScanner/VinScanTriggerButton';
+import SearchablePillSelect from '../../../components/SearchablePillSelect/SearchablePillSelect';
 import useVinCartBasket from '../../../hooks/useVinCartBasket';
+import { buildWizardCatalogSelectOptions } from '../../../utils/wizardCatalogDisplay';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -90,6 +92,11 @@ export default function VinCatalogPage() {
   const imageMapReqId = useRef(0);
 
   const openWizard = searchParams.get('wizard') === '1';
+
+  const wizardCatalogOptions = useMemo(
+    () => buildWizardCatalogSelectOptions(wizardCatalogs),
+    [wizardCatalogs],
+  );
   const { basketId: vinBasketId, ensureVinBasket } = useVinCartBasket(vehicle, vin);
 
   const handleSoftFail = (result) => {
@@ -924,28 +931,28 @@ export default function VinCatalogPage() {
           ) : null}
           <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Марка</label>
-              <select
-                className={inputClass}
+              <label htmlFor="wizard-brand" className="block text-sm font-medium text-gray-700">
+                Марка
+              </label>
+              <SearchablePillSelect
+                id="wizard-brand"
+                ariaLabel="Марка автомобиля"
                 value={wizardCatalog}
-                disabled={wizardLoading || !wizardCatalogs.length}
-                onChange={(e) => {
-                  const code = e.target.value;
+                onChange={(code) => {
                   setWizardCatalog(code);
                   setWizardSsd('');
                   setWizardConditions([]);
                   setWizardCanList(false);
                   if (code) loadWizardStep(code, '');
                 }}
-              >
-                <option value="">Выберите каталог</option>
-                {wizardCatalogs.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.brand || c.name || c.code}
-                    {c.name && c.brand ? ` — ${c.name}` : ''}
-                  </option>
-                ))}
-              </select>
+                options={wizardCatalogOptions}
+                loading={wizardLoading && !wizardCatalogs.length}
+                disabled={wizardLoading || !wizardCatalogs.length}
+                placeholder="Введите марку…"
+                emptyOptionLabel="Сбросить"
+                inputClassName={inputClass}
+                className="mt-1"
+              />
             </div>
 
             {wizardConditions

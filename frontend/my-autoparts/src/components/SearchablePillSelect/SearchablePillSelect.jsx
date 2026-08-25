@@ -16,6 +16,7 @@ export default function SearchablePillSelect({
   ariaLabel,
   id,
   className = '',
+  inputClassName = '',
 }) {
   const rootRef = useRef(null);
   const inputRef = useRef(null);
@@ -92,8 +93,13 @@ export default function SearchablePillSelect({
             setQuery('');
           }
         }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || !open || filtered.length === 0) return;
+          event.preventDefault();
+          handleSelect(filtered[0].value);
+        }}
         autoComplete="off"
-        className={`${warehousePillControlClass} mt-0 pr-10 ${open ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
+        className={`${inputClassName || warehousePillControlClass} mt-0 pr-10 ${open ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
       />
       <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400">
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
