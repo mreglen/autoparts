@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Button from './Button';
 
 function cx(...parts) {
@@ -37,8 +38,13 @@ export default function Modal({
   const width =
     size === 'sm' ? 'max-w-md' : size === 'lg' ? 'max-w-3xl' : size === 'xl' ? 'max-w-5xl' : 'max-w-xl';
 
-  return (
-    <div className={cx('fixed inset-0 flex items-end justify-center p-0 sm:items-center sm:p-4', wrapperClassName || 'z-[110]')}>
+  return createPortal(
+    <div
+      className={cx(
+        'fixed inset-0 flex items-end justify-center p-0 max-lg:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:items-center sm:p-4 lg:pb-0',
+        wrapperClassName || 'z-[110]',
+      )}
+    >
       <button
         type="button"
         className="absolute inset-0 bg-slate-900/40"
@@ -104,7 +110,8 @@ export default function Modal({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
