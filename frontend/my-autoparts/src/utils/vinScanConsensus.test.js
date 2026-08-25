@@ -4,7 +4,6 @@ describe('VinScanConsensus', () => {
   it('builds stable 17-char VIN from noisy readings', () => {
     const consensus = new VinScanConsensus();
     expect(consensus.add('JHMGD18908S212467')).toBeNull();
-    expect(consensus.add('JHMGD18908S212467')).toBeNull();
     expect(consensus.add('JHMGD18908S212467')).toBe('JHMGD18908S212467');
   });
 

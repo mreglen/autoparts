@@ -2,18 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import {
+  normalizeVinForLookupOrNull,
   normalizeVinOrNull,
   sanitizeVinInput,
   VIN_INPUT_MAX_LENGTH,
 } from '../../utils/laximoVin';
-import { extractVinFromOcrText } from '../../utils/extractVinFromOcrText';
+import { extractVinFromOcrText, extractVinCandidatesFromOcrText } from '../../utils/extractVinFromOcrText';
 import {
   recognizeVinFromCanvas,
   recognizeVinFromCanvasThorough,
   recognizeVinFromImageSource,
   warmupVinOcrWorker,
 } from '../../utils/vinOcr';
-import { assessVinFrameQuality } from '../../utils/vinFrameQuality';
+import { assessVinFrameQuality, isExtremelyPoorVinFrame } from '../../utils/vinFrameQuality';
 import { VinScanConsensus, consensusProgressLabel } from '../../utils/vinScanConsensus';
 import {
   createVinBarcodeDetector,
@@ -109,8 +110,8 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
   }, [onClose, resetState]);
 
   const confirmVin = useCallback((vin, { warning = '' } = {}) => {
-    const nextVin = normalizeVinOrNull(vin) || sanitizeVinInput(vin);
-    if (!nextVin) return false;
+    const nextVin = normalizeVinForLookupOrNull(vin) || normalizeVinOrNull(vin) || sanitizeVinInput(vin);
+    if (!nextVin || nextVin.length < 11) return false;
 
     setVinDraft(nextVin);
     setMessage(warning);
@@ -178,11 +179,18 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     };
   }, [open, mode, startCamera]);
 
-  const applyOcrText = useCallback((text, { fromLive = false } = {}) => {
+  const applyOcrText = useCallback((text, { fromLive = false, allowPartial = false } = {}) => {
     const extracted = extractVinFromOcrText(text);
-    const nextVin = extracted?.normalized || extracted?.raw || sanitizeVinInput(text);
+    let nextVin = extracted?.normalized || extracted?.raw || null;
 
-    if (!nextVin) {
+    if (!nextVin && allowPartial) {
+      const candidates = extractVinCandidatesFromOcrText(text);
+      nextVin = candidates[0]?.normalized || candidates[0]?.raw || sanitizeVinInput(text);
+    } else if (!nextVin) {
+      nextVin = sanitizeVinInput(text);
+    }
+
+    if (!nextVin || nextVin.length < 11) {
       if (fromLive) return false;
       setMessage('Не удалось распознать VIN. Держите номер в рамке или введите вручную.');
       setVinDraft('');
@@ -191,16 +199,18 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     }
 
     if (fromLive) {
-      if (!extracted?.normalized) return false;
-      const consensusVin = consensusRef.current.add(extracted.normalized);
+      const stableVin = normalizeVinForLookupOrNull(nextVin) || normalizeVinOrNull(nextVin);
+      if (!stableVin) return false;
+      const consensusVin = consensusRef.current.add(stableVin);
       setScanProgress(consensusRef.current.getProgress());
       if (!consensusVin) return false;
       return confirmVin(consensusVin);
     }
 
-    return confirmVin(nextVin, {
-      warning: extracted?.normalized ? '' : 'Проверьте VIN перед поиском — распознавание может содержать ошибки.',
-    });
+    const warning = extracted?.normalized
+      ? ''
+      : 'Проверьте VIN перед поиском — распознавание может содержать ошибки.';
+    return confirmVin(nextVin, { warning });
   }, [confirmVin]);
 
   const tryBarcodeScan = useCallback(async (source) => {
@@ -213,18 +223,20 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
 
   const processCapturedCanvas = useCallback(async (canvas, { thorough = false } = {}) => {
     const quality = assessVinFrameQuality(canvas);
-    if (!quality.ok && !thorough) {
+    if (!quality.ok) {
       setScanHint(quality.hint || 'Поднесите камеру ближе');
-      return false;
+      if (!thorough && isExtremelyPoorVinFrame(quality)) {
+        return false;
+      }
+    } else {
+      setScanHint(thorough ? 'Считываем рамку…' : '');
     }
-
-    setScanHint(thorough ? 'Считываем рамку…' : '');
 
     const text = thorough
       ? await recognizeVinFromCanvasThorough(canvas)
       : await recognizeVinFromCanvas(canvas);
 
-    return applyOcrText(text, { fromLive: !thorough });
+    return applyOcrText(text, { fromLive: !thorough, allowPartial: thorough });
   }, [applyOcrText]);
 
   useEffect(() => {
@@ -246,10 +258,11 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
         if (!quality.ok) {
           setScanHint(quality.hint || 'Поднесите камеру ближе');
           setScanProgress(consensusRef.current.getProgress());
-          return;
+          if (isExtremelyPoorVinFrame(quality)) return;
+        } else {
+          setScanHint('');
         }
 
-        setScanHint('');
         await processCapturedCanvas(canvas, { thorough: false });
       } catch (_) {
         /* keep scanning */
@@ -336,7 +349,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
   }, [resetState]);
 
   const handleContinue = useCallback(() => {
-    const next = normalizeVinOrNull(vinDraft);
+    const next = normalizeVinForLookupOrNull(vinDraft) || normalizeVinOrNull(vinDraft);
     if (!next) {
       setMessage('VIN должен содержать от 11 до 17 символов');
       return;
@@ -346,7 +359,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     resetState();
   }, [onConfirm, resetState, vinDraft]);
 
-  const canContinue = Boolean(normalizeVinOrNull(vinDraft));
+  const canContinue = Boolean(normalizeVinForLookupOrNull(vinDraft) || normalizeVinOrNull(vinDraft));
 
   const liveStatusText = (() => {
     if (!engineReady) return 'Готовим распознавание…';
@@ -424,7 +437,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center p-5">
               <div
                 ref={guideRef}
-                className="h-[4.25rem] w-[92%] max-w-xl rounded-md border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
+                className="h-[5rem] w-[92%] max-w-xl rounded-md border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
               />
             </div>
             {torchSupported ? (

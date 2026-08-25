@@ -1,7 +1,9 @@
-const MIN_BRIGHTNESS = 42;
-const MAX_BRIGHTNESS = 228;
-const MIN_CONTRAST = 22;
-const MIN_SHARPNESS = 18;
+const MIN_BRIGHTNESS = 35;
+const MAX_BRIGHTNESS = 235;
+const MIN_CONTRAST = 14;
+const MIN_SHARPNESS = 10;
+const EXTREME_MIN_BRIGHTNESS = 26;
+const EXTREME_MIN_CONTRAST = 8;
 
 function grayAt(data, width, x, y) {
   const i = (y * width + x) * 4;
@@ -74,6 +76,11 @@ export function assessVinImageMetrics(data, width, height) {
   }
 
   return { ok: true, hint: null, brightness, contrast, sharpness };
+}
+
+export function isExtremelyPoorVinFrame(quality) {
+  if (!quality) return true;
+  return quality.brightness < EXTREME_MIN_BRIGHTNESS || quality.contrast < EXTREME_MIN_CONTRAST;
 }
 
 export function assessVinFrameQuality(canvas) {

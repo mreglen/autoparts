@@ -1,7 +1,7 @@
 import { VIN_MAX_LENGTH, VIN_MIN_LENGTH } from './laximoVin';
 
 const DEFAULT_HISTORY_SIZE = 7;
-const MIN_FRAMES_FULL = 3;
+const MIN_FRAMES_FULL = 2;
 const MIN_FRAMES_SHORT = 4;
 const MIN_CHAR_RATIO_FULL = 0.68;
 const MIN_CHAR_RATIO_SHORT = 0.78;

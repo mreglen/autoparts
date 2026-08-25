@@ -6,6 +6,22 @@ import {
 } from './laximoVin';
 import { vinCheckDigitScoreBoost } from './vinCheckDigit';
 
+/** Cyrillic lookalikes (RU docs) → Latin VIN letters */
+const CYR_TO_LATIN = {
+  А: 'A',
+  В: 'B',
+  Е: 'E',
+  К: 'K',
+  М: 'M',
+  Н: 'H',
+  О: 'O',
+  Р: 'P',
+  С: 'C',
+  Т: 'T',
+  У: 'Y',
+  Х: 'X',
+};
+
 /** Common OCR confusions for VIN (I/O/Q are forbidden in real VIN). */
 const OCR_CONFUSIONS = {
   0: ['O', 'Q', 'D'],
@@ -36,8 +52,12 @@ function normalizeOcrChar(ch) {
   return '';
 }
 
+function mapCyrillicLookalikes(text) {
+  return String(text || '').replace(/[АВЕКМНОРСТУХ]/g, (ch) => CYR_TO_LATIN[ch] || ch);
+}
+
 function rewriteForbiddenVinChars(text) {
-  return String(text || '')
+  return mapCyrillicLookalikes(String(text || ''))
     .toUpperCase()
     .replace(/[OОQ]/g, '0')
     .replace(/[I|!]/g, '1');

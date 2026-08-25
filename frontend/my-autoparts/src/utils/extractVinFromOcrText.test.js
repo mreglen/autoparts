@@ -49,4 +49,14 @@ describe('extractVinFromOcrText', () => {
   it('rejects obvious non-VIN part numbers in noisy text', () => {
     expect(extractVinFromOcrText('12345678901234567')).toBeNull();
   });
+
+  it('extracts Chevrolet STS VIN from OCR text', () => {
+    const result = extractVinFromOcrText('XUFTA48EJEN034395');
+    expect(result?.normalized).toBe('XUFTA48EJEN034395');
+  });
+
+  it('maps Cyrillic lookalikes from STS OCR', () => {
+    const result = extractVinFromOcrText('ХUFTА48EJEN034395');
+    expect(result?.normalized).toBe('XUFTA48EJEN034395');
+  });
 });

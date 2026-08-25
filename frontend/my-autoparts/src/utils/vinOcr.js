@@ -8,6 +8,7 @@ const MAX_OCR_WIDTH = 1800;
 const VIN_OCR_WHITELIST = 'ABCDEFGHJKLMNPRSTUVWXYZabcdefghjklmnprstuvwxyzIOQioq0123456789';
 const DEFAULT_PSM = '7';
 const FALLBACK_PSM = '13';
+const BLOCK_PSM = '6';
 
 function bumpIdleTimer() {
   if (typeof window === 'undefined') return;
@@ -96,6 +97,9 @@ function canvasMeanGray(data) {
 }
 
 function removeHorizontalFormLines(data, width, height) {
+  // Single-line VIN crops and STS rows look like form lines — do not strip them.
+  if (height < 200 || width / Math.max(height, 1) > 4) return;
+
   for (let y = 0; y < height; y += 1) {
     let dark = 0;
     for (let x = 0; x < width; x += 1) {
@@ -336,6 +340,11 @@ export async function recognizeVinFromCanvas(sourceCanvas, { thorough = false, t
     bumpIdleTimer();
   }
 
+  if (thorough && compactLen(text) < 17) {
+    text = pickLongerText(text, await recognizeWithPsm(worker, first, BLOCK_PSM));
+    bumpIdleTimer();
+  }
+
   return text;
 }
 
@@ -368,7 +377,7 @@ export async function recognizeVinFromImageSource(imageSource) {
     throw new Error('Invalid image dimensions');
   }
 
-  const maxSide = 1600;
+  const maxSide = 2000;
   const scale = Math.min(1, maxSide / Math.max(width, height));
   width = Math.round(width * scale);
   height = Math.round(height * scale);
@@ -377,5 +386,20 @@ export async function recognizeVinFromImageSource(imageSource) {
   canvas.height = height;
   ctx.drawImage(imageSource, 0, 0, width, height);
 
-  return recognizeVinFromCanvasThorough(canvas);
+  const bands = [
+    canvas,
+    cropVinBand(canvas, { yRatio: 0.14, heightRatio: 0.1 }),
+    cropVinBand(canvas, { yRatio: 0.22, heightRatio: 0.1 }),
+    cropVinBand(canvas, { yRatio: 0.38, heightRatio: 0.1 }),
+    cropVinBand(canvas, { yRatio: 0.44, heightRatio: 0.12 }),
+    cropVinBand(canvas, { yRatio: 0.35, heightRatio: 0.3 }),
+    cropVinBand(canvas, { yRatio: 0.12, heightRatio: 0.28 }),
+  ];
+
+  let bestText = '';
+  for (const band of bands) {
+    bestText = pickLongerText(bestText, await recognizeVinFromCanvas(band, { thorough: true, tryPsm13: true }));
+    if (compactLen(bestText) >= 17) break;
+  }
+  return bestText;
 }
