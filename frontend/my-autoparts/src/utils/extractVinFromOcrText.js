@@ -4,6 +4,7 @@ import {
   VIN_MAX_LENGTH,
   VIN_MIN_LENGTH,
 } from './laximoVin';
+import { vinCheckDigitScoreBoost } from './vinCheckDigit';
 
 /** Common OCR confusions for VIN (I/O/Q are forbidden in real VIN). */
 const OCR_CONFUSIONS = {
@@ -58,6 +59,16 @@ function fixOcrSequence(raw) {
   }).join('');
 }
 
+function countOcrFixes(raw, normalized) {
+  const rawChars = String(raw || '').toUpperCase().split('');
+  const normChars = String(normalized || '').toUpperCase().split('');
+  let fixes = 0;
+  for (let i = 0; i < Math.min(rawChars.length, normChars.length); i += 1) {
+    if (rawChars[i] !== normChars[i]) fixes += 1;
+  }
+  return fixes;
+}
+
 function buildCandidate(value) {
   const trimmed = String(value || '').trim();
   if (!trimmed) return null;
@@ -71,11 +82,23 @@ function buildCandidate(value) {
   const best = normalized || normalizedFixed;
   if (!best) return null;
 
+  const raw = sanitized || fixed;
+  const fixCount = countOcrFixes(raw, best);
+
   return {
-    raw: sanitized || fixed,
+    raw,
     normalized: best,
     length: best.length,
+    fixCount,
+    score: scoreCandidate(best, fixCount),
   };
+}
+
+function scoreCandidate(normalized, fixCount = 0) {
+  let score = normalized.length === VIN_MAX_LENGTH ? 100 : normalized.length * 4;
+  score += vinCheckDigitScoreBoost(normalized);
+  score -= Math.min(fixCount, 8) * 2;
+  return score;
 }
 
 function collectCandidates(text) {
@@ -83,10 +106,14 @@ function collectCandidates(text) {
   const add = (value) => {
     const candidate = buildCandidate(value);
     if (!candidate) return;
-    found.set(candidate.normalized, candidate);
+    const existing = found.get(candidate.normalized);
+    if (!existing || candidate.score > existing.score) {
+      found.set(candidate.normalized, candidate);
+    }
   };
 
-  const upper = rewriteForbiddenVinChars(String(text || ''));
+  const stripped = String(text || '').replace(VIN_LABEL_RE, '');
+  const upper = rewriteForbiddenVinChars(stripped);
   upper.split(/[^A-Z0-9]+/).forEach((token) => add(token));
 
   const compact = upper.replace(/[^A-Z0-9]/g, '');
@@ -101,25 +128,62 @@ function collectCandidates(text) {
   return [...found.values()];
 }
 
-/**
- * Find the best VIN-like substring in noisy OCR output.
- * Prefers exact valid 17-char matches.
- */
-export function extractVinFromOcrText(text) {
-  if (!text) return null;
-
-  const candidates = collectCandidates(text);
-  if (!candidates.length) return null;
-
-  candidates.sort((a, b) => {
+function sortCandidates(candidates) {
+  return [...candidates].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
     const lengthScoreA = a.length === VIN_MAX_LENGTH ? 100 : a.length * 4;
     const lengthScoreB = b.length === VIN_MAX_LENGTH ? 100 : b.length * 4;
     return lengthScoreB - lengthScoreA;
   });
+}
+
+/**
+ * Find the best VIN-like substring in noisy OCR output.
+ */
+export function extractVinFromOcrText(text) {
+  if (!text) return null;
+
+  const candidates = sortCandidates(collectCandidates(text));
+  if (!candidates.length) return null;
 
   const best = candidates[0];
   return {
     raw: best.raw,
     normalized: best.normalized,
+    score: best.score,
+    fixCount: best.fixCount,
   };
+}
+
+export function extractVinCandidatesFromOcrText(text) {
+  if (!text) return [];
+  return sortCandidates(collectCandidates(text));
+}
+
+/**
+ * Pick best VIN from repeated frame readings using score + frequency.
+ */
+export function pickBestVinFromFrameReadings(readings) {
+  const scores = new Map();
+  for (const reading of readings || []) {
+    const extracted = extractVinFromOcrText(reading);
+    if (!extracted?.normalized) continue;
+    const prev = scores.get(extracted.normalized) || { count: 0, score: extracted.score || 0 };
+    scores.set(extracted.normalized, {
+      count: prev.count + 1,
+      score: Math.max(prev.score, extracted.score || 0),
+    });
+  }
+
+  let bestVin = null;
+  let bestCombined = -1;
+  scores.forEach(({ count, score }, vin) => {
+    const combined = score + count * 12;
+    if (combined > bestCombined) {
+      bestCombined = combined;
+      bestVin = vin;
+    }
+  });
+
+  return bestVin;
 }

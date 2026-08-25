@@ -5,14 +5,24 @@ import {
   normalizeVinOrNull,
   sanitizeVinInput,
   VIN_INPUT_MAX_LENGTH,
-  VIN_MAX_LENGTH,
 } from '../../utils/laximoVin';
 import { extractVinFromOcrText } from '../../utils/extractVinFromOcrText';
 import {
   recognizeVinFromCanvas,
+  recognizeVinFromCanvasThorough,
   recognizeVinFromImageSource,
   warmupVinOcrWorker,
 } from '../../utils/vinOcr';
+import { assessVinFrameQuality } from '../../utils/vinFrameQuality';
+import { VinScanConsensus, consensusProgressLabel } from '../../utils/vinScanConsensus';
+import {
+  createVinBarcodeDetector,
+  scanVinBarcodeFromSource,
+} from '../../utils/vinBarcodeScan';
+import {
+  applyCameraEnhancements,
+  setTorchEnabled,
+} from '../../utils/vinCameraControls';
 
 const MODES = {
   SCAN: 'scan',
@@ -66,8 +76,8 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
   const streamRef = useRef(null);
   const fileInputRef = useRef(null);
   const liveBusyRef = useRef(false);
-  const liveVinRef = useRef('');
-  const liveMatchRef = useRef(0);
+  const consensusRef = useRef(new VinScanConsensus());
+  const barcodeDetectorRef = useRef(null);
 
   const [mode, setMode] = useState(MODES.SCAN);
   const [cameraError, setCameraError] = useState('');
@@ -75,6 +85,10 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
   const [engineReady, setEngineReady] = useState(false);
   const [vinDraft, setVinDraft] = useState('');
   const [message, setMessage] = useState('');
+  const [scanHint, setScanHint] = useState('');
+  const [scanProgress, setScanProgress] = useState(0);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   const resetState = useCallback(() => {
     setMode(MODES.SCAN);
@@ -82,8 +96,10 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     setProcessing(false);
     setVinDraft('');
     setMessage('');
-    liveVinRef.current = '';
-    liveMatchRef.current = 0;
+    setScanHint('');
+    setScanProgress(0);
+    setTorchOn(false);
+    consensusRef.current.reset();
   }, []);
 
   const handleClose = useCallback(() => {
@@ -91,6 +107,17 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     resetState();
     onClose?.();
   }, [onClose, resetState]);
+
+  const confirmVin = useCallback((vin, { warning = '' } = {}) => {
+    const nextVin = normalizeVinOrNull(vin) || sanitizeVinInput(vin);
+    if (!nextVin) return false;
+
+    setVinDraft(nextVin);
+    setMessage(warning);
+    stopMediaStream(streamRef);
+    setMode(MODES.CONFIRM);
+    return true;
+  }, []);
 
   const startCamera = useCallback(async () => {
     setCameraError('');
@@ -112,6 +139,9 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
         audio: false,
       });
       streamRef.current = stream;
+      const caps = await applyCameraEnhancements(stream);
+      setTorchSupported(Boolean(caps.torchSupported));
+
       const video = videoRef.current;
       if (video) {
         video.srcObject = stream;
@@ -132,6 +162,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
 
     resetState();
     setEngineReady(false);
+    barcodeDetectorRef.current = createVinBarcodeDetector();
     warmupVinOcrWorker().then(() => setEngineReady(true)).catch(() => setEngineReady(true));
 
     return () => {
@@ -152,11 +183,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     const nextVin = extracted?.normalized || extracted?.raw || sanitizeVinInput(text);
 
     if (!nextVin) {
-      if (fromLive) {
-        liveVinRef.current = '';
-        liveMatchRef.current = 0;
-        return false;
-      }
+      if (fromLive) return false;
       setMessage('Не удалось распознать VIN. Держите номер в рамке или введите вручную.');
       setVinDraft('');
       setMode(MODES.CONFIRM);
@@ -164,34 +191,41 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     }
 
     if (fromLive) {
-      if (!extracted?.normalized) {
-        liveVinRef.current = '';
-        liveMatchRef.current = 0;
-        return false;
-      }
-      if (extracted.normalized.length === VIN_MAX_LENGTH) {
-        liveVinRef.current = extracted.normalized;
-        liveMatchRef.current = 2;
-      } else if (extracted.normalized === liveVinRef.current) {
-        liveMatchRef.current += 1;
-      } else {
-        liveVinRef.current = extracted.normalized;
-        liveMatchRef.current = 1;
-        return false;
-      }
-      if (liveMatchRef.current < 2) return false;
+      if (!extracted?.normalized) return false;
+      const consensusVin = consensusRef.current.add(extracted.normalized);
+      setScanProgress(consensusRef.current.getProgress());
+      if (!consensusVin) return false;
+      return confirmVin(consensusVin);
     }
 
-    setVinDraft(nextVin);
-    if (!extracted?.normalized) {
-      setMessage('Проверьте VIN перед поиском — распознавание может содержать ошибки.');
-    } else {
-      setMessage('');
+    return confirmVin(nextVin, {
+      warning: extracted?.normalized ? '' : 'Проверьте VIN перед поиском — распознавание может содержать ошибки.',
+    });
+  }, [confirmVin]);
+
+  const tryBarcodeScan = useCallback(async (source) => {
+    const detector = barcodeDetectorRef.current;
+    if (!detector || !source) return false;
+    const vin = await scanVinBarcodeFromSource(detector, source);
+    if (!vin) return false;
+    return confirmVin(vin);
+  }, [confirmVin]);
+
+  const processCapturedCanvas = useCallback(async (canvas, { thorough = false } = {}) => {
+    const quality = assessVinFrameQuality(canvas);
+    if (!quality.ok && !thorough) {
+      setScanHint(quality.hint || 'Поднесите камеру ближе');
+      return false;
     }
-    stopMediaStream(streamRef);
-    setMode(MODES.CONFIRM);
-    return true;
-  }, []);
+
+    setScanHint(thorough ? 'Считываем рамку…' : '');
+
+    const text = thorough
+      ? await recognizeVinFromCanvasThorough(canvas)
+      : await recognizeVinFromCanvas(canvas);
+
+    return applyOcrText(text, { fromLive: !thorough });
+  }, [applyOcrText]);
 
   useEffect(() => {
     if (!open || mode !== MODES.SCAN || !engineReady || processing) return undefined;
@@ -200,13 +234,23 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
       if (liveBusyRef.current) return;
       const video = videoRef.current;
       if (!video || video.readyState < 2) return;
-      const canvas = captureFrame(video, guideRef.current);
-      if (!canvas) return;
 
       liveBusyRef.current = true;
       try {
-        const text = await recognizeVinFromCanvas(canvas);
-        applyOcrText(text, { fromLive: true });
+        if (await tryBarcodeScan(video)) return;
+
+        const canvas = captureFrame(video, guideRef.current);
+        if (!canvas) return;
+
+        const quality = assessVinFrameQuality(canvas);
+        if (!quality.ok) {
+          setScanHint(quality.hint || 'Поднесите камеру ближе');
+          setScanProgress(consensusRef.current.getProgress());
+          return;
+        }
+
+        setScanHint('');
+        await processCapturedCanvas(canvas, { thorough: false });
       } catch (_) {
         /* keep scanning */
       } finally {
@@ -220,7 +264,44 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
       window.clearInterval(id);
       liveBusyRef.current = false;
     };
-  }, [open, mode, engineReady, processing, applyOcrText]);
+  }, [open, mode, engineReady, processing, tryBarcodeScan, processCapturedCanvas]);
+
+  const handleManualCapture = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2 || processing) return;
+
+    setProcessing(true);
+    setScanHint('Считываем рамку…');
+    try {
+      if (await tryBarcodeScan(video)) return;
+
+      const canvas = captureFrame(video, guideRef.current);
+      if (!canvas) {
+        setScanHint('Не удалось захватить кадр');
+        return;
+      }
+
+      const ok = await processCapturedCanvas(canvas, { thorough: true });
+      if (!ok) {
+        setMessage('Не удалось распознать VIN. Попробуйте другой угол или загрузите фото.');
+        setVinDraft('');
+        setMode(MODES.CONFIRM);
+      }
+    } catch (_) {
+      setMessage('Не удалось обработать кадр.');
+      setMode(MODES.ERROR);
+    } finally {
+      setProcessing(false);
+    }
+  }, [processing, tryBarcodeScan, processCapturedCanvas]);
+
+  const handleToggleTorch = useCallback(async () => {
+    const stream = streamRef.current;
+    if (!stream || !torchSupported) return;
+    const next = !torchOn;
+    const ok = await setTorchEnabled(stream, next);
+    if (ok) setTorchOn(next);
+  }, [torchOn, torchSupported]);
 
   const handleFileChange = useCallback(async (event) => {
     const file = event.target.files?.[0];
@@ -233,6 +314,10 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
 
     try {
       const bitmap = await createImageBitmap(file);
+      if (await tryBarcodeScan(bitmap)) {
+        bitmap.close?.();
+        return;
+      }
       const text = await recognizeVinFromImageSource(bitmap);
       bitmap.close?.();
       applyOcrText(text);
@@ -242,10 +327,11 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
     } finally {
       setProcessing(false);
     }
-  }, [applyOcrText]);
+  }, [applyOcrText, tryBarcodeScan]);
 
   const handleRetry = useCallback(() => {
     resetState();
+    barcodeDetectorRef.current = createVinBarcodeDetector();
     warmupVinOcrWorker().then(() => setEngineReady(true)).catch(() => setEngineReady(true));
   }, [resetState]);
 
@@ -261,6 +347,13 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
   }, [onConfirm, resetState, vinDraft]);
 
   const canContinue = Boolean(normalizeVinOrNull(vinDraft));
+
+  const liveStatusText = (() => {
+    if (!engineReady) return 'Готовим распознавание…';
+    if (processing) return 'Считываем рамку…';
+    if (scanHint) return scanHint;
+    return consensusProgressLabel(scanProgress);
+  })();
 
   return (
     <Modal
@@ -281,6 +374,14 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
                 disabled={processing}
               >
                 С фото
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleManualCapture}
+                disabled={processing || !engineReady}
+                loading={processing}
+              >
+                Считать сейчас
               </Button>
             </>
           ) : null}
@@ -326,18 +427,32 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
                 className="h-[4.25rem] w-[92%] max-w-xl rounded-md border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
               />
             </div>
+            {torchSupported ? (
+              <button
+                type="button"
+                onClick={handleToggleTorch}
+                className={`absolute right-3 top-3 rounded-full px-3 py-1.5 text-xs font-semibold shadow ${
+                  torchOn ? 'bg-amber-400 text-gray-900' : 'bg-black/50 text-white'
+                }`}
+                aria-pressed={torchOn}
+              >
+                {torchOn ? 'Фонарик вкл.' : 'Фонарик'}
+              </button>
+            ) : null}
             <div className="pointer-events-none absolute inset-x-0 bottom-3 px-4 text-center">
-              <p className="text-xs font-medium text-white/90">
-                {!engineReady
-                  ? 'Готовим распознавание…'
-                  : processing
-                    ? 'Считываем рамку…'
-                    : 'Держите VIN в рамке — считаем автоматически'}
-              </p>
+              <p className="text-xs font-medium text-white/90">{liveStatusText}</p>
+              {scanProgress > 0.15 && scanProgress < 1 ? (
+                <div className="mx-auto mt-2 h-1 max-w-xs overflow-hidden rounded-full bg-white/20">
+                  <div
+                    className="h-full rounded-full bg-white/90 transition-all duration-300"
+                    style={{ width: `${Math.round(scanProgress * 100)}%` }}
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
           <p className="text-sm text-gray-600">
-            Поместите номер в белую рамку. Как только VIN будет прочитан, появится поле для проверки.
+            Поместите номер в белую рамку. Поддерживаются штрихкод на наклейке и текстовый VIN — после распознавания можно проверить и исправить.
           </p>
           {cameraError ? <p className="text-sm text-red-600">{cameraError}</p> : null}
         </div>
@@ -381,7 +496,7 @@ export default function VinScanModal({ open, onClose, onConfirm }) {
         <div className="space-y-3">
           <p className="text-sm text-red-600">{cameraError || message || 'Не удалось распознать VIN'}</p>
           <p className="text-sm text-gray-600">
-            Наведите номер в рамку ещё раз или загрузите фото.
+            Наведите номер в рамку ещё раз, нажмите «Считать сейчас» или загрузите фото.
           </p>
         </div>
       ) : null}
