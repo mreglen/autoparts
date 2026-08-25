@@ -44,7 +44,6 @@ export function getPublicLayoutProfile(pathname = '', chatIdParam = null) {
 export function getPublicMainClasses({
   isFullBleedAmbientPage,
   isChatsPage,
-  isMobileActiveChat,
   isPartPage,
   isNewPartDetailPage,
   isVinCatalogPage,
@@ -54,11 +53,7 @@ export function getPublicMainClasses({
     return 'max-w-none bg-surface px-0 py-0 min-h-[calc(100dvh-var(--sg-mobile-header-h)-var(--sg-mobile-bottom-nav-total))] lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]';
   }
   if (isChatsPage) {
-    return `max-w-sg-content max-lg:px-0 max-lg:py-0 max-lg:overflow-hidden px-4 sm:px-6 lg:px-8 py-6 sm:py-8 ${
-      isMobileActiveChat
-        ? 'max-lg:h-[100dvh]'
-        : 'max-lg:h-[calc(100dvh-var(--sg-mobile-header-h)-var(--sg-mobile-bottom-nav-total))]'
-    } lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]`;
+    return 'max-w-sg-content max-lg:flex max-lg:min-h-0 max-lg:flex-1 max-lg:flex-col max-lg:overflow-hidden max-lg:px-0 max-lg:py-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]';
   }
   if (isPartPage || isNewPartDetailPage) {
     return 'max-w-sg-content max-lg:px-0 max-lg:py-0 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-lg:min-h-[calc(100dvh-var(--sg-mobile-bottom-nav-total))]';
@@ -84,13 +79,9 @@ export function getCabinetLayoutProfile(pathname = '', chatIdParam = null) {
   };
 }
 
-export function getCabinetMainClasses({ isChatsPage, isMobileActiveChat }) {
+export function getCabinetMainClasses({ isChatsPage }) {
   if (isChatsPage) {
-    return `mx-auto max-w-full max-lg:px-0 max-lg:py-0 px-4 py-6 sm:px-6 sm:py-8 lg:flex lg:max-h-[calc(100dvh-var(--sg-desktop-header-h))] lg:min-h-0 lg:flex-col lg:overflow-hidden lg:px-8 lg:py-4 lg:max-w-sg-content ${
-      isMobileActiveChat
-        ? 'max-lg:h-[100dvh]'
-        : 'max-lg:h-[calc(100dvh-var(--sg-mobile-header-h)-var(--sg-mobile-bottom-nav-total))]'
-    }`;
+    return 'mx-auto max-w-full max-lg:flex max-lg:min-h-0 max-lg:flex-1 max-lg:flex-col max-lg:overflow-hidden max-lg:px-0 max-lg:py-0 px-4 py-6 sm:px-6 sm:py-8 lg:flex lg:max-h-[calc(100dvh-var(--sg-desktop-header-h))] lg:min-h-0 lg:flex-col lg:overflow-hidden lg:px-8 lg:py-4 lg:max-w-sg-content';
   }
   return 'mx-auto max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
 }

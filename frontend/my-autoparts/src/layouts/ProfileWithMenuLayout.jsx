@@ -192,6 +192,8 @@ export default function ProfileWithMenuLayout() {
         <MobileShellFrame
             mobileHeaderHidden={cabinetProfile.hideMobileHeader}
             onMenuClick={openMenu}
+            showBottomChrome={!isMobileActiveChat}
+            reserveBottomNavSpace={!isMobileActiveChat}
             beforeMain={location.pathname === '/profile' ? <NotificationsBanner /> : null}
             sideMenuProps={{
                 isOpen: isMobileMenuOpen,
@@ -210,7 +212,7 @@ export default function ProfileWithMenuLayout() {
                 <div
                     className={`grid min-h-0 grid-cols-1 lg:grid-cols-[minmax(15.5rem,17.5rem)_1fr] lg:items-start ${
                         isChatsPage
-                            ? 'max-lg:gap-0 flex-1 gap-6 lg:overflow-hidden'
+                            ? 'max-lg:gap-0 max-lg:flex max-lg:h-full max-lg:min-h-0 max-lg:flex-1 max-lg:flex-col flex-1 gap-6 lg:overflow-hidden'
                             : 'gap-6'
                     }`}
                 >
@@ -229,7 +231,7 @@ export default function ProfileWithMenuLayout() {
 
                     <div
                         className={`min-h-0 min-w-0 ${
-                            isChatsPage ? 'flex min-h-0 flex-col lg:h-full lg:overflow-hidden' : ''
+                            isChatsPage ? 'flex min-h-0 flex-1 flex-col max-lg:h-full lg:h-full lg:overflow-hidden' : ''
                         }`}
                     >
                         <Outlet key={location.pathname} />

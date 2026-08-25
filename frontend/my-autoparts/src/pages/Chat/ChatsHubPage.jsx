@@ -580,7 +580,7 @@ const ChatsHubPage = () => {
         </div>
       ) : null}
 
-      <div className="flex min-h-0 w-full flex-1 flex-col max-md:h-full max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:h-0 md:overflow-hidden">
+      <div className="flex min-h-0 w-full flex-1 flex-col max-md:h-full md:h-0 md:overflow-hidden">
         <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden bg-white max-md:h-full md:h-full md:max-h-full md:rounded-2xl md:border md:border-gray-200/80 md:shadow-lg md:shadow-gray-200/50">
           {/* Левая панель — список чатов */}
           <div
@@ -727,7 +727,7 @@ const ChatsHubPage = () => {
           <div
             className={`${
               activeChatId ? 'flex' : 'hidden lg:flex'
-            } min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] md:h-full md:max-h-full`}
+            } min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] max-lg:h-full md:h-full md:max-h-full`}
           >
             {activeChatId ? (
               isAvitoActive ? (
@@ -1244,7 +1244,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
   );
 
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] max-md:min-h-0 md:h-full">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] md:h-full">
       <ChatPanelHeader
         pinned
         onBack={onBack}
@@ -1678,7 +1678,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
   };
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] max-md:min-h-0 md:h-full">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] md:h-full">
       <ChatPanelHeader
         pinned
         onBack={onBack}

@@ -144,11 +144,17 @@ See [`MOBILE_QA_CHECKLIST.md`](./MOBILE_QA_CHECKLIST.md) for manual regression s
 ## Chats (mobile)
 
 - **Routes:** canonical `/chats?source=…&chatId=…`; legacy `/chats/:id` redirects to query form via [`resolveActiveChatParams.js`](../src/utils/resolveActiveChatParams.js).
-- **Active chat shell:** bottom nav hidden (`layoutProfiles.isMobileActiveChat`); composer uses [`useVisualViewportInset`](../src/hooks/useVisualViewportInset.js) so keyboard does not cover input.
+- **Active chat shell:** bottom nav hidden in both public and cabinet layouts (`layoutProfiles.isMobileActiveChat`); thread + composer fill remaining height (`flex-1 min-h-0`). Composer uses [`useVisualViewportInset`](../src/hooks/useVisualViewportInset.js) so keyboard does not cover input (inset ignores URL-bar gaps <120px).
 - **Secure media:** [`chatMediaAuth.js`](../src/utils/chatMediaAuth.js) — `Authorization: Bearer`, no `?token=` in URLs; lightbox uses `Z_MODAL`.
 - **Unread:** [`chatUnread.js`](../src/utils/chatUnread.js) — shared `selectTotalUnreadCount` for list rows + bottom nav.
 - **Push:** SW posts full URL with `source`; local history at `/profile/notification-center`.
 - **iOS:** A2HS hint on notification settings + banner when not standalone PWA.
+
+## Repair order form (mobile)
+
+- Line items (works / client parts / shop parts): identity row (name + delete) + compact controls row; desktop stays a single row (`md:contents`).
+- Sticky footer breakdown wraps instead of `truncate`; page padding clears footer + bottom nav.
+- Duplicate page `h1` / back link hidden below `lg` (MobileHeader already provides chrome).
 
 ## Seller parts and warehouse (mobile)
 

@@ -268,13 +268,6 @@ input[type="password"] {
   margin-bottom: 0.5rem;
 }
 
-/* Ensure full height works correctly on mobile */
-@supports (-webkit-touch-callout: none) {
-  .h-\[100dvh\] {
-    height: -webkit-fill-available;
-  }
-}
-
 /* Заказ-наряд: на экране — лист A4; при печати — 100% области печати */
 .repair-order-print-sheet {
   box-sizing: border-box;

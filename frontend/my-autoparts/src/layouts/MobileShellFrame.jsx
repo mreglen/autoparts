@@ -22,7 +22,7 @@ export default function MobileShellFrame({
 }) {
   const reserveNavPad = reserveBottomNavSpace ?? showBottomChrome;
   return (
-    <div className={`min-h-screen max-w-full overflow-x-hidden bg-surface lg:pb-0 ${reserveNavPad ? 'pb-mobile-nav' : 'max-lg:pb-0'}`}>
+    <div className={`min-h-screen max-w-full overflow-x-hidden bg-surface max-lg:flex max-lg:min-h-dvh max-lg:flex-col lg:pb-0 ${reserveNavPad ? 'pb-mobile-nav' : 'max-lg:pb-0'}`}>
       <HeaderBadgeHeightSync />
       <div className="hidden lg:block">
         <Navigation />

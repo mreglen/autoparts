@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
 
+/** Ignore small innerHeight vs visualViewport gaps from browser chrome / URL bar. */
+export const KEYBOARD_INSET_THRESHOLD_PX = 120;
+
+export function computeVisualViewportInset(innerHeight, vvHeight, vvOffsetTop = 0) {
+  const raw = Math.max(0, Number(innerHeight) - Number(vvHeight) - Number(vvOffsetTop || 0));
+  if (!Number.isFinite(raw) || raw < KEYBOARD_INSET_THRESHOLD_PX) {
+    return 0;
+  }
+  return Math.round(raw);
+}
+
 /**
  * Keyboard inset (px) for mobile chat composer — uses Visual Viewport API when available.
  */
@@ -11,8 +22,7 @@ export default function useVisualViewportInset() {
     if (!vv) return undefined;
 
     const update = () => {
-      const keyboard = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      setInset(Math.round(keyboard));
+      setInset(computeVisualViewportInset(window.innerHeight, vv.height, vv.offsetTop));
     };
 
     update();
