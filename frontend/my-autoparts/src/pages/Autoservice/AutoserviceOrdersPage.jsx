@@ -49,7 +49,7 @@ function StatusPicker({ status, options, disabled, saving, onChange }) {
   }
 
   return (
-    <div ref={rootRef} className="status-picker relative inline-block">
+    <div ref={rootRef} className="status-picker relative inline-flex max-w-full align-middle">
       <button
         type="button"
         disabled={disabled || saving}
@@ -57,7 +57,7 @@ function StatusPicker({ status, options, disabled, saving, onChange }) {
           e.stopPropagation();
           setOpen((value) => !value);
         }}
-        className="rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:cursor-wait disabled:opacity-60"
+        className="inline-flex max-w-full items-center rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:cursor-wait disabled:opacity-60"
         title="Сменить статус"
       >
         <OrderStatusBadge status={status} className={saving ? 'opacity-70' : ''} />
@@ -100,7 +100,7 @@ function OrderActionsMenu({
       estimatedMenuHeight={onApprove ? 248 : 204}
       showLabel={showLabel}
       disabled={duplicating || approveSaving}
-      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60"
+      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60 max-md:h-11 max-md:w-11 max-md:justify-center max-md:px-0"
     >
       {onApprove ? (
         <ActionsDropdownItem onClick={onApprove} disabled={duplicating || approveSaving}>
@@ -135,11 +135,11 @@ function OrderMobileCard({
   approveSaving = false,
 }) {
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
-      <div className="flex items-start justify-between gap-2">
+    <div className="rounded-xl border border-gray-200 bg-white px-3 py-3">
+      <div className="flex items-start gap-2">
         <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">{repairOrderNumberLabel(row)}</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">{repairOrderNumberLabel(row)}</span>
             <StatusPicker
               status={row.status}
               options={statusActions}
@@ -148,7 +148,7 @@ function OrderMobileCard({
               onChange={(nextStatus) => onStatusChange(row.id, nextStatus)}
             />
           </div>
-          <p className="mt-1 truncate text-sm font-medium text-gray-800">{vehicleLabel(row.vehicle)}</p>
+          <p className="mt-1.5 truncate text-sm font-medium text-gray-800">{vehicleLabel(row.vehicle)}</p>
           <p className="mt-0.5 truncate text-sm text-gray-500">
             {row.client?.name || '—'}
             {row.client?.phone ? ` · ${row.client.phone}` : ''}
@@ -158,7 +158,7 @@ function OrderMobileCard({
             <p className="mt-0.5 text-xs text-gray-500">Зона: {row.work_zone.name}</p>
           ) : null}
         </button>
-        <div className="shrink-0">
+        <div className="shrink-0 pt-0.5">
           <OrderActionsMenu
             onView={onView}
             onEdit={onEdit}
@@ -415,10 +415,10 @@ export default function AutoserviceOrdersPage() {
     <div className="w-full min-w-0">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
+          <h1 className="max-lg:hidden text-xl font-bold text-gray-900 sm:text-2xl">
             {pageTitle}
           </h1>
-          <p className="mt-0.5 text-sm text-gray-500">
+          <p className="text-sm text-gray-500 lg:mt-0.5">
             {pageSubtitle}
           </p>
         </div>
@@ -427,7 +427,7 @@ export default function AutoserviceOrdersPage() {
             <button
               type="button"
               onClick={() => navigate('/autoservice/orders/new')}
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 max-lg:min-h-11 max-lg:rounded-full sm:w-auto"
             >
               Новый заказ-наряд
             </button>
@@ -444,11 +444,11 @@ export default function AutoserviceOrdersPage() {
         onChange={setListView}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex items-center gap-2">
         <AutoserviceLiveSearchField
           value={q}
           onChange={setQ}
-          placeholder="Номер, клиент, авто, VIN или госномер"
+          placeholder="Номер, клиент, авто, VIN…"
           ariaLabel="Поиск заказ-нарядов"
         />
 
@@ -566,15 +566,15 @@ export default function AutoserviceOrdersPage() {
       {/* Mobile list */}
       <div className="md:hidden">
         {loading ? (
-          <div className="divide-y divide-gray-100">
+          <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={`msk-${i}`} className="flex items-start justify-between gap-3 py-3">
+              <div key={`msk-${i}`} className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 px-3 py-3">
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className="h-4 w-24" />
                   <Skeleton className="h-4 w-40" />
                   <Skeleton className="h-3 w-32" />
                 </div>
-                <Skeleton className="h-8 w-8 rounded-lg" />
+                <Skeleton className="h-11 w-11 rounded-lg" />
               </div>
             ))}
           </div>
@@ -583,7 +583,8 @@ export default function AutoserviceOrdersPage() {
             {viewHistory ? 'В истории пока нет заказ-нарядов' : viewReview ? 'Заявок на проверке нет' : 'Активных заказ-нарядов нет'}
           </p>
         ) : (
-          rows.map((row) => (
+          <div className="space-y-2">
+          {rows.map((row) => (
             <OrderMobileCard
               key={row.id}
               row={row}
@@ -598,7 +599,8 @@ export default function AutoserviceOrdersPage() {
               duplicating={duplicatingId === row.id}
               approveSaving={approvingId === row.id}
             />
-          ))
+          ))}
+          </div>
         )}
       </div>
 

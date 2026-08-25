@@ -65,13 +65,15 @@ import {
 import { splitVatInclusive } from '../../utils/updDocument';
 
 const pillInputClass =
-  'mt-1.5 block h-11 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+  'mt-1.5 box-border block h-11 w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 md:rounded-full md:px-4';
 
 const pillInputSmClass =
-  'block h-10 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+  'box-border block h-10 w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 md:rounded-full';
 
 const pillTextareaClass =
-  'mt-1.5 block w-full rounded-sg border border-transparent bg-gray-100 px-4 py-2.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0';
+  'mt-1.5 box-border block w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3.5 py-2.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:rounded-sg md:px-4';
+
+const pillDateInputClass = `${pillInputClass} sg-native-date-input`;
 
 const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700';
 
@@ -100,10 +102,13 @@ const lineItemControlsClass =
 const rowActionBtnClass =
   'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm text-ink-muted transition hover:bg-gray-200 hover:text-ink-soft';
 
-function FieldLabel({ children, action }) {
+function FieldLabel({ children, optional = false, action }) {
   return (
-    <div className="mb-1 flex items-center justify-between gap-2">
-      <span className="text-sg-caption font-medium text-ink-muted">{children}</span>
+    <div className="flex items-end justify-between gap-2">
+      <span className="block min-w-0 text-sg-caption font-medium text-ink-muted">
+        {children}
+        {optional ? <span className="font-normal text-gray-400"> (необязательно)</span> : null}
+      </span>
       {action}
     </div>
   );
@@ -313,10 +318,10 @@ function vehicleSearchText(v) {
 
 function SectionCard({ title, children, action }) {
   return (
-    <section className="rounded-sg-lg border border-line bg-surface p-4 max-md:px-4 max-md:py-4 sm:p-5">
+    <section className="min-w-0 overflow-x-hidden rounded-sg-lg border border-line bg-surface p-4 sm:p-5">
       {title ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-line-soft pb-3">
-          <h2 className="text-sg-subtitle text-ink">{title}</h2>
+          <h2 className="min-w-0 text-sg-subtitle text-ink">{title}</h2>
           {action}
         </div>
       ) : null}
@@ -1896,8 +1901,8 @@ export default function AutoserviceOrderFormPage() {
   }
 
   return (
-    <div className={`min-h-screen bg-white ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
-    <div className="mx-auto w-full px-3 py-6 pb-28 sm:px-2 lg:-mx-4 lg:px-2 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+6.5rem)]">
+    <div className={`min-h-screen min-w-0 overflow-x-hidden bg-white ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
+    <div className="mx-auto w-full min-w-0 px-3 py-6 pb-28 sm:px-2 lg:-mx-4 lg:px-2 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+6.5rem)]">
       <header className="mb-6 max-lg:mb-4">
         <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
           ← Назад
@@ -1911,7 +1916,7 @@ export default function AutoserviceOrderFormPage() {
         </p>
       ) : null}
 
-      <form id="repair-order-form" onSubmit={handleSubmit} className="space-y-4">
+      <form id="repair-order-form" onSubmit={handleSubmit} className="min-w-0 space-y-4">
         {error ? (
           <p className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
             {error}
@@ -1919,20 +1924,21 @@ export default function AutoserviceOrderFormPage() {
         ) : null}
 
         <SectionCard title="Клиент и автомобиль">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <div className="flex items-end justify-between gap-2">
-                <label className="block text-sg-caption font-medium text-ink-muted">Клиент</label>
-                {ownMode ? null : (
-                <button
-                  type="button"
-                  onClick={() => setAddClientOpen(true)}
-                  className={linkActionClass}
-                >
-                  Добавить
-                </button>
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="min-w-0">
+              <FieldLabel
+                action={ownMode ? null : (
+                  <button
+                    type="button"
+                    onClick={() => setAddClientOpen(true)}
+                    className={linkActionClass}
+                  >
+                    Добавить
+                  </button>
                 )}
-              </div>
+              >
+                Клиент
+              </FieldLabel>
               <SearchableSelect
                 value={clientId}
                 onChange={handleClientSelect}
@@ -1943,20 +1949,21 @@ export default function AutoserviceOrderFormPage() {
                 onQueryChange={handleClientSearchQuery}
               />
             </div>
-            <div>
-              <div className="flex items-end justify-between gap-2">
-                <label className="block text-sg-caption font-medium text-ink-muted">Автомобиль</label>
-                {ownMode ? null : (
-                <button
-                  type="button"
-                  onClick={() => setAddVehicleOpen(true)}
-                  disabled={!clientId}
-                  className={`${linkActionClass} disabled:cursor-not-allowed disabled:text-ink-faint`}
-                >
-                  Добавить
-                </button>
+            <div className="min-w-0">
+              <FieldLabel
+                action={ownMode ? null : (
+                  <button
+                    type="button"
+                    onClick={() => setAddVehicleOpen(true)}
+                    disabled={!clientId}
+                    className={`${linkActionClass} disabled:cursor-not-allowed disabled:text-ink-faint`}
+                  >
+                    Добавить
+                  </button>
                 )}
-              </div>
+              >
+                Автомобиль
+              </FieldLabel>
               <SearchableSelect
                 value={vehicleId}
                 onChange={setVehicleId}
@@ -1976,28 +1983,28 @@ export default function AutoserviceOrderFormPage() {
 
         <SectionCard title="Заказ-наряд">
           {ownMode ? null : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-0 block text-sg-caption font-medium text-ink-muted">Дата записи</label>
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="min-w-0">
+              <FieldLabel>Дата записи</FieldLabel>
               <input
                 type="datetime-local"
-                className={`${pillInputClass} max-md:leading-tight`}
+                className={pillDateInputClass}
                 value={scheduledAt}
                 onChange={(e) => setScheduledAt(e.target.value)}
                 required
               />
             </div>
-            <div>
-              <label className="block text-sg-caption font-medium text-ink-muted">Окончание (необязательно)</label>
+            <div className="min-w-0">
+              <FieldLabel optional>Окончание</FieldLabel>
               <input
                 type="datetime-local"
-                className={`${pillInputClass} max-md:leading-tight`}
+                className={pillDateInputClass}
                 value={scheduledEndAt}
                 onChange={(e) => setScheduledEndAt(e.target.value)}
               />
             </div>
-            <div>
-              <label className="block text-sg-caption font-medium text-ink-muted">Рабочая зона</label>
+            <div className="min-w-0">
+              <FieldLabel>Рабочая зона</FieldLabel>
               <select
                 className={pillInputClass}
                 value={workZoneId}
@@ -2012,22 +2019,20 @@ export default function AutoserviceOrderFormPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sg-caption font-medium text-ink-muted">Дата поступления запчастей</label>
+            <div className="min-w-0">
+              <FieldLabel>Дата поступления запчастей</FieldLabel>
               <input
                 type="date"
-                className={pillInputClass}
+                className={pillDateInputClass}
                 value={shippingDate}
                 onChange={(e) => setShippingDate(e.target.value)}
               />
             </div>
           </div>
           )}
-          <div className={`${ownMode ? '' : 'mt-4 '}grid gap-4 sm:grid-cols-2`}>
-            <div>
-              <label className="block text-sg-caption font-medium text-ink-muted">
-                Пробег, км <span className="font-normal text-gray-400">необязательно</span>
-              </label>
+          <div className={`${ownMode ? '' : 'mt-4 '}grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2`}>
+            <div className="min-w-0">
+              <FieldLabel optional>Пробег, км</FieldLabel>
               <input
                 type="number"
                 min="0"
@@ -2040,9 +2045,9 @@ export default function AutoserviceOrderFormPage() {
               />
             </div>
           </div>
-          <div className="mt-4 grid gap-4">
-            <div>
-              <label className="block text-sg-caption font-medium text-ink-muted">Комментарий клиента</label>
+          <div className="mt-4 grid min-w-0 grid-cols-1 gap-4">
+            <div className="min-w-0">
+              <FieldLabel>Комментарий клиента</FieldLabel>
               <textarea
                 className={pillTextareaClass}
                 rows={2}
@@ -2050,8 +2055,8 @@ export default function AutoserviceOrderFormPage() {
                 onChange={(e) => setComment(e.target.value)}
               />
             </div>
-            <div>
-              <label className="block text-sg-caption font-medium text-ink-muted">Комментарий сотрудника</label>
+            <div className="min-w-0">
+              <FieldLabel>Комментарий сотрудника</FieldLabel>
               <textarea
                 className={pillTextareaClass}
                 rows={2}

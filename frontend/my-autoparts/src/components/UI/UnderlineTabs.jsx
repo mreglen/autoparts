@@ -94,10 +94,10 @@ export default function UnderlineTabs({
               ) : (
                 <span>{tab.label}</span>
               )}
-              {hasCount ? (
-                <sup className="ml-0.5 text-[10px] font-semibold tabular-nums text-gray-400">
-                  {tab.count > 0 ? tab.count : '0'}
-                </sup>
+              {hasCount && tab.count > 0 ? (
+                <span className="ml-1.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-gray-100 px-1.5 text-[10px] font-semibold tabular-nums text-gray-600">
+                  {tab.count}
+                </span>
               ) : null}
             </button>
           );

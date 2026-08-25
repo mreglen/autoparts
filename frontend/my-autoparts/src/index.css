@@ -268,6 +268,45 @@ input[type="password"] {
   margin-bottom: 0.5rem;
 }
 
+/* Native date/time controls overflow rounded pills on mobile */
+.sg-native-date-input {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.sg-native-date-input::-webkit-datetime-edit,
+.sg-native-date-input::-webkit-datetime-edit-fields-wrapper {
+  min-width: 0;
+  padding: 0;
+}
+
+.sg-native-date-input::-webkit-datetime-edit-text,
+.sg-native-date-input::-webkit-datetime-edit-month-field,
+.sg-native-date-input::-webkit-datetime-edit-day-field,
+.sg-native-date-input::-webkit-datetime-edit-year-field,
+.sg-native-date-input::-webkit-datetime-edit-hour-field,
+.sg-native-date-input::-webkit-datetime-edit-minute-field,
+.sg-native-date-input::-webkit-datetime-edit-ampm-field {
+  padding: 0;
+}
+
+.sg-native-date-input::-webkit-calendar-picker-indicator {
+  margin: 0 0 0 0.25rem;
+  padding: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1023px) {
+  select {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
 /* Заказ-наряд: на экране — лист A4; при печати — 100% области печати */
 .repair-order-print-sheet {
   box-sizing: border-box;
