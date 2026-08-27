@@ -11,6 +11,8 @@ import app.models.organization_drom_integration  # noqa: F401
 
 from app.models.permission import Permission
 from app.models.product import Product as ProductModel
+from app.models.stock_out import StockOut
+from datetime import date
 from app.models.user import User as UserModel
 from app.models.user_permission import UserPermission
 from app.routers.products import read_qr_part_card
@@ -63,10 +65,12 @@ class OrgProductAccessTests(unittest.TestCase):
                         is_admin BOOLEAN,
                         is_director BOOLEAN,
                         is_employee BOOLEAN,
+                        must_change_password BOOLEAN DEFAULT 0,
                         hashed_password VARCHAR,
                         avatar_url VARCHAR(512),
                         notify_push_enabled BOOLEAN DEFAULT 1,
                         notify_email_enabled BOOLEAN DEFAULT 1,
+                        notification_prefs TEXT,
                         organization_id VARCHAR(10)
                     )
                     """
@@ -96,6 +100,8 @@ class OrgProductAccessTests(unittest.TestCase):
                         is_new BOOLEAN DEFAULT 0,
                         price NUMERIC(12, 2),
                         quantity INTEGER,
+                        reserved_qty INTEGER DEFAULT 0,
+                        source_pending_id INTEGER,
                         organization_id VARCHAR(10),
                         storage_location_id INTEGER,
                         created_by INTEGER NOT NULL DEFAULT 1,
@@ -164,6 +170,29 @@ class OrgProductAccessTests(unittest.TestCase):
                         id INTEGER PRIMARY KEY,
                         address VARCHAR(255),
                         organization_id VARCHAR(10)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE stock_out (
+                        id INTEGER PRIMARY KEY,
+                        quantity INTEGER,
+                        sale_price NUMERIC(12, 2),
+                        movement_date DATE,
+                        organization_id VARCHAR(10),
+                        storage_location_id INTEGER,
+                        product_id INTEGER,
+                        acquired_product_id INTEGER,
+                        user_id INTEGER,
+                        reason TEXT,
+                        sale_channel VARCHAR(50),
+                        avito_order_id VARCHAR(64),
+                        source_kind VARCHAR(32),
+                        garage_used_order_item_id INTEGER,
+                        payment_method VARCHAR(255)
                     )
                     """
                 )
@@ -262,6 +291,34 @@ class OrgProductAccessTests(unittest.TestCase):
         result = read_qr_part_card(product_id=10, db=self.db, current_user=self.seller)
         self.assertEqual(result.id, 10)
         self.assertEqual(result.name, "Filter")
+        self.assertEqual(result.stock_outs, [])
+        self.assertEqual(result.reserved_qty, 0)
+
+    def test_qr_card_includes_writeoff_history(self):
+        self.product.quantity = 0
+        self.db.add(
+            StockOut(
+                id=1,
+                product_id=10,
+                organization_id="ORG1",
+                storage_location_id=1,
+                quantity=2,
+                sale_price=0,
+                movement_date=date(2026, 8, 20),
+                reason="Бой при перевозке",
+                source_kind="writeoff",
+            )
+        )
+        self.db.commit()
+
+        result = read_qr_part_card(product_id=10, db=self.db, current_user=self.seller)
+        self.assertEqual(result.quantity, 0)
+        self.assertEqual(len(result.stock_outs), 1)
+        movement = result.stock_outs[0]
+        self.assertEqual(movement.reason, "Бой при перевозке")
+        self.assertEqual(movement.quantity, 2)
+        self.assertEqual(movement.source_kind, "writeoff")
+        self.assertEqual(str(movement.movement_date), "2026-08-20")
 
     def test_employee_with_stock_in_returns_card(self):
         result = read_qr_part_card(product_id=10, db=self.db, current_user=self.employee_ok)

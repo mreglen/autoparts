@@ -99,7 +99,7 @@ function NavIcon({ item, active, badge }) {
                 {item.icon}
             </svg>
             {badge > 0 && (
-                <span className="absolute right-0 top-0 flex h-4 min-w-4 translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold leading-none text-white">
+                <span className="absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white">
                     {badge > 99 ? '99+' : badge}
                 </span>
             )}
@@ -186,11 +186,11 @@ export default function MobileBottomNav() {
 
     return (
         <nav
-            className="lg:hidden fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 pb-safe"
+            className="lg:hidden fixed bottom-0 left-0 right-0 overflow-visible border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 pb-safe"
             style={{ zIndex: Z_MOBILE_BOTTOM_NAV }}
             aria-label="Основная навигация"
         >
-            <div className={`grid gap-0 px-1 pt-1 ${gridColsClass}`}>
+            <div className={`grid gap-0 overflow-visible px-1 pt-1.5 ${gridColsClass}`}>
                 {visibleNavItems.map((item) => {
                     const isActive = item.match(location.pathname);
                     if (item.isButton) {

@@ -4,10 +4,11 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from pydantic import BaseModel, Field
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
 from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
+from app.models.stock_out import StockOut as StockOutModel
 from app.services.my_products_query_service import (
     apply_my_products_availability as _apply_my_products_availability,
     apply_my_products_filters as _apply_my_products_filters,
@@ -23,6 +24,7 @@ from app.schemas.product import (
     DeletePhotosRequest,
     DeleteVideosRequest,
     QrPartCardResponse,
+    QrPartCardMovementOut,
 )
 from app.schemas.article_matches import ArticleMatchDetailResponse, ArticleMatchesResponse
 from app.services.article_matches_service import find_article_matches, get_article_match_detail
@@ -36,7 +38,6 @@ from app.services.yandex_feed_sync_service import (
     mark_yandex_feed_dirty,
     mark_yandex_feed_dirty_for_used_product,
 )
-from sqlalchemy.orm import selectinload
 from app.utils.partnumber import normalize_partnumber
 from app.utils.search_sql import get_sql_normalize
 from app.core.config import settings
@@ -652,6 +653,85 @@ def read_public_product(
     return product
 
 
+def _format_person_name(last_name, first_name, patronymic) -> Optional[str]:
+    parts = [last_name, first_name, patronymic]
+    name = " ".join(part for part in parts if part).strip()
+    return name or None
+
+
+def _qr_card_stock_outs(db: Session, product_id: int) -> list[QrPartCardMovementOut]:
+    rows = (
+        db.query(StockOutModel)
+        .filter(StockOutModel.product_id == product_id)
+        .order_by(StockOutModel.movement_date.desc(), StockOutModel.id.desc())
+        .limit(20)
+        .all()
+    )
+    user_ids = [row.user_id for row in rows if row.user_id]
+    name_by_id = {}
+    if user_ids:
+        name_rows = (
+            db.query(User.id, User.last_name, User.first_name, User.patronymic)
+            .filter(User.id.in_(user_ids))
+            .all()
+        )
+        for user_id, last_name, first_name, patronymic in name_rows:
+            name_by_id[user_id] = _format_person_name(last_name, first_name, patronymic)
+
+    return [
+        QrPartCardMovementOut(
+            id=row.id,
+            quantity=int(row.quantity or 0),
+            movement_date=row.movement_date,
+            reason=(row.reason or "").strip() or None,
+            sale_price=float(row.sale_price) if row.sale_price is not None else None,
+            sale_channel=row.sale_channel,
+            source_kind=row.source_kind,
+            avito_order_id=row.avito_order_id,
+            user_name=name_by_id.get(row.user_id) if row.user_id else None,
+        )
+        for row in rows
+    ]
+    rows = (
+        db.query(StockOutModel)
+        .filter(StockOutModel.product_id == product_id)
+        .order_by(StockOutModel.movement_date.desc(), StockOutModel.id.desc())
+        .limit(20)
+        .all()
+    )
+    user_ids = [row.user_id for row in rows if row.user_id]
+    name_by_id = {}
+    if user_ids:
+        name_rows = (
+            db.query(User.id, User.last_name, User.first_name, User.patronymic)
+            .filter(User.id.in_(user_ids))
+            .all()
+        )
+        for user_id, last_name, first_name, patronymic in name_rows:
+            name_by_id[user_id] = _stock_out_user_name(
+                type("UserName", (), {
+                    "last_name": last_name,
+                    "first_name": first_name,
+                    "patronymic": patronymic,
+                })()
+            )
+
+    return [
+        QrPartCardMovementOut(
+            id=row.id,
+            quantity=int(row.quantity or 0),
+            movement_date=row.movement_date,
+            reason=(row.reason or "").strip() or None,
+            sale_price=float(row.sale_price) if row.sale_price is not None else None,
+            sale_channel=row.sale_channel,
+            source_kind=row.source_kind,
+            avito_order_id=row.avito_order_id,
+            user_name=name_by_id.get(row.user_id) if row.user_id else None,
+        )
+        for row in rows
+    ]
+
+
 @router.get("/qr-card/{product_id}", response_model=QrPartCardResponse)
 def read_qr_part_card(
     product_id: int,
@@ -700,12 +780,15 @@ def read_qr_part_card(
         else:
             storage_addresses.append(value)
 
+    reserved_qty = int(getattr(product, "reserved_qty", 0) or 0)
+
     return QrPartCardResponse(
         id=product.id,
         name=product.name,
         brand=product.brand,
         article=product.article,
         quantity=product.quantity,
+        reserved_qty=reserved_qty,
         internal_code=product.internal_code,
         source_pending_id=getattr(product, "source_pending_id", None),
         price=float(product.price) if product.price is not None else None,
@@ -715,6 +798,7 @@ def read_qr_part_card(
         product_storage_cells=product_storage_cells_out,
         photos=product.photos or [],
         videos=product.videos or [],
+        stock_outs=_qr_card_stock_outs(db, product.id),
     )
 
 

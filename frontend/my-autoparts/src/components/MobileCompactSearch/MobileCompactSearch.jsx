@@ -84,7 +84,7 @@ export default function MobileCompactSearch({
     };
 
     const rightPadding = enableVinScan
-        ? (showClear ? 'pr-[5.5rem]' : 'pr-[4.25rem]')
+        ? (showClear ? 'pr-[7rem]' : 'pr-[4.25rem]')
         : (showClear ? 'pr-[4.25rem]' : 'pr-11');
 
     return (
@@ -116,7 +116,7 @@ export default function MobileCompactSearch({
                         type="button"
                         onClick={handleClear}
                         disabled={isSearching}
-                        className={`absolute top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:text-gray-600 disabled:opacity-40 ${enableVinScan ? 'right-[2.75rem]' : 'right-11'}`}
+                        className={`absolute top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:text-gray-600 disabled:opacity-40 ${enableVinScan ? 'right-[5rem]' : 'right-11'}`}
                         aria-label="Очистить поиск"
                     >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -129,7 +129,7 @@ export default function MobileCompactSearch({
                         compact
                         onClick={() => setVinScanOpen(true)}
                         disabled={isSearching}
-                        className="absolute right-11 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center"
+                        className="absolute right-9 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center"
                     />
                 ) : null}
                 <button

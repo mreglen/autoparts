@@ -12,11 +12,12 @@ import { updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
 import { INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/internalCode';
 import { buildSellerPartCardSeo, PageSeoHelmet } from '../../utils/pageSeo';
-import { resolveProductQrScan } from '../../utils/resolveProductQrScan';
+import { resolveProductQrScan, fetchSellerQrPartCard } from '../../utils/resolveProductQrScan';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useWarehousePermissions, usePermissionCodes } from '../../hooks/useWarehousePermissions';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { Z_MOBILE_STICKY_FOOTER, MOBILE_STICKY_BOTTOM_OFFSET } from '../../constants/mobileTokens';
+import SellerPartCardSituation from './SellerPartCardSituation';
 
 function ActionButton({ children, onClick, to, variant = 'default', disabled = false }) {
   const base = 'flex min-h-12 flex-1 items-center justify-center rounded-xl px-3 py-3 text-sm font-semibold transition-colors disabled:opacity-50';
@@ -198,7 +199,12 @@ const SellerPartCardPage = () => {
     await dispatch(createStockOut(stockOutData)).unwrap();
     const newQuantity = Math.max(0, (part.quantity || 0) - quantity);
     await dispatch(updateProductQuantityAPI({ productId: part.id, newQuantity })).unwrap();
-    setPart((prev) => ({ ...prev, quantity: newQuantity }));
+    const refreshed = await fetchSellerQrPartCard(part.id, user, permissionCodes);
+    if (refreshed?.ok) {
+      setPart(refreshed.data);
+    } else {
+      setPart((prev) => ({ ...prev, quantity: newQuantity }));
+    }
     setModalOpen(false);
     setFormData({ quantity: '', price: '', reason: '', comment: '' });
     setOperationType(null);
@@ -253,6 +259,9 @@ const SellerPartCardPage = () => {
 
   const seo = buildSellerPartCardSeo(part);
   const previewMedia = mediaItems[0];
+  const qty = Number(part.quantity || 0);
+  const reservedQty = Number(part.reserved_qty || 0);
+  const hasStock = qty > 0;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
@@ -289,9 +298,16 @@ const SellerPartCardPage = () => {
             <div className="flex flex-wrap gap-2 text-sm">
               <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-blue-700">{part.brand || '—'}</span>
               <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">{part.article || '—'}</span>
-              <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
-                {part.quantity || 0} шт.
+              <span className={`rounded-lg px-2.5 py-1 font-medium ${
+                hasStock ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-800'
+              }`}>
+                {qty} шт.
               </span>
+              {reservedQty > 0 ? (
+                <span className="rounded-lg bg-sky-50 px-2.5 py-1 font-medium text-sky-800">
+                  Резерв {reservedQty} шт.
+                </span>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -342,6 +358,8 @@ const SellerPartCardPage = () => {
             )}
           </div>
         </div>
+
+        {perms.isStaff ? <SellerPartCardSituation part={part} /> : null}
       </div>
 
       {perms.isStaff && (
@@ -358,10 +376,10 @@ const SellerPartCardPage = () => {
               <ActionButton onClick={() => setPrintModalOpen(true)}>Печать</ActionButton>
             )}
             {perms.canSell && (
-              <ActionButton variant="primary" onClick={() => handleOpenModal('sale')}>Продать</ActionButton>
+              <ActionButton variant="primary" disabled={!hasStock} onClick={() => handleOpenModal('sale')}>Продать</ActionButton>
             )}
             {perms.canStockOut && (
-              <ActionButton variant="danger" onClick={() => handleOpenModal('writeoff')}>Списать</ActionButton>
+              <ActionButton variant="danger" disabled={!hasStock} onClick={() => handleOpenModal('writeoff')}>Списать</ActionButton>
             )}
             {perms.canStockIn && (
               <ActionButton onClick={() => setStockInModalOpen(true)}>Приход</ActionButton>
@@ -390,7 +408,14 @@ const SellerPartCardPage = () => {
         isOpen={stockInModalOpen}
         onClose={() => setStockInModalOpen(false)}
         part={part}
-        onSuccess={(newQuantity) => setPart((prev) => ({ ...prev, quantity: newQuantity }))}
+        onSuccess={async (newQuantity) => {
+          const refreshed = await fetchSellerQrPartCard(part.id, user, permissionCodes);
+          if (refreshed?.ok) {
+            setPart(refreshed.data);
+            return;
+          }
+          setPart((prev) => ({ ...prev, quantity: newQuantity }));
+        }}
       />
 
       <StorageCellsQuickEditModal

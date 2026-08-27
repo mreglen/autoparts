@@ -33,8 +33,7 @@ import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
 import EmptyState from '../../components/UI/EmptyState';
-import ResponsiveDataView from '../../components/ResponsiveDataView/ResponsiveDataView';
-import CartItemMobileCard from './CartItemMobileCard';
+import CartMobileView from './CartMobileView';
 import { FieldLabel, Input } from '../../components/UI/Field';
 import { PageHeader } from '../../components/UI/SectionHeader';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../redux/slices/ClientMarkupSlice';
@@ -206,83 +205,6 @@ function CartTableRow({
   );
 }
 
-function CartBlockMobileMenu({
-  someSelected,
-  showMoveAction,
-  onMoveSelected,
-  showRepairOrderAction,
-  onAddToRepairOrder,
-  onRemoveSelected,
-  onClearAll,
-}) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
-
-  const actions = [
-    someSelected && showMoveAction && onMoveSelected
-      ? { label: 'Переместить', onClick: onMoveSelected }
-      : null,
-    someSelected && showRepairOrderAction && onAddToRepairOrder
-      ? { label: 'В заказ-наряд', onClick: onAddToRepairOrder }
-      : null,
-    someSelected
-      ? { label: 'Удалить выбранное', onClick: onRemoveSelected, danger: true }
-      : null,
-    { label: 'Очистить корзину', onClick: onClearAll, danger: true },
-  ].filter(Boolean);
-
-  if (!actions.length) return null;
-
-  return (
-    <div className="relative" ref={menuRef}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sg border border-line bg-surface px-3 text-sm font-medium text-ink transition hover:bg-surface-muted"
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label="Дополнительные действия"
-      >
-        ⋯
-      </button>
-      {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-10 mt-1 min-w-[12rem] overflow-hidden rounded-sg border border-line bg-surface py-1 shadow-lg"
-        >
-          {actions.map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                action.onClick?.();
-              }}
-              className={`block w-full px-4 py-2.5 text-left text-sm transition hover:bg-surface-muted ${
-                action.danger ? 'text-danger-600' : 'text-ink'
-              }`}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function CartTableBlock({
   title,
   items,
@@ -353,32 +275,10 @@ function CartTableBlock({
               </svg>
             </button>
           ) : null}
-          <p className="hidden text-lg font-bold text-ink md:ml-auto md:block">{formatItemPrice(displayTotal)}</p>
+          <p className="ml-auto text-lg font-bold text-ink">{formatItemPrice(displayTotal)}</p>
         </div>
 
-        {/* Mobile toolbar */}
-        <div className="mt-3 flex items-center gap-2 md:hidden">
-          <p className="text-lg font-bold text-ink">{formatItemPrice(displayTotal)}</p>
-          <Button
-            className="min-h-11 flex-1"
-            disabled={offline}
-            onClick={someSelected ? onCheckoutSelected : onCheckout}
-          >
-            {someSelected ? `Оформить (${selectedCount})` : checkoutLabel}
-          </Button>
-          <CartBlockMobileMenu
-            someSelected={someSelected}
-            showMoveAction={showMoveAction}
-            onMoveSelected={onMoveSelected}
-            showRepairOrderAction={showRepairOrderAction}
-            onAddToRepairOrder={onAddToRepairOrder}
-            onRemoveSelected={onRemoveSelected}
-            onClearAll={onClearAll}
-          />
-        </div>
-
-        {/* Desktop toolbar */}
-        <div className="mt-3 hidden flex-wrap items-center gap-2 md:mt-0 md:flex md:w-auto md:justify-end">
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
           {someSelected ? (
             <>
               {showMoveAction && onMoveSelected ? (
@@ -429,99 +329,56 @@ function CartTableBlock({
         </div>
       ) : null}
 
-      <ResponsiveDataView
-        isEmpty={false}
-        renderDesktop={() => (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-line bg-surface-muted/60 text-xs font-medium uppercase tracking-wide text-ink-muted">
-                  <th className="w-10 px-2 py-2.5">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected && !allSelected;
-                      }}
-                      onChange={onSelectAll}
-                      className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
-                      aria-label={`Выбрать все в ${title}`}
-                    />
-                  </th>
-                  <th className="px-2 py-2.5">Запчасть</th>
-                  <th className="px-2 py-2.5">Наименование</th>
-                  {showDeliveryColumn ? <th className="px-2 py-2.5">Доставка</th> : null}
-                  <th className="px-2 py-2.5 text-right">
-                    <span className="inline-flex items-center justify-end gap-1.5">
-                      {showClientMarkupControl ? <ClientMarkupPopover /> : null}
-                      <span>Цена, ₽</span>
-                    </span>
-                  </th>
-                  <th className="px-2 py-2.5">Кол-во</th>
-                  <th className="px-2 py-2.5 text-right">Стоимость, ₽</th>
-                  <th className="w-10 px-2 py-2.5" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <CartTableRow
-                    key={item.id}
-                    item={item}
-                    selected={selectedItems.has(item.id)}
-                    onSelect={() => onItemSelect(item.id)}
-                    onQuantityChange={onQuantityChange}
-                    onRemove={onRemove}
-                    showDeliveryColumn={showDeliveryColumn}
-                    clientMarkupEnabled={clientMarkupEnabled}
-                    clientMarkupPercent={clientMarkupPercent}
-                    showBothPrices={showBothPrices}
-                    formatItemPrice={formatItemPrice}
-                    quantityBusy={quantityUpdatingIds.includes(item.id)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        renderMobile={() => (
-          <>
-            <div className="flex items-center gap-2 border-b border-line bg-surface-muted/40 px-3 py-2">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                ref={(el) => {
-                  if (el) el.indeterminate = someSelected && !allSelected;
-                }}
-                onChange={onSelectAll}
-                className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
-                aria-label={`Выбрать все в ${title}`}
-              />
-              <span className="text-xs font-medium text-ink-muted">Выбрать все</span>
-            </div>
-            <div className="space-y-3 p-3">
-              {items.map((item) => (
-                <CartItemMobileCard
-                  key={item.id}
-                  item={item}
-                  selected={selectedItems.has(item.id)}
-                  onSelect={() => onItemSelect(item.id)}
-                  onQuantityChange={onQuantityChange}
-                  onRemove={onRemove}
-                  showDeliveryColumn={showDeliveryColumn}
-                  clientMarkupEnabled={clientMarkupEnabled}
-                  clientMarkupPercent={clientMarkupPercent}
-                  showBothPrices={showBothPrices}
-                  formatItemPrice={formatItemPrice}
-                  quantityBusy={quantityUpdatingIds.includes(item.id)}
-                  checkoutPrice={checkoutPrice}
-                  clientPrice={clientPrice}
-                  getMaxAllowedQuantity={getMaxAllowedQuantity}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-line bg-surface-muted/60 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              <th className="w-10 px-2 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected && !allSelected;
+                  }}
+                  onChange={onSelectAll}
+                  className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+                  aria-label={`Выбрать все в ${title}`}
                 />
-              ))}
-            </div>
-          </>
-        )}
-      />
+              </th>
+              <th className="px-2 py-2.5">Запчасть</th>
+              <th className="px-2 py-2.5">Наименование</th>
+              {showDeliveryColumn ? <th className="px-2 py-2.5">Доставка</th> : null}
+              <th className="px-2 py-2.5 text-right">
+                <span className="inline-flex items-center justify-end gap-1.5">
+                  {showClientMarkupControl ? <ClientMarkupPopover /> : null}
+                  <span>Цена, ₽</span>
+                </span>
+              </th>
+              <th className="px-2 py-2.5">Кол-во</th>
+              <th className="px-2 py-2.5 text-right">Стоимость, ₽</th>
+              <th className="w-10 px-2 py-2.5" aria-hidden />
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <CartTableRow
+                key={item.id}
+                item={item}
+                selected={selectedItems.has(item.id)}
+                onSelect={() => onItemSelect(item.id)}
+                onQuantityChange={onQuantityChange}
+                onRemove={onRemove}
+                showDeliveryColumn={showDeliveryColumn}
+                clientMarkupEnabled={clientMarkupEnabled}
+                clientMarkupPercent={clientMarkupPercent}
+                showBothPrices={showBothPrices}
+                formatItemPrice={formatItemPrice}
+                quantityBusy={quantityUpdatingIds.includes(item.id)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -1021,9 +878,89 @@ export default function CartPage() {
     && (visibleNewPartsBaskets[0]?.item_count ?? 0) === 0
     && usedSellerGroups.length === 0;
 
+  const cartSections = [];
+  visibleNewPartsBaskets.forEach((basket) => {
+    const items = mapBasketItems(basket);
+    if (!items.length) {
+      if (!basket.is_default || hasOnlyEmptyDefault) {
+        cartSections.push({
+          key: `new-empty-${basket.id}`,
+          title: basket.name,
+          items: [],
+          emptyText: basket.is_default
+            ? 'Добавьте новые запчасти из каталога или VIN-поиска'
+            : `Корзина «${basket.name}» пуста`,
+        });
+      }
+      return;
+    }
+    cartSections.push({
+      key: `new-${basket.id}`,
+      title: basket.name,
+      items,
+      canRename: !basket.is_default,
+      onRename: () => openRenameModal(basket),
+      showMoveAction: true,
+      onMoveSelected: () => openMoveModal(basket.id, items),
+      showRepairOrderAction: canAddToRepairOrder,
+      onAddToRepairOrder: () => openRepairOrderModal(items),
+      onCheckout: () => handleNewPartsCheckout(basket.id),
+      onCheckoutSelected: () => handleNewPartsCheckoutSelected(basket.id, items),
+      onClearAll: () => handleClearNewPartsBasket(basket, items),
+      onRemoveSelected: () => {
+        items
+          .filter((item) => selectedItems.has(item.id))
+          .forEach((item) => handleRemoveItem(item.id));
+      },
+      showDeliveryColumn: true,
+      clientMarkupEnabled,
+      clientMarkupPercent,
+      showBothPrices: showPurchaseInCart,
+      showClientMarkupControl: clientMarkupEnabled,
+      formatItemPrice: formatNewPartPrice,
+      showSupplierDeliveryOption: true,
+      deliverInParts: Boolean(deliverInPartsByBasket[String(basket.id)]),
+      onDeliverInPartsChange: (checked) => handleDeliverInPartsChange(basket.id, checked),
+      checkoutLabel: 'Оформить заказ',
+    });
+  });
+
+  if (!hasVisibleCartContent && usedSellerGroups.length === 0 && visibleNewPartsBaskets.length === 0) {
+    cartSections.push({
+      key: 'empty-cart',
+      items: [],
+      emptyText: 'Добавьте новые запчасти из каталога или VIN-поиска',
+    });
+  }
+
+  usedSellerGroups.forEach(({ seller, items }) => {
+    cartSections.push({
+      key: `used-${seller}`,
+      title: seller,
+      items,
+      showRepairOrderAction: canAddToRepairOrder,
+      onAddToRepairOrder: () => openRepairOrderModal(items),
+      onCheckout: () => saveUsedOrderAndNavigate(items, seller),
+      onCheckoutSelected: () => {
+        const selected = items.filter((item) => selectedItems.has(item.id));
+        if (selected.length) saveUsedOrderAndNavigate(selected, seller);
+      },
+      onClearAll: () => handleClearUsedBasket(items),
+      onRemoveSelected: () => {
+        items
+          .filter((item) => selectedItems.has(item.id))
+          .forEach((item) => handleRemoveItem(item.id));
+      },
+      showDeliveryColumn: false,
+      formatItemPrice: formatUsedPrice,
+      checkoutLabel: 'Оформить заказ',
+    });
+  });
+
   return (
-    <div className="max-md:mt-0 mt-5 pb-8">
+    <div className="mt-5 pb-8 max-lg:mt-0">
       <PageHeader
+        className="max-lg:hidden"
         title="Корзина"
         subtitle={
           !isInitialLoad && cartItems.length > 0
@@ -1044,98 +981,69 @@ export default function CartPage() {
           className="border-solid"
         />
       ) : (
-        <div className="space-y-8">
-          {visibleNewPartsBaskets.map((basket) => {
-            const items = mapBasketItems(basket);
-            if (!items.length) {
-              if (!basket.is_default || hasOnlyEmptyDefault) {
-                return (
-                  <div
-                    key={basket.id}
-                    className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted"
-                  >
-                    {basket.is_default
-                      ? 'Добавьте новые запчасти из каталога или VIN-поиска'
-                      : `Корзина «${basket.name}» пуста`}
-                  </div>
-                );
-              }
-              return null;
-            }
-
-            return (
-              <CartTableBlock
-                key={basket.id}
-                title={basket.name}
-                items={items}
-                selectedItems={selectedItems}
-                onSelectAll={() => handleSelectAllItems(items)}
-                onItemSelect={handleItemSelect}
-                onQuantityChange={handleQuantityChange}
-                onRemove={handleRemoveItem}
-                onRemoveSelected={() => {
-                  items
-                    .filter((item) => selectedItems.has(item.id))
-                    .forEach((item) => handleRemoveItem(item.id));
-                }}
-                onMoveSelected={() => openMoveModal(basket.id, items)}
-                showMoveAction
-                onAddToRepairOrder={() => openRepairOrderModal(items)}
-                showRepairOrderAction={canAddToRepairOrder}
-                onCheckout={() => handleNewPartsCheckout(basket.id)}
-                onCheckoutSelected={() => handleNewPartsCheckoutSelected(basket.id, items)}
-                onClearAll={() => handleClearNewPartsBasket(basket, items)}
-                onRename={() => openRenameModal(basket)}
-                canRename={!basket.is_default}
-                showDeliveryColumn
-                clientMarkupEnabled={clientMarkupEnabled}
-                clientMarkupPercent={clientMarkupPercent}
-                showBothPrices={showPurchaseInCart}
-                showClientMarkupControl={clientMarkupEnabled}
-                formatItemPrice={formatNewPartPrice}
-                quantityUpdatingIds={quantityUpdatingIds}
-                showSupplierDeliveryOption
-                deliverInParts={Boolean(deliverInPartsByBasket[String(basket.id)])}
-                onDeliverInPartsChange={(checked) => handleDeliverInPartsChange(basket.id, checked)}
-              />
-            );
-          })}
-
-          {!hasVisibleCartContent && usedSellerGroups.length === 0 && visibleNewPartsBaskets.length === 0 ? (
-            <div className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted">
-              Добавьте новые запчасти из каталога или VIN-поиска
-            </div>
-          ) : null}
-
-          {usedSellerGroups.map(({ seller, items }) => (
-            <CartTableBlock
-              key={seller}
-              title={seller}
-              items={items}
+        <>
+          <div className="lg:hidden">
+            <CartMobileView
+              sections={cartSections}
               selectedItems={selectedItems}
-              onSelectAll={() => handleSelectAllItems(items)}
+              onSelectAll={handleSelectAllItems}
               onItemSelect={handleItemSelect}
               onQuantityChange={handleQuantityChange}
               onRemove={handleRemoveItem}
-              onRemoveSelected={() => {
-                items
-                  .filter((item) => selectedItems.has(item.id))
-                  .forEach((item) => handleRemoveItem(item.id));
-              }}
-              onAddToRepairOrder={() => openRepairOrderModal(items)}
-              showRepairOrderAction={canAddToRepairOrder}
-              onCheckout={() => saveUsedOrderAndNavigate(items, seller)}
-              onCheckoutSelected={() => {
-                const selected = items.filter((item) => selectedItems.has(item.id));
-                if (selected.length) saveUsedOrderAndNavigate(selected, seller);
-              }}
-              onClearAll={() => handleClearUsedBasket(items)}
-              showDeliveryColumn={false}
-              formatItemPrice={formatUsedPrice}
               quantityUpdatingIds={quantityUpdatingIds}
+              checkoutPrice={checkoutPrice}
+              clientPrice={clientPrice}
+              getMaxAllowedQuantity={getMaxAllowedQuantity}
             />
-          ))}
-        </div>
+          </div>
+          <div className="hidden space-y-8 lg:block">
+            {cartSections.map((section) => {
+              if (!section.items?.length) {
+                return (
+                  <div
+                    key={section.key}
+                    className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted"
+                  >
+                    {section.emptyText}
+                  </div>
+                );
+              }
+              return (
+                <CartTableBlock
+                  key={section.key}
+                  title={section.title}
+                  items={section.items}
+                  selectedItems={selectedItems}
+                  onSelectAll={() => handleSelectAllItems(section.items)}
+                  onItemSelect={handleItemSelect}
+                  onQuantityChange={handleQuantityChange}
+                  onRemove={handleRemoveItem}
+                  onRemoveSelected={section.onRemoveSelected}
+                  onMoveSelected={section.onMoveSelected}
+                  showMoveAction={Boolean(section.showMoveAction)}
+                  onAddToRepairOrder={section.onAddToRepairOrder}
+                  showRepairOrderAction={Boolean(section.showRepairOrderAction)}
+                  onCheckout={section.onCheckout}
+                  onCheckoutSelected={section.onCheckoutSelected}
+                  onClearAll={section.onClearAll}
+                  onRename={section.onRename}
+                  canRename={Boolean(section.canRename)}
+                  showDeliveryColumn={section.showDeliveryColumn !== false}
+                  clientMarkupEnabled={Boolean(section.clientMarkupEnabled)}
+                  clientMarkupPercent={section.clientMarkupPercent || 0}
+                  showBothPrices={Boolean(section.showBothPrices)}
+                  showClientMarkupControl={Boolean(section.showClientMarkupControl)}
+                  formatItemPrice={section.formatItemPrice}
+                  checkoutLabel={section.checkoutLabel}
+                  quantityUpdatingIds={quantityUpdatingIds}
+                  showSupplierDeliveryOption={Boolean(section.showSupplierDeliveryOption)}
+                  deliverInParts={Boolean(section.deliverInParts)}
+                  onDeliverInPartsChange={section.onDeliverInPartsChange}
+                />
+              );
+            })}
+          </div>
+        </>
       )}
 
       <CartAuthModal

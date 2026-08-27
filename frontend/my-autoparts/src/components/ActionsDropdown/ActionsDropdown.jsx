@@ -68,6 +68,9 @@ export default function ActionsDropdown({
           e.stopPropagation();
           setOpen(!open);
         }}
+        aria-label={label}
+        aria-expanded={open}
+        aria-haspopup="menu"
         className={buttonClassName || defaultButtonClass}
       >
         <ActionsDotsIcon />

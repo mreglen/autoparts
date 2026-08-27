@@ -2190,46 +2190,45 @@ export default function AutoserviceOrderFormPage() {
           ) : (
             <div className="space-y-2">
               {clientParts.map((p, index) => (
-                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-3 py-2.5 lg:px-2 lg:py-1.5">
-                  <div className={lineItemRowClass}>
-                    <div className={lineItemIdentityClass}>
-                      <span className="w-4 shrink-0 pt-2 text-center text-xs tabular-nums text-ink-muted lg:pt-0">
-                        {index + 1}
-                      </span>
-                      <input
-                        className={`min-w-0 flex-1 ${pillInputSmClass}`}
-                        placeholder="Название"
-                        value={p.title}
-                        onChange={(e) => updatePart(index, { title: e.target.value })}
-                      />
-                      <button
-                        type="button"
-                        className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700 lg:order-last`}
-                        onClick={() => setLineDeleteConfirm({ type: 'clientPart', index })}
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <div className={lineItemControlsClass}>
+                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2.5 py-2">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">
+                      {index + 1}
+                    </span>
+                    <input
+                      className="box-border h-11 min-w-0 flex-1 rounded-2xl border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base lg:h-10 lg:rounded-full"
+                      placeholder="Название"
+                      value={p.title}
+                      onChange={(e) => updatePart(index, { title: e.target.value })}
+                    />
                     <input
                       type="number"
                       min={1}
                       step={1}
-                      className="h-11 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
+                      className="h-11 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-center text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base lg:h-10"
                       placeholder="Кол-во"
+                      aria-label="Количество"
                       value={p.qty}
                       onChange={(e) => updatePart(index, { qty: e.target.value })}
                     />
                     <select
-                      className="h-11 w-[4.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
+                      className="h-11 w-[4.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base lg:h-10"
                       value={p.unit || 'pcs'}
+                      aria-label="Единица измерения"
                       onChange={(e) => updatePart(index, { unit: e.target.value })}
                     >
                       <option value="pcs">шт.</option>
                       <option value="l">л</option>
                       <option value="kg">кг</option>
                     </select>
-                    </div>
+                    <button
+                      type="button"
+                      className={`${rowActionBtnClass} shrink-0 text-danger-600 hover:bg-danger-50 hover:text-danger-700`}
+                      aria-label="Удалить"
+                      onClick={() => setLineDeleteConfirm({ type: 'clientPart', index })}
+                    >
+                      ×
+                    </button>
                   </div>
                 </div>
               ))}
@@ -2243,12 +2242,23 @@ export default function AutoserviceOrderFormPage() {
         {!ownMode ? (
         <SectionCard
           title="Запчасти исполнителя"
-          action={clientMarkupEnabled ? (
-            <div className="flex items-center gap-1.5 text-sm text-ink-muted">
-              <span>Наценка</span>
-              <ClientMarkupPopover onApply={applyShopPartsMarkup} bottomInset={72} />
+          action={(
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {clientMarkupEnabled ? (
+                <div className="flex items-center gap-1.5 text-sm text-ink-muted">
+                  <span>Наценка</span>
+                  <ClientMarkupPopover onApply={applyShopPartsMarkup} bottomInset={72} />
+                </div>
+              ) : null}
+              <SectionAddLink
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShopPartAddMenuOpen(true);
+                }}
+              />
             </div>
-          ) : null}
+          )}
         >
           {shopParts.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет запчастей исполнителя</p>
@@ -2383,17 +2393,10 @@ export default function AutoserviceOrderFormPage() {
               })}
             </div>
           )}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-3">
+          <div className="mt-3 flex items-center justify-between gap-2 border-t border-line-soft pt-3">
             <p className="text-sm font-medium text-ink">
               Итого ЗЧ исполнителя: {formatRubles(shopPartsTotal)} ₽
             </p>
-            <button
-              type="button"
-              onClick={() => setShopPartAddMenuOpen(true)}
-              className={`${linkActionClass} max-lg:inline-flex max-lg:min-h-11 max-lg:items-center`}
-            >
-              + Добавить
-            </button>
           </div>
         </SectionCard>
         ) : null}
@@ -2401,10 +2404,10 @@ export default function AutoserviceOrderFormPage() {
       </form>
 
       <div
-        className="fixed inset-x-0 bottom-[var(--sg-mobile-sticky-bottom-offset)] border-t border-line bg-surface/95 px-3 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 lg:bottom-0 lg:px-4"
+        className="pointer-events-none fixed inset-x-0 bottom-[var(--sg-mobile-sticky-bottom-offset)] border-t border-line bg-surface/95 px-3 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 lg:bottom-0 lg:px-4"
         style={{ zIndex: Z_MOBILE_STICKY_FOOTER }}
       >
-        <div className="mx-auto flex w-full max-w-sg-content flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
+        <div className="pointer-events-auto mx-auto flex w-full max-w-sg-content flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
           <div className="min-w-0 lg:flex-1">
             <p className="text-sm font-semibold text-ink">
               {ownMode ? 'Заказ-наряд' : `Итого ${formatMoney(grandTotal)} ₽`}
@@ -2454,12 +2457,11 @@ export default function AutoserviceOrderFormPage() {
         />
       ) : null}
 
-      {shopPartAddMenuOpen ? (
-        <Modal
-          open
-          title="Добавить запчасть исполнителя"
-          onClose={() => setShopPartAddMenuOpen(false)}
-        >
+      <Modal
+        open={shopPartAddMenuOpen}
+        title="Добавить запчасть исполнителя"
+        onClose={() => setShopPartAddMenuOpen(false)}
+      >
           <div className="flex flex-col gap-2">
             <button
               type="button"
@@ -2502,8 +2504,7 @@ export default function AutoserviceOrderFormPage() {
               Добавить вручную
             </button>
           </div>
-        </Modal>
-      ) : null}
+      </Modal>
 
       <PurchaseItemsPickerModal
         open={purchasePickerOpen}

@@ -79,21 +79,26 @@ export default function CartItemMobileCard({
   const showPurchase = clientMarkupEnabled
     && showBothPrices
     && Math.abs(displayedPrice - basePrice) > 0.009;
+  const title = item.partTitle || item.name;
 
   return (
-    <article className="rounded-sg border border-line bg-surface p-3 shadow-sg-sm">
+    <article className="rounded-sg border border-line bg-surface p-3">
       <div className="flex gap-3">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onSelect}
-          className="mt-1 h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
-          aria-label={`Выбрать ${item.partTitle || item.name}`}
-        />
+        <label className="flex h-11 w-11 shrink-0 items-center justify-center">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onSelect}
+            className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+            aria-label={`Выбрать ${title}`}
+          />
+        </label>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-ink">{item.brand || '—'}</p>
           <p className="text-sm font-medium text-brand-600">{item.number || '—'}</p>
-          <p className="mt-1 text-sm text-ink">{item.partTitle || item.name}</p>
+          {title ? (
+            <p className="mt-1 text-sm text-ink">{title}</p>
+          ) : null}
           {showDeliveryColumn ? (
             <div className="mt-2">
               <DeliveryCell

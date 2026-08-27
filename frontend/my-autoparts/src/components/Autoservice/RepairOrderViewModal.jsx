@@ -770,6 +770,7 @@ export default function RepairOrderViewModal({
       }}
       closeVariant="back"
       size="lg"
+      className="max-lg:!rounded-none"
       title={
         order ? (
           <div className="space-y-1 pr-2">

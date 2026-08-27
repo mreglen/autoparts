@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, List, Optional
 from pydantic import BaseModel
 from app.schemas.storage_location import StorageLocation
@@ -182,12 +182,25 @@ class QrProductStorageCellOut(BaseModel):
         from_attributes = True
 
 
+class QrPartCardMovementOut(BaseModel):
+    id: int
+    quantity: int
+    movement_date: Optional[date] = None
+    reason: Optional[str] = None
+    sale_price: Optional[float] = None
+    sale_channel: Optional[str] = None
+    source_kind: Optional[str] = None
+    avito_order_id: Optional[str] = None
+    user_name: Optional[str] = None
+
+
 class QrPartCardResponse(BaseModel):
     id: int
     name: str
     brand: str
     article: str
     quantity: int
+    reserved_qty: int = 0
     internal_code: Optional[str] = None
     source_pending_id: Optional[int] = None
     price: Optional[float] = None
@@ -197,6 +210,7 @@ class QrPartCardResponse(BaseModel):
     product_storage_cells: List[QrProductStorageCellOut] = []
     photos: List[ProductPhoto] = []
     videos: List[ProductVideo] = []
+    stock_outs: List[QrPartCardMovementOut] = []
 
     class Config:
         from_attributes = True
