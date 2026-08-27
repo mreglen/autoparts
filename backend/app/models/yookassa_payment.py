@@ -36,6 +36,10 @@ class YookassaPayment(Base):
     refundable = Column(Boolean, nullable=True)
     refund_id = Column(String(64), nullable=True, index=True)
     refund_status = Column(String(32), nullable=True, index=True)
+    income_amount = Column(Float, nullable=True)
+    acquiring_fee_amount = Column(Float, nullable=True)
+    refund_amount = Column(Float, nullable=True)
+    refunded_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),

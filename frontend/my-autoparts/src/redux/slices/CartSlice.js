@@ -210,6 +210,9 @@ export const addNewPartsToCart = createAsyncThunk(
             if (cartItem?.purchase_price != null) {
                 payload.purchase_price = truncateRubles(cartItem.purchase_price);
             }
+            if (cartItem?.supplier_unit_price != null) {
+                payload.supplier_unit_price = truncateRubles(cartItem.supplier_unit_price);
+            }
             const response = await apiAxios.post('/cart/new-parts', payload);
             dispatch(fetchCart());
             return response.data;

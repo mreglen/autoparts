@@ -56,6 +56,7 @@ class UserResponse(BaseModel):
     organization_name: Optional[str] = None
     organization_phone: Optional[str] = None
     organization_is_autoservice: bool = False
+    can_see_rossko_sales_report: bool = False
     is_service_executor: bool = False
     notification_prefs: NotificationPrefs = NotificationPrefs()
 

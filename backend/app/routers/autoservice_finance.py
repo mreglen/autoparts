@@ -19,6 +19,9 @@ from app.schemas.autoservice_finance import (
     AutoservicePaymentPayerUpdate,
     AutoservicePayrollReportEmployeeRow,
     AutoservicePayrollReportResponse,
+    RosskoSalesReportResponse,
+    RosskoSalesReportRow,
+    RosskoSalesReportSummary,
 )
 from app.schemas.autoservice_warehouse import (
     WarehouseStockReportResponse,
@@ -41,12 +44,15 @@ from app.services.autoservice_payment_service import (
 )
 from app.services.autoservice_payroll import compute_org_monthly_payroll
 from app.services.autoservice_payroll_report_xlsx import build_payroll_report_workbook_bytes
+from app.services.autoservice_rossko_sales_report import RosskoSalesReportFilters, build_rossko_sales_report
+from app.services.autoservice_rossko_sales_report_xlsx import build_rossko_sales_workbook_bytes
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_FINANCE,
     AUTOSERVICE_PERMISSION_REPORTS,
     require_any_autoservice_permission,
     require_autoservice_director,
     require_autoservice_permission,
+    require_rossko_sales_report_access,
 )
 
 router = APIRouter(tags=["Autoservice finance"])
@@ -296,6 +302,47 @@ def export_autoservice_warehouse_stock_xlsx(
     )
     content = build_warehouse_stock_workbook_bytes(db, org_id, filters)
     filename = f"warehouse_stock_{year}_{month:02d}.xlsx"
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/autoservice/reports/rossko-sales",
+    response_model=RosskoSalesReportResponse,
+)
+def get_autoservice_rossko_sales_report(
+    date_from: date = Query(...),
+    date_to: date = Query(...),
+    q: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_rossko_sales_report_access(db, current_user)
+    filters = RosskoSalesReportFilters(date_from=date_from, date_to=date_to, q=q)
+    data = build_rossko_sales_report(db, org_id, filters)
+    return RosskoSalesReportResponse(
+        date_from=data["date_from"],
+        date_to=data["date_to"],
+        summary=RosskoSalesReportSummary.model_validate(data["summary"]),
+        items=[RosskoSalesReportRow.model_validate(row) for row in data["items"]],
+    )
+
+
+@router.get("/autoservice/reports/rossko-sales.xlsx")
+def export_autoservice_rossko_sales_xlsx(
+    date_from: date = Query(...),
+    date_to: date = Query(...),
+    q: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_rossko_sales_report_access(db, current_user)
+    filters = RosskoSalesReportFilters(date_from=date_from, date_to=date_to, q=q)
+    content = build_rossko_sales_workbook_bytes(db, org_id, filters)
+    filename = f"rossko_sales_{date_from.isoformat()}_{date_to.isoformat()}.xlsx"
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

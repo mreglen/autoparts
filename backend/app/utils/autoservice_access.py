@@ -154,6 +154,41 @@ def require_autoservice_director(db: Session, user: User) -> str:
     return org_id
 
 
+def organization_has_admin_director(db: Session, org_id: str) -> bool:
+    return (
+        db.query(User.id)
+        .filter(
+            User.organization_id == org_id,
+            User.is_director.is_(True),
+            User.is_admin.is_(True),
+        )
+        .first()
+        is not None
+    )
+
+
+def can_see_rossko_sales_report(db: Session, user: User) -> bool:
+    if not user.organization_id:
+        return False
+    if not organization_has_admin_director(db, user.organization_id):
+        return False
+    try:
+        require_autoservice_staff(db, user)
+    except HTTPException:
+        return False
+    return has_autoservice_permission(db, user, AUTOSERVICE_PERMISSION_REPORTS)
+
+
+def require_rossko_sales_report_access(db: Session, user: User) -> str:
+    org_id = require_autoservice_permission(db, user, AUTOSERVICE_PERMISSION_REPORTS)
+    if not organization_has_admin_director(db, org_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Отчёт «Продажи Росско» недоступен для вашей организации",
+        )
+    return org_id
+
+
 MISSING_PHONE_PREFIX = "__no_phone_"
 
 

@@ -87,6 +87,7 @@ export function useNewPartCartActions({ part, stocksData }) {
       partnumber: String(number).trim(),
       quantity: Number.isInteger(quantityToAdd) ? quantityToAdd : 1,
       price: priceWithMarkup(stock?.price),
+      supplier_unit_price: Number(stock?.price) > 0 ? Number(stock.price) : undefined,
       stock_id: String(stock?.stock_id || '').trim(),
       max_quantity: Math.max(1, Number(stock?.available_count) || 1),
     };

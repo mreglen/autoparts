@@ -22,6 +22,7 @@ from app.services.new_parts_order_fulfillment import (
     fulfill_new_parts_order,
     parse_cart_snapshot,
 )
+from app.services.yookassa_economics import apply_refund_economics, apply_yookassa_economics
 from app.services.yookassa_client import get_yookassa_client
 from app.services.yookassa_receipt_builder import build_receipt
 from app.utils.guest_cart import get_or_create_user_cart
@@ -42,7 +43,7 @@ def _format_amount(value: float) -> str:
 
 
 def _serialize_cart_item(item: NewPartsCart) -> dict[str, Any]:
-    return {
+    payload = {
         "id": item.id,
         "brand": item.brand,
         "partnumber": item.partnumber,
@@ -51,6 +52,10 @@ def _serialize_cart_item(item: NewPartsCart) -> dict[str, Any]:
         "price": cart_item_checkout_price(item),
         "stock_id": str(item.stock_id),
     }
+    supplier = getattr(item, "supplier_unit_price", None)
+    if supplier is not None:
+        payload["supplier_unit_price"] = float(supplier)
+    return payload
 
 
 def _load_user_cart_items(
@@ -128,6 +133,9 @@ def _apply_yookassa_payment_row(
             row.qr_payload = qr
     if webhook_payload is not None:
         row.raw_webhook_payload = json.dumps(webhook_payload, ensure_ascii=False)
+
+    if row.status == "succeeded":
+        apply_yookassa_economics(row, api_payment)
 
 
 async def create_checkout_session(
@@ -372,6 +380,7 @@ async def _sync_pending_refund(db: Session, session: NewPartsCheckoutSession) ->
     client = get_yookassa_client()
     refund = await client.get_refund(paid.refund_id)
     paid.refund_status = str(refund.get("status") or paid.refund_status)
+    apply_refund_economics(paid, refund)
     if paid.refund_status == "succeeded":
         session.status = "refunded"
         session.garage_order_id = None
@@ -501,6 +510,7 @@ async def _refund_after_failed_fulfillment(
         refund = await client.create_refund(refund_body, str(uuid.uuid4()))
         payment_row.refund_id = refund.get("id")
         payment_row.refund_status = str(refund.get("status") or "pending")
+        apply_refund_economics(payment_row, refund)
         refund_status = payment_row.refund_status
 
         if refund_status == "succeeded":

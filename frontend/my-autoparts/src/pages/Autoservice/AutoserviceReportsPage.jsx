@@ -97,6 +97,21 @@ function warehouseStockNameParts(row) {
   return { primary: name || codeLine || '—', secondary: '' };
 }
 
+const EMPTY_ROSSKO_SALES = {
+  summary: {
+    count: 0,
+    sale_total: 0,
+    supplier_total: 0,
+    acquiring_fee: 0,
+    refund_total: 0,
+    margin: 0,
+    site_income: 0,
+    organization_income: 0,
+    pending_count: 0,
+  },
+  items: [],
+};
+
 const EMPTY_ECONOMICS = {
   summary: {
     count: 0,
@@ -213,12 +228,17 @@ export default function AutoserviceReportsPage() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
   const canSeePayroll = Boolean(user?.is_director);
+  const canSeeRosskoSales = Boolean(user?.can_see_rossko_sales_report);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const requestedTab = tabParam === 'payroll' || tabParam === 'payments' || tabParam === 'warehouse-stock'
+  const requestedTab = tabParam === 'payroll' || tabParam === 'payments' || tabParam === 'warehouse-stock' || tabParam === 'rossko-sales'
     ? tabParam
     : 'economics';
-  const tab = requestedTab === 'payroll' && !canSeePayroll ? 'economics' : requestedTab;
+  const tab = requestedTab === 'payroll' && !canSeePayroll
+    ? 'economics'
+    : requestedTab === 'rossko-sales' && !canSeeRosskoSales
+      ? 'economics'
+      : requestedTab;
 
   const defaults = useMemo(() => getMonthRangeDefaults(), []);
   const todayDate = useMemo(() => getFinanceTodayDate(), []);
@@ -257,6 +277,14 @@ export default function AutoserviceReportsPage() {
   const [warehouseStockHideZero, setWarehouseStockHideZero] = useState(true);
   const [warehouseStockExporting, setWarehouseStockExporting] = useState(false);
 
+  const [rosskoSalesLoading, setRosskoSalesLoading] = useState(false);
+  const [rosskoSalesError, setRosskoSalesError] = useState('');
+  const [rosskoSales, setRosskoSales] = useState(EMPTY_ROSSKO_SALES);
+  const [rosskoSalesSearchInput, setRosskoSalesSearchInput] = useState('');
+  const [rosskoSalesSearch, setRosskoSalesSearch] = useState('');
+  const [expandedRosskoOrderId, setExpandedRosskoOrderId] = useState(null);
+  const [rosskoSalesExporting, setRosskoSalesExporting] = useState(false);
+
   const [viewOrder, setViewOrder] = useState(null);
   const [viewOrderLoading, setViewOrderLoading] = useState(false);
   const [viewOrderError, setViewOrderError] = useState('');
@@ -268,8 +296,9 @@ export default function AutoserviceReportsPage() {
       { id: 'warehouse-stock', label: 'Остатки на складе' },
     ];
     if (canSeePayroll) items.splice(2, 0, { id: 'payroll', label: 'Зарплаты' });
+    if (canSeeRosskoSales) items.push({ id: 'rossko-sales', label: 'Продажи Росско' });
     return items;
-  }, [canSeePayroll]);
+  }, [canSeePayroll, canSeeRosskoSales]);
 
   const setTab = (next) => {
     if (next === 'payroll' && canSeePayroll) {
@@ -284,6 +313,10 @@ export default function AutoserviceReportsPage() {
       setSearchParams({ tab: 'warehouse-stock' });
       return;
     }
+    if (next === 'rossko-sales' && canSeeRosskoSales) {
+      setSearchParams({ tab: 'rossko-sales' });
+      return;
+    }
     setSearchParams({});
   };
 
@@ -293,6 +326,10 @@ export default function AutoserviceReportsPage() {
 
   const debouncedSetWarehouseStockSearch = useDebouncedCallback((value) => {
     setWarehouseStockSearch(value.trim());
+  }, 300);
+
+  const debouncedSetRosskoSalesSearch = useDebouncedCallback((value) => {
+    setRosskoSalesSearch(value.trim());
   }, 300);
 
   const loadPayments = useCallback(async () => {
@@ -509,6 +546,50 @@ export default function AutoserviceReportsPage() {
     }
   }, [monthValue, warehouseStockHideZero, warehouseStockSearch]);
 
+  const loadRosskoSales = useCallback(async () => {
+    if (!canSeeRosskoSales) return;
+    setRosskoSalesLoading(true);
+    setRosskoSalesError('');
+    try {
+      const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+      if (rosskoSalesSearch) params.set('q', rosskoSalesSearch);
+      const response = await apiRequest(`/autoservice/reports/rossko-sales?${params.toString()}`);
+      setRosskoSales(response || EMPTY_ROSSKO_SALES);
+    } catch (e) {
+      setRosskoSalesError(e?.message || 'Не удалось загрузить отчёт');
+      setRosskoSales(EMPTY_ROSSKO_SALES);
+    } finally {
+      setRosskoSalesLoading(false);
+    }
+  }, [canSeeRosskoSales, dateFrom, dateTo, rosskoSalesSearch]);
+
+  const exportRosskoSales = useCallback(async () => {
+    setRosskoSalesExporting(true);
+    try {
+      const params = { date_from: dateFrom, date_to: dateTo };
+      if (rosskoSalesSearch) params.q = rosskoSalesSearch;
+      const response = await apiAxios.get('/autoservice/reports/rossko-sales.xlsx', {
+        params,
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `rossko_sales_${dateFrom}_${dateTo}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setRosskoSalesError(e?.message || 'Не удалось выгрузить Excel');
+    } finally {
+      setRosskoSalesExporting(false);
+    }
+  }, [dateFrom, dateTo, rosskoSalesSearch]);
+
   const openOrderView = useCallback(async (orderId) => {
     setViewOrderLoading(true);
     setViewOrder(null);
@@ -557,6 +638,13 @@ export default function AutoserviceReportsPage() {
   }, [tab, loadWarehouseStock]);
 
   useEffect(() => {
+    if (tab === 'rossko-sales') {
+      setExpandedRosskoOrderId(null);
+      loadRosskoSales();
+    }
+  }, [tab, loadRosskoSales]);
+
+  useEffect(() => {
     debouncedSetEconomicsSearch(economicsSearchInput);
   }, [economicsSearchInput, debouncedSetEconomicsSearch]);
 
@@ -565,10 +653,20 @@ export default function AutoserviceReportsPage() {
   }, [warehouseStockSearchInput, debouncedSetWarehouseStockSearch]);
 
   useEffect(() => {
+    debouncedSetRosskoSalesSearch(rosskoSalesSearchInput);
+  }, [rosskoSalesSearchInput, debouncedSetRosskoSalesSearch]);
+
+  useEffect(() => {
     if (requestedTab === 'payroll' && !canSeePayroll) {
       setSearchParams({}, { replace: true });
     }
   }, [requestedTab, canSeePayroll, setSearchParams]);
+
+  useEffect(() => {
+    if (requestedTab === 'rossko-sales' && !canSeeRosskoSales) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [requestedTab, canSeeRosskoSales, setSearchParams]);
 
   useEffect(() => {
     const onPullRefresh = (event) => {
@@ -577,10 +675,11 @@ export default function AutoserviceReportsPage() {
       else if (tab === 'payroll') loadPayroll();
       else if (tab === 'economics') loadEconomics();
       else if (tab === 'warehouse-stock') loadWarehouseStock();
+      else if (tab === 'rossko-sales') loadRosskoSales();
     };
     window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
-  }, [tab, loadPayments, loadPayroll, loadEconomics, loadWarehouseStock]);
+  }, [tab, loadPayments, loadPayroll, loadEconomics, loadWarehouseStock, loadRosskoSales]);
 
   const paymentItems = payments.items || [];
   const payrollRows = payroll.employees || [];
@@ -588,6 +687,8 @@ export default function AutoserviceReportsPage() {
   const economicsSummary = economics.summary || EMPTY_ECONOMICS.summary;
   const warehouseStockItems = warehouseStock.items || [];
   const warehouseStockSummary = warehouseStock.summary || EMPTY_WAREHOUSE_STOCK.summary;
+  const rosskoSalesItems = rosskoSales.items || [];
+  const rosskoSalesSummary = rosskoSales.summary || EMPTY_ROSSKO_SALES.summary;
 
   const toggleEmployeeExpand = (employeeId) => {
     setExpandedEmployeeId((prev) => (prev === employeeId ? null : employeeId));
@@ -595,6 +696,10 @@ export default function AutoserviceReportsPage() {
 
   const toggleOrderExpand = (orderId) => {
     setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
+  };
+
+  const toggleRosskoOrderExpand = (orderId) => {
+    setExpandedRosskoOrderId((prev) => (prev === orderId ? null : orderId));
   };
 
   const payrollOrderCount = payrollRows.reduce((sum, row) => sum + Number(row.completed_orders || 0), 0);
@@ -657,6 +762,19 @@ export default function AutoserviceReportsPage() {
                   <p className="mt-1.5 text-xs text-gray-500 sm:text-sm">
                     {warehouseStockSummary.positions ?? 0} позиций на конец месяца
                   </p>
+                </>
+              )}
+            </div>
+          ) : tab === 'rossko-sales' ? (
+            <div className="text-right">
+              {rosskoSalesLoading ? (
+                <Skeleton className="ml-auto h-8 w-24" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold tabular-nums leading-none text-gray-900">
+                    {formatFinanceCurrency(rosskoSalesSummary.organization_income)}
+                  </p>
+                  <p className="mt-1.5 text-xs text-gray-500 sm:text-sm">доход организации за период</p>
                 </>
               )}
             </div>
@@ -1204,7 +1322,7 @@ export default function AutoserviceReportsPage() {
             </div>
           )}
         </>
-      ) : (
+      ) : tab === 'warehouse-stock' ? (
         <>
           <MobileCollapsibleFilters title="Фильтры">
             <div className="space-y-4">
@@ -1355,7 +1473,199 @@ export default function AutoserviceReportsPage() {
             </p>
           ) : null}
         </>
-      )}
+      ) : tab === 'rossko-sales' ? (
+        <>
+          <MobileCollapsibleFilters title="Фильтры">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-xs font-medium text-gray-500">Период с</span>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo < todayDate ? dateTo : todayDate}
+                    onChange={(e) => {
+                      const next = clampFinanceDate(e.target.value, todayDate);
+                      setDateFrom(next);
+                      if (next > dateTo) setDateTo(next);
+                    }}
+                    className={warehousePillControlClass}
+                  />
+                </label>
+                <label className="block min-w-0">
+                  <span className="mb-1.5 block text-xs font-medium text-gray-500">Период по</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom}
+                    max={todayDate}
+                    onChange={(e) => {
+                      const next = clampFinanceDate(e.target.value, todayDate);
+                      setDateTo(next);
+                      if (next < dateFrom) setDateFrom(next);
+                    }}
+                    className={warehousePillControlClass}
+                  />
+                </label>
+              </div>
+              <AutoserviceLiveSearchField
+                value={rosskoSalesSearchInput}
+                onChange={setRosskoSalesSearchInput}
+                placeholder="Заказ, Росско №, покупатель, запчасть"
+                ariaLabel="Поиск продаж Росско"
+              />
+            </div>
+          </MobileCollapsibleFilters>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-500">
+              {rosskoSalesSummary.count ?? 0} операц{(rosskoSalesSummary.count ?? 0) === 1 ? 'ия' : (rosskoSalesSummary.count ?? 0) >= 2 && (rosskoSalesSummary.count ?? 0) <= 4 ? 'ии' : 'ий'} за период
+            </p>
+            <button
+              type="button"
+              onClick={exportRosskoSales}
+              disabled={rosskoSalesExporting || rosskoSalesLoading}
+              className={`${warehousePrimaryButtonClass} w-full shrink-0 sm:w-auto`}
+            >
+              {rosskoSalesExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            {[
+              { label: 'Продажа', value: rosskoSalesSummary.sale_total },
+              { label: 'Закупка', value: rosskoSalesSummary.supplier_total },
+              { label: 'Эквайринг', value: rosskoSalesSummary.acquiring_fee },
+              { label: 'Возвраты', value: rosskoSalesSummary.refund_total },
+              { label: 'Маржа', value: rosskoSalesSummary.margin },
+              { label: 'Сайт 7%', value: rosskoSalesSummary.site_income },
+              { label: 'Организация', value: rosskoSalesSummary.organization_income },
+            ].map((item) => (
+              <div key={item.label} className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">
+                <p className="text-xs text-gray-500">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-gray-900">
+                  {rosskoSalesLoading ? '…' : formatFinanceCurrency(item.value)}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {rosskoSalesError ? (
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{rosskoSalesError}</div>
+          ) : null}
+
+          {rosskoSalesLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : !rosskoSalesItems.length ? (
+            <EmptyState
+              illustration="empty"
+              title="Нет продаж"
+              description="За выбранный период операций Росско с сохранённой закупочной ценой не найдено."
+            />
+          ) : (
+            <div className="space-y-3">
+              {rosskoSalesItems.map((row) => {
+                const isExpanded = expandedRosskoOrderId === row.order_id;
+                return (
+                  <div
+                    key={row.order_id}
+                    className="cursor-pointer rounded-2xl bg-white p-4 ring-1 ring-gray-200/80 transition hover:bg-gray-50/80"
+                    onClick={() => toggleRosskoOrderExpand(row.order_id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleRosskoOrderExpand(row.order_id);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-expanded={isExpanded}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ExpandChevron expanded={isExpanded} className="h-4 w-4" />
+                          <span className="text-sm font-semibold text-gray-900">Заказ № {row.order_id}</span>
+                          {row.rossko_order_id ? (
+                            <span className="text-xs text-gray-500">Росско № {row.rossko_order_id}</span>
+                          ) : null}
+                          {row.pending_acquiring ? (
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+                              Ожидается комиссия
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-sm text-gray-900">{row.buyer_name || '—'}</p>
+                        <p className="text-xs text-gray-500">
+                          {row.operation_at ? formatServerDateTime(row.operation_at) : '—'} · {row.payment_method_label}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-lg font-semibold tabular-nums text-gray-900">
+                          {formatFinanceCurrency(row.organization_income ?? 0)}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">организации</p>
+                      </div>
+                    </div>
+                    {isExpanded ? (
+                      <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                        <ReportField label="Продажа">{formatFinanceCurrency(row.sale_total)}</ReportField>
+                        <ReportField label="Закупка Росско">{formatFinanceCurrency(row.supplier_total)}</ReportField>
+                        <ReportField label="Эквайринг">
+                          {row.acquiring_fee != null ? formatFinanceCurrency(row.acquiring_fee) : 'Ожидается'}
+                        </ReportField>
+                        <ReportField label="Возврат">
+                          {Number(row.refund_amount) > 0
+                            ? `${formatFinanceCurrency(row.refund_amount)}${row.refund_at ? ` · ${formatServerDateTime(row.refund_at)}` : ''}`
+                            : '—'}
+                        </ReportField>
+                        <ReportField label="Маржа">
+                          {row.margin != null ? formatFinanceCurrency(row.margin) : '—'}
+                        </ReportField>
+                        <ReportField label="Доход сайта (7%)">
+                          {row.site_income != null ? formatFinanceCurrency(row.site_income) : '—'}
+                        </ReportField>
+                        <ReportField label="Доход организации">
+                          {row.organization_income != null ? formatFinanceCurrency(row.organization_income) : '—'}
+                        </ReportField>
+                        {(row.items || []).length ? (
+                          <div className="pt-2">
+                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Позиции</p>
+                            <div className="space-y-2">
+                              {(row.items || []).map((item) => (
+                                <div key={item.item_id} className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                                  <p className="font-medium text-gray-900">
+                                    {[item.brand, item.partnumber].filter(Boolean).join(' ') || item.name}
+                                  </p>
+                                  {item.name ? <p className="text-xs text-gray-500">{item.name}</p> : null}
+                                  <div className="mt-1 grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                    <span>Кол-во: {item.quantity}</span>
+                                    <span>Продажа: {formatFinanceCurrency(item.sale_total)}</span>
+                                    <span>Закупка: {formatFinanceCurrency(item.supplier_total)}</span>
+                                    <span>
+                                      Организации:{' '}
+                                      {item.organization_income != null
+                                        ? formatFinanceCurrency(item.organization_income)
+                                        : '—'}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : null}
       <RepairOrderViewModal
         order={viewOrder}
         loading={viewOrderLoading}

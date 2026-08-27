@@ -117,6 +117,11 @@ def apply_rossko_statuses_to_order(
         if item.status_code in SELLER_LOCKED_NEW_PARTS_STATUSES:
             continue
         line = rossko_by_key.get(item_match_key(item.brand, item.partnumber))
+        if line and line.price > 0 and item.supplier_unit_price is not None:
+            confirmed = float(line.price)
+            if item.supplier_unit_price != confirmed:
+                item.supplier_unit_price = confirmed
+                changed = True
         mapped = _display_status_from_rossko_line(item.status_code, line, for_seller=True)
         if mapped != item.status_code:
             item.status_code = mapped

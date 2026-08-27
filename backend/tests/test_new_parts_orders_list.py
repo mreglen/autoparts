@@ -27,6 +27,7 @@ def _sample_order(*, rossko_order_id: str | None = "12345"):
         partnumber="W712/75",
         quantity=2,
         price=450.0,
+        supplier_unit_price=420.0,
         status_code="new_waiting_confirmation",
     )
     return SimpleNamespace(
@@ -198,6 +199,14 @@ class NewPartsOrderEnrichmentTests(unittest.TestCase):
         self.assertTrue(changed)
         self.assertEqual(order.status_code, "new_shipped")
         self.assertEqual(order.items[0].status_code, "new_shipped")
+        self.assertEqual(order.items[0].supplier_unit_price, 450.0)
+
+    def test_persist_does_not_backfill_supplier_price_without_snapshot(self):
+        order = _sample_order()
+        order.items[0].supplier_unit_price = None
+        snapshot = _sample_snapshot()
+        persist_rossko_supplier_statuses([order], {"12345": snapshot}, None)
+        self.assertIsNone(order.items[0].supplier_unit_price)
 
     def test_persist_skips_on_sync_error(self):
         order = _sample_order()

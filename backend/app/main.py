@@ -103,6 +103,8 @@ from app.db.schema_patches import (
     ensure_new_parts_basket_tables,
     ensure_yookassa_payment_tables,
     ensure_yookassa_refund_columns,
+    ensure_supplier_unit_price_columns,
+    ensure_yookassa_payment_economics_columns,
     ensure_garage_new_order_yookassa_columns,
     ensure_seo_landing_pages_table,
     ensure_openrouter_tables,
@@ -336,6 +338,8 @@ try:
     ensure_new_parts_basket_tables()
     ensure_yookassa_payment_tables()
     ensure_yookassa_refund_columns()
+    ensure_supplier_unit_price_columns()
+    ensure_yookassa_payment_economics_columns()
     ensure_garage_new_order_yookassa_columns()
     ensure_seo_landing_pages_table()
     ensure_openrouter_tables()

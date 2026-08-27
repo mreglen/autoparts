@@ -210,6 +210,7 @@ function StockOfferRow({
       partnumber: number,
       quantity: quantityToAdd,
       price: purchasePrice,
+      supplier_unit_price: Number(stock.price) > 0 ? Number(stock.price) : undefined,
       stock_id: String(stock.stock_id || '').trim(),
       max_quantity: maxQty,
     };

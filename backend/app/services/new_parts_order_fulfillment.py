@@ -38,9 +38,12 @@ class SnapshotCartItem:
     quantity: int
     price: float
     stock_id: str
+    supplier_unit_price: float | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> SnapshotCartItem:
+        supplier_raw = data.get("supplier_unit_price")
+        supplier_unit_price = float(supplier_raw) if supplier_raw is not None else None
         return cls(
             id=data.get("id"),
             brand=str(data.get("brand") or ""),
@@ -49,7 +52,20 @@ class SnapshotCartItem:
             quantity=int(data.get("quantity") or 1),
             price=float(data.get("price") or 0),
             stock_id=str(data.get("stock_id") or ""),
+            supplier_unit_price=supplier_unit_price,
         )
+
+
+def _snapshot_supplier_unit_price(item: SnapshotCartItem | NewPartsCart) -> float | None:
+    raw = getattr(item, "supplier_unit_price", None)
+    if raw is not None:
+        try:
+            value = float(raw)
+            if value > 0:
+                return value
+        except (TypeError, ValueError):
+            pass
+    return None
 
 
 def cart_item_checkout_price(item: SnapshotCartItem | NewPartsCart) -> float:
@@ -174,6 +190,7 @@ async def fulfill_new_parts_order(
                     partnumber=item.partnumber,
                     quantity=int(item.quantity),
                     price=cart_item_checkout_price(item),
+                    supplier_unit_price=_snapshot_supplier_unit_price(item),
                     status_code="new_waiting_confirmation",
                     seo_card_id=card.id if card else None,
                 )

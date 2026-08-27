@@ -2232,6 +2232,85 @@ def ensure_yookassa_refund_columns() -> None:
     logger.info("Applied yookassa_payments refund column patches: %s", statements)
 
 
+def ensure_supplier_unit_price_columns() -> None:
+    """Raw Rossko supplier price snapshot for new-parts cart and order lines."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    statements: list[str] = []
+
+    for table in ("new_parts_cart", "guest_new_parts_cart"):
+        if table not in table_names:
+            continue
+        columns = {col["name"] for col in inspector.get_columns(table)}
+        if "supplier_unit_price" not in columns:
+            if engine.dialect.name == "postgresql":
+                statements.append(f"ALTER TABLE {table} ADD COLUMN supplier_unit_price DOUBLE PRECISION")
+            else:
+                statements.append(f"ALTER TABLE {table} ADD COLUMN supplier_unit_price NUMERIC(12, 2)")
+
+    if "garage_new_order_items" in table_names:
+        columns = {col["name"] for col in inspector.get_columns("garage_new_order_items")}
+        if "supplier_unit_price" not in columns:
+            if engine.dialect.name == "postgresql":
+                statements.append(
+                    "ALTER TABLE garage_new_order_items ADD COLUMN supplier_unit_price DOUBLE PRECISION"
+                )
+            else:
+                statements.append(
+                    "ALTER TABLE garage_new_order_items ADD COLUMN supplier_unit_price NUMERIC(12, 2)"
+                )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied supplier_unit_price column patches: %s", statements)
+
+
+def ensure_yookassa_payment_economics_columns() -> None:
+    """Store net income / acquiring fee / refund amounts from YooKassa."""
+    inspector = inspect(engine)
+    if "yookassa_payments" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("yookassa_payments")}
+    statements: list[str] = []
+    dialect = engine.dialect.name
+
+    def _add_float(name: str) -> None:
+        if name not in columns:
+            if dialect == "postgresql":
+                statements.append(f"ALTER TABLE yookassa_payments ADD COLUMN {name} DOUBLE PRECISION")
+            else:
+                statements.append(f"ALTER TABLE yookassa_payments ADD COLUMN {name} REAL")
+
+    def _add_ts(name: str) -> None:
+        if name not in columns:
+            if dialect == "postgresql":
+                statements.append(
+                    f"ALTER TABLE yookassa_payments ADD COLUMN {name} TIMESTAMP WITH TIME ZONE"
+                )
+            else:
+                statements.append(f"ALTER TABLE yookassa_payments ADD COLUMN {name} TIMESTAMP")
+
+    _add_float("income_amount")
+    _add_float("acquiring_fee_amount")
+    _add_float("refund_amount")
+    _add_ts("refunded_at")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied yookassa_payments economics column patches: %s", statements)
+
+
 def ensure_garage_new_order_yookassa_columns() -> None:
     """Add YooKassa linkage columns to garage_new_orders."""
     inspector = inspect(engine)

@@ -105,6 +105,9 @@ def _new_parts_cart_item_response(cart_item) -> CartItemResponse:
         purchase_price=float(cart_item.purchase_price)
         if getattr(cart_item, "purchase_price", None) is not None
         else None,
+        supplier_unit_price=float(cart_item.supplier_unit_price)
+        if getattr(cart_item, "supplier_unit_price", None) is not None
+        else None,
         stock_id=cart_item.stock_id,
         seller=cart_item.seller,
         created_at=cart_item.created_at,
@@ -265,6 +268,8 @@ async def add_new_parts_to_cart(
             existing_item.price = item.price
             if item.purchase_price is not None:
                 existing_item.purchase_price = item.purchase_price
+            if item.supplier_unit_price is not None:
+                existing_item.supplier_unit_price = item.supplier_unit_price
             if delivery_str is not None:
                 existing_item.delivery = delivery_str
             if item.delivery_start is not None:
@@ -287,6 +292,7 @@ async def add_new_parts_to_cart(
             quantity=_cap_to_max(item.quantity, incoming_max),
             price=item.price,
             purchase_price=item.purchase_price,
+            supplier_unit_price=item.supplier_unit_price,
             stock_id=item.stock_id,
             max_quantity=incoming_max,
             guid=item.guid,
@@ -311,6 +317,8 @@ async def add_new_parts_to_cart(
             existing_item.price = item.price
             if item.purchase_price is not None:
                 existing_item.purchase_price = item.purchase_price
+            if item.supplier_unit_price is not None:
+                existing_item.supplier_unit_price = item.supplier_unit_price
             if delivery_str is not None:
                 existing_item.delivery = delivery_str
             if item.delivery_start is not None:
@@ -333,6 +341,7 @@ async def add_new_parts_to_cart(
             quantity=_cap_to_max(item.quantity, incoming_max),
             price=item.price,
             purchase_price=item.purchase_price,
+            supplier_unit_price=item.supplier_unit_price,
             stock_id=item.stock_id,
             max_quantity=incoming_max,
             guid=item.guid,

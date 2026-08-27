@@ -162,3 +162,61 @@ class AutoserviceOrderEconomicsResponse(BaseModel):
     date_to: date
     summary: AutoserviceOrderEconomicsSummary
     items: list[AutoserviceOrderEconomicsRow] = Field(default_factory=list)
+
+
+class RosskoSalesReportLineItem(BaseModel):
+    item_id: int
+    brand: str = ""
+    partnumber: str = ""
+    name: str = ""
+    quantity: int = 0
+    sale_unit_price: Decimal = Decimal("0.00")
+    supplier_unit_price: Decimal = Decimal("0.00")
+    sale_total: Decimal = Decimal("0.00")
+    supplier_total: Decimal = Decimal("0.00")
+    refund_amount: Decimal = Decimal("0.00")
+    acquiring_fee: Decimal | None = None
+    margin: Decimal | None = None
+    site_income: Decimal | None = None
+    organization_income: Decimal | None = None
+    pending_acquiring: bool = False
+
+
+class RosskoSalesReportRow(BaseModel):
+    order_id: int
+    operation_at: datetime | None = None
+    rossko_order_id: str | None = None
+    buyer_name: str = ""
+    buyer_phone: str = ""
+    payment_method: str = ""
+    payment_method_label: str = ""
+    is_paid: bool = False
+    sale_total: Decimal = Decimal("0.00")
+    supplier_total: Decimal = Decimal("0.00")
+    acquiring_fee: Decimal | None = None
+    refund_amount: Decimal = Decimal("0.00")
+    refund_at: datetime | None = None
+    margin: Decimal | None = None
+    site_income: Decimal | None = None
+    organization_income: Decimal | None = None
+    pending_acquiring: bool = False
+    items: list[RosskoSalesReportLineItem] = Field(default_factory=list)
+
+
+class RosskoSalesReportSummary(BaseModel):
+    count: int = 0
+    sale_total: Decimal = Decimal("0.00")
+    supplier_total: Decimal = Decimal("0.00")
+    acquiring_fee: Decimal = Decimal("0.00")
+    refund_total: Decimal = Decimal("0.00")
+    margin: Decimal = Decimal("0.00")
+    site_income: Decimal = Decimal("0.00")
+    organization_income: Decimal = Decimal("0.00")
+    pending_count: int = 0
+
+
+class RosskoSalesReportResponse(BaseModel):
+    date_from: date
+    date_to: date
+    summary: RosskoSalesReportSummary
+    items: list[RosskoSalesReportRow] = Field(default_factory=list)

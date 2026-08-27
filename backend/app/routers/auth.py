@@ -53,6 +53,7 @@ from app.utils.org_markup import (
     global_markup_percent,
     org_markup_tier_override,
 )
+from app.utils.autoservice_access import can_see_rossko_sales_report
 from app.utils.user_public_code import assign_public_code
 from app.utils.user_avatar import avatar_public_url
 import logging
@@ -63,7 +64,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 settings = Settings()
 
 
-def build_user_profile_response(user: User) -> dict:
+def build_user_profile_response(user: User, db: Session | None = None) -> dict:
     return {
         "id": user.id,
         "public_code": user.public_code,
@@ -93,6 +94,7 @@ def build_user_profile_response(user: User) -> dict:
             effective_markup_tier(user.organization)
             if user.organization_id and user.organization else "buyer"
         ),
+        "can_see_rossko_sales_report": can_see_rossko_sales_report(db, user) if db else False,
         "notification_prefs": NotificationPrefs.model_validate(
             get_user_notification_prefs(user)
         ).model_dump(),
@@ -332,7 +334,7 @@ def login(
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
-        "user": build_user_profile_response(user),
+        "user": build_user_profile_response(user, db),
     }
 
 @router.post("/refresh", response_model=Token)
@@ -352,7 +354,7 @@ def get_profile(current_user: User = Depends(get_current_user), db: Session = De
         .filter(User.id == current_user.id)
         .first()
     )
-    return build_user_profile_response(user_data)
+    return build_user_profile_response(user_data, db)
 
 @router.post("/register/send-code")
 def send_code(data: EmailOnly, db: Session = Depends(get_db)):
