@@ -31,7 +31,7 @@ from app.utils.product_search_seo import (
 from app.utils.product_part_faq import build_product_faq_items, build_product_faq_json_ld
 from app.utils.new_part_price_utils import min_stock_base_price, min_stock_price_with_markup
 from app.utils.org_markup import global_markup_percent
-from app.utils.seo_constants import HTML_OG_PRODUCT_PREFIX, resolve_product_placeholder_image_url
+from app.utils.seo_constants import HTML_OG_PRODUCT_PREFIX, SITE_OWNERSHIP_META_HTML, resolve_product_placeholder_image_url
 from app.utils.page_keywords import build_page_keywords
 from app.utils.site_settings_db import get_or_create_site_settings
 
@@ -1074,7 +1074,7 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="robots" content="{robots}" />
+{SITE_OWNERSHIP_META_HTML}  <meta name="robots" content="{robots}" />
   <title>{title}</title>
   <meta name="description" content="{description}" />
 {keywords_tag}  <link rel="canonical" href="{canonical}" />

@@ -18,7 +18,7 @@ from app.utils.product_urls import (
     build_product_page_url,
     build_used_catalog_url_for_query,
 )
-from app.utils.seo_constants import resolve_default_og_image_url
+from app.utils.seo_constants import resolve_default_og_image_url, SITE_OWNERSHIP_META_HTML
 
 DEFAULT_SITE_ORIGIN = "https://svoygarage.ru"
 SELLER_PART_CARD_RE = re.compile(r"^/seller/part-card/(?P<product_id>\d+)$")
@@ -880,7 +880,7 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="robots" content="{robots}" />
+{SITE_OWNERSHIP_META_HTML}  <meta name="robots" content="{robots}" />
   <title>{title}</title>
   <meta name="description" content="{description}" />
 {keywords_tag}

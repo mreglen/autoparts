@@ -6,6 +6,12 @@ PRODUCT_PLACEHOLDER_IMAGE_PATH = "/img/product-placeholder-white.png"
 # Для meta property="product:price:amount" и др. — иначе RDFa-валидатор ругается на неизвестный префикс.
 HTML_OG_PRODUCT_PREFIX = 'og: http://ogp.me/ns# product: http://ogp.me/ns/product#'
 
+# Keep in sync with frontend/my-autoparts/public/index.html
+SITE_OWNERSHIP_META_HTML = (
+    '  <meta name="yandex-verification" content="ce766610ecf7435a" />\n'
+    '  <meta name="google-site-verification" content="KJxyNSpEQ19FqegFqDs6WwYVsjl8MsIzJaf0JWl5nBI" />\n'
+)
+
 
 def resolve_default_og_image_url(site_origin: str) -> str:
     origin = (site_origin or "https://svoygarage.ru").rstrip("/")

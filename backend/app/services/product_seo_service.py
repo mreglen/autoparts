@@ -37,7 +37,7 @@ from app.utils.product_search_seo import (
     resolve_product_city,
 )
 from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
-from app.utils.seo_constants import HTML_OG_PRODUCT_PREFIX, resolve_product_placeholder_image_url
+from app.utils.seo_constants import HTML_OG_PRODUCT_PREFIX, SITE_OWNERSHIP_META_HTML, resolve_product_placeholder_image_url
 
 
 @dataclass(frozen=True)
@@ -625,7 +625,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="robots" content="{robots}" />
+{SITE_OWNERSHIP_META_HTML}  <meta name="robots" content="{robots}" />
   <title>{title}</title>
   <meta name="description" content="{description}" />
 {keywords_tag}  <link rel="canonical" href="{canonical}" />

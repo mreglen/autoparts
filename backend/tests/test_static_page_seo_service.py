@@ -15,6 +15,9 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertIn("Свой Гараж", meta.title)
         self.assertEqual(meta.canonical_url, "https://svoygarage.ru/")
         self.assertEqual(meta.robots, "index, follow")
+        html = render_static_page_prerender_html(meta)
+        self.assertIn('name="yandex-verification"', html)
+        self.assertIn("ce766610ecf7435a", html)
 
     def test_catalog_seo(self):
         meta = get_static_page_seo_for_path(None, "/catalog")
