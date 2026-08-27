@@ -15,7 +15,7 @@ const EMPTY_FORM = {
 };
 
 const fieldClass =
-  'h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-indigo-400 focus:ring-0';
+  'h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-indigo-400 focus:ring-0 max-md:h-11 max-md:min-h-11 max-md:text-base';
 
 const labelClass = 'mb-1 block text-xs font-medium text-gray-500';
 
@@ -259,7 +259,7 @@ export default function AutoserviceWarehouseAddModal({
               type="button"
               onClick={handleFillFromRossko}
               disabled={rosskoLookupLoading || !form.article.trim()}
-              className="inline-flex h-9 items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 min-h-11 items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 max-md:w-full max-md:justify-center md:min-h-9"
             >
               {rosskoLookupLoading ? 'Поиск в Rossko…' : 'Заполнить из Rossko'}
             </button>
@@ -272,7 +272,7 @@ export default function AutoserviceWarehouseAddModal({
           </div>
         ) : null}
 
-        <div className={`grid gap-3 ${isWarehouseEdit ? 'grid-cols-1 sm:grid-cols-2' : showUnitSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <div className={`grid gap-3 ${isWarehouseEdit ? 'grid-cols-1 sm:grid-cols-2' : showUnitSelector ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
           {!isWarehouseEdit ? (
             <label className="block">
               <span className={labelClass}>Кол-во</span>
@@ -338,11 +338,11 @@ export default function AutoserviceWarehouseAddModal({
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-        <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
-          <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
+        <div className="flex justify-end gap-2 border-t border-gray-100 pt-3 max-md:flex-col">
+          <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting} className="max-md:min-h-11">
             Отмена
           </Button>
-          <Button type="submit" loading={submitting}>
+          <Button type="submit" loading={submitting} className="max-md:min-h-11">
             {modalSubmitLabel}
           </Button>
         </div>

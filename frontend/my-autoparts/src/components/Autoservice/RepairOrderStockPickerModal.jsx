@@ -83,7 +83,7 @@ export default function RepairOrderStockPickerModal({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Поиск по названию, артикулу, бренду"
-          className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm max-md:min-h-11 max-md:text-base"
           autoFocus
         />
         {error ? (
@@ -137,20 +137,20 @@ export default function RepairOrderStockPickerModal({
               step={qtyStep}
               value={qty}
               onChange={(event) => setQty(event.target.value)}
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm max-md:min-h-11 max-md:text-base"
             />
             <span className="mt-1 block text-xs text-gray-500">
               Доступно: {maxQty} {formatShopPartUnit(selectedUnit)}
             </span>
           </label>
         ) : null}
-        <div className="flex justify-end gap-2">
-          <button type="button" className={warehouseSecondaryButtonClass} onClick={onClose}>
+        <div className="flex justify-end gap-2 max-md:flex-col">
+          <button type="button" className={`${warehouseSecondaryButtonClass} max-md:min-h-11`} onClick={onClose}>
             Отмена
           </button>
           <button
             type="button"
-            className={warehousePrimaryButtonClass}
+            className={`${warehousePrimaryButtonClass} max-md:min-h-11`}
             disabled={!selected}
             onClick={handleConfirm}
           >

@@ -25,7 +25,7 @@ import RepairOrderStockPickerModal from '../../components/Autoservice/RepairOrde
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
-import { Z_MOBILE_STICKY_FOOTER, MOBILE_PRODUCT_STICKY_SCROLL_PAD } from '../../constants/mobileTokens';
+import { Z_MOBILE_STICKY_FOOTER } from '../../constants/mobileTokens';
 import {
   clearRepairOrderFormDraft,
   readRepairOrderFormDraft,
@@ -68,7 +68,7 @@ const pillInputClass =
   'mt-1.5 box-border block h-11 w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 md:rounded-full md:px-4';
 
 const pillInputSmClass =
-  'box-border block h-10 w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 md:rounded-full';
+  'box-border block h-11 w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-10 lg:rounded-full';
 
 const pillTextareaClass =
   'mt-1.5 box-border block w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3.5 py-2.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:rounded-sg md:px-4';
@@ -79,7 +79,11 @@ const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700
 
 function SectionAddLink({ onClick, label = '+ Добавить' }) {
   return (
-    <button type="button" onClick={onClick} className={linkActionClass}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${linkActionClass} max-lg:inline-flex max-lg:min-h-11 max-lg:items-center`}
+    >
       {label}
     </button>
   );
@@ -92,12 +96,12 @@ const btnSecondaryClass =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
 
 const lineItemRowClass =
-  'flex min-w-0 flex-col gap-2 md:flex-row md:flex-nowrap md:items-center md:gap-1.5';
+  'flex min-w-0 flex-col gap-2 lg:flex-row lg:flex-nowrap lg:items-center lg:gap-1.5';
 
-const lineItemIdentityClass = 'flex min-w-0 items-start gap-2 md:contents';
+const lineItemIdentityClass = 'flex min-w-0 items-start gap-2 lg:contents';
 
 const lineItemControlsClass =
-  'flex min-w-0 flex-wrap items-center gap-1.5 max-md:pl-6 md:contents';
+  'flex min-w-0 flex-wrap items-center gap-1.5 max-lg:pl-6 lg:contents';
 
 const rowActionBtnClass =
   'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm text-ink-muted transition hover:bg-gray-200 hover:text-ink-soft';
@@ -231,7 +235,7 @@ function shopPartNameParts(part) {
 }
 
 const shopPartNameBoxClass =
-  'flex min-h-8 min-w-0 w-full items-center rounded-sg border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-ink max-md:items-start md:h-8 md:py-0';
+  'flex min-h-11 min-w-0 w-full items-center rounded-sg border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-ink max-lg:items-start lg:h-8 lg:min-h-8 lg:py-0';
 
 function ShopPartNameField({
   part,
@@ -251,7 +255,7 @@ function ShopPartNameField({
         onClick={onEdit}
         title={label}
       >
-        <span className="block min-w-0 font-medium max-md:whitespace-normal max-md:break-words max-md:line-clamp-2 md:truncate">{label}</span>
+        <span className="block min-w-0 font-medium max-lg:whitespace-normal max-lg:break-words max-lg:line-clamp-2 lg:truncate">{label}</span>
       </button>
     );
   }
@@ -262,7 +266,7 @@ function ShopPartNameField({
         className={`${shopPartNameBoxClass} cursor-default bg-surface-muted/80 opacity-90`}
         title={label}
       >
-        <span className="block min-w-0 font-medium max-md:whitespace-normal max-md:break-words max-md:line-clamp-2 md:truncate">{label}</span>
+        <span className="block min-w-0 font-medium max-lg:whitespace-normal max-lg:break-words max-lg:line-clamp-2 lg:truncate">{label}</span>
       </div>
     );
   }
@@ -279,10 +283,10 @@ function ShopPartNameField({
 }
 
 const shopPartControlInputClass =
-  'h-8 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+  'h-11 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
 
 const shopPartControlSelectClass =
-  'h-8 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+  'h-11 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
 
 function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
   return {
@@ -318,10 +322,10 @@ function vehicleSearchText(v) {
 
 function SectionCard({ title, children, action }) {
   return (
-    <section className="min-w-0 overflow-x-hidden rounded-sg-lg border border-line bg-surface p-4 sm:p-5">
+    <section className="min-w-0 rounded-sg-lg border border-line bg-surface p-3 sm:p-5">
       {title ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-line-soft pb-3">
-          <h2 className="min-w-0 text-sg-subtitle text-ink">{title}</h2>
+          <h2 className="min-w-0 text-lg font-semibold text-ink lg:text-sg-subtitle">{title}</h2>
           {action}
         </div>
       ) : null}
@@ -410,7 +414,7 @@ function SearchableSelect({
               <li key={String(o.value) || '__empty__'}>
                 <button
                   type="button"
-                  className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-brand-50 ${
+                  className={`block w-full min-h-11 px-4 py-2.5 text-left text-sm hover:bg-brand-50 lg:min-h-0 ${
                     String(o.value) === String(value) ? 'bg-brand-50 font-medium text-brand-700' : 'text-ink-soft'
                   }`}
                   onMouseDown={(e) => e.preventDefault()}
@@ -432,7 +436,7 @@ function SearchableSelect({
             <li className="sticky bottom-0 border-t border-line-soft bg-surface">
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-brand-600 hover:bg-brand-50"
+                className="flex w-full min-h-11 items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-brand-600 hover:bg-brand-50 lg:min-h-0"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   setOpen(false);
@@ -522,7 +526,7 @@ function AddClientModal({ onClose, onCreated }) {
           {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
         </div>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
           <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
             Отмена
           </button>
@@ -602,7 +606,7 @@ function AddEmployeeModal({ onClose, onCreated }) {
           />
         </div>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
           <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
             Отмена
           </button>
@@ -842,7 +846,7 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
           </div>
         </div>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
           <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
             Отмена
           </button>
@@ -1879,10 +1883,10 @@ export default function AutoserviceOrderFormPage() {
   if (orderLoading || metaLoading || !formInitialized) {
     return (
       <div className="mx-auto w-full px-1 py-8 sm:px-2 lg:-mx-4 lg:px-2">
-        <button type="button" onClick={goBack} className={linkActionClass}>
+        <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
           ← Назад
         </button>
-        <p className="mt-6 text-sm text-ink-muted">Загрузка…</p>
+        <p className="mt-6 text-sm text-ink-muted max-lg:mt-0">Загрузка…</p>
       </div>
     );
   }
@@ -1890,10 +1894,10 @@ export default function AutoserviceOrderFormPage() {
   if (orderError) {
     return (
       <div className="mx-auto w-full px-1 py-8 sm:px-2 lg:-mx-4 lg:px-2">
-        <button type="button" onClick={goBack} className={linkActionClass}>
+        <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
           ← Назад
         </button>
-        <p className="mt-6 text-sm text-red-600" role="alert">
+        <p className="mt-6 text-sm text-red-600 max-lg:mt-0" role="alert">
           {orderError}
         </p>
       </div>
@@ -1901,8 +1905,8 @@ export default function AutoserviceOrderFormPage() {
   }
 
   return (
-    <div className={`min-h-screen min-w-0 overflow-x-hidden bg-white ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
-    <div className="mx-auto w-full min-w-0 px-3 py-6 pb-28 sm:px-2 lg:-mx-4 lg:px-2 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+6.5rem)]">
+    <div className="min-h-screen min-w-0 overflow-x-hidden bg-white">
+    <div className="mx-auto w-full min-w-0 px-3 py-6 pb-28 sm:px-2 lg:-mx-4 lg:px-2 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)]">
       <header className="mb-6 max-lg:mb-4">
         <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
           ← Назад
@@ -1924,14 +1928,14 @@ export default function AutoserviceOrderFormPage() {
         ) : null}
 
         <SectionCard title="Клиент и автомобиль">
-          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="min-w-0">
               <FieldLabel
                 action={ownMode ? null : (
                   <button
                     type="button"
                     onClick={() => setAddClientOpen(true)}
-                    className={linkActionClass}
+                    className={`${linkActionClass} max-lg:inline-flex max-lg:min-h-11 max-lg:items-center`}
                   >
                     Добавить
                   </button>
@@ -1956,7 +1960,7 @@ export default function AutoserviceOrderFormPage() {
                     type="button"
                     onClick={() => setAddVehicleOpen(true)}
                     disabled={!clientId}
-                    className={`${linkActionClass} disabled:cursor-not-allowed disabled:text-ink-faint`}
+                    className={`${linkActionClass} disabled:cursor-not-allowed disabled:text-ink-faint max-lg:inline-flex max-lg:min-h-11 max-lg:items-center`}
                   >
                     Добавить
                   </button>
@@ -1983,7 +1987,7 @@ export default function AutoserviceOrderFormPage() {
 
         <SectionCard title="Заказ-наряд">
           {ownMode ? null : (
-          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="min-w-0">
               <FieldLabel>Дата записи</FieldLabel>
               <input
@@ -2030,7 +2034,7 @@ export default function AutoserviceOrderFormPage() {
             </div>
           </div>
           )}
-          <div className={`${ownMode ? '' : 'mt-4 '}grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2`}>
+          <div className={`${ownMode ? '' : 'mt-4 '}grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2`}>
             <div className="min-w-0">
               <FieldLabel optional>Пробег, км</FieldLabel>
               <input
@@ -2073,10 +2077,10 @@ export default function AutoserviceOrderFormPage() {
           ) : (
             <div className="space-y-2">
               {works.map((w, index) => (
-                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2 py-2 md:py-1.5">
+                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-3 py-2.5 lg:px-2 lg:py-1.5">
                   <div className={lineItemRowClass}>
                     <div className={lineItemIdentityClass}>
-                      <span className="w-4 shrink-0 pt-1.5 text-center text-xs tabular-nums text-ink-muted md:pt-0">{index + 1}</span>
+                      <span className="w-4 shrink-0 pt-1.5 text-center text-xs tabular-nums text-ink-muted lg:pt-0">{index + 1}</span>
                       <div className="min-w-0 flex-1">
                         <WorkCatalogInput
                           value={w.title}
@@ -2088,7 +2092,7 @@ export default function AutoserviceOrderFormPage() {
                       </div>
                       <button
                         type="button"
-                        className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700 md:order-last`}
+                        className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700 lg:order-last`}
                         onClick={() => setLineDeleteConfirm({ type: 'work', index })}
                       >
                         ×
@@ -2098,7 +2102,7 @@ export default function AutoserviceOrderFormPage() {
                     <input
                       type="number"
                       min={1}
-                      className="h-10 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:h-8"
+                      className="h-11 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
                       placeholder={ownMode ? 'Н/ч' : 'Кол-во'}
                       value={w.qty}
                       onChange={(e) => updateWork(index, { qty: e.target.value })}
@@ -2109,17 +2113,17 @@ export default function AutoserviceOrderFormPage() {
                       type="number"
                       min={0}
                       step="0.01"
-                      className="h-10 w-[5.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:h-8"
+                      className="h-11 w-[5.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
                       placeholder="0"
                       value={w.unit_price}
                       onChange={(e) => updateWork(index, { unit_price: e.target.value })}
                     />
-                    <span className="ml-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink md:ml-0 md:w-[5.75rem]">
+                    <span className="ml-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[5.75rem]">
                       {formatMoney(lineSum(w.qty, w.unit_price))} ₽
                     </span>
                     <button
                       type="button"
-                      className="shrink-0 whitespace-nowrap text-xs font-medium text-brand-600 hover:text-brand-700"
+                      className="shrink-0 whitespace-nowrap text-xs font-medium text-brand-600 hover:text-brand-700 max-lg:inline-flex max-lg:min-h-11 max-lg:items-center"
                       onClick={() => addWorkExecutor(index)}
                     >
                       + сотрудник
@@ -2129,12 +2133,12 @@ export default function AutoserviceOrderFormPage() {
                     </div>
                   </div>
                   {(ownMode ? [] : (w.executors || [])).length > 0 ? (
-                    <div className="mt-1.5 min-w-0 space-y-1 pl-5">
+                    <div className="mt-1.5 min-w-0 space-y-1.5 max-lg:pl-0 pl-5">
                       {(w.executors || []).map((ex, execIndex) => (
-                        <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 ring-1 ring-line">
+                        <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1.5 ring-1 ring-line lg:rounded-full lg:py-1">
                           <SearchableSelect
                             className="min-w-0 flex-1"
-                            inputClassName="block h-8 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
+                            inputClassName="block h-11 w-full rounded-2xl border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8 lg:rounded-full"
                             value={ex.employee_id}
                             onChange={(next) => updateWorkExecutor(index, execIndex, { employee_id: next })}
                             options={employeeOptions}
@@ -2148,7 +2152,7 @@ export default function AutoserviceOrderFormPage() {
                             type="number"
                             min={0}
                             max={100}
-                            className="h-7 w-16 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0"
+                            className="h-11 w-16 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-7"
                             value={ex.percent}
                             onChange={(e) => updateWorkExecutor(index, execIndex, { percent: e.target.value })}
                           />
@@ -2158,7 +2162,7 @@ export default function AutoserviceOrderFormPage() {
                           </span>
                           <button
                             type="button"
-                            className="text-xs text-danger-600 hover:text-danger-700"
+                            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm text-danger-600 hover:bg-danger-50 hover:text-danger-700 lg:h-auto lg:w-auto lg:text-xs"
                             onClick={() => removeWorkExecutor(index, execIndex)}
                           >
                             ×
@@ -2183,10 +2187,10 @@ export default function AutoserviceOrderFormPage() {
           ) : (
             <div className="space-y-2">
               {clientParts.map((p, index) => (
-                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2 py-2 md:py-1.5">
+                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-3 py-2.5 lg:px-2 lg:py-1.5">
                   <div className={lineItemRowClass}>
                     <div className={lineItemIdentityClass}>
-                      <span className="w-4 shrink-0 pt-2 text-center text-xs tabular-nums text-ink-muted md:pt-0">
+                      <span className="w-4 shrink-0 pt-2 text-center text-xs tabular-nums text-ink-muted lg:pt-0">
                         {index + 1}
                       </span>
                       <input
@@ -2197,7 +2201,7 @@ export default function AutoserviceOrderFormPage() {
                       />
                       <button
                         type="button"
-                        className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700 md:order-last`}
+                        className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700 lg:order-last`}
                         onClick={() => setLineDeleteConfirm({ type: 'clientPart', index })}
                       >
                         ×
@@ -2208,13 +2212,13 @@ export default function AutoserviceOrderFormPage() {
                       type="number"
                       min={1}
                       step={1}
-                      className="h-10 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:h-8"
+                      className="h-11 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
                       placeholder="Кол-во"
                       value={p.qty}
                       onChange={(e) => updatePart(index, { qty: e.target.value })}
                     />
                     <select
-                      className="h-10 w-[4.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:h-8"
+                      className="h-11 w-[4.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
                       value={p.unit || 'pcs'}
                       onChange={(e) => updatePart(index, { unit: e.target.value })}
                     >
@@ -2270,11 +2274,11 @@ export default function AutoserviceOrderFormPage() {
                 return (
                   <div
                     key={shopPartRowKey(p, index)}
-                    className="min-w-0 rounded-sg border border-line bg-white px-2 py-2 md:py-1.5"
+                    className="min-w-0 rounded-sg border border-line bg-white px-3 py-2.5 lg:px-2 lg:py-1.5"
                   >
                     <div className={lineItemRowClass}>
                       <div className={lineItemIdentityClass}>
-                        <span className="w-4 shrink-0 pt-1.5 text-center text-xs tabular-nums text-ink-muted md:pt-0">
+                        <span className="w-4 shrink-0 pt-1.5 text-center text-xs tabular-nums text-ink-muted lg:pt-0">
                           {index + 1}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -2299,7 +2303,7 @@ export default function AutoserviceOrderFormPage() {
                         </div>
                         <button
                           type="button"
-                          className={`${rowActionBtnClass} shrink-0 text-danger-600 hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-50 md:order-last`}
+                          className={`${rowActionBtnClass} shrink-0 text-danger-600 hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-50 lg:order-last`}
                           aria-label={isImported ? 'Убрать из заказ-наряда' : 'Удалить'}
                           disabled={detachingShopPartId === p.id}
                           onClick={() => requestRemoveShopPart(index)}
@@ -2313,7 +2317,7 @@ export default function AutoserviceOrderFormPage() {
                         min={qtyMin}
                         max={isWarehouseLinked && p.stock_max_qty != null ? p.stock_max_qty : undefined}
                         step={qtyStep}
-                        className={`w-14 max-md:h-10 ${shopPartControlInputClass}${isQtyLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
+                        className={`w-14 ${shopPartControlInputClass}${isQtyLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
                         value={qtyValue}
                         readOnly={isQtyLocked}
                         disabled={isQtyLocked}
@@ -2341,7 +2345,7 @@ export default function AutoserviceOrderFormPage() {
                         }}
                       />
                       <select
-                        className={`w-[4.25rem] max-md:h-10 ${shopPartControlSelectClass}${isUnitLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
+                        className={`w-[4.25rem] ${shopPartControlSelectClass}${isUnitLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
                         value={p.unit || 'pcs'}
                         disabled={isUnitLocked}
                         aria-label="Единица измерения"
@@ -2356,7 +2360,7 @@ export default function AutoserviceOrderFormPage() {
                           type="number"
                           min={0}
                           step="0.01"
-                          className={`w-[5.25rem] max-md:h-10 ${shopPartControlInputClass}`}
+                          className={`w-[5.25rem] ${shopPartControlInputClass}`}
                           value={p.client_unit_price_override ?? ''}
                           placeholder={formatRubles(automaticClientUnit)}
                           aria-label="Клиентская цена"
@@ -2366,7 +2370,7 @@ export default function AutoserviceOrderFormPage() {
                         />
                         <span className="shrink-0 text-xs tabular-nums text-ink-muted">₽</span>
                       </div>
-                      <span className="ml-auto w-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink md:ml-0 md:w-[5.75rem]">
+                      <span className="ml-auto w-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[5.75rem]">
                         {formatRubles(lineTotal)} ₽
                       </span>
                       </div>
@@ -2388,11 +2392,11 @@ export default function AutoserviceOrderFormPage() {
       </form>
 
       <div
-        className="fixed inset-x-0 bottom-[var(--sg-mobile-sticky-bottom-offset)] z-[45] border-t border-line bg-surface/95 px-3 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 sm:px-3 lg:bottom-0 lg:px-4"
+        className="fixed inset-x-0 bottom-[var(--sg-mobile-sticky-bottom-offset)] border-t border-line bg-surface/95 px-3 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 lg:bottom-0 lg:px-4"
         style={{ zIndex: Z_MOBILE_STICKY_FOOTER }}
       >
-        <div className="mx-auto flex w-full max-w-sg-content items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
+        <div className="mx-auto flex w-full max-w-sg-content flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
+          <div className="min-w-0 lg:flex-1">
             <p className="text-sm font-semibold text-ink">
               {ownMode ? 'Заказ-наряд' : `Итого ${formatMoney(grandTotal)} ₽`}
             </p>
@@ -2403,15 +2407,15 @@ export default function AutoserviceOrderFormPage() {
               </p>
             )}
           </div>
-          <div className="flex shrink-0 gap-2">
-            <button type="button" onClick={goBack} className={`${btnSecondaryClass} max-md:px-3`}>
+          <div className="flex gap-2 max-lg:w-full">
+            <button type="button" onClick={goBack} className={`${btnSecondaryClass} max-lg:flex-1 max-lg:px-3`}>
               Отмена
             </button>
             <button
               type="submit"
               form="repair-order-form"
               disabled={saving}
-              className={`${btnPrimaryClass} max-md:px-4`}
+              className={`${btnPrimaryClass} max-lg:flex-[2] max-lg:px-4`}
             >
               {saving ? 'Сохранение…' : ownMode ? 'Отправить' : 'Сохранить'}
             </button>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 
 const pillInputSmClass =
-  'block h-8 w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+  'block h-11 w-full min-w-0 rounded-2xl border border-transparent bg-gray-100 px-3 text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8 lg:rounded-full lg:text-sm';
 
 function formatMoney(value) {
   const n = Number(value);
@@ -49,7 +49,7 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
   const display = open ? query : value || selected?.name || '';
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative min-w-0">
       <input
         type="text"
         className={pillInputSmClass}
@@ -74,7 +74,7 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
             <li key={item.id}>
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm hover:bg-brand-50"
+                className="flex w-full min-h-11 items-center justify-between gap-2 px-4 py-2.5 text-left text-sm hover:bg-brand-50 lg:min-h-0"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(item)}
               >
@@ -87,7 +87,7 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
             <li className="border-t border-line-soft">
               <button
                 type="button"
-                className="w-full px-4 py-2.5 text-left text-sm font-medium text-brand-600 hover:bg-brand-50"
+                className="w-full min-h-11 px-4 py-2.5 text-left text-sm font-medium text-brand-600 hover:bg-brand-50 lg:min-h-0"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   const name = (query || value || '').trim();

@@ -125,11 +125,11 @@ export default function PurchaseItemsPickerModal({
       size="lg"
       title="Выбрать из оформленных заказов"
       footer={(
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
+        <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
+          <Button variant="secondary" onClick={onClose} className="max-md:min-h-11">
             Отмена
           </Button>
-          <Button onClick={handleConfirm} disabled={selectedEntries.length === 0}>
+          <Button onClick={handleConfirm} disabled={selectedEntries.length === 0} className="max-md:min-h-11">
             Добавить ({selectedEntries.length})
           </Button>
         </div>
@@ -158,7 +158,7 @@ export default function PurchaseItemsPickerModal({
                   <button
                     type="button"
                     onClick={() => setExpandedOrderKey(isExpanded ? null : key)}
-                    className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                    className="flex w-full min-h-11 items-center justify-between px-3 py-2.5 text-left"
                   >
                     <span className="text-sm font-medium text-ink">
                       {orderType === 'new' ? 'NEW' : 'Б/У'}
@@ -191,7 +191,7 @@ export default function PurchaseItemsPickerModal({
                           const title = item.name || item.product_name || 'Товар';
                           return (
                             <li key={itemKey}>
-                              <label className="flex cursor-pointer items-start gap-2 rounded-sg border border-line/70 px-2 py-2 hover:bg-surface-muted/40">
+                              <label className="flex min-h-11 cursor-pointer items-start gap-2 rounded-sg border border-line/70 px-2 py-2 hover:bg-surface-muted/40">
                                 <input
                                   type="checkbox"
                                   checked={selectedKeys.has(itemKey)}

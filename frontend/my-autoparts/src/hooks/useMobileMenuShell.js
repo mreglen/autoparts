@@ -310,6 +310,7 @@ export function getPageTitle(pathname) {
         '/autoservice/planner': 'Планировщик',
         '/autoservice/clients': 'Клиенты автосервиса',
         '/autoservice/orders': 'Заказ-наряды',
+        '/autoservice/orders/new': 'Новый заказ-наряд',
         '/autoservice/inspections': 'Заявки',
         '/autoservice/finance': 'Финансы',
         '/autoservice/payroll': 'Зарплата',
@@ -320,6 +321,8 @@ export function getPageTitle(pathname) {
     };
 
     if (exact[pathname]) return exact[pathname];
+    if (/^\/autoservice\/orders\/\d+\/edit$/.test(pathname)) return 'Редактирование';
+    if (pathname.startsWith('/autoservice/orders')) return 'Заказ-наряды';
     if (pathname.endsWith('/filters') && pathname.startsWith('/autoparts')) return 'Фильтры';
     if (pathname.startsWith('/autoparts')) return 'Поиск';
     if (pathname.startsWith('/organizations/')) return 'Организация';

@@ -16,6 +16,7 @@ import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
+import { warehouseEmptyShellClass } from '../../utils/warehouseListUi';
 
 function formatDateTime(value) {
   return formatServerDateTime(value);
@@ -27,8 +28,25 @@ function normalizeStatus(status) {
   return status;
 }
 
-function StatusPicker({ status, options, disabled, saving, onChange }) {
-  const [open, setOpen] = useState(false);
+function orderMatchesList(order, { scope, historyStatus, includeReviewInActive }) {
+  const status = order?.status;
+  if (scope === 'review') return status === 'review';
+  if (scope === 'history') {
+    if (historyStatus) return status === historyStatus;
+    return status === 'completed' || status === 'cancelled';
+  }
+  if (status === 'pending' || status === 'in_progress' || status === 'done') return true;
+  return Boolean(includeReviewInActive && status === 'review');
+}
+
+function StatusPicker({ status, options, disabled, saving, onChange, isOpen, onOpenChange }) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = isOpen !== undefined;
+  const open = isControlled ? isOpen : internalOpen;
+  const setOpen = (next) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const rootRef = useRef(null);
   const normalized = normalizeStatus(status);
   const available = options.filter((option) => option.value !== normalized);
@@ -55,7 +73,7 @@ function StatusPicker({ status, options, disabled, saving, onChange }) {
         disabled={disabled || saving}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((value) => !value);
+          setOpen(!open);
         }}
         className="inline-flex max-w-full items-center rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:cursor-wait disabled:opacity-60"
         title="Сменить статус"
@@ -67,6 +85,7 @@ function StatusPicker({ status, options, disabled, saving, onChange }) {
           {available.map((option) => (
             <ActionsDropdownItem
               key={option.value}
+              className="max-lg:min-h-11"
               disabled={option.disabled}
               title={option.disabled ? option.disabledTitle : undefined}
               onClick={() => {
@@ -93,28 +112,33 @@ function OrderActionsMenu({
   duplicating = false,
   approveSaving = false,
   showLabel = true,
+  isOpen,
+  onOpenChange,
 }) {
+  const itemClass = 'max-lg:min-h-11';
   return (
     <ActionsDropdown
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
       menuClassName="w-52 z-50"
       estimatedMenuHeight={onApprove ? 248 : 204}
       showLabel={showLabel}
       disabled={duplicating || approveSaving}
-      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60 max-md:h-11 max-md:w-11 max-md:justify-center max-md:px-0"
+      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60 max-lg:h-11 max-lg:w-11 max-lg:justify-center max-lg:px-0"
     >
       {onApprove ? (
-        <ActionsDropdownItem onClick={onApprove} disabled={duplicating || approveSaving}>
+        <ActionsDropdownItem className={itemClass} onClick={onApprove} disabled={duplicating || approveSaving}>
           {approveSaving ? 'Принятие…' : 'Принять в работу'}
         </ActionsDropdownItem>
       ) : null}
-      <ActionsDropdownItem onClick={onView} disabled={duplicating}>Просмотр</ActionsDropdownItem>
-      <ActionsDropdownItem onClick={onEdit} disabled={duplicating}>Изменить</ActionsDropdownItem>
+      <ActionsDropdownItem className={itemClass} onClick={onView} disabled={duplicating}>Просмотр</ActionsDropdownItem>
+      <ActionsDropdownItem className={itemClass} onClick={onEdit} disabled={duplicating}>Изменить</ActionsDropdownItem>
       {onDuplicate ? (
-        <ActionsDropdownItem onClick={onDuplicate} disabled={duplicating}>
+        <ActionsDropdownItem className={itemClass} onClick={onDuplicate} disabled={duplicating}>
           {duplicating ? 'Копирование…' : 'Скопировать и создать'}
         </ActionsDropdownItem>
       ) : null}
-      <ActionsDropdownItem onClick={onDelete} disabled={duplicating} danger>
+      <ActionsDropdownItem className={itemClass} onClick={onDelete} disabled={duplicating} danger>
         Удалить
       </ActionsDropdownItem>
     </ActionsDropdown>
@@ -134,31 +158,41 @@ function OrderMobileCard({
   duplicating = false,
   approveSaving = false,
 }) {
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const menuOpen = statusOpen || actionsOpen;
+  const zone = row.work_zone?.name;
+  const when = formatDateTime(row.scheduled_at);
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-3 py-3">
+    <div className={`rounded-xl border border-gray-200 bg-white px-4 py-3 ${menuOpen ? 'relative z-30' : ''}`}>
       <div className="flex items-start gap-2">
         <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">{repairOrderNumberLabel(row)}</span>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="shrink-0 text-base font-semibold tabular-nums text-gray-900">
+              {repairOrderNumberLabel(row)}
+            </span>
             <StatusPicker
               status={row.status}
               options={statusActions}
               saving={statusSavingId === row.id}
               disabled={statusSavingId === row.id}
+              isOpen={statusOpen}
+              onOpenChange={setStatusOpen}
               onChange={(nextStatus) => onStatusChange(row.id, nextStatus)}
             />
           </div>
-          <p className="mt-1.5 truncate text-sm font-medium text-gray-800">{vehicleLabel(row.vehicle)}</p>
-          <p className="mt-0.5 truncate text-sm text-gray-500">
-            {row.client?.name || '—'}
-            {row.client?.phone ? ` · ${row.client.phone}` : ''}
-          </p>
-          <p className="mt-1 text-xs text-gray-500">{formatDateTime(row.scheduled_at)}</p>
-          {row.work_zone?.name ? (
-            <p className="mt-0.5 text-xs text-gray-500">Зона: {row.work_zone.name}</p>
+          <p className="mt-1.5 line-clamp-2 text-sm font-medium text-gray-800">{vehicleLabel(row.vehicle)}</p>
+          <p className="mt-0.5 truncate text-sm text-gray-800">{row.client?.name || '—'}</p>
+          {row.client?.phone ? (
+            <p className="mt-0.5 truncate text-sm text-gray-500">{row.client.phone}</p>
           ) : null}
+          <p className="mt-1 text-xs text-gray-500">
+            {when}
+            {zone ? ` · ${zone}` : ''}
+          </p>
         </button>
-        <div className="shrink-0 pt-0.5">
+        <div className="shrink-0">
           <OrderActionsMenu
             onView={onView}
             onEdit={onEdit}
@@ -168,6 +202,8 @@ function OrderMobileCard({
             duplicating={duplicating}
             approveSaving={approveSaving}
             showLabel={false}
+            isOpen={actionsOpen}
+            onOpenChange={setActionsOpen}
           />
         </div>
       </div>
@@ -262,15 +298,34 @@ export default function AutoserviceOrdersPage() {
     setViewOrder(null);
   };
 
+  const applyOrderToList = useCallback(
+    (updated) => {
+      const belongs = orderMatchesList(updated, {
+        scope,
+        historyStatus,
+        includeReviewInActive: !canReview,
+      });
+      setRows((prev) => {
+        if (!belongs) return prev.filter((row) => row.id !== updated.id);
+        return prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row));
+      });
+      if (viewOrder?.id === updated.id) setViewOrder(updated);
+      if (scope === 'review' && updated.status !== 'review') {
+        setReviewCount((count) => Math.max(0, count - 1));
+      }
+    },
+    [scope, historyStatus, canReview, viewOrder?.id],
+  );
+
   const handleStatus = async (id, nextStatus) => {
     setStatusSavingId(id);
     setError('');
     try {
-      await apiRequest(`/autoservice/repair-orders/${id}/status`, {
+      const updated = await apiRequest(`/autoservice/repair-orders/${id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status: nextStatus }),
       });
-      await load();
+      applyOrderToList(updated);
     } catch (e) {
       setError(e?.message || 'Не удалось сменить статус');
     } finally {
@@ -285,8 +340,7 @@ export default function AutoserviceOrdersPage() {
       const updated = await apiRequest(`/autoservice/repair-orders/${id}/approve`, {
         method: 'POST',
       });
-      if (viewOrder?.id === id) setViewOrder(updated);
-      await load();
+      applyOrderToList(updated);
     } catch (e) {
       setError(e?.message || 'Не удалось принять заявку');
     } finally {
@@ -376,13 +430,9 @@ export default function AutoserviceOrdersPage() {
 
   const handleOrderUpdated = useCallback(
     (updated) => {
-      setViewOrder(updated);
-      setRows((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
-      if (updated.status === 'completed' || updated.status === 'cancelled' || updated.status === 'pending') {
-        load();
-      }
+      applyOrderToList(updated);
     },
-    [load],
+    [applyOrderToList],
   );
 
   if (!isReady) return <AuthLoadingScreen />;
@@ -406,14 +456,14 @@ export default function AutoserviceOrdersPage() {
           : `${rows.length} ваших активных`;
   const orderTabs = [
     { id: 'active', label: 'Активные' },
-    ...(canReview ? [{ id: 'review', label: 'На проверке', count: reviewCount }] : []),
+    ...(canReview ? [{ id: 'review', label: 'На проверке', shortLabel: 'Проверка', count: reviewCount }] : []),
     { id: 'history', label: 'История' },
   ];
   const tabValue = viewReview ? 'review' : viewHistory ? 'history' : 'active';
 
   return (
     <div className="w-full min-w-0">
-      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 lg:mb-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="max-lg:hidden text-xl font-bold text-gray-900 sm:text-2xl">
             {pageTitle}
@@ -427,7 +477,7 @@ export default function AutoserviceOrdersPage() {
             <button
               type="button"
               onClick={() => navigate('/autoservice/orders/new')}
-              className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 max-lg:min-h-11 max-lg:rounded-full sm:w-auto"
+              className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 max-lg:min-h-11 max-lg:rounded-full lg:w-auto"
             >
               Новый заказ-наряд
             </button>
@@ -439,12 +489,13 @@ export default function AutoserviceOrdersPage() {
         className="mb-4"
         ariaLabel="Разделы заказ-нарядов"
         gapClassName="gap-4"
+        tabClassName="max-lg:min-h-11 pb-3 pt-2 text-sm font-medium sm:text-[15px] lg:pt-1"
         tabs={orderTabs}
         value={tabValue}
         onChange={setListView}
       />
 
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
         <AutoserviceLiveSearchField
           value={q}
           onChange={setQ}
@@ -454,7 +505,7 @@ export default function AutoserviceOrdersPage() {
 
         {viewHistory ? (
           <select
-            className="h-10 shrink-0 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+            className="h-10 min-w-0 shrink-0 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70 max-lg:order-3 max-lg:h-11 max-lg:min-h-11 max-lg:w-full max-lg:text-base"
             value={historyStatus}
             onChange={(e) => setHistoryStatus(e.target.value)}
             aria-label="Фильтр по статусу"
@@ -468,7 +519,7 @@ export default function AutoserviceOrdersPage() {
         <button
           type="button"
           onClick={() => load()}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900 max-lg:h-11 max-lg:min-h-11 max-lg:w-11"
           title="Обновить"
           aria-label="Обновить"
         >
@@ -485,7 +536,7 @@ export default function AutoserviceOrdersPage() {
       ) : null}
 
       {/* Desktop table */}
-      <div className="hidden md:block min-w-0">
+      <div className="hidden lg:block min-w-0">
         <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
           <thead>
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -563,12 +614,12 @@ export default function AutoserviceOrdersPage() {
         </table>
       </div>
 
-      {/* Mobile list */}
-      <div className="md:hidden">
+      {/* Mobile / tablet shell list */}
+      <div className="lg:hidden">
         {loading ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={`msk-${i}`} className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 px-3 py-3">
+              <div key={`msk-${i}`} className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 px-4 py-3">
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className="h-4 w-24" />
                   <Skeleton className="h-4 w-40" />
@@ -579,11 +630,11 @@ export default function AutoserviceOrdersPage() {
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">
+          <p className={`${warehouseEmptyShellClass} text-sm text-gray-500`}>
             {viewHistory ? 'В истории пока нет заказ-нарядов' : viewReview ? 'Заявок на проверке нет' : 'Активных заказ-нарядов нет'}
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
           {rows.map((row) => (
             <OrderMobileCard
               key={row.id}

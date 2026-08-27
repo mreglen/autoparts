@@ -1,7 +1,7 @@
 import React from 'react';
 
 const fieldClass =
-  'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 pr-10 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0';
+  'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 pr-10 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0 max-md:h-11 max-md:min-h-11 max-md:text-base';
 
 /**
  * Instant-filter search that keeps mobile keyboard open:
