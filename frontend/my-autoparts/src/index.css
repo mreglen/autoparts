@@ -270,6 +270,8 @@ input[type="password"] {
 
 /* Native date/time controls overflow rounded pills on mobile */
 .sg-native-date-input {
+  display: block;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -277,8 +279,11 @@ input[type="password"] {
 
 .sg-native-date-input::-webkit-datetime-edit,
 .sg-native-date-input::-webkit-datetime-edit-fields-wrapper {
+  display: inline-flex;
   min-width: 0;
+  max-width: 100%;
   padding: 0;
+  overflow: hidden;
 }
 
 .sg-native-date-input::-webkit-datetime-edit-text,
@@ -287,12 +292,13 @@ input[type="password"] {
 .sg-native-date-input::-webkit-datetime-edit-year-field,
 .sg-native-date-input::-webkit-datetime-edit-hour-field,
 .sg-native-date-input::-webkit-datetime-edit-minute-field,
-.sg-native-date-input::-webkit-datetime-edit-ampm-field {
+.sg-native-date-input::-webkit-datetime-edit-ampm-field,
+.sg-native-date-input::-webkit-datetime-edit-second-field {
   padding: 0;
 }
 
 .sg-native-date-input::-webkit-calendar-picker-indicator {
-  margin: 0 0 0 0.25rem;
+  margin: 0 0 0 auto;
   padding: 0;
   width: 1.15rem;
   height: 1.15rem;

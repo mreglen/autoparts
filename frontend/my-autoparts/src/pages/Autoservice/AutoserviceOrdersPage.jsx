@@ -16,7 +16,6 @@ import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
-import { warehouseEmptyShellClass } from '../../utils/warehouseListUi';
 
 function formatDateTime(value) {
   return formatServerDateTime(value);
@@ -165,7 +164,7 @@ function OrderMobileCard({
   const when = formatDateTime(row.scheduled_at);
 
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white px-4 py-3 ${menuOpen ? 'relative z-30' : ''}`}>
+    <div className={`border-b border-gray-100 py-3 last:border-b-0 ${menuOpen ? 'relative z-30' : ''}`}>
       <div className="flex items-start gap-2">
         <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -463,7 +462,7 @@ export default function AutoserviceOrdersPage() {
 
   return (
     <div className="w-full min-w-0">
-      <div className="mb-4 flex flex-col gap-3 lg:mb-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="max-lg:hidden text-xl font-bold text-gray-900 sm:text-2xl">
             {pageTitle}
@@ -477,7 +476,7 @@ export default function AutoserviceOrdersPage() {
             <button
               type="button"
               onClick={() => navigate('/autoservice/orders/new')}
-              className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 max-lg:min-h-11 max-lg:rounded-full lg:w-auto"
+              className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 max-lg:min-h-11 sm:w-auto"
             >
               Новый заказ-наряд
             </button>
@@ -617,9 +616,9 @@ export default function AutoserviceOrdersPage() {
       {/* Mobile / tablet shell list */}
       <div className="lg:hidden">
         {loading ? (
-          <div className="space-y-3">
+          <div>
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={`msk-${i}`} className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 px-4 py-3">
+              <div key={`msk-${i}`} className="flex items-start justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0">
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className="h-4 w-24" />
                   <Skeleton className="h-4 w-40" />
@@ -630,18 +629,17 @@ export default function AutoserviceOrdersPage() {
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <p className={`${warehouseEmptyShellClass} text-sm text-gray-500`}>
+          <p className="py-10 text-center text-sm text-gray-500">
             {viewHistory ? 'В истории пока нет заказ-нарядов' : viewReview ? 'Заявок на проверке нет' : 'Активных заказ-нарядов нет'}
           </p>
         ) : (
-          <div className="space-y-3">
-          {rows.map((row) => (
+          rows.map((row) => (
             <OrderMobileCard
               key={row.id}
               row={row}
               statusActions={statusActionsForRow(row)}
-              statusSavingId={statusSavingId}
               onStatusChange={handleStatus}
+              statusSavingId={statusSavingId}
               onView={() => setViewOrder(row)}
               onEdit={() => navigate(`/autoservice/orders/${row.id}/edit`)}
               onDuplicate={viewReview ? undefined : () => handleDuplicate(row)}
@@ -650,8 +648,7 @@ export default function AutoserviceOrdersPage() {
               duplicating={duplicatingId === row.id}
               approveSaving={approvingId === row.id}
             />
-          ))}
-          </div>
+          ))
         )}
       </div>
 

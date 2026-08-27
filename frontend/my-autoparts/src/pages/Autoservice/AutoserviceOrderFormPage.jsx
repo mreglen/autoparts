@@ -73,7 +73,8 @@ const pillInputSmClass =
 const pillTextareaClass =
   'mt-1.5 box-border block w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3.5 py-2.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:rounded-sg md:px-4';
 
-const pillDateInputClass = `${pillInputClass} sg-native-date-input`;
+const pillDateInputClass =
+  'mt-1.5 box-border block h-11 w-full min-w-0 max-w-full rounded-lg border border-transparent bg-gray-100 px-3 text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:rounded-full lg:px-4 lg:text-sm sg-native-date-input';
 
 const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700';
 
@@ -322,7 +323,7 @@ function vehicleSearchText(v) {
 
 function SectionCard({ title, children, action }) {
   return (
-    <section className="min-w-0 rounded-sg-lg border border-line bg-surface p-3 sm:p-5">
+    <section className="min-w-0 rounded-sg-lg border border-line bg-surface px-2.5 py-3 sm:p-5">
       {title ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-line-soft pb-3">
           <h2 className="min-w-0 text-lg font-semibold text-ink lg:text-sg-subtitle">{title}</h2>
@@ -1882,7 +1883,7 @@ export default function AutoserviceOrderFormPage() {
 
   if (orderLoading || metaLoading || !formInitialized) {
     return (
-      <div className="mx-auto w-full px-1 py-8 sm:px-2 lg:-mx-4 lg:px-2">
+      <div className="mx-auto w-full py-8 max-lg:-mx-4 max-lg:px-3 lg:-mx-4 lg:px-2">
         <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
           ← Назад
         </button>
@@ -1893,7 +1894,7 @@ export default function AutoserviceOrderFormPage() {
 
   if (orderError) {
     return (
-      <div className="mx-auto w-full px-1 py-8 sm:px-2 lg:-mx-4 lg:px-2">
+      <div className="mx-auto w-full py-8 max-lg:-mx-4 max-lg:px-3 lg:-mx-4 lg:px-2">
         <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
           ← Назад
         </button>
@@ -1906,7 +1907,7 @@ export default function AutoserviceOrderFormPage() {
 
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-white">
-    <div className="mx-auto w-full min-w-0 px-3 py-6 pb-28 sm:px-2 lg:-mx-4 lg:px-2 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)]">
+    <div className="mx-auto w-full min-w-0 py-6 pb-28 max-lg:-mx-4 max-lg:px-3 lg:-mx-4 lg:px-2 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)]">
       <header className="mb-6 max-lg:mb-4">
         <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
           ← Назад
@@ -1992,6 +1993,7 @@ export default function AutoserviceOrderFormPage() {
               <FieldLabel>Дата записи</FieldLabel>
               <input
                 type="datetime-local"
+                step={60}
                 className={pillDateInputClass}
                 value={scheduledAt}
                 onChange={(e) => setScheduledAt(e.target.value)}
@@ -2002,6 +2004,7 @@ export default function AutoserviceOrderFormPage() {
               <FieldLabel optional>Окончание</FieldLabel>
               <input
                 type="datetime-local"
+                step={60}
                 className={pillDateInputClass}
                 value={scheduledEndAt}
                 onChange={(e) => setScheduledEndAt(e.target.value)}
@@ -2384,7 +2387,13 @@ export default function AutoserviceOrderFormPage() {
             <p className="text-sm font-medium text-ink">
               Итого ЗЧ исполнителя: {formatRubles(shopPartsTotal)} ₽
             </p>
-            <SectionAddLink onClick={() => setShopPartAddMenuOpen(true)} />
+            <button
+              type="button"
+              onClick={() => setShopPartAddMenuOpen(true)}
+              className={`${linkActionClass} max-lg:inline-flex max-lg:min-h-11 max-lg:items-center`}
+            >
+              + Добавить
+            </button>
           </div>
         </SectionCard>
         ) : null}
@@ -2447,6 +2456,7 @@ export default function AutoserviceOrderFormPage() {
 
       {shopPartAddMenuOpen ? (
         <Modal
+          open
           title="Добавить запчасть исполнителя"
           onClose={() => setShopPartAddMenuOpen(false)}
         >
