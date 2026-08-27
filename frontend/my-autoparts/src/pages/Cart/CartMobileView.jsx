@@ -85,26 +85,28 @@ function CartMobileBlock({
   return (
     <section className="overflow-hidden rounded-sg border-2 border-brand-200 bg-surface shadow-sm">
       <header className="border-b border-brand-200 bg-brand-100 px-3 py-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <h2 className="min-w-0 truncate text-base font-semibold text-ink">{section.title}</h2>
-          {section.canRename && section.onRename ? (
-            <button
-              type="button"
-              onClick={section.onRename}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:text-brand-600"
-              aria-label="Переименовать корзину"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                />
-              </svg>
-            </button>
-          ) : null}
-          <p className="ml-auto shrink-0 text-lg font-bold text-ink">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{section.title}</h2>
+            {section.canRename && section.onRename ? (
+              <button
+                type="button"
+                onClick={section.onRename}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:text-brand-600"
+                aria-label="Переименовать корзину"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                  />
+                </svg>
+              </button>
+            ) : null}
+          </div>
+          <p className="shrink-0 text-lg font-bold tabular-nums text-ink">
             {section.formatItemPrice(displayTotal)}
           </p>
         </div>

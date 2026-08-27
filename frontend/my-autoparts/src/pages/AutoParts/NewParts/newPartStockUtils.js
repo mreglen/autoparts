@@ -41,6 +41,11 @@ export function formatNewPartMoney(price) {
   }).format(amount);
 }
 
+/** Единый формат сумм в корзине (новые и б/у позиции). */
+export function formatCartMoney(price) {
+  return formatNewPartMoney(price);
+}
+
 export function formatDeliveryTimeText(deliveryStart, deliveryEnd) {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (!parts) return '—';

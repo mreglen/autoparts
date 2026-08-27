@@ -42,14 +42,11 @@ import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import {
   applyMarkup,
   formatDeliveryParts,
-  formatNewPartMoney,
+  formatCartMoney,
   truncateRubles,
 } from '../../pages/AutoParts/NewParts/newPartStockUtils';
 
-const formatNewPartPrice = (price) => formatNewPartMoney(price);
-
-const formatUsedPrice = (price) =>
-  new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price || 0);
+const formatCartPrice = (price) => formatCartMoney(price);
 
 function checkoutPrice(item) {
   const legacyPurchase = Number(item?.purchasePrice);
@@ -228,7 +225,7 @@ function CartTableBlock({
   clientMarkupPercent = 0,
   showBothPrices = false,
   showClientMarkupControl = false,
-  formatItemPrice = formatNewPartPrice,
+  formatItemPrice = formatCartPrice,
   checkoutLabel = 'Оформить заказ',
   quantityUpdatingIds = [],
   showSupplierDeliveryOption = false,
@@ -256,26 +253,28 @@ function CartTableBlock({
   return (
     <section className="overflow-hidden rounded-sg border-2 border-brand-200 bg-surface shadow-sm">
       <header className="border-b border-brand-200 bg-brand-100 px-3 py-3 sm:px-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <h2 className="truncate text-base font-semibold text-ink sm:text-lg">{title}</h2>
-          {canRename && onRename ? (
-            <button
-              type="button"
-              onClick={onRename}
-              className="shrink-0 text-ink-muted transition hover:text-brand-600"
-              aria-label="Переименовать корзину"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                />
-              </svg>
-            </button>
-          ) : null}
-          <p className="ml-auto text-lg font-bold text-ink">{formatItemPrice(displayTotal)}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-ink sm:text-lg">{title}</h2>
+            {canRename && onRename ? (
+              <button
+                type="button"
+                onClick={onRename}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:text-brand-600"
+                aria-label="Переименовать корзину"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                  />
+                </svg>
+              </button>
+            ) : null}
+          </div>
+          <p className="shrink-0 text-lg font-bold tabular-nums text-ink">{formatItemPrice(displayTotal)}</p>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
@@ -917,7 +916,7 @@ export default function CartPage() {
       clientMarkupPercent,
       showBothPrices: showPurchaseInCart,
       showClientMarkupControl: clientMarkupEnabled,
-      formatItemPrice: formatNewPartPrice,
+      formatItemPrice: formatCartPrice,
       showSupplierDeliveryOption: true,
       deliverInParts: Boolean(deliverInPartsByBasket[String(basket.id)]),
       onDeliverInPartsChange: (checked) => handleDeliverInPartsChange(basket.id, checked),
@@ -952,7 +951,7 @@ export default function CartPage() {
           .forEach((item) => handleRemoveItem(item.id));
       },
       showDeliveryColumn: false,
-      formatItemPrice: formatUsedPrice,
+      formatItemPrice: formatCartPrice,
       checkoutLabel: 'Оформить заказ',
     });
   });
@@ -964,7 +963,7 @@ export default function CartPage() {
         title="Корзина"
         subtitle={
           !isInitialLoad && cartItems.length > 0
-            ? `${cartItems.length} поз. · ${grandQty} шт. · ${formatUsedPrice(grandTotal)}`
+            ? `${cartItems.length} поз. · ${grandQty} шт. · ${formatCartPrice(grandTotal)}`
             : 'Новые запчасти и б/у от разных продавцов'
         }
       />

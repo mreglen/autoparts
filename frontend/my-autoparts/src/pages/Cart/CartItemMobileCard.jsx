@@ -121,8 +121,8 @@ export default function CartItemMobileCard({
         </button>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-        <div>
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-t border-line pt-3">
+        <div className="min-w-0">
           <p className="text-xs text-ink-muted">Цена</p>
           <p className="text-sm font-semibold text-brand-600">{formatItemPrice(displayedPrice)}</p>
           {showPurchase ? (
@@ -136,7 +136,7 @@ export default function CartItemMobileCard({
           onDecrease={() => onQuantityChange(item.id, quantity - 1)}
           onIncrease={() => onQuantityChange(item.id, quantity + 1)}
         />
-        <div className="text-right">
+        <div className="min-w-0 text-right">
           <p className="text-xs text-ink-muted">Сумма</p>
           <p className="text-sm font-bold text-ink">{formatItemPrice(lineTotal)}</p>
         </div>
