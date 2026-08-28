@@ -32,13 +32,6 @@ class AutoservicePayment(Base):
     sequential_number = Column(Integer, nullable=False)
     method = Column(String(16), nullable=False)  # card | cash | bank
     amount = Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
-    payer_id = Column(
-        Integer,
-        ForeignKey("autoservice_payers.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
-    payer_name = Column(String(255), nullable=True)
     created_by_user_id = Column(
         Integer,
         ForeignKey("users.id"),
@@ -48,5 +41,4 @@ class AutoservicePayment(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
 
     order = relationship("RepairOrder", foreign_keys=[repair_order_id], overlaps="payments")
-    payer = relationship("AutoservicePayer", foreign_keys=[payer_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])

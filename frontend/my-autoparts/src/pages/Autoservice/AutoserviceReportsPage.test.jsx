@@ -125,9 +125,6 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
       if (String(url).includes('/autoservice/finance/receipts')) {
         return Promise.resolve({ total_amount: 0, count: 0, items: [] });
       }
-      if (String(url).includes('/autoservice/payers')) {
-        return Promise.resolve([]);
-      }
       return Promise.resolve({});
     });
   });

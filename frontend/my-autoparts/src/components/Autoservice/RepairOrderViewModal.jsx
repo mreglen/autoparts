@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../UI/Modal';
-import { formatServerDateTime } from '../../utils/serverDate';
+import { ActionsDropdownItem } from '../ActionsDropdown/ActionsDropdown';
+import { formatServerDateTime, formatServerDate } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
 import { Skeleton } from '../UI';
+import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 import {
   formatShopPartQty,
   formatShopPartUnit,
@@ -13,8 +15,10 @@ import {
 } from '../../utils/repairOrderShopPartUtils';
 import { splitVatInclusive } from '../../utils/updDocument';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
-import PayerFormModal from './PayerFormModal';
-import { payerDisplayName, payerSearchText } from '../../utils/autoservicePayerRequisites';
+import {
+  AUTOSERVICE_PAYMENT_METHOD_LABELS,
+  paymentReceiptPrintUrl,
+} from '../../utils/autoservicePaymentReceipt';
 
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
@@ -89,47 +93,82 @@ function PaymentWizard({
   method,
   amount,
   payDate,
-  payerId,
-  payerQuery,
-  payers,
-  payersLoading,
-  payerCreating,
   saving,
   error,
+  success = false,
+  paidAmount = 0,
   onMethodChange,
   onAmountChange,
   onPayDateChange,
-  onPayerQueryChange,
-  onPayerSelect,
-  onPayerCreate,
   onSubmit,
+  onPayMore,
+  onBackToDetails,
+  onPrintReceipt,
 }) {
+  if (success) {
+    const fullyPaid = remaining <= 0.005;
+    return (
+      <div className="flex min-h-[22rem] flex-col justify-center">
+        <div className="mx-auto w-full max-w-md space-y-5 text-center">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-5">
+            <p className="text-base font-semibold text-emerald-900">Оплата прошла успешно</p>
+            <p className="mt-2 text-sm text-emerald-800">
+              Принято: <span className="font-semibold tabular-nums">{formatMoney(paidAmount)} ₽</span>
+            </p>
+            {fullyPaid ? (
+              <p className="mt-1 text-sm text-emerald-800">Заказ-наряд оплачен полностью</p>
+            ) : (
+              <p className="mt-1 text-sm text-emerald-800">
+                Осталось к оплате:{' '}
+                <span className="font-semibold tabular-nums">{formatMoney(remaining)} ₽</span>
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            {onPrintReceipt ? (
+              <button
+                type="button"
+                onClick={onPrintReceipt}
+                className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                Печать чека
+              </button>
+            ) : null}
+            {fullyPaid ? (
+              <button
+                type="button"
+                onClick={onBackToDetails}
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                К заказ-наряду
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onPayMore}
+                  className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  Оплатить ещё
+                </button>
+                <button
+                  type="button"
+                  onClick={onBackToDetails}
+                  className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                >
+                  К заказ-наряду
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const payAmount = Number(amount) || 0;
   const afterPay = Math.max(0, Math.round((remaining - payAmount) * 100) / 100);
   const canSubmit = Boolean(method) && Boolean(payDate) && payAmount > 0 && payAmount <= remaining + 0.005;
-  const queryNorm = (payerQuery || '').trim().toLowerCase();
-  const filteredPayers = useMemo(() => {
-    const list = Array.isArray(payers) ? payers : [];
-    if (!queryNorm) return list;
-    return list.filter((row) => payerSearchText(row).includes(queryNorm));
-  }, [payers, queryNorm]);
-  const exactMatch = (payers || []).some(
-    (row) => payerSearchText(row) === queryNorm
-      || String(row.display_name || payerDisplayName(row)).trim().toLowerCase() === queryNorm,
-  );
-  const canCreatePayer = Boolean(queryNorm) && !exactMatch;
-  const [payerMenuOpen, setPayerMenuOpen] = useState(false);
-  const payerRootRef = useRef(null);
-
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (payerRootRef.current && !payerRootRef.current.contains(e.target)) {
-        setPayerMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, []);
 
   return (
     <div className="flex min-h-[22rem] flex-col justify-center">
@@ -172,73 +211,6 @@ function PaymentWizard({
             className="mt-1 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
           />
         </label>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-700">
-            Плательщик
-            <span className="ml-1 font-normal text-gray-400">необязательно</span>
-          </label>
-          <div ref={payerRootRef} className="relative mt-1">
-            <input
-              type="text"
-              value={payerQuery}
-              onChange={(e) => {
-                onPayerQueryChange(e.target.value);
-                setPayerMenuOpen(true);
-              }}
-              onFocus={() => setPayerMenuOpen(true)}
-              disabled={saving || payerCreating || payersLoading}
-              placeholder={payersLoading ? 'Загрузка…' : 'Введите или выберите плательщика'}
-              autoComplete="off"
-              className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
-            />
-            {payerMenuOpen && !saving && !payerCreating && !payersLoading ? (
-              <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                {filteredPayers.length === 0 ? (
-                  <li className="px-3 py-2 text-sm text-gray-400">
-                    {(payers || []).length === 0 ? 'Справочник пуст' : 'Ничего не найдено'}
-                  </li>
-                ) : (
-                  filteredPayers.map((row) => (
-                    <li key={row.id}>
-                      <button
-                        type="button"
-                        className={`block w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 ${
-                          payerId === row.id ? 'bg-indigo-50 font-medium text-indigo-800' : 'text-gray-800'
-                        }`}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                          onPayerSelect(row);
-                          setPayerMenuOpen(false);
-                        }}
-                      >
-                        {row.display_name || payerDisplayName(row)}
-                      </button>
-                    </li>
-                  ))
-                )}
-                {canCreatePayer ? (
-                  <li className="sticky bottom-0 border-t border-gray-100 bg-white">
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-indigo-600 hover:bg-indigo-50"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setPayerMenuOpen(false);
-                        onPayerCreate();
-                      }}
-                    >
-                      Создать плательщика
-                    </button>
-                  </li>
-                ) : null}
-              </ul>
-            ) : null}
-          </div>
-          {payerId ? (
-            <p className="mt-1 text-xs text-emerald-700">Выбран из справочника</p>
-          ) : null}
-        </div>
 
         <label className="block text-xs font-medium text-gray-700">
           Сумма, ₽
@@ -298,83 +270,123 @@ export function OrderStatusBadge({ status, className = '' }) {
   );
 }
 
-function OrderStatusStepButton({
-  children,
-  onClick,
-  disabled,
-  variant = 'primary',
-}) {
-  const className = variant === 'success'
-    ? 'inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60'
-    : 'inline-flex h-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60';
-  return (
-    <button type="button" onClick={onClick} disabled={disabled} className={className}>
-      {children}
-    </button>
-  );
+export function buildRepairOrderStatusOptions({
+  status,
+  payment = null,
+  enablePayment = false,
+} = {}) {
+  const normalized = normalizeRepairOrderStatus(status);
+  const unpaid = enablePayment && payment
+    ? !payment.isPaid && payment.remaining > 0.005
+    : false;
+
+  if (status === 'review') {
+    return [{ value: 'cancelled', label: 'Отклонить' }];
+  }
+
+  if (normalized === 'completed' || normalized === 'cancelled') {
+    return [
+      { value: 'pending', label: 'Ожидание' },
+      { value: 'in_progress', label: 'В работу' },
+      { value: 'done', label: 'Выполнен' },
+    ];
+  }
+
+  const options = [
+    { value: 'pending', label: 'Ожидание' },
+    { value: 'in_progress', label: 'В работу' },
+    { value: 'done', label: 'Выполнен' },
+    { value: 'completed', label: 'Закрыт' },
+    { value: 'cancelled', label: 'Отменить' },
+  ];
+
+  if (enablePayment && unpaid) {
+    return options.map((option) => (
+      option.value === 'completed'
+        ? {
+            ...option,
+            disabled: true,
+            disabledTitle: 'Сначала оплатите заказ-наряд полностью',
+          }
+        : option
+    ));
+  }
+
+  return options;
 }
 
-function OrderStatusProgress({
+export function RepairOrderStatusPicker({
   status,
-  enablePayment,
-  payment,
-  statusSaving,
-  paySaving,
-  onAdvanceStatus,
-  onPay,
-  onComplete,
+  options,
+  disabled = false,
+  saving = false,
+  onChange,
+  isOpen,
+  onOpenChange,
+  menuClassName = '',
 }) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = isOpen !== undefined;
+  const open = isControlled ? isOpen : internalOpen;
+  const setOpen = (next) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
+  const rootRef = useRef(null);
   const normalized = normalizeRepairOrderStatus(status);
-  if (!enablePayment || status === 'cancelled' || normalized === 'completed' || normalized === 'review') {
-    return null;
+  const available = (options || []).filter((option) => option.value !== normalized);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDocClick = (event) => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open, setOpen]);
+
+  if (available.length === 0) {
+    return <OrderStatusBadge status={status} />;
   }
 
-  const busy = statusSaving || paySaving;
-
-  if (normalized === 'pending') {
-    return (
-      <OrderStatusStepButton
-        disabled={busy}
-        onClick={() => onAdvanceStatus('in_progress')}
+  return (
+    <div ref={rootRef} className="status-picker relative inline-flex max-w-full align-middle">
+      <button
+        type="button"
+        disabled={disabled || saving}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(!open);
+        }}
+        className="inline-flex max-w-full items-center rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:cursor-wait disabled:opacity-60"
+        title="Сменить статус"
+        aria-label="Сменить статус"
       >
-        {statusSaving ? 'Сохранение…' : 'В работу'}
-      </OrderStatusStepButton>
-    );
-  }
-
-  if (normalized === 'in_progress') {
-    return (
-      <OrderStatusStepButton
-        disabled={busy}
-        onClick={() => onAdvanceStatus('done')}
-      >
-        {statusSaving ? 'Сохранение…' : 'Выполнено'}
-      </OrderStatusStepButton>
-    );
-  }
-
-  if (normalized === 'done') {
-    if (payment?.remaining > 0.005) {
-      return (
-        <OrderStatusStepButton disabled={busy} onClick={onPay}>
-          Оплатить
-        </OrderStatusStepButton>
-      );
-    }
-    if (payment?.isPaid) {
-      return (
-        <OrderStatusStepButton
-          variant="success"
-          disabled={busy}
-          onClick={onComplete}
-        >
-          {statusSaving ? 'Закрытие…' : 'Закрыть'}
-        </OrderStatusStepButton>
-      );
-    }
-  }
-
-  return null;
+        <OrderStatusBadge status={status} className={saving ? 'opacity-70' : ''} />
+      </button>
+      {open ? (
+        <div className={buildActionsDropdownMenuClassName(false, `w-44 z-[120] ${menuClassName}`.trim())}>
+          {available.map((option) => (
+            <ActionsDropdownItem
+              key={option.value}
+              className="max-lg:min-h-11"
+              disabled={option.disabled}
+              title={option.disabled ? option.disabledTitle : undefined}
+              onClick={() => {
+                if (option.disabled) return;
+                setOpen(false);
+                onChange(option.value);
+              }}
+            >
+              {option.label}
+            </ActionsDropdownItem>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function MetaItem({ label, children, className = '' }) {
@@ -560,31 +572,38 @@ export default function RepairOrderViewModal({
   const [payMethod, setPayMethod] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(todayDateInputValue);
-  const [payPayerId, setPayPayerId] = useState(null);
-  const [payPayerQuery, setPayPayerQuery] = useState('');
-  const [payers, setPayers] = useState([]);
-  const [payerCreateOpen, setPayerCreateOpen] = useState(false);
-  const [payerCreateInitial, setPayerCreateInitial] = useState(null);
-  const [payersLoading, setPayersLoading] = useState(false);
   const [paySaving, setPaySaving] = useState(false);
   const [payError, setPayError] = useState('');
+  const [paySuccess, setPaySuccess] = useState(false);
+  const [lastPaidAmount, setLastPaidAmount] = useState(0);
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState('');
   const [completeSaving, setCompleteSaving] = useState(false);
   const [completeError, setCompleteError] = useState('');
   const [printPickerOpen, setPrintPickerOpen] = useState(false);
+  const [receiptPickerOpen, setReceiptPickerOpen] = useState(false);
+  const [orderPayments, setOrderPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState('');
+  const [selectedPaymentIds, setSelectedPaymentIds] = useState([]);
+  const [statusPickerOpen, setStatusPickerOpen] = useState(false);
 
   useEffect(() => {
     setPayOpen(false);
     setPayMethod(null);
     setPayAmount('');
     setPayDate(todayDateInputValue());
-    setPayPayerId(null);
-    setPayPayerQuery('');
     setPayError('');
+    setPaySuccess(false);
+    setLastPaidAmount(0);
     setStatusError('');
     setCompleteError('');
     setPrintPickerOpen(false);
+    setReceiptPickerOpen(false);
+    setOrderPayments([]);
+    setPaymentsError('');
+    setSelectedPaymentIds([]);
+    setStatusPickerOpen(false);
   }, [order?.id]);
 
   const totals = order ? orderTotals(order) : null;
@@ -595,80 +614,81 @@ export default function RepairOrderViewModal({
     && payment
     && payment.remaining > 0.005
     && normalizedStatus === 'done';
-
-  const handlePayerQueryChange = useCallback((value) => {
-    setPayPayerQuery(value);
-    const query = String(value || '').trim().toLowerCase();
-    const match = payers.find(
-      (row) => payerSearchText(row) === query
-        || String(row.display_name || payerDisplayName(row)).trim().toLowerCase() === query,
-    );
-    setPayPayerId(match ? match.id : null);
-  }, [payers]);
-
-  const handlePayerSelect = useCallback((row) => {
-    if (!row) return;
-    setPayPayerId(row.id);
-    setPayPayerQuery(row.display_name || payerDisplayName(row) || '');
-  }, []);
-
-  const handlePayerCreateOpen = useCallback(() => {
-    const query = payPayerQuery.trim();
-    setPayerCreateInitial(query ? { name: query } : null);
-    setPayerCreateOpen(true);
-  }, [payPayerQuery]);
-
-  const handlePayerCreated = useCallback((created) => {
-    if (!created) return;
-    setPayers((prev) => {
-      const next = Array.isArray(prev) ? [...prev] : [];
-      if (!next.some((row) => row.id === created.id)) next.push(created);
-      return next.sort((a, b) => String(a.display_name || payerDisplayName(a)).localeCompare(
-        String(b.display_name || payerDisplayName(b)),
-        'ru',
-      ));
-    });
-    setPayPayerId(created.id);
-    setPayPayerQuery(created.display_name || payerDisplayName(created) || '');
-    setPayerCreateOpen(false);
-    setPayerCreateInitial(null);
-  }, []);
-
-  const loadPayers = useCallback(async () => {
-    setPayersLoading(true);
-    try {
-      const data = await apiRequest('/autoservice/payers');
-      setPayers(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setPayers([]);
-      setPayError(e?.message || 'Не удалось загрузить плательщиков');
-    } finally {
-      setPayersLoading(false);
-    }
-  }, []);
+  const hasPayments = enablePayment && payment && payment.paid > 0.005;
 
   const resetPaymentWizard = useCallback(() => {
     setPayOpen(false);
     setPayMethod(null);
     setPayAmount('');
     setPayDate(todayDateInputValue());
-    setPayPayerId(null);
-    setPayPayerQuery('');
     setPayError('');
+    setPaySuccess(false);
+    setLastPaidAmount(0);
   }, []);
+
+  const loadOrderPayments = useCallback(async () => {
+    if (!order?.id) return [];
+    setPaymentsLoading(true);
+    setPaymentsError('');
+    try {
+      const data = await apiRequest(`/autoservice/repair-orders/${order.id}/payments`);
+      const items = data?.items || [];
+      setOrderPayments(items);
+      return items;
+    } catch (e) {
+      setPaymentsError(e?.message || 'Не удалось загрузить операции оплаты');
+      setOrderPayments([]);
+      return [];
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, [order?.id]);
+
+  const openReceiptPicker = useCallback(async () => {
+    setReceiptPickerOpen(true);
+    const items = await loadOrderPayments();
+    setSelectedPaymentIds(items.map((row) => row.id));
+  }, [loadOrderPayments]);
+
+  const handlePrintSelectedReceipts = useCallback(() => {
+    if (!order?.id || selectedPaymentIds.length === 0) return;
+    const url = paymentReceiptPrintUrl(order.id, selectedPaymentIds);
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setReceiptPickerOpen(false);
+  }, [order?.id, selectedPaymentIds]);
+
+  const paymentsByDate = useMemo(() => {
+    const groups = new Map();
+    orderPayments.forEach((payment) => {
+      const dateKey = formatServerDate(payment.created_at) || '—';
+      const bucket = groups.get(dateKey) || [];
+      bucket.push(payment);
+      groups.set(dateKey, bucket);
+    });
+    return [...groups.entries()];
+  }, [orderPayments]);
+
+  const statusOptions = useMemo(
+    () => buildRepairOrderStatusOptions({
+      status: order?.status,
+      payment,
+      enablePayment,
+    }),
+    [order?.status, payment, enablePayment],
+  );
 
   const handleStartPayment = useCallback(() => {
     setCompleteError('');
     setStatusError('');
+    setPaySuccess(false);
+    setLastPaidAmount(0);
     setPayOpen(true);
     setPayMethod(null);
     setPayAmount(payment?.remaining ? String(payment.remaining) : '');
     setPayDate(todayDateInputValue());
-    setPayPayerId(null);
-    setPayPayerQuery('');
     setPayError('');
-    loadPayers();
-  }, [payment?.remaining, loadPayers]);
+  }, [payment?.remaining]);
 
   const handleAdvanceStatus = useCallback(async (nextStatus) => {
     if (!order?.id) return;
@@ -710,6 +730,14 @@ export default function RepairOrderViewModal({
     }
   }, [order?.id, onOrderChange]);
 
+  const handleStatusChange = useCallback(async (nextStatus) => {
+    if (nextStatus === 'completed') {
+      await handleCompleteOrder();
+      return;
+    }
+    await handleAdvanceStatus(nextStatus);
+  }, [handleAdvanceStatus, handleCompleteOrder]);
+
   const handleSubmitPayment = useCallback(async () => {
     if (!order?.id || !payMethod) return;
     setPaySaving(true);
@@ -720,37 +748,31 @@ export default function RepairOrderViewModal({
         amount: Number(payAmount),
         paid_at: payDate || todayDateInputValue(),
       };
-      const trimmedPayer = payPayerQuery.trim();
-      if (payPayerId) {
-        payload.payer_id = payPayerId;
-      } else if (trimmedPayer) {
-        payload.payer_name = trimmedPayer;
-      }
       const updated = await apiRequest(`/autoservice/repair-orders/${order.id}/payments`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      const updatedTotals = orderTotals(updated);
-      const updatedPayment = paymentSummary(updated, updatedTotals.grand);
-      if (
-        normalizeRepairOrderStatus(updated.status) === 'done'
-        && updatedPayment.isPaid
-      ) {
-        const completed = await apiRequest(`/autoservice/repair-orders/${order.id}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'completed' }),
-        });
-        onOrderChange?.(completed);
-      } else {
-        onOrderChange?.(updated);
-      }
-      resetPaymentWizard();
+      onOrderChange?.(updated);
+      setLastPaidAmount(Number(payAmount) || 0);
+      setPaySuccess(true);
+      setPayMethod(null);
+      setPayAmount('');
+      setPayError('');
     } catch (e) {
       setPayError(e?.message || 'Не удалось провести оплату');
     } finally {
       setPaySaving(false);
     }
-  }, [order?.id, payMethod, payAmount, payDate, payPayerId, payPayerQuery, onOrderChange, resetPaymentWizard]);
+  }, [order?.id, payMethod, payAmount, payDate, onOrderChange]);
+
+  const handlePayMore = useCallback(() => {
+    setPaySuccess(false);
+    setLastPaidAmount(0);
+    setPayMethod(null);
+    setPayAmount(payment?.remaining ? String(payment.remaining) : '');
+    setPayDate(todayDateInputValue());
+    setPayError('');
+  }, [payment?.remaining]);
 
   if (!order && !loading) return null;
 
@@ -759,6 +781,8 @@ export default function RepairOrderViewModal({
   const hasStaffComment = Boolean(order?.staff_comment?.trim());
   const secondaryBtnClass =
     'inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60 md:h-10';
+  const primaryBtnClass =
+    'inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 md:h-10';
 
   return (
     <>
@@ -778,17 +802,19 @@ export default function RepairOrderViewModal({
               <h2 className="text-base font-semibold text-gray-900">
                 {order.status === 'review' ? repairOrderNumberLabel(order) : `Заказ-наряд ${repairOrderNumberLabel(order)}`}
               </h2>
-              <OrderStatusBadge status={order.status} />
-              <OrderStatusProgress
-                status={order.status}
-                enablePayment={enablePayment}
-                payment={payment}
-                statusSaving={statusSaving || completeSaving}
-                paySaving={paySaving}
-                onAdvanceStatus={handleAdvanceStatus}
-                onPay={handleStartPayment}
-                onComplete={handleCompleteOrder}
-              />
+              {showExecutors ? (
+                <RepairOrderStatusPicker
+                  status={order.status}
+                  options={statusOptions}
+                  saving={statusSaving || completeSaving}
+                  disabled={statusSaving || completeSaving || paySaving}
+                  isOpen={statusPickerOpen}
+                  onOpenChange={setStatusPickerOpen}
+                  onChange={handleStatusChange}
+                />
+              ) : (
+                <OrderStatusBadge status={order.status} />
+              )}
             </div>
             {statusError ? (
               <p className="text-xs text-red-600" role="alert">{statusError}</p>
@@ -841,8 +867,31 @@ export default function RepairOrderViewModal({
               ) : null}
             </div>
             {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
-            <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
-              {order?.id && showExecutors ? (
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {canPay && !payOpen ? (
+                  <button
+                    type="button"
+                    onClick={handleStartPayment}
+                    disabled={paySaving || statusSaving || completeSaving}
+                    className={primaryBtnClass}
+                  >
+                    Оплатить
+                  </button>
+                ) : null}
+                {hasPayments && !payOpen ? (
+                  <button
+                    type="button"
+                    onClick={openReceiptPicker}
+                    disabled={paymentsLoading}
+                    className={secondaryBtnClass}
+                  >
+                    Печать чека
+                  </button>
+                ) : null}
+              </div>
+              <div className="grid w-full grid-cols-2 gap-2 sm:w-auto md:flex md:flex-wrap md:justify-end">
+              {order?.id && showExecutors && !payOpen ? (
                 <button
                   type="button"
                   onClick={() => setPrintPickerOpen(true)}
@@ -856,7 +905,7 @@ export default function RepairOrderViewModal({
                   Изменить
                 </button>
               ) : null}
-              {canPay && payOpen ? (
+              {canPay && payOpen && !paySuccess ? (
                 <button
                   type="button"
                   onClick={resetPaymentWizard}
@@ -866,6 +915,7 @@ export default function RepairOrderViewModal({
                   Подробности
                 </button>
               ) : null}
+              </div>
             </div>
           </div>
         ) : null
@@ -904,13 +954,10 @@ export default function RepairOrderViewModal({
           method={payMethod}
           amount={payAmount}
           payDate={payDate}
-          payerId={payPayerId}
-          payerQuery={payPayerQuery}
-          payers={payers}
-          payersLoading={payersLoading}
-          payerCreating={payerCreateOpen}
           saving={paySaving}
           error={payError}
+          success={paySuccess}
+          paidAmount={lastPaidAmount}
           onMethodChange={(value) => {
             setPayMethod(value);
             if (value && !payAmount) {
@@ -919,10 +966,10 @@ export default function RepairOrderViewModal({
           }}
           onAmountChange={setPayAmount}
           onPayDateChange={setPayDate}
-          onPayerQueryChange={handlePayerQueryChange}
-          onPayerSelect={handlePayerSelect}
-          onPayerCreate={handlePayerCreateOpen}
           onSubmit={handleSubmitPayment}
+          onPayMore={handlePayMore}
+          onBackToDetails={resetPaymentWizard}
+          onPrintReceipt={openReceiptPicker}
         />
       ) : (
         <div className="space-y-5">
@@ -1006,16 +1053,93 @@ export default function RepairOrderViewModal({
         </a>
       </div>
     </Modal>
-    <PayerFormModal
-      open={payerCreateOpen}
-      mode="create"
-      initialForm={payerCreateInitial}
-      onClose={() => {
-        setPayerCreateOpen(false);
-        setPayerCreateInitial(null);
-      }}
-      onSaved={handlePayerCreated}
-    />
+    <Modal
+      open={receiptPickerOpen && Boolean(order?.id)}
+      onClose={() => setReceiptPickerOpen(false)}
+      title="Печать чека"
+      size="sm"
+      wrapperClassName="z-[120]"
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Выберите операции оплаты по заказ-наряду. В документ попадут только отмеченные строки.
+        </p>
+        {paymentsLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+        ) : paymentsError ? (
+          <p className="text-sm text-red-600">{paymentsError}</p>
+        ) : orderPayments.length === 0 ? (
+          <p className="text-sm text-gray-500">Оплат по этому заказ-наряду пока нет.</p>
+        ) : (
+          <div className="max-h-[50vh] space-y-4 overflow-y-auto pr-1">
+            {paymentsByDate.map(([dateLabel, rows]) => (
+              <section key={dateLabel} className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  {dateLabel}
+                </h3>
+                <div className="space-y-2">
+                  {rows.map((payment) => {
+                    const checked = selectedPaymentIds.includes(payment.id);
+                    return (
+                      <label
+                        key={payment.id}
+                        className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 px-3 py-2.5 hover:bg-gray-50"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          checked={checked}
+                          onChange={() => {
+                            setSelectedPaymentIds((prev) => (
+                              checked
+                                ? prev.filter((id) => id !== payment.id)
+                                : [...prev, payment.id]
+                            ));
+                          }}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium text-gray-900">
+                            {AUTOSERVICE_PAYMENT_METHOD_LABELS[payment.method] || payment.method}
+                            {' · '}
+                            <span className="tabular-nums">{formatMoney(payment.amount)} ₽</span>
+                          </span>
+                          <span className="mt-0.5 block text-xs text-gray-500">
+                            Чек № {payment.sequential_number}
+                            {formatServerDateTime(payment.created_at) !== '—'
+                              ? ` · ${formatServerDateTime(payment.created_at)}`
+                              : ''}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setReceiptPickerOpen(false)}
+            className={secondaryBtnClass}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintSelectedReceipts}
+            disabled={paymentsLoading || selectedPaymentIds.length === 0}
+            className={primaryBtnClass}
+          >
+            Печать
+          </button>
+        </div>
+      </div>
+    </Modal>
     </>
   );
 }

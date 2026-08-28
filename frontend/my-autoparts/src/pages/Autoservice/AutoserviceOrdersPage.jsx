@@ -6,7 +6,10 @@ import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
-import RepairOrderViewModal, { OrderStatusBadge, vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
+import RepairOrderViewModal, {
+  RepairOrderStatusPicker,
+  vehicleLabel,
+} from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
 import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
@@ -15,16 +18,9 @@ import { formatServerDateTime } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
-import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
 function formatDateTime(value) {
   return formatServerDateTime(value);
-}
-
-function normalizeStatus(status) {
-  if (status === 'accepted' || status === 'open') return 'pending';
-  if (status === 'ready' || status === 'issued') return 'completed';
-  return status;
 }
 
 function orderMatchesList(order, { scope, historyStatus, includeReviewInActive }) {
@@ -36,70 +32,6 @@ function orderMatchesList(order, { scope, historyStatus, includeReviewInActive }
   }
   if (status === 'pending' || status === 'in_progress' || status === 'done') return true;
   return Boolean(includeReviewInActive && status === 'review');
-}
-
-function StatusPicker({ status, options, disabled, saving, onChange, isOpen, onOpenChange }) {
-  const [internalOpen, setInternalOpen] = useState(false);
-  const isControlled = isOpen !== undefined;
-  const open = isControlled ? isOpen : internalOpen;
-  const setOpen = (next) => {
-    if (!isControlled) setInternalOpen(next);
-    onOpenChange?.(next);
-  };
-  const rootRef = useRef(null);
-  const normalized = normalizeStatus(status);
-  const available = options.filter((option) => option.value !== normalized);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDocClick = (event) => {
-      if (rootRef.current && !rootRef.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open]);
-
-  if (available.length === 0) {
-    return <OrderStatusBadge status={status} />;
-  }
-
-  return (
-    <div ref={rootRef} className="status-picker relative inline-flex max-w-full align-middle">
-      <button
-        type="button"
-        disabled={disabled || saving}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(!open);
-        }}
-        className="inline-flex max-w-full items-center rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:cursor-wait disabled:opacity-60"
-        title="Сменить статус"
-      >
-        <OrderStatusBadge status={status} className={saving ? 'opacity-70' : ''} />
-      </button>
-      {open ? (
-        <div className={buildActionsDropdownMenuClassName(false, 'w-44 z-50')}>
-          {available.map((option) => (
-            <ActionsDropdownItem
-              key={option.value}
-              className="max-lg:min-h-11"
-              disabled={option.disabled}
-              title={option.disabled ? option.disabledTitle : undefined}
-              onClick={() => {
-                if (option.disabled) return;
-                setOpen(false);
-                onChange(option.value);
-              }}
-            >
-              {option.label}
-            </ActionsDropdownItem>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 function OrderActionsMenu({
@@ -171,7 +103,7 @@ function OrderMobileCard({
             <span className="shrink-0 text-base font-semibold tabular-nums text-gray-900">
               {repairOrderNumberLabel(row)}
             </span>
-            <StatusPicker
+            <RepairOrderStatusPicker
               status={row.status}
               options={statusActions}
               saving={statusSavingId === row.id}
@@ -361,7 +293,7 @@ export default function AutoserviceOrdersPage() {
             { value: 'pending', label: 'Ожидание' },
             { value: 'in_progress', label: 'В работу' },
             { value: 'done', label: 'Выполнен' },
-            { value: 'completed', label: 'Завершить' },
+            { value: 'completed', label: 'Закрыт' },
             { value: 'cancelled', label: 'Отменить' },
           ],
     [viewHistory, viewReview],
@@ -587,7 +519,7 @@ export default function AutoserviceOrdersPage() {
                     {row.client?.phone ? <div className="mt-0.5 text-xs text-gray-500">{row.client.phone}</div> : null}
                   </td>
                   <td className="py-3 pr-3 align-middle">
-                    <StatusPicker
+                    <RepairOrderStatusPicker
                       status={row.status}
                       options={statusActionsForRow(row)}
                       saving={statusSavingId === row.id}

@@ -11,8 +11,6 @@ class AutoservicePaymentIn(BaseModel):
     method: AutoservicePaymentMethod
     amount: Decimal = Field(gt=0)
     paid_at: Optional[date] = None
-    payer_id: Optional[int] = None
-    payer_name: Optional[str] = Field(None, max_length=255)
 
 
 class AutoservicePaymentMethodTotals(BaseModel):
@@ -28,19 +26,25 @@ class AutoserviceFinanceReceiptRow(BaseModel):
     repair_order_number: str
     client_name: str
     client_phone: str = ""
-    payer_id: Optional[int] = None
-    payer_name: str
     amount: Decimal
     method: AutoservicePaymentMethod
     created_at: datetime
 
 
+class RepairOrderPaymentView(BaseModel):
+    id: int
+    sequential_number: int
+    method: AutoservicePaymentMethod
+    amount: Decimal
+    created_at: datetime
+
+
+class RepairOrderPaymentsListResponse(BaseModel):
+    items: list[RepairOrderPaymentView] = Field(default_factory=list)
+
+
 class AutoservicePaymentDateUpdate(BaseModel):
     paid_at: date
-
-
-class AutoservicePaymentPayerUpdate(BaseModel):
-    payer_id: Optional[int] = None
 
 
 class AutoserviceFinanceReceiptsResponse(BaseModel):

@@ -17,7 +17,6 @@ from app.services.autoservice_payment_service import (
     list_finance_receipts,
     order_payment_summary,
     update_autoservice_payment_date,
-    update_autoservice_payment_payer,
 )
 
 
@@ -137,7 +136,6 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             method="card",
             created_at=datetime(2026, 8, 10, 12, 0, 0),
             order=order,
-            payer_name=None,
         )
         payment_cash = MagicMock(
             id=12,
@@ -147,7 +145,6 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             method="cash",
             created_at=datetime(2026, 8, 11, 12, 0, 0),
             order=order,
-            payer_name=None,
         )
         query = db.query.return_value
         query.options.return_value = query
@@ -168,83 +165,9 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
         self.assertEqual(result.totals.cash, Decimal("50.00"))
         self.assertEqual(result.total_amount, Decimal("150.00"))
         self.assertEqual(result.items[0].client_name, "Ivan Petrov")
-        self.assertEqual(result.items[0].payer_name, "Ivan Petrov")
         self.assertEqual(result.items[0].id, 11)
 
-    def test_create_repair_order_payment_with_payer_id(self):
-        db = MagicMock()
-        order = self._order()
-        payer = MagicMock()
-        payer.id = 9
-        payer.name = "ООО Ромашка"
-        payment_obj = MagicMock(
-            sequential_number=3,
-            amount=Decimal("40.00"),
-            method="card",
-            payer_id=9,
-            payer_name="ООО Ромашка",
-        )
-        db.query.return_value.filter.return_value.first.return_value = payer
-        with patch(
-            "app.services.autoservice_payment_service.order_payment_summary",
-            return_value=(Decimal("0.00"), Decimal("100.00"), False),
-        ), patch(
-            "app.services.autoservice_payment_service.allocate_autoservice_payment_number",
-            return_value=3,
-        ), patch(
-            "app.services.autoservice_payment_service.AutoservicePayment",
-            return_value=payment_obj,
-        ) as payment_cls:
-            payment = create_repair_order_payment(
-                db,
-                order=order,
-                org_id="ORG1",
-                user_id=7,
-                method="card",
-                amount=Decimal("40.00"),
-                grand_total=Decimal("100.00"),
-                payer_id=9,
-            )
-        kwargs = payment_cls.call_args.kwargs
-        self.assertEqual(kwargs["payer_id"], 9)
-        self.assertEqual(kwargs["payer_name"], "ООО Ромашка")
-        self.assertEqual(payment.payer_name, "ООО Ромашка")
-
-    def test_create_repair_order_payment_with_manual_payer_name(self):
-        db = MagicMock()
-        order = self._order()
-        payment_obj = MagicMock(
-            sequential_number=3,
-            amount=Decimal("40.00"),
-            method="cash",
-            payer_id=None,
-            payer_name="Иван вручную",
-        )
-        with patch(
-            "app.services.autoservice_payment_service.order_payment_summary",
-            return_value=(Decimal("0.00"), Decimal("100.00"), False),
-        ), patch(
-            "app.services.autoservice_payment_service.allocate_autoservice_payment_number",
-            return_value=3,
-        ), patch(
-            "app.services.autoservice_payment_service.AutoservicePayment",
-            return_value=payment_obj,
-        ) as payment_cls:
-            create_repair_order_payment(
-                db,
-                order=order,
-                org_id="ORG1",
-                user_id=7,
-                method="cash",
-                amount=Decimal("40.00"),
-                grand_total=Decimal("100.00"),
-                payer_name="  Иван вручную  ",
-            )
-        kwargs = payment_cls.call_args.kwargs
-        self.assertIsNone(kwargs["payer_id"])
-        self.assertEqual(kwargs["payer_name"], "Иван вручную")
-
-    def test_finance_receipt_falls_back_to_client_name(self):
+    def test_finance_receipt_uses_client_name(self):
         from app.services.autoservice_payment_service import _finance_receipt_row
 
         order = self._order()
@@ -256,28 +179,8 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             method="cash",
             created_at=datetime(2026, 8, 10, 12, 0, 0),
             order=order,
-            payer_name=None,
         )
         row = _finance_receipt_row(payment)
-        self.assertEqual(row.payer_name, "Ivan Petrov")
-        self.assertEqual(row.client_name, "Ivan Petrov")
-
-    def test_finance_receipt_uses_payer_snapshot(self):
-        from app.services.autoservice_payment_service import _finance_receipt_row
-
-        order = self._order()
-        payment = MagicMock(
-            id=1,
-            sequential_number=1,
-            repair_order_id=1,
-            amount=Decimal("10.00"),
-            method="cash",
-            created_at=datetime(2026, 8, 10, 12, 0, 0),
-            order=order,
-            payer_name="Плательщик А",
-        )
-        row = _finance_receipt_row(payment)
-        self.assertEqual(row.payer_name, "Плательщик А")
         self.assertEqual(row.client_name, "Ivan Petrov")
 
     def test_update_autoservice_payment_date(self):
@@ -291,7 +194,6 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             method="bank",
             created_at=datetime(2026, 8, 5, 12, 0, 0),
             order=order,
-            payer_name=None,
         )
         db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
 
@@ -306,71 +208,6 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
         self.assertEqual(result.id, 15)
         self.assertEqual(payment.created_at, datetime(2026, 8, 19, 12, 0))
         db.flush.assert_called_once()
-
-    def test_update_autoservice_payment_payer_copies_snapshot(self):
-        db = MagicMock()
-        order = self._order()
-        payment = MagicMock(
-            id=15,
-            sequential_number=4,
-            repair_order_id=1,
-            amount=Decimal("80.00"),
-            method="bank",
-            created_at=datetime(2026, 8, 5, 12, 0, 0),
-            order=order,
-            payer_id=None,
-            payer_name=None,
-        )
-        payer = MagicMock()
-        payer.id = 9
-        payer.name = "ООО Новый плательщик"
-        payment_query = MagicMock()
-        payment_query.options.return_value.filter.return_value.first.return_value = payment
-        payer_query = MagicMock()
-        payer_query.filter.return_value.first.return_value = payer
-        db.query.side_effect = [payment_query, payer_query]
-
-        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
-            result = update_autoservice_payment_payer(
-                db,
-                org_id="ORG1",
-                payment_id=15,
-                payer_id=9,
-            )
-
-        self.assertEqual(payment.payer_id, 9)
-        self.assertEqual(payment.payer_name, "ООО Новый плательщик")
-        self.assertEqual(result.payer_id, 9)
-        self.assertEqual(result.payer_name, "ООО Новый плательщик")
-        db.flush.assert_called_once()
-
-    def test_update_autoservice_payment_payer_none_falls_back_to_client(self):
-        db = MagicMock()
-        order = self._order()
-        payment = MagicMock(
-            id=15,
-            sequential_number=4,
-            repair_order_id=1,
-            amount=Decimal("80.00"),
-            method="bank",
-            created_at=datetime(2026, 8, 5, 12, 0, 0),
-            order=order,
-            payer_id=9,
-            payer_name="Старый плательщик",
-        )
-        db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
-
-        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
-            result = update_autoservice_payment_payer(
-                db,
-                org_id="ORG1",
-                payment_id=15,
-                payer_id=None,
-            )
-
-        self.assertIsNone(payment.payer_id)
-        self.assertIsNone(payment.payer_name)
-        self.assertEqual(result.payer_name, "Ivan Petrov")
 
     def test_delete_autoservice_payment_reopens_completed_order(self):
         db = MagicMock()

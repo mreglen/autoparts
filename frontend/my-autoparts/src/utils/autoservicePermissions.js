@@ -25,6 +25,7 @@ export const AUTOSERVICE_SECTION_PERMISSION = {
   'order-print': AUTOSERVICE_ORDERS_SECTION_CODES,
   'order-upd-print': AUTOSERVICE_PERMISSION.orders,
   'order-invoice-print': AUTOSERVICE_PERMISSION.orders,
+  'order-receipt-print': AUTOSERVICE_PERMISSION.orders,
   clients: AUTOSERVICE_PERMISSION.clients,
   inspections: AUTOSERVICE_PERMISSION.inspections,
   finance: AUTOSERVICE_PERMISSION.finance,

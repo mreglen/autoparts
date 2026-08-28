@@ -16,7 +16,6 @@ from app.schemas.autoservice_finance import (
     AutoserviceOrderEconomicsRow,
     AutoserviceOrderEconomicsSummary,
     AutoservicePaymentDateUpdate,
-    AutoservicePaymentPayerUpdate,
     AutoservicePayrollReportEmployeeRow,
     AutoservicePayrollReportResponse,
     RosskoSalesReportResponse,
@@ -40,7 +39,6 @@ from app.services.autoservice_payment_service import (
     delete_autoservice_payment,
     list_finance_receipts,
     update_autoservice_payment_date,
-    update_autoservice_payment_payer,
 )
 from app.services.autoservice_payroll import compute_org_monthly_payroll
 from app.services.autoservice_payroll_report_xlsx import build_payroll_report_workbook_bytes
@@ -93,32 +91,6 @@ def patch_autoservice_finance_receipt_date(
         org_id=org_id,
         payment_id=payment_id,
         paid_at=payload.paid_at,
-    )
-    db.commit()
-    return row
-
-
-@router.patch(
-    "/autoservice/finance/receipts/{payment_id}/payer",
-    response_model=AutoserviceFinanceReceiptRow,
-)
-def patch_autoservice_finance_receipt_payer(
-    payment_id: int,
-    payload: AutoservicePaymentPayerUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    org_id = require_any_autoservice_permission(
-        db,
-        current_user,
-        AUTOSERVICE_PERMISSION_FINANCE,
-        AUTOSERVICE_PERMISSION_REPORTS,
-    )
-    row = update_autoservice_payment_payer(
-        db,
-        org_id=org_id,
-        payment_id=payment_id,
-        payer_id=payload.payer_id,
     )
     db.commit()
     return row

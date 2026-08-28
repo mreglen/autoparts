@@ -96,16 +96,19 @@ const btnPrimaryClass =
 const btnSecondaryClass =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
 
-const lineItemRowClass =
-  'flex min-w-0 flex-col gap-2 lg:flex-row lg:flex-nowrap lg:items-center lg:gap-1.5';
+const orderFormPageClass =
+  'w-full min-w-0 py-6 pb-28 max-lg:-mx-4 max-lg:px-3 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)] lg:pb-24';
 
-const lineItemIdentityClass = 'flex min-w-0 items-start gap-2 lg:contents';
+const lineItemRowClass =
+  'flex min-w-0 flex-col gap-1.5 lg:flex-row lg:flex-nowrap lg:items-center lg:gap-1.5';
+
+const lineItemIdentityClass = 'flex min-w-0 items-center gap-1.5 lg:contents';
 
 const lineItemControlsClass =
-  'flex min-w-0 flex-wrap items-center gap-1.5 max-lg:pl-6 lg:contents';
+  'flex min-w-0 flex-wrap items-center gap-1 max-lg:pl-5 lg:contents';
 
-const rowActionBtnClass =
-  'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm text-ink-muted transition hover:bg-gray-200 hover:text-ink-soft';
+const lineDeleteBtnClass =
+  'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-base leading-none text-danger-600 transition hover:bg-danger-50 hover:text-danger-700 lg:h-6 lg:w-6 lg:text-xs';
 
 function FieldLabel({ children, optional = false, action }) {
   return (
@@ -178,6 +181,19 @@ function emptyWork() {
   return { title: '', catalog_work_id: '', qty: 1, unit_price: '', executors: [] };
 }
 
+function workUnitPriceFromApi(value) {
+  if (value == null || value === '') return '';
+  const amount = Number(value);
+  if (Number.isNaN(amount) || amount === 0) return '';
+  return String(value);
+}
+
+function workUnitPriceToPayload(value) {
+  if (value == null || value === '') return 0;
+  const amount = Number(value);
+  return Number.isNaN(amount) ? 0 : amount;
+}
+
 function emptyExecutor(employeeId = '', percent = '') {
   return { employee_id: employeeId, percent };
 }
@@ -189,6 +205,65 @@ function workPayAmount(qty, unitPrice, percent) {
 function emptyClientPart() {
   return { title: '', qty: '', unit: 'pcs' };
 }
+
+function isEmptyWorkRow(w) {
+  if (String(w?.title || '').trim()) return false;
+  if (w?.catalog_work_id) return false;
+  if ((w?.executors || []).some((ex) => ex.employee_id)) return false;
+  if (String(w?.unit_price ?? '') !== '') return false;
+  return Number(w?.qty) === 1;
+}
+
+function isEmptyClientPartRow(p) {
+  return !String(p?.title || '').trim() && (p?.qty === '' || p?.qty == null);
+}
+
+function isEmptyShopPartRow(p) {
+  if (p?.pending_import || p?.pending_cart_import) return false;
+  if (p?.id) return false;
+  if (p?.source && p.source !== 'manual') return false;
+  if (String(p?.title || '').trim()) return false;
+  if (String(p?.brand || '').trim() || String(p?.partnumber || '').trim()) return false;
+  return Number(p?.qty) === 1 && Number(p?.unit_price) === 0;
+}
+
+function mergeShopPartIdsFromServer(localParts, serverOrder) {
+  const serverParts = serverOrder?.shop_parts || [];
+  const serverById = new Map(
+    serverParts.filter((part) => part.id != null).map((part) => [part.id, part]),
+  );
+  const serverUnmatched = serverParts.filter(
+    (part) => !localParts.some((local) => local.id && String(local.id) === String(part.id)),
+  );
+  let unmatchedIdx = 0;
+
+  return localParts.map((local) => {
+    if (local.id) {
+      const serverPart = serverById.get(local.id);
+      if (!serverPart) return local;
+      return {
+        ...local,
+        is_imported: Boolean(serverPart.is_imported),
+        is_in_cart: Boolean(serverPart.is_in_cart),
+        is_manual_editable: Boolean(serverPart.is_manual_editable),
+      };
+    }
+    if (local.pending_import || local.pending_cart_import) return local;
+    const serverPart = serverUnmatched[unmatchedIdx];
+    if (!serverPart?.id) return local;
+    unmatchedIdx += 1;
+    return {
+      ...local,
+      id: serverPart.id,
+      is_imported: Boolean(serverPart.is_imported),
+      is_in_cart: Boolean(serverPart.is_in_cart),
+      is_manual_editable: Boolean(serverPart.is_manual_editable),
+    };
+  });
+}
+
+const AUTO_SAVE_DELAY_MS = 1200;
+
 function emptyShopPart(overrides = {}, defaultMarkupPercent = 0) {
   return {
     title: '',
@@ -902,7 +977,7 @@ function mapOrderToFormState(order) {
           title: w.title || '',
           catalog_work_id: w.catalog_work_id ? String(w.catalog_work_id) : '',
           qty: w.qty || 1,
-          unit_price: String(w.unit_price ?? '0'),
+          unit_price: workUnitPriceFromApi(w.unit_price),
           executors: (w.executors || []).map((ex) => ({
             employee_id: String(ex.employee_id),
             percent: String(ex.percent ?? '0'),
@@ -1022,11 +1097,18 @@ export default function AutoserviceOrderFormPage() {
   const [addEmployeeTarget, setAddEmployeeTarget] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('idle');
   const [detachingShopPartId, setDetachingShopPartId] = useState(null);
   const [shopPartRemoveConfirm, setShopPartRemoveConfirm] = useState(null);
   const [lineDeleteConfirm, setLineDeleteConfirm] = useState(null);
   const plannerPrefillRef = useRef(location.state);
   const createInitRef = useRef(false);
+  const autoSaveTimerRef = useRef(null);
+  const autoSaveResumeTimerRef = useRef(null);
+  const skipAutoSaveRef = useRef(true);
+  const lastSavedSnapshotRef = useRef('');
+  const justAutoCreatedOrderIdRef = useRef(null);
+  const persistInFlightRef = useRef(false);
 
   const applyFormState = useCallback((state) => {
     setClientId(state.clientId);
@@ -1038,7 +1120,10 @@ export default function AutoserviceOrderFormPage() {
     setScheduledEndAt(state.scheduledEndAt);
     setShippingDate(state.shippingDate || todayDateInputValue());
     setMileageKm(state.mileageKm || '');
-    setWorks(state.works);
+    setWorks((state.works || []).map((w) => ({
+      ...w,
+      unit_price: workUnitPriceFromApi(w.unit_price),
+    })));
     setClientParts(state.clientParts);
     setShopParts(state.shopParts);
   }, []);
@@ -1070,6 +1155,18 @@ export default function AutoserviceOrderFormPage() {
     clientParts,
     shopParts,
   ]);
+
+  const pauseAutoSave = useCallback((snapshotOverride = null) => {
+    skipAutoSaveRef.current = true;
+    if (autoSaveResumeTimerRef.current) {
+      clearTimeout(autoSaveResumeTimerRef.current);
+    }
+    autoSaveResumeTimerRef.current = setTimeout(() => {
+      skipAutoSaveRef.current = false;
+      lastSavedSnapshotRef.current = snapshotOverride ?? JSON.stringify(captureFormSnapshot());
+      autoSaveResumeTimerRef.current = null;
+    }, 150);
+  }, [captureFormSnapshot]);
 
   const loadClients = useCallback(async (query = '') => {
     const q = String(query || '').trim();
@@ -1122,18 +1219,24 @@ export default function AutoserviceOrderFormPage() {
       const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
       setOrderNumber(order?.order_number ?? null);
       applyFormState(mapOrderToFormState(order));
+      pauseAutoSave();
       setFormInitialized(true);
     } catch (err) {
       setOrderError(err?.message || 'Не удалось загрузить заказ-наряд');
     } finally {
       setOrderLoading(false);
     }
-  }, [orderId, applyFormState]);
+  }, [orderId, applyFormState, pauseAutoSave]);
 
   useEffect(() => {
     if (isReady && isAuthenticated) {
       loadMeta();
       if (isEdit) {
+        if (justAutoCreatedOrderIdRef.current === orderId) {
+          justAutoCreatedOrderIdRef.current = null;
+          pauseAutoSave();
+          return;
+        }
         loadOrder();
       } else if (isCreate && !createInitRef.current) {
         createInitRef.current = true;
@@ -1171,10 +1274,11 @@ export default function AutoserviceOrderFormPage() {
           }
         }
         applyFormState(initial);
+        pauseAutoSave();
         setFormInitialized(true);
       }
     }
-  }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState, clientMarkupPercent]);
+  }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState, clientMarkupPercent, pauseAutoSave, orderId]);
 
   useEffect(() => {
     if (!formInitialized || (!isCreate && !isEdit)) return undefined;
@@ -1334,7 +1438,6 @@ export default function AutoserviceOrderFormPage() {
       updateWork(workIndex, {
         title: row.name,
         catalog_work_id: String(row.id),
-        unit_price: String(row.default_unit_price ?? 0),
       });
     } catch (err) {
       setError(err?.message || 'Не удалось добавить работу');
@@ -1604,6 +1707,7 @@ export default function AutoserviceOrderFormPage() {
         );
         applyFormState(mapOrderToFormState(updated));
         saveLinkedRepairOrder(updated);
+        pauseAutoSave();
       } catch (err) {
         setError(err?.message || 'Не удалось импортировать позиции из заказов');
       }
@@ -1638,83 +1742,74 @@ export default function AutoserviceOrderFormPage() {
 
   const goBack = useHistoryBack('/autoservice/orders');
 
-  const buildPayload = () => ({
-    client_id: Number(clientId),
-    vehicle_id: Number(vehicleId),
-    scheduled_at: fromLocalInputValue(scheduledAt),
-    scheduled_end_at: scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null,
-    shipping_date: shippingDate || null,
-    mileage_km: mileageKm === '' || mileageKm == null ? null : Number(mileageKm),
-    client_comment: comment.trim() || null,
-    staff_comment: staffComment.trim() || null,
-    work_zone_id: workZoneId ? Number(workZoneId) : null,
-    assignee_user_ids: [],
-    works: works.map((w) => ({
-      title: w.title.trim(),
-      catalog_work_id: w.catalog_work_id ? Number(w.catalog_work_id) : null,
-      qty: Number(w.qty),
-      unit_price: Number(w.unit_price),
-      executors: (w.executors || [])
-        .filter((ex) => ex.employee_id)
-        .map((ex) => ({
-          employee_id: Number(ex.employee_id),
-          percent: Number(ex.percent) || 0,
-        })),
-    })),
-    client_parts: clientParts.map((p) => ({
-      title: p.title.trim(),
-      qty: Number(p.qty),
-      unit: p.unit || 'pcs',
-    })),
-    shop_parts: ownMode
+  const buildPayload = ({ forAutoSave = false } = {}) => {
+    const worksSource = forAutoSave ? works.filter((w) => !isEmptyWorkRow(w)) : works;
+    const clientPartsSource = forAutoSave
+      ? clientParts.filter((p) => !isEmptyClientPartRow(p))
+      : clientParts;
+    const shopPartsSource = ownMode
       ? []
-      : shopParts
-      .filter((p) => !p.pending_import && !p.pending_cart_import)
-      .map((p) => ({
-        ...(p.id ? { id: p.id } : {}),
+      : (forAutoSave
+        ? shopParts.filter((p) => !isEmptyShopPartRow(p))
+        : shopParts);
+
+    return {
+      client_id: Number(clientId),
+      vehicle_id: Number(vehicleId),
+      scheduled_at: fromLocalInputValue(scheduledAt),
+      scheduled_end_at: scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null,
+      shipping_date: shippingDate || null,
+      mileage_km: mileageKm === '' || mileageKm == null ? null : Number(mileageKm),
+      client_comment: comment.trim() || null,
+      staff_comment: staffComment.trim() || null,
+      work_zone_id: workZoneId ? Number(workZoneId) : null,
+      assignee_user_ids: [],
+      works: worksSource.map((w) => ({
+        title: w.title.trim(),
+        catalog_work_id: w.catalog_work_id ? Number(w.catalog_work_id) : null,
+        qty: Number(w.qty),
+        unit_price: workUnitPriceToPayload(w.unit_price),
+        executors: (w.executors || [])
+          .filter((ex) => ex.employee_id)
+          .map((ex) => ({
+            employee_id: Number(ex.employee_id),
+            percent: Number(ex.percent) || 0,
+          })),
+      })),
+      client_parts: clientPartsSource.map((p) => ({
         title: p.title.trim(),
-        brand: (p.brand || p.rossko_brand || '').trim() || null,
-        partnumber: (p.partnumber || p.rossko_partnumber || '').trim() || null,
         qty: Number(p.qty),
         unit: p.unit || 'pcs',
-        unit_price: Number(p.unit_price),
-        markup_percent: Number(p.markup_percent),
-        client_unit_price_override: p.client_unit_price_override === ''
-          || p.client_unit_price_override == null
-          ? null
-          : Number(p.client_unit_price_override),
-        source: p.source || 'manual',
-        product_id: p.source === 'warehouse' ? p.product_id : null,
-        autoservice_stock_item_id: p.source === 'autoservice_stock'
-          ? p.autoservice_stock_item_id
-          : null,
-        rossko_brand: p.source === 'rossko' ? (p.rossko_brand || p.brand || null) : null,
-        rossko_partnumber: p.source === 'rossko' ? (p.rossko_partnumber || p.partnumber || null) : null,
       })),
-  });
+      shop_parts: shopPartsSource
+        .filter((p) => !p.pending_import && !p.pending_cart_import)
+        .map((p) => ({
+          ...(p.id ? { id: p.id } : {}),
+          title: p.title.trim(),
+          brand: (p.brand || p.rossko_brand || '').trim() || null,
+          partnumber: (p.partnumber || p.rossko_partnumber || '').trim() || null,
+          qty: Number(p.qty),
+          unit: p.unit || 'pcs',
+          unit_price: Number(p.unit_price),
+          markup_percent: Number(p.markup_percent),
+          client_unit_price_override: p.client_unit_price_override === ''
+            || p.client_unit_price_override == null
+            ? null
+            : Number(p.client_unit_price_override),
+          source: p.source || 'manual',
+          product_id: p.source === 'warehouse' ? p.product_id : null,
+          autoservice_stock_item_id: p.source === 'autoservice_stock'
+            ? p.autoservice_stock_item_id
+            : null,
+          rossko_brand: p.source === 'rossko' ? (p.rossko_brand || p.brand || null) : null,
+          rossko_partnumber: p.source === 'rossko' ? (p.rossko_partnumber || p.partnumber || null) : null,
+        })),
+    };
+  };
 
-  const validateForm = () => {
-    if (!clientId || !vehicleId || (!ownMode && !scheduledAt)) {
-      return ownMode
-        ? 'Выберите клиента и автомобиль'
-        : 'Выберите клиента, автомобиль и дату записи';
-    }
-    const iso = fromLocalInputValue(scheduledAt);
-    if (!ownMode && !iso) return 'Некорректная дата записи';
-    const endIso = scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null;
-    if (endIso && iso && new Date(endIso) <= new Date(iso)) {
-      return 'Время окончания должно быть позже времени начала';
-    }
-    if (mileageKm !== '' && mileageKm != null) {
-      const mileage = Number(mileageKm);
-      if (!Number.isInteger(mileage) || mileage < 0) {
-        return 'Пробег должен быть целым числом ≥ 0';
-      }
-      if (mileage > 9999999) {
-        return 'Пробег слишком большой';
-      }
-    }
+  const validateLineItems = ({ allowEmptyRows = false } = {}) => {
     for (const w of works) {
+      if (allowEmptyRows && isEmptyWorkRow(w)) continue;
       if (!String(w.title || '').trim()) return 'У каждой работы должно быть название';
       if (!Number.isInteger(Number(w.qty)) || Number(w.qty) < 1) {
         return 'Количество работы должно быть целым числом ≥ 1';
@@ -1724,12 +1819,14 @@ export default function AutoserviceOrderFormPage() {
       }
     }
     for (const p of clientParts) {
+      if (allowEmptyRows && isEmptyClientPartRow(p)) continue;
       if (!String(p.title || '').trim()) return 'У каждой запчасти клиента должно быть название';
       if (!Number.isInteger(Number(p.qty)) || Number(p.qty) < 1) {
         return 'Количество запчасти должно быть целым числом ≥ 1';
       }
     }
     for (const p of ownMode ? [] : shopParts) {
+      if (allowEmptyRows && isEmptyShopPartRow(p)) continue;
       if (
         p.client_unit_price_override !== ''
         && p.client_unit_price_override != null
@@ -1764,110 +1861,265 @@ export default function AutoserviceOrderFormPage() {
     return '';
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
+  const validateCommonFields = () => {
+    if (!clientId || !vehicleId || (!ownMode && !scheduledAt)) {
+      return ownMode
+        ? 'Выберите клиента и автомобиль'
+        : 'Выберите клиента, автомобиль и дату записи';
     }
-    setSaving(true);
-    try {
-      const body = buildPayload();
-      const groupsToImport = isCreate
-        ? pendingPurchaseGroups
-          .map((group) => {
-            const itemIds = group.itemIds.filter((itemId) => shopParts.some(
-              (part) => part.pending_import
-                && part.purchase_item_id === itemId
-                && part.purchase_order_type === group.orderType,
-            ));
-            const items = group.items.filter((item) => itemIds.includes(item.id));
-            return { ...group, itemIds, items };
-          })
-          .filter((group) => group.itemIds.length > 0)
-        : [];
-      const cartItemsToImport = isCreate
-        ? pendingCartItems.filter((item) => shopParts.some(
-          (part) => part.pending_cart_import
-            && part.cart_item_id === item.id
-            && part.cart_item_type === item.itemType,
-        ))
-        : [];
-      const goToSavedOrder = () => {
-        clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null);
-        navigate('/autoservice/orders');
-      };
+    const iso = fromLocalInputValue(scheduledAt);
+    if (!ownMode && !iso) return 'Некорректная дата записи';
+    const endIso = scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null;
+    if (endIso && iso && new Date(endIso) <= new Date(iso)) {
+      return 'Время окончания должно быть позже времени начала';
+    }
+    if (mileageKm !== '' && mileageKm != null) {
+      const mileage = Number(mileageKm);
+      if (!Number.isInteger(mileage) || mileage < 0) {
+        return 'Пробег должен быть целым числом ≥ 0';
+      }
+      if (mileage > 9999999) {
+        return 'Пробег слишком большой';
+      }
+    }
+    return '';
+  };
 
-      if (isEdit) {
-        await apiRequest(`/autoservice/repair-orders/${orderId}`, {
+  const canAttemptAutoSave = () => (
+    Boolean(clientId && vehicleId && (ownMode || scheduledAt))
+  );
+
+  const validateForAutoSave = () => {
+    if (!canAttemptAutoSave()) return null;
+    const commonError = validateCommonFields();
+    if (commonError) return commonError;
+    return validateLineItems({ allowEmptyRows: true }) || null;
+  };
+
+  const getPendingImports = () => {
+    const groupsToImport = isCreate
+      ? pendingPurchaseGroups
+        .map((group) => {
+          const itemIds = group.itemIds.filter((itemId) => shopParts.some(
+            (part) => part.pending_import
+              && part.purchase_item_id === itemId
+              && part.purchase_order_type === group.orderType,
+          ));
+          const items = group.items.filter((item) => itemIds.includes(item.id));
+          return { ...group, itemIds, items };
+        })
+        .filter((group) => group.itemIds.length > 0)
+      : [];
+    const cartItemsToImport = isCreate
+      ? pendingCartItems.filter((item) => shopParts.some(
+        (part) => part.pending_cart_import
+          && part.cart_item_id === item.id
+          && part.cart_item_type === item.itemType,
+      ))
+      : [];
+    return { groupsToImport, cartItemsToImport };
+  };
+
+  const persistRepairOrder = async ({ afterCreate = 'edit' } = {}) => {
+    if (persistInFlightRef.current) return null;
+    const validationError = validateForAutoSave();
+    if (validationError) return validationError;
+    if (!canAttemptAutoSave()) return null;
+
+    persistInFlightRef.current = true;
+    const snapshotAtSaveStart = JSON.stringify(captureFormSnapshot());
+    const targetOrderId = isEdit ? orderId : justAutoCreatedOrderIdRef.current;
+
+    try {
+      const body = buildPayload({ forAutoSave: true });
+
+      if (targetOrderId) {
+        const updated = await apiRequest(`/autoservice/repair-orders/${targetOrderId}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
-        goToSavedOrder();
-      } else {
-        const created = await apiRequest('/autoservice/repair-orders', {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
-        let saved = created;
-        if (created?.id && (groupsToImport.length || cartItemsToImport.length)) {
-          saveLinkedRepairOrder(created);
-          try {
-            if (groupsToImport.length) {
-              const itemPriceOverrides = Object.fromEntries(
-                shopParts
-                  .filter((part) => (
-                    part.pending_import
-                    && part.purchase_item_id
-                    && part.client_unit_price_override !== ''
-                    && part.client_unit_price_override != null
-                  ))
-                  .map((part) => [
-                    part.purchase_item_id,
-                    Number(part.client_unit_price_override),
-                  ]),
-              );
-              const updated = await importPurchaseGroupsToRepairOrder(
-                apiRequest,
-                created.id,
-                groupsToImport,
-                clientMarkupPercent,
-                itemPriceOverrides,
-              );
-              saved = updated || created;
-            }
-            if (cartItemsToImport.length) {
-              const updated = await importCartItemsToRepairOrder(
-                apiRequest,
-                created.id,
-                cartItemsToImport.map((item) => ({
-                  id: item.id,
-                  type: item.itemType,
-                })),
-                clientMarkupPercent,
-              );
-              saved = updated || saved;
-            }
-            saveLinkedRepairOrder(saved);
-          } catch (importErr) {
-            setError(importErr?.message || 'Заказ-наряд создан, но импорт позиций не удался');
-            clearRepairOrderPurchaseDraft();
-            clearRepairOrderCartDraft();
-            navigate(`/autoservice/orders/${created.id}/edit`);
-            return;
+        setShopParts((prev) => mergeShopPartIdsFromServer(prev, updated));
+        const snapshotNow = JSON.stringify(captureFormSnapshot());
+        if (snapshotAtSaveStart === snapshotNow) {
+          pauseAutoSave(snapshotNow);
+        } else {
+          lastSavedSnapshotRef.current = snapshotNow;
+        }
+        return null;
+      }
+
+      skipAutoSaveRef.current = true;
+      const { groupsToImport, cartItemsToImport } = getPendingImports();
+      const created = await apiRequest('/autoservice/repair-orders', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      justAutoCreatedOrderIdRef.current = created?.id ?? null;
+      let saved = created;
+      if (created?.id && (groupsToImport.length || cartItemsToImport.length)) {
+        saveLinkedRepairOrder(created);
+        try {
+          if (groupsToImport.length) {
+            const itemPriceOverrides = Object.fromEntries(
+              shopParts
+                .filter((part) => (
+                  part.pending_import
+                  && part.purchase_item_id
+                  && part.client_unit_price_override !== ''
+                  && part.client_unit_price_override != null
+                ))
+                .map((part) => [
+                  part.purchase_item_id,
+                  Number(part.client_unit_price_override),
+                ]),
+            );
+            const updated = await importPurchaseGroupsToRepairOrder(
+              apiRequest,
+              created.id,
+              groupsToImport,
+              clientMarkupPercent,
+              itemPriceOverrides,
+            );
+            saved = updated || created;
           }
+          if (cartItemsToImport.length) {
+            const updated = await importCartItemsToRepairOrder(
+              apiRequest,
+              created.id,
+              cartItemsToImport.map((item) => ({
+                id: item.id,
+                type: item.itemType,
+              })),
+              clientMarkupPercent,
+            );
+            saved = updated || saved;
+          }
+          saveLinkedRepairOrder(saved);
+        } catch (importErr) {
           clearRepairOrderPurchaseDraft();
           clearRepairOrderCartDraft();
+          if (afterCreate === 'edit') {
+            justAutoCreatedOrderIdRef.current = created.id;
+            navigate(`/autoservice/orders/${created.id}/edit`, { replace: true });
+          }
+          return importErr?.message || 'Заказ-наряд создан, но импорт позиций не удался';
         }
-        goToSavedOrder();
+        clearRepairOrderPurchaseDraft();
+        clearRepairOrderCartDraft();
       }
+
+      clearRepairOrderFormDraft('create', null);
+      if (afterCreate === 'edit') {
+        setOrderNumber(saved?.order_number ?? null);
+        applyFormState(mapOrderToFormState(saved));
+        justAutoCreatedOrderIdRef.current = saved?.id ?? null;
+        pauseAutoSave();
+        navigate(`/autoservice/orders/${saved.id}/edit`, { replace: true });
+      }
+      return null;
     } catch (err) {
-      setError(err?.message || 'Не удалось сохранить');
+      return err?.message || 'Не удалось сохранить';
     } finally {
-      setSaving(false);
+      persistInFlightRef.current = false;
     }
+  };
+
+  useEffect(() => {
+    if (!formInitialized || skipAutoSaveRef.current) return undefined;
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (skipAutoSaveRef.current || persistInFlightRef.current) return;
+
+      const snapshot = JSON.stringify(captureFormSnapshot());
+      if (snapshot === lastSavedSnapshotRef.current) return;
+
+      const validationError = validateForAutoSave();
+      if (!canAttemptAutoSave()) return;
+      if (validationError) {
+        setAutoSaveStatus('error');
+        setError(validationError);
+        return;
+      }
+
+      setAutoSaveStatus('saving');
+      setError('');
+      const err = await persistRepairOrder();
+      if (err) {
+        setAutoSaveStatus('error');
+        setError(err);
+        return;
+      }
+      lastSavedSnapshotRef.current = snapshot;
+      setAutoSaveStatus('saved');
+      window.setTimeout(() => {
+        setAutoSaveStatus((status) => (status === 'saved' ? 'idle' : status));
+      }, 2000);
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [
+    formInitialized,
+    captureFormSnapshot,
+    clientId,
+    vehicleId,
+    scheduledAt,
+    comment,
+    staffComment,
+    workZoneId,
+    scheduledEndAt,
+    shippingDate,
+    mileageKm,
+    works,
+    clientParts,
+    shopParts,
+    isCreate,
+    isEdit,
+    orderId,
+  ]);
+
+  const handleClose = async () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
+    if (canAttemptAutoSave()) {
+      const validationError = validateForAutoSave();
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      const snapshot = JSON.stringify(captureFormSnapshot());
+      if (snapshot !== lastSavedSnapshotRef.current || isCreate) {
+        setSaving(true);
+        setAutoSaveStatus('saving');
+        const err = await persistRepairOrder({ afterCreate: isCreate ? 'none' : 'edit' });
+        setSaving(false);
+        if (err) {
+          setAutoSaveStatus('error');
+          setError(err);
+          return;
+        }
+        lastSavedSnapshotRef.current = snapshot;
+      }
+    }
+
+    clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null);
+    goBack();
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
   };
 
   if (!isReady) return <AuthLoadingScreen />;
@@ -1883,9 +2135,9 @@ export default function AutoserviceOrderFormPage() {
 
   if (orderLoading || metaLoading || !formInitialized) {
     return (
-      <div className="mx-auto w-full py-8 max-lg:-mx-4 max-lg:px-3 lg:-mx-4 lg:px-2">
+      <div className={orderFormPageClass}>
         <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
-          ← Назад
+          ← Закрыть
         </button>
         <p className="mt-6 text-sm text-ink-muted max-lg:mt-0">Загрузка…</p>
       </div>
@@ -1894,9 +2146,9 @@ export default function AutoserviceOrderFormPage() {
 
   if (orderError) {
     return (
-      <div className="mx-auto w-full py-8 max-lg:-mx-4 max-lg:px-3 lg:-mx-4 lg:px-2">
+      <div className={orderFormPageClass}>
         <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
-          ← Назад
+          ← Закрыть
         </button>
         <p className="mt-6 text-sm text-red-600 max-lg:mt-0" role="alert">
           {orderError}
@@ -1906,13 +2158,12 @@ export default function AutoserviceOrderFormPage() {
   }
 
   return (
-    <div className="min-h-screen min-w-0 overflow-x-hidden bg-white">
-    <div className="mx-auto w-full min-w-0 py-6 pb-28 max-lg:-mx-4 max-lg:px-3 lg:-mx-4 lg:px-2 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)]">
+    <div className={orderFormPageClass}>
       <header className="mb-6 max-lg:mb-4">
-        <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
-          ← Назад
+        <button type="button" onClick={handleClose} className={`${linkActionClass} max-lg:hidden`}>
+          ← Закрыть
         </button>
-        <h1 className="mt-2 text-sg-title text-ink max-lg:hidden">{pageTitle}</h1>
+        <h1 className="mt-2 break-words text-sg-title text-ink max-lg:hidden">{pageTitle}</h1>
       </header>
 
       {metaError ? (
@@ -2078,12 +2329,12 @@ export default function AutoserviceOrderFormPage() {
           {works.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет работ</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {works.map((w, index) => (
-                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-3 py-2.5 lg:px-2 lg:py-1.5">
+                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2.5 py-2 lg:px-2 lg:py-1">
                   <div className={lineItemRowClass}>
                     <div className={lineItemIdentityClass}>
-                      <span className="w-4 shrink-0 pt-1.5 text-center text-xs tabular-nums text-ink-muted lg:pt-0">{index + 1}</span>
+                      <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">{index + 1}</span>
                       <div className="min-w-0 flex-1">
                         <WorkCatalogInput
                           value={w.title}
@@ -2095,7 +2346,8 @@ export default function AutoserviceOrderFormPage() {
                       </div>
                       <button
                         type="button"
-                        className={`${rowActionBtnClass} text-danger-600 hover:bg-danger-50 hover:text-danger-700 lg:order-last`}
+                        className={`${lineDeleteBtnClass} lg:order-last`}
+                        aria-label="Удалить работу"
                         onClick={() => setLineDeleteConfirm({ type: 'work', index })}
                       >
                         ×
@@ -2105,7 +2357,7 @@ export default function AutoserviceOrderFormPage() {
                     <input
                       type="number"
                       min={1}
-                      className="h-11 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
+                      className="h-10 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
                       placeholder={ownMode ? 'Н/ч' : 'Кол-во'}
                       value={w.qty}
                       onChange={(e) => updateWork(index, { qty: e.target.value })}
@@ -2116,17 +2368,17 @@ export default function AutoserviceOrderFormPage() {
                       type="number"
                       min={0}
                       step="0.01"
-                      className="h-11 w-[5.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
-                      placeholder="0"
-                      value={w.unit_price}
+                      className="h-10 w-[5rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
+                      placeholder="0 ₽"
+                      value={w.unit_price ?? ''}
                       onChange={(e) => updateWork(index, { unit_price: e.target.value })}
                     />
-                    <span className="ml-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[5.75rem]">
+                    <span className="ml-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[5.25rem]">
                       {formatMoney(lineSum(w.qty, w.unit_price))} ₽
                     </span>
                     <button
                       type="button"
-                      className="shrink-0 whitespace-nowrap text-xs font-medium text-brand-600 hover:text-brand-700 max-lg:inline-flex max-lg:min-h-11 max-lg:items-center"
+                      className="shrink-0 whitespace-nowrap py-1 text-xs font-medium text-brand-600 hover:text-brand-700"
                       onClick={() => addWorkExecutor(index)}
                     >
                       + сотрудник
@@ -2136,12 +2388,12 @@ export default function AutoserviceOrderFormPage() {
                     </div>
                   </div>
                   {(ownMode ? [] : (w.executors || [])).length > 0 ? (
-                    <div className="mt-1.5 min-w-0 space-y-1.5 max-lg:pl-0 pl-5">
+                    <div className="mt-1 min-w-0 space-y-1 pl-5">
                       {(w.executors || []).map((ex, execIndex) => (
-                        <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-xl bg-surface px-2.5 py-1.5 ring-1 ring-line lg:rounded-full lg:py-1">
+                        <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1 rounded-lg bg-surface px-2 py-1 ring-1 ring-line lg:rounded-full">
                           <SearchableSelect
                             className="min-w-0 flex-1"
-                            inputClassName="block h-11 w-full rounded-2xl border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8 lg:rounded-full"
+                            inputClassName="block h-10 w-full rounded-2xl border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8 lg:rounded-full"
                             value={ex.employee_id}
                             onChange={(next) => updateWorkExecutor(index, execIndex, { employee_id: next })}
                             options={employeeOptions}
@@ -2155,7 +2407,7 @@ export default function AutoserviceOrderFormPage() {
                             type="number"
                             min={0}
                             max={100}
-                            className="h-11 w-16 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-7"
+                            className="h-10 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-7"
                             value={ex.percent}
                             onChange={(e) => updateWorkExecutor(index, execIndex, { percent: e.target.value })}
                           />
@@ -2165,7 +2417,8 @@ export default function AutoserviceOrderFormPage() {
                           </span>
                           <button
                             type="button"
-                            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm text-danger-600 hover:bg-danger-50 hover:text-danger-700 lg:h-auto lg:w-auto lg:text-xs"
+                            className={lineDeleteBtnClass}
+                            aria-label="Удалить сотрудника"
                             onClick={() => removeWorkExecutor(index, execIndex)}
                           >
                             ×
@@ -2223,7 +2476,7 @@ export default function AutoserviceOrderFormPage() {
                     </select>
                     <button
                       type="button"
-                      className={`${rowActionBtnClass} shrink-0 text-danger-600 hover:bg-danger-50 hover:text-danger-700`}
+                      className={`${lineDeleteBtnClass} shrink-0`}
                       aria-label="Удалить"
                       onClick={() => setLineDeleteConfirm({ type: 'clientPart', index })}
                     >
@@ -2316,7 +2569,7 @@ export default function AutoserviceOrderFormPage() {
                         </div>
                         <button
                           type="button"
-                          className={`${rowActionBtnClass} shrink-0 text-danger-600 hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-50 lg:order-last`}
+                          className={`${lineDeleteBtnClass} shrink-0 disabled:cursor-not-allowed disabled:opacity-50 lg:order-last`}
                           aria-label={isImported ? 'Убрать из заказ-наряда' : 'Удалить'}
                           disabled={detachingShopPartId === p.id}
                           onClick={() => requestRemoveShopPart(index)}
@@ -2404,10 +2657,10 @@ export default function AutoserviceOrderFormPage() {
       </form>
 
       <div
-        className="pointer-events-none fixed inset-x-0 bottom-[var(--sg-mobile-sticky-bottom-offset)] border-t border-line bg-surface/95 px-3 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 lg:bottom-0 lg:px-4"
+        className="pointer-events-none sticky bottom-0 mt-6 border-t border-line bg-surface/95 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[var(--sg-mobile-sticky-bottom-offset)] max-lg:mt-0 max-lg:px-3 lg:px-0"
         style={{ zIndex: Z_MOBILE_STICKY_FOOTER }}
       >
-        <div className="pointer-events-auto mx-auto flex w-full max-w-sg-content flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
+        <div className="pointer-events-auto flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
           <div className="min-w-0 lg:flex-1">
             <p className="text-sm font-semibold text-ink">
               {ownMode ? 'Заказ-наряд' : `Итого ${formatMoney(grandTotal)} ₽`}
@@ -2419,17 +2672,24 @@ export default function AutoserviceOrderFormPage() {
               </p>
             )}
           </div>
-          <div className="flex gap-2 max-lg:w-full">
-            <button type="button" onClick={goBack} className={`${btnSecondaryClass} max-lg:flex-1 max-lg:px-3`}>
-              Отмена
-            </button>
+          <div className="flex min-w-0 flex-1 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+            {autoSaveStatus === 'saving' || saving ? (
+              <p className="text-xs text-ink-muted sm:mr-auto" role="status">
+                Сохранение…
+              </p>
+            ) : null}
+            {autoSaveStatus === 'saved' ? (
+              <p className="text-xs text-success-700 sm:mr-auto" role="status">
+                Сохранено
+              </p>
+            ) : null}
             <button
-              type="submit"
-              form="repair-order-form"
+              type="button"
+              onClick={handleClose}
               disabled={saving}
-              className={`${btnPrimaryClass} max-lg:flex-[2] max-lg:px-4`}
+              className={`${btnSecondaryClass} max-lg:w-full max-lg:px-3`}
             >
-              {saving ? 'Сохранение…' : ownMode ? 'Отправить' : 'Сохранить'}
+              {saving ? 'Сохранение…' : 'Закрыть'}
             </button>
           </div>
         </div>
@@ -2591,7 +2851,6 @@ export default function AutoserviceOrderFormPage() {
         cancelLabel="Отмена"
         danger
       />
-    </div>
     </div>
   );
 }

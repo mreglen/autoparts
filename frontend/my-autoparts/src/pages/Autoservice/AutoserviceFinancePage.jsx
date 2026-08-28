@@ -12,12 +12,10 @@ import AutoserviceLiveSearchField from '../../components/Autoservice/Autoservice
 import { Skeleton } from '../../components/UI';
 import { ConfirmDialog } from '../../components/UI/Modal';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
-import PaymentPayerSelect from '../../components/Autoservice/PaymentPayerSelect';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import {
-  buildPayersMap,
   filterFinanceReceipts,
-  financeReceiptPayerLabel,
+  financeReceiptClientLabel,
   FINANCE_METHOD_LABELS,
 } from '../../utils/financeReceiptSearch';
 import {
@@ -88,13 +86,10 @@ function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
 
 function FinanceReceiptRows({
   entries,
-  payers,
   todayDate,
   savingPaymentId,
-  savingPayerPaymentId,
   deletingPaymentId,
   onPaymentDateSave,
-  onPaymentPayerSave,
   onDeletePayment,
   showMethod = false,
   showMatchHint = false,
@@ -111,12 +106,12 @@ function FinanceReceiptRows({
   return (
     <>
       <div className="space-y-3 md:hidden">
-        {entries.map(({ row, payer, hint }) => (
+        {entries.map(({ row, hint }) => (
           <div
             key={row.id}
             className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80"
           >
-            <FinanceField label="Плательщик">{financeReceiptPayerLabel(row, payer)}</FinanceField>
+            <FinanceField label="Клиент">{financeReceiptClientLabel(row)}</FinanceField>
             {showMethod ? (
               <FinanceField label="Способ">{FINANCE_METHOD_LABELS[row.method] || row.method}</FinanceField>
             ) : null}
@@ -129,16 +124,6 @@ function FinanceReceiptRows({
               <>
                 <FinanceField label="№">{row.sequential_number}</FinanceField>
                 <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="shrink-0 text-gray-500">Плательщик</span>
-                  <PaymentPayerSelect
-                    row={row}
-                    payers={payers}
-                    saving={savingPayerPaymentId === row.id}
-                    onSave={onPaymentPayerSave}
-                    className="min-w-0"
-                  />
-                </div>
                 <div className="flex justify-between gap-3 text-sm">
                   <span className="shrink-0 text-gray-500">Дата</span>
                   <PaymentReceiptDateField
@@ -170,7 +155,7 @@ function FinanceReceiptRows({
             <tr>
               {showMethod ? null : <th className="px-4 py-3 font-medium">№</th>}
               {showMethod ? null : <th className="px-4 py-3 font-medium">Заказ-наряд</th>}
-              <th className="px-4 py-3 font-medium">Плательщик</th>
+              <th className="px-4 py-3 font-medium">Клиент</th>
               {showMethod ? <th className="px-4 py-3 font-medium">Способ</th> : null}
               <th className="px-4 py-3 text-right font-medium">Сумма</th>
               <th className="px-4 py-3 font-medium">Дата</th>
@@ -179,7 +164,7 @@ function FinanceReceiptRows({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {entries.map(({ row, payer, hint }) => (
+            {entries.map(({ row, hint }) => (
               <tr key={row.id} className="hover:bg-gray-50/80">
                 {showMethod ? null : (
                   <td className="px-4 py-3 tabular-nums font-medium text-gray-900">
@@ -190,16 +175,7 @@ function FinanceReceiptRows({
                   <td className="px-4 py-3 tabular-nums">№ {row.repair_order_number}</td>
                 )}
                 <td className="px-4 py-3">
-                  {showMethod ? (
-                    financeReceiptPayerLabel(row, payer)
-                  ) : (
-                    <PaymentPayerSelect
-                      row={row}
-                      payers={payers}
-                      saving={savingPayerPaymentId === row.id}
-                      onSave={onPaymentPayerSave}
-                    />
-                  )}
+                  {financeReceiptClientLabel(row)}
                 </td>
                 {showMethod ? (
                   <td className="px-4 py-3">{FINANCE_METHOD_LABELS[row.method] || row.method}</td>
@@ -251,10 +227,8 @@ export default function AutoserviceFinancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState({ totals: {}, total_amount: 0, count: 0, items: [] });
-  const [payers, setPayers] = useState([]);
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [savingPaymentId, setSavingPaymentId] = useState(null);
-  const [savingPayerPaymentId, setSavingPayerPaymentId] = useState(null);
   const [deletePayment, setDeletePayment] = useState(null);
   const [deletingPaymentId, setDeletingPaymentId] = useState(null);
   const [searchInput, setSearchInput] = useState('');
@@ -265,9 +239,7 @@ export default function AutoserviceFinancePage() {
     setError('');
     try {
       const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
-      const payerRows = await apiRequest('/autoservice/payers');
       const response = await apiRequest(`/autoservice/finance/receipts?${params.toString()}`);
-      setPayers(Array.isArray(payerRows) ? payerRows : []);
       setData(response || { totals: {}, total_amount: 0, count: 0, items: [] });
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить поступления');
@@ -307,25 +279,6 @@ export default function AutoserviceFinancePage() {
     }
   };
 
-  const handlePaymentPayerSave = async (paymentId, payerId) => {
-    setSavingPayerPaymentId(paymentId);
-    setError('');
-    try {
-      const updated = await apiRequest(`/autoservice/finance/receipts/${paymentId}/payer`, {
-        method: 'PATCH',
-        body: JSON.stringify({ payer_id: payerId }),
-      });
-      setData((prev) => ({
-        ...prev,
-        items: (prev.items || []).map((row) => (row.id === paymentId ? updated : row)),
-      }));
-    } catch (e) {
-      setError(e?.message || 'Не удалось изменить плательщика');
-    } finally {
-      setSavingPayerPaymentId(null);
-    }
-  };
-
   const handleDeletePaymentConfirm = async () => {
     if (!deletePayment) return;
     setDeletingPaymentId(deletePayment.id);
@@ -344,14 +297,13 @@ export default function AutoserviceFinancePage() {
   };
 
   const items = data.items || [];
-  const payersById = useMemo(() => buildPayersMap(payers), [payers]);
   const searchApplied = Boolean(searchQuery.trim());
 
   const searchResults = useMemo(
-    () => filterFinanceReceipts(items, payersById, searchQuery, {
+    () => filterFinanceReceipts(items, searchQuery, {
       method: selectedMethod || undefined,
     }),
-    [items, payersById, searchQuery, selectedMethod],
+    [items, searchQuery, selectedMethod],
   );
 
   const methodStats = useMemo(() => {
@@ -381,11 +333,10 @@ export default function AutoserviceFinancePage() {
       .filter((row) => row.method === selectedMethod)
       .map((row) => ({
         row,
-        payer: row.payer_id ? payersById.get(row.payer_id) : null,
         match: null,
         hint: null,
       }));
-  }, [searchApplied, searchResults, selectedMethod, items, payersById]);
+  }, [searchApplied, searchResults, selectedMethod, items]);
 
   return (
     <div className={`${warehousePageClass} min-w-0 space-y-4`}>
@@ -468,7 +419,7 @@ export default function AutoserviceFinancePage() {
       <AutoserviceLiveSearchField
         value={searchInput}
         onChange={setSearchInput}
-        placeholder="Плательщик, клиент, телефон, заказ-наряд, № поступления"
+        placeholder="Клиент, телефон, заказ-наряд, № поступления"
         ariaLabel="Поиск поступлений"
       />
 
@@ -530,13 +481,10 @@ export default function AutoserviceFinancePage() {
       ) : searchApplied && !selectedMethod ? (
         <FinanceReceiptRows
           entries={searchResults}
-          payers={payers}
           todayDate={todayDate}
           savingPaymentId={savingPaymentId}
-          savingPayerPaymentId={savingPayerPaymentId}
           deletingPaymentId={deletingPaymentId}
           onPaymentDateSave={handlePaymentDateSave}
-          onPaymentPayerSave={handlePaymentPayerSave}
           onDeletePayment={setDeletePayment}
           showMethod
           showMatchHint
@@ -566,13 +514,10 @@ export default function AutoserviceFinancePage() {
 
           <FinanceReceiptRows
             entries={selectedEntries}
-            payers={payers}
             todayDate={todayDate}
             savingPaymentId={savingPaymentId}
-            savingPayerPaymentId={savingPayerPaymentId}
             deletingPaymentId={deletingPaymentId}
             onPaymentDateSave={handlePaymentDateSave}
-            onPaymentPayerSave={handlePaymentPayerSave}
             onDeletePayment={setDeletePayment}
             showMatchHint={searchApplied}
             emptyText={searchApplied ? 'Ничего не найдено' : 'Нет поступлений за период'}

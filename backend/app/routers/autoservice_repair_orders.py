@@ -60,7 +60,7 @@ from app.schemas.repair_order import (
     RepairOrderWorkView,
     WarehouseProductOption,
 )
-from app.schemas.autoservice_finance import AutoservicePaymentIn
+from app.schemas.autoservice_finance import AutoservicePaymentIn, RepairOrderPaymentsListResponse
 from app.utils.autoservice_access import (
     display_client_phone,
     related_autoservice_client_ids,
@@ -74,6 +74,7 @@ from app.services.autoservice_payment_service import (
     batch_paid_amounts,
     create_repair_order_payment,
     ensure_order_fully_paid,
+    list_repair_order_payments,
     order_payment_summary,
 )
 from app.services.repair_order_cart_import import (
@@ -1730,6 +1731,20 @@ def patch_repair_order_status(
     return _to_staff_view(db, row)
 
 
+@router.get(
+    "/autoservice/repair-orders/{order_id}/payments",
+    response_model=RepairOrderPaymentsListResponse,
+)
+def get_repair_order_payments(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = _require_full_orders(db, current_user)
+    _get_org_order_or_404(db, org_id, order_id)
+    return list_repair_order_payments(db, org_id=org_id, order_id=order_id)
+
+
 @router.post(
     "/autoservice/repair-orders/{order_id}/payments",
     response_model=RepairOrderStaffView,
@@ -1752,8 +1767,6 @@ def post_repair_order_payment(
         amount=payload.amount,
         grand_total=grand_total,
         paid_at=payload.paid_at,
-        payer_id=payload.payer_id,
-        payer_name=payload.payer_name,
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)

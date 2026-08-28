@@ -52,7 +52,6 @@ from app.db.schema_patches import (
     ensure_autoservice_works_and_employees_tables,
     ensure_autoservice_digest_log_table,
     ensure_autoservice_payments_table,
-    ensure_autoservice_payers,
     ensure_autoservice_warehouse_tables,
     ensure_autoservice_warehouse_receipt_docs_table,
     ensure_autoservice_warehouse_receipts_document_id,
@@ -271,7 +270,6 @@ try:
     ensure_autoservice_works_and_employees_tables()
     ensure_autoservice_digest_log_table()
     ensure_autoservice_payments_table()
-    ensure_autoservice_payers()
     ensure_autoservice_warehouse_tables()
     ensure_autoservice_warehouse_receipt_docs_table()
     ensure_autoservice_warehouse_receipts_document_id()

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 
 const pillInputSmClass =
-  'block h-11 w-full min-w-0 rounded-2xl border border-transparent bg-gray-100 px-3 text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8 lg:rounded-full lg:text-sm';
+  'block h-10 w-full min-w-0 rounded-2xl border border-transparent bg-gray-100 px-3 text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8 lg:rounded-full lg:text-sm';
 
 function formatMoney(value) {
   const n = Number(value);
@@ -40,7 +40,6 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
     onChange({
       title: item.name,
       catalog_work_id: String(item.id),
-      unit_price: String(item.default_unit_price ?? 0),
     });
     setOpen(false);
     setQuery('');

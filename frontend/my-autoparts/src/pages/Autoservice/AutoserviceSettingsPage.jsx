@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import Modal from '../../components/UI/Modal';
-import PayerFormModal from '../../components/Autoservice/PayerFormModal';
 import WorkZonesSortableList from '../../components/Autoservice/WorkZonesSortableList';
 import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
-import { payerDisplayName, personTypeLabel } from '../../utils/autoservicePayerRequisites';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
@@ -187,15 +184,12 @@ export default function AutoserviceSettingsPage() {
   const [publicName, setPublicName] = useState('');
   const [publicDescription, setPublicDescription] = useState('');
   const [workZones, setWorkZones] = useState([]);
-  const [payers, setPayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [workZonesLoading, setWorkZonesLoading] = useState(false);
-  const [payersLoading, setPayersLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
   const [zoneModal, setZoneModal] = useState(null);
-  const [payerModal, setPayerModal] = useState(null);
   const [worksOpen, setWorksOpen] = useState(false);
   const [works, setWorks] = useState([]);
   const [worksLoading, setWorksLoading] = useState(false);
@@ -219,18 +213,6 @@ export default function AutoserviceSettingsPage() {
     }
   }, []);
 
-  const loadPayers = useCallback(async () => {
-    setPayersLoading(true);
-    try {
-      const data = await apiRequest('/autoservice/payers');
-      setPayers(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setError(e?.message || 'Не удалось загрузить плательщиков');
-    } finally {
-      setPayersLoading(false);
-    }
-  }, []);
-
   const loadWorks = useCallback(async () => {
     setWorksLoading(true);
     try {
@@ -247,13 +229,13 @@ export default function AutoserviceSettingsPage() {
     setLoading(true);
     setError('');
     try {
-      await Promise.all([loadSettings(), loadWorkZones(), loadPayers(), loadWorks()]);
+      await Promise.all([loadSettings(), loadWorkZones(), loadWorks()]);
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить настройки');
     } finally {
       setLoading(false);
     }
-  }, [loadSettings, loadWorkZones, loadPayers, loadWorks]);
+  }, [loadSettings, loadWorkZones, loadWorks]);
 
   useEffect(() => {
     if (isReady && isAuthenticated) load();
@@ -313,17 +295,6 @@ export default function AutoserviceSettingsPage() {
     }
   };
 
-  const removePayer = async (payerId) => {
-    if (!window.confirm('Удалить плательщика?')) return;
-    setError('');
-    try {
-      await apiRequest(`/autoservice/payers/${payerId}`, { method: 'DELETE' });
-      await loadPayers();
-    } catch (err) {
-      setError(err?.message || 'Не удалось удалить');
-    }
-  };
-
   const addWork = async (payload) => {
     await apiRequest('/autoservice/works', { method: 'POST', body: JSON.stringify(payload) });
   };
@@ -363,7 +334,6 @@ export default function AutoserviceSettingsPage() {
           { id: 'general', label: 'Общее' },
           { id: 'zones', label: 'Зоны' },
           { id: 'works', label: 'Работы' },
-          { id: 'payers', label: 'Плательщики' },
         ]}
         value={tab}
         onChange={setTab}
@@ -505,107 +475,6 @@ export default function AutoserviceSettingsPage() {
               </div>
             </section>
           ) : null}
-
-          {tab === 'payers' ? (
-            <section>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-gray-500">
-                  {payersLoading ? 'Загрузка…' : `${payers.length} плательщиков`}
-                </p>
-                <button type="button" onClick={() => setPayerModal({ mode: 'create' })} className={btnPrimary}>
-                  Добавить
-                </button>
-              </div>
-              <div className="hidden md:block">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead>
-                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      <th className="py-3 pr-3">Плательщик</th>
-                      <th className="w-28 py-3 pr-3">Тип</th>
-                      <th className="py-3 pr-3">Email</th>
-                      <th className="w-40 py-3 text-right">Действия</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {payersLoading ? (
-                      <tr>
-                        <td colSpan={4} className="py-12 text-center text-gray-500">
-                          Загрузка…
-                        </td>
-                      </tr>
-                    ) : payers.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="py-12 text-center text-gray-500">
-                          Плательщиков пока нет
-                        </td>
-                      </tr>
-                    ) : (
-                      payers.map((payer) => (
-                        <tr key={payer.id} className="transition-colors hover:bg-gray-50/70">
-                          <td className="py-3 pr-3 align-middle font-medium text-gray-900">
-                            {payer.display_name || payerDisplayName(payer)}
-                          </td>
-                          <td className="py-3 pr-3 align-middle text-gray-600">
-                            {personTypeLabel(payer.person_type)}
-                          </td>
-                          <td className="py-3 pr-3 align-middle text-gray-600">{payer.email || '—'}</td>
-                          <td className="py-3 text-right align-middle">
-                            <ActionsDropdown
-                              menuClassName="w-40 z-50"
-                              estimatedMenuHeight={100}
-                              showLabel
-                              buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-                            >
-                              <ActionsDropdownItem onClick={() => setPayerModal({ mode: 'edit', payer })}>
-                                Изменить
-                              </ActionsDropdownItem>
-                              <ActionsDropdownItem danger onClick={() => removePayer(payer.id)}>
-                                Удалить
-                              </ActionsDropdownItem>
-                            </ActionsDropdown>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="md:hidden">
-                {payersLoading ? (
-                  <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
-                ) : payers.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-gray-500">Плательщиков пока нет</p>
-                ) : (
-                  payers.map((payer) => (
-                    <div key={payer.id} className="flex items-center justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-900">
-                          {payer.display_name || payerDisplayName(payer)}
-                        </p>
-                        <p className="truncate text-xs text-gray-500">
-                          {personTypeLabel(payer.person_type)}
-                          {payer.email ? ` · ${payer.email}` : ''}
-                        </p>
-                      </div>
-                      <ActionsDropdown
-                        menuClassName="w-40 z-50"
-                        estimatedMenuHeight={100}
-                        showLabel={false}
-                        buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50"
-                      >
-                        <ActionsDropdownItem onClick={() => setPayerModal({ mode: 'edit', payer })}>
-                          Изменить
-                        </ActionsDropdownItem>
-                        <ActionsDropdownItem danger onClick={() => removePayer(payer.id)}>
-                          Удалить
-                        </ActionsDropdownItem>
-                      </ActionsDropdown>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
-          ) : null}
         </>
       )}
 
@@ -626,13 +495,6 @@ export default function AutoserviceSettingsPage() {
         onSaved={loadWorkZones}
       />
 
-      <PayerFormModal
-        open={Boolean(payerModal)}
-        mode={payerModal?.mode || 'create'}
-        payer={payerModal?.payer}
-        onClose={() => setPayerModal(null)}
-        onSaved={loadPayers}
-      />
     </div>
   );
 }

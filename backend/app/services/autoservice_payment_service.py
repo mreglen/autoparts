@@ -8,15 +8,15 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.autoservice_payment import AutoservicePayment
-from app.models.autoservice_payer import AutoservicePayer
 from app.models.repair_order import RepairOrder
 from app.schemas.autoservice_finance import (
     AutoserviceFinanceReceiptRow,
     AutoserviceFinanceReceiptsResponse,
     AutoservicePaymentMethodTotals,
+    RepairOrderPaymentView,
+    RepairOrderPaymentsListResponse,
 )
 from app.utils.autoservice_access import display_client_phone
-from app.utils.autoservice_payer_requisites import payer_catalog_name_from_row
 from app.services.autoservice_payroll import clear_order_accruals
 from app.services.repair_order_status_timestamps import record_repair_order_status_timestamp
 
@@ -34,11 +34,7 @@ def _created_at_for_payment_date(paid_at: date) -> datetime:
     return datetime.combine(paid_at, time(12, 0))
 
 
-def _display_payer_name(payment: AutoservicePayment) -> str:
-    snapshot = (getattr(payment, "payer_name", None) or "").strip()
-    if snapshot:
-        return snapshot
-    order = payment.order
+def _finance_receipt_client_name(order) -> str:
     if order and order.client and (order.client.name or "").strip():
         return order.client.name.strip()
     return "—"
@@ -56,10 +52,8 @@ def _finance_receipt_client_phone(order) -> str:
 def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceReceiptRow:
     method = payment.method if payment.method in _VALID_METHODS else "cash"
     order = payment.order
-    client_name = order.client.name if order and order.client else "—"
+    client_name = _finance_receipt_client_name(order)
     client_phone = _finance_receipt_client_phone(order)
-    raw_payer_id = getattr(payment, "payer_id", None)
-    payer_id = raw_payer_id if isinstance(raw_payer_id, int) else None
     return AutoserviceFinanceReceiptRow(
         id=payment.id,
         sequential_number=payment.sequential_number,
@@ -67,8 +61,6 @@ def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceRecei
         repair_order_number=order.order_number if order else str(payment.repair_order_id),
         client_name=client_name,
         client_phone=client_phone,
-        payer_id=payer_id,
-        payer_name=_display_payer_name(payment),
         amount=_money(payment.amount),
         method=method,
         created_at=payment.created_at,
@@ -91,6 +83,34 @@ def sum_order_payments(db: Session, order_id: int) -> Decimal:
         .scalar()
     )
     return _money(total or 0)
+
+
+def list_repair_order_payments(
+    db: Session,
+    *,
+    org_id: str,
+    order_id: int,
+) -> RepairOrderPaymentsListResponse:
+    rows = (
+        db.query(AutoservicePayment)
+        .filter(
+            AutoservicePayment.organization_id == org_id,
+            AutoservicePayment.repair_order_id == order_id,
+        )
+        .order_by(AutoservicePayment.created_at.asc(), AutoservicePayment.id.asc())
+        .all()
+    )
+    items = [
+        RepairOrderPaymentView(
+            id=row.id,
+            sequential_number=row.sequential_number,
+            method=row.method if row.method in _VALID_METHODS else "cash",
+            amount=_money(row.amount),
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+    return RepairOrderPaymentsListResponse(items=items)
 
 
 def batch_paid_amounts(db: Session, order_ids: list[int]) -> dict[int, Decimal]:
@@ -121,7 +141,7 @@ def ensure_order_fully_paid(db: Session, order: RepairOrder, grand_total: Decima
     if remaining > Decimal("0.00"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Заказ-наряд можно завершить только после полной оплаты",
+            detail="Заказ-наряд можно закрыть только после полной оплаты",
         )
 
 
@@ -135,8 +155,6 @@ def create_repair_order_payment(
     amount: Decimal,
     grand_total: Decimal,
     paid_at: date | None = None,
-    payer_id: int | None = None,
-    payer_name: str | None = None,
 ) -> AutoservicePayment:
     if method not in _VALID_METHODS:
         raise HTTPException(
@@ -156,29 +174,6 @@ def create_repair_order_payment(
             detail="Сумма оплаты превышает остаток к оплате",
         )
 
-    resolved_payer_id = None
-    resolved_payer_name = None
-    if payer_id is not None:
-        payer = (
-            db.query(AutoservicePayer)
-            .filter(
-                AutoservicePayer.id == payer_id,
-                AutoservicePayer.organization_id == org_id,
-            )
-            .first()
-        )
-        if not payer:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Плательщик не найден",
-            )
-        resolved_payer_id = payer.id
-        resolved_payer_name = payer_catalog_name_from_row(payer) or None
-    else:
-        manual_name = (payer_name or "").strip()[:255]
-        if manual_name:
-            resolved_payer_name = manual_name
-
     effective_date = paid_at or date.today()
     created_at = _created_at_for_payment_date(effective_date)
     payment = AutoservicePayment(
@@ -187,62 +182,12 @@ def create_repair_order_payment(
         sequential_number=allocate_autoservice_payment_number(db, org_id),
         method=method,
         amount=pay_amount,
-        payer_id=resolved_payer_id,
-        payer_name=resolved_payer_name,
         created_by_user_id=user_id,
         created_at=created_at,
     )
     db.add(payment)
     db.flush()
     return payment
-
-
-def update_autoservice_payment_payer(
-    db: Session,
-    *,
-    org_id: str,
-    payment_id: int,
-    payer_id: int | None,
-) -> AutoserviceFinanceReceiptRow:
-    payment = (
-        db.query(AutoservicePayment)
-        .options(
-            joinedload(AutoservicePayment.order).joinedload(RepairOrder.client),
-        )
-        .filter(
-            AutoservicePayment.id == payment_id,
-            AutoservicePayment.organization_id == org_id,
-        )
-        .first()
-    )
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Поступление не найдено",
-        )
-
-    if payer_id is None:
-        payment.payer_id = None
-        payment.payer_name = None
-    else:
-        payer = (
-            db.query(AutoservicePayer)
-            .filter(
-                AutoservicePayer.id == payer_id,
-                AutoservicePayer.organization_id == org_id,
-            )
-            .first()
-        )
-        if not payer:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Плательщик не найден",
-            )
-        payment.payer_id = payer.id
-        payment.payer_name = payer_catalog_name_from_row(payer) or None
-
-    db.flush()
-    return _finance_receipt_row(payment)
 
 
 def _period_bounds(date_from: date, date_to: date) -> tuple[datetime, datetime]:
