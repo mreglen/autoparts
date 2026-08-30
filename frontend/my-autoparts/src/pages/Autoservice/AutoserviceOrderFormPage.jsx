@@ -2664,40 +2664,42 @@ export default function AutoserviceOrderFormPage() {
       </form>
 
       <div
-        className="pointer-events-none sticky bottom-0 mt-6 border-t border-line bg-surface/95 px-3 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[var(--sg-mobile-sticky-bottom-offset)] max-lg:mt-0 lg:px-0"
+        className="pointer-events-none mt-4 max-lg:fixed max-lg:bottom-[calc(var(--sg-mobile-sticky-bottom-offset)+0.75rem)] max-lg:left-3 max-lg:right-3 max-lg:mt-0 lg:sticky lg:bottom-4"
         style={{ zIndex: Z_MOBILE_STICKY_FOOTER }}
       >
-        <div className="pointer-events-auto flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
-          <div className="min-w-0 lg:flex-1">
-            <p className="text-sm font-semibold text-ink">
-              {ownMode ? 'Заказ-наряд' : `Итого ${formatMoney(grandTotal)} ₽`}
-            </p>
-            {ownMode ? null : (
-              <p className="text-[11px] leading-snug text-ink-muted sm:text-xs">
-                работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)} · НДС{' '}
-                {formatMoney(grandVat)}
+        <div className="pointer-events-auto min-w-0 rounded-sg-lg border border-line bg-surface px-2.5 py-3 sm:p-5">
+          <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
+            <div className="min-w-0 lg:flex-1">
+              <p className="text-sm font-semibold text-ink">
+                {ownMode ? 'Заказ-наряд' : `Итого ${formatMoney(grandTotal)} ₽`}
               </p>
-            )}
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
-            {autoSaveStatus === 'saving' || saving ? (
-              <p className="text-xs text-ink-muted sm:mr-auto" role="status">
-                Сохранение…
-              </p>
-            ) : null}
-            {autoSaveStatus === 'saved' ? (
-              <p className="text-xs text-success-700 sm:mr-auto" role="status">
-                Сохранено
-              </p>
-            ) : null}
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={saving}
-              className={`${btnSecondaryClass} max-lg:w-full max-lg:px-3`}
-            >
-              {saving ? 'Сохранение…' : 'Закрыть'}
-            </button>
+              {ownMode ? null : (
+                <p className="text-[11px] leading-snug text-ink-muted sm:text-xs">
+                  работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)} · НДС{' '}
+                  {formatMoney(grandVat)}
+                </p>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+              {autoSaveStatus === 'saving' || saving ? (
+                <p className="text-xs text-ink-muted sm:mr-auto" role="status">
+                  Сохранение…
+                </p>
+              ) : null}
+              {autoSaveStatus === 'saved' ? (
+                <p className="text-xs text-success-700 sm:mr-auto" role="status">
+                  Сохранено
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={saving}
+                className={`${btnSecondaryClass} max-lg:w-full max-lg:px-3`}
+              >
+                {saving ? 'Сохранение…' : 'Закрыть'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -4,7 +4,6 @@ import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
 import MobileSideMenu from '../components/MobileSideMenu/MobileSideMenu';
 import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
 import OfflineBanner from '../components/OfflineBanner/OfflineBanner';
-import AppUpdateBanner from '../components/AppUpdateBanner/AppUpdateBanner';
 import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
 
 /**
@@ -50,7 +49,6 @@ export default function MobileShellFrame({
 
       {showBottomChrome ? (
         <>
-          <AppUpdateBanner />
           <InstallPwaPrompt />
           <MobileBottomNav />
         </>

@@ -15,6 +15,9 @@ import OrderWriteMessageButton from '../OrderWriteMessageButton/OrderWriteMessag
 
 const SVOYGARAGE_LOGO = '/logos/svoygarage.png';
 
+const compactActionPillClass =
+  'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition hover:opacity-90';
+
 function SvoyGarageStatusIcon({ onClick, title, interactive = true, size = 'md' }) {
   const boxClass =
     size === 'sm'
@@ -138,8 +141,6 @@ export default function SalesGarageOrderCard({
   orderStatusOptions = [],
   formatDate,
   formatPrice,
-  onRefreshSupplierStatus,
-  supplierRefreshLoading = false,
 }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -274,19 +275,6 @@ export default function SalesGarageOrderCard({
                   Статус поставщика временно недоступен
                 </span>
               )}
-              {isNew && rosskoOrderId && onRefreshSupplierStatus && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRefreshSupplierStatus(order.id);
-                  }}
-                  disabled={supplierRefreshLoading}
-                  className="inline-flex min-h-11 items-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {supplierRefreshLoading ? 'Обновление…' : 'Обновить статус поставщика'}
-                </button>
-              )}
               <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
             </div>
             <div className="flex items-start gap-3">
@@ -330,7 +318,7 @@ export default function SalesGarageOrderCard({
                       e.stopPropagation();
                       onOpenCancelPayment?.(order);
                     }}
-                    className="inline-flex min-h-11 items-center rounded-full bg-emerald-500 px-3 text-sm font-semibold text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600"
+                    className={`${compactActionPillClass} bg-emerald-500 text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600`}
                     title="Отменить оплату"
                   >
                     Оплачено
@@ -342,7 +330,7 @@ export default function SalesGarageOrderCard({
                       e.stopPropagation();
                       onOpenPayment?.(order);
                     }}
-                    className="inline-flex min-h-11 items-center rounded-full bg-amber-100 px-3 text-sm font-semibold text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200"
+                    className={`${compactActionPillClass} bg-amber-100 text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200`}
                     title="Оплатить оставшиеся позиции"
                   >
                     Частично
@@ -354,7 +342,7 @@ export default function SalesGarageOrderCard({
                       e.stopPropagation();
                       onOpenPayment?.(order);
                     }}
-                    className="inline-flex min-h-11 items-center rounded-full bg-amber-400 px-3 text-sm font-semibold text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500"
+                    className={`${compactActionPillClass} bg-amber-400 text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500`}
                   >
                     Оплата
                   </button>
@@ -397,7 +385,7 @@ export default function SalesGarageOrderCard({
                     }
                     onUpdateStatus(order.id, primaryCta.status, null);
                   }}
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-indigo-600 px-3 text-sm font-semibold text-white hover:bg-indigo-700"
+                  className={`${compactActionPillClass} bg-indigo-600 text-white hover:bg-indigo-700`}
                 >
                   {primaryCta.label}
                 </button>
@@ -511,7 +499,7 @@ export default function SalesGarageOrderCard({
                               e.stopPropagation();
                               onOpenCancelItemPayment?.(order, item);
                             }}
-                            className="inline-flex min-h-11 items-center rounded-full bg-emerald-500 px-3 text-sm font-semibold text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600"
+                            className={`${compactActionPillClass} bg-emerald-500 text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600`}
                             title="Отменить оплату позиции"
                           >
                             Оплачено
@@ -523,7 +511,7 @@ export default function SalesGarageOrderCard({
                               e.stopPropagation();
                               onOpenItemPayment?.(order, item);
                             }}
-                            className="inline-flex min-h-11 items-center rounded-full bg-amber-400 px-3 text-sm font-semibold text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500"
+                            className={`${compactActionPillClass} bg-amber-400 text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500`}
                           >
                             Оплата
                           </button>

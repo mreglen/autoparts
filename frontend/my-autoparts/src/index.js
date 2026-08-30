@@ -8,7 +8,6 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { scheduleAppSplashHide } from './utils/appSplash';
 import { appendNotificationHistory } from './utils/notificationHistory';
-import { dispatchSwUpdateAvailable } from './utils/networkStatus';
 import { initSentry } from './utils/sentry';
 
 window.__sgSplashStart = Date.now();
@@ -30,35 +29,12 @@ requestAnimationFrame(() => {
   requestAnimationFrame(scheduleAppSplashHide);
 });
 
-function watchServiceWorkerUpdates(registration) {
-  if (!registration) return;
-
-  const notifyIfWaiting = () => {
-    if (registration.waiting && navigator.serviceWorker.controller) {
-      dispatchSwUpdateAvailable(registration);
-    }
-  };
-
-  registration.addEventListener('updatefound', () => {
-    const installing = registration.installing;
-    if (!installing) return;
-    installing.addEventListener('statechange', () => {
-      if (installing.state === 'installed') {
-        notifyIfWaiting();
-      }
-    });
-  });
-
-  notifyIfWaiting();
-}
-
 // Register Service Worker for Push Notifications + offline shell
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
       .then((registration) => {
         console.log('[SW] Service Worker registered:', registration.scope);
-        watchServiceWorkerUpdates(registration);
       })
       .catch((registrationError) => {
         console.log('[SW] Service Worker registration failed:', registrationError);
