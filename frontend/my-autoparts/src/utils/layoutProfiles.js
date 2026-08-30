@@ -71,17 +71,25 @@ export function getCabinetLayoutProfile(pathname = '', chatIdParam = null) {
   const path = String(pathname || '');
   const isChatsPage = path.startsWith('/chats');
   const isActiveChat = isMobileActiveChat(path, chatIdParam);
+  const isAutoserviceStaffPage = path.startsWith('/autoservice/') && !/\/print(\/|$)/.test(path);
   return {
     isChatsPage,
     isActiveChat,
+    isAutoserviceStaffPage,
     hideSidebar: isActiveChat,
     hideMobileHeader: isActiveChat,
   };
 }
 
-export function getCabinetMainClasses({ isChatsPage }) {
+/** Horizontal padding for autoservice staff pages on mobile (layout main uses px-0). */
+export const autoserviceStaffPageClass = 'w-full min-w-0 max-lg:px-4';
+
+export function getCabinetMainClasses({ isChatsPage, isAutoserviceStaffPage = false }) {
   if (isChatsPage) {
     return 'mx-auto max-w-full max-lg:flex max-lg:min-h-0 max-lg:flex-1 max-lg:flex-col max-lg:overflow-hidden max-lg:px-0 max-lg:py-0 px-4 py-6 sm:px-6 sm:py-8 lg:flex lg:max-h-[calc(100dvh-var(--sg-desktop-header-h))] lg:min-h-0 lg:flex-col lg:overflow-hidden lg:px-8 lg:py-4 lg:max-w-sg-content';
+  }
+  if (isAutoserviceStaffPage) {
+    return 'mx-auto max-w-sg-content max-lg:px-0 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
   }
   return 'mx-auto max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
 }

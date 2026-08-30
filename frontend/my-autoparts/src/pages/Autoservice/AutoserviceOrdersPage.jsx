@@ -16,6 +16,7 @@ import { apiRequest } from '../../utils/apiClient';
 import { buildRepairOrderDuplicatePayload } from '../../utils/repairOrderDuplicate';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
+import { autoserviceStaffPageClass } from '../../utils/layoutProfiles';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
@@ -393,7 +394,7 @@ export default function AutoserviceOrdersPage() {
   const tabValue = viewReview ? 'review' : viewHistory ? 'history' : 'active';
 
   return (
-    <div className="w-full min-w-0">
+    <div className={autoserviceStaffPageClass}>
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="max-lg:hidden text-xl font-bold text-gray-900 sm:text-2xl">

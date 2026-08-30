@@ -1,6 +1,6 @@
 import React from 'react';
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { apiRequest } from '../../utils/apiClient';
@@ -134,36 +134,17 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
     expect(screen.queryByRole('tab', { name: 'Продажи Росско' })).not.toBeInTheDocument();
   });
 
-  it('shows Rossko sales tab when access flag is enabled', () => {
+  it('hides Rossko sales tab while the report section is disabled', () => {
     renderReportsPage({ can_see_rossko_sales_report: true });
-    expect(screen.getByRole('tab', { name: 'Продажи Росско' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Продажи Росско' })).not.toBeInTheDocument();
   });
 
-  it('redirects away from rossko-sales tab without access', async () => {
+  it('redirects away from rossko-sales tab while the report section is disabled', async () => {
     mockSearchParams = new URLSearchParams('tab=rossko-sales');
-    renderReportsPage({ can_see_rossko_sales_report: false });
+    renderReportsPage({ can_see_rossko_sales_report: true });
     await waitFor(() => {
       expect(mockSetSearchParams).toHaveBeenCalledWith({}, { replace: true });
     });
     expect(screen.queryByText('доход организации за период')).not.toBeInTheDocument();
-  });
-
-  it('loads Rossko report and expands order details', async () => {
-    mockSearchParams = new URLSearchParams('tab=rossko-sales');
-    renderReportsPage({ can_see_rossko_sales_report: true });
-
-    await waitFor(() => {
-      expect(apiRequest).toHaveBeenCalledWith(expect.stringContaining('/autoservice/reports/rossko-sales'));
-    });
-
-    expect(await screen.findByText('Заказ № 42')).toBeInTheDocument();
-    expect(screen.getByText(/1 операци/i)).toBeInTheDocument();
-    expect(screen.getByText('доход организации за период')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Заказ № 42/i }));
-
-    expect(await screen.findByText('Фильтр масляный')).toBeInTheDocument();
-    expect(screen.getByText('Доход сайта (7%)')).toBeInTheDocument();
-    expect(screen.getByText('Иван Петров')).toBeInTheDocument();
   });
 });

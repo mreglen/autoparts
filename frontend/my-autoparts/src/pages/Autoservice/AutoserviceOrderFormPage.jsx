@@ -97,7 +97,7 @@ const btnSecondaryClass =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
 
 const orderFormPageClass =
-  'w-full min-w-0 py-6 pb-28 max-lg:-mx-4 max-lg:px-3 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)] lg:pb-24';
+  'w-full min-w-0 py-6 pb-28 max-lg:px-4 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)] lg:pb-24';
 
 const lineItemRowClass =
   'flex min-w-0 flex-col gap-1.5 lg:flex-row lg:flex-nowrap lg:items-center lg:gap-1.5';

@@ -111,6 +111,9 @@ const EMPTY_ROSSKO_SALES = {
   items: [],
 };
 
+/** Временно скрываем вкладку «Продажи Росско» на странице отчётов. */
+const ROSSKO_SALES_REPORT_ENABLED = false;
+
 const EMPTY_ECONOMICS = {
   summary: {
     count: 0,
@@ -227,7 +230,7 @@ export default function AutoserviceReportsPage() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
   const canSeePayroll = Boolean(user?.is_director);
-  const canSeeRosskoSales = Boolean(user?.can_see_rossko_sales_report);
+  const canSeeRosskoSales = ROSSKO_SALES_REPORT_ENABLED && Boolean(user?.can_see_rossko_sales_report);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const requestedTab = tabParam === 'payroll' || tabParam === 'payments' || tabParam === 'warehouse-stock' || tabParam === 'rossko-sales'

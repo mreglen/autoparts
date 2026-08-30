@@ -186,7 +186,10 @@ export default function ProfileWithMenuLayout() {
         );
     }
 
-    const mainClassName = getCabinetMainClasses({ isChatsPage, isMobileActiveChat });
+    const mainClassName = getCabinetMainClasses({
+      isChatsPage,
+      isAutoserviceStaffPage: cabinetProfile.isAutoserviceStaffPage,
+    });
 
     return (
         <MobileShellFrame

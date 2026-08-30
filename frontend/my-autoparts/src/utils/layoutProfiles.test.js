@@ -20,4 +20,12 @@ describe('chat layout classes', () => {
     expect(classes).toContain('max-lg:flex-col');
     expect(classes).toContain('max-lg:min-h-0');
   });
+
+  it('uses flush mobile padding for autoservice staff pages', () => {
+    const classes = getCabinetMainClasses({
+      isChatsPage: false,
+      isAutoserviceStaffPage: true,
+    });
+    expect(classes).toContain('max-lg:px-0');
+  });
 });
