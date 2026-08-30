@@ -1,4 +1,4 @@
-export const warehousePageClass = 'mt-4 sm:mt-5 px-4 sm:px-0';
+export const warehousePageClass = 'mt-4 sm:mt-5';
 
 /** Layout aligned with /autoservice/orders list pages */
 export const autoserviceListPageClass = 'w-full min-w-0';

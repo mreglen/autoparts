@@ -97,7 +97,7 @@ const btnSecondaryClass =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
 
 const orderFormPageClass =
-  'w-full min-w-0 py-6 pb-28 max-lg:px-4 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)] lg:pb-24';
+  'w-full min-w-0 py-6 pb-28 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)] lg:pb-24';
 
 const lineItemRowClass =
   'flex min-w-0 flex-col gap-1.5 lg:flex-row lg:flex-nowrap lg:items-center lg:gap-1.5';
@@ -1156,6 +1156,9 @@ export default function AutoserviceOrderFormPage() {
     shopParts,
   ]);
 
+  const captureFormSnapshotRef = useRef(captureFormSnapshot);
+  captureFormSnapshotRef.current = captureFormSnapshot;
+
   const pauseAutoSave = useCallback((snapshotOverride = null) => {
     skipAutoSaveRef.current = true;
     if (autoSaveResumeTimerRef.current) {
@@ -1163,10 +1166,10 @@ export default function AutoserviceOrderFormPage() {
     }
     autoSaveResumeTimerRef.current = setTimeout(() => {
       skipAutoSaveRef.current = false;
-      lastSavedSnapshotRef.current = snapshotOverride ?? JSON.stringify(captureFormSnapshot());
+      lastSavedSnapshotRef.current = snapshotOverride ?? JSON.stringify(captureFormSnapshotRef.current());
       autoSaveResumeTimerRef.current = null;
     }, 150);
-  }, [captureFormSnapshot]);
+  }, []);
 
   const loadClients = useCallback(async (query = '') => {
     const q = String(query || '').trim();
@@ -1229,56 +1232,60 @@ export default function AutoserviceOrderFormPage() {
   }, [orderId, applyFormState, pauseAutoSave]);
 
   useEffect(() => {
-    if (isReady && isAuthenticated) {
-      loadMeta();
-      if (isEdit) {
-        if (justAutoCreatedOrderIdRef.current === orderId) {
-          justAutoCreatedOrderIdRef.current = null;
-          pauseAutoSave();
-          return;
-        }
-        loadOrder();
-      } else if (isCreate && !createInitRef.current) {
-        createInitRef.current = true;
-        const prefill = plannerPrefillRef.current || {};
-        const initial = emptyFormState();
-        if (prefill.scheduledAtLocal) {
-          initial.scheduledAt = prefill.scheduledAtLocal;
-        } else if (prefill.scheduledAt) {
-          initial.scheduledAt = toLocalInputValue(prefill.scheduledAt);
-        }
-        if (prefill.workZoneId != null) {
-          initial.workZoneId = String(prefill.workZoneId);
-        }
-        const draft = readRepairOrderPurchaseDraft();
-        if (draft?.groups?.length) {
-          setPendingPurchaseGroups(draft.groups);
-          initial.shopParts = draft.groups.flatMap((group) => (
-            mapPurchaseItemsToShopParts(group.items, clientMarkupPercent)
-          ));
-        } else {
-          const cartDraft = readRepairOrderCartDraft();
-          if (cartDraft?.items?.length) {
-            setPendingCartItems(cartDraft.items);
-            initial.shopParts = mapCartItemsToShopParts(cartDraft.items, clientMarkupPercent);
-          }
-        }
-        const formDraft = readRepairOrderFormDraft('create');
-        if (formDraft?.form && repairOrderFormSnapshotHasContent(formDraft.form)) {
-          const { shopParts: draftShopParts, ...restDraft } = formDraft.form;
-          Object.assign(initial, restDraft);
-          const hasImportShopParts = Boolean(draft?.groups?.length)
-            || Boolean(readRepairOrderCartDraft()?.items?.length);
-          if (!hasImportShopParts && draftShopParts?.length) {
-            initial.shopParts = draftShopParts;
-          }
-        }
-        applyFormState(initial);
-        pauseAutoSave();
-        setFormInitialized(true);
+    if (!isReady || !isAuthenticated) return;
+    loadMeta();
+  }, [isReady, isAuthenticated, loadMeta]);
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated || !isEdit) return;
+    if (String(justAutoCreatedOrderIdRef.current ?? '') === String(orderId ?? '')) {
+      justAutoCreatedOrderIdRef.current = null;
+      pauseAutoSave();
+      return;
+    }
+    loadOrder();
+  }, [isReady, isAuthenticated, isEdit, orderId, loadOrder, pauseAutoSave]);
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated || !isCreate || createInitRef.current) return;
+    createInitRef.current = true;
+    const prefill = plannerPrefillRef.current || {};
+    const initial = emptyFormState();
+    if (prefill.scheduledAtLocal) {
+      initial.scheduledAt = prefill.scheduledAtLocal;
+    } else if (prefill.scheduledAt) {
+      initial.scheduledAt = toLocalInputValue(prefill.scheduledAt);
+    }
+    if (prefill.workZoneId != null) {
+      initial.workZoneId = String(prefill.workZoneId);
+    }
+    const draft = readRepairOrderPurchaseDraft();
+    if (draft?.groups?.length) {
+      setPendingPurchaseGroups(draft.groups);
+      initial.shopParts = draft.groups.flatMap((group) => (
+        mapPurchaseItemsToShopParts(group.items, clientMarkupPercent)
+      ));
+    } else {
+      const cartDraft = readRepairOrderCartDraft();
+      if (cartDraft?.items?.length) {
+        setPendingCartItems(cartDraft.items);
+        initial.shopParts = mapCartItemsToShopParts(cartDraft.items, clientMarkupPercent);
       }
     }
-  }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState, clientMarkupPercent, pauseAutoSave, orderId]);
+    const formDraft = readRepairOrderFormDraft('create');
+    if (formDraft?.form && repairOrderFormSnapshotHasContent(formDraft.form)) {
+      const { shopParts: draftShopParts, ...restDraft } = formDraft.form;
+      Object.assign(initial, restDraft);
+      const hasImportShopParts = Boolean(draft?.groups?.length)
+        || Boolean(readRepairOrderCartDraft()?.items?.length);
+      if (!hasImportShopParts && draftShopParts?.length) {
+        initial.shopParts = draftShopParts;
+      }
+    }
+    applyFormState(initial);
+    pauseAutoSave();
+    setFormInitialized(true);
+  }, [isReady, isAuthenticated, isCreate, applyFormState, clientMarkupPercent, pauseAutoSave]);
 
   useEffect(() => {
     if (!formInitialized || (!isCreate && !isEdit)) return undefined;
@@ -2657,7 +2664,7 @@ export default function AutoserviceOrderFormPage() {
       </form>
 
       <div
-        className="pointer-events-none sticky bottom-0 mt-6 border-t border-line bg-surface/95 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[var(--sg-mobile-sticky-bottom-offset)] max-lg:mt-0 max-lg:px-3 lg:px-0"
+        className="pointer-events-none sticky bottom-0 mt-6 border-t border-line bg-surface/95 px-3 py-3 shadow-sg-md backdrop-blur supports-[backdrop-filter]:bg-surface/90 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[var(--sg-mobile-sticky-bottom-offset)] max-lg:mt-0 lg:px-0"
         style={{ zIndex: Z_MOBILE_STICKY_FOOTER }}
       >
         <div className="pointer-events-auto flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">

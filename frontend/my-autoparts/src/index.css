@@ -8,7 +8,7 @@
   --sg-mobile-bottom-nav-h: 3.5rem;
   --sg-mobile-bottom-nav-safe-pad: max(0.5rem, env(safe-area-inset-bottom, 0px));
   --sg-mobile-bottom-nav-total: calc(var(--sg-mobile-bottom-nav-h) + var(--sg-mobile-bottom-nav-safe-pad));
-  --sg-mobile-sticky-bottom-offset: calc(var(--sg-mobile-bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+  --sg-mobile-sticky-bottom-offset: var(--sg-mobile-bottom-nav-total);
 
   --sg-z-mobile-header: 40;
   --sg-z-mobile-sticky-footer: 45;
@@ -126,8 +126,6 @@ html.pwa-standalone body {
   position: fixed;
   inset: 0;
   width: 100%;
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
 }
 
 html.mobile-shell #root,

@@ -18,7 +18,6 @@ export default function MobileStickyFooter({
       style={{
         zIndex: Z_MOBILE_STICKY_FOOTER,
         bottom: MOBILE_STICKY_BOTTOM_OFFSET,
-        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
       }}
     >
       <div className="mx-auto flex max-w-4xl gap-2">

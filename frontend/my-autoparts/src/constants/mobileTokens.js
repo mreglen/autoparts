@@ -16,8 +16,8 @@ export const MOBILE_BOTTOM_NAV_SAFE_PAD = 'max(0.5rem, env(safe-area-inset-botto
 /** Scroll padding to clear bottom nav (layouts, long pages) */
 export const MOBILE_PAGE_BOTTOM_PAD = `calc(${MOBILE_BOTTOM_NAV_H} + ${MOBILE_BOTTOM_NAV_SAFE_PAD})`;
 
-/** Fixed sticky CTA bar sits above bottom nav */
-export const MOBILE_STICKY_BOTTOM_OFFSET = `calc(${MOBILE_BOTTOM_NAV_H} + env(safe-area-inset-bottom, 0px))`;
+/** Fixed sticky CTA bar sits above bottom nav (includes nav safe padding) */
+export const MOBILE_STICKY_BOTTOM_OFFSET = `calc(${MOBILE_BOTTOM_NAV_H} + ${MOBILE_BOTTOM_NAV_SAFE_PAD})`;
 
 /** Scroll padding when product detail sticky bar is visible (mobile) */
 export const MOBILE_PRODUCT_STICKY_SCROLL_PAD = 'max-md:pb-32';

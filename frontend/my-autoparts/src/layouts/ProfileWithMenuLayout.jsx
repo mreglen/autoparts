@@ -171,7 +171,7 @@ export default function ProfileWithMenuLayout() {
     if (!isReady) {
         return (
             <MobileShellFrame onMenuClick={() => {}} showBottomChrome={false}>
-                <main className="mx-auto w-full max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 py-12 sm:px-6 lg:px-8">
+                <main className="mx-auto w-full max-w-sg-content max-lg:px-3 max-lg:py-4 px-4 py-12 sm:px-6 lg:px-8">
                     <AuthLoadingScreen className="h-48" />
                 </main>
             </MobileShellFrame>
@@ -186,10 +186,7 @@ export default function ProfileWithMenuLayout() {
         );
     }
 
-    const mainClassName = getCabinetMainClasses({
-      isChatsPage,
-      isAutoserviceStaffPage: cabinetProfile.isAutoserviceStaffPage,
-    });
+    const mainClassName = getCabinetMainClasses({ isChatsPage });
 
     return (
         <MobileShellFrame

@@ -21,11 +21,10 @@ describe('chat layout classes', () => {
     expect(classes).toContain('max-lg:min-h-0');
   });
 
-  it('uses flush mobile padding for autoservice staff pages', () => {
+  it('uses compact mobile padding in cabinet', () => {
     const classes = getCabinetMainClasses({
       isChatsPage: false,
-      isAutoserviceStaffPage: true,
     });
-    expect(classes).toContain('max-lg:px-0');
+    expect(classes).toContain('max-lg:px-3');
   });
 });
