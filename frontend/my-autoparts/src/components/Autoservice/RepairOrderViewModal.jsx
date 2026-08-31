@@ -608,12 +608,7 @@ export default function RepairOrderViewModal({
 
   const totals = order ? orderTotals(order) : null;
   const payment = order && totals ? paymentSummary(order, totals.grand) : null;
-  const normalizedStatus = order ? normalizeRepairOrderStatus(order.status) : null;
-  const canPay =
-    enablePayment
-    && payment
-    && payment.remaining > 0.005
-    && normalizedStatus === 'done';
+  const showPayButton = enablePayment && payment;
   const hasPayments = enablePayment && payment && payment.paid > 0.005;
 
   const resetPaymentWizard = useCallback(() => {
@@ -869,7 +864,7 @@ export default function RepairOrderViewModal({
             {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                {canPay && !payOpen ? (
+                {showPayButton && !payOpen ? (
                   <button
                     type="button"
                     onClick={handleStartPayment}
@@ -905,7 +900,7 @@ export default function RepairOrderViewModal({
                   Изменить
                 </button>
               ) : null}
-              {canPay && payOpen && !paySuccess ? (
+              {showPayButton && payOpen && !paySuccess ? (
                 <button
                   type="button"
                   onClick={resetPaymentWizard}
