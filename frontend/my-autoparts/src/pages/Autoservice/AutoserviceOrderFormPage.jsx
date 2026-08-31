@@ -2664,7 +2664,7 @@ export default function AutoserviceOrderFormPage() {
       </form>
 
       <div
-        className="pointer-events-none mt-4 max-lg:fixed max-lg:bottom-[calc(var(--sg-mobile-sticky-bottom-offset)+0.75rem)] max-lg:left-3 max-lg:right-3 max-lg:mt-0 lg:sticky lg:bottom-4"
+        className="pointer-events-none mt-4 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[calc(var(--sg-mobile-sticky-bottom-offset)+0.75rem)] max-lg:mt-0 lg:sticky lg:bottom-4"
         style={{ zIndex: Z_MOBILE_STICKY_FOOTER }}
       >
         <div className="pointer-events-auto min-w-0 rounded-sg-lg border border-line bg-surface px-2.5 py-3 sm:p-5">

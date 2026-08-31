@@ -18,6 +18,7 @@ import { formatServerDateTime } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+import AutoserviceOrdersMobileView from './AutoserviceOrdersMobileView';
 
 function formatDateTime(value) {
   return formatServerDateTime(value);
@@ -73,72 +74,6 @@ function OrderActionsMenu({
         Удалить
       </ActionsDropdownItem>
     </ActionsDropdown>
-  );
-}
-
-function OrderMobileCard({
-  row,
-  statusActions,
-  statusSavingId,
-  onStatusChange,
-  onView,
-  onEdit,
-  onDuplicate,
-  onDelete,
-  onApprove,
-  duplicating = false,
-  approveSaving = false,
-}) {
-  const [statusOpen, setStatusOpen] = useState(false);
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const menuOpen = statusOpen || actionsOpen;
-  const zone = row.work_zone?.name;
-  const when = formatDateTime(row.scheduled_at);
-
-  return (
-    <div className={`border-b border-gray-100 py-3 last:border-b-0 ${menuOpen ? 'relative z-30' : ''}`}>
-      <div className="flex items-start gap-2">
-        <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="shrink-0 text-base font-semibold tabular-nums text-gray-900">
-              {repairOrderNumberLabel(row)}
-            </span>
-            <RepairOrderStatusPicker
-              status={row.status}
-              options={statusActions}
-              saving={statusSavingId === row.id}
-              disabled={statusSavingId === row.id}
-              isOpen={statusOpen}
-              onOpenChange={setStatusOpen}
-              onChange={(nextStatus) => onStatusChange(row.id, nextStatus)}
-            />
-          </div>
-          <p className="mt-1.5 line-clamp-2 text-sm font-medium text-gray-800">{vehicleLabel(row.vehicle)}</p>
-          <p className="mt-0.5 truncate text-sm text-gray-800">{row.client?.name || '—'}</p>
-          {row.client?.phone ? (
-            <p className="mt-0.5 truncate text-sm text-gray-500">{row.client.phone}</p>
-          ) : null}
-          <p className="mt-1 text-xs text-gray-500">
-            {when}
-            {zone ? ` · ${zone}` : ''}
-          </p>
-        </button>
-        <div className="shrink-0">
-          <OrderActionsMenu
-            onView={onView}
-            onEdit={onEdit}
-            onDuplicate={onDuplicate}
-            onDelete={onDelete}
-            onApprove={onApprove}
-            duplicating={duplicating}
-            approveSaving={approveSaving}
-            showLabel={false}
-            isOpen={actionsOpen}
-            onOpenChange={setActionsOpen}
-          />
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -391,83 +326,115 @@ export default function AutoserviceOrdersPage() {
     { id: 'history', label: 'История' },
   ];
   const tabValue = viewReview ? 'review' : viewHistory ? 'history' : 'active';
+  const emptyMessage = viewHistory
+    ? 'В истории пока нет заказ-нарядов'
+    : viewReview
+      ? 'Заявок на проверке нет'
+      : 'Активных заказ-нарядов нет';
 
   return (
     <div className="w-full min-w-0">
-      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="max-lg:hidden text-xl font-bold text-gray-900 sm:text-2xl">
-            {pageTitle}
-          </h1>
-          <p className="text-sm text-gray-500 lg:mt-0.5">
-            {pageSubtitle}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {!viewHistory && !viewReview ? (
-            <button
-              type="button"
-              onClick={() => navigate('/autoservice/orders/new')}
-              className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 max-lg:min-h-11 sm:w-auto"
-            >
-              Новый заказ-наряд
-            </button>
-          ) : null}
-        </div>
+      <div className="lg:hidden">
+        <AutoserviceOrdersMobileView
+          pageSubtitle={pageSubtitle}
+          showCreateButton={!viewHistory && !viewReview}
+          onCreate={() => navigate('/autoservice/orders/new')}
+          orderTabs={orderTabs}
+          tabValue={tabValue}
+          onTabChange={setListView}
+          q={q}
+          onSearchChange={setQ}
+          viewHistory={viewHistory}
+          historyStatus={historyStatus}
+          onHistoryStatusChange={setHistoryStatus}
+          loading={loading}
+          onRefresh={() => load()}
+          error={error}
+          rows={rows}
+          emptyMessage={emptyMessage}
+          statusActionsForRow={statusActionsForRow}
+          onStatusChange={handleStatus}
+          statusSavingId={statusSavingId}
+          onView={setViewOrder}
+          onEdit={(row) => navigate(`/autoservice/orders/${row.id}/edit`)}
+          onDuplicate={viewReview ? undefined : handleDuplicate}
+          onDelete={setDeleteConfirmOrder}
+          onApprove={viewReview ? (row) => handleApprove(row.id) : undefined}
+          duplicatingId={duplicatingId}
+          approvingId={approvingId}
+          formatDateTime={formatDateTime}
+        />
       </div>
 
-      <UnderlineTabs
-        className="mb-4"
-        ariaLabel="Разделы заказ-нарядов"
-        gapClassName="gap-4"
-        tabClassName="max-lg:min-h-11 pb-3 pt-2 text-sm font-medium sm:text-[15px] lg:pt-1"
-        tabs={orderTabs}
-        value={tabValue}
-        onChange={setListView}
-      />
+      <div className="hidden lg:block">
+        <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{pageTitle}</h1>
+            <p className="mt-0.5 text-sm text-gray-500">{pageSubtitle}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {!viewHistory && !viewReview ? (
+              <button
+                type="button"
+                onClick={() => navigate('/autoservice/orders/new')}
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:w-auto"
+              >
+                Новый заказ-наряд
+              </button>
+            ) : null}
+          </div>
+        </div>
 
-      <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
-        <AutoserviceLiveSearchField
-          value={q}
-          onChange={setQ}
-          placeholder="Номер, клиент, авто, VIN…"
-          ariaLabel="Поиск заказ-нарядов"
+        <UnderlineTabs
+          className="mb-4"
+          ariaLabel="Разделы заказ-нарядов"
+          gapClassName="gap-4"
+          tabClassName="pb-3 pt-1 text-sm font-medium sm:text-[15px]"
+          tabs={orderTabs}
+          value={tabValue}
+          onChange={setListView}
         />
 
-        {viewHistory ? (
-          <select
-            className="h-10 min-w-0 shrink-0 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70 max-lg:order-3 max-lg:h-11 max-lg:min-h-11 max-lg:w-full max-lg:text-base"
-            value={historyStatus}
-            onChange={(e) => setHistoryStatus(e.target.value)}
-            aria-label="Фильтр по статусу"
+        <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+          <AutoserviceLiveSearchField
+            value={q}
+            onChange={setQ}
+            placeholder="Номер, клиент, авто, VIN…"
+            ariaLabel="Поиск заказ-нарядов"
+          />
+
+          {viewHistory ? (
+            <select
+              className="h-10 min-w-0 shrink-0 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+              value={historyStatus}
+              onChange={(e) => setHistoryStatus(e.target.value)}
+              aria-label="Фильтр по статусу"
+            >
+              <option value="">Все статусы</option>
+              <option value="completed">Завершён</option>
+              <option value="cancelled">Отменён</option>
+            </select>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => load()}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+            title="Обновить"
+            aria-label="Обновить"
           >
-            <option value="">Все статусы</option>
-            <option value="completed">Завершён</option>
-            <option value="cancelled">Отменён</option>
-          </select>
+            <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
+
+        {error ? (
+          <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+            {error}
+          </p>
         ) : null}
 
-        <button
-          type="button"
-          onClick={() => load()}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900 max-lg:h-11 max-lg:min-h-11 max-lg:w-11"
-          title="Обновить"
-          aria-label="Обновить"
-        >
-          <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
-      </div>
-
-      {error ? (
-        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      {/* Desktop table */}
-      <div className="hidden lg:block min-w-0">
         <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
           <thead>
             <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -495,7 +462,7 @@ export default function AutoserviceOrdersPage() {
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-12 text-center text-gray-500">
-                  {viewHistory ? 'В истории пока нет заказ-нарядов' : viewReview ? 'Заявок на проверке нет' : 'Активных заказ-нарядов нет'}
+                  {emptyMessage}
                 </td>
               </tr>
             ) : (
@@ -543,45 +510,6 @@ export default function AutoserviceOrdersPage() {
             )}
           </tbody>
         </table>
-      </div>
-
-      {/* Mobile / tablet shell list */}
-      <div className="lg:hidden">
-        {loading ? (
-          <div>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={`msk-${i}`} className="flex items-start justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-3 w-32" />
-                </div>
-                <Skeleton className="h-11 w-11 rounded-lg" />
-              </div>
-            ))}
-          </div>
-        ) : rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">
-            {viewHistory ? 'В истории пока нет заказ-нарядов' : viewReview ? 'Заявок на проверке нет' : 'Активных заказ-нарядов нет'}
-          </p>
-        ) : (
-          rows.map((row) => (
-            <OrderMobileCard
-              key={row.id}
-              row={row}
-              statusActions={statusActionsForRow(row)}
-              onStatusChange={handleStatus}
-              statusSavingId={statusSavingId}
-              onView={() => setViewOrder(row)}
-              onEdit={() => navigate(`/autoservice/orders/${row.id}/edit`)}
-              onDuplicate={viewReview ? undefined : () => handleDuplicate(row)}
-              onDelete={() => setDeleteConfirmOrder(row)}
-              onApprove={viewReview ? () => handleApprove(row.id) : undefined}
-              duplicating={duplicatingId === row.id}
-              approveSaving={approvingId === row.id}
-            />
-          ))
-        )}
       </div>
 
       <RepairOrderViewModal
