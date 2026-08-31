@@ -2,6 +2,7 @@ import {
   AUTOSERVICE_PERMISSION,
   canAccessAutoserviceSection,
   canAccessAutoserviceSettingsPermission,
+  canEditClientMarkupSettings,
   getAutoserviceShopEmployeeWorkMenuItems,
   getDefaultAutoserviceStaffPath,
   hasAnyAutoservicePermission,
@@ -57,6 +58,17 @@ describe('autoservicePermissions', () => {
     expect(getDefaultAutoserviceStaffPath(employee, [AUTOSERVICE_PERMISSION.clients])).toBe('/garage');
     expect(getDefaultAutoserviceStaffPath(employee, [AUTOSERVICE_PERMISSION.ordersOwn])).toBe('/autoservice/orders');
     expect(getDefaultAutoserviceStaffPath(employee, [])).toBe('/garage');
+  });
+
+  it('controls client markup settings editing', () => {
+    expect(canEditClientMarkupSettings(employee, [])).toBe(false);
+    expect(
+      canEditClientMarkupSettings(employee, [AUTOSERVICE_PERMISSION.markup]),
+    ).toBe(true);
+    expect(canEditClientMarkupSettings({ ...employee, is_director: true }, [])).toBe(true);
+    expect(
+      canEditClientMarkupSettings({ ...employee, organization_is_autoservice: false }, [AUTOSERVICE_PERMISSION.markup]),
+    ).toBe(false);
   });
 
   it('lets own-order employees open the orders section', () => {

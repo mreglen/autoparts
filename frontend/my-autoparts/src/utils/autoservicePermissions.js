@@ -9,6 +9,7 @@ export const AUTOSERVICE_PERMISSION = {
   clients: 'autoservice.clients',
   inspections: 'autoservice.inspections',
   settings: 'autoservice.settings',
+  markup: 'autoservice.markup',
 };
 
 export const AUTOSERVICE_PERMISSION_CODES = Object.values(AUTOSERVICE_PERMISSION);
@@ -146,6 +147,14 @@ export function canAccessAutoserviceSection(user, permissionCodes, section) {
 export function canAccessAutoserviceSettingsPermission(user, permissionCodes) {
   if (hasAutoserviceBypass(user)) return true;
   return hasAutoservicePermission(user, permissionCodes, AUTOSERVICE_PERMISSION.settings);
+}
+
+/** Client markup popover: edit percent and display mode (autoservice staff). */
+export function canEditClientMarkupSettings(user, permissionCodes) {
+  if (!user?.organization_is_autoservice) return false;
+  if (hasAutoserviceBypass(user)) return true;
+  if (!user?.is_employee) return false;
+  return hasAutoservicePermission(user, permissionCodes, AUTOSERVICE_PERMISSION.markup);
 }
 
 export function getDefaultAutoserviceStaffPath(user, permissionCodes) {

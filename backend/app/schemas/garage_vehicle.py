@@ -69,6 +69,7 @@ class GarageVehicleUpdate(BaseModel):
     color: Optional[str] = Field(None, max_length=40)
     plate: Optional[str] = Field(None, max_length=20)
     notes: Optional[str] = Field(None, max_length=2000)
+    mileage_km: Optional[int] = Field(None, ge=0, le=9_999_999)
 
 
 class GarageVehicleView(BaseModel):
@@ -82,6 +83,7 @@ class GarageVehicleView(BaseModel):
     color: Optional[str] = None
     plate: Optional[str] = None
     notes: Optional[str] = None
+    mileage_km: Optional[int] = None
     source: str
     laximo_catalog: Optional[str] = None
     laximo_vehicle_id: Optional[str] = None

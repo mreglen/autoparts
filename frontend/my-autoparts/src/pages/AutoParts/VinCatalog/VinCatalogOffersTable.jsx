@@ -4,6 +4,7 @@ import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import ClientMarkupPopover from '../../../components/NewParts/ClientMarkupPopover';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../../redux/slices/ClientMarkupSlice';
 import { canUseClientMarkup, computeClientPrices } from '../../../utils/clientMarkupUtils';
+import { canEditClientMarkupSettings } from '../../../utils/autoservicePermissions';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import { mapPartToStocksData, dedupeRosskoParts, rosskoPartDedupeKey } from '../NewParts/rosskoHelpers';
@@ -415,8 +416,10 @@ function PartOfferGroup({
 function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBasket }) {
   const siteMarkupPercent = useNewPartsMarkupPercent('auto');
   const user = useSelector((state) => state.auth.user);
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
   const clientMarkup = useSelector((state) => state.clientMarkup);
   const showStaffMarkup = canUseClientMarkup(user);
+  const canEditMarkupSettings = canEditClientMarkupSettings(user, permissionCodes);
   const clientMarkupPercent = showStaffMarkup ? (Number(clientMarkup.percent) || 0) : 0;
   const showBothPrices = showStaffMarkup && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH;
 
@@ -462,7 +465,9 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
             <th className="px-3 py-2">Остаток</th>
             <th className="px-3 py-2 pl-6 text-right">
               <div className="inline-flex items-center justify-end gap-1.5">
-                {showStaffMarkup ? <ClientMarkupPopover /> : null}
+                {showStaffMarkup ? (
+                  <ClientMarkupPopover readOnly={!canEditMarkupSettings} />
+                ) : null}
                 <span>Цена, ₽</span>
               </div>
             </th>

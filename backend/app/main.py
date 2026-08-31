@@ -65,6 +65,7 @@ from app.db.schema_patches import (
     ensure_repair_order_status_timestamps,
     ensure_repair_orders_shipping_date,
     ensure_repair_orders_mileage_km,
+    ensure_garage_vehicle_mileage_history,
     ensure_repair_orders_review_flow,
     ensure_organization_employees_tables,
     ensure_autoservice_warehouse_items_unit,
@@ -283,6 +284,7 @@ try:
     ensure_repair_order_status_timestamps()
     ensure_repair_orders_shipping_date()
     ensure_repair_orders_mileage_km()
+    ensure_garage_vehicle_mileage_history()
     ensure_repair_orders_review_flow()
     ensure_organization_employees_tables()
     from app.db.database import SessionLocal

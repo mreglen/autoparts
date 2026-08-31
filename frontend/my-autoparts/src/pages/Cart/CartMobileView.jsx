@@ -123,7 +123,7 @@ function CartMobileBlock({
           </Button>
           {section.showClientMarkupControl ? (
             <div className="flex h-11 items-center">
-              <ClientMarkupPopover bottomInset={80} />
+              <ClientMarkupPopover bottomInset={80} readOnly={Boolean(section.clientMarkupReadOnly)} />
             </div>
           ) : null}
           <CartMobileMenu

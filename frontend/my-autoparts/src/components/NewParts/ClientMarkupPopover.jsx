@@ -21,7 +21,7 @@ function clampPanelLeft(triggerRect) {
   return Math.max(PANEL_GAP, Math.min(ideal, window.innerWidth - PANEL_WIDTH - PANEL_GAP));
 }
 
-export default function ClientMarkupPopover({ onApply, bottomInset = 0 }) {
+export default function ClientMarkupPopover({ onApply, bottomInset = 0, readOnly = false }) {
   const dispatch = useDispatch();
   const settings = useSelector((state) => state.clientMarkup);
   const [open, setOpen] = useState(false);
@@ -100,6 +100,7 @@ export default function ClientMarkupPopover({ onApply, bottomInset = 0 }) {
   }, [open]);
 
   const handleApply = () => {
+    if (readOnly) return;
     const value = Math.max(0, Math.min(500, Number(percent) || 0));
     dispatch(applyClientMarkupSettings({
       percent: value,
@@ -133,6 +134,11 @@ export default function ClientMarkupPopover({ onApply, bottomInset = 0 }) {
         </div>
 
         <div className="space-y-4 px-4 py-4">
+          {readOnly ? (
+            <p className="text-xs text-ink-muted">
+              Нет прав на изменение наценки. Отображаются текущие настройки.
+            </p>
+          ) : null}
           <label className="block text-sm">
             <span className="font-medium text-ink-soft">Наценка, %</span>
             <div className="relative mt-1">
@@ -143,9 +149,11 @@ export default function ClientMarkupPopover({ onApply, bottomInset = 0 }) {
                 step="1"
                 value={percent}
                 onChange={(e) => setPercent(e.target.value)}
-                className={fieldClass}
+                disabled={readOnly}
+                readOnly={readOnly}
+                className={`${fieldClass}${readOnly ? ' cursor-not-allowed bg-surface-muted/80 opacity-90' : ''}`}
               />
-              {percent !== '' && percent !== '0' ? (
+              {!readOnly && percent !== '' && percent !== '0' ? (
                 <button
                   type="button"
                   onClick={() => setPercent('0')}
@@ -158,24 +166,26 @@ export default function ClientMarkupPopover({ onApply, bottomInset = 0 }) {
             </div>
           </label>
 
-          <fieldset className="space-y-2">
+          <fieldset className="space-y-2" disabled={readOnly}>
             <legend className="mb-2 text-sm font-medium text-ink-soft">Показывать на сайте</legend>
-            <label className="flex cursor-pointer items-start gap-2.5 rounded-sg border border-line bg-surface-muted/40 px-3 py-2.5 text-sm text-ink">
+            <label className={`flex items-start gap-2.5 rounded-sg border border-line bg-surface-muted/40 px-3 py-2.5 text-sm text-ink${readOnly ? ' opacity-90' : ' cursor-pointer'}`}>
               <input
                 type="radio"
                 name="client-markup-display"
                 checked={displayMode === CLIENT_MARKUP_DISPLAY_BOTH}
                 onChange={() => setDisplayMode(CLIENT_MARKUP_DISPLAY_BOTH)}
+                disabled={readOnly}
                 className="mt-0.5 text-brand-600 focus:ring-brand-500"
               />
               <span className="min-w-0">
                 <span className="font-medium">Нацененную и закупочную цены</span>
                 {displayMode === CLIENT_MARKUP_DISPLAY_BOTH ? (
-                  <label className="mt-2 flex items-center gap-2 text-xs text-ink-soft">
+                  <label className={`mt-2 flex items-center gap-2 text-xs text-ink-soft${readOnly ? '' : ' cursor-pointer'}`}>
                     <input
                       type="checkbox"
                       checked={showPurchaseInCart}
                       onChange={(e) => setShowPurchaseInCart(e.target.checked)}
+                      disabled={readOnly}
                       className="rounded border-line text-brand-600 focus:ring-brand-500"
                     />
                     Показывать в корзине
@@ -183,12 +193,13 @@ export default function ClientMarkupPopover({ onApply, bottomInset = 0 }) {
                 ) : null}
               </span>
             </label>
-            <label className="flex cursor-pointer items-start gap-2.5 rounded-sg border border-line bg-surface-muted/40 px-3 py-2.5 text-sm text-ink">
+            <label className={`flex items-start gap-2.5 rounded-sg border border-line bg-surface-muted/40 px-3 py-2.5 text-sm text-ink${readOnly ? ' opacity-90' : ' cursor-pointer'}`}>
               <input
                 type="radio"
                 name="client-markup-display"
                 checked={displayMode === CLIENT_MARKUP_DISPLAY_MARKED_UP_ONLY}
                 onChange={() => setDisplayMode(CLIENT_MARKUP_DISPLAY_MARKED_UP_ONLY)}
+                disabled={readOnly}
                 className="mt-0.5 text-brand-600 focus:ring-brand-500"
               />
               <span className="font-medium">Только нацененную цену</span>
@@ -197,9 +208,13 @@ export default function ClientMarkupPopover({ onApply, bottomInset = 0 }) {
         </div>
 
         <div className="border-t border-line px-4 py-3">
-          <Button type="button" variant="primary" size="sm" className="w-full" onClick={handleApply}>
-            Применить
-          </Button>
+          {readOnly ? (
+            <p className="text-center text-xs text-ink-muted">Только просмотр</p>
+          ) : (
+            <Button type="button" variant="primary" size="sm" className="w-full" onClick={handleApply}>
+              Применить
+            </Button>
+          )}
         </div>
       </div>
     </>

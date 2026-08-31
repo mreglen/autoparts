@@ -16,6 +16,7 @@ import AutoserviceWarehouseReturnModal from '../../components/Autoservice/Autose
 import { useAuthReady } from '../../hooks/useAuthReady';
 import useNewPartsMarkupPercent from '../../hooks/useNewPartsMarkupPercent';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
+import { canEditClientMarkupSettings } from '../../utils/autoservicePermissions';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import {
   autoserviceWarehouseClientPrice,
@@ -161,7 +162,9 @@ function PurchaseLotMobileCard({ lot, onReturn }) {
 
 export default function AutoserviceWarehousePage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
   const clientMarkupEnabled = canUseClientMarkup(user);
+  const canEditMarkupSettings = canEditClientMarkupSettings(user, permissionCodes);
   const storedClientMarkupPercent = useSelector(
     (state) => Number(state.clientMarkup.percent) || 0,
   );
@@ -571,7 +574,9 @@ export default function AutoserviceWarehousePage() {
                   <th className={autoserviceListThRightClass}>Кол-во</th>
                   <th className={autoserviceListThRightClass}>
                     <span className="inline-flex items-center justify-end gap-1.5">
-                      {clientMarkupEnabled ? <ClientMarkupPopover /> : null}
+                      {clientMarkupEnabled ? (
+                        <ClientMarkupPopover readOnly={!canEditMarkupSettings} />
+                      ) : null}
                       <span>Цена</span>
                     </span>
                   </th>

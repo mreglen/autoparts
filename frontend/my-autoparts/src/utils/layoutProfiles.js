@@ -107,7 +107,7 @@ export function getCabinetMainClasses({ isChatsPage, pathname = '' } = {}) {
     return 'mx-auto max-w-sg-content max-lg:px-0 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
   }
   if (isAutoserviceOrdersFormRoute(pathname)) {
-    return 'mx-auto max-w-sg-content max-lg:px-1.5 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
+    return 'mx-auto max-w-sg-content max-lg:px-1.5 max-lg:pt-3 max-lg:pb-4 px-4 sm:px-6 lg:px-8 pt-4 pb-6 sm:pt-5 sm:pb-8';
   }
   return 'mx-auto max-w-sg-content max-lg:px-3 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
 }

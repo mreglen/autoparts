@@ -26,6 +26,7 @@ from app.models.repair_order import (
 from app.models.product import Product
 from app.models.autoservice_warehouse import AutoserviceWarehouseItem
 from app.models.user import User
+from app.services.garage_vehicle_mileage import sync_repair_order_vehicle_mileage
 from app.schemas.repair_order import (
     ACTIVE_STATUSES,
     ALL_STATUSES,
@@ -684,6 +685,37 @@ def _get_client_and_vehicle(
             detail="Автомобиль не найден у этого клиента",
         )
     return client, vehicle
+
+
+def _sync_order_mileage_to_vehicle(
+    db: Session,
+    *,
+    order: RepairOrder,
+    mileage_km: int | None,
+    user_id: int,
+) -> None:
+    if mileage_km is None or order.vehicle_id is None:
+        return
+    vehicle = (
+        db.query(GarageVehicle)
+        .filter(GarageVehicle.id == order.vehicle_id)
+        .first()
+    )
+    if not vehicle:
+        return
+    try:
+        sync_repair_order_vehicle_mileage(
+            db,
+            vehicle=vehicle,
+            mileage_km=mileage_km,
+            repair_order_id=order.id,
+            user_id=user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 def _resolve_assignees(db: Session, org_id: str, user_ids: list[int]) -> list[User]:
@@ -1433,6 +1465,12 @@ def create_repair_order(
     _replace_client_parts(row, payload.client_parts)
     if not is_own:
         _replace_shop_parts(db, row, org_id, shop_parts, current_user.id)
+    _sync_order_mileage_to_vehicle(
+        db,
+        order=row,
+        mileage_km=payload.mileage_km,
+        user_id=current_user.id,
+    )
     db.commit()
     row = _get_org_order_or_404(db, org_id, row.id)
     return _to_staff_view(db, row)
@@ -1504,6 +1542,14 @@ def update_repair_order(
 
     if not is_own and "shop_parts" in payload.model_fields_set and payload.shop_parts is not None:
         _replace_shop_parts(db, row, org_id, payload.shop_parts, current_user.id)
+
+    if "mileage_km" in payload.model_fields_set:
+        _sync_order_mileage_to_vehicle(
+            db,
+            order=row,
+            mileage_km=row.mileage_km,
+            user_id=current_user.id,
+        )
 
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)

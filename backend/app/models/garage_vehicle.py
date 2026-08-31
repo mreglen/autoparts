@@ -39,6 +39,7 @@ class GarageVehicle(Base):
     laximo_catalog = Column(String(64), nullable=True)
     laximo_vehicle_id = Column(String(64), nullable=True)
     laximo_attributes = Column(JSON, nullable=True)
+    mileage_km = Column(Integer, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime,
@@ -49,3 +50,8 @@ class GarageVehicle(Base):
 
     client = relationship("AutoserviceClient", foreign_keys=[client_id])
     organization = relationship("Organization", foreign_keys=[organization_id])
+    mileage_history = relationship(
+        "GarageVehicleMileageHistory",
+        back_populates="vehicle",
+        foreign_keys="GarageVehicleMileageHistory.garage_vehicle_id",
+    )

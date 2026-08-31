@@ -56,6 +56,7 @@ from app.models.autoservice_payment import AutoservicePayment
 from app.models.autoservice_warehouse import AutoserviceWarehouseItem
 from app.models.organization_employee import OrganizationEmployee
 from app.models.garage_vehicle import GarageVehicle
+from app.models.garage_vehicle_mileage_history import GarageVehicleMileageHistory
 from app.models.inspection_booking import InspectionBooking
 from app.models.repair_booking import RepairBooking
 from app.models.repair_order import (

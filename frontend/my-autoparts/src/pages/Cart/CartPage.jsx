@@ -7,7 +7,7 @@ import {
   saveRepairOrderCartDraft,
   snapshotCartItems,
 } from '../../utils/repairOrderCartDraft';
-import { canAccessRepairOrders } from '../../utils/autoservicePermissions';
+import { canAccessRepairOrders, canEditClientMarkupSettings } from '../../utils/autoservicePermissions';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
 import useNetworkStatus from '../../hooks/useNetworkStatus';
 import {
@@ -225,6 +225,7 @@ function CartTableBlock({
   clientMarkupPercent = 0,
   showBothPrices = false,
   showClientMarkupControl = false,
+  clientMarkupReadOnly = false,
   formatItemPrice = formatCartPrice,
   checkoutLabel = 'Оформить заказ',
   quantityUpdatingIds = [],
@@ -349,7 +350,9 @@ function CartTableBlock({
               {showDeliveryColumn ? <th className="px-2 py-2.5">Доставка</th> : null}
               <th className="px-2 py-2.5 text-right">
                 <span className="inline-flex items-center justify-end gap-1.5">
-                  {showClientMarkupControl ? <ClientMarkupPopover /> : null}
+                  {showClientMarkupControl ? (
+                    <ClientMarkupPopover readOnly={clientMarkupReadOnly} />
+                  ) : null}
                   <span>Цена, ₽</span>
                 </span>
               </th>
@@ -397,6 +400,7 @@ export default function CartPage() {
   const clientMarkupEnabled = canUseClientMarkup(user);
   const clientMarkupPercent = clientMarkupEnabled ? (Number(clientMarkup.percent) || 0) : 0;
   const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
+  const canEditMarkupSettings = canEditClientMarkupSettings(user, permissionCodes);
   const showPurchaseInCart = clientMarkupEnabled
     && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH
     && clientMarkup.showPurchaseInCart;
@@ -916,6 +920,7 @@ export default function CartPage() {
       clientMarkupPercent,
       showBothPrices: showPurchaseInCart,
       showClientMarkupControl: clientMarkupEnabled,
+      clientMarkupReadOnly: clientMarkupEnabled && !canEditMarkupSettings,
       formatItemPrice: formatCartPrice,
       showSupplierDeliveryOption: true,
       deliverInParts: Boolean(deliverInPartsByBasket[String(basket.id)]),
@@ -1032,6 +1037,7 @@ export default function CartPage() {
                   clientMarkupPercent={section.clientMarkupPercent || 0}
                   showBothPrices={Boolean(section.showBothPrices)}
                   showClientMarkupControl={Boolean(section.showClientMarkupControl)}
+                  clientMarkupReadOnly={Boolean(section.clientMarkupReadOnly)}
                   formatItemPrice={section.formatItemPrice}
                   checkoutLabel={section.checkoutLabel}
                   quantityUpdatingIds={quantityUpdatingIds}

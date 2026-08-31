@@ -6226,3 +6226,125 @@ def ensure_user_session_refresh_columns() -> None:
 
     logger.info("Applied user_sessions refresh token columns patch: %s", statements)
 
+
+def ensure_garage_vehicle_mileage_history() -> None:
+    """Current mileage on garage vehicles and append-only mileage history."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "garage_vehicles" not in tables:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("garage_vehicles")}
+    if "mileage_km" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE garage_vehicles ADD COLUMN mileage_km INTEGER"))
+        logger.info("Applied garage_vehicles.mileage_km patch")
+
+    if "garage_vehicle_mileage_history" in tables:
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE garage_vehicle_mileage_history (
+            id SERIAL PRIMARY KEY,
+            garage_vehicle_id INTEGER NOT NULL REFERENCES garage_vehicles(id) ON DELETE CASCADE,
+            mileage_km INTEGER NOT NULL,
+            repair_order_id INTEGER REFERENCES repair_orders(id) ON DELETE SET NULL,
+            recorded_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE garage_vehicle_mileage_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            garage_vehicle_id INTEGER NOT NULL REFERENCES garage_vehicles(id) ON DELETE CASCADE,
+            mileage_km INTEGER NOT NULL,
+            repair_order_id INTEGER REFERENCES repair_orders(id) ON DELETE SET NULL,
+            recorded_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        conn.execute(
+            text(
+                "CREATE INDEX ix_garage_vehicle_mileage_history_vehicle_id "
+                "ON garage_vehicle_mileage_history (garage_vehicle_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX ix_garage_vehicle_mileage_history_repair_order_id "
+                "ON garage_vehicle_mileage_history (repair_order_id)"
+            )
+        )
+        if "repair_orders" in tables and "mileage_km" in {
+            col["name"] for col in inspector.get_columns("repair_orders")
+        }:
+            if engine.dialect.name == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        UPDATE garage_vehicles AS gv
+                        SET mileage_km = latest.mileage_km
+                        FROM (
+                            SELECT DISTINCT ON (vehicle_id)
+                                vehicle_id,
+                                mileage_km
+                            FROM repair_orders
+                            WHERE mileage_km IS NOT NULL
+                            ORDER BY vehicle_id, updated_at DESC, id DESC
+                        ) AS latest
+                        WHERE gv.id = latest.vehicle_id
+                          AND gv.mileage_km IS NULL
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE garage_vehicles
+                        SET mileage_km = (
+                            SELECT ro.mileage_km
+                            FROM repair_orders ro
+                            WHERE ro.vehicle_id = garage_vehicles.id
+                              AND ro.mileage_km IS NOT NULL
+                            ORDER BY ro.updated_at DESC, ro.id DESC
+                            LIMIT 1
+                        )
+                        WHERE mileage_km IS NULL
+                        """
+                    )
+                )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO garage_vehicle_mileage_history (
+                        garage_vehicle_id,
+                        mileage_km,
+                        repair_order_id,
+                        recorded_by_user_id,
+                        recorded_at,
+                        created_at
+                    )
+                    SELECT
+                        ro.vehicle_id,
+                        ro.mileage_km,
+                        ro.id,
+                        ro.accepted_by_user_id,
+                        COALESCE(ro.updated_at, ro.created_at),
+                        COALESCE(ro.updated_at, ro.created_at)
+                    FROM repair_orders ro
+                    WHERE ro.mileage_km IS NOT NULL
+                    ORDER BY ro.id
+                    """
+                )
+            )
+
+    logger.info("Applied garage_vehicle_mileage_history table patch")
+

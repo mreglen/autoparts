@@ -17,6 +17,7 @@ import {
 } from '../../utils/laximoVinCandidate';
 import { normalizeVinForLookupOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
+import { canEditClientMarkupSettings } from '../../utils/autoservicePermissions';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
@@ -65,16 +66,16 @@ import {
 import { splitVatInclusive } from '../../utils/updDocument';
 
 const pillInputClass =
-  'mt-1.5 box-border block h-11 w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 md:rounded-full md:px-4';
+  'mt-1 box-border block h-9 w-full min-w-0 max-w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
 
 const pillInputSmClass =
-  'box-border block h-11 w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-10 lg:rounded-full';
+  'box-border block h-9 w-full min-w-0 max-w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
 
 const pillTextareaClass =
-  'mt-1.5 box-border block w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3.5 py-2.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:rounded-sg md:px-4';
+  'mt-1 box-border block w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3 py-2 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:rounded-sg';
 
 const pillDateInputClass =
-  'mt-1.5 box-border block h-11 w-full min-w-0 max-w-full rounded-lg border border-transparent bg-gray-100 px-3 text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:rounded-full lg:px-4 lg:text-sm sg-native-date-input';
+  'mt-1 box-border block h-9 w-full min-w-0 max-w-full rounded-full border border-transparent bg-gray-100 px-3 text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:px-4 lg:text-sm sg-native-date-input';
 
 const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700';
 
@@ -97,15 +98,20 @@ const btnSecondaryClass =
   'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
 
 const orderFormPageClass =
-  'w-full min-w-0 py-6 pb-28 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)] lg:pb-24';
+  'w-full min-w-0 pt-0 pb-28 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)] lg:pb-24';
 
 const lineItemRowClass =
-  'flex min-w-0 flex-col gap-1.5 lg:flex-row lg:flex-nowrap lg:items-center lg:gap-1.5';
+  'flex min-w-0 flex-col gap-1 lg:flex-row lg:flex-nowrap lg:items-center lg:gap-1';
 
-const lineItemIdentityClass = 'flex min-w-0 items-center gap-1.5 lg:contents';
+const lineItemIdentityClass = 'flex min-w-0 items-center gap-1 lg:contents';
 
 const lineItemControlsClass =
-  'flex min-w-0 flex-wrap items-center gap-1 max-lg:pl-5 lg:contents';
+  'flex min-w-0 flex-wrap items-center gap-1 max-lg:pl-[1.125rem] lg:contents';
+
+const lineIndexClass = 'w-3.5 shrink-0 text-center text-[11px] tabular-nums text-ink-muted';
+
+const lineDeleteBtnCompactClass =
+  'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs leading-none text-danger-600 transition hover:bg-danger-50 hover:text-danger-700';
 
 const lineDeleteBtnClass =
   'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-base leading-none text-danger-600 transition hover:bg-danger-50 hover:text-danger-700 lg:h-6 lg:w-6 lg:text-xs';
@@ -204,6 +210,12 @@ function workPayAmount(qty, unitPrice, percent) {
 
 function emptyClientPart() {
   return { title: '', qty: '', unit: 'pcs' };
+}
+
+function sanitizePositiveIntegerInput(raw) {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.replace(/^0+/, '') || '';
 }
 
 function isEmptyWorkRow(w) {
@@ -311,7 +323,7 @@ function shopPartNameParts(part) {
 }
 
 const shopPartNameBoxClass =
-  'flex min-h-11 min-w-0 w-full items-center rounded-sg border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-ink max-lg:items-start lg:h-8 lg:min-h-8 lg:py-0';
+  'flex min-h-9 min-w-0 w-full items-center rounded-full border border-transparent bg-gray-100 px-2.5 py-1 text-sm text-ink max-lg:items-start lg:h-8 lg:min-h-8 lg:py-0';
 
 function ShopPartNameField({
   part,
@@ -358,11 +370,21 @@ function ShopPartNameField({
   );
 }
 
-const shopPartControlInputClass =
-  'h-11 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
+const compactControlInputClass =
+  'h-9 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm tabular-nums text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
 
-const shopPartControlSelectClass =
-  'h-11 shrink-0 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
+const compactControlSelectClass =
+  'h-9 shrink-0 rounded-full border border-transparent bg-gray-100 px-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
+
+const shopPartControlInputClass = compactControlInputClass;
+const shopPartControlSelectClass = compactControlSelectClass;
+
+const clientPartTitleInputClass =
+  'box-border h-9 min-w-0 flex-1 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base lg:h-8';
+
+const clientPartControlInputClass = `${compactControlInputClass} w-12 px-1.5 text-center`;
+
+const clientPartControlSelectClass = `${compactControlSelectClass} w-[3.75rem]`;
 
 function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
   return {
@@ -396,12 +418,12 @@ function vehicleSearchText(v) {
   return [v.make, v.model, v.year, v.plate, v.vin].filter(Boolean).join(' ').toLowerCase();
 }
 
-function SectionCard({ title, children, action }) {
+function SectionCard({ title, children, action, compact = false }) {
   return (
-    <section className="min-w-0 rounded-sg-lg border border-line bg-surface px-2.5 py-3 sm:p-5">
+    <section className={`min-w-0 rounded-sg-lg border border-line bg-surface ${compact ? 'px-2.5 py-2.5 sm:p-4' : 'px-2.5 py-3 sm:p-5'}`}>
       {title ? (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-line-soft pb-3">
-          <h2 className="min-w-0 text-lg font-semibold text-ink lg:text-sg-subtitle">{title}</h2>
+        <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-line-soft ${compact ? 'mb-2.5 pb-2' : 'mb-4 pb-3'}`}>
+          <h2 className={`min-w-0 font-semibold text-ink ${compact ? 'text-sm lg:text-base' : 'text-lg lg:text-sg-subtitle'}`}>{title}</h2>
           {action}
         </div>
       ) : null}
@@ -1039,6 +1061,7 @@ export default function AutoserviceOrderFormPage() {
   );
   const clientMarkupEnabled = canUseClientMarkup(user);
   const clientMarkupPercent = clientMarkupEnabled ? storedClientMarkupPercent : 0;
+  const canEditMarkupSettings = canEditClientMarkupSettings(user, permissionCodes || []);
   const makeEmptyShopPart = useCallback(
     (overrides = {}) => emptyShopPart(overrides, clientMarkupPercent),
     [clientMarkupPercent]
@@ -1109,6 +1132,7 @@ export default function AutoserviceOrderFormPage() {
   const lastSavedSnapshotRef = useRef('');
   const justAutoCreatedOrderIdRef = useRef(null);
   const persistInFlightRef = useRef(false);
+  const mileageTouchedRef = useRef(false);
 
   const applyFormState = useCallback((state) => {
     setClientId(state.clientId);
@@ -1120,6 +1144,7 @@ export default function AutoserviceOrderFormPage() {
     setScheduledEndAt(state.scheduledEndAt);
     setShippingDate(state.shippingDate || todayDateInputValue());
     setMileageKm(state.mileageKm || '');
+    mileageTouchedRef.current = Boolean(state.mileageKm);
     setWorks((state.works || []).map((w) => ({
       ...w,
       unit_price: workUnitPriceFromApi(w.unit_price),
@@ -1388,6 +1413,33 @@ export default function AutoserviceOrderFormPage() {
       })),
     [vehicles],
   );
+
+  const selectedVehicle = useMemo(
+    () => vehicles.find((v) => String(v.id) === String(vehicleId)) || null,
+    [vehicles, vehicleId],
+  );
+
+  const handleVehicleSelect = useCallback((nextVehicleId) => {
+    const nextId = String(nextVehicleId);
+    setVehicleId(nextId);
+    const vehicle = vehicles.find((v) => String(v.id) === nextId);
+    if (vehicle?.mileage_km != null && vehicle?.mileage_km !== '') {
+      setMileageKm(String(vehicle.mileage_km));
+      mileageTouchedRef.current = false;
+      return;
+    }
+    if (String(vehicleId) !== nextId) {
+      setMileageKm('');
+      mileageTouchedRef.current = false;
+    }
+  }, [vehicleId, vehicles]);
+
+  useEffect(() => {
+    if (!formInitialized || !vehicleId || mileageTouchedRef.current) return;
+    const vehicle = vehicles.find((v) => String(v.id) === String(vehicleId));
+    if (!vehicle || vehicle.mileage_km == null || vehicle.mileage_km === '') return;
+    setMileageKm(String(vehicle.mileage_km));
+  }, [formInitialized, vehicleId, vehicles]);
 
   const employeeOptions = useMemo(
     () => [
@@ -1840,7 +1892,7 @@ export default function AutoserviceOrderFormPage() {
         && (Number.isNaN(Number(p.client_unit_price_override))
           || Number(p.client_unit_price_override) < 0)
       ) {
-        return 'Итоговая цена ЗЧ исполнителя должна быть ≥ 0';
+        return 'Итоговая цена запчастей исполнителя должна быть ≥ 0';
       }
       if (p.pending_import || p.pending_cart_import) continue;
       if (!String(p.title || '').trim()) {
@@ -1848,8 +1900,8 @@ export default function AutoserviceOrderFormPage() {
       }
       if (!isValidShopPartQty(p.qty, p.unit || 'pcs')) {
         return p.unit === 'pcs'
-          ? 'Количество ЗЧ исполнителя должно быть целым числом ≥ 1'
-          : 'Количество ЗЧ исполнителя должно быть ≥ 0,001';
+          ? 'Количество запчастей исполнителя должно быть целым числом ≥ 1'
+          : 'Количество запчастей исполнителя должно быть ≥ 0,001';
       }
       if (
         isWarehouseLinkedShopPart(p)
@@ -1859,7 +1911,7 @@ export default function AutoserviceOrderFormPage() {
         return `Количество «${shopPartDisplayName(p)}» не может превышать ${p.stock_max_qty} ${formatShopPartUnit(p.unit || 'pcs')}`;
       }
       if (Number.isNaN(Number(p.unit_price)) || Number(p.unit_price) < 0) {
-        return 'Цена ЗЧ исполнителя должна быть ≥ 0';
+        return 'Цена запчастей исполнителя должна быть ≥ 0';
       }
       if (Number.isNaN(Number(p.markup_percent)) || Number(p.markup_percent) < 0) {
         return 'Наценка должна быть ≥ 0';
@@ -2166,11 +2218,15 @@ export default function AutoserviceOrderFormPage() {
 
   return (
     <div className={orderFormPageClass}>
-      <header className="mb-6 max-lg:mb-4">
-        <button type="button" onClick={handleClose} className={`${linkActionClass} max-lg:hidden`}>
-          ← Закрыть
-        </button>
-        <h1 className="mt-2 break-words text-sg-title text-ink max-lg:hidden">{pageTitle}</h1>
+      <header className="mb-3 max-lg:hidden">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <button type="button" onClick={handleClose} className={linkActionClass}>
+            ← Закрыть
+          </button>
+          <h1 className="min-w-0 flex-1 break-words text-lg font-semibold leading-snug text-ink lg:text-xl">
+            {pageTitle}
+          </h1>
+        </div>
       </header>
 
       {metaError ? (
@@ -2179,15 +2235,15 @@ export default function AutoserviceOrderFormPage() {
         </p>
       ) : null}
 
-      <form id="repair-order-form" onSubmit={handleSubmit} className="min-w-0 space-y-4">
+      <form id="repair-order-form" onSubmit={handleSubmit} className="min-w-0 space-y-3">
         {error ? (
           <p className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
             {error}
           </p>
         ) : null}
 
-        <SectionCard title="Клиент и автомобиль">
-          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+        <SectionCard title="Клиент и заказ-наряд" compact>
+          <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2">
             <div className="min-w-0">
               <FieldLabel
                 action={ownMode ? null : (
@@ -2229,7 +2285,7 @@ export default function AutoserviceOrderFormPage() {
               </FieldLabel>
               <SearchableSelect
                 value={vehicleId}
-                onChange={setVehicleId}
+                onChange={handleVehicleSelect}
                 options={vehicleOptions}
                 placeholder={clientId ? 'Поиск по марке, модели, VIN…' : 'Сначала выберите клиента'}
                 disabled={!clientId}
@@ -2241,62 +2297,7 @@ export default function AutoserviceOrderFormPage() {
                 <p className="mt-1 text-xs text-danger-600" role="alert">{vehiclesError}</p>
               ) : null}
             </div>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Заказ-наряд">
-          {ownMode ? null : (
-          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="min-w-0">
-              <FieldLabel>Дата записи</FieldLabel>
-              <input
-                type="datetime-local"
-                step={60}
-                className={pillDateInputClass}
-                value={scheduledAt}
-                onChange={(e) => setScheduledAt(e.target.value)}
-                required
-              />
-            </div>
-            <div className="min-w-0">
-              <FieldLabel optional>Окончание</FieldLabel>
-              <input
-                type="datetime-local"
-                step={60}
-                className={pillDateInputClass}
-                value={scheduledEndAt}
-                onChange={(e) => setScheduledEndAt(e.target.value)}
-              />
-            </div>
-            <div className="min-w-0">
-              <FieldLabel>Рабочая зона</FieldLabel>
-              <select
-                className={pillInputClass}
-                value={workZoneId}
-                onChange={(e) => setWorkZoneId(e.target.value)}
-                disabled={workZones.length <= 0}
-              >
-                <option value="">{workZones.length > 0 ? 'Не назначена' : 'Нет рабочих зон'}</option>
-                {workZones.map((zone) => (
-                  <option key={zone.id} value={zone.id}>
-                    {zone.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="min-w-0">
-              <FieldLabel>Дата поступления запчастей</FieldLabel>
-              <input
-                type="date"
-                className={pillDateInputClass}
-                value={shippingDate}
-                onChange={(e) => setShippingDate(e.target.value)}
-              />
-            </div>
-          </div>
-          )}
-          <div className={`${ownMode ? '' : 'mt-4 '}grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2`}>
-            <div className="min-w-0">
+            <div className="min-w-0 lg:col-span-2">
               <FieldLabel optional>Пробег, км</FieldLabel>
               <input
                 type="number"
@@ -2305,12 +2306,70 @@ export default function AutoserviceOrderFormPage() {
                 inputMode="numeric"
                 className={pillInputClass}
                 value={mileageKm}
-                onChange={(e) => setMileageKm(e.target.value)}
+                onChange={(e) => {
+                  mileageTouchedRef.current = true;
+                  setMileageKm(e.target.value);
+                }}
                 placeholder="Например, 85000"
+                disabled={!vehicleId}
               />
+              {selectedVehicle?.mileage_km != null && selectedVehicle.mileage_km !== '' && !mileageKm ? (
+                <p className="mt-1 text-xs text-gray-500">
+                  Последний пробег по автомобилю:{' '}
+                  {Number(selectedVehicle.mileage_km).toLocaleString('ru-RU')} км
+                </p>
+              ) : null}
             </div>
-          </div>
-          <div className="mt-4 grid min-w-0 grid-cols-1 gap-4">
+            {ownMode ? null : (
+              <>
+                <div className="min-w-0">
+                  <FieldLabel>Дата записи</FieldLabel>
+                  <input
+                    type="datetime-local"
+                    step={60}
+                    className={pillDateInputClass}
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="min-w-0">
+                  <FieldLabel optional>Окончание</FieldLabel>
+                  <input
+                    type="datetime-local"
+                    step={60}
+                    className={pillDateInputClass}
+                    value={scheduledEndAt}
+                    onChange={(e) => setScheduledEndAt(e.target.value)}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <FieldLabel>Рабочая зона</FieldLabel>
+                  <select
+                    className={pillInputClass}
+                    value={workZoneId}
+                    onChange={(e) => setWorkZoneId(e.target.value)}
+                    disabled={workZones.length <= 0}
+                  >
+                    <option value="">{workZones.length > 0 ? 'Не назначена' : 'Нет рабочих зон'}</option>
+                    {workZones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="min-w-0">
+                  <FieldLabel>Дата поступления запчастей</FieldLabel>
+                  <input
+                    type="date"
+                    className={pillDateInputClass}
+                    value={shippingDate}
+                    onChange={(e) => setShippingDate(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
             <div className="min-w-0">
               <FieldLabel>Комментарий клиента</FieldLabel>
               <textarea
@@ -2332,16 +2391,16 @@ export default function AutoserviceOrderFormPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Работы">
+        <SectionCard title="Работы" compact>
           {works.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет работ</p>
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {works.map((w, index) => (
-                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2.5 py-2 lg:px-2 lg:py-1">
+                <div key={index} className="min-w-0">
                   <div className={lineItemRowClass}>
                     <div className={lineItemIdentityClass}>
-                      <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">{index + 1}</span>
+                      <span className={lineIndexClass}>{index + 1}</span>
                       <div className="min-w-0 flex-1">
                         <WorkCatalogInput
                           value={w.title}
@@ -2353,7 +2412,7 @@ export default function AutoserviceOrderFormPage() {
                       </div>
                       <button
                         type="button"
-                        className={`${lineDeleteBtnClass} lg:order-last`}
+                        className={`${lineDeleteBtnCompactClass} lg:order-last`}
                         aria-label="Удалить работу"
                         onClick={() => setLineDeleteConfirm({ type: 'work', index })}
                       >
@@ -2364,7 +2423,7 @@ export default function AutoserviceOrderFormPage() {
                     <input
                       type="number"
                       min={1}
-                      className="h-10 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
+                      className={`w-12 ${compactControlInputClass} px-1.5 text-center`}
                       placeholder={ownMode ? 'Н/ч' : 'Кол-во'}
                       value={w.qty}
                       onChange={(e) => updateWork(index, { qty: e.target.value })}
@@ -2375,17 +2434,17 @@ export default function AutoserviceOrderFormPage() {
                       type="number"
                       min={0}
                       step="0.01"
-                      className="h-10 w-[5rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
+                      className={`w-[4.75rem] ${compactControlInputClass}`}
                       placeholder="0 ₽"
                       value={w.unit_price ?? ''}
                       onChange={(e) => updateWork(index, { unit_price: e.target.value })}
                     />
-                    <span className="ml-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[5.25rem]">
+                    <span className="ml-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[4.75rem]">
                       {formatMoney(lineSum(w.qty, w.unit_price))} ₽
                     </span>
                     <button
                       type="button"
-                      className="shrink-0 whitespace-nowrap py-1 text-xs font-medium text-brand-600 hover:text-brand-700"
+                      className="shrink-0 whitespace-nowrap py-0.5 text-xs font-medium text-brand-600 hover:text-brand-700"
                       onClick={() => addWorkExecutor(index)}
                     >
                       + сотрудник
@@ -2395,12 +2454,12 @@ export default function AutoserviceOrderFormPage() {
                     </div>
                   </div>
                   {(ownMode ? [] : (w.executors || [])).length > 0 ? (
-                    <div className="mt-1 min-w-0 space-y-1 pl-5">
+                    <div className="mt-1 min-w-0 space-y-1 pl-[1.125rem]">
                       {(w.executors || []).map((ex, execIndex) => (
-                        <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1 rounded-lg bg-surface px-2 py-1 ring-1 ring-line lg:rounded-full">
+                        <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1">
                           <SearchableSelect
                             className="min-w-0 flex-1"
-                            inputClassName="block h-10 w-full rounded-2xl border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8 lg:rounded-full"
+                            inputClassName="block h-9 w-full rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
                             value={ex.employee_id}
                             onChange={(next) => updateWorkExecutor(index, execIndex, { employee_id: next })}
                             options={employeeOptions}
@@ -2414,7 +2473,7 @@ export default function AutoserviceOrderFormPage() {
                             type="number"
                             min={0}
                             max={100}
-                            className="h-10 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm max-md:text-base text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-7"
+                            className={`w-12 ${compactControlInputClass} px-1.5 text-center`}
                             value={ex.percent}
                             onChange={(e) => updateWorkExecutor(index, execIndex, { percent: e.target.value })}
                           />
@@ -2424,7 +2483,7 @@ export default function AutoserviceOrderFormPage() {
                           </span>
                           <button
                             type="button"
-                            className={lineDeleteBtnClass}
+                            className={lineDeleteBtnCompactClass}
                             aria-label="Удалить сотрудника"
                             onClick={() => removeWorkExecutor(index, execIndex)}
                           >
@@ -2438,63 +2497,67 @@ export default function AutoserviceOrderFormPage() {
               ))}
             </div>
           )}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-3">
-            <p className="text-sm font-medium text-ink">Итого работ: {formatMoney(worksTotal)} ₽</p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-2">
+            <p className="text-sm font-medium text-ink">Итого: {formatMoney(worksTotal)} ₽</p>
             <SectionAddLink onClick={() => setWorks((prev) => [...prev, emptyWork()])} />
           </div>
         </SectionCard>
 
-        <SectionCard title="Запчасти клиента">
+        <SectionCard title="Запчасти клиента" compact>
           {clientParts.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет запчастей клиента</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {clientParts.map((p, index) => (
-                <div key={index} className="min-w-0 rounded-sg border border-line bg-white px-2.5 py-2">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="w-4 shrink-0 text-center text-xs tabular-nums text-ink-muted">
-                      {index + 1}
-                    </span>
-                    <input
-                      className="box-border h-11 min-w-0 flex-1 rounded-2xl border border-transparent bg-gray-100 px-3 text-sm text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base lg:h-10 lg:rounded-full"
-                      placeholder="Название"
-                      value={p.title}
-                      onChange={(e) => updatePart(index, { title: e.target.value })}
-                    />
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      className="h-11 w-14 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-center text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base lg:h-10"
-                      placeholder="Кол-во"
-                      aria-label="Количество"
-                      value={p.qty}
-                      onChange={(e) => updatePart(index, { qty: e.target.value })}
-                    />
-                    <select
-                      className="h-11 w-[4.25rem] shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base lg:h-10"
-                      value={p.unit || 'pcs'}
-                      aria-label="Единица измерения"
-                      onChange={(e) => updatePart(index, { unit: e.target.value })}
-                    >
-                      <option value="pcs">шт.</option>
-                      <option value="l">л</option>
-                      <option value="kg">кг</option>
-                    </select>
-                    <button
-                      type="button"
-                      className={`${lineDeleteBtnClass} shrink-0`}
-                      aria-label="Удалить"
-                      onClick={() => setLineDeleteConfirm({ type: 'clientPart', index })}
-                    >
-                      ×
-                    </button>
-                  </div>
+                <div key={index} className="flex min-w-0 items-center gap-1">
+                  <span className={lineIndexClass}>
+                    {index + 1}
+                  </span>
+                  <input
+                    className={clientPartTitleInputClass}
+                    placeholder="Название"
+                    value={p.title}
+                    onChange={(e) => updatePart(index, { title: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className={clientPartControlInputClass}
+                    placeholder="Кол-во"
+                    aria-label="Количество"
+                    value={p.qty}
+                    onChange={(e) => updatePart(index, { qty: sanitizePositiveIntegerInput(e.target.value) })}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      updatePart(index, {
+                        qty: sanitizePositiveIntegerInput(e.clipboardData.getData('text')),
+                      });
+                    }}
+                  />
+                  <select
+                    className={clientPartControlSelectClass}
+                    value={p.unit || 'pcs'}
+                    aria-label="Единица измерения"
+                    onChange={(e) => updatePart(index, { unit: e.target.value })}
+                  >
+                    <option value="pcs">шт.</option>
+                    <option value="l">л</option>
+                    <option value="kg">кг</option>
+                  </select>
+                  <button
+                    type="button"
+                    className={`${lineDeleteBtnCompactClass} shrink-0`}
+                    aria-label="Удалить"
+                    onClick={() => setLineDeleteConfirm({ type: 'clientPart', index })}
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
             </div>
           )}
-          <div className="mt-3 flex justify-end border-t border-line-soft pt-3">
+          <div className="mt-2 flex justify-end border-t border-line-soft pt-2">
             <SectionAddLink onClick={() => setClientParts((prev) => [...prev, emptyClientPart()])} />
           </div>
         </SectionCard>
@@ -2502,12 +2565,17 @@ export default function AutoserviceOrderFormPage() {
         {!ownMode ? (
         <SectionCard
           title="Запчасти исполнителя"
+          compact
           action={(
             <div className="flex flex-wrap items-center justify-end gap-2">
               {clientMarkupEnabled ? (
                 <div className="flex items-center gap-1.5 text-sm text-ink-muted">
                   <span>Наценка</span>
-                  <ClientMarkupPopover onApply={applyShopPartsMarkup} bottomInset={72} />
+                  <ClientMarkupPopover
+                    onApply={applyShopPartsMarkup}
+                    bottomInset={72}
+                    readOnly={!canEditMarkupSettings}
+                  />
                 </div>
               ) : null}
               <SectionAddLink
@@ -2523,7 +2591,7 @@ export default function AutoserviceOrderFormPage() {
           {shopParts.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет запчастей исполнителя</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {shopParts.map((p, index) => {
                 const pricingOptions = shopPartPricingOptions(p);
                 const automaticClientUnit = priceWithMarkup(
@@ -2545,13 +2613,10 @@ export default function AutoserviceOrderFormPage() {
                   : p.qty;
 
                 return (
-                  <div
-                    key={shopPartRowKey(p, index)}
-                    className="min-w-0 rounded-sg border border-line bg-white px-3 py-2.5 lg:px-2 lg:py-1.5"
-                  >
+                  <div key={shopPartRowKey(p, index)} className="min-w-0">
                     <div className={lineItemRowClass}>
                       <div className={lineItemIdentityClass}>
-                        <span className="w-4 shrink-0 pt-1.5 text-center text-xs tabular-nums text-ink-muted lg:pt-0">
+                        <span className={lineIndexClass}>
                           {index + 1}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -2576,7 +2641,7 @@ export default function AutoserviceOrderFormPage() {
                         </div>
                         <button
                           type="button"
-                          className={`${lineDeleteBtnClass} shrink-0 disabled:cursor-not-allowed disabled:opacity-50 lg:order-last`}
+                          className={`${lineDeleteBtnCompactClass} disabled:cursor-not-allowed disabled:opacity-50 lg:order-last`}
                           aria-label={isImported ? 'Убрать из заказ-наряда' : 'Удалить'}
                           disabled={detachingShopPartId === p.id}
                           onClick={() => requestRemoveShopPart(index)}
@@ -2590,7 +2655,7 @@ export default function AutoserviceOrderFormPage() {
                         min={qtyMin}
                         max={isWarehouseLinked && p.stock_max_qty != null ? p.stock_max_qty : undefined}
                         step={qtyStep}
-                        className={`w-14 ${shopPartControlInputClass}${isQtyLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
+                        className={`w-12 px-1.5 text-center ${shopPartControlInputClass}${isQtyLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
                         value={qtyValue}
                         readOnly={isQtyLocked}
                         disabled={isQtyLocked}
@@ -2618,7 +2683,7 @@ export default function AutoserviceOrderFormPage() {
                         }}
                       />
                       <select
-                        className={`w-[4.25rem] ${shopPartControlSelectClass}${isUnitLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
+                        className={`w-[3.75rem] ${shopPartControlSelectClass}${isUnitLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
                         value={p.unit || 'pcs'}
                         disabled={isUnitLocked}
                         aria-label="Единица измерения"
@@ -2633,7 +2698,7 @@ export default function AutoserviceOrderFormPage() {
                           type="number"
                           min={0}
                           step="0.01"
-                          className={`w-[5.25rem] ${shopPartControlInputClass}`}
+                          className={`w-[4.75rem] ${shopPartControlInputClass}`}
                           value={p.client_unit_price_override ?? ''}
                           placeholder={formatRubles(automaticClientUnit)}
                           aria-label="Клиентская цена"
@@ -2643,7 +2708,7 @@ export default function AutoserviceOrderFormPage() {
                         />
                         <span className="shrink-0 text-xs tabular-nums text-ink-muted">₽</span>
                       </div>
-                      <span className="ml-auto w-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[5.75rem]">
+                      <span className="ml-auto w-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[4.75rem]">
                         {formatRubles(lineTotal)} ₽
                       </span>
                       </div>
@@ -2653,9 +2718,9 @@ export default function AutoserviceOrderFormPage() {
               })}
             </div>
           )}
-          <div className="mt-3 flex items-center justify-between gap-2 border-t border-line-soft pt-3">
+          <div className="mt-2 flex items-center justify-between gap-2 border-t border-line-soft pt-2">
             <p className="text-sm font-medium text-ink">
-              Итого ЗЧ исполнителя: {formatRubles(shopPartsTotal)} ₽
+              Итого: {formatRubles(shopPartsTotal)} ₽
             </p>
           </div>
         </SectionCard>
@@ -2671,7 +2736,7 @@ export default function AutoserviceOrderFormPage() {
           <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
             <div className="min-w-0 lg:flex-1">
               <p className="text-sm font-semibold text-ink">
-                {ownMode ? 'Заказ-наряд' : `Итого ${formatMoney(grandTotal)} ₽`}
+                {ownMode ? 'Заказ-наряд' : `Итого: ${formatMoney(grandTotal)} ₽`}
               </p>
               {ownMode ? null : (
                 <p className="text-[11px] leading-snug text-ink-muted sm:text-xs">
