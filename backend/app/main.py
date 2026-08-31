@@ -118,6 +118,7 @@ from app.db.schema_patches import (
     ensure_inventory_tables,
     ensure_user_engagement_tables,
     ensure_user_rossko_favorites_table,
+    ensure_storage_location_geocode_columns,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
@@ -353,6 +354,7 @@ try:
     ensure_inventory_tables()
     ensure_user_engagement_tables()
     ensure_user_rossko_favorites_table()
+    ensure_storage_location_geocode_columns()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise
@@ -540,6 +542,13 @@ async def startup_event():
         trigger=CronTrigger(hour=settings.AUTOSERVICE_PLANNER_DIGEST_HOUR_UTC, minute=0),
         id="autoservice_planner_daily_digest",
         name="Autoservice planner daily digest (12:00 MSK)",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        func=run_storage_location_geocode_backfill,
+        trigger=IntervalTrigger(minutes=15),
+        id="storage_location_geocode_backfill",
+        name="Backfill storage location coordinates via DaData",
         replace_existing=True,
     )
     
@@ -759,6 +768,16 @@ async def run_autoservice_planner_digest_tick():
         logger.info("Autoservice planner daily digest dispatched to Celery")
     except Exception as e:
         logger.error("Ошибка постановки autoservice planner digest в Celery: %s", e)
+
+
+async def run_storage_location_geocode_backfill():
+    try:
+        from app.tasks.geocode_tasks import backfill_storage_locations_geocode_task
+
+        await enqueue_celery_task(backfill_storage_locations_geocode_task)
+        logger.info("Storage location geocode backfill dispatched to Celery")
+    except Exception as e:
+        logger.error("Ошибка постановки geocode backfill в Celery: %s", e)
 
 
 async def run_yandex_feed_scheduler_tick():

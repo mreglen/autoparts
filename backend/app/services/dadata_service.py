@@ -106,3 +106,52 @@ async def suggest_address(
         return []
     suggestions = data.get("suggestions")
     return suggestions if isinstance(suggestions, list) else []
+
+
+def _parse_geocode_from_suggestions(suggestions: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not suggestions:
+        return None
+    first = suggestions[0]
+    if not isinstance(first, dict):
+        return None
+    data = first.get("data")
+    if not isinstance(data, dict):
+        return None
+    lat_raw = data.get("geo_lat")
+    lon_raw = data.get("geo_lon")
+    if lat_raw in (None, "") or lon_raw in (None, ""):
+        return None
+    try:
+        lat = float(lat_raw)
+        lon = float(lon_raw)
+    except (TypeError, ValueError):
+        return None
+    qc_raw = data.get("qc_geo")
+    qc_geo: int | None
+    try:
+        qc_geo = int(qc_raw) if qc_raw not in (None, "") else None
+    except (TypeError, ValueError):
+        qc_geo = None
+    return {"lat": lat, "lon": lon, "qc_geo": qc_geo}
+
+
+async def geocode_address(address: str) -> dict[str, Any] | None:
+    """Resolve coordinates for a free-form address via DaData suggest."""
+    query = (address or "").strip()
+    if not query:
+        return None
+    suggestions = await suggest_address(query, count=1)
+    return _parse_geocode_from_suggestions(suggestions)
+
+
+def geocode_address_sync(address: str) -> dict[str, Any] | None:
+    """Sync wrapper for Celery/backfill jobs."""
+    import asyncio
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            raise RuntimeError("geocode_address_sync called from running event loop")
+        return loop.run_until_complete(geocode_address(address))
+    except RuntimeError:
+        return asyncio.run(geocode_address(address))

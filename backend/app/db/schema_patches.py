@@ -6348,3 +6348,35 @@ def ensure_garage_vehicle_mileage_history() -> None:
 
     logger.info("Applied garage_vehicle_mileage_history table patch")
 
+
+def ensure_storage_location_geocode_columns() -> None:
+    """Add geocode columns to storage_locations for part detail maps."""
+    inspector = inspect(engine)
+    if "storage_locations" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("storage_locations")}
+    is_pg = engine.dialect.name == "postgresql"
+    float_type = "DOUBLE PRECISION" if is_pg else "REAL"
+    timestamp_type = "TIMESTAMP" if is_pg else "DATETIME"
+
+    statements = []
+    if "latitude" not in columns:
+        statements.append(f"ALTER TABLE storage_locations ADD COLUMN latitude {float_type}")
+    if "longitude" not in columns:
+        statements.append(f"ALTER TABLE storage_locations ADD COLUMN longitude {float_type}")
+    if "geocoded_at" not in columns:
+        statements.append(f"ALTER TABLE storage_locations ADD COLUMN geocoded_at {timestamp_type}")
+    if "geocode_qc" not in columns:
+        qc_type = "SMALLINT" if is_pg else "INTEGER"
+        statements.append(f"ALTER TABLE storage_locations ADD COLUMN geocode_qc {qc_type}")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied storage_locations geocode column patches: %s", statements)
+

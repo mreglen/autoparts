@@ -23,6 +23,21 @@ import { warehouseListShellClass } from '../../utils/warehouseListUi';
 const iconBtnClass =
   'inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-50';
 
+function parseSuggestionCoord(value) {
+  if (value == null || value === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function coordsFromSuggestion(suggestion) {
+  const data = suggestion?.data;
+  if (!data) return { latitude: null, longitude: null };
+  return {
+    latitude: parseSuggestionCoord(data.geo_lat),
+    longitude: parseSuggestionCoord(data.geo_lon),
+  };
+}
+
 const StorageLocationsSection = ({ orgId }) => {
   const dispatch = useDispatch();
   const { storageLocations, loadingLocations, locationsError } = useSelector(
@@ -31,8 +46,10 @@ const StorageLocationsSection = ({ orgId }) => {
 
   const [isAdding, setIsAdding] = useState(false);
   const [newLocation, setNewLocation] = useState('');
+  const [newCoords, setNewCoords] = useState({ latitude: null, longitude: null });
   const [editingId, setEditingId] = useState(null);
   const [editLocation, setEditLocation] = useState('');
+  const [editCoords, setEditCoords] = useState({ latitude: null, longitude: null });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [deleteId, setDeleteId] = useState(null);
@@ -46,12 +63,14 @@ const StorageLocationsSection = ({ orgId }) => {
   const resetAddForm = () => {
     setIsAdding(false);
     setNewLocation('');
+    setNewCoords({ latitude: null, longitude: null });
     setFormError('');
   };
 
   const resetEditForm = () => {
     setEditingId(null);
     setEditLocation('');
+    setEditCoords({ latitude: null, longitude: null });
     setFormError('');
   };
 
@@ -63,12 +82,15 @@ const StorageLocationsSection = ({ orgId }) => {
     setSaving(true);
     setFormError('');
     try {
-      await dispatch(
-        createStorageLocation({
-          address,
-          organization_id: orgId,
-        }),
-      ).unwrap();
+      const payload = {
+        address,
+        organization_id: orgId,
+      };
+      if (newCoords.latitude != null && newCoords.longitude != null) {
+        payload.latitude = newCoords.latitude;
+        payload.longitude = newCoords.longitude;
+      }
+      await dispatch(createStorageLocation(payload)).unwrap();
       resetAddForm();
     } catch (error) {
       setFormError(typeof error === 'string' ? error : 'Не удалось добавить склад');
@@ -85,13 +107,16 @@ const StorageLocationsSection = ({ orgId }) => {
     setSaving(true);
     setFormError('');
     try {
-      await dispatch(
-        updateStorageLocation({
-          id: editingId,
-          address,
-          organization_id: orgId,
-        }),
-      ).unwrap();
+      const payload = {
+        id: editingId,
+        address,
+        organization_id: orgId,
+      };
+      if (editCoords.latitude != null && editCoords.longitude != null) {
+        payload.latitude = editCoords.latitude;
+        payload.longitude = editCoords.longitude;
+      }
+      await dispatch(updateStorageLocation(payload)).unwrap();
       resetEditForm();
     } catch (error) {
       setFormError(typeof error === 'string' ? error : 'Не удалось сохранить склад');
@@ -143,7 +168,13 @@ const StorageLocationsSection = ({ orgId }) => {
             <DadataAddressInput
               id="new-storage-location"
               value={newLocation}
-              onChange={setNewLocation}
+              onChange={(value) => {
+                setNewLocation(value);
+                setNewCoords({ latitude: null, longitude: null });
+              }}
+              onSuggestionSelect={(suggestion) => {
+                setNewCoords(coordsFromSuggestion(suggestion));
+              }}
               placeholder="Город, улица, дом"
               className={fieldClass}
             />
@@ -187,7 +218,13 @@ const StorageLocationsSection = ({ orgId }) => {
                 <DadataAddressInput
                   id={`edit-storage-location-${location.id}`}
                   value={editLocation}
-                  onChange={setEditLocation}
+                  onChange={(value) => {
+                    setEditLocation(value);
+                    setEditCoords({ latitude: null, longitude: null });
+                  }}
+                  onSuggestionSelect={(suggestion) => {
+                    setEditCoords(coordsFromSuggestion(suggestion));
+                  }}
                   placeholder="Город, улица, дом"
                   className={fieldClass}
                 />
@@ -231,6 +268,10 @@ const StorageLocationsSection = ({ orgId }) => {
                       setFormError('');
                       setEditingId(location.id);
                       setEditLocation(location.address || '');
+                      setEditCoords({
+                        latitude: location.latitude ?? null,
+                        longitude: location.longitude ?? null,
+                      });
                     }}
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

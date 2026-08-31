@@ -40,3 +40,25 @@ def invalidate_public_product_detail(product_id: int) -> None:
         get_redis_sync().delete(f"products:public:detail:{int(product_id)}")
     except Exception as exc:
         logger.warning("Redis delete failed for product detail %s: %s", product_id, exc)
+
+
+def invalidate_public_products_for_storage_location(db, storage_location_id: int) -> None:
+    """Invalidate cached public product cards tied to a warehouse."""
+    from app.models.product import Product
+
+    try:
+        product_ids = (
+            db.query(Product.id)
+            .filter(Product.storage_location_id == int(storage_location_id))
+            .all()
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to load products for storage location %s: %s",
+            storage_location_id,
+            exc,
+        )
+        return
+
+    for (product_id,) in product_ids:
+        invalidate_public_product_detail(product_id)

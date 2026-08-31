@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -8,8 +11,10 @@ from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.models.user import User
 from app.schemas.storage_location import StorageLocation as StorageLocationSchema, StorageLocationCreate
 from app.services.audit_service import log_audit
+from app.services.geocode_storage_location import reset_geocode_fields
 
 router = APIRouter(prefix="/storage-locations", tags=["Storage Locations"])
+logger = logging.getLogger(__name__)
 
 
 def _payload_dict(loc: StorageLocationCreate) -> dict:
@@ -25,6 +30,29 @@ def _require_org_access(current_user: User, organization_id: str) -> None:
         return
     if not current_user.organization_id or current_user.organization_id != organization_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет доступа к этой организации")
+
+
+def _has_client_coords(data: dict) -> bool:
+    lat = data.get("latitude")
+    lng = data.get("longitude")
+    return lat is not None and lng is not None
+
+
+def _apply_client_coords(db_loc: StorageLocationModel, data: dict) -> None:
+    if not _has_client_coords(data):
+        return
+    db_loc.latitude = float(data["latitude"])
+    db_loc.longitude = float(data["longitude"])
+    db_loc.geocoded_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _enqueue_storage_location_geocode(location_id: int) -> None:
+    try:
+        from app.tasks.geocode_tasks import geocode_storage_location_task
+
+        geocode_storage_location_task.delay(int(location_id))
+    except Exception as exc:
+        logger.warning("Failed to enqueue geocode for storage location %s: %s", location_id, exc)
 
 
 @router.post("/", response_model=StorageLocationSchema)
@@ -43,9 +71,12 @@ def create_storage_location(
     address = (data.get("address") or "").strip()
     if not address:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Укажите адрес склада")
-    data["address"] = address
 
-    db_loc = StorageLocationModel(**data)
+    db_loc = StorageLocationModel(
+        address=address,
+        organization_id=data["organization_id"],
+    )
+    _apply_client_coords(db_loc, data)
     db.add(db_loc)
     try:
         db.commit()
@@ -53,6 +84,10 @@ def create_storage_location(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не удалось создать склад")
     db.refresh(db_loc)
+
+    if not _has_client_coords(data):
+        _enqueue_storage_location_geocode(db_loc.id)
+
     log_audit(
         db,
         event_type="storage_location_created",
@@ -91,12 +126,24 @@ def update_storage_location(
     address = (data.get("address") or "").strip()
     if not address:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Укажите адрес склада")
+
+    old_address = (db_loc.address or "").strip()
+    address_changed = old_address != address
+    if address_changed:
+        reset_geocode_fields(db_loc)
+
     db_loc.address = address
     if current_user.is_admin and data.get("organization_id"):
         db_loc.organization_id = data["organization_id"]
 
+    _apply_client_coords(db_loc, data)
+
     db.commit()
     db.refresh(db_loc)
+
+    if not _has_client_coords(data) and (db_loc.latitude is None or db_loc.longitude is None):
+        _enqueue_storage_location_geocode(db_loc.id)
+
     log_audit(
         db,
         event_type="storage_location_updated",

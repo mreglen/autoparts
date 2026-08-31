@@ -17,10 +17,6 @@ export default function PartDetailPurchaseSidebar({
 }) {
   if (!product) return null;
 
-  const address = product.storage_location?.address
-    || product.storage_location?.name
-    || '—';
-
   return (
     <Card as="section" padding="sm">
       <Badge tone={inStock ? 'success' : 'warning'} className="mb-3">
@@ -96,11 +92,6 @@ export default function PartDetailPurchaseSidebar({
           ) : null}
         </div>
       ) : null}
-
-      <div className="mt-4 border-t border-line-soft pt-3">
-        <p className="text-xs font-medium text-ink-muted">Адрес</p>
-        <p className="mt-1 break-words text-sm font-medium leading-snug text-ink">{address}</p>
-      </div>
     </Card>
   );
 }

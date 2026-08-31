@@ -28,6 +28,7 @@ import PartDetailDesktopGallery from './PartDetailDesktopGallery';
 import PartDetailOrganizationSidebar from './PartDetailOrganizationSidebar';
 import PartDetailPurchaseSidebar from './PartDetailPurchaseSidebar';
 import PartDetailFitmentBlock from './PartDetailFitmentBlock';
+import PartDetailLocationBlock from './PartDetailLocationBlock';
 import PartDetailTrustRow from './PartDetailTrustRow';
 import PartDetailReturnPolicyBlock from './PartDetailReturnPolicyBlock';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
@@ -1323,6 +1324,7 @@ const PartDetail = () => {
         </div>
 
         <div className="mt-8 space-y-6 md:mt-10">
+          <PartDetailLocationBlock storageLocation={currentProduct.storage_location} />
           <PartDetailFitmentBlock
             sellerVehicles={currentProduct.compatible_vehicles}
             referenceVehicles={referenceFitment}
