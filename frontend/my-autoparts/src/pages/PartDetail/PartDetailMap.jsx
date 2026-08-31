@@ -34,12 +34,10 @@ export default function PartDetailMap({ latitude, longitude }) {
       center={position}
       zoom={15}
       scrollWheelZoom={false}
-      className="h-[260px] w-full"
+      attributionControl={false}
+      className="part-detail-map h-[260px] w-full [&_.leaflet-control-attribution]:hidden"
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Marker position={position} />
       <MapResizeOnMount />
     </MapContainer>
