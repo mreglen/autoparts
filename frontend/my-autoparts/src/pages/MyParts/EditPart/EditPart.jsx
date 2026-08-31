@@ -1603,22 +1603,20 @@ const EditPart = () => {
 
         {/* Адресное хранение - выбор ячеек */}
         {formData.storage_location_id && (
-          <MobilePageSection title="Адресное хранение">
-          <div className="rounded-lg bg-gray-50 p-4 max-md:bg-white max-md:p-0 md:bg-gray-50 md:p-4">
-            <div className="mb-3 flex flex-col gap-2 max-md:gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="hidden text-lg font-medium text-gray-900 md:block">Адресное хранение</h3>
+          <MobilePageSection
+            title="Адресное хранение"
+            headerAction={(
               <button
                 type="button"
                 onClick={() => setShowNewCellForm(!showNewCellForm)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
               >
                 {showNewCellForm ? 'Отмена' : 'Добавить адрес'}
               </button>
-            </div>
-            <p className="text-sm text-gray-600 mb-4">Укажите значение для каждой ячейки (не обязательно заполнять все поля)</p>
-            
+            )}
+          >
             {showNewCellForm && (
-              <div className="mb-4 p-3 bg-white rounded-md border border-gray-300">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <div className="mb-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Название ячейки</label>
                   <input
@@ -1648,7 +1646,7 @@ const EditPart = () => {
                 </button>
               </div>
             )}
-            
+
             {locationCells.length > 0 && (
               <>
                 <div className="hidden overflow-x-auto md:block">
@@ -1695,7 +1693,6 @@ const EditPart = () => {
                 </ul>
               </>
             )}
-          </div>
           </MobilePageSection>
         )}
 

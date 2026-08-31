@@ -1895,10 +1895,9 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
 
         {/* Адресное хранение - выбор ячеек */}
         {formData.storage_location_id && (
-          <MobilePageSection title="Адресное хранение">
-          <div>
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-gray-600">Укажите значение для каждой ячейки (не обязательно заполнять все поля)</p>
+          <MobilePageSection
+            title="Адресное хранение"
+            headerAction={(
               <button
                 type="button"
                 onClick={() => setShowNewCellForm(!showNewCellForm)}
@@ -1906,10 +1905,10 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
               >
                 {showNewCellForm ? 'Отмена' : 'Добавить адрес'}
               </button>
-            </div>
-            
+            )}
+          >
             {showNewCellForm && (
-              <div className="mb-4 rounded-xl bg-gray-50 p-4 ring-1 ring-gray-200/80">
+              <div className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-200/80">
                 <div className="mb-3">
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">Название ячейки</label>
                   <input
@@ -1939,7 +1938,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
                 </button>
               </div>
             )}
-            
+
             {locationCells.length > 0 && (
               <>
                 <div className="hidden overflow-x-auto md:block">
@@ -1986,7 +1985,6 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
                 </ul>
               </>
             )}
-          </div>
           </MobilePageSection>
         )}
 
