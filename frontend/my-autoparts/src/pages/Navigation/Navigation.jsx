@@ -216,7 +216,13 @@ export default function Navigation() {
                     aria-label="Профиль"
                     className="flex items-center gap-2 rounded-sg border border-line py-1 pl-1 pr-3 transition hover:border-brand-200 hover:bg-surface-subtle"
                   >
-                    <HeaderAvatar initial={firstName} size="sm" />
+                    <HeaderAvatar
+                      initial={firstName}
+                      avatarUrl={user.avatar_url}
+                      firstName={user.first_name}
+                      lastName={user.last_name}
+                      size="sm"
+                    />
                     <span className="hidden max-w-[120px] truncate text-sm font-medium text-ink lg:block">
                       {firstName}
                     </span>
@@ -230,7 +236,13 @@ export default function Navigation() {
                         className="block border-b border-line bg-brand-50 px-4 py-4 transition hover:bg-brand-100"
                       >
                         <div className="flex items-center gap-3">
-                          <HeaderAvatar initial={firstName} size="lg" />
+                          <HeaderAvatar
+                            initial={firstName}
+                            avatarUrl={user.avatar_url}
+                            firstName={user.first_name}
+                            lastName={user.last_name}
+                            size="lg"
+                          />
                           <div className="min-w-0">
                             <p className="truncate font-semibold text-ink">{fullName || firstName}</p>
                             {user.organization_name && (

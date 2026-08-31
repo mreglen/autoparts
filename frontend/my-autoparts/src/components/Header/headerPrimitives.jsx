@@ -1,5 +1,6 @@
 import { Link, NavLink } from 'react-router-dom';
 import { PWA_START_PATH, usePwaStandalone } from '../../utils/pwaStandalone';
+import UserAvatar from '../UserAvatar/UserAvatar';
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ');
@@ -56,18 +57,30 @@ export function HeaderIconButton({
   );
 }
 
-export function HeaderAvatar({ initial, size = 'md', className = '' }) {
-  const sizeClass = size === 'lg' ? 'h-12 w-12 text-lg' : size === 'sm' ? 'h-8 w-8 text-sm' : 'h-10 w-10 text-sm';
+export function HeaderAvatar({
+  initial,
+  avatarUrl,
+  firstName,
+  lastName,
+  size = 'md',
+  className = '',
+}) {
+  const avatarSize = size === 'lg' ? 'lg' : size === 'sm' ? 'sm' : 'md';
+  const sizeClass =
+    size === 'lg'
+      ? '!h-12 !w-12 !rounded-sg !text-lg'
+      : size === 'sm'
+        ? '!h-8 !w-8 !rounded-sg !text-xs'
+        : '!h-10 !w-10 !rounded-sg';
+
   return (
-    <span
-      className={cx(
-        'flex shrink-0 items-center justify-center rounded-sg bg-brand-600 font-semibold text-white',
-        sizeClass,
-        className,
-      )}
-    >
-      {String(initial || 'П').charAt(0).toUpperCase()}
-    </span>
+    <UserAvatar
+      avatarUrl={avatarUrl}
+      firstName={firstName || initial}
+      lastName={lastName}
+      size={avatarSize}
+      className={`${sizeClass} !bg-brand-600 ${className}`.trim()}
+    />
   );
 }
 

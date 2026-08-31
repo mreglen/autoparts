@@ -61,18 +61,18 @@ export default function OrganizationCard({ orgId }) {
     <ProfileBlock title="Организация">
       <Link
         to={`/organizations/${org.id}`}
-        className="flex items-center gap-3 px-4 py-4 transition hover:bg-gray-50 sm:px-5"
+        className="flex items-center gap-3 px-4 py-4 transition hover:bg-surface-muted/60 sm:px-5"
       >
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-100 ring-1 ring-gray-200/80">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-sg border border-line bg-brand-50">
           {logoUrl ? (
             <img src={logoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="text-sm font-semibold text-gray-500">{orgInitials}</span>
+            <span className="text-sm font-bold text-brand-700">{orgInitials}</span>
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold text-gray-900">{org.name || 'Организация'}</p>
-          {phone ? <p className="truncate text-sm text-gray-500">{phone}</p> : null}
+          <p className="truncate text-base font-bold text-ink">{org.name || 'Организация'}</p>
+          {phone ? <p className="truncate text-sm text-ink-muted">{phone}</p> : null}
         </div>
         <ChevronRight />
       </Link>

@@ -40,9 +40,9 @@ export default function NotificationsBanner({ className = '' }) {
 
   return (
     <div className={`px-3 pt-3 sm:px-1 lg:px-2 ${className}`.trim()}>
-      <div className="mx-auto max-w-7xl rounded-xl border border-gray-200 bg-white px-3.5 py-3 shadow-sm sm:px-4">
+      <div className="mx-auto max-w-7xl rounded-sg-lg border border-line bg-surface px-3.5 py-3 shadow-sg-sm sm:px-4">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
             <svg
               className="h-5 w-5"
               fill="none"
@@ -60,8 +60,8 @@ export default function NotificationsBanner({ className = '' }) {
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-900">Включите уведомления</p>
-            <p className="mt-0.5 text-sm leading-snug text-gray-600">
+            <p className="text-sm font-bold text-ink">Включите уведомления</p>
+            <p className="mt-0.5 text-sm leading-snug text-ink-muted">
               {iosHint
                 ? 'На iPhone добавьте сайт на экран «Домой», затем включите push в настройках профиля.'
                 : 'Чтобы не пропустить заказы и сообщения в чате.'}
@@ -69,7 +69,7 @@ export default function NotificationsBanner({ className = '' }) {
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <Link
                 to="/profile/notifications"
-                className="inline-flex min-h-9 items-center justify-center rounded-lg bg-indigo-600 px-3.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                className="inline-flex min-h-9 items-center justify-center rounded-full bg-brand-600 px-3.5 text-sm font-semibold text-white transition hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
               >
                 Настроить
               </Link>
@@ -79,7 +79,7 @@ export default function NotificationsBanner({ className = '' }) {
                   localStorage.setItem('notifications_banner_dismissed', '1');
                   setVisible(false);
                 }}
-                className="inline-flex min-h-9 items-center justify-center rounded-lg px-3 text-sm font-medium text-gray-500 transition hover:bg-gray-50 hover:text-gray-800"
+                className="inline-flex min-h-9 items-center justify-center rounded-full px-3 text-sm font-medium text-ink-muted transition hover:bg-surface-subtle hover:text-ink"
               >
                 Не сейчас
               </button>
@@ -92,7 +92,7 @@ export default function NotificationsBanner({ className = '' }) {
               localStorage.setItem('notifications_banner_dismissed', '1');
               setVisible(false);
             }}
-            className="-mr-1 -mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+            className="-mr-1 -mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-faint transition hover:bg-surface-subtle hover:text-ink-soft"
             aria-label="Закрыть"
           >
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

@@ -20,9 +20,11 @@ import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationMo
 import ChangePasswordModal from './ChangePasswordModal';
 import OrganizationCard from './OrganizationCard';
 import ProfileEngagementPreview from './ProfileEngagementPreview';
+import { Badge } from '../../components/UI';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import {
   ProfileBlock,
+  ProfileNavLink,
   ProfileQuickAction,
   ProfileRow,
   profileInputClass,
@@ -34,33 +36,14 @@ import {
 function ProfilePageSkeleton() {
   return (
     <div className={`${profilePageShell} animate-pulse`}>
-      <div className="space-y-2">
-        <div className="h-3 w-16 rounded bg-gray-100" />
-        <div className="h-8 w-36 rounded-lg bg-gray-100" />
-        <div className="h-4 w-48 rounded bg-gray-100" />
-      </div>
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
-        <div className="flex items-center gap-4">
-          <div className="h-16 w-16 rounded-full bg-gray-100" />
-          <div className="flex-1 space-y-2">
-            <div className="h-5 w-44 rounded-lg bg-gray-100" />
-            <div className="h-4 w-28 rounded-lg bg-gray-100" />
-            <div className="h-6 w-20 rounded-lg bg-gray-100" />
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 rounded-xl bg-gray-100" />
+      <div className="h-24 rounded-sg-lg bg-surface-muted" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-20 rounded-sg-lg bg-surface-muted" />
         ))}
       </div>
-      <div className="rounded-xl border border-gray-200 bg-white">
-        {[1, 2].map((i) => (
-          <div key={i} className="border-b border-gray-100 px-4 py-4 last:border-0">
-            <div className="h-4 w-36 rounded-lg bg-gray-100" />
-          </div>
-        ))}
-      </div>
+      <div className="h-48 rounded-sg-lg bg-surface-muted" />
+      <div className="h-32 rounded-sg-lg bg-surface-muted" />
     </div>
   );
 }
@@ -72,32 +55,34 @@ function getRoleLabel(user) {
   return 'Покупатель';
 }
 
+const iconClass = 'h-5 w-5';
+
 const IconBag = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+  <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
   </svg>
 );
 
 const IconBell = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+  <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
   </svg>
 );
 
 const IconParts = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+  <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
   </svg>
 );
 
 const IconLock = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+  <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
   </svg>
 );
 
 const IconCar = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+  <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -107,8 +92,21 @@ const IconCar = () => (
 );
 
 const IconLogout = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+  <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+  </svg>
+);
+
+const IconHeart = () => (
+  <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+  </svg>
+);
+
+const IconEye = () => (
+  <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
   </svg>
 );
 
@@ -170,7 +168,7 @@ export default function ProfilePage() {
       <div className={profilePageShell}>
         <ProfileBlock padded>
           <div className="py-6 text-center">
-            <p className="text-sm text-gray-900 sm:text-[15px]">Войдите в аккаунт</p>
+            <p className="text-sm text-ink-muted">Войдите в аккаунт</p>
             <Link to="/auth" className={`${profilePrimaryBtn} mt-5`}>
               Войти
             </Link>
@@ -263,11 +261,12 @@ export default function ProfilePage() {
   );
 
   const quickActions = [
+    { to: '/purchases/orders', label: 'Заказы', icon: <IconBag /> },
+    { to: '/profile/favorites', label: 'Избранное', icon: <IconHeart /> },
+    { to: '/profile/views', label: 'Просмотры', icon: <IconEye /> },
+    { to: '/profile/notifications', label: 'Уведомления', icon: <IconBell /> },
     canOpenGarage ? { to: '/garage', label: 'Мои авто', icon: <IconCar /> } : null,
     showMyParts ? { to: '/my-parts', label: 'Мои запчасти', icon: <IconParts /> } : null,
-    { to: '/purchases/orders', label: 'Заказы', icon: <IconBag /> },
-    { to: '/profile/notifications', label: 'Уведомления', icon: <IconBell /> },
-    { to: '/profile/notification-center', label: 'История push', icon: <IconBell /> },
   ].filter(Boolean);
 
   const quickActionsGridClass =
@@ -287,15 +286,15 @@ export default function ProfilePage() {
               firstName={user.first_name}
               lastName={user.last_name}
               size="lg"
-              className="!h-16 !w-16 !rounded-full !text-xl"
+              className="!h-16 !w-16 !rounded-full !text-xl ring-2 ring-brand-100"
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <p className="min-w-0 truncate text-lg font-semibold text-gray-900 sm:text-xl">{displayName}</p>
+                <p className="min-w-0 truncate text-lg font-semibold text-ink sm:text-xl">{displayName}</p>
                 <button
                   type="button"
                   onClick={handleEdit}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-sg text-ink-faint transition hover:bg-surface-muted hover:text-brand-600"
                   aria-label="Редактировать профиль"
                   title="Редактировать"
                 >
@@ -308,13 +307,11 @@ export default function ProfilePage() {
                   </svg>
                 </button>
               </div>
-              <p className="mt-0.5 truncate text-sm text-gray-500">{profileSubtitle}</p>
+              <p className="mt-0.5 truncate text-sm text-ink-muted">{profileSubtitle}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="inline-flex rounded-lg bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                  {getRoleLabel(user)}
-                </span>
+                <Badge tone="brand">{getRoleLabel(user)}</Badge>
                 {user.id != null ? (
-                  <span className="font-mono text-xs text-gray-400" title="Идентификатор пользователя">
+                  <span className="font-mono text-xs text-ink-faint" title="Идентификатор пользователя">
                     ID {user.id}
                   </span>
                 ) : null}
@@ -325,7 +322,9 @@ export default function ProfilePage() {
       ) : (
         <ProfileBlock title="Личные данные" padded>
           {saveError ? (
-            <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
+            <div className="mb-4 rounded-sg border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700">
+              {saveError}
+            </div>
           ) : null}
 
           <div className="mb-5 flex items-center gap-4">
@@ -333,7 +332,7 @@ export default function ProfilePage() {
               type="button"
               onClick={() => avatarInputRef.current?.click()}
               disabled={avatarLoading}
-              className="relative shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+              className="relative shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-60"
             >
               <UserAvatar
                 avatarUrl={user.avatar_url}
@@ -352,7 +351,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
-                className="font-medium text-indigo-600 hover:text-indigo-700"
+                className="font-medium text-brand-600 hover:text-brand-700"
               >
                 Изменить фото
               </button>
@@ -361,7 +360,7 @@ export default function ProfilePage() {
                   type="button"
                   onClick={handleDeleteAvatar}
                   disabled={avatarLoading}
-                  className="mt-1 block text-gray-400 hover:text-red-600 disabled:opacity-50"
+                  className="mt-1 block text-ink-faint hover:text-danger-600 disabled:opacity-50"
                 >
                   Удалить
                 </button>
@@ -378,7 +377,7 @@ export default function ProfilePage() {
 
           <div className="space-y-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Фамилия</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-soft">Фамилия</label>
               <input
                 name="last_name"
                 value={formData.last_name}
@@ -388,7 +387,7 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Имя</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-soft">Имя</label>
               <input
                 name="first_name"
                 value={formData.first_name}
@@ -398,7 +397,7 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Отчество</label>
+              <label className="mb-1.5 block text-sm font-medium text-ink-soft">Отчество</label>
               <input
                 name="patronymic"
                 value={formData.patronymic}
@@ -419,7 +418,7 @@ export default function ProfilePage() {
         </ProfileBlock>
       )}
 
-      <div className={`grid gap-2 sm:gap-3 ${quickActionsGridClass}`}>
+      <div className={`grid gap-3 ${quickActionsGridClass}`}>
         {quickActions.map((action) => (
           <ProfileQuickAction
             key={action.to}
@@ -430,11 +429,28 @@ export default function ProfilePage() {
         ))}
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ProfileNavLink
+          to="/purchases/orders"
+          label="Мои заказы"
+          hint="Активные и завершённые покупки"
+          icon={<IconBag />}
+        />
+        <ProfileNavLink
+          to="/profile/notifications"
+          label="Настройки уведомлений"
+          hint="Push и email по категориям"
+          icon={<IconBell />}
+        />
+      </div>
+
       {showOrganization ? <OrganizationCard orgId={user.organization_id} /> : null}
 
       <ProfileEngagementPreview />
 
       <ProfileBlock title="Аккаунт">
+        <ProfileRow to="/profile/subscriptions" label="Подписки на поиск" icon={<IconParts />} />
+        <ProfileRow to="/profile/notification-center" label="История push" icon={<IconBell />} />
         <ProfileRow label="Сменить пароль" onClick={() => setShowPasswordModal(true)} icon={<IconLock />} />
         <ProfileRow
           label="Выйти"

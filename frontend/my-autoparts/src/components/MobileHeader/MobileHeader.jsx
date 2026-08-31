@@ -113,7 +113,12 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
 
             {token && user ? (
               <Link to={profilePath} aria-label="Профиль" className="shrink-0 active:scale-[0.97]">
-                <HeaderAvatar initial={firstName} />
+                <HeaderAvatar
+                  initial={firstName}
+                  avatarUrl={user.avatar_url}
+                  firstName={user.first_name}
+                  lastName={user.last_name}
+                />
               </Link>
             ) : (
               <Button
