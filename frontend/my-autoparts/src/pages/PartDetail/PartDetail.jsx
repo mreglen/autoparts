@@ -1329,7 +1329,6 @@ const PartDetail = () => {
             sellerVehicles={currentProduct.compatible_vehicles}
             referenceVehicles={referenceFitment}
             loading={secondaryEnabled ? referenceFitmentLoading : true}
-            fitmentMeta={fitmentMeta}
           />
           <PartArticleMatchesBlock
             title={alternateOffersTitle}

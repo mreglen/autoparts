@@ -16,28 +16,10 @@ function FitmentSkeleton() {
   );
 }
 
-function FitmentMetaNotice({ meta }) {
-  if (!meta) return null;
-  const { coverage, dataSource } = meta;
-  const parts = [];
-  if (dataSource === 'db') parts.push('данные из базы');
-  else if (dataSource === 'mixed') parts.push('данные из базы и Laximo');
-  else if (dataSource === 'laximo') parts.push('данные Laximo');
-  if (coverage === 'partial') parts.push('список может быть неполным');
-  if (!parts.length) return null;
-  return (
-    <p className="mt-2 text-xs text-ink-muted">
-      {parts.join(' · ')}
-      . Справочные данные — уточняйте у продавца.
-    </p>
-  );
-}
-
 export default function PartDetailFitmentBlock({
   sellerVehicles = [],
   referenceVehicles = [],
   loading = false,
-  fitmentMeta = null,
 }) {
   const { donors, compatibility } = useMemo(
     () => splitFitmentForDisplay(sellerVehicles, referenceVehicles),
@@ -71,7 +53,6 @@ export default function PartDetailFitmentBlock({
           <span className="text-sm text-ink-muted">{groupedCount} модификаций</span>
         ) : null}
       </div>
-      <FitmentMetaNotice meta={fitmentMeta} />
 
       {visibleDonors.length > 0 ? (
         <div className="mt-4 space-y-3">

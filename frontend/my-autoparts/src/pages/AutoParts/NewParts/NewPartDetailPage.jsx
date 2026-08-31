@@ -735,7 +735,6 @@ export default function NewPartDetailPage() {
           sellerVehicles={[]}
           referenceVehicles={referenceVehicles}
           loading={secondaryEnabled ? fitmentLoading : true}
-          fitmentMeta={fitmentMeta}
         />
 
         <NewPartUsedMatchesBlock
