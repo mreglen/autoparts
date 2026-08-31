@@ -243,6 +243,10 @@ input[type="password"] {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+.pr-safe {
+  padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+}
+
 /* Mobile shell: page padding above bottom nav (sync mobileTokens MOBILE_PAGE_BOTTOM_PAD) */
 .pb-mobile-nav {
   padding-bottom: var(--sg-mobile-bottom-nav-total);
