@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import SoftServiceNotice from '../../../components/SoftServiceNotice/SoftServiceNotice';
+import { buildVinCatalogSeo, PageSeoHelmet } from '../../../utils/pageSeo';
 import { apiRequestUnauth } from '../../../utils/apiClient';
 import {
   candidateLabel,
@@ -45,6 +46,7 @@ export default function VinCatalogPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
+  const pageSeo = useMemo(() => buildVinCatalogSeo(searchParams), [searchParams]);
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const fallbackSearchPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
 
@@ -820,6 +822,7 @@ export default function VinCatalogPage() {
 
   return (
     <div className={`mx-auto px-3 ${step === 'browse' ? 'max-w-7xl py-2 sm:px-4 sm:py-3' : 'max-w-4xl py-4 sm:px-4 sm:py-6'}`}>
+      <PageSeoHelmet seo={pageSeo} />
       {step !== 'browse' ? (
         <div className="mb-4 flex items-center justify-between gap-3">
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Каталог по VIN</h1>

@@ -37,6 +37,8 @@ Disallow: /buyer/
 Disallow: /users/
 Disallow: /autoparts/new/filters
 Disallow: /autoparts/used/filters
+Disallow: /autoparts/vin?vin=
+Disallow: /autoparts/vin?wizard=
 
 Disallow: /find
 Disallow: /api/
@@ -46,5 +48,6 @@ Disallow: /server/
 
 Host: svoygarage.ru
 Clean-param: utm_source&utm_medium&utm_campaign&utm_content&utm_term&yclid&ysclid&from
+Clean-param: vin&wizard /autoparts/vin
 
 Sitemap: https://svoygarage.ru/sitemap.xml

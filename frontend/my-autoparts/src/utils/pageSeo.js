@@ -85,6 +85,28 @@ export function buildCatalogSeo() {
   };
 }
 
+/** Страницы с конкретным VIN или wizard-сессией не индексируем. */
+export function isVinCatalogNoindexQuery(searchParams) {
+  if (!searchParams) return false;
+  if ((searchParams.get('vin') || '').trim()) return true;
+  if (searchParams.get('wizard') === '1') return true;
+  return false;
+}
+
+export function buildVinCatalogSeo(searchParams) {
+  const isPrivate = isVinCatalogNoindexQuery(searchParams);
+  return {
+    title: isPrivate
+      ? 'Каталог по VIN | Свой Гараж'
+      : 'Каталог по VIN — подбор запчастей | Свой Гараж',
+    description: isPrivate
+      ? 'Подбор автозапчастей по VIN на «Свой Гараж».'
+      : 'Каталог запчастей по VIN: оригинальные номера и узлы по идентификационному номеру автомобиля.',
+    canonicalUrl: absoluteUrl('/autoparts/vin'),
+    robots: isPrivate ? 'noindex, nofollow' : 'index, follow',
+  };
+}
+
 export function buildNewPartsSeo(searchParams) {
   const q = (searchParams?.get('q') || '').trim();
   const brands = searchParams?.getAll('brand') || [];

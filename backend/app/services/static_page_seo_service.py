@@ -117,6 +117,28 @@ def _build_catalog_seo(site_origin: str) -> StaticPageSeoMeta:
     )
 
 
+def _build_vin_catalog_seo(site_origin: str, *, private: bool) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/autoparts/vin")
+    if private:
+        return StaticPageSeoMeta(
+            title="Каталог по VIN | Свой Гараж",
+            description="Подбор автозапчастей по VIN на «Свой Гараж».",
+            canonical_url=canonical_url,
+            h1="Каталог по VIN",
+            robots="noindex, nofollow",
+        )
+    return StaticPageSeoMeta(
+        title="Каталог по VIN — подбор запчастей | Свой Гараж",
+        description=(
+            "Каталог запчастей по VIN: оригинальные номера и узлы "
+            "по идентификационному номеру автомобиля."
+        ),
+        canonical_url=canonical_url,
+        h1="Каталог по VIN",
+        robots="index, follow",
+    )
+
+
 def _build_new_parts_seo(
     site_origin: str,
     query: str | None,
@@ -759,6 +781,10 @@ def get_static_page_seo_for_path(
         return _build_home_seo(origin)
     if path == "/catalog":
         return _build_catalog_seo(origin)
+    if path == "/autoparts/vin":
+        vin = (query_params.get("vin") or [""])[0].strip()
+        wizard = (query_params.get("wizard") or [""])[0] == "1"
+        return _build_vin_catalog_seo(origin, private=bool(vin) or wizard)
     if path == "/autoparts":
         return _build_autoparts_redirect_seo(origin)
     if path == "/autoparts/new":

@@ -25,6 +25,25 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertIn("Каталог", meta.title)
         self.assertEqual(meta.canonical_url, "https://svoygarage.ru/catalog")
 
+    def test_vin_catalog_base_seo_is_indexable(self):
+        meta = get_static_page_seo_for_path(None, "/autoparts/vin")
+        self.assertIsNotNone(meta)
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/vin")
+        self.assertEqual(meta.robots, "index, follow")
+
+    def test_vin_catalog_with_vin_query_is_noindex(self):
+        meta = get_static_page_seo_for_path(None, "/autoparts/vin?vin=WAUYP64B91N069929")
+        self.assertIsNotNone(meta)
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/vin")
+        self.assertEqual(meta.robots, "noindex, nofollow")
+        html = render_static_page_prerender_html(meta)
+        self.assertIn('content="noindex, nofollow"', html)
+
+    def test_vin_catalog_wizard_query_is_noindex(self):
+        meta = get_static_page_seo_for_path(None, "/autoparts/vin?wizard=1")
+        self.assertIsNotNone(meta)
+        self.assertEqual(meta.robots, "noindex, nofollow")
+
     def test_new_parts_search_seo(self):
         meta = get_static_page_seo_for_path(None, "/autoparts/new?q=if1009")
         self.assertIsNotNone(meta)
