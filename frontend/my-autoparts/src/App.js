@@ -35,6 +35,7 @@ import {
 import { buildAutopartsRedirectSeo, PageSeoHelmet } from './utils/pageSeo';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
 import { isPwaStandalone, PWA_START_PATH } from './utils/pwaStandalone';
+import { markAppPaintReady } from './utils/appSplash';
 
 // Eager: публичный каталог и первый экран
 import Authorization from './pages/Autorization/Authorization';
@@ -446,6 +447,10 @@ function App() {
     dispatch(fetchPublicSiteConfig(true));
     dispatch(fetchSiteQuickLinks());
   }, [dispatch]);
+
+  useEffect(() => {
+    markAppPaintReady();
+  }, []);
 
   useEffect(() => {
     if (!token) return undefined;

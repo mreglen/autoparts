@@ -6,11 +6,12 @@ import { store } from './redux/store';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { scheduleAppSplashHide } from './utils/appSplash';
 import { appendNotificationHistory } from './utils/notificationHistory';
+import { ensureAppSplashBootFallback } from './utils/appSplash';
 import { initSentry } from './utils/sentry';
 
 window.__sgSplashStart = Date.now();
+ensureAppSplashBootFallback();
 
 initSentry();
 
@@ -24,10 +25,6 @@ root.render(
     </Provider>
   </React.StrictMode>
 );
-
-requestAnimationFrame(() => {
-  requestAnimationFrame(scheduleAppSplashHide);
-});
 
 // Register Service Worker for Push Notifications + offline shell
 if ('serviceWorker' in navigator) {

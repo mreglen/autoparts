@@ -25,20 +25,32 @@
       })();
     </script>
     <style>
+      html:not(.sg-app-ready) #root {
+        visibility: hidden;
+      }
+
+      html.sg-app-ready #root {
+        visibility: visible;
+      }
+
+      body {
+        margin: 0;
+        background: #fefdfb;
+        color: #0f172a;
+        font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
       #pwa-splash {
-        display: none;
+        display: flex;
         position: fixed;
         inset: 0;
         z-index: 99999;
         align-items: center;
         justify-content: center;
         background: #fefdfb;
-        transition: opacity 0.45s ease, visibility 0.45s;
-      }
-
-      html.pwa-standalone #pwa-splash,
-      html.mobile-shell #pwa-splash {
-        display: flex;
+        transition: opacity 0.35s ease, visibility 0.35s;
       }
 
       #pwa-splash.pwa-splash--hide {
@@ -107,7 +119,7 @@
     <link rel="preload" as="image" href="%PUBLIC_URL%/img/LogoWithoutBg.png" />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Onest:wght@100..900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Onest:wght@100..900&display=optional"
     />
     <!-- Favicon (public/favicons/) -->
     <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/favicons/favicon.svg" sizes="120x120" />
