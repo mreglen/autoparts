@@ -6,13 +6,13 @@ function LinkRow({ title, items }) {
   if (!items?.length) return null;
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+      <h3 className="text-sm font-semibold text-ink-soft">{title}</h3>
       <div className="flex flex-wrap gap-2">
         {items.map((item) => (
           <Link
             key={`${item.kind}-${item.slug}`}
             to={item.path}
-            className="inline-flex items-center rounded-xl border border-indigo-100 bg-white px-4 py-2 text-sm font-medium text-indigo-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50"
+            className="inline-flex items-center rounded-full border border-brand-100/80 bg-[#f5f6f8] px-4 py-2 text-sm font-medium text-brand-700 transition hover:border-brand-200 hover:bg-brand-50"
           >
             {item.label}
           </Link>
@@ -53,11 +53,12 @@ export default function FeaturedLandingsSection() {
   if (!hasAny) return null;
 
   return (
-    <section className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-indigo-100/80 bg-white/90 p-6 shadow-sm sm:p-8">
-        <h2 className="text-2xl font-bold text-gray-900">Популярные каталоги</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Бренды, категории и гео-посадочные для быстрого перехода к нужным запчастям.
+    <section className="relative mx-auto max-w-sg-content px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
+      <div className="rounded-[1.75rem] border border-white/70 bg-white/85 p-6 shadow-[0_8px_32px_rgba(15,23,42,0.06)] backdrop-blur-sm sm:rounded-[2rem] sm:p-8">
+        <p className="text-sm font-semibold text-brand-600">Популярное</p>
+        <h2 className="mt-1 text-2xl font-bold text-ink">Каталоги и подборки</h2>
+        <p className="mt-2 text-sm text-ink-muted">
+          Бренды, категории и города — быстрый переход к нужным запчастям.
         </p>
         <div className="mt-6 space-y-6">
           <LinkRow title="Новые бренды" items={data.brands_new} />

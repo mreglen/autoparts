@@ -110,10 +110,21 @@ export const fetchSiteQuickLinks = createAsyncThunk(
   }
 );
 
+function buildAdminOrganizationPhoneFromConfig(p) {
+  if (!p?.organization_phone) return null;
+  return {
+    organization_name: p.organization_name ?? null,
+    organization_phone: p.organization_phone,
+  };
+}
+
+const cachedSiteConfig =
+  typeof window !== 'undefined' ? readSessionCache(SITE_CONFIG_CACHE_KEY) : null;
+
 const publicInfoSlice = createSlice({
   name: 'publicInfo',
     initialState: {
-        adminOrganizationPhone: null,
+        adminOrganizationPhone: buildAdminOrganizationPhoneFromConfig(cachedSiteConfig),
         showNewAutoparts: true,
         showSiteReviews: true,
         showYandexBadge: true,
@@ -217,14 +228,7 @@ const publicInfoSlice = createSlice({
           mode === 'cart_only' || mode === 'cta_only' || mode === 'both' ? mode : 'both';
         state.roundProductPrices = p?.round_product_prices === true;
         state.laximoVinCatalogAvailable = p?.laximo_vin_catalog_available === true;
-        if (p?.organization_phone) {
-          state.adminOrganizationPhone = {
-            organization_name: p.organization_name ?? null,
-            organization_phone: p.organization_phone,
-          };
-        } else {
-          state.adminOrganizationPhone = null;
-        }
+        state.adminOrganizationPhone = buildAdminOrganizationPhoneFromConfig(p);
       })
       .addCase(fetchPublicSiteConfig.rejected, (state, action) => {
         state.loading = false;

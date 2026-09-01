@@ -3,8 +3,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { getPageTitle } from '../../hooks/useMobileMenuShell';
 import useHistoryBack from '../../hooks/useHistoryBack';
-import { useShowYandexBadge } from '../../utils/siteReviewsPublic';
-import HeaderYandexBadge from '../Seo/HeaderYandexBadge';
 import CitySelectModal from '../CitySelectModal/CitySelectModal';
 import { useSelectedCity } from '../../hooks/useSelectedCity';
 import { PWA_START_PATH, usePwaStandalone } from '../../utils/pwaStandalone';
@@ -70,7 +68,6 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
 
   const firstName = user?.first_name || user?.name?.split?.(' ')?.[0] || 'П';
   const profilePath = '/profile';
-  const showYandexBadge = useShowYandexBadge();
 
   const isPwa = usePwaStandalone();
   const handleBack = useHistoryBack(isPwa ? PWA_START_PATH : '/');
@@ -81,7 +78,6 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
         className={`lg:hidden fixed inset-x-0 top-0 border-b border-line bg-surface pt-safe-top ${hidden ? 'hidden' : ''}`}
         style={{ zIndex: Z_MOBILE_HEADER }}
       >
-        {showYandexBadge ? <HeaderYandexBadge /> : null}
         <div className="flex h-[3.75rem] items-center gap-2.5 px-4 sm:px-6">
           {showBack ? (
             <HeaderIconButton onClick={handleBack} label="Назад">

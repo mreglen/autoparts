@@ -1,15 +1,4 @@
-import { useEffect } from 'react';
-import { useShowYandexBadge } from '../../utils/siteReviewsPublic';
-
+/** Резерв под синхронизацию высоты шапки (бейдж ИКС в header отключён). */
 export default function HeaderBadgeHeightSync() {
-  const showYandexBadge = useShowYandexBadge();
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('sg-yandex-badge-on', showYandexBadge);
-    return () => {
-      document.documentElement.classList.remove('sg-yandex-badge-on');
-    };
-  }, [showYandexBadge]);
-
   return null;
 }

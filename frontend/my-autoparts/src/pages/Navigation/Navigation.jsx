@@ -7,8 +7,7 @@ import { fetchAdminOrganizationPhone } from '../../redux/slices/PublicInfoSlice'
 import { fetchUnreadCount } from '../../redux/slices/ChatSlice';
 import { selectTotalUnreadCount } from '../../utils/chatUnread';
 import Search from './Search/Search';
-import { useShowSiteReviews, useShowYandexBadge } from '../../utils/siteReviewsPublic';
-import HeaderYandexBadge from '../../components/Seo/HeaderYandexBadge';
+import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import CitySelectModal from '../../components/CitySelectModal/CitySelectModal';
 import { useSelectedCity } from '../../hooks/useSelectedCity';
 import { Button } from '../../components/UI';
@@ -61,7 +60,6 @@ export default function Navigation() {
   const totalUnreadCount = useSelector(selectTotalUnreadCount);
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const showSiteReviews = useShowSiteReviews();
-  const showYandexBadge = useShowYandexBadge();
   const {
     city: selectedCity,
     isModalOpen: isCityModalOpen,
@@ -120,7 +118,6 @@ export default function Navigation() {
   return (
     <>
     <header className="fixed inset-x-0 top-0 z-50 border-b border-line bg-surface">
-      {showYandexBadge ? <HeaderYandexBadge /> : null}
       <div className="border-b border-line bg-surface-subtle">
         <div className={`flex h-9 items-center justify-between gap-4 ${HEADER_CONTENT_CLASS}`}>
           <div className="flex min-w-0 items-center gap-3 text-xs text-ink-muted">
@@ -131,10 +128,12 @@ export default function Navigation() {
             />
             {adminOrganizationPhone?.organization_phone && (
               <>
-                <span className="hidden text-line-strong sm:inline">|</span>
+                <span className="shrink-0 text-line-strong" aria-hidden>
+                  |
+                </span>
                 <a
                   href={`tel:${adminOrganizationPhone.organization_phone.replace(/\D/g, '')}`}
-                  className="hidden items-center gap-1.5 font-medium text-ink-soft transition hover:text-brand-600 sm:inline-flex"
+                  className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-medium text-ink-soft transition hover:text-brand-600"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
