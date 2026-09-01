@@ -1,8 +1,22 @@
+import { flushSync } from 'react-dom';
+
 /** ФИО: фамилия, имя, отчество (отчество опционально), кириллица, дефис в частях */
 export const FULL_NAME_REGEX =
   /^[А-ЯЁа-яё]+(?:-[А-ЯЁа-яё]+)?\s+[А-ЯЁа-яё]+(?:-[А-ЯЁа-яё]+)?(?:\s+[А-ЯЁа-яё]+(?:-[А-ЯЁа-яё]+)?)?$/;
 
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** Нормализует введённые цифры к формату 7XXXXXXXXXX (макс. 11 цифр). */
+function normalizePhoneDigits(digits) {
+  let d = String(digits || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('8')) {
+    d = `7${d.slice(1)}`;
+  } else if (!d.startsWith('7')) {
+    d = `7${d}`;
+  }
+  return d.slice(0, 11);
+}
 
 export function normalizeFullName(value) {
   return (value || '').replace(/\s+/g, ' ').trim();
@@ -42,43 +56,23 @@ export function validateEmail(value) {
 
 export function formatPhoneFromRaw(phone) {
   if (!phone) return '';
-  let digits = String(phone).replace(/\D/g, '');
-  if (digits.startsWith('8')) digits = '7' + digits.slice(1);
-  if (digits.startsWith('7')) digits = digits.slice(0, 11);
-  else if (digits.length === 10) digits = '7' + digits;
-  else return formatPhoneInput('+7' + digits.slice(0, 10));
-
-  let formatted = '+7';
-  if (digits.length > 1) formatted += ` (${digits.slice(1, 4)}`;
-  if (digits.length > 4) formatted += `) ${digits.slice(4, 7)}`;
-  if (digits.length > 7) formatted += `-${digits.slice(7, 9)}`;
-  if (digits.length > 9) formatted += `-${digits.slice(9, 11)}`;
-  return formatted;
+  return formatPhoneInput(phone);
 }
 
 export function formatPhoneInput(inputValue) {
-  let digits = (inputValue || '').replace(/[^\d+]/g, '');
-  if (digits.startsWith('8')) digits = '+7' + digits.slice(1);
-  else if (digits.startsWith('7') && !digits.startsWith('+')) digits = '+7' + digits.slice(1);
-  else if (digits === '+') digits = '+7';
-  else if (!digits.startsWith('+7')) {
-    if (!digits.startsWith('+')) digits = '';
-  }
+  const digits = normalizePhoneDigits(inputValue);
+  if (!digits) return '';
 
-  const cleanDigits = digits.replace(/\D/g, '');
-  if (cleanDigits.length > 11) digits = '+7' + cleanDigits.slice(1, 11);
+  const national = digits.slice(1);
+  if (national.length === 0) return '+7';
 
-  let formatted = digits;
-  if (digits.startsWith('+7')) {
-    const rest = digits.slice(2);
-    if (rest.length === 0) formatted = '+7';
-    else if (rest.length <= 3) formatted = `+7 (${rest}`;
-    else if (rest.length <= 6) formatted = `+7 (${rest.slice(0, 3)}) ${rest.slice(3)}`;
-    else if (rest.length <= 8) {
-      formatted = `+7 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
-    } else if (rest.length <= 10) {
-      formatted = `+7 (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6, 8)}-${rest.slice(8)}`;
-    }
+  let formatted = '+7';
+  if (national.length <= 3) formatted += ` (${national}`;
+  else if (national.length <= 6) formatted += ` (${national.slice(0, 3)}) ${national.slice(3)}`;
+  else if (national.length <= 8) {
+    formatted += ` (${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`;
+  } else {
+    formatted += ` (${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6, 8)}-${national.slice(8)}`;
   }
   return formatted;
 }
@@ -102,10 +96,9 @@ function getPhoneCursorPosition(formatted, digitsBeforeCursor) {
 }
 
 export function formatPhoneInputChange(inputValue, selectionStart = null) {
-  const cursor = selectionStart ?? String(inputValue || '').length;
-  const digitsBeforeCursor = String(inputValue || '')
-    .slice(0, cursor)
-    .replace(/\D/g, '').length;
+  const raw = String(inputValue || '');
+  const cursor = selectionStart ?? raw.length;
+  const digitsBeforeCursor = normalizePhoneDigits(raw.slice(0, cursor).replace(/\D/g, '')).length;
   const formatted = formatPhoneInput(inputValue);
   const nextCursor = getPhoneCursorPosition(formatted, digitsBeforeCursor);
 
@@ -119,14 +112,19 @@ export function formatPhoneInputChange(inputValue, selectionStart = null) {
 export function handlePhoneInputChange(event, setValue) {
   const input = event.target;
   const result = formatPhoneInputChange(input.value, input.selectionStart ?? input.value.length);
-  const { selectionStart, selectionEnd } = result;
-  setValue(result.value);
-  const restoreCursor = () => {
-    if (document.activeElement === input) {
+  const { selectionStart, selectionEnd, value } = result;
+
+  flushSync(() => {
+    setValue(value);
+  });
+
+  if (document.activeElement === input) {
+    try {
       input.setSelectionRange(selectionStart, selectionEnd);
+    } catch {
+      // type="tel" on some browsers may reject selection updates
     }
-  };
-  requestAnimationFrame(() => requestAnimationFrame(restoreCursor));
+  }
 }
 
 export function validatePhone(value) {

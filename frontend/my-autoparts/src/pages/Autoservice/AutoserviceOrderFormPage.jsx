@@ -561,6 +561,7 @@ function AddClientModal({ onClose, onCreated }) {
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const nameInputRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -594,11 +595,12 @@ function AddClientModal({ onClose, onCreated }) {
   };
 
   return (
-    <Modal open title="Добавить клиента" onClose={onClose}>
+    <Modal open title="Добавить клиента" onClose={onClose} initialFocusRef={nameInputRef}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sg-caption font-medium text-ink-muted">ФИО</label>
           <input
+            ref={nameInputRef}
             className={pillInputClass}
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -606,12 +608,14 @@ function AddClientModal({ onClose, onCreated }) {
             disabled={saving}
             required
             maxLength={120}
+            autoComplete="name"
           />
         </div>
         <div>
           <label className="block text-sg-caption font-medium text-ink-muted">Телефон (необязательно)</label>
           <input
             type="tel"
+            inputMode="tel"
             className={`${pillInputClass} ${phoneError ? '!border-danger-600 !bg-danger-50 focus:!border-danger-600' : ''}`}
             value={phone}
             onChange={(e) => {
@@ -620,6 +624,7 @@ function AddClientModal({ onClose, onCreated }) {
             }}
             placeholder="+7 (___) ___-__-__"
             disabled={saving}
+            autoComplete="tel"
           />
           {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
         </div>
