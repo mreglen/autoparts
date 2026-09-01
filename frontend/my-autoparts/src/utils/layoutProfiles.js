@@ -44,11 +44,14 @@ export function getPublicLayoutProfile(pathname = '', chatIdParam = null) {
 export function getPublicMainClasses({
   isFullBleedAmbientPage,
   isChatsPage,
+  isMobileActiveChat,
   isPartPage,
   isNewPartDetailPage,
   isVinCatalogPage,
   isAutopartsPage,
+  pathname = '',
 }) {
+  const path = String(pathname || '');
   if (isFullBleedAmbientPage) {
     return 'max-w-none bg-surface px-0 py-0 min-h-[calc(100dvh-var(--sg-mobile-header-h)-var(--sg-mobile-bottom-nav-total))] lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]';
   }
@@ -63,6 +66,9 @@ export function getPublicMainClasses({
   }
   if (isAutopartsPage) {
     return 'max-w-sg-content max-lg:px-0 max-lg:py-2 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
+  }
+  if (path === '/cart' || path.startsWith('/cart/')) {
+    return 'max-w-sg-content max-lg:px-3 max-lg:py-3 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
   }
   return 'max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
 }

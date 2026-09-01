@@ -36,6 +36,8 @@ import EmptyState from '../../components/UI/EmptyState';
 import CartMobileView from './CartMobileView';
 import { FieldLabel, Input } from '../../components/UI/Field';
 import { PageHeader } from '../../components/UI/SectionHeader';
+import ProductDetailStickyBar from '../../components/ProductDetail/ProductDetailStickyBar';
+import { MOBILE_PRODUCT_STICKY_SCROLL_PAD } from '../../constants/mobileTokens';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../redux/slices/ClientMarkupSlice';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
@@ -404,6 +406,7 @@ export default function CartPage() {
   const showPurchaseInCart = clientMarkupEnabled
     && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH
     && clientMarkup.showPurchaseInCart;
+  const { offline } = useNetworkStatus();
 
   const canAddToRepairOrder = useMemo(
     () => isAuthorized && canAccessRepairOrders(user, permissionCodes),
@@ -961,8 +964,23 @@ export default function CartPage() {
     });
   });
 
+  const filledCartSections = cartSections.filter((section) => section.items?.length);
+  const singleCheckoutSection = filledCartSections.length === 1 ? filledCartSections[0] : null;
+  const showMobileStickySummary = filledCartSections.length > 0;
+
+  const handleStickyCheckout = useCallback(() => {
+    if (!singleCheckoutSection?.items?.length) return;
+    const items = singleCheckoutSection.items;
+    const someSelected = items.some((item) => selectedItems.has(item.id));
+    if (someSelected) {
+      singleCheckoutSection.onCheckoutSelected?.();
+      return;
+    }
+    singleCheckoutSection.onCheckout?.();
+  }, [selectedItems, singleCheckoutSection]);
+
   return (
-    <div className="mt-5 pb-8 max-lg:mt-0">
+    <div className={`mt-5 pb-8 max-lg:mt-0 ${showMobileStickySummary ? MOBILE_PRODUCT_STICKY_SCROLL_PAD : ''}`}>
       <PageHeader
         className="max-lg:hidden"
         title="Корзина"
@@ -972,6 +990,15 @@ export default function CartPage() {
             : 'Новые запчасти и б/у от разных продавцов'
         }
       />
+
+      {!isInitialLoad && !error && cartItems.length > 0 ? (
+        <div className="mb-4 lg:hidden">
+          <h1 className="text-xl font-bold text-ink">Корзина</h1>
+          <p className="mt-1 text-sm text-ink-muted">
+            {cartItems.length} поз. · {grandQty} шт. · {formatCartPrice(grandTotal)}
+          </p>
+        </div>
+      ) : null}
 
       {isInitialLoad ? (
         <EmptyState illustration="empty" title="Загрузка корзины…" className="border-solid" />
@@ -1050,6 +1077,32 @@ export default function CartPage() {
           </div>
         </>
       )}
+
+      {showMobileStickySummary ? (
+        <ProductDetailStickyBar
+          priceLabel="Итого"
+          priceValue={formatCartPrice(grandTotal)}
+          meta={`${grandQty} шт.`}
+          ariaLabel="Итого по корзине"
+        >
+          {singleCheckoutSection ? (
+            <Button
+              className="w-full"
+              size="lg"
+              disabled={offline}
+              onClick={handleStickyCheckout}
+            >
+              {singleCheckoutSection.items.some((item) => selectedItems.has(item.id))
+                ? `Оформить (${singleCheckoutSection.items.filter((item) => selectedItems.has(item.id)).length})`
+                : (singleCheckoutSection.checkoutLabel || 'Оформить заказ')}
+            </Button>
+          ) : (
+            <p className="text-center text-xs leading-snug text-ink-muted">
+              Оформление — в блоках корзины выше
+            </p>
+          )}
+        </ProductDetailStickyBar>
+      ) : null}
 
       <CartAuthModal
         isOpen={isAuthModalOpen}

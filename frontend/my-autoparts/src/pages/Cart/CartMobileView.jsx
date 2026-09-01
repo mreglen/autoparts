@@ -83,16 +83,16 @@ function CartMobileBlock({
   const displayTotal = someSelected ? selectedTotal : blockTotal;
 
   return (
-    <section className="overflow-hidden rounded-sg border-2 border-brand-200 bg-surface shadow-sm">
-      <header className="border-b border-brand-200 bg-brand-100 px-3 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+    <section className="overflow-hidden rounded-sg border border-line bg-surface shadow-sg-sm">
+      <header className="border-b border-line bg-surface-subtle px-3 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1">
             <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{section.title}</h2>
             {section.canRename && section.onRename ? (
               <button
                 type="button"
                 onClick={section.onRename}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:text-brand-600"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:text-brand-600"
                 aria-label="Переименовать корзину"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,12 +106,12 @@ function CartMobileBlock({
               </button>
             ) : null}
           </div>
-          <p className="shrink-0 text-lg font-bold tabular-nums text-ink">
+          <p className="shrink-0 text-base font-bold tabular-nums text-ink">
             {section.formatItemPrice(displayTotal)}
           </p>
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-2.5 flex items-center gap-2">
           <Button
             className="min-h-11 flex-1"
             disabled={offline}
@@ -123,7 +123,7 @@ function CartMobileBlock({
           </Button>
           {section.showClientMarkupControl ? (
             <div className="flex h-11 items-center">
-              <ClientMarkupPopover bottomInset={80} readOnly={Boolean(section.clientMarkupReadOnly)} />
+              <ClientMarkupPopover bottomInset={120} readOnly={Boolean(section.clientMarkupReadOnly)} />
             </div>
           ) : null}
           <CartMobileMenu
@@ -139,27 +139,20 @@ function CartMobileBlock({
       </header>
 
       {section.showSupplierDeliveryOption ? (
-        <div className="border-b border-brand-200 bg-surface px-3 py-3">
-          <label className="flex cursor-pointer items-start gap-3">
+        <div className="border-b border-line bg-surface px-3 py-2.5">
+          <label className="flex cursor-pointer items-center gap-2.5">
             <input
               type="checkbox"
               checked={Boolean(section.deliverInParts)}
               onChange={(e) => section.onDeliverInPartsChange?.(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+              className="h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
             />
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-ink">Доставлять частями</span>
-              <span className="mt-0.5 block text-xs leading-snug text-ink-muted">
-                {section.deliverInParts
-                  ? 'Позиции будут отправляться по мере поступления на склад Rossko.'
-                  : 'По умолчанию все позиции одной поставкой на наш склад.'}
-              </span>
-            </span>
+            <span className="min-w-0 text-sm font-medium text-ink">Доставлять частями</span>
           </label>
         </div>
       ) : null}
 
-      <div className="flex items-center gap-2 border-b border-line bg-surface-muted/40 px-3 py-2">
+      <div className="flex items-center gap-2 border-b border-line bg-surface-muted/30 px-3 py-2">
         <input
           type="checkbox"
           checked={allSelected}
@@ -173,7 +166,7 @@ function CartMobileBlock({
         <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">Выбрать все</span>
       </div>
 
-      <div className="space-y-3 p-3">
+      <div className="divide-y divide-line">
         {items.map((item) => (
           <CartItemMobileCard
             key={item.id}
@@ -228,7 +221,7 @@ export default function CartMobileView({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 lg:hidden">
       {filled.map((section) => (
         <CartMobileBlock
           key={section.key}

@@ -59,6 +59,7 @@ export default function MainLayout() {
         isNewPartDetailPage,
         isVinCatalogPage,
         isAutopartsPage: layoutProfile.isAutopartsPage,
+        pathname: location.pathname,
     });
 
     return (
