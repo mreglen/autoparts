@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.rossko_stock_filter import is_rossko_deliverable_stock
+
 
 def _safe_text(value: object, default: str = "") -> str:
     if value is None:
@@ -82,7 +84,7 @@ def get_rossko_stock_count(part: dict[str, Any]) -> int:
     arr = stocks if isinstance(stocks, list) else [stocks]
     total = 0
     for stock in arr:
-        if not isinstance(stock, dict):
+        if not isinstance(stock, dict) or not is_rossko_deliverable_stock(stock):
             continue
         try:
             total += max(0, int(stock.get("count") or 0))
@@ -98,7 +100,7 @@ def get_rossko_min_price(part: dict[str, Any]) -> float:
     arr = stocks if isinstance(stocks, list) else [stocks]
     min_price = 0.0
     for stock in arr:
-        if not isinstance(stock, dict):
+        if not isinstance(stock, dict) or not is_rossko_deliverable_stock(stock):
             continue
         try:
             price = float(stock.get("price") or 0)
@@ -218,7 +220,7 @@ def map_rossko_stocks(part: dict[str, Any]) -> list[dict[str, Any]]:
     arr = stocks if isinstance(stocks, list) else [stocks]
     mapped: list[dict[str, Any]] = []
     for stock in arr:
-        if not isinstance(stock, dict):
+        if not isinstance(stock, dict) or not is_rossko_deliverable_stock(stock):
             continue
         stock_id = _safe_text(stock.get("id"))
         if not stock_id:

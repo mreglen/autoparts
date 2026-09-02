@@ -10,6 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.new_parts_seo_card import NewPartsSeoCard
+from app.services.rossko_stock_filter import is_rossko_deliverable_stock
 from app.models.seo_landing_page import SeoLandingPage
 from app.utils.slug_utils import slugify_brand
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
@@ -166,13 +167,20 @@ def _normalize_stock_entry(raw: object) -> dict | None:
         available_count = max(0, int(raw.get("available_count") or 0))
     except Exception:
         available_count = 0
-    return {
+    row = {
         "stock_id": stock_id,
         "price": price_value,
         "available_count": available_count,
         "delivery_start": _safe_text(raw.get("delivery_start")) or None,
         "delivery_end": _safe_text(raw.get("delivery_end")) or None,
     }
+    if not _is_deliverable_stock_entry(row):
+        return None
+    return row
+
+
+def _is_deliverable_stock_entry(row: dict) -> bool:
+    return is_rossko_deliverable_stock(row)
 
 
 def _merge_stocks(existing: list[dict], incoming: list[dict]) -> list[dict]:
@@ -185,7 +193,7 @@ def _merge_stocks(existing: list[dict], incoming: list[dict]) -> list[dict]:
         prev = merged.get(key)
         if prev is None or normalized["available_count"] > prev["available_count"]:
             merged[key] = normalized
-    return list(merged.values())
+    return [row for row in merged.values() if _is_deliverable_stock_entry(row)]
 
 
 def _payload_from_raw(card: NewPartsSeoCard) -> dict:

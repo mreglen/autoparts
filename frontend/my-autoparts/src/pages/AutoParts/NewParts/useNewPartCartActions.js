@@ -10,6 +10,7 @@ import {
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import { applyMarkup } from './newPartStockUtils';
+import { isRosskoDeliverableStock } from './rosskoHelpers';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 
 const toSafeText = (value, fallback = '') => {
@@ -41,7 +42,11 @@ export function useNewPartCartActions({ part, stocksData }) {
 
   const stocks = useMemo(
     () => (stocksData || []).filter(
-      (stock) => stock?.price && stock.price !== '0' && stock.price !== 0 && (stock.available_count || 0) > 0,
+      (stock) => isRosskoDeliverableStock(stock)
+        && stock?.price
+        && stock.price !== '0'
+        && stock.price !== 0
+        && (stock.available_count || 0) > 0,
     ),
     [stocksData],
   );

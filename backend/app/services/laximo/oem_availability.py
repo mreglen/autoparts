@@ -16,6 +16,7 @@ from app.utils.rossko_api_keys import get_rossko_api_keys
 from app.models.product import Product as ProductModel
 from app.services.laximo.doc_client import LaximoDocError, find_oem
 from app.services.laximo.gate import laximo_doc_ready
+from app.services.rossko_stock_filter import is_rossko_deliverable_stock
 from app.utils.partnumber import normalize_partnumber
 from app.utils.search_sql import get_sql_normalize
 
@@ -76,7 +77,7 @@ def _rossko_part_min_price(part: dict[str, Any]) -> Optional[float]:
     stocks = (part.get("stocks") or {}).get("stock")
     prices: list[float] = []
     for stock in _as_list(stocks):
-        if not isinstance(stock, dict):
+        if not isinstance(stock, dict) or not is_rossko_deliverable_stock(stock):
             continue
         try:
             price = float(stock.get("price") or 0)
@@ -91,7 +92,7 @@ def _rossko_part_stock_count(part: dict[str, Any]) -> int:
     stocks = (part.get("stocks") or {}).get("stock")
     total = 0
     for stock in _as_list(stocks):
-        if not isinstance(stock, dict):
+        if not isinstance(stock, dict) or not is_rossko_deliverable_stock(stock):
             continue
         try:
             total += int(stock.get("count") or 0)

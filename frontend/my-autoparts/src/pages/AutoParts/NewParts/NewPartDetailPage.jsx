@@ -32,6 +32,7 @@ import { getMinStockPrice } from './newPartStockUtils';
 import {
   buildRosskoLookupText,
   getRosskoParts,
+  isRosskoDeliverableStock,
   mapPartToStocksData,
   pickBestRosskoPart,
 } from './rosskoHelpers';
@@ -83,7 +84,8 @@ const stocksFromCardApi = (card) => {
       delivery_start: stock.delivery_start || null,
       delivery_end: stock.delivery_end || null,
     }))
-    .filter((stock) => stock.price > 0 && stock.available_count > 0);
+    .filter((stock) => stock.price > 0 && stock.available_count > 0)
+    .filter((stock) => isRosskoDeliverableStock(stock));
 };
 
 const buildPartFromCard = (card) => ({

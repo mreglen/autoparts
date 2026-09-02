@@ -1,14 +1,28 @@
-export const getRosskoStockCount = (part) => {
+function rosskoStocksArray(part) {
   const stocks = part?.stocks?.stock;
-  if (!stocks) return 0;
-  const arr = Array.isArray(stocks) ? stocks : [stocks];
+  if (!stocks) return [];
+  return Array.isArray(stocks) ? stocks : [stocks];
+}
+
+/** Склад с доставкой: у Rossko API 2.1 есть окно deliveryStart/deliveryEnd. */
+export function isRosskoDeliverableStock(stock) {
+  if (!stock || typeof stock !== 'object') return false;
+  const start = stock.deliveryStart ?? stock.delivery_start;
+  const end = stock.deliveryEnd ?? stock.delivery_end;
+  return Boolean(start && end);
+}
+
+function rosskoDeliverableStocksArray(part) {
+  return rosskoStocksArray(part).filter(isRosskoDeliverableStock);
+}
+
+export const getRosskoStockCount = (part) => {
+  const arr = rosskoDeliverableStocksArray(part);
   return arr.reduce((sum, s) => sum + (parseInt(s?.count, 10) || 0), 0);
 };
 
 export const getRosskoMinPrice = (part) => {
-  const stocks = part?.stocks?.stock;
-  if (!stocks) return 0;
-  const arr = Array.isArray(stocks) ? stocks : [stocks];
+  const arr = rosskoDeliverableStocksArray(part);
   return arr.reduce((min, s) => {
     const p = parseFloat(s?.price) || 0;
     if (!p) return min;
@@ -26,9 +40,8 @@ export const roundRosskoSalePrice = (rawPrice) => {
 };
 
 export const getRosskoEarliestDelivery = (part) => {
-  const stocks = part?.stocks?.stock;
-  if (!stocks) return Number.POSITIVE_INFINITY;
-  const arr = Array.isArray(stocks) ? stocks : [stocks];
+  const arr = rosskoDeliverableStocksArray(part);
+  if (!arr.length) return Number.POSITIVE_INFINITY;
   let min = Number.POSITIVE_INFINITY;
   arr.forEach((s) => {
     if (!s?.deliveryStart) return;
@@ -39,9 +52,8 @@ export const getRosskoEarliestDelivery = (part) => {
 };
 
 export const isRosskoFastDelivery = (part) => {
-  const stocks = part?.stocks?.stock;
-  if (!stocks) return false;
-  const arr = Array.isArray(stocks) ? stocks : [stocks];
+  const arr = rosskoDeliverableStocksArray(part);
+  if (!arr.length) return false;
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -66,6 +78,7 @@ export const mapPartToStocksData = (part) => {
   const stocksArray = Array.isArray(part.stocks.stock) ? part.stocks.stock : [part.stocks.stock];
   return stocksArray
     .filter((stock) => stock && typeof stock === 'object')
+    .filter(isRosskoDeliverableStock)
     .map((stock) => ({
       stock_id: stock.id,
       price: parseFloat(stock.price) || 0,
@@ -118,16 +131,12 @@ export function rosskoPartDedupeKey(part) {
   return `${brand}|${article}`;
 }
 
-function rosskoStocksArray(part) {
-  const stocks = part?.stocks?.stock;
-  if (!stocks) return [];
-  return Array.isArray(stocks) ? stocks : [stocks];
-}
-
 function mergeRosskoPartStocks(existingPart, incomingPart) {
   if (!existingPart || !incomingPart) return existingPart || incomingPart;
   const byId = new Map();
-  [...rosskoStocksArray(existingPart), ...rosskoStocksArray(incomingPart)].forEach((stock) => {
+  [...rosskoStocksArray(existingPart), ...rosskoStocksArray(incomingPart)]
+    .filter(isRosskoDeliverableStock)
+    .forEach((stock) => {
     if (!stock || stock.id == null) return;
     const id = String(stock.id);
     const prev = byId.get(id);
@@ -276,6 +285,7 @@ export const pickBestRosskoPart = (data, article, brand) => {
       score: scoreRosskoPart(part, queryArticleNorm, queryBrandLower),
       price: getRosskoMinPrice(part),
     }))
+    .filter((row) => getRosskoStockCount(row.part) > 0 && row.price > 0)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       if (a.price && b.price) return a.price - b.price;

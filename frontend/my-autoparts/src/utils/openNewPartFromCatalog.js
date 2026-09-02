@@ -5,6 +5,7 @@ import {
 } from './partRoutes';
 import {
   buildRosskoLookupText,
+  isRosskoDeliverableStock,
   mapPartToStocksData,
   pickBestRosskoPart,
 } from '../pages/AutoParts/NewParts/rosskoHelpers';
@@ -20,7 +21,8 @@ const ROSSKO_SEARCH_DEFAULTS = {
 
 function filterAvailableStocks(stocksData) {
   return (stocksData || []).filter(
-    (stock) => stock?.price
+    (stock) => isRosskoDeliverableStock(stock)
+      && stock?.price
       && stock.price !== '0'
       && stock.price !== 0
       && (stock.available_count || 0) > 0,

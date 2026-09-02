@@ -98,7 +98,14 @@ export function getMinStockPrice(stocks, markupPercent = 0) {
 
 export function summarizeStocks(stocks, markupPercent = 0) {
   const active = (stocks || []).filter(
-    (stock) => stock?.price && Number(stock.price) > 0 && Number(stock.available_count || 0) > 0
+    (stock) => {
+      const start = stock?.delivery_start ?? stock?.deliveryStart;
+      const end = stock?.delivery_end ?? stock?.deliveryEnd;
+      return Boolean(start && end)
+        && stock?.price
+        && Number(stock.price) > 0
+        && Number(stock.available_count || 0) > 0;
+    },
   );
   const minPrice = getMinStockPrice(active, markupPercent);
   const totalQty = active.reduce((sum, stock) => sum + Number(stock.available_count || 0), 0);

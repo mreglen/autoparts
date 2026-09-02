@@ -1,4 +1,4 @@
-/* Onest подключается в public/index.html (без блокирующего @import) */
+/* Onest подключается локально из public/fonts/onest.css */
 :root {
   --sg-yandex-badge-h: 0px;
   --sg-mobile-header-h: calc(3.75rem + var(--sg-yandex-badge-h) + env(safe-area-inset-top, 0px));
