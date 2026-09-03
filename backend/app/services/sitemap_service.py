@@ -331,7 +331,7 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
     used_brand_count = _count_active_landings(db, "brand_used")
     used_category_count = _count_active_landings(db, "category_used")
     used_geo_count = _count_active_landings(db, "geo")
-    static_pages_count = 10
+    static_pages_count = 12
     index_children = 8
 
     return [

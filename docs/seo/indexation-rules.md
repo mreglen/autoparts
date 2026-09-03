@@ -32,7 +32,8 @@
 | `/autoparts/used/geo/{slug}` | index, follow | self | авто, `buildPageKeywords` | `usedPartsGeoSeo` |
 | `/part/{id}-…` | index, follow | self | авто, `buildPageKeywords` | `buildProductSeo` / part prerender; обогащённый контент (О запчасти, FAQ, доставка); FAQPage JSON-LD |
 | `/seller/part-card/{id}` | noindex, follow | `/part/…` | — | `buildSellerPartCardSeo` |
-| `/about`, `/delivery`, `/organizations` | index, follow | self | — | static SEO builders |
+| `/about`, `/delivery`, `/payment`, `/organizations`, `/reviews` | index, follow | self | — | static SEO builders |
+| `/privacy`, `/personal-data-consent`, `/offer`, `/cookie-policy` | index, follow | self | — | legal docs: full text in prerender + `sitemap-pages.xml` |
 
 **keywords:** автогенерация через [`page_keywords.py`](../../backend/app/utils/page_keywords.py) / [`pageKeywords.js`](../../frontend/my-autoparts/src/utils/pageKeywords.js). На **noindex**-страницах тег `<meta name="keywords">` **не выводится**.
 
@@ -53,7 +54,7 @@
 
 Файл: [`frontend/my-autoparts/public/robots.txt`](../../frontend/my-autoparts/public/robots.txt).
 
-Дублирует meta robots для **crawl budget**: закрывает кабинеты (`/auth`, `/my-parts`, `/seller/`, `/admin/`), служебный редирект поиска (`/find`), зеркала карточек (`/seller/part-card/`), страницы фильтров (`/autoparts/*/filters`), корзину и служебные URL. Индексируемые разделы (`/part/`, `/autoparts/`, `/organizations`, `/delivery`) явно разрешены. `Clean-param` убирает UTM и рекламные метки из индекса Яндекса.
+Дублирует meta robots для **crawl budget**: закрывает кабинеты (`/auth`, `/my-parts`, `/seller/`, `/admin/`), служебный редирект поиска (`/find`), зеркала карточек (`/seller/part-card/`), страницы фильтров (`/autoparts/*/filters`), корзину и служебные URL. Индексируемые разделы (`/part/`, `/autoparts/`, `/organizations`, `/delivery`, `/privacy`, `/personal-data-consent`, `/offer`, `/cookie-policy`) явно разрешены. `Clean-param` убирает UTM и рекламные метки из индекса Яндекса.
 
 ## Фильтр `?brand=` → canonical на посадочную
 

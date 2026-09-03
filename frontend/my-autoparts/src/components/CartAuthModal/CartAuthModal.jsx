@@ -65,9 +65,11 @@ export default function CartAuthModal({ isOpen, onClose, onAuthSuccess }) {
     password: '',
     password_repeat: '',
   });
-  const [acceptedConsent, setAcceptedConsent] = useState(false);
+  const [acceptedPersonalData, setAcceptedPersonalData] = useState(false);
+  const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
   const [showConsentError, setShowConsentError] = useState(false);
   const [localError, setLocalError] = useState('');
+  const acceptedConsent = acceptedPersonalData && acceptedPrivacyPolicy;
 
   useEffect(() => {
     if (!isOpen) {
@@ -82,7 +84,8 @@ export default function CartAuthModal({ isOpen, onClose, onAuthSuccess }) {
         password: '',
         password_repeat: '',
       });
-      setAcceptedConsent(false);
+      setAcceptedPersonalData(false);
+      setAcceptedPrivacyPolicy(false);
       setShowConsentError(false);
       setLocalError('');
       dispatch(resetRegistration());
@@ -299,10 +302,15 @@ export default function CartAuthModal({ isOpen, onClose, onAuthSuccess }) {
             />
           </div>
           <RegistrationLegalConsent
-            accepted={acceptedConsent}
-            onChange={(value) => {
-              setAcceptedConsent(value);
-              if (value) setShowConsentError(false);
+            acceptedPersonalData={acceptedPersonalData}
+            acceptedPrivacyPolicy={acceptedPrivacyPolicy}
+            onPersonalDataChange={(value) => {
+              setAcceptedPersonalData(value);
+              if (value && acceptedPrivacyPolicy) setShowConsentError(false);
+            }}
+            onPrivacyPolicyChange={(value) => {
+              setAcceptedPrivacyPolicy(value);
+              if (value && acceptedPersonalData) setShowConsentError(false);
             }}
             showError={showConsentError}
           />

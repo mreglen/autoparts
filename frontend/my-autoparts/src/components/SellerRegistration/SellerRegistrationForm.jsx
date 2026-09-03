@@ -38,8 +38,10 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
     const [emailError, setEmailError] = useState('');
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [acceptedLegalConsent, setAcceptedLegalConsent] = useState(false);
+    const [acceptedPersonalData, setAcceptedPersonalData] = useState(false);
+    const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
     const [showLegalErrors, setShowLegalErrors] = useState(false);
+    const acceptedLegalConsent = acceptedPersonalData && acceptedPrivacyPolicy;
     const [currentStep, setCurrentStep] = useState(1);
     const [initialized, setInitialized] = useState(false);
     const dropdownRef = useRef(null);
@@ -328,6 +330,16 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
             dispatch({ type: 'auth/setError', payload: 'Введите мобильный номер в формате +7 (9XX) XXX-XX-XX' });
             return;
         }
+        if (!acceptedLegalConsent) {
+            setShowLegalErrors(true);
+            dispatch({
+                type: 'auth/setError',
+                payload:
+                    'Дайте согласие на обработку персональных данных и подтвердите ознакомление с политикой конфиденциальности',
+            });
+            return;
+        }
+        setShowLegalErrors(false);
         handleSendCode();
         setCurrentStep(2);
     };
@@ -406,11 +418,21 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
                             />
                             {phoneError && <p className="mt-1 text-sm text-red-600">{phoneError}</p>}
                         </div>
+
+                        <RegistrationLegalConsent
+                            acceptedPersonalData={acceptedPersonalData}
+                            acceptedPrivacyPolicy={acceptedPrivacyPolicy}
+                            onPersonalDataChange={setAcceptedPersonalData}
+                            onPrivacyPolicyChange={setAcceptedPrivacyPolicy}
+                            showError={showLegalErrors}
+                        />
+
                         <div className="flex justify-end pt-1">
                             <button
                                 type="button"
                                 onClick={goToStep2}
-                                className="rounded-lg bg-indigo-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                disabled={!acceptedLegalConsent}
+                                className="rounded-lg bg-indigo-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60"
                             >
                                 Далее
                             </button>
@@ -529,12 +551,6 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
                         </div>
                         {addressError && <p className="text-sm text-red-600">{addressError}</p>}
 
-                        <RegistrationLegalConsent
-                            accepted={acceptedLegalConsent}
-                            onChange={setAcceptedLegalConsent}
-                            showError={showLegalErrors}
-                        />
-
                         <div className="flex justify-between pt-1">
                             <button type="button" onClick={() => setCurrentStep(2)} className="font-medium text-gray-600 transition-colors hover:text-gray-800">
                                 Назад
@@ -561,7 +577,8 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
                         dispatch(resetRegistration());
                         dispatch(setIsBuyer(false));
                         setCurrentStep(1);
-                        setAcceptedLegalConsent(false);
+                        setAcceptedPersonalData(false);
+                        setAcceptedPrivacyPolicy(false);
                         setAddressInput('');
                     }}
                 />

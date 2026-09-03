@@ -365,6 +365,32 @@ class StaticPageSeoTests(unittest.TestCase):
         url = get_seller_part_card_redirect_url(db, "/seller/part-card/16")
         self.assertEqual(url, "https://svoygarage.ru/part/16-brand-article")
 
+    def test_legal_documents_are_indexable_with_full_text(self):
+        paths = (
+            "/privacy",
+            "/personal-data-consent",
+            "/offer",
+            "/cookie-policy",
+        )
+        for path in paths:
+            with self.subTest(path=path):
+                meta = get_static_page_seo_for_path(None, path)
+                self.assertIsNotNone(meta)
+                self.assertEqual(meta.robots, "index, follow")
+                self.assertTrue(meta.content_sections_html)
+                html = render_static_page_prerender_html(meta)
+                self.assertIn('content="index, follow"', html)
+                self.assertIn("<article>", html)
+                self.assertIn("<p>", html)
+
+    def test_about_prerender_links_to_legal_documents(self):
+        meta = get_static_page_seo_for_path(None, "/about")
+        html = render_static_page_prerender_html(meta)
+        self.assertIn("/privacy", html)
+        self.assertIn("/personal-data-consent", html)
+        self.assertIn("/offer", html)
+        self.assertIn("/cookie-policy", html)
+
 
 if __name__ == "__main__":
     unittest.main()

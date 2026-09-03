@@ -270,11 +270,30 @@ def _build_about_seo(site_origin: str) -> StaticPageSeoMeta:
         "ООО «Кроан» — оператор маркетплейса «Свой Гараж» в Екатеринбурге. "
         "Автозапчасти новые и б/у, доставка по России."
     )
+    docs = (
+        ("/privacy", "Политика конфиденциальности"),
+        ("/personal-data-consent", "Согласие на обработку персональных данных"),
+        ("/offer", "Публичная оферта"),
+        ("/cookie-policy", "Политика обработки cookie"),
+        ("/delivery", "Условия доставки"),
+        ("/payment", "Способы оплаты"),
+    )
+    items = "".join(
+        f'<li><a href="{html.escape(_absolute_url(site_origin, path), quote=True)}">'
+        f"{html.escape(label)}</a></li>"
+        for path, label in docs
+    )
+    content = (
+        "<section><h2>Документы</h2><ul>"
+        f"{items}</ul></section>"
+    )
     return StaticPageSeoMeta(
         title=title,
         description=description,
         canonical_url=canonical_url,
         h1="О компании",
+        robots="index, follow",
+        content_sections_html=content,
     )
 
 
@@ -338,51 +357,109 @@ def _build_reviews_seo(site_origin: str) -> StaticPageSeoMeta:
     )
 
 
-def _build_cookie_policy_seo(site_origin: str) -> StaticPageSeoMeta:
-    canonical_url = _absolute_url(site_origin, "/cookie-policy")
-    title = "Политика обработки cookie | Свой Гараж"
-    description = "Информация об использовании файлов cookie на сайте «Свой Гараж»."
+def _paragraphs_to_article_html(paragraphs: tuple[str, ...] | list[str]) -> str:
+    parts = []
+    for text in paragraphs:
+        value = (text or "").strip()
+        if not value:
+            continue
+        parts.append(f"<p>{html.escape(value)}</p>")
+    if not parts:
+        return ""
+    return "<article>" + "".join(parts) + "</article>"
+
+
+def _legal_related_links_html(site_origin: str, current_path: str) -> str:
+    links = (
+        ("/privacy", "Политика конфиденциальности"),
+        ("/personal-data-consent", "Согласие на обработку персональных данных"),
+        ("/offer", "Публичная оферта"),
+        ("/cookie-policy", "Политика обработки cookie"),
+        ("/about", "О компании"),
+    )
+    items = []
+    for path, label in links:
+        if path == current_path:
+            continue
+        href = html.escape(_absolute_url(site_origin, path), quote=True)
+        items.append(f'<li><a href="{href}">{html.escape(label)}</a></li>')
+    if not items:
+        return ""
+    return "<nav aria-label=\"Документы\"><h2>Документы</h2><ul>" + "".join(items) + "</ul></nav>"
+
+
+def _build_legal_document_seo(
+    site_origin: str,
+    *,
+    path: str,
+    title: str,
+    description: str,
+    h1: str,
+    paragraphs: tuple[str, ...] | list[str],
+) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, path)
+    related = _legal_related_links_html(site_origin, path)
+    body = _paragraphs_to_article_html(paragraphs)
+    content = f"{related}{body}" if related else body
     return StaticPageSeoMeta(
         title=title,
         description=description,
         canonical_url=canonical_url,
+        h1=h1,
+        robots="index, follow",
+        content_sections_html=content,
+    )
+
+
+def _build_cookie_policy_seo(site_origin: str) -> StaticPageSeoMeta:
+    from app.content.legal_texts import COOKIE_POLICY_PARAGRAPHS
+
+    return _build_legal_document_seo(
+        site_origin,
+        path="/cookie-policy",
+        title="Политика обработки cookie | Свой Гараж",
+        description="Информация об использовании файлов cookie на сайте «Свой Гараж».",
         h1="Политика обработки cookie",
+        paragraphs=COOKIE_POLICY_PARAGRAPHS,
     )
 
 
 def _build_privacy_seo(site_origin: str) -> StaticPageSeoMeta:
-    canonical_url = _absolute_url(site_origin, "/privacy")
-    title = "Политика конфиденциальности | Свой Гараж"
-    description = "Политика конфиденциальности интернет-магазина «Свой Гараж»."
-    return StaticPageSeoMeta(
-        title=title,
-        description=description,
-        canonical_url=canonical_url,
+    from app.content.legal_texts import PRIVACY_POLICY_PARAGRAPHS
+
+    return _build_legal_document_seo(
+        site_origin,
+        path="/privacy",
+        title="Политика конфиденциальности | Свой Гараж",
+        description="Политика конфиденциальности интернет-магазина «Свой Гараж».",
         h1="Политика конфиденциальности",
+        paragraphs=PRIVACY_POLICY_PARAGRAPHS,
     )
 
 
 def _build_offer_seo(site_origin: str) -> StaticPageSeoMeta:
-    canonical_url = _absolute_url(site_origin, "/offer")
-    title = "Публичная оферта | Свой Гараж"
-    description = "Условия покупки товаров в интернет-магазине «Свой Гараж»."
-    return StaticPageSeoMeta(
-        title=title,
-        description=description,
-        canonical_url=canonical_url,
+    from app.content.legal_texts import PUBLIC_OFFER_PARAGRAPHS
+
+    return _build_legal_document_seo(
+        site_origin,
+        path="/offer",
+        title="Публичная оферта | Свой Гараж",
+        description="Условия покупки товаров в интернет-магазине «Свой Гараж».",
         h1="Публичная оферта",
+        paragraphs=PUBLIC_OFFER_PARAGRAPHS,
     )
 
 
 def _build_personal_data_consent_seo(site_origin: str) -> StaticPageSeoMeta:
-    canonical_url = _absolute_url(site_origin, "/personal-data-consent")
-    title = "Согласие на обработку персональных данных | Свой Гараж"
-    description = "Согласие пользователя на обработку персональных данных на сайте «Свой Гараж»."
-    return StaticPageSeoMeta(
-        title=title,
-        description=description,
-        canonical_url=canonical_url,
+    from app.content.legal_texts import PERSONAL_DATA_CONSENT_PARAGRAPHS
+
+    return _build_legal_document_seo(
+        site_origin,
+        path="/personal-data-consent",
+        title="Согласие на обработку персональных данных | Свой Гараж",
+        description="Согласие пользователя на обработку персональных данных на сайте «Свой Гараж».",
         h1="Согласие на обработку персональных данных",
+        paragraphs=PERSONAL_DATA_CONSENT_PARAGRAPHS,
     )
 
 

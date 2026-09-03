@@ -30,8 +30,10 @@ export default function Registration() {
     const [emailError, setEmailError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordRepeat, setShowPasswordRepeat] = useState(false);
-    const [acceptedLegalConsent, setAcceptedLegalConsent] = useState(false);
+    const [acceptedPersonalData, setAcceptedPersonalData] = useState(false);
+    const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
     const [showLegalErrors, setShowLegalErrors] = useState(false);
+    const acceptedLegalConsent = acceptedPersonalData && acceptedPrivacyPolicy;
     const [currentStep, setCurrentStep] = useState(1);
 
     useEffect(() => {
@@ -427,8 +429,10 @@ export default function Registration() {
             )}
 
             <RegistrationLegalConsent
-                accepted={acceptedLegalConsent}
-                onChange={setAcceptedLegalConsent}
+                acceptedPersonalData={acceptedPersonalData}
+                acceptedPrivacyPolicy={acceptedPrivacyPolicy}
+                onPersonalDataChange={setAcceptedPersonalData}
+                onPrivacyPolicyChange={setAcceptedPrivacyPolicy}
                 showError={showLegalErrors}
             />
 

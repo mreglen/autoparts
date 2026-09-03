@@ -82,8 +82,10 @@ export default function AutoservicePublicPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [preferredDate, setPreferredDate] = useState('');
-  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [acceptedPersonalData, setAcceptedPersonalData] = useState(false);
+  const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
   const [showConsentError, setShowConsentError] = useState(false);
+  const consentAccepted = acceptedPersonalData && acceptedPrivacyPolicy;
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -179,7 +181,8 @@ export default function AutoservicePublicPage() {
       setName('');
       setPhone('');
       setPreferredDate('');
-      setConsentAccepted(false);
+      setAcceptedPersonalData(false);
+      setAcceptedPrivacyPolicy(false);
     } catch (err) {
       const detail = err?.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : 'Не удалось отправить заявку');
@@ -381,10 +384,15 @@ export default function AutoservicePublicPage() {
                       </div>
 
                       <RegistrationLegalConsent
-                        accepted={consentAccepted}
-                        onChange={(v) => {
-                          setConsentAccepted(v);
-                          if (v) setShowConsentError(false);
+                        acceptedPersonalData={acceptedPersonalData}
+                        acceptedPrivacyPolicy={acceptedPrivacyPolicy}
+                        onPersonalDataChange={(v) => {
+                          setAcceptedPersonalData(v);
+                          if (v && acceptedPrivacyPolicy) setShowConsentError(false);
+                        }}
+                        onPrivacyPolicyChange={(v) => {
+                          setAcceptedPrivacyPolicy(v);
+                          if (v && acceptedPersonalData) setShowConsentError(false);
                         }}
                         showError={showConsentError}
                       />

@@ -5,9 +5,13 @@ Allow: /autoparts/
 Allow: /about
 Allow: /delivery
 Allow: /payment
+Allow: /privacy
+Allow: /personal-data-consent
+Allow: /offer
+Allow: /cookie-policy
 Allow: /part/
 Allow: /organizations
-
+Allow: /reviews
 Disallow: /auth
 Disallow: /dashboard
 Disallow: /profile
