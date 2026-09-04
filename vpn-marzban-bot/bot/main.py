@@ -16,6 +16,7 @@ from typing import Any
 
 import httpx
 from aiogram import Bot, Dispatcher, F
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.filters import CommandStart
 from aiogram.types import (
     CallbackQuery,
@@ -49,6 +50,7 @@ class Settings:
     data_limit_gb: float
     expire_days: int
     cooldown_seconds: int
+    telegram_proxy_url: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -71,6 +73,10 @@ class Settings:
             data_limit_gb=float(os.getenv("DATA_LIMIT_GB", "50")),
             expire_days=int(os.getenv("EXPIRE_DAYS", "30")),
             cooldown_seconds=int(os.getenv("COOLDOWN_SECONDS", "60")),
+            # На многих VPS api.telegram.org недоступен напрямую — используем Tor (как alert-bot)
+            telegram_proxy_url=os.getenv(
+                "TELEGRAM_PROXY_URL", "socks5://127.0.0.1:9050"
+            ).strip(),
         )
 
 
@@ -355,7 +361,14 @@ async def on_get_vpn_key(
 async def main() -> None:
     settings = Settings.from_env()
     marzban = MarzbanClient(settings)
-    bot = Bot(token=settings.bot_token)
+
+    session = None
+    if settings.telegram_proxy_url:
+        # socks5 требует пакет aiohttp-socks
+        session = AiohttpSession(proxy=settings.telegram_proxy_url)
+        logger.info("Telegram proxy: %s", settings.telegram_proxy_url)
+
+    bot = Bot(token=settings.bot_token, session=session)
     dp = Dispatcher()
 
     @dp.message(CommandStart())

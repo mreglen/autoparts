@@ -372,7 +372,10 @@ EOF
 
 ensure_vpn_bot_apply() {
   local src="$ROOT/vpn-marzban-bot/scripts/marzban-vpn-bot-apply.sh"
+  local bot_src="$ROOT/vpn-marzban-bot/bot"
+  local bot_dir="/opt/marzban-vpn-bot"
   local bin="/usr/local/bin/marzban-vpn-bot-apply"
+  local unit_src="$bot_src/marzban-vpn-bot.service"
   local dst="/etc/sudoers.d/autoparts-vpn-bot"
   local tmp
 
@@ -399,6 +402,29 @@ EOF
     log "Установлен $dst (NOPASSWD marzban-vpn-bot-apply для fast)"
   fi
   rm -f "$tmp"
+
+  # Синхронизация кода бота (если каталог уже развёрнут)
+  if [[ -d "$bot_dir" && -d "$bot_src" ]]; then
+    install -m 644 "$bot_src/main.py" "$bot_dir/main.py"
+    install -m 644 "$bot_src/requirements.txt" "$bot_dir/requirements.txt"
+    sed -i 's/\r$//' "$bot_dir/main.py" "$bot_dir/requirements.txt" || true
+    if [[ -f "$bot_dir/.env" ]] && ! grep -q '^TELEGRAM_PROXY_URL=' "$bot_dir/.env"; then
+      printf '\nTELEGRAM_PROXY_URL=socks5://127.0.0.1:9050\n' >> "$bot_dir/.env"
+    fi
+    if [[ -x "$bot_dir/.venv/bin/pip" ]]; then
+      "$bot_dir/.venv/bin/pip" install -q -r "$bot_dir/requirements.txt" || log "WARN: vpn-bot pip install failed"
+    fi
+    if [[ -f "$unit_src" ]]; then
+      install -m 644 "$unit_src" /etc/systemd/system/marzban-vpn-bot.service
+      sed -i 's/\r$//' /etc/systemd/system/marzban-vpn-bot.service || true
+      systemctl daemon-reload
+    fi
+    chown -R marzbanbot:marzbanbot "$bot_dir" 2>/dev/null || true
+    if systemctl is-enabled --quiet marzban-vpn-bot.service 2>/dev/null; then
+      systemctl restart marzban-vpn-bot.service || log "WARN: marzban-vpn-bot restart failed"
+      log "VPN-бот: код синхронизирован, сервис перезапущен"
+    fi
+  fi
 }
 
 ensure_pgbouncer() {

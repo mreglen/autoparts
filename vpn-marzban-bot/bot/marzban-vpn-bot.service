@@ -1,8 +1,9 @@
 [Unit]
 Description=Public Marzban VPN Telegram bot (isolated)
-# Стартуем после сети; Docker/Marzban могут подняться чуть позже — бот переподключится
-After=network-online.target
+# Telegram API на VPS часто только через Tor
+After=network-online.target tor.service
 Wants=network-online.target
+Wants=tor.service
 
 [Service]
 Type=simple

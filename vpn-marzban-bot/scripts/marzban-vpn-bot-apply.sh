@@ -56,6 +56,10 @@ case "$ACTION" in
     fi
     mkdir -p "$BOT_DIR"
     upsert_env "BOT_TOKEN" "$TOKEN" "$ENV_FILE"
+    # По умолчанию Tor — иначе polling к api.telegram.org таймаутится
+    if ! grep -q '^TELEGRAM_PROXY_URL=' "$ENV_FILE" 2>/dev/null; then
+      upsert_env "TELEGRAM_PROXY_URL" "socks5://127.0.0.1:9050" "$ENV_FILE"
+    fi
     chown marzbanbot:marzbanbot "$ENV_FILE" 2>/dev/null || true
     chmod 600 "$ENV_FILE"
     rm -f "$TOKEN_FILE"
