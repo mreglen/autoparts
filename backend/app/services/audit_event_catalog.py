@@ -40,6 +40,8 @@ EVENT_TYPE_LABELS: dict[str, str] = {
     "finance_export": "Экспорт финансов XLSX",
     "organization_updated": "Организация обновлена",
     "site_settings_updated": "Настройки сайта обновлены",
+    "vpn_bot_credentials_updated": "Токен VPN Telegram-бота обновлён",
+    "vpn_bot_settings_updated": "Настройки VPN Telegram-бота обновлены",
     "storage_location_changed": "Склад изменён",
     "integration_updated": "Интеграция обновлена",
     "avito_sync": "Синхронизация Авито",

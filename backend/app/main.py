@@ -108,6 +108,7 @@ from app.db.schema_patches import (
     ensure_garage_new_order_yookassa_columns,
     ensure_seo_landing_pages_table,
     ensure_openrouter_tables,
+    ensure_vpn_bot_tables,
     ensure_laximo_cat_tables,
     ensure_site_analytics_attribution_columns,
     ensure_site_analytics_conversion_events_table,
@@ -173,6 +174,7 @@ import app.models.seo_sync_daily_counter  # noqa: F401 — daily API budget coun
 import app.models.seo_pipeline_state  # noqa: F401 — TecDoc harvest cursors
 import app.models.seo_landing_page  # noqa: F401 — SEO landing pages registry
 import app.models.site_openrouter_integration  # noqa: F401 — OpenRouter integration
+import app.models.site_vpn_bot_integration  # noqa: F401 — VPN Telegram bot
 import app.models.site_laximo_cat_integration  # noqa: F401 — Laximo.CAT integration
 import app.models.organization_ai_description_access  # noqa: F401 — AI description org allowlist
 import app.models.product_draft  # noqa: F401 — product drafts
@@ -344,6 +346,7 @@ try:
     ensure_garage_new_order_yookassa_columns()
     ensure_seo_landing_pages_table()
     ensure_openrouter_tables()
+    ensure_vpn_bot_tables()
     ensure_laximo_cat_tables()
     ensure_site_analytics_attribution_columns()
     ensure_site_analytics_conversion_events_table()

@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     GOOGLE_CREDENTIALS_SECRET: Optional[str] = None
     # Ключ для шифрования API-ключа OpenRouter в БД. Если не задан — SECRET_KEY.
     OPENROUTER_CREDENTIALS_SECRET: Optional[str] = None
+    # Ключ для шифрования токена публичного VPN Telegram-бота. Если не задан — SECRET_KEY.
+    VPN_BOT_CREDENTIALS_SECRET: Optional[str] = None
+    # Путь к sudo-хелперу применения токена на хосте (production).
+    VPN_BOT_APPLY_BIN: Optional[str] = "/usr/local/bin/marzban-vpn-bot-apply"
     # Ключ для шифрования логина/пароля Laximo.CAT в БД. Если не задан — SECRET_KEY.
     LAXIMO_CREDENTIALS_SECRET: Optional[str] = None
     # Dev-fallback credentials (не основной путь; прод — /admin-settings).

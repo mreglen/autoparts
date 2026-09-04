@@ -6380,3 +6380,48 @@ def ensure_storage_location_geocode_columns() -> None:
 
     logger.info("Applied storage_locations geocode column patches: %s", statements)
 
+
+def ensure_vpn_bot_tables() -> None:
+    """Create VPN Telegram bot integration singleton table."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+
+    if "site_vpn_bot_integration" in table_names:
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE site_vpn_bot_integration (
+            id INTEGER PRIMARY KEY,
+            bot_token_encrypted TEXT,
+            is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            last_apply_status TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+        seed = (
+            "INSERT INTO site_vpn_bot_integration (id, is_enabled) "
+            "VALUES (1, FALSE) ON CONFLICT (id) DO NOTHING"
+        )
+    else:
+        ddl = """
+        CREATE TABLE site_vpn_bot_integration (
+            id INTEGER PRIMARY KEY,
+            bot_token_encrypted TEXT,
+            is_enabled BOOLEAN NOT NULL DEFAULT 0,
+            last_apply_status TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        seed = (
+            "INSERT OR IGNORE INTO site_vpn_bot_integration (id, is_enabled) "
+            "VALUES (1, 0)"
+        )
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        conn.execute(text(seed))
+    logger.info("Applied site_vpn_bot_integration table patch")
+

@@ -370,6 +370,37 @@ EOF
   rm -f "$tmp"
 }
 
+ensure_vpn_bot_apply() {
+  local src="$ROOT/vpn-marzban-bot/scripts/marzban-vpn-bot-apply.sh"
+  local bin="/usr/local/bin/marzban-vpn-bot-apply"
+  local dst="/etc/sudoers.d/autoparts-vpn-bot"
+  local tmp
+
+  [[ -f "$src" ]] || return 0
+
+  if [[ ! -f "$bin" ]] || ! cmp -s "$src" "$bin"; then
+    install -m 755 "$src" "$bin"
+    # Strip Windows CRLF if present
+    sed -i 's/\r$//' "$bin" || true
+    log "Установлен $bin"
+  fi
+
+  tmp="$(mktemp)"
+  cat >"$tmp" <<'EOF'
+# Managed by /usr/local/bin/update — allow API (user fast) to apply VPN bot token from /admin-settings
+fast ALL=(root) NOPASSWD: /usr/local/bin/marzban-vpn-bot-apply
+EOF
+  if [[ ! -f "$dst" ]] || ! cmp -s "$tmp" "$dst"; then
+    install -m 440 "$tmp" "$dst"
+    if ! visudo -cf "$dst" >/dev/null 2>&1; then
+      rm -f "$dst" "$tmp"
+      die "Некорректный sudoers: $dst"
+    fi
+    log "Установлен $dst (NOPASSWD marzban-vpn-bot-apply для fast)"
+  fi
+  rm -f "$tmp"
+}
+
 ensure_pgbouncer() {
   local env="$BACKEND/.env" template="$ROOT/docs/ops/pgbouncer.ini.template"
   [[ -f "$env" && -f "$template" ]] || return 0
@@ -763,6 +794,7 @@ main() {
   fi
   sync_installer
   ensure_deploy_sudoers
+  ensure_vpn_bot_apply
   ensure_scheduler_env
   install_kroan_unit
   ensure_pgbouncer
