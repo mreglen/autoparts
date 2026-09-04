@@ -1,0 +1,21 @@
+[Unit]
+Description=Public Marzban VPN Telegram bot (isolated)
+# Стартуем после сети; Docker/Marzban могут подняться чуть позже — бот переподключится
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=marzbanbot
+Group=marzbanbot
+WorkingDirectory=/opt/marzban-vpn-bot
+EnvironmentFile=/opt/marzban-vpn-bot/.env
+ExecStart=/opt/marzban-vpn-bot/.venv/bin/python /opt/marzban-vpn-bot/main.py
+Restart=always
+RestartSec=5
+# Безопасность: без лишних привилегий
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

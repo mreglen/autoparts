@@ -1,0 +1,13 @@
+# Изолированный Marzban: пути /opt/marzban-vpn и /var/lib/marzban-vpn.
+# network_mode: host — как в официальном образе; порты задаются в .env и xray_config.json,
+# а НЕ через секцию ports (чтобы не трогать существующий Nginx на 80/443).
+services:
+  marzban:
+    image: gozargah/marzban:latest
+    container_name: marzban-vpn
+    restart: unless-stopped
+    env_file: .env
+    network_mode: host
+    volumes:
+      # Данные панели, БД и xray_config.json живут отдельно от типичного /var/lib/marzban
+      - /var/lib/marzban-vpn:/var/lib/marzban
