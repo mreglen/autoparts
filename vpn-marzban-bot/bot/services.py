@@ -17,7 +17,7 @@ from db import (
 )
 from marzban_api import MarzbanClient
 from happ_crypto import (
-    get_happ_crypt4,
+    build_happ_crypt4,
     is_real_happ_crypto_link,
 )
 from utils import build_marzban_username
@@ -26,12 +26,12 @@ logger = logging.getLogger("marzban-vpn-bot.services")
 
 
 def _needs_configs_refresh(crypt4_link: str, vless_links: list[str] | None) -> bool:
-    """Старый url/servers / пустой configs → обновить."""
+    """Старый формат / несовпадение с актуальной нормализацией → обновить."""
     if not is_real_happ_crypto_link(crypt4_link):
         return True
     if not vless_links:
         return False
-    return crypt4_link != get_happ_crypt4(vless_links)
+    return crypt4_link != build_happ_crypt4(vless_links)
 
 
 async def ensure_real_crypto_link(
@@ -78,11 +78,11 @@ async def ensure_real_crypto_link(
         )
         return user
 
-    new_link = get_happ_crypt4(vless_links)
+    new_link = build_happ_crypt4(vless_links)
     user.subscription_url = sub
     user.crypt4_link = new_link
     user.key_valid = True
-    user.verify_note = "crypt4_clean_query"
+    user.verify_note = "crypt4_normalized_urlsafe"
     await session.commit()
     logger.info(
         "Обновлён crypt4(configs) tg=%s n=%s → %s…",
@@ -136,7 +136,7 @@ async def ensure_registered(
         raise RuntimeError(
             "Marzban не вернул VLESS links. Проверьте Host Settings / inbound."
         )
-    crypt4 = get_happ_crypt4(vless_links)
+    crypt4 = build_happ_crypt4(vless_links)
 
     user = await create_user(
         session,

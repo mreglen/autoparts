@@ -31,7 +31,7 @@ from db import (
     mark_user_verified,
     session_factory,
 )
-from happ_crypto import get_happ_crypt4, is_real_happ_crypto_link
+from happ_crypto import build_happ_crypt4, is_real_happ_crypto_link
 from marzban_api import MarzbanClient
 
 logger = logging.getLogger("marzban-vpn-bot.tasks")
@@ -96,12 +96,12 @@ async def _verify_all_keys() -> dict:
 
                     need_reencrypt = not is_real_happ_crypto_link(user.crypt4_link)
                     if not need_reencrypt and vless_links:
-                        need_reencrypt = user.crypt4_link != get_happ_crypt4(
+                        need_reencrypt = user.crypt4_link != build_happ_crypt4(
                             vless_links
                         )
                     if need_reencrypt and vless_links:
-                        user.crypt4_link = get_happ_crypt4(vless_links)
-                        user.verify_note = "crypt4_clean_query"
+                        user.crypt4_link = build_happ_crypt4(vless_links)
+                        user.verify_note = "crypt4_normalized_urlsafe"
                         stats["reencrypted"] += 1
                         notes.append("reencrypted_configs")
 
