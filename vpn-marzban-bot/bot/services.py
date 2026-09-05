@@ -26,19 +26,50 @@ from utils import build_marzban_username
 logger = logging.getLogger("marzban-vpn-bot.services")
 
 
+def _needs_https_refresh(subscription_url: str, crypt4_link: str) -> bool:
+    sub = subscription_url or ""
+    if sub.startswith("http://") or "195.24.65.251:2086" in sub or "195.24.65.251:62050" in sub:
+        return True
+    if not is_real_happ_crypto_link(crypt4_link or ""):
+        return True
+    return False
+
+
 async def ensure_real_crypto_link(
     session: AsyncSession,
     user: MarzVpnUser,
+    marzban: MarzbanClient | None = None,
 ) -> MarzVpnUser:
-    """Перешифровывает старые невалидные base64-JSON ссылки через API Happ."""
-    if is_real_happ_crypto_link(user.crypt4_link):
+    """Перешифровывает устаревшие/http ссылки в валидный HTTPS Happ crypt."""
+    if not _needs_https_refresh(user.subscription_url, user.crypt4_link):
         return user
-    new_link = await generate_valid_happ_link_async(user.subscription_url)
+
+    sub = user.subscription_url
+    if marzban is not None:
+        try:
+            remote = await marzban.get_user(user.marzban_username)
+            if remote:
+                extracted = marzban.extract_subscription_url(remote)
+                if extracted:
+                    sub = extracted
+        except Exception as exc:
+            logger.warning("refresh sub from marzban failed: %s", exc)
+            sub = marzban.public_subscription_url(sub) if marzban else sub
+    else:
+        # минимальный https rewrite без клиента
+        sub = (
+            sub.replace("://195.24.65.251:2086", "://svoygarage.ru")
+            .replace("://195.24.65.251:62050", "://svoygarage.ru")
+            .replace("http://svoygarage.ru", "https://svoygarage.ru")
+        )
+
+    new_link = await generate_valid_happ_link_async(sub)
+    user.subscription_url = sub
     user.crypt4_link = new_link
     user.key_valid = True
-    user.verify_note = "reencrypted_via_happ_api"
+    user.verify_note = "https_sub_reencrypted"
     await session.commit()
-    logger.info("Перешифрован ключ tg=%s → %s…", user.telegram_id, new_link[:28])
+    logger.info("Обновлён HTTPS ключ tg=%s → %s…", user.telegram_id, new_link[:28])
     return user
 
 
@@ -57,7 +88,7 @@ async def ensure_registered(
     """
     existing = await get_user(session, telegram_id)
     if existing is not None:
-        existing = await ensure_real_crypto_link(session, existing)
+        existing = await ensure_real_crypto_link(session, existing, marzban)
         return existing, False, False
 
     now = datetime.now(timezone.utc)

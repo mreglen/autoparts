@@ -85,11 +85,22 @@ class MarzbanClient:
         return response
 
     def public_subscription_url(self, url: str) -> str:
-        """Panel localhost → публичный proxy подписки (:2086)."""
+        """Panel/local → публичный HTTPS subscription.
+
+        Happ часто отклоняет cleartext `http://IP:port/sub/...` как «невалидная подписка».
+        """
+        url = (url or "").strip()
         src = self._settings.subscription_url_rewrite_from
         dst = self._settings.subscription_url_rewrite_to
         if src and dst and src in url:
-            return url.replace(src, dst)
+            url = url.replace(src, dst)
+        for a, b in (
+            ("://195.24.65.251:2086", "://svoygarage.ru"),
+            ("://195.24.65.251:62050", "://svoygarage.ru"),
+            ("http://svoygarage.ru", "https://svoygarage.ru"),
+        ):
+            if a in url:
+                url = url.replace(a, b)
         return url
 
     def extract_subscription_url(self, user_payload: dict[str, Any]) -> str | None:

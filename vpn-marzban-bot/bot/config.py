@@ -78,7 +78,7 @@ class Settings:
                 "SUB_URL_REWRITE_FROM", "://195.24.65.251:62050"
             ).strip(),
             subscription_url_rewrite_to=os.getenv(
-                "SUB_URL_REWRITE_TO", "://195.24.65.251:2086"
+                "SUB_URL_REWRITE_TO", "://svoygarage.ru"
             ).strip(),
             data_limit_gb=float(os.getenv("DATA_LIMIT_GB", "50")),
             # Тест: TRIAL_MINUTES=10; прод: TRIAL_MINUTES=4320 (3 дня)

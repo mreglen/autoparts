@@ -124,7 +124,7 @@ def register_handlers(
         async with session_maker() as session:
             user = await get_user(session, callback.from_user.id)
             if user is not None:
-                user = await ensure_real_crypto_link(session, user)
+                user = await ensure_real_crypto_link(session, user, marzban)
 
         if user is None:
             await callback.answer("Сначала нажмите /start", show_alert=True)
