@@ -13,7 +13,7 @@ from config import Settings
 from db import get_user
 from keyboards import back_to_menu_keyboard, main_menu_keyboard
 from marzban_api import MarzbanClient
-from services import ensure_registered
+from services import ensure_real_crypto_link, ensure_registered
 from utils import format_remaining, html_code, parse_referral_payload, utcnow
 
 logger = logging.getLogger("marzban-vpn-bot.handlers")
@@ -35,7 +35,7 @@ HOW_TO_SETUP = (
     "<b>Как настроить Happ VPN</b>\n\n"
     "1. Установите приложение <b>Happ</b> (iOS / Android).\n"
     "2. Откройте бота → <b>🔑 Ключ</b> → нажмите на код "
-    "<code>happ://crypt4/...</code> (скопируется).\n"
+    "<code>happ://crypt…</code> (скопируется).\n"
     "3. В Happ вставьте ссылку из буфера.\n"
     "4. В списке серверов выберите локацию (🇷🇺 / 🇩🇪).\n\n"
     "После продления подписки в Happ нажмите «Обновить» — "
@@ -123,6 +123,8 @@ def register_handlers(
 
         async with session_maker() as session:
             user = await get_user(session, callback.from_user.id)
+            if user is not None:
+                user = await ensure_real_crypto_link(session, user)
 
         if user is None:
             await callback.answer("Сначала нажмите /start", show_alert=True)

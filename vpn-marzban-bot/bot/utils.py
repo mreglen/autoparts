@@ -1,34 +1,12 @@
-"""Утилиты: Happ crypt4, HTML, время подписки."""
+"""Утилиты: HTML, время подписки, username Marzban."""
 
 from __future__ import annotations
 
-import base64
-import json
 import secrets
 from datetime import datetime, timezone
 
-
-def encode_happ_crypt4(subscription_url: str) -> str:
-    """Кодирует обычную ссылку подписки в формат happ://crypt4/..."""
-    payload = {"url": subscription_url}
-    json_bytes = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode(
-        "utf-8"
-    )
-    return f"happ://crypt4/{base64.b64encode(json_bytes).decode('utf-8')}"
-
-
-def decode_happ_crypt4(crypt4_link: str) -> str | None:
-    """Достаёт subscription URL из happ://crypt4/... или None при ошибке."""
-    prefix = "happ://crypt4/"
-    if not crypt4_link.startswith(prefix):
-        return None
-    try:
-        raw = base64.b64decode(crypt4_link[len(prefix) :].encode("utf-8"))
-        data = json.loads(raw.decode("utf-8"))
-        url = data.get("url")
-        return url if isinstance(url, str) and url.strip() else None
-    except Exception:
-        return None
+# Реэкспорт настоящего Happ crypto (не base64-JSON)
+from happ_crypto import encode_happ_crypt4, encode_happ_crypto_link  # noqa: F401
 
 
 def build_marzban_username(telegram_user_id: int) -> str:

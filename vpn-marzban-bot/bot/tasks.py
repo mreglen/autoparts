@@ -3,10 +3,11 @@
 
 Проверяет для каждого пользователя в marzvpn_users:
 1. Существует ли аккаунт в Marzban
-2. Совпадает ли subscription_url (публичный) с ожидаемым
-3. Совпадает ли crypt4_link с encode_happ_crypt4(subscription_url)
+2. Жив ли subscription_url (HTTP)
+3. crypt4_link — настоящий happ://crypt* (не старый base64 JSON)
 4. Если expire_at < now → отключает профиль в Marzban (ключ тот же)
 5. Если expire_at >= now → активирует и синхронизирует expire в Marzban
+6. Перешифровывает невалидные crypt-ссылки через Happ API
 """
 
 from __future__ import annotations
@@ -19,6 +20,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import httpx
+
 from celery_app import celery_app
 from config import get_settings
 from db import (
@@ -28,8 +31,8 @@ from db import (
     mark_user_verified,
     session_factory,
 )
+from happ_crypto import encode_happ_crypto_link, is_real_happ_crypto_link
 from marzban_api import MarzbanClient
-from utils import decode_happ_crypt4, encode_happ_crypt4
 
 logger = logging.getLogger("marzban-vpn-bot.tasks")
 
@@ -47,6 +50,7 @@ async def _verify_all_keys() -> dict:
         "disabled": 0,
         "reactivated": 0,
         "missing_in_marzban": 0,
+        "reencrypted": 0,
         "errors": 0,
     }
 
@@ -74,21 +78,25 @@ async def _verify_all_keys() -> dict:
                         )
                         continue
 
-                    remote_sub = marzban.extract_subscription_url(remote) or ""
-                    if remote_sub and remote_sub != user.subscription_url:
-                        # Подписка в Marzban не должна «плавать» — фиксируем расхождение
+                    # Подписка должна отдавать конфиг
+                    try:
+                        async with httpx.AsyncClient(
+                            timeout=15.0, follow_redirects=True
+                        ) as client:
+                            sub_resp = await client.get(user.subscription_url)
+                        if sub_resp.status_code != 200 or len(sub_resp.content) < 16:
+                            key_valid = False
+                            notes.append(f"sub_http_{sub_resp.status_code}")
+                    except Exception as exc:
                         key_valid = False
-                        notes.append("subscription_url_mismatch")
+                        notes.append(f"sub_fetch_error:{exc}")
 
-                    expected_crypt4 = encode_happ_crypt4(user.subscription_url)
-                    if user.crypt4_link != expected_crypt4:
-                        key_valid = False
-                        notes.append("crypt4_tampered_or_stale")
-
-                    decoded = decode_happ_crypt4(user.crypt4_link)
-                    if decoded != user.subscription_url:
-                        key_valid = False
-                        notes.append("crypt4_decode_mismatch")
+                    if not is_real_happ_crypto_link(user.crypt4_link):
+                        user.crypt4_link = await encode_happ_crypto_link(
+                            user.subscription_url
+                        )
+                        stats["reencrypted"] += 1
+                        notes.append("reencrypted")
 
                     expire_at = user.expire_at
                     if expire_at.tzinfo is None:

@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 from config import Settings
-from utils import encode_happ_crypt4
+from happ_crypto import encode_happ_crypt4
 
 logger = logging.getLogger("marzban-vpn-bot.marzban")
 

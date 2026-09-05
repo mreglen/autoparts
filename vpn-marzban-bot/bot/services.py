@@ -16,9 +16,26 @@ from db import (
     get_user,
 )
 from marzban_api import MarzbanClient
-from utils import build_marzban_username, encode_happ_crypt4
+from happ_crypto import encode_happ_crypto_link, is_real_happ_crypto_link
+from utils import build_marzban_username
 
 logger = logging.getLogger("marzban-vpn-bot.services")
+
+
+async def ensure_real_crypto_link(
+    session: AsyncSession,
+    user: MarzVpnUser,
+) -> MarzVpnUser:
+    """Перешифровывает старые невалидные base64-JSON ссылки через API Happ."""
+    if is_real_happ_crypto_link(user.crypt4_link):
+        return user
+    new_link = await encode_happ_crypto_link(user.subscription_url)
+    user.crypt4_link = new_link
+    user.key_valid = True
+    user.verify_note = "reencrypted_via_happ_api"
+    await session.commit()
+    logger.info("Перешифрован ключ tg=%s → %s…", user.telegram_id, new_link[:28])
+    return user
 
 
 async def ensure_registered(
@@ -36,6 +53,7 @@ async def ensure_registered(
     """
     existing = await get_user(session, telegram_id)
     if existing is not None:
+        existing = await ensure_real_crypto_link(session, existing)
         return existing, False, False
 
     now = datetime.now(timezone.utc)
@@ -59,7 +77,7 @@ async def ensure_registered(
             "Marzban не вернул subscription_url. "
             "Проверьте XRAY_SUBSCRIPTION_URL_PREFIX / Host Settings."
         )
-    crypt4 = encode_happ_crypt4(sub_url)
+    crypt4 = await encode_happ_crypto_link(sub_url)
 
     user = await create_user(
         session,
