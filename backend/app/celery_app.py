@@ -24,6 +24,7 @@ celery_app = Celery(
         'app.tasks.search_subscription_tasks',
         'app.tasks.autoservice_notification_tasks',
         'app.tasks.geocode_tasks',
+        'app.tasks.marzvpn_tasks',
     ]
 )
 
@@ -58,6 +59,10 @@ celery_app.conf.update(
         "analytics-monthly-query-review": {
             "task": "analytics.run_monthly_query_review",
             "schedule": crontab(day_of_month=1, hour=3, minute=0),
+        },
+        "marzvpn-verify-keys": {
+            "task": "marzvpn.verify_keys_authenticity",
+            "schedule": 300.0,  # каждые 5 минут
         },
     },
 )
