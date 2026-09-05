@@ -33,13 +33,13 @@ def format_main_menu(telegram_id: int, expire_at) -> str:
 
 HOW_TO_SETUP = (
     "<b>Как настроить Happ VPN</b>\n\n"
-    "1. Установите приложение <b>Happ</b> (iOS / Android).\n"
-    "2. Откройте бота → <b>🔑 Ключ</b>.\n"
-    "3. Скопируйте <code>happ://crypt4/...</code> и вставьте в Happ.\n"
-    "4. Если ключ не принят — добавьте HTTPS-ссылку подписки из пункта 2.\n"
-    "5. Выберите локацию (Russia / Germany).\n\n"
-    "После продления подписки ключ менять не нужно.\n"
-    "Если обновили локации/SNI — запросите ключ в боте заново."
+    "1. Установите <b>Happ</b>.\n"
+    "2. Бот → <b>🔑 Ключ</b>.\n"
+    "3. Добавьте ссылку <code>happ://add/https://...</code> "
+    "или HTTPS подписку.\n"
+    "4. Либо добавьте отдельно серверы Russia / Germany "
+    "(ссылки <code>vless://</code>).\n"
+    "5. Включите VPN и выберите сервер."
 )
 
 
@@ -131,18 +131,42 @@ def register_handlers(
             return
 
         await callback.answer()
-        text = (
-            "<b>КЛЮЧ HAPP VPN</b>\n\n"
-            "<b>1) Зашифрованный ключ (рекомендуется):</b>\n"
-            f"{html_code(user.crypt4_link)}\n\n"
-            "<b>2) Резерв — HTTPS подписка:</b>\n"
-            f"{html_code(user.subscription_url)}\n\n"
-            "<i>Скопируйте пункт 1 в Happ → Добавить подписку.\n"
-            "Если crypt4 не принят — добавьте пункт 2 как URL подписки.</i>"
+
+        from happ_crypto import build_simple_vless_links
+
+        vless_lines: list[str] = []
+        try:
+            remote = await marzban.get_user(user.marzban_username)
+            if remote:
+                vless_lines = build_simple_vless_links(
+                    [x for x in (remote.get("links") or []) if isinstance(x, str)]
+                )
+        except Exception as exc:
+            logger.warning("vless fetch failed: %s", exc)
+
+        parts = [
+            "<b>КЛЮЧ HAPP VPN</b>",
+            "",
+            "<b>1) Импорт в Happ (рекомендуется):</b>",
+            html_code(user.crypt4_link),
+            "",
+            "<b>2) HTTPS подписка:</b>",
+            html_code(user.subscription_url),
+        ]
+        if vless_lines:
+            parts.extend(["", "<b>3) Серверы по отдельности:</b>"])
+            for i, vl in enumerate(vless_lines, 1):
+                parts.append(f"{i}. {html_code(vl)}")
+        parts.extend(
+            [
+                "",
+                "<i>Сначала пункт 1. Если не откроется — пункт 2.</i>",
+                "<i>Если нет пинга — добавьте пункты из блока 3 по одному.</i>",
+            ]
         )
         if callback.message:
             await callback.message.answer(
-                text,
+                "\n".join(parts),
                 parse_mode="HTML",
                 reply_markup=back_to_menu_keyboard(),
                 disable_web_page_preview=True,

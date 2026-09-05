@@ -7,16 +7,13 @@ from datetime import datetime, timezone
 
 # Реэкспорт генератора валидных Happ-ссылок
 from happ_crypto import (  # noqa: F401
+    build_happ_add_link,
     build_happ_crypt4,
+    build_simple_vless_links,
     encode_happ_crypt4,
     encode_happ_crypto_link,
-    generate_direct_happ_payload,
-    generate_happ_crypt4_clean,
     generate_valid_happ_link,
     generate_valid_happ_link_async,
-    get_happ_crypt4,
-    get_single_happ_link,
-    make_valid_happ_crypt4,
 )
 
 

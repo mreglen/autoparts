@@ -31,7 +31,7 @@ from db import (
     mark_user_verified,
     session_factory,
 )
-from happ_crypto import build_happ_crypt4, is_real_happ_crypto_link
+from happ_crypto import build_happ_add_link, is_real_happ_crypto_link
 from marzban_api import MarzbanClient
 
 logger = logging.getLogger("marzban-vpn-bot.tasks")
@@ -94,16 +94,20 @@ async def _verify_all_keys() -> dict:
                     except Exception as exc:
                         notes.append(f"sub_fetch_error:{exc}")
 
-                    need_reencrypt = not is_real_happ_crypto_link(user.crypt4_link)
-                    if not need_reencrypt and vless_links:
-                        need_reencrypt = user.crypt4_link != build_happ_crypt4(
-                            vless_links
-                        )
-                    if need_reencrypt and vless_links:
-                        user.crypt4_link = build_happ_crypt4(vless_links)
-                        user.verify_note = "crypt4_configs_hashsafe"
+                    need_reencrypt = not user.crypt4_link.startswith(
+                        "happ://add/https://"
+                    )
+                    if need_reencrypt or not is_real_happ_crypto_link(
+                        user.crypt4_link
+                    ):
+                        sub = user.subscription_url
+                        if not sub.startswith("https://"):
+                            sub = marzban.public_subscription_url(sub)
+                            user.subscription_url = sub
+                        user.crypt4_link = build_happ_add_link(sub)
+                        user.verify_note = "happ_add_https"
                         stats["reencrypted"] += 1
-                        notes.append("reencrypted_configs")
+                        notes.append("reencrypted_add")
 
                     expire_at = user.expire_at
                     if expire_at.tzinfo is None:
