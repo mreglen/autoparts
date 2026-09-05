@@ -28,9 +28,11 @@ logger = logging.getLogger("marzban-vpn-bot.services")
 
 def _needs_https_refresh(subscription_url: str, crypt4_link: str) -> bool:
     sub = subscription_url or ""
+    link = crypt4_link or ""
     if sub.startswith("http://") or "195.24.65.251:2086" in sub or "195.24.65.251:62050" in sub:
         return True
-    if not is_real_happ_crypto_link(crypt4_link or ""):
+    # crypt5 / битый ключ → пересобрать в crypt4 JSON
+    if link.startswith("happ://crypt5/") or not is_real_happ_crypto_link(link):
         return True
     return False
 
@@ -67,7 +69,7 @@ async def ensure_real_crypto_link(
     user.subscription_url = sub
     user.crypt4_link = new_link
     user.key_valid = True
-    user.verify_note = "https_sub_reencrypted"
+    user.verify_note = "crypt4_json_reencrypted"
     await session.commit()
     logger.info("Обновлён HTTPS ключ tg=%s → %s…", user.telegram_id, new_link[:28])
     return user

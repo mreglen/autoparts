@@ -6,4 +6,3 @@ SQLAlchemy[asyncio]>=2.0,<3
 asyncpg>=0.29,<1
 celery[redis]>=5.3,<6
 redis>=5.0,<6
-cryptography>=42,<47
