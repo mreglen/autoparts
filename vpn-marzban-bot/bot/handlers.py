@@ -34,14 +34,11 @@ def format_main_menu(telegram_id: int, expire_at) -> str:
 HOW_TO_SETUP = (
     "<b>Как настроить Happ VPN</b>\n\n"
     "1. Установите <b>Happ</b>.\n"
-    "2. Бот → <b>🔑 Ключ</b>.\n"
-    "3. Удалите старую подписку в Happ.\n"
-    "4. Добавьте свежий <code>happ://add/https://...</code>.\n"
-    "5. Обновите подписку (pull-to-refresh).\n"
-    "6. Режим: <b>Global / Proxy All</b>.\n"
-    "7. Выберите <b>Russia_VLESS_Reality</b> "
-    "(не <code>_noflow</code>).\n"
-    "8. Включите VPN и откройте сайт в браузере."
+    "2. Бот → <b>🔑 Ключ</b> → скопируйте единственную ссылку "
+    "<code>happ://add/https://...</code>.\n"
+    "3. Удалите старые подписки в Happ.\n"
+    "4. Добавьте новую ссылку → обновите подписку.\n"
+    "5. Режим <b>Global</b> → сервер <b>Russia</b> → включите VPN."
 )
 
 
@@ -134,38 +131,14 @@ def register_handlers(
 
         await callback.answer()
 
-        from happ_crypto import build_simple_vless_links
-
-        vless_lines: list[str] = []
-        try:
-            remote = await marzban.get_user(user.marzban_username)
-            if remote:
-                vless_lines = build_simple_vless_links(
-                    [x for x in (remote.get("links") or []) if isinstance(x, str)]
-                )
-        except Exception as exc:
-            logger.warning("vless fetch failed: %s", exc)
-
         parts = [
             "<b>КЛЮЧ HAPP VPN</b>",
             "",
-            "<b>1) Импорт в Happ (рекомендуется):</b>",
             html_code(user.crypt4_link),
             "",
-            "<b>2) HTTPS подписка:</b>",
-            html_code(user.subscription_url),
+            "<i>Только эта ссылка. Удалите старые подписки в Happ, "
+            "добавьте заново, режим Global, сервер Russia.</i>",
         ]
-        if vless_lines:
-            parts.extend(["", "<b>3) Серверы по отдельности:</b>"])
-            for i, vl in enumerate(vless_lines, 1):
-                parts.append(f"{i}. {html_code(vl)}")
-        parts.extend(
-            [
-                "",
-                "<i>Сначала пункт 1. Если не откроется — пункт 2.</i>",
-                "<i>Если нет пинга — добавьте пункты из блока 3 по одному.</i>",
-            ]
-        )
         if callback.message:
             await callback.message.answer(
                 "\n".join(parts),

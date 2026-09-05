@@ -136,7 +136,8 @@ class MarzbanClient:
         expire_ts = int(expire_at.timestamp())
         body: dict[str, Any] = {
             "username": username,
-            "proxies": {"vless": {"flow": "xtls-rprx-vision"}},
+            # Plain VLESS TCP — без Reality/TLS/flow
+            "proxies": {"vless": {}},
             "inbounds": {"vless": [self._settings.inbound_tag]},
             "expire": expire_ts,
             "data_limit": data_limit_bytes,
