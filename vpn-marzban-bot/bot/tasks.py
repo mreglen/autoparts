@@ -3,11 +3,11 @@
 
 Проверяет для каждого пользователя в marzvpn_users:
 1. Существует ли аккаунт в Marzban
-2. Жив ли subscription_url (HTTP)
-3. crypt4_link — настоящий happ://crypt* (не старый base64 JSON)
+2. Есть ли VLESS links в Marzban
+3. crypt4_link — soft crypt4 с {"servers":[vless://...]}
 4. Если expire_at < now → отключает профиль в Marzban (ключ тот же)
 5. Если expire_at >= now → активирует и синхронизирует expire в Marzban
-6. Перешифровывает невалидные crypt-ссылки через Happ API
+6. Пересобирает crypt4 из актуальных VLESS links
 """
 
 from __future__ import annotations
@@ -31,7 +31,11 @@ from db import (
     mark_user_verified,
     session_factory,
 )
-from happ_crypto import encode_happ_crypto_link, is_real_happ_crypto_link
+from happ_crypto import (
+    decode_happ_crypt4_servers,
+    generate_direct_happ_payload,
+    is_real_happ_crypto_link,
+)
 from marzban_api import MarzbanClient
 
 logger = logging.getLogger("marzban-vpn-bot.tasks")
@@ -78,25 +82,31 @@ async def _verify_all_keys() -> dict:
                         )
                         continue
 
-                    # Подписка должна отдавать конфиг
+                    vless_links = marzban.extract_vless_links(remote)
+                    if not vless_links:
+                        key_valid = False
+                        notes.append("no_vless_links")
+
+                    # HTTPS sub — опциональный контроль (ключ больше не зависит от URL)
                     try:
                         async with httpx.AsyncClient(
                             timeout=15.0, follow_redirects=True
                         ) as client:
                             sub_resp = await client.get(user.subscription_url)
                         if sub_resp.status_code != 200 or len(sub_resp.content) < 16:
-                            key_valid = False
                             notes.append(f"sub_http_{sub_resp.status_code}")
                     except Exception as exc:
-                        key_valid = False
                         notes.append(f"sub_fetch_error:{exc}")
 
-                    if not is_real_happ_crypto_link(user.crypt4_link):
-                        user.crypt4_link = await encode_happ_crypto_link(
-                            user.subscription_url
-                        )
+                    need_reencrypt = not is_real_happ_crypto_link(user.crypt4_link)
+                    if not need_reencrypt and vless_links:
+                        current = decode_happ_crypt4_servers(user.crypt4_link) or []
+                        need_reencrypt = set(current) != set(vless_links)
+                    if need_reencrypt and vless_links:
+                        user.crypt4_link = generate_direct_happ_payload(vless_links)
+                        user.verify_note = "crypt4_servers_direct"
                         stats["reencrypted"] += 1
-                        notes.append("reencrypted")
+                        notes.append("reencrypted_servers")
 
                     expire_at = user.expire_at
                     if expire_at.tzinfo is None:

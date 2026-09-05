@@ -109,6 +109,19 @@ class MarzbanClient:
             return self.public_subscription_url(url.strip())
         return None
 
+    @staticmethod
+    def extract_vless_links(user_payload: dict[str, Any]) -> list[str]:
+        """VLESS URI из Marzban user.links (Host Settings → Reality)."""
+        out: list[str] = []
+        for link in user_payload.get("links") or []:
+            if isinstance(link, str) and link.strip().startswith("vless://"):
+                out.append(link.strip())
+        return out
+
+    @staticmethod
+    def expected_crypt4(vless_links: list[str]) -> str:
+        return encode_happ_crypt4(vless_links)
+
     async def create_user(
         self,
         username: str,
@@ -200,7 +213,3 @@ class MarzbanClient:
                 "expire": int(expire_at.timestamp()),
             },
         )
-
-    @staticmethod
-    def expected_crypt4(subscription_url: str) -> str:
-        return encode_happ_crypt4(subscription_url)
