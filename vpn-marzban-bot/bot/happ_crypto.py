@@ -6,59 +6,79 @@ import base64
 import json
 import logging
 import re
-from urllib.parse import (
-    parse_qsl,
-    quote,
-    unquote,
-    urlencode,
-    urlparse,
-    urlunparse,
-)
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse
 
 logger = logging.getLogger("marzban-vpn-bot.happ")
 
+# Порядок параметров ближе к Sing-box / клиентам Happ
+_PARAM_ORDER = (
+    "encryption",
+    "security",
+    "type",
+    "flow",
+    "sni",
+    "fp",
+    "pbk",
+    "sid",
+    "spx",
+)
+
 
 def normalize_vless_for_happ(vless_url: str) -> str:
-    """Приводит VLESS URL к валидному стандарту Sing-box / Happ VPN."""
-    if not vless_url or not vless_url.startswith("vless://"):
+    """Приводит VLESS URL к валидному стандарту Sing-box / Happ VPN.
+
+    Гарантирует разделитель ``#`` между query и remark (без склейки
+    ``encryption=noneRussia...``).
+    """
+    if not vless_url or not str(vless_url).strip().startswith("vless://"):
         return ""
 
-    if "#" in vless_url:
-        main_part, remark = vless_url.split("#", 1)
+    raw = str(vless_url).strip()
+
+    if "#" in raw:
+        main_part, remark = raw.split("#", 1)
         clean_remark = re.sub(r"[^\w\s\.-]", "", unquote(remark))
         clean_remark = re.sub(r"\s+", " ", clean_remark).strip().replace(" ", "_")
         if not clean_remark:
             clean_remark = "VLESS_Server"
     else:
-        main_part = vless_url
+        main_part = raw
         clean_remark = "VLESS_Server"
 
-    parsed = urlparse(main_part.strip())
-    params = dict(parse_qsl(parsed.query, keep_blank_values=False))
+    parsed = urlparse(main_part)
+    if parsed.scheme != "vless" or not parsed.netloc:
+        return ""
 
-    # Ключи в нижнем регистре, пустые значения отбрасываем
-    clean_params = {str(k).lower(): v for k, v in params.items() if v}
+    params = {
+        str(k).lower(): v
+        for k, v in parse_qsl(parsed.query, keep_blank_values=False)
+        if v not in (None, "")
+    }
 
-    # Значения ключевых параметров — строго lowercase
-    for key in ("security", "flow", "type", "encryption", "fp", "headerType"):
-        if key in clean_params and isinstance(clean_params[key], str):
-            clean_params[key] = clean_params[key].lower()
+    for key in ("security", "flow", "type", "encryption", "fp"):
+        if key in params and isinstance(params[key], str):
+            params[key] = params[key].lower()
 
-    if "encryption" not in clean_params:
-        clean_params["encryption"] = "none"
+    # Пустые «мусорные» ключи Reality/TCP — выкидываем всегда
+    for junk in ("headertype", "path", "host", "alpn", "mode"):
+        params.pop(junk, None)
 
-    new_query = urlencode(clean_params)
-    clean_main = urlunparse(
-        (
-            parsed.scheme,
-            parsed.netloc,
-            parsed.path,
-            parsed.params,
-            new_query,
-            "",
-        )
-    )
-    return f"{clean_main}#{quote(clean_remark)}"
+    if "encryption" not in params:
+        params["encryption"] = "none"
+
+    ordered: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for key in _PARAM_ORDER:
+        if key in params:
+            ordered.append((key, params[key]))
+            seen.add(key)
+    for key, val in params.items():
+        if key not in seen:
+            ordered.append((key, val))
+
+    query = urlencode(ordered, doseq=False)
+    # Ручная сборка: query всегда отделён от remark символом #
+    return f"vless://{parsed.netloc}?{query}#{quote(clean_remark)}"
 
 
 def build_happ_crypt4(vless_list: list[str]) -> str:
@@ -76,11 +96,31 @@ def build_happ_crypt4(vless_list: list[str]) -> str:
     json_bytes = json.dumps(
         payload, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
-    b64_str = base64.urlsafe_b64encode(json_bytes).decode("utf-8")
+    b64_str = base64.urlsafe_b64encode(json_bytes).decode("utf-8").rstrip("\n")
     return f"happ://crypt4/{b64_str}"
 
 
-# --- aliases (бот / celery / скрипты) ---
+def normalize_subscription_body(raw: bytes | str) -> bytes:
+    """Декодирует base64/sub text → нормализует каждую vless → base64 снова."""
+    if isinstance(raw, bytes):
+        text = raw.decode("utf-8", errors="replace").strip()
+    else:
+        text = raw.strip()
+
+    lines: list[str] = []
+    try:
+        decoded = base64.b64decode(text).decode("utf-8", errors="replace")
+        lines = [ln.strip() for ln in decoded.splitlines() if ln.strip()]
+    except Exception:
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+    cleaned = [normalize_vless_for_happ(ln) for ln in lines if ln.startswith("vless://")]
+    cleaned = [c for c in cleaned if c]
+    body = "\n".join(cleaned)
+    return base64.b64encode(body.encode("utf-8"))
+
+
+# --- aliases ---
 
 def get_happ_crypt4(vless_list: list[str]) -> str:
     return build_happ_crypt4(vless_list)
@@ -131,7 +171,6 @@ def generate_happ_add_link(sub_url: str) -> str:
 
 
 def clean_vless_url(vless_url: str) -> str:
-    """Совместимость: полная нормализация."""
     return normalize_vless_for_happ(vless_url)
 
 
@@ -163,7 +202,6 @@ def _decode_crypt4_json(link: str) -> dict | None:
 
 
 def is_real_happ_crypto_link(link: str) -> bool:
-    """Валидный ключ = soft crypt4 с JSON {"configs":[vless://...]}."""
     data = _decode_crypt4_json(link)
     if not data:
         return False
@@ -171,7 +209,8 @@ def is_real_happ_crypto_link(link: str) -> bool:
     if not isinstance(configs, list) or not configs:
         return False
     return all(
-        isinstance(s, str) and s.strip().startswith("vless://") for s in configs
+        isinstance(s, str) and s.strip().startswith("vless://") and "#" in s
+        for s in configs
     )
 
 
