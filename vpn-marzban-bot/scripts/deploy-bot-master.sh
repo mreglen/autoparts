@@ -34,24 +34,32 @@ chown marzbanbot:marzbanbot "${ENV_FILE}"
 
 # Prefer direct Postgres for asyncpg (bypass pgbouncer)
 DB_URL=""
+CELERY_URL=""
 if [[ -f "${BACKEND_ENV}" ]]; then
   DB_URL="$(grep -E '^DATABASE_URL_DIRECT=' "${BACKEND_ENV}" | head -1 | cut -d= -f2- || true)"
   if [[ -z "${DB_URL}" ]]; then
     DB_URL="$(grep -E '^DATABASE_URL=' "${BACKEND_ENV}" | head -1 | cut -d= -f2- || true)"
-    # pgbouncer :6432 → try direct :5432
     DB_URL="${DB_URL//:6432\//:5432/}"
   fi
+  CELERY_URL="$(grep -E '^CELERY_BROKER_URL=' "${BACKEND_ENV}" | head -1 | cut -d= -f2- || true)"
 fi
 if [[ -z "${DB_URL}" ]]; then
   echo "ERROR: cannot read DATABASE_URL from ${BACKEND_ENV}" >&2
   exit 1
 fi
+# Isolated Redis DB index for bot Celery (keep site password/host)
+if [[ -n "${CELERY_URL}" ]]; then
+  CELERY_URL="$(python3 -c "import sys,re; u=sys.argv[1].strip().strip(chr(34)).strip(chr(39)); print(re.sub(r'/(\d+)?$', '/2', u) if u.rstrip('/').split('/')[-1].isdigit() or u.endswith('/') else u.rstrip('/')+'/2')" "${CELERY_URL}")"
+else
+  CELERY_URL="redis://127.0.0.1:6379/2"
+fi
 
-python3 - "${ENV_FILE}" "${DB_URL}" <<'PY'
+python3 - "${ENV_FILE}" "${DB_URL}" "${CELERY_URL}" <<'PY'
 import sys
 from pathlib import Path
 env_path = Path(sys.argv[1])
 db_url = sys.argv[2].strip().strip('"').strip("'")
+celery_url = sys.argv[3].strip().strip('"').strip("'")
 lines = env_path.read_text(encoding="utf-8").splitlines() if env_path.exists() else []
 kv = {}
 order = []
@@ -68,8 +76,8 @@ updates = {
     "BOT_USERNAME": kv.get("BOT_USERNAME", "marzvpn_bot"),
     "TRIAL_MINUTES": kv.get("TRIAL_MINUTES", "4320"),
     "REFERRAL_REWARD_DAYS": kv.get("REFERRAL_REWARD_DAYS", "5"),
-    "CELERY_BROKER_URL": kv.get("CELERY_BROKER_URL", "redis://127.0.0.1:6379/2"),
-    "CELERY_RESULT_BACKEND": kv.get("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/2"),
+    "CELERY_BROKER_URL": celery_url,
+    "CELERY_RESULT_BACKEND": celery_url,
     "KEY_VERIFY_INTERVAL_MINUTES": kv.get("KEY_VERIFY_INTERVAL_MINUTES", "5"),
     "SUB_URL_REWRITE_FROM": kv.get("SUB_URL_REWRITE_FROM", "://195.24.65.251:62050"),
     "SUB_URL_REWRITE_TO": kv.get("SUB_URL_REWRITE_TO", "://195.24.65.251:2086"),
@@ -79,9 +87,7 @@ for k, v in updates.items():
         order.append(k)
     kv[k] = v
 
-out = []
-for k in order:
-    out.append(f"{k}={kv[k]}")
+out = [f"{k}={kv[k]}" for k in order]
 env_path.write_text("\n".join(out) + "\n", encoding="utf-8")
 print("env updated keys:", ", ".join(sorted(updates)))
 PY
