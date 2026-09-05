@@ -5,8 +5,13 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timezone
 
-# Реэкспорт настоящего Happ crypto (не base64-JSON)
-from happ_crypto import encode_happ_crypt4, encode_happ_crypto_link  # noqa: F401
+# Реэкспорт генератора валидных Happ-ссылок
+from happ_crypto import (  # noqa: F401
+    encode_happ_crypt4,
+    encode_happ_crypto_link,
+    generate_valid_happ_link,
+    generate_valid_happ_link_async,
+)
 
 
 def build_marzban_username(telegram_user_id: int) -> str:

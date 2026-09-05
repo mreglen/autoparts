@@ -16,7 +16,11 @@ from db import (
     get_user,
 )
 from marzban_api import MarzbanClient
-from happ_crypto import encode_happ_crypto_link, is_real_happ_crypto_link
+from happ_crypto import (
+    encode_happ_crypto_link,
+    generate_valid_happ_link_async,
+    is_real_happ_crypto_link,
+)
 from utils import build_marzban_username
 
 logger = logging.getLogger("marzban-vpn-bot.services")
@@ -29,7 +33,7 @@ async def ensure_real_crypto_link(
     """Перешифровывает старые невалидные base64-JSON ссылки через API Happ."""
     if is_real_happ_crypto_link(user.crypt4_link):
         return user
-    new_link = await encode_happ_crypto_link(user.subscription_url)
+    new_link = await generate_valid_happ_link_async(user.subscription_url)
     user.crypt4_link = new_link
     user.key_valid = True
     user.verify_note = "reencrypted_via_happ_api"
@@ -77,7 +81,7 @@ async def ensure_registered(
             "Marzban не вернул subscription_url. "
             "Проверьте XRAY_SUBSCRIPTION_URL_PREFIX / Host Settings."
         )
-    crypt4 = await encode_happ_crypto_link(sub_url)
+    crypt4 = await generate_valid_happ_link_async(sub_url)
 
     user = await create_user(
         session,
