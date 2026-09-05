@@ -1,4 +1,4 @@
-"""Простой VLESS TCP без Reality/TLS — только для Happ happ://add/https://..."""
+"""VLESS + TLS (Let's Encrypt svoygarage.ru). Основной ключ: happ://add/https://..."""
 
 from __future__ import annotations
 
@@ -6,11 +6,12 @@ import base64
 import json
 import logging
 import re
-from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse
+from urllib.parse import quote, unquote, urlencode, urlparse
 
 logger = logging.getLogger("marzban-vpn-bot.happ")
 
-_PARAM_ORDER = ("encryption", "security", "type")
+_PARAM_ORDER = ("encryption", "security", "type", "sni", "fp", "alpn")
+DEFAULT_TLS_SNI = "svoygarage.ru"
 
 
 def normalize_vless_for_happ(
@@ -19,7 +20,7 @@ def normalize_vless_for_happ(
     *,
     with_flow: bool = False,
 ) -> str:
-    """Минимальный VLESS: encryption=none, security=none, type=tcp. Без flow/pbk/sid/sni."""
+    """VLESS TCP + TLS: encryption=none, security=tls, sni=svoygarage.ru."""
     if not vless_url or not str(vless_url).strip().startswith("vless://"):
         return ""
 
@@ -37,7 +38,11 @@ def normalize_vless_for_happ(
 
     if "Germany" in (remark or "") or "212.102.227.25" in raw:
         remark = "Germany"
-    elif "Russia" in (remark or "") or "195.24.65.251" in raw:
+    elif (
+        "Russia" in (remark or "")
+        or "195.24.65.251" in raw
+        or "svoygarage.ru" in raw
+    ):
         remark = "Russia"
     else:
         remark = re.sub(r"[^\w\.-]", "_", remark or "VPN")
@@ -47,16 +52,22 @@ def normalize_vless_for_happ(
     if parsed.scheme != "vless" or not parsed.netloc:
         return ""
 
-    # Полностью игнорируем Reality/TLS/flow параметры из Marzban
+    # Russia: prefer domain so cert CN matches
+    hostport = parsed.netloc
+    if hostport.startswith("195.24.65.251"):
+        hostport = hostport.replace("195.24.65.251", DEFAULT_TLS_SNI, 1)
+
     params = {
         "encryption": "none",
-        "security": "none",
+        "security": "tls",
         "type": "tcp",
+        "sni": DEFAULT_TLS_SNI,
+        "fp": "chrome",
+        "alpn": "http/1.1",
     }
-
     query = urlencode([(k, params[k]) for k in _PARAM_ORDER], doseq=False)
     safe_remark = quote(remark, safe="_-.")
-    return f"vless://{parsed.netloc}?{query}#{safe_remark}"
+    return f"vless://{hostport}?{query}#{safe_remark}"
 
 
 def build_simple_vless_links(vless_list: list[str]) -> list[str]:
@@ -77,7 +88,6 @@ def build_happ_add_link(sub_url: str) -> str:
 
 
 def build_correct_happ_crypt4(vless_urls: list[str]) -> str:
-    """Совместимость: не основной канал. Основной — happ://add/https://..."""
     configs = build_simple_vless_links(vless_urls)
     if not configs:
         raise ValueError("no vless")
