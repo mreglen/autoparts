@@ -17,7 +17,8 @@ def sanitize_vless_link(vless_url: str) -> str:
         return vless_url.strip()
 
     base_part, remark = vless_url.split("#", 1)
-    clean_remark = re.sub(r"[^\w\s\.-]", "", unquote(remark)).strip()
+    clean_remark = re.sub(r"[^\w\s\.-]", "", unquote(remark))
+    clean_remark = re.sub(r"\s+", " ", clean_remark).strip()
     clean_remark = clean_remark.replace(" ", "_")
 
     if not clean_remark:
