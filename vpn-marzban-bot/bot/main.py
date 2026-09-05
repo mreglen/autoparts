@@ -206,13 +206,14 @@ def build_username(telegram_user_id: int) -> str:
     return raw[:32]
 
 
-def extract_vless_link(user_payload: dict[str, Any]) -> str | None:
-    """Достаёт первую vless:// ссылку из ответа Marzban."""
+def extract_vless_links(user_payload: dict[str, Any]) -> list[str]:
+    """Все vless:// ссылки из ответа Marzban (по одной на Host / локацию)."""
     links = user_payload.get("links") or []
+    result: list[str] = []
     for link in links:
         if isinstance(link, str) and link.startswith("vless://"):
-            return link
-    return None
+            result.append(link)
+    return result
 
 
 def extract_subscription_url(user_payload: dict[str, Any]) -> str | None:
@@ -232,8 +233,17 @@ def _html_code(value: str) -> str:
     return f"<code>{escaped}</code>"
 
 
+def _remark_from_vless(link: str) -> str:
+    """Имя профиля после # (флаг + локация), если есть."""
+    if "#" not in link:
+        return "VPN"
+    from urllib.parse import unquote
+
+    return unquote(link.rsplit("#", 1)[-1]) or "VPN"
+
+
 def format_success_message(
-    vless_link: str | None,
+    vless_links: list[str],
     subscription_url: str | None,
     username: str,
 ) -> str:
@@ -243,25 +253,25 @@ def format_success_message(
         "",
     ]
 
-    if vless_link:
-        parts.extend(
-            [
-                "🔑 VLESS-ключ (для Happ VPN):",
-                _html_code(vless_link),
-                "",
-            ]
-        )
+    if vless_links:
+        parts.append(f"🔑 Локации ({len(vless_links)}) — скопируйте нужную или все:")
+        parts.append("")
+        for idx, link in enumerate(vless_links, start=1):
+            remark = _remark_from_vless(link)
+            parts.append(f"{idx}. <b>{remark}</b>")
+            parts.append(_html_code(link))
+            parts.append("")
 
     if subscription_url:
         parts.extend(
             [
-                "📎 Ссылка подписки (альтернатива):",
+                "📎 Ссылка подписки (все локации сразу, лучше для Happ):",
                 _html_code(subscription_url),
                 "",
             ]
         )
 
-    if not vless_link and not subscription_url:
+    if not vless_links and not subscription_url:
         parts.append(
             "⚠️ Ключ создан, но ссылка не найдена в ответе API. "
             "Проверьте Host Settings в панели Marzban."
@@ -271,12 +281,11 @@ def format_success_message(
     parts.extend(
         [
             "📱 Как импортировать в Happ VPN:",
-            "1. Скопируйте ключ vless://... (или ссылку подписки) выше.",
-            "2. Откройте приложение Happ VPN.",
-            "3. Вставьте конфигурацию из буфера обмена (импорт / «+» / paste).",
-            "4. Подключитесь к добавленному профилю.",
+            "1. Предпочтительно: скопируйте ссылку подписки выше → Happ → вставить.",
+            "2. Или скопируйте каждый vless:// ключ локации и вставьте по очереди.",
+            "3. В списке серверов должны появиться профили с флагами (🇷🇺 / 🇩🇪).",
             "",
-            "Совет: в Happ обычно достаточно «вставить из буфера» после копирования ключа.",
+            "Если видна только одна страна — обновите подписку в Happ (потянуть вниз / Update).",
         ]
     )
     return "\n".join(parts)
@@ -345,13 +354,27 @@ async def on_get_vpn_key(
 
     _last_issue_at[user_id] = now
 
-    vless_link = extract_vless_link(user_payload)
+    vless_links = extract_vless_links(user_payload)
     subscription_url = extract_subscription_url(user_payload)
-    text = format_success_message(vless_link, subscription_url, username)
+    text = format_success_message(vless_links, subscription_url, username)
 
     if callback.message:
-        await callback.message.answer(text, parse_mode="HTML")
-        # Кнопка снова доступна под новым сообщением
+        # Telegram лимит ~4096 символов; при многих локациях режем на части
+        if len(text) <= 4000:
+            await callback.message.answer(text, parse_mode="HTML")
+        else:
+            chunks: list[str] = []
+            buf = ""
+            for line in text.split("\n"):
+                if len(buf) + len(line) + 1 > 3900:
+                    chunks.append(buf)
+                    buf = line
+                else:
+                    buf = f"{buf}\n{line}" if buf else line
+            if buf:
+                chunks.append(buf)
+            for chunk in chunks:
+                await callback.message.answer(chunk, parse_mode="HTML")
         await callback.message.answer(
             "Нужен ещё один ключ? Нажмите кнопку ниже.",
             reply_markup=main_keyboard(),
