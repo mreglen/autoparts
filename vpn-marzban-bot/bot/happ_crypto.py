@@ -11,8 +11,8 @@ from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse
 logger = logging.getLogger("marzban-vpn-bot.happ")
 
 # Порядок параметров ближе к Sing-box / клиентам Happ
+# encryption=none убран: часть клиентов Reality ломается от лишнего encryption=
 _PARAM_ORDER = (
-    "encryption",
     "security",
     "type",
     "flow",
@@ -55,16 +55,17 @@ def normalize_vless_for_happ(vless_url: str) -> str:
         if v not in (None, "")
     }
 
-    for key in ("security", "flow", "type", "encryption", "fp"):
+    for key in ("security", "flow", "type", "fp"):
         if key in params and isinstance(params[key], str):
             params[key] = params[key].lower()
 
     # Пустые «мусорные» ключи Reality/TCP — выкидываем всегда
-    for junk in ("headertype", "path", "host", "alpn", "mode"):
+    for junk in ("headertype", "path", "host", "alpn", "mode", "encryption"):
         params.pop(junk, None)
 
-    if "encryption" not in params:
-        params["encryption"] = "none"
+    # spx по умолчанию для Reality (Marzban spiderX=/)
+    if params.get("security") == "reality" and "spx" not in params:
+        params["spx"] = "/"
 
     ordered: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -96,7 +97,7 @@ def build_happ_crypt4(vless_list: list[str]) -> str:
     json_bytes = json.dumps(
         payload, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
-    b64_str = base64.urlsafe_b64encode(json_bytes).decode("utf-8").rstrip("\n")
+    b64_str = base64.b64encode(json_bytes).decode("utf-8").rstrip("\n")
     return f"happ://crypt4/{b64_str}"
 
 
@@ -184,10 +185,11 @@ def prepare_vless_link(vless_url: str) -> str:
 
 def _b64decode_payload(payload: str) -> bytes:
     pad = "=" * (-len(payload) % 4)
+    # Happ expects standard base64; keep urlsafe as fallback for old links
     try:
-        return base64.urlsafe_b64decode(payload + pad)
+        return base64.b64decode(payload + pad, validate=False)
     except Exception:
-        return base64.b64decode(payload + pad)
+        return base64.urlsafe_b64decode(payload + pad)
 
 
 def _decode_crypt4_json(link: str) -> dict | None:
