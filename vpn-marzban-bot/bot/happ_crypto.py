@@ -37,13 +37,13 @@ def normalize_vless_for_happ(
             remark = "VPN"
 
     if "Germany" in (remark or "") or "212.102.227.25" in raw:
-        remark = "Germany"
+        remark = "🇩🇪 Germany"
     elif (
         "Russia" in (remark or "")
         or "195.24.65.251" in raw
         or "svoygarage.ru" in raw
     ):
-        remark = "Russia"
+        remark = "🇷🇺 Russia"
     else:
         remark = re.sub(r"[^\w\.-]", "_", remark or "VPN")
         remark = re.sub(r"_+", "_", remark).strip("_") or "VPN"
@@ -66,7 +66,8 @@ def normalize_vless_for_happ(
         "alpn": "http/1.1",
     }
     query = urlencode([(k, params[k]) for k in _PARAM_ORDER], doseq=False)
-    safe_remark = quote(remark, safe="_-.")
+    # Флаги и пробелы — percent-encode (Happ нормально декодирует)
+    safe_remark = quote(remark, safe="")
     return f"vless://{hostport}?{query}#{safe_remark}"
 
 

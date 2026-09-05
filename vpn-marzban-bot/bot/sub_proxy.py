@@ -25,6 +25,9 @@ MARZBAN_SUB_UPSTREAM = os.getenv(
 ).rstrip("/")
 LISTEN_HOST = os.getenv("SUB_PROXY_HOST", "127.0.0.1")
 LISTEN_PORT = int(os.getenv("SUB_PROXY_PORT", "62060"))
+SUPPORT_TG_URL = os.getenv(
+    "HAPP_SUPPORT_URL", "https://t.me/marzvpn_bot"
+).strip()
 
 
 async def handle_sub(request: web.Request) -> web.StreamResponse:
@@ -46,14 +49,11 @@ async def handle_sub(request: web.Request) -> web.StreamResponse:
                     body=raw,
                     content_type=resp.content_type or "text/plain",
                 )
-            # Pass through useful Marzban subscription headers
             pass_headers = {}
             for h in (
                 "subscription-userinfo",
                 "profile-title",
                 "content-disposition",
-                "support-url",
-                "profile-web-page-url",
             ):
                 if h in resp.headers:
                     pass_headers[h] = resp.headers[h]
@@ -63,11 +63,16 @@ async def handle_sub(request: web.Request) -> web.StreamResponse:
     except Exception:
         body = raw
 
+    # Иконка Telegram в Happ → бот @marzvpn_bot
     pass_headers.update(
         {
             "Content-Type": "text/plain; charset=utf-8",
             "profile-update-interval": "24",
             "Cache-Control": "no-store",
+            "profile-title": "base64:U3ZveUdhcmFnZSBWUE4=",  # SvoyGarage VPN
+            "support-url": SUPPORT_TG_URL,
+            "profile-web-page-url": SUPPORT_TG_URL,
+            "announce": SUPPORT_TG_URL,
         }
     )
     return web.Response(body=body, headers=pass_headers)
