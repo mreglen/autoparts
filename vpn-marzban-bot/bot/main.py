@@ -219,7 +219,11 @@ def extract_vless_links(user_payload: dict[str, Any]) -> list[str]:
 def extract_subscription_url(user_payload: dict[str, Any]) -> str | None:
     url = user_payload.get("subscription_url")
     if isinstance(url, str) and url.strip():
-        return url.strip()
+        # Panel is localhost-only; public sub proxy listens on :2086
+        return url.strip().replace(
+            "://195.24.65.251:62050",
+            "://195.24.65.251:2086",
+        )
     return None
 
 
