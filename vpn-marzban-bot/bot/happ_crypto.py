@@ -11,8 +11,9 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlparse
 logger = logging.getLogger("marzban-vpn-bot.happ")
 
 _PARAM_ORDER = ("security", "type", "flow", "sni", "fp", "pbk", "sid")
-# Fallback если Marzban внезапно отдаст пустой sid
-DEFAULT_REALITY_SID = "e0407c966b24646b"
+# Актуальные Reality-ключи (сервер /root/marzban-vpn-reality-*.key)
+DEFAULT_REALITY_SID = "65ebe0daaa020cb2"
+DEFAULT_REALITY_PBK = "Rlb-IPbM75c8dIoOHRI3ptprWuMgmJig2f8X-2y0RRI"
 
 
 def normalize_vless_for_happ(vless_url: str, remark: str | None = None) -> str:
@@ -58,6 +59,9 @@ def normalize_vless_for_happ(vless_url: str, remark: str | None = None) -> str:
 
     if not params.get("sid"):
         params["sid"] = DEFAULT_REALITY_SID
+    # Marzban иногда кэширует старый pbk в links — всегда пишем рабочие ключи
+    params["pbk"] = DEFAULT_REALITY_PBK
+    params["sid"] = DEFAULT_REALITY_SID
 
     ordered: list[tuple[str, str]] = []
     seen: set[str] = set()
