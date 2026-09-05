@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import logging
 import os
 import secrets
@@ -13,6 +15,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 import httpx
 from aiogram import Bot, Dispatcher, F
@@ -227,6 +230,16 @@ def extract_subscription_url(user_payload: dict[str, Any]) -> str | None:
     return None
 
 
+def encode_happ_crypt4(subscription_url: str) -> str:
+    """Кодирует обычную ссылку подписки в формат happ://crypt4/..."""
+    payload = {"url": subscription_url}
+    json_bytes = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    base64_encoded = base64.b64encode(json_bytes).decode("utf-8")
+    return f"happ://crypt4/{base64_encoded}"
+
+
 def _html_code(value: str) -> str:
     """Экранирование для HTML parse_mode Telegram (надёжнее Markdown для длинных URL)."""
     escaped = (
@@ -241,55 +254,46 @@ def _remark_from_vless(link: str) -> str:
     """Имя профиля после # (флаг + локация), если есть."""
     if "#" not in link:
         return "VPN"
-    from urllib.parse import unquote
-
     return unquote(link.rsplit("#", 1)[-1]) or "VPN"
 
 
 def format_success_message(
-    vless_links: list[str],
-    subscription_url: str | None,
+    happ_link: str | None,
+    location_names: list[str],
     username: str,
 ) -> str:
     parts: list[str] = [
-        "✅ Ваш VPN-ключ готов.",
-        f"Пользователь Marzban: {_html_code(username)}",
+        "✅ Ваш VPN готов.",
+        f"Пользователь: {_html_code(username)}",
         "",
     ]
 
-    if vless_links:
-        parts.append(f"🔑 Локации ({len(vless_links)}) — скопируйте нужную или все:")
-        parts.append("")
-        for idx, link in enumerate(vless_links, start=1):
-            remark = _remark_from_vless(link)
-            parts.append(f"{idx}. <b>{remark}</b>")
-            parts.append(_html_code(link))
-            parts.append("")
-
-    if subscription_url:
+    if happ_link:
         parts.extend(
             [
-                "📎 Ссылка подписки (все локации сразу, лучше для Happ):",
-                _html_code(subscription_url),
+                "🔑 Одна ссылка для Happ VPN (все локации внутри):",
+                _html_code(happ_link),
                 "",
             ]
         )
-
-    if not vless_links and not subscription_url:
+        if location_names:
+            parts.append("Доступные серверы в Happ:")
+            for name in location_names:
+                parts.append(f"• {name}")
+            parts.append("")
+    else:
         parts.append(
-            "⚠️ Ключ создан, но ссылка не найдена в ответе API. "
-            "Проверьте Host Settings в панели Marzban."
+            "⚠️ Ключ создан, но ссылка подписки не найдена в ответе API. "
+            "Проверьте Host Settings / XRAY_SUBSCRIPTION_URL_PREFIX в Marzban."
         )
         return "\n".join(parts)
 
     parts.extend(
         [
-            "📱 Как импортировать в Happ VPN:",
-            "1. Предпочтительно: скопируйте ссылку подписки выше → Happ → вставить.",
-            "2. Или скопируйте каждый vless:// ключ локации и вставьте по очереди.",
-            "3. В списке серверов должны появиться профили с флагами (🇷🇺 / 🇩🇪).",
-            "",
-            "Если видна только одна страна — обновите подписку в Happ (потянуть вниз / Update).",
+            "📱 Как импортировать:",
+            "1. Скопируйте ссылку happ://crypt4/... выше.",
+            "2. Откройте Happ VPN → вставьте из буфера.",
+            "3. В списке выберите нужную страну (🇷🇺 / 🇩🇪).",
         ]
     )
     return "\n".join(parts)
@@ -316,8 +320,8 @@ def main_keyboard() -> InlineKeyboardMarkup:
 async def cmd_start(message: Message) -> None:
     await message.answer(
         "👋 Публичный VPN-бот на базе Marzban (VLESS Reality).\n\n"
-        "Нажмите кнопку ниже — бот создаст уникальный ключ и отправит его вам.\n"
-        "Ключ совместим с Happ VPN.",
+        "Нажмите кнопку — получите одну ссылку Happ (crypt4).\n"
+        "Внутри Happ можно выбрать локацию (🇷🇺 / 🇩🇪).",
         reply_markup=main_keyboard(),
     )
 
@@ -358,27 +362,14 @@ async def on_get_vpn_key(
 
     _last_issue_at[user_id] = now
 
-    vless_links = extract_vless_links(user_payload)
     subscription_url = extract_subscription_url(user_payload)
-    text = format_success_message(vless_links, subscription_url, username)
+    vless_links = extract_vless_links(user_payload)
+    location_names = [_remark_from_vless(link) for link in vless_links]
+    happ_link = encode_happ_crypt4(subscription_url) if subscription_url else None
+    text = format_success_message(happ_link, location_names, username)
 
     if callback.message:
-        # Telegram лимит ~4096 символов; при многих локациях режем на части
-        if len(text) <= 4000:
-            await callback.message.answer(text, parse_mode="HTML")
-        else:
-            chunks: list[str] = []
-            buf = ""
-            for line in text.split("\n"):
-                if len(buf) + len(line) + 1 > 3900:
-                    chunks.append(buf)
-                    buf = line
-                else:
-                    buf = f"{buf}\n{line}" if buf else line
-            if buf:
-                chunks.append(buf)
-            for chunk in chunks:
-                await callback.message.answer(chunk, parse_mode="HTML")
+        await callback.message.answer(text, parse_mode="HTML", disable_web_page_preview=True)
         await callback.message.answer(
             "Нужен ещё один ключ? Нажмите кнопку ниже.",
             reply_markup=main_keyboard(),
