@@ -17,7 +17,7 @@ from db import (
 )
 from marzban_api import MarzbanClient
 from happ_crypto import (
-    encode_happ_crypto_link,
+    decode_happ_crypt4,
     generate_valid_happ_link_async,
     is_real_happ_crypto_link,
 )
@@ -31,14 +31,14 @@ def _needs_https_refresh(subscription_url: str, crypt4_link: str) -> bool:
     link = crypt4_link or ""
     if sub.startswith("http://") or "195.24.65.251:2086" in sub or "195.24.65.251:62050" in sub:
         return True
-    # soft crypt4 (eyJ...) Happ отклоняет — нужен официальный crypto
-    if link.startswith("happ://crypt4/eyJ") or not is_real_happ_crypto_link(link):
+    if not sub.startswith("https://svoygarage.ru/sub/"):
         return True
-    # уже официальный crypt5 — ок, если https sub
-    if link.startswith("happ://crypt") and "eyJ" not in link.split("/", 3)[-1][:3]:
-        if sub.startswith("https://"):
-            return False
-    return not link.startswith("happ://crypt")
+    # Нужна ровно soft crypt4 с JSON {"url":...}; crypt5/add — перегенерировать
+    if not is_real_happ_crypto_link(link):
+        return True
+    if decode_happ_crypt4(link) != sub:
+        return True
+    return False
 
 
 async def ensure_real_crypto_link(
@@ -46,7 +46,7 @@ async def ensure_real_crypto_link(
     user: MarzVpnUser,
     marzban: MarzbanClient | None = None,
 ) -> MarzVpnUser:
-    """Перешифровывает устаревшие/http ссылки в валидный HTTPS Happ crypt."""
+    """Переводит sub на HTTPS и выдаёт единый happ://crypt4/."""
     if not _needs_https_refresh(user.subscription_url, user.crypt4_link):
         return user
 
@@ -62,7 +62,6 @@ async def ensure_real_crypto_link(
             logger.warning("refresh sub from marzban failed: %s", exc)
             sub = marzban.public_subscription_url(sub) if marzban else sub
     else:
-        # минимальный https rewrite без клиента
         sub = (
             sub.replace("://195.24.65.251:2086", "://svoygarage.ru")
             .replace("://195.24.65.251:62050", "://svoygarage.ru")
@@ -73,9 +72,9 @@ async def ensure_real_crypto_link(
     user.subscription_url = sub
     user.crypt4_link = new_link
     user.key_valid = True
-    user.verify_note = "official_happ_crypto"
+    user.verify_note = "soft_crypt4_json"
     await session.commit()
-    logger.info("Обновлён HTTPS ключ tg=%s → %s…", user.telegram_id, new_link[:28])
+    logger.info("Обновлён crypt4 tg=%s → %s…", user.telegram_id, new_link[:28])
     return user
 
 

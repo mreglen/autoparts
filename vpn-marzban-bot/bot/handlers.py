@@ -14,7 +14,6 @@ from db import get_user
 from keyboards import back_to_menu_keyboard, main_menu_keyboard
 from marzban_api import MarzbanClient
 from services import ensure_real_crypto_link, ensure_registered
-from happ_crypto import generate_happ_add_link, decode_happ_crypt4
 from utils import format_remaining, html_code, parse_referral_payload, utcnow
 
 logger = logging.getLogger("marzban-vpn-bot.handlers")
@@ -132,45 +131,11 @@ def register_handlers(
             return
 
         await callback.answer()
-        # Для soft-crypt4 можно достать url; для official crypto — из subscription_url
-        sub_url = decode_happ_crypt4(user.crypt4_link) or user.subscription_url
-        add_link = generate_happ_add_link(sub_url)
-
-        # Прямые vless:// — запасной путь, если подписка в Happ не импортируется
-        vless_lines: list[str] = []
-        try:
-            remote = await marzban.get_user(user.marzban_username)
-            if remote:
-                for link in remote.get("links") or []:
-                    if isinstance(link, str) and link.startswith("vless://"):
-                        vless_lines.append(link)
-        except Exception as exc:
-            logger.warning("get vless links failed: %s", exc)
-
-        parts = [
-            "<b>КЛЮЧ ДОСТУПА ДЛЯ HAPP</b>",
-            "",
-            "<b>1) Импорт подписки (рекомендуется):</b>",
-            html_code(add_link),
-            "",
-            "<b>2) Зашифрованный ключ Happ:</b>",
-            html_code(user.crypt4_link),
-            "",
-            "<b>3) Прямой URL подписки:</b>",
-            html_code(sub_url),
-        ]
-        if vless_lines:
-            parts.extend(["", "<b>4) Запасной вариант — отдельные серверы:</b>"])
-            for i, vl in enumerate(vless_lines, 1):
-                parts.append(f"{i}. {html_code(vl)}")
-        parts.extend(
-            [
-                "",
-                "<i>Скопируйте пункт 1 или 2 и вставьте в Happ → Добавить подписку.</i>",
-                "<i>Если пинг n/a — попробуйте пункт 4 (по одной ссылке).</i>",
-            ]
+        text = (
+            "<b>КЛЮЧ HAPP VPN</b>\n\n"
+            f"{html_code(user.crypt4_link)}\n\n"
+            "<i>Нажмите на ссылку — скопируется. Вставьте в Happ → Добавить подписку.</i>"
         )
-        text = "\n".join(parts)
         if callback.message:
             await callback.message.answer(
                 text,
