@@ -1,4 +1,4 @@
-"""Простая выдача ссылок для Happ: HTTPS + чистые vless://."""
+"""Эталонная выдача VLESS / Happ: pbk+sid с сервера, encryption=none, SNI dl.google.com."""
 
 from __future__ import annotations
 
@@ -6,18 +6,35 @@ import base64
 import json
 import logging
 import re
-from urllib.parse import parse_qsl, unquote, urlencode, urlparse
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse
 
 logger = logging.getLogger("marzban-vpn-bot.happ")
 
-_PARAM_ORDER = ("security", "type", "flow", "sni", "fp", "pbk", "sid")
-# Актуальные Reality-ключи (сервер /root/marzban-vpn-reality-*.key)
+_PARAM_ORDER = (
+    "encryption",
+    "security",
+    "type",
+    "flow",
+    "sni",
+    "fp",
+    "pbk",
+    "sid",
+)
+
+# Сверено с /root/marzban-vpn-reality-*.key и xray realitySettings
 DEFAULT_REALITY_SID = "65ebe0daaa020cb2"
 DEFAULT_REALITY_PBK = "Rlb-IPbM75c8dIoOHRI3ptprWuMgmJig2f8X-2y0RRI"
+# Устойчивее к ТСПУ, чем www.apple.com / microsoft
+DEFAULT_REALITY_SNI = "dl.google.com"
 
 
-def normalize_vless_for_happ(vless_url: str, remark: str | None = None) -> str:
-    """Минимальный VLESS URI: без пустых params, с обязательным sid."""
+def normalize_vless_for_happ(
+    vless_url: str,
+    remark: str | None = None,
+    *,
+    with_flow: bool = True,
+) -> str:
+    """Валидный VLESS Reality URI без пустых params."""
     if not vless_url or not str(vless_url).strip().startswith("vless://"):
         return ""
 
@@ -34,12 +51,17 @@ def normalize_vless_for_happ(vless_url: str, remark: str | None = None) -> str:
             remark = "VPN"
 
     if "Germany" in (remark or "") or "212.102.227.25" in raw:
-        remark = "Germany"
+        remark = "Germany_VLESS_Reality"
     elif "Russia" in (remark or "") or "195.24.65.251" in raw:
-        remark = "Russia"
+        remark = "Russia_VLESS_Reality"
     else:
         remark = re.sub(r"[^\w\.-]", "_", remark or "VPN")
         remark = re.sub(r"_+", "_", remark).strip("_") or "VPN"
+        if not remark.endswith("_VLESS_Reality"):
+            remark = f"{remark}_VLESS_Reality"
+
+    if not with_flow:
+        remark = f"{remark}_noflow"
 
     parsed = urlparse(main_part)
     if parsed.scheme != "vless" or not parsed.netloc:
@@ -50,18 +72,24 @@ def normalize_vless_for_happ(vless_url: str, remark: str | None = None) -> str:
         for k, v in parse_qsl(parsed.query, keep_blank_values=True)
         if v not in (None, "")
     }
-    for junk in ("headertype", "path", "host", "alpn", "mode", "encryption", "spx"):
+    for junk in ("headertype", "path", "host", "alpn", "mode", "spx"):
         params.pop(junk, None)
 
-    for key in ("security", "flow", "type", "fp"):
+    for key in ("security", "flow", "type", "fp", "encryption"):
         if key in params and isinstance(params[key], str):
             params[key] = params[key].lower()
 
-    if not params.get("sid"):
-        params["sid"] = DEFAULT_REALITY_SID
-    # Marzban иногда кэширует старый pbk в links — всегда пишем рабочие ключи
+    params["encryption"] = "none"
+    params["security"] = "reality"
+    params["type"] = params.get("type") or "tcp"
+    params["sni"] = DEFAULT_REALITY_SNI
+    params["fp"] = params.get("fp") or "chrome"
     params["pbk"] = DEFAULT_REALITY_PBK
     params["sid"] = DEFAULT_REALITY_SID
+    if with_flow:
+        params["flow"] = "xtls-rprx-vision"
+    else:
+        params.pop("flow", None)
 
     ordered: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -74,15 +102,22 @@ def normalize_vless_for_happ(vless_url: str, remark: str | None = None) -> str:
             ordered.append((key, val))
 
     query = urlencode(ordered, doseq=False)
-    return f"vless://{parsed.netloc}?{query}#{remark}"
+    # ASCII remark only — без emoji / спецсимволов в #
+    safe_remark = quote(remark, safe="_-.")
+    return f"vless://{parsed.netloc}?{query}#{safe_remark}"
 
 
 def build_simple_vless_links(vless_list: list[str]) -> list[str]:
+    """Основные конфиги с flow + запас без flow."""
     out: list[str] = []
+    seen: set[str] = set()
     for link in vless_list:
-        if isinstance(link, str) and link.strip():
-            n = normalize_vless_for_happ(link)
-            if n:
+        if not isinstance(link, str) or not link.strip():
+            continue
+        for with_flow in (True, False):
+            n = normalize_vless_for_happ(link, with_flow=with_flow)
+            if n and n not in seen:
+                seen.add(n)
                 out.append(n)
     return out
 
@@ -91,16 +126,37 @@ def build_happ_add_link(sub_url: str) -> str:
     return f"happ://add/{sub_url.strip()}"
 
 
-def build_happ_crypt4(vless_list: list[str]) -> str:
-    """Совместимость: не основной канал для Happ."""
-    configs = build_simple_vless_links(vless_list)
-    if not configs:
+def build_correct_happ_crypt4(vless_urls: list[str]) -> str:
+    """Эталонный happ://crypt4/ с {"configs":[...]}."""
+    cleaned_configs = build_simple_vless_links(vless_urls)
+    if not cleaned_configs:
+        # fallback: минимальная доводка encryption=none
+        cleaned_configs = []
+        for url in vless_urls:
+            if not isinstance(url, str) or not url.strip():
+                continue
+            u = url.strip()
+            if "encryption=" not in u:
+                if "#" in u:
+                    base, tag = u.split("#", 1)
+                    u = f"{base}&encryption=none#{tag}"
+                else:
+                    u = f"{u}&encryption=none"
+            cleaned_configs.append(u)
+    if not cleaned_configs:
         raise ValueError("no vless")
-    payload = {"configs": configs}
-    b64 = base64.b64encode(
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    ).decode("utf-8")
-    return f"happ://crypt4/{b64}"
+
+    payload = {"configs": cleaned_configs}
+    json_data = json.dumps(
+        payload, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    # Happ принимает standard Base64 (не urlsafe: _/- дают «invalid»)
+    b64_payload = base64.b64encode(json_data).decode("utf-8")
+    return f"happ://crypt4/{b64_payload}"
+
+
+def build_happ_crypt4(vless_list: list[str]) -> str:
+    return build_correct_happ_crypt4(vless_list)
 
 
 def normalize_subscription_body(raw: bytes | str) -> bytes:

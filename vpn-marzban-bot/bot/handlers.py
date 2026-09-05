@@ -35,11 +35,13 @@ HOW_TO_SETUP = (
     "<b>Как настроить Happ VPN</b>\n\n"
     "1. Установите <b>Happ</b>.\n"
     "2. Бот → <b>🔑 Ключ</b>.\n"
-    "3. Добавьте ссылку <code>happ://add/https://...</code> "
-    "или HTTPS подписку.\n"
-    "4. Либо добавьте отдельно серверы Russia / Germany "
-    "(ссылки <code>vless://</code>).\n"
-    "5. Включите VPN и выберите сервер."
+    "3. Удалите старую подписку в Happ.\n"
+    "4. Добавьте свежий <code>happ://add/https://...</code>.\n"
+    "5. Обновите подписку (pull-to-refresh).\n"
+    "6. Режим: <b>Global / Proxy All</b>.\n"
+    "7. Выберите <b>Russia_VLESS_Reality</b> "
+    "(не <code>_noflow</code>).\n"
+    "8. Включите VPN и откройте сайт в браузере."
 )
 
 
