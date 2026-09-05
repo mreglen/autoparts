@@ -1,4 +1,4 @@
-"""Генерация happ://crypt4/ с {"configs":[vless://...]} и чистыми remarks."""
+"""Генерация happ://crypt4/ с очищенными VLESS URI и remarks."""
 
 from __future__ import annotations
 
@@ -6,9 +6,35 @@ import base64
 import json
 import logging
 import re
-from urllib.parse import quote, unquote
+from urllib.parse import (
+    parse_qsl,
+    quote,
+    unquote,
+    urlencode,
+    urlparse,
+    urlunparse,
+)
 
 logger = logging.getLogger("marzban-vpn-bot.happ")
+
+
+def clean_vless_url(vless_url: str) -> str:
+    """Удаляет пустые параметры (path=&, host=& и т.д.) из VLESS URL."""
+    parsed = urlparse(vless_url.strip())
+    query_params = [
+        (k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=False) if v
+    ]
+    new_query = urlencode(query_params)
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment,
+        )
+    )
 
 
 def sanitize_vless_link(vless_url: str) -> str:
@@ -27,33 +53,42 @@ def sanitize_vless_link(vless_url: str) -> str:
     return f"{base_part.strip()}#{quote(clean_remark)}"
 
 
-def make_valid_happ_crypt4(vless_links: list[str]) -> str:
-    sanitized_configs = [
-        sanitize_vless_link(link)
+def prepare_vless_link(vless_url: str) -> str:
+    """Сначала пустые query, затем безопасный remark."""
+    return sanitize_vless_link(clean_vless_url(vless_url))
+
+
+def generate_happ_crypt4_clean(vless_links: list[str]) -> str:
+    cleaned_configs = [
+        prepare_vless_link(link)
         for link in vless_links
         if isinstance(link, str) and link.strip()
     ]
-    if not sanitized_configs:
+    if not cleaned_configs:
         raise ValueError("Нужен хотя бы один VLESS-конфиг для happ://crypt4/")
-    payload = {"configs": sanitized_configs}
+    payload = {"configs": cleaned_configs}
     json_bytes = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     return f"happ://crypt4/{base64.b64encode(json_bytes).decode('utf-8')}"
 
 
+def make_valid_happ_crypt4(vless_links: list[str]) -> str:
+    return generate_happ_crypt4_clean(vless_links)
+
+
 def get_happ_crypt4(vless_list: list[str]) -> str:
-    return make_valid_happ_crypt4(vless_list)
+    return generate_happ_crypt4_clean(vless_list)
 
 
 def generate_direct_happ_payload(vless_links_list: list[str]) -> str:
-    return make_valid_happ_crypt4(vless_links_list)
+    return generate_happ_crypt4_clean(vless_links_list)
 
 
 def get_single_happ_link(vless_links_list: list[str]) -> str:
-    return make_valid_happ_crypt4(vless_links_list)
+    return generate_happ_crypt4_clean(vless_links_list)
 
 
 def generate_happ_crypt4(vless_links_list: list[str]) -> str:
-    return make_valid_happ_crypt4(vless_links_list)
+    return generate_happ_crypt4_clean(vless_links_list)
 
 
 def generate_happ_add_link(sub_url: str) -> str:
@@ -62,11 +97,11 @@ def generate_happ_add_link(sub_url: str) -> str:
 
 
 def generate_valid_happ_link(vless_links_list: list[str]) -> str:
-    return make_valid_happ_crypt4(vless_links_list)
+    return generate_happ_crypt4_clean(vless_links_list)
 
 
 async def generate_valid_happ_link_async(vless_links_list: list[str]) -> str:
-    return make_valid_happ_crypt4(vless_links_list)
+    return generate_happ_crypt4_clean(vless_links_list)
 
 
 def _decode_crypt4_json(link: str) -> dict | None:
@@ -119,12 +154,12 @@ def decode_happ_crypt4(link: str) -> str | None:
 
 
 def encode_happ_crypt4(vless_links_list: list[str]) -> str:
-    return make_valid_happ_crypt4(vless_links_list)
+    return generate_happ_crypt4_clean(vless_links_list)
 
 
 def encode_happ_crypto_link_sync(vless_links_list: list[str]) -> str:
-    return make_valid_happ_crypt4(vless_links_list)
+    return generate_happ_crypt4_clean(vless_links_list)
 
 
 async def encode_happ_crypto_link(vless_links_list: list[str]) -> str:
-    return make_valid_happ_crypt4(vless_links_list)
+    return generate_happ_crypt4_clean(vless_links_list)

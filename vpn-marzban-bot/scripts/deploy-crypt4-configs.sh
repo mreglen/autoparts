@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 load_dotenv('/opt/marzban-vpn-bot/.env')
 import asyncpg, httpx
-from happ_crypto import make_valid_happ_crypt4, is_real_happ_crypto_link, sanitize_vless_link
+from happ_crypto import generate_happ_crypt4_clean, is_real_happ_crypto_link
 
 BASE=os.getenv('MARZBAN_BASE_URL','http://127.0.0.1:62050').rstrip('/')
 USER=os.getenv('MARZBAN_USERNAME','admin')
@@ -36,14 +36,15 @@ def to_https(u: str) -> str:
              .replace('http://svoygarage.ru','https://svoygarage.ru'))
 
 async def main():
-    sample = make_valid_happ_crypt4(['vless://a@1.1.1.1:443#🇷🇺 Russia | Test'])
+    dirty='vless://u@1.1.1.1:8443?security=reality&type=tcp&headerType=&path=&host=&sni=www.microsoft.com&fp=chrome#🇷🇺 Russia | Test'
+    sample = generate_happ_crypt4_clean([dirty])
     assert is_real_happ_crypto_link(sample)
     data=json.loads(base64.b64decode(sample.split('/',3)[-1]))
-    assert 'configs' in data
+    cfg=data['configs'][0]
+    assert 'headerType=' not in cfg and 'path=' not in cfg and 'host=' not in cfg
+    assert 'security=reality' in cfg and 'sni=www.microsoft.com' in cfg
     from urllib.parse import unquote as uq
-    remark = uq(data['configs'][0].split('#',1)[1])
-    assert remark == 'Russia_Test', remark
-    print('smoke_ok remark=', remark)
+    print('smoke_ok', cfg.split('?',1)[1].split('#')[0], 'remark=', uq(cfg.split('#',1)[1]))
 
     async with httpx.AsyncClient(timeout=20) as client:
         tok=(await client.post(f'{BASE}/api/admin/token', data={'username':USER,'password':PASS})).json()['access_token']
@@ -60,18 +61,18 @@ async def main():
                 print('NO_LINKS', r['telegram_id'])
                 continue
             sub=to_https(payload.get('subscription_url') or r['subscription_url'])
-            crypt=make_valid_happ_crypt4(links)
+            crypt=generate_happ_crypt4_clean(links)
             assert is_real_happ_crypto_link(crypt)
             cfgs=json.loads(base64.b64decode(crypt.split('/',3)[-1]))['configs']
             print(r['telegram_id'], 'n=', len(cfgs), crypt[:55]+'...')
             for c in cfgs:
-                host=c.split('@')[1].split('?')[0] if '@' in c else c[:30]
-                rem=c.split('#',1)[-1] if '#' in c else ''
-                print(' ', host, '#', rem)
+                q=c.split('?',1)[1].split('#',1)[0] if '?' in c else ''
+                bad=[p for p in q.split('&') if p.endswith('=') or p.endswith('=&')]
+                print(' ', c.split('@')[1].split('?')[0] if '@' in c else c[:30], 'q=', q[:80], 'bad=', bad)
             await conn.execute(
                 '''update marzvpn_users set subscription_url=$1, crypt4_link=$2, key_valid=true,
                    verify_note=$3, last_verified_at=$4 where telegram_id=$5''',
-                sub, crypt, 'crypt4_configs_clean', datetime.now(timezone.utc), r['telegram_id'])
+                sub, crypt, 'crypt4_clean_query', datetime.now(timezone.utc), r['telegram_id'])
         await conn.close()
 asyncio.run(main())
 PY

@@ -82,7 +82,7 @@ async def ensure_real_crypto_link(
     user.subscription_url = sub
     user.crypt4_link = new_link
     user.key_valid = True
-    user.verify_note = "crypt4_configs_clean"
+    user.verify_note = "crypt4_clean_query"
     await session.commit()
     logger.info(
         "Обновлён crypt4(configs) tg=%s n=%s → %s…",

@@ -10,6 +10,7 @@ from happ_crypto import (  # noqa: F401
     encode_happ_crypt4,
     encode_happ_crypto_link,
     generate_direct_happ_payload,
+    generate_happ_crypt4_clean,
     generate_valid_happ_link,
     generate_valid_happ_link_async,
     get_happ_crypt4,
