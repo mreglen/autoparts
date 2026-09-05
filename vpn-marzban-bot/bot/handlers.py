@@ -132,12 +132,11 @@ def register_handlers(
         await callback.answer()
 
         parts = [
-            "<b>КЛЮЧ HAPP VPN</b>",
+            "<b>КЛЮЧ ДОСТУПА ДЛЯ HAPP</b>",
+            "",
+            "вставьте ключ в приложение happ",
             "",
             html_code(user.crypt4_link),
-            "",
-            "<i>Только эта ссылка. Удалите старые подписки в Happ, "
-            "добавьте заново, режим Global, сервер Russia.</i>",
         ]
         if callback.message:
             await callback.message.answer(
