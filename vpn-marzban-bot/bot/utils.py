@@ -14,6 +14,7 @@ from happ_crypto import (  # noqa: F401
     generate_valid_happ_link_async,
     get_happ_crypt4,
     get_single_happ_link,
+    make_valid_happ_crypt4,
 )
 
 

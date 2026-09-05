@@ -101,7 +101,7 @@ async def _verify_all_keys() -> dict:
                         )
                     if need_reencrypt and vless_links:
                         user.crypt4_link = get_happ_crypt4(vless_links)
-                        user.verify_note = "crypt4_configs"
+                        user.verify_note = "crypt4_configs_clean"
                         stats["reencrypted"] += 1
                         notes.append("reencrypted_configs")
 

@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 load_dotenv('/opt/marzban-vpn-bot/.env')
 import asyncpg, httpx
-from happ_crypto import get_happ_crypt4, is_real_happ_crypto_link, decode_happ_crypt4_configs, sanitize_vless_link
+from happ_crypto import make_valid_happ_crypt4, is_real_happ_crypto_link, sanitize_vless_link
 
 BASE=os.getenv('MARZBAN_BASE_URL','http://127.0.0.1:62050').rstrip('/')
 USER=os.getenv('MARZBAN_USERNAME','admin')
@@ -36,12 +36,14 @@ def to_https(u: str) -> str:
              .replace('http://svoygarage.ru','https://svoygarage.ru'))
 
 async def main():
-    sample = get_happ_crypt4(['vless://a@1.1.1.1:443#🇷🇺 Russia | Test'])
+    sample = make_valid_happ_crypt4(['vless://a@1.1.1.1:443#🇷🇺 Russia | Test'])
     assert is_real_happ_crypto_link(sample)
     data=json.loads(base64.b64decode(sample.split('/',3)[-1]))
-    assert 'configs' in data and 'servers' not in data
-    assert '%' in data['configs'][0].split('#',1)[1]
-    print('smoke_ok', sample[:48], 'remark=', data['configs'][0].split('#',1)[1][:40])
+    assert 'configs' in data
+    from urllib.parse import unquote as uq
+    remark = uq(data['configs'][0].split('#',1)[1])
+    assert remark == 'Russia_Test', remark
+    print('smoke_ok remark=', remark)
 
     async with httpx.AsyncClient(timeout=20) as client:
         tok=(await client.post(f'{BASE}/api/admin/token', data={'username':USER,'password':PASS})).json()['access_token']
@@ -58,16 +60,18 @@ async def main():
                 print('NO_LINKS', r['telegram_id'])
                 continue
             sub=to_https(payload.get('subscription_url') or r['subscription_url'])
-            crypt=get_happ_crypt4(links)
+            crypt=make_valid_happ_crypt4(links)
             assert is_real_happ_crypto_link(crypt)
-            cfgs=decode_happ_crypt4_configs(crypt)
-            print(r['telegram_id'], 'n=', len(cfgs or []), crypt[:55]+'...')
-            for c in cfgs or []:
-                print(' ', c.split('@')[1].split('?')[0] if '@' in c else c[:30], '#', c.split('#',1)[-1][:50] if '#' in c else '')
+            cfgs=json.loads(base64.b64decode(crypt.split('/',3)[-1]))['configs']
+            print(r['telegram_id'], 'n=', len(cfgs), crypt[:55]+'...')
+            for c in cfgs:
+                host=c.split('@')[1].split('?')[0] if '@' in c else c[:30]
+                rem=c.split('#',1)[-1] if '#' in c else ''
+                print(' ', host, '#', rem)
             await conn.execute(
                 '''update marzvpn_users set subscription_url=$1, crypt4_link=$2, key_valid=true,
                    verify_note=$3, last_verified_at=$4 where telegram_id=$5''',
-                sub, crypt, 'crypt4_configs', datetime.now(timezone.utc), r['telegram_id'])
+                sub, crypt, 'crypt4_configs_clean', datetime.now(timezone.utc), r['telegram_id'])
         await conn.close()
 asyncio.run(main())
 PY
