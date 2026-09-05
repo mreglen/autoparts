@@ -1,0 +1,16 @@
+# Marzban Node on a dedicated VPS (host networking).
+# Panel (master) connects to SERVICE_PORT / XRAY_API_PORT.
+# Xray inbound ports (e.g. 8443) are opened by the core config pushed from the panel.
+services:
+  marzban-node:
+    image: gozargah/marzban-node:latest
+    container_name: marzban-node
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      SSL_CLIENT_CERT_FILE: "/var/lib/marzban-node/ssl_client_cert.pem"
+      SERVICE_PROTOCOL: "rest"
+      SERVICE_PORT: "62050"
+      XRAY_API_PORT: "62051"
+    volumes:
+      - /var/lib/marzban-node:/var/lib/marzban-node

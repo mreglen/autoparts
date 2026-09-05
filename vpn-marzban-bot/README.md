@@ -15,6 +15,8 @@
 - данные Marzban: `/var/lib/marzban-vpn/`
 - бот: `/opt/marzban-vpn-bot/`
 
+Дополнительная нода (отдельный VPS): см. [`node/README-NODE.md`](node/README-NODE.md).
+
 ---
 
 ## 0. Что нужно заранее
