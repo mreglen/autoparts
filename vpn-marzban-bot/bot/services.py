@@ -17,8 +17,7 @@ from db import (
 )
 from marzban_api import MarzbanClient
 from happ_crypto import (
-    decode_happ_crypt4_servers,
-    generate_direct_happ_payload,
+    get_happ_crypt4,
     is_real_happ_crypto_link,
 )
 from utils import build_marzban_username
@@ -26,14 +25,13 @@ from utils import build_marzban_username
 logger = logging.getLogger("marzban-vpn-bot.services")
 
 
-def _needs_servers_refresh(crypt4_link: str, vless_links: list[str] | None) -> bool:
-    """Старый {"url":...} / crypt5 / пустой servers → обновить."""
+def _needs_configs_refresh(crypt4_link: str, vless_links: list[str] | None) -> bool:
+    """Старый url/servers / пустой configs → обновить."""
     if not is_real_happ_crypto_link(crypt4_link):
         return True
-    if vless_links is None:
+    if not vless_links:
         return False
-    current = decode_happ_crypt4_servers(crypt4_link) or []
-    return set(current) != set(vless_links)
+    return crypt4_link != get_happ_crypt4(vless_links)
 
 
 async def ensure_real_crypto_link(
@@ -41,7 +39,7 @@ async def ensure_real_crypto_link(
     user: MarzVpnUser,
     marzban: MarzbanClient | None = None,
 ) -> MarzVpnUser:
-    """HTTPS sub URL в БД + happ://crypt4/ с прямыми VLESS servers."""
+    """HTTPS sub URL в БД + happ://crypt4/ с {"configs":[vless://...]}."""
     remote = None
     vless_links: list[str] = []
     sub = user.subscription_url
@@ -64,7 +62,9 @@ async def ensure_real_crypto_link(
             .replace("http://svoygarage.ru", "https://svoygarage.ru")
         )
 
-    if not _needs_servers_refresh(user.crypt4_link, vless_links or None):
+    if not _needs_configs_refresh(
+        user.crypt4_link, vless_links if vless_links else None
+    ):
         if sub != user.subscription_url:
             user.subscription_url = sub
             await session.commit()
@@ -78,14 +78,14 @@ async def ensure_real_crypto_link(
         )
         return user
 
-    new_link = generate_direct_happ_payload(vless_links)
+    new_link = get_happ_crypt4(vless_links)
     user.subscription_url = sub
     user.crypt4_link = new_link
     user.key_valid = True
-    user.verify_note = "crypt4_servers_direct"
+    user.verify_note = "crypt4_configs"
     await session.commit()
     logger.info(
-        "Обновлён crypt4(servers) tg=%s n=%s → %s…",
+        "Обновлён crypt4(configs) tg=%s n=%s → %s…",
         user.telegram_id,
         len(vless_links),
         new_link[:28],
@@ -136,7 +136,7 @@ async def ensure_registered(
         raise RuntimeError(
             "Marzban не вернул VLESS links. Проверьте Host Settings / inbound."
         )
-    crypt4 = generate_direct_happ_payload(vless_links)
+    crypt4 = get_happ_crypt4(vless_links)
 
     user = await create_user(
         session,

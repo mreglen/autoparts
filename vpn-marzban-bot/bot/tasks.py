@@ -4,7 +4,7 @@
 Проверяет для каждого пользователя в marzvpn_users:
 1. Существует ли аккаунт в Marzban
 2. Есть ли VLESS links в Marzban
-3. crypt4_link — soft crypt4 с {"servers":[vless://...]}
+3. crypt4_link — soft crypt4 с {"configs":[vless://...]}
 4. Если expire_at < now → отключает профиль в Marzban (ключ тот же)
 5. Если expire_at >= now → активирует и синхронизирует expire в Marzban
 6. Пересобирает crypt4 из актуальных VLESS links
@@ -31,11 +31,7 @@ from db import (
     mark_user_verified,
     session_factory,
 )
-from happ_crypto import (
-    decode_happ_crypt4_servers,
-    generate_direct_happ_payload,
-    is_real_happ_crypto_link,
-)
+from happ_crypto import get_happ_crypt4, is_real_happ_crypto_link
 from marzban_api import MarzbanClient
 
 logger = logging.getLogger("marzban-vpn-bot.tasks")
@@ -100,13 +96,14 @@ async def _verify_all_keys() -> dict:
 
                     need_reencrypt = not is_real_happ_crypto_link(user.crypt4_link)
                     if not need_reencrypt and vless_links:
-                        current = decode_happ_crypt4_servers(user.crypt4_link) or []
-                        need_reencrypt = set(current) != set(vless_links)
+                        need_reencrypt = user.crypt4_link != get_happ_crypt4(
+                            vless_links
+                        )
                     if need_reencrypt and vless_links:
-                        user.crypt4_link = generate_direct_happ_payload(vless_links)
-                        user.verify_note = "crypt4_servers_direct"
+                        user.crypt4_link = get_happ_crypt4(vless_links)
+                        user.verify_note = "crypt4_configs"
                         stats["reencrypted"] += 1
-                        notes.append("reencrypted_servers")
+                        notes.append("reencrypted_configs")
 
                     expire_at = user.expire_at
                     if expire_at.tzinfo is None:
