@@ -108,11 +108,10 @@ systemctl is-active marzban-vpn-bot marzban-vpn-bot-celery marzban-vpn-bot-celer
 journalctl -u marzban-vpn-bot -n 15 --no-pager
 journalctl -u marzban-vpn-bot-celery -n 10 --no-pager
 
-# Reload site backend code (celery include) without forcing double beat
-if systemctl list-unit-files | grep -q celery; then
-  echo "==> reload site celery workers (code pull already done)"
-  systemctl try-restart celery celerybeat 2>/dev/null || \
-  systemctl try-restart celery-worker celery-beat 2>/dev/null || true
-fi
+# Site celery: soft reload (do not block deploy)
+timeout 15 systemctl try-restart celery 2>/dev/null || true
+timeout 15 systemctl try-restart celerybeat 2>/dev/null || true
+timeout 15 systemctl try-restart celery-worker 2>/dev/null || true
+timeout 15 systemctl try-restart celery-beat 2>/dev/null || true
 
 echo "DEPLOY_MASTER_OK"
