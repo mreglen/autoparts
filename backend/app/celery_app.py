@@ -60,10 +60,8 @@ celery_app.conf.update(
             "task": "analytics.run_monthly_query_review",
             "schedule": crontab(day_of_month=1, hour=3, minute=0),
         },
-        "marzvpn-verify-keys": {
-            "task": "marzvpn.verify_keys_authenticity",
-            "schedule": 300.0,  # каждые 5 минут
-        },
+        # marzvpn.verify_keys_authenticity — отдельный beat бота (redis db/2),
+        # чтобы не дублировать с marzban-vpn-bot-celerybeat.
     },
 )
 
