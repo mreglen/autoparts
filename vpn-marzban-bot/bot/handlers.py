@@ -15,6 +15,7 @@ from keyboards import back_to_menu_keyboard, main_menu_keyboard
 from marzban_api import MarzbanClient
 from services import ensure_real_crypto_link, ensure_registered
 from utils import format_remaining, html_code, parse_referral_payload, utcnow
+from happ_crypto import generate_happ_add_link, decode_happ_crypt4
 
 logger = logging.getLogger("marzban-vpn-bot.handlers")
 
@@ -131,10 +132,17 @@ def register_handlers(
             return
 
         await callback.answer()
+        sub_url = decode_happ_crypt4(user.crypt4_link) or user.subscription_url
+        add_link = generate_happ_add_link(sub_url)
         text = (
             "<b>КЛЮЧ ДОСТУПА ДЛЯ HAPP</b>\n\n"
+            "<b>1) Рекомендуется (открыть в Happ):</b>\n"
+            f"{html_code(add_link)}\n\n"
+            "<b>2) crypt4:</b>\n"
             f"{html_code(user.crypt4_link)}\n\n"
-            "<i>Нажмите на код выше, чтобы скопировать зашифрованный ключ Happ.</i>"
+            "<b>3) Прямая подписка (если deeplink не сработал):</b>\n"
+            f"{html_code(sub_url)}\n\n"
+            "<i>Нажмите на код, чтобы скопировать. В Happ: добавить подписку / вставить.</i>"
         )
         if callback.message:
             await callback.message.answer(
