@@ -53,6 +53,10 @@ class MarzVpnUser(Base):
         DateTime(timezone=True), nullable=True
     )
     verify_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # active | disabled | banned — админ-оверрайд (Celery не реактивирует banned/disabled)
+    account_status: Mapped[str] = mapped_column(
+        String(32), default="active", server_default="active", nullable=False
+    )
 
 
 class MarzVpnReferral(Base):

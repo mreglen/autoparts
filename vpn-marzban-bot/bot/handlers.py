@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import io
 import logging
 
+import qrcode
 from aiogram import F, Router
 from aiogram.filters import CommandStart
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from config import Settings
 from db import get_user
-from keyboards import back_to_menu_keyboard, main_menu_keyboard
+from keyboards import (
+    back_to_menu_keyboard,
+    key_message_keyboard,
+    main_menu_keyboard,
+)
 from marzban_api import MarzbanClient
 from services import ensure_real_crypto_link, ensure_registered
 from utils import format_remaining, html_code, parse_referral_payload, utcnow
@@ -40,6 +46,16 @@ HOW_TO_SETUP = (
     "4. Добавьте новую → обновите подписку.\n"
     "5. Режим <b>Global</b> → сервер <b>Russia</b> → VPN."
 )
+
+
+def _make_key_qr_png(payload: str) -> bytes:
+    qr = qrcode.QRCode(version=None, box_size=8, border=2)
+    qr.add_data(payload)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 def register_handlers(
@@ -142,8 +158,51 @@ def register_handlers(
             await callback.message.answer(
                 "\n".join(parts),
                 parse_mode="HTML",
-                reply_markup=back_to_menu_keyboard(),
+                reply_markup=key_message_keyboard(),
                 disable_web_page_preview=True,
+            )
+
+    @router.callback_query(F.data == "show_key_qr")
+    async def on_show_key_qr(callback: CallbackQuery) -> None:
+        if callback.from_user is None:
+            await callback.answer()
+            return
+
+        async with session_maker() as session:
+            user = await get_user(session, callback.from_user.id)
+            if user is not None:
+                user = await ensure_real_crypto_link(session, user, marzban)
+
+        if user is None:
+            await callback.answer("Сначала нажмите /start", show_alert=True)
+            return
+
+        link = (user.crypt4_link or "").strip()
+        if not link:
+            await callback.answer("Ключ ещё не готов", show_alert=True)
+            return
+
+        await callback.answer()
+        try:
+            png = _make_key_qr_png(link)
+        except Exception:
+            logger.exception("QR generation failed tg=%s", callback.from_user.id)
+            if callback.message:
+                await callback.message.answer(
+                    "❌ Не удалось создать QR код. Скопируйте ключ текстом.",
+                    reply_markup=back_to_menu_keyboard(),
+                )
+            return
+
+        if callback.message:
+            await callback.message.answer_photo(
+                BufferedInputFile(png, filename="marzvpn-key-qr.png"),
+                caption=(
+                    "<b>QR код ключа MarzVPN</b>\n"
+                    "Отсканируйте в приложении Happ"
+                ),
+                parse_mode="HTML",
+                reply_markup=back_to_menu_keyboard(),
             )
 
     @router.callback_query(F.data == "invite_friend")

@@ -24,7 +24,72 @@ function displayName(user) {
   return `ID ${user.telegram_id}`;
 }
 
-function VpnUserDetailModal({ user, loading, onClose }) {
+function statusLabel(status) {
+  if (status === 'banned') return 'бан';
+  if (status === 'disabled') return 'отключён';
+  return 'активен';
+}
+
+function statusClass(status) {
+  if (status === 'banned') return 'bg-red-100 text-red-800';
+  if (status === 'disabled') return 'bg-amber-100 text-amber-800';
+  return 'bg-emerald-100 text-emerald-800';
+}
+
+function paymentStatusClass(status) {
+  if (status === 'paid') return 'text-emerald-700';
+  if (status === 'failed' || status === 'cancelled') return 'text-red-600';
+  if (status === 'refunded') return 'text-amber-700';
+  return 'text-gray-600';
+}
+
+function ActionButton({ children, onClick, disabled, tone = 'neutral' }) {
+  const tones = {
+    neutral: 'bg-gray-100 text-gray-800 hover:bg-gray-200',
+    primary: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
+    danger: 'bg-red-50 text-red-700 hover:bg-red-100',
+    warn: 'bg-amber-50 text-amber-800 hover:bg-amber-100',
+    success: 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
+  };
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${tones[tone] || tones.neutral}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function InfoCard({ label, value, highlight, mono }) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</div>
+      <div
+        className={`mt-1 text-sm font-semibold ${
+          highlight === false ? 'text-red-600' : highlight ? 'text-emerald-700' : 'text-gray-900'
+        } ${mono ? 'font-mono text-xs break-all' : ''}`}
+      >
+        {value || '—'}
+      </div>
+    </div>
+  );
+}
+
+function VpnUserDetailModal({
+  user,
+  loading,
+  busy,
+  actionError,
+  onClose,
+  onAction,
+  daysInput,
+  setDaysInput,
+  paymentForm,
+  setPaymentForm,
+}) {
   if (loading || !user) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose} role="presentation">
@@ -35,6 +100,9 @@ function VpnUserDetailModal({ user, loading, onClose }) {
     );
   }
 
+  const mz = user.marzban || {};
+  const accountStatus = user.account_status || 'active';
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
@@ -42,13 +110,16 @@ function VpnUserDetailModal({ user, loading, onClose }) {
       role="presentation"
     >
       <div
-        className="flex max-h-[100dvh] sm:max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-none sm:rounded-2xl bg-white shadow-xl"
+        className="flex max-h-[100dvh] sm:max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-none sm:rounded-2xl bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-gray-100 px-5 py-4">
           <div>
             <h2 className="text-lg font-bold text-gray-900">MarzVPN · {displayName(user)}</h2>
             <p className="mt-0.5 font-mono text-xs text-gray-500">{user.telegram_id}</p>
+            <span className={`mt-2 inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(accountStatus)}`}>
+              {statusLabel(accountStatus)}
+            </span>
           </div>
           <button
             type="button"
@@ -60,7 +131,13 @@ function VpnUserDetailModal({ user, loading, onClose }) {
           </button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4 space-y-4">
+        <div className="overflow-y-auto px-5 py-4 space-y-5">
+          {actionError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {actionError}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <InfoCard label="Зарегистрирован" value={formatDateTime(user.created_at)} />
             <InfoCard label="Подписка до" value={formatDateTime(user.expire_at)} />
@@ -73,6 +150,109 @@ function VpnUserDetailModal({ user, loading, onClose }) {
               highlight={user.key_valid}
             />
           </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-800">Marzban · онлайн / трафик</h3>
+            {!mz.available ? (
+              <p className="text-sm text-gray-500">
+                {mz.error ? `Не удалось получить данные: ${mz.error}` : 'Нет данных из Marzban'}
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <InfoCard
+                  label="Онлайн"
+                  value={mz.is_online ? 'сейчас онлайн' : 'офлайн'}
+                  highlight={!!mz.is_online}
+                />
+                <InfoCard label="Последний онлайн" value={formatDateTime(mz.online_at)} />
+                <InfoCard
+                  label="Трафик"
+                  value={`${mz.used_traffic_label || '—'} / ${mz.data_limit_label || '∞'}`}
+                />
+                <InfoCard label="Статус Marzban" value={mz.status || '—'} />
+                <InfoCard label="За всё время" value={mz.lifetime_used_traffic_label || '—'} />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-800">Действия</h3>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <input
+                type="number"
+                min={1}
+                max={3650}
+                value={daysInput}
+                onChange={(e) => setDaysInput(e.target.value)}
+                className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                aria-label="Дней"
+              />
+              <ActionButton
+                tone="primary"
+                disabled={busy}
+                onClick={() => onAction('extend', { days: Number(daysInput) })}
+              >
+                Выдать дни
+              </ActionButton>
+              {accountStatus === 'disabled' ? (
+                <ActionButton tone="success" disabled={busy} onClick={() => onAction('enable')}>
+                  Включить
+                </ActionButton>
+              ) : (
+                <ActionButton tone="warn" disabled={busy || accountStatus === 'banned'} onClick={() => onAction('disable')}>
+                  Отключить
+                </ActionButton>
+              )}
+              {accountStatus === 'banned' ? (
+                <ActionButton tone="success" disabled={busy} onClick={() => onAction('unban')}>
+                  Снять бан
+                </ActionButton>
+              ) : (
+                <ActionButton tone="danger" disabled={busy} onClick={() => onAction('ban')}>
+                  Забанить
+                </ActionButton>
+              )}
+              <ActionButton
+                tone="neutral"
+                disabled={busy}
+                onClick={() => {
+                  if (window.confirm('Сбросить ключ? Старая ссылка перестанет работать.')) {
+                    onAction('reset-key');
+                  }
+                }}
+              >
+                Сброс ключа
+              </ActionButton>
+              <ActionButton
+                tone="neutral"
+                disabled={busy}
+                onClick={() => {
+                  if (window.confirm('Обнулить трафик в Marzban?')) {
+                    onAction('reset-traffic');
+                  }
+                }}
+              >
+                Сброс трафика
+              </ActionButton>
+            </div>
+          </div>
+
+          {(user.subscription_url || user.crypt4_link) && (
+            <div className="space-y-2">
+              {user.subscription_url && (
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                  <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Subscription</div>
+                  <div className="mt-1 break-all font-mono text-xs text-gray-800">{user.subscription_url}</div>
+                </div>
+              )}
+              {user.crypt4_link && (
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                  <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Ключ Happ</div>
+                  <div className="mt-1 break-all font-mono text-xs text-gray-800">{user.crypt4_link}</div>
+                </div>
+              )}
+            </div>
+          )}
 
           {user.referrer_id && (
             <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
@@ -89,6 +269,95 @@ function VpnUserDetailModal({ user, loading, onClose }) {
               {user.last_verified_at ? ` · ${formatDateTime(user.last_verified_at)}` : ''}
             </div>
           )}
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-800">Платежи</h3>
+            <div className="mb-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <input
+                type="number"
+                min={0}
+                step="1"
+                placeholder="₽"
+                value={paymentForm.amount_rub}
+                onChange={(e) => setPaymentForm((f) => ({ ...f, amount_rub: e.target.value }))}
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              />
+              <input
+                type="number"
+                min={0}
+                placeholder="дней"
+                value={paymentForm.days_granted}
+                onChange={(e) => setPaymentForm((f) => ({ ...f, days_granted: e.target.value }))}
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              />
+              <select
+                value={paymentForm.status}
+                onChange={(e) => setPaymentForm((f) => ({ ...f, status: e.target.value }))}
+                className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+              >
+                <option value="paid">paid</option>
+                <option value="pending">pending</option>
+                <option value="failed">failed</option>
+                <option value="refunded">refunded</option>
+                <option value="cancelled">cancelled</option>
+              </select>
+              <ActionButton
+                tone="primary"
+                disabled={busy}
+                onClick={() =>
+                  onAction('payment', {
+                    amount_rub: Number(paymentForm.amount_rub || 0),
+                    days_granted: Number(paymentForm.days_granted || 0),
+                    status: paymentForm.status,
+                    note: paymentForm.note || undefined,
+                    apply_days: true,
+                  })
+                }
+              >
+                Записать
+              </ActionButton>
+            </div>
+            <input
+              type="text"
+              placeholder="Комментарий (необязательно)"
+              value={paymentForm.note}
+              onChange={(e) => setPaymentForm((f) => ({ ...f, note: e.target.value }))}
+              className="mb-3 w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+            />
+            {!user.payments?.length ? (
+              <p className="text-sm text-gray-500">Платежей пока нет</p>
+            ) : (
+              <ul className="divide-y divide-gray-100 rounded-xl border border-gray-100">
+                {user.payments.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {Number(p.amount_rub).toLocaleString('ru-RU')} ₽
+                        {p.days_granted ? ` · +${p.days_granted} дн.` : ''}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatDateTime(p.created_at)}
+                        {p.note ? ` · ${p.note}` : ''}
+                        {p.provider ? ` · ${p.provider}` : ''}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-medium ${paymentStatusClass(p.status)}`}>{p.status}</span>
+                      {p.status === 'pending' && (
+                        <ActionButton
+                          tone="success"
+                          disabled={busy}
+                          onClick={() => onAction('patch-payment', { id: p.id, status: 'paid' })}
+                        >
+                          paid
+                        </ActionButton>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-800">
@@ -120,21 +389,6 @@ function VpnUserDetailModal({ user, loading, onClose }) {
   );
 }
 
-function InfoCard({ label, value, highlight, mono }) {
-  return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</div>
-      <div
-        className={`mt-1 text-sm font-semibold ${
-          highlight === false ? 'text-red-600' : highlight ? 'text-emerald-700' : 'text-gray-900'
-        } ${mono ? 'font-mono text-xs break-all' : ''}`}
-      >
-        {value || '—'}
-      </div>
-    </div>
-  );
-}
-
 export default function AdminVpnPage() {
   const navigate = useNavigate();
   const { isReady, user } = useAuthReady();
@@ -145,6 +399,15 @@ export default function AdminVpnPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState(null);
+  const [daysInput, setDaysInput] = useState('30');
+  const [paymentForm, setPaymentForm] = useState({
+    amount_rub: '299',
+    days_granted: '30',
+    status: 'paid',
+    note: '',
+  });
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -180,6 +443,7 @@ export default function AdminVpnPage() {
   const openDetail = useCallback(async (telegramId) => {
     setSelectedId(telegramId);
     setDetail(null);
+    setActionError(null);
     setDetailLoading(true);
     try {
       const data = await apiRequest(`/admin/vpn/users/${telegramId}`);
@@ -192,6 +456,60 @@ export default function AdminVpnPage() {
     }
   }, []);
 
+  const handleAction = useCallback(
+    async (type, payload = {}) => {
+      if (!selectedId) return;
+      setBusy(true);
+      setActionError(null);
+      try {
+        let data;
+        if (type === 'extend') {
+          const days = Number(payload.days);
+          if (!Number.isFinite(days) || days < 1) {
+            throw new Error('Укажите число дней ≥ 1');
+          }
+          data = await apiRequest(`/admin/vpn/users/${selectedId}/extend`, {
+            method: 'POST',
+            body: JSON.stringify({ days }),
+          });
+        } else if (type === 'disable') {
+          data = await apiRequest(`/admin/vpn/users/${selectedId}/disable`, { method: 'POST' });
+        } else if (type === 'enable') {
+          data = await apiRequest(`/admin/vpn/users/${selectedId}/enable`, { method: 'POST' });
+        } else if (type === 'ban') {
+          data = await apiRequest(`/admin/vpn/users/${selectedId}/ban`, { method: 'POST' });
+        } else if (type === 'unban') {
+          data = await apiRequest(`/admin/vpn/users/${selectedId}/unban`, { method: 'POST' });
+        } else if (type === 'reset-key') {
+          data = await apiRequest(`/admin/vpn/users/${selectedId}/reset-key`, { method: 'POST' });
+        } else if (type === 'reset-traffic') {
+          data = await apiRequest(`/admin/vpn/users/${selectedId}/reset-traffic`, { method: 'POST' });
+        } else if (type === 'payment') {
+          data = await apiRequest(`/admin/vpn/users/${selectedId}/payments`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          setPaymentForm((f) => ({ ...f, note: '' }));
+        } else if (type === 'patch-payment') {
+          await apiRequest(`/admin/vpn/payments/${payload.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: payload.status }),
+          });
+          data = await apiRequest(`/admin/vpn/users/${selectedId}`);
+        } else {
+          throw new Error('Неизвестное действие');
+        }
+        setDetail(data);
+        await loadUsers();
+      } catch (err) {
+        setActionError(err?.message || 'Ошибка действия');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [selectedId, loadUsers]
+  );
+
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return users;
@@ -199,7 +517,8 @@ export default function AdminVpnPage() {
       const uname = (u.username || '').toLowerCase();
       const mid = String(u.telegram_id);
       const mban = (u.marzban_username || '').toLowerCase();
-      return uname.includes(q) || mid.includes(q) || mban.includes(q);
+      const st = (u.account_status || '').toLowerCase();
+      return uname.includes(q) || mid.includes(q) || mban.includes(q) || st.includes(q);
     });
   }, [users, searchQuery]);
 
@@ -221,7 +540,7 @@ export default function AdminVpnPage() {
         <label className="mb-1 block text-sm font-medium text-gray-700">Поиск</label>
         <input
           type="text"
-          placeholder="Telegram ID, @username, marzban..."
+          placeholder="Telegram ID, @username, marzban, статус..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
@@ -254,9 +573,9 @@ export default function AdminVpnPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-600">Пользователь</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-600">Telegram ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-600">Регистрация</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-600">Статус</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-600">Подписка</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-600">Платежи</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-600">Пригласил</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-600" />
                 </tr>
@@ -270,15 +589,19 @@ export default function AdminVpnPage() {
                   >
                     <td className="px-4 py-4">
                       <div className="text-sm font-semibold text-gray-900">{displayName(u)}</div>
-                      <div className="font-mono text-xs text-gray-500">{u.marzban_username}</div>
+                      <div className="font-mono text-xs text-gray-500">{u.telegram_id}</div>
                     </td>
-                    <td className="px-4 py-4 font-mono text-sm text-gray-700">{u.telegram_id}</td>
-                    <td className="px-4 py-4 text-sm text-gray-600">{formatDateTime(u.created_at)}</td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(u.account_status)}`}>
+                        {statusLabel(u.account_status)}
+                      </span>
+                    </td>
                     <td className="px-4 py-4 text-sm">
                       <span className={u.is_active ? 'text-emerald-700 font-medium' : 'text-red-600'}>
                         {u.remaining_label}
                       </span>
                     </td>
+                    <td className="px-4 py-4 text-sm text-gray-700">{u.payments_paid_count || 0}</td>
                     <td className="px-4 py-4 text-sm text-gray-700">{u.referrals_count}</td>
                     <td className="px-4 py-4 text-right">
                       <button
@@ -311,13 +634,13 @@ export default function AdminVpnPage() {
                     <div className="font-semibold text-gray-900">{displayName(u)}</div>
                     <div className="mt-0.5 font-mono text-xs text-gray-500">{u.telegram_id}</div>
                   </div>
-                  <span className={`text-xs font-medium ${u.is_active ? 'text-emerald-700' : 'text-red-600'}`}>
-                    {u.remaining_label}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusClass(u.account_status)}`}>
+                    {statusLabel(u.account_status)}
                   </span>
                 </div>
                 <div className="mt-3 flex justify-between text-xs text-gray-500">
-                  <span>с {formatDateTime(u.created_at)}</span>
-                  <span>пригласил: {u.referrals_count}</span>
+                  <span className={u.is_active ? 'text-emerald-700' : 'text-red-600'}>{u.remaining_label}</span>
+                  <span>платежей: {u.payments_paid_count || 0}</span>
                 </div>
               </button>
             ))}
@@ -329,9 +652,17 @@ export default function AdminVpnPage() {
         <VpnUserDetailModal
           user={detail}
           loading={detailLoading}
+          busy={busy}
+          actionError={actionError}
+          daysInput={daysInput}
+          setDaysInput={setDaysInput}
+          paymentForm={paymentForm}
+          setPaymentForm={setPaymentForm}
+          onAction={handleAction}
           onClose={() => {
             setSelectedId(null);
             setDetail(null);
+            setActionError(null);
           }}
         />
       )}

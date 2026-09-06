@@ -109,6 +109,7 @@ from app.db.schema_patches import (
     ensure_seo_landing_pages_table,
     ensure_openrouter_tables,
     ensure_vpn_bot_tables,
+    ensure_marzvpn_admin_tables,
     ensure_laximo_cat_tables,
     ensure_site_analytics_attribution_columns,
     ensure_site_analytics_conversion_events_table,
@@ -348,6 +349,7 @@ try:
     ensure_seo_landing_pages_table()
     ensure_openrouter_tables()
     ensure_vpn_bot_tables()
+    ensure_marzvpn_admin_tables()
     ensure_laximo_cat_tables()
     ensure_site_analytics_attribution_columns()
     ensure_site_analytics_conversion_events_table()

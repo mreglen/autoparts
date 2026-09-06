@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     VPN_BOT_CREDENTIALS_SECRET: Optional[str] = None
     # Путь к sudo-хелперу применения токена на хосте (production).
     VPN_BOT_APPLY_BIN: Optional[str] = "/usr/local/bin/marzban-vpn-bot-apply"
+    # Marzban panel (admin VPN). Если пусто — берём из MARZBAN_BOT_ENV_FILE.
+    MARZBAN_BASE_URL: Optional[str] = "http://127.0.0.1:62050"
+    MARZBAN_USERNAME: Optional[str] = None
+    MARZBAN_PASSWORD: Optional[str] = None
+    MARZBAN_BOT_ENV_FILE: Optional[str] = "/opt/marzban-vpn-bot/.env"
     # Ключ для шифрования логина/пароля Laximo.CAT в БД. Если не задан — SECRET_KEY.
     LAXIMO_CREDENTIALS_SECRET: Optional[str] = None
     # Dev-fallback credentials (не основной путь; прод — /admin-settings).

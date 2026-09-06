@@ -116,7 +116,16 @@ async def _verify_all_keys() -> dict:
                     remote_status = str(remote.get("status") or "")
                     remote_expire = int(remote.get("expire") or 0)
 
-                    if expire_at <= now:
+                    account_status = str(
+                        getattr(user, "account_status", None) or "active"
+                    )
+
+                    if account_status in ("banned", "disabled"):
+                        if remote_status != "disabled":
+                            await marzban.disable_user(user.marzban_username)
+                            stats["disabled"] += 1
+                            notes.append(f"kept_{account_status}")
+                    elif expire_at <= now:
                         if remote_status != "disabled":
                             await marzban.disable_user(user.marzban_username)
                             stats["disabled"] += 1

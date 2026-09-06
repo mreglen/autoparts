@@ -41,3 +41,22 @@ def back_to_menu_keyboard() -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+def key_message_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📷 Показать QR код",
+                    callback_data="show_key_qr",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Назад в меню",
+                    callback_data="back_to_menu",
+                )
+            ],
+        ]
+    )

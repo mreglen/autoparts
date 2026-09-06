@@ -6425,3 +6425,76 @@ def ensure_vpn_bot_tables() -> None:
         conn.execute(text(seed))
     logger.info("Applied site_vpn_bot_integration table patch")
 
+
+def ensure_marzvpn_admin_tables() -> None:
+    """Admin fields + payments for MarzVPN users (shared with Telegram bot)."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    is_pg = engine.dialect.name == "postgresql"
+
+    if "marzvpn_users" in table_names:
+        cols = {c["name"] for c in inspector.get_columns("marzvpn_users")}
+        if "account_status" not in cols:
+            with engine.begin() as conn:
+                if is_pg:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE marzvpn_users "
+                            "ADD COLUMN account_status VARCHAR(32) NOT NULL DEFAULT 'active'"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE marzvpn_users "
+                            "ADD COLUMN account_status VARCHAR(32) NOT NULL DEFAULT 'active'"
+                        )
+                    )
+            logger.info("Added marzvpn_users.account_status")
+
+    if "marzvpn_payments" not in table_names and "marzvpn_users" in table_names:
+        if is_pg:
+            ddl = """
+            CREATE TABLE marzvpn_payments (
+                id SERIAL PRIMARY KEY,
+                telegram_id BIGINT NOT NULL REFERENCES marzvpn_users(telegram_id),
+                amount_rub NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                days_granted INTEGER NOT NULL DEFAULT 0,
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                provider VARCHAR(64),
+                external_id VARCHAR(128),
+                note TEXT,
+                created_by_admin_id INTEGER,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                paid_at TIMESTAMPTZ
+            )
+            """
+            idx = (
+                "CREATE INDEX IF NOT EXISTS ix_marzvpn_payments_telegram_id "
+                "ON marzvpn_payments (telegram_id)"
+            )
+        else:
+            ddl = """
+            CREATE TABLE marzvpn_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                telegram_id BIGINT NOT NULL REFERENCES marzvpn_users(telegram_id),
+                amount_rub NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                days_granted INTEGER NOT NULL DEFAULT 0,
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                provider VARCHAR(64),
+                external_id VARCHAR(128),
+                note TEXT,
+                created_by_admin_id INTEGER,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                paid_at DATETIME
+            )
+            """
+            idx = (
+                "CREATE INDEX IF NOT EXISTS ix_marzvpn_payments_telegram_id "
+                "ON marzvpn_payments (telegram_id)"
+            )
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            conn.execute(text(idx))
+        logger.info("Applied marzvpn_payments table patch")
+

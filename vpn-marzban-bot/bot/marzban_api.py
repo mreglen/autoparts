@@ -214,3 +214,19 @@ class MarzbanClient:
                 "expire": int(expire_at.timestamp()),
             },
         )
+
+    async def revoke_sub(self, username: str) -> dict[str, Any]:
+        response = await self._request("POST", f"/api/user/{username}/revoke_sub")
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Marzban revoke_sub failed (HTTP {response.status_code})"
+            )
+        return response.json()
+
+    async def reset_traffic(self, username: str) -> dict[str, Any]:
+        response = await self._request("POST", f"/api/user/{username}/reset")
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Marzban reset traffic failed (HTTP {response.status_code})"
+            )
+        return response.json()
