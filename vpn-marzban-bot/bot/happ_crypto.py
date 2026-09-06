@@ -42,12 +42,12 @@ def normalize_vless_for_happ(
         main_part, rem = raw.split("#", 1)
         if remark is None:
             rem = re.sub(r"[^\w\s\.-]", "", unquote(rem))
-            rem = re.sub(r"\s+", " ", rem).strip().replace(" ", "_") or "VPN"
+            rem = re.sub(r"\s+", " ", rem).strip().replace(" ", "_") or "MarzVPN"
             remark = rem
     else:
         main_part = raw
         if remark is None:
-            remark = "VPN"
+            remark = "MarzVPN"
 
     if "Germany" in (remark or "") or "212.102.227.25" in raw:
         remark = "🇩🇪 Germany"
@@ -58,8 +58,8 @@ def normalize_vless_for_happ(
     ):
         remark = "🇷🇺 Russia"
     else:
-        remark = re.sub(r"[^\w\.-]", "_", remark or "VPN")
-        remark = re.sub(r"_+", "_", remark).strip("_") or "VPN"
+        remark = re.sub(r"[^\w\.-]", "_", remark or "MarzVPN")
+        remark = re.sub(r"_+", "_", remark).strip("_") or "MarzVPN"
 
     parsed = urlparse(main_part)
     if parsed.scheme != "vless" or not parsed.netloc:

@@ -69,10 +69,11 @@ async def handle_sub(request: web.Request) -> web.StreamResponse:
             "Content-Type": "text/plain; charset=utf-8",
             "profile-update-interval": "24",
             "Cache-Control": "no-store",
-            "profile-title": "base64:U3ZveUdhcmFnZSBWUE4=",  # SvoyGarage VPN
+            "profile-title": "base64:TWFyelZQTg==",  # MarzVPN
             "support-url": SUPPORT_TG_URL,
             "profile-web-page-url": SUPPORT_TG_URL,
             "announce": SUPPORT_TG_URL,
+            "content-disposition": 'attachment; filename="MarzVPN"',
         }
     )
     return web.Response(body=body, headers=pass_headers)

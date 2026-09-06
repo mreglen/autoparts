@@ -32,7 +32,7 @@ def format_main_menu(telegram_id: int, expire_at) -> str:
 
 
 HOW_TO_SETUP = (
-    "<b>Как настроить Happ VPN</b>\n\n"
+    "<b>Как настроить MarzVPN</b>\n\n"
     "1. Установите <b>Happ</b>.\n"
     "2. Бот → <b>🔑 Ключ</b> → скопируйте ссылку "
     "<code>happ://add/https://...</code>.\n"
@@ -132,7 +132,7 @@ def register_handlers(
         await callback.answer()
 
         parts = [
-            "<b>КЛЮЧ ДОСТУПА ДЛЯ HAPP</b>",
+            "<b>КЛЮЧ ДОСТУПА MarzVPN</b>",
             "",
             "вставьте ключ в приложение happ",
             "",
