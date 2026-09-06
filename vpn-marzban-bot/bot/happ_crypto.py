@@ -53,8 +53,9 @@ def normalize_vless_for_happ(
         return ""
 
     hostport = parsed.netloc
-    if hostport.startswith("195.24.65.251"):
-        hostport = hostport.replace("195.24.65.251", DEFAULT_TLS_SNI, 1)
+    # Россия: IP (домен:8443 у части клиентов даёт n/a), SNI остаётся svoygarage.ru
+    if "svoygarage.ru" in hostport:
+        hostport = hostport.replace("svoygarage.ru", "195.24.65.251", 1)
 
     params = {
         "encryption": "none",
