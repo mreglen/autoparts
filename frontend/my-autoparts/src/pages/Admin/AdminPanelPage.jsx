@@ -403,6 +403,9 @@ function AdminPanelPage() {
           <Link to="/admin/users" className="inline-flex min-h-11 items-center rounded-lg bg-white px-3 text-sm font-medium text-indigo-700 ring-1 ring-indigo-100">
             Пользователи
           </Link>
+          <Link to="/admin/vpn" className="inline-flex min-h-11 items-center rounded-lg bg-white px-3 text-sm font-medium text-indigo-700 ring-1 ring-indigo-100">
+            VPN
+          </Link>
           <Link to="/admin/audit-log" className="inline-flex min-h-11 items-center rounded-lg bg-white px-3 text-sm font-medium text-indigo-700 ring-1 ring-indigo-100">
             Журнал
           </Link>
