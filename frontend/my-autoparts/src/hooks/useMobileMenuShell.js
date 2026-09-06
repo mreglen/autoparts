@@ -303,6 +303,7 @@ export function getPageTitle(pathname) {
         '/admin-settings': 'Настройки',
         '/admin/audit-log': 'Журнал событий',
         '/admin/users': 'Пользователи',
+        '/admin/vpn': 'VPN',
         '/admin/rossko': 'Rossko',
         '/admin/analytics': 'Аналитика',
         '/autoservice/welcome': 'Автосервис',

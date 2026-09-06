@@ -152,6 +152,7 @@ const ChatsHubPage = lazy(() => import('./pages/Chat/ChatsHubPage'));
 const AdminPanelPage = lazy(() => import('./pages/Admin/AdminPanelPage'));
 const AuditLogPage = lazy(() => import('./pages/Admin/AuditLogPage'));
 const AdminUsersPage = lazy(() => import('./pages/Admin/AdminUsersPage'));
+const AdminVpnPage = lazy(() => import('./pages/Admin/AdminVpnPage'));
 const RosskoSettingsPage = lazy(() => import('./pages/Admin/RosskoSettingsPage'));
 const SitePaymentsPage = lazy(() => import('./pages/Admin/SitePaymentsPage'));
 const SitePaymentsHistoryPage = lazy(() => import('./pages/Admin/SitePaymentsHistoryPage'));
@@ -1046,6 +1047,14 @@ function App() {
             element={(
               <LazyRoute>
                 <AdminUsersPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/admin/vpn"
+            element={(
+              <LazyRoute>
+                <AdminVpnPage />
               </LazyRoute>
             )}
           />

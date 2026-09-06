@@ -45,6 +45,7 @@ export const TAB_PATH_MAP = {
     'product-moderation': '/moderation/products',
     'audit-log': '/admin/audit-log',
     'admin-users': '/admin/users',
+    'admin-vpn': '/admin/vpn',
     'admin-rossko': '/admin/rossko',
     'site-payments': '/admin/site-payments',
     analytics: '/admin/analytics',
@@ -330,6 +331,7 @@ const buildAdminTabs = (user, hasPermission) => {
         { id: 'admin-panel', label: 'Настройки' },
         { id: 'design-system', label: 'Дизайн-система' },
         { id: 'admin-users', label: 'Пользователи' },
+        { id: 'admin-vpn', label: 'VPN' },
         { id: 'admin-rossko', label: 'Rossko' },
         { id: 'site-payments', label: 'Оплата сайта' },
         { id: 'audit-log', label: 'Журнал событий' },
@@ -367,6 +369,7 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/design-system')) return 'design-system';
     if (path.startsWith('/admin/analytics')) return 'analytics';
     if (path.startsWith('/admin/users')) return 'admin-users';
+    if (path.startsWith('/admin/vpn')) return 'admin-vpn';
     if (path.startsWith('/admin/rossko')) return 'admin-rossko';
     if (path.startsWith('/admin/site-payments')) return 'site-payments';
     if (path.startsWith('/garage/repairs') || path.startsWith('/garage/orders')) {
