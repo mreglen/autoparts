@@ -1,4 +1,4 @@
-"""VLESS + TLS (Let's Encrypt svoygarage.ru). Основной ключ: happ://add/https://..."""
+"""VLESS + REALITY (SNI dl.google.com). Основной ключ: happ://add/https://..."""
 
 from __future__ import annotations
 
@@ -10,17 +10,30 @@ from urllib.parse import quote, unquote, urlencode, urlparse
 
 logger = logging.getLogger("marzban-vpn-bot.happ")
 
-_PARAM_ORDER = ("encryption", "security", "type", "sni", "fp", "alpn")
-DEFAULT_TLS_SNI = "svoygarage.ru"
+_PARAM_ORDER = (
+    "encryption",
+    "security",
+    "type",
+    "flow",
+    "sni",
+    "fp",
+    "pbk",
+    "sid",
+)
+
+# Актуальные ключи с сервера (/root/marzban-vpn-reality-*.key)
+DEFAULT_REALITY_PBK = "7j2jGKpCPkiERzSDCEzoi8jhLFM6X4ZcgCg_jhGa9Cc"
+DEFAULT_REALITY_SID = "184b594b7dab462a"
+DEFAULT_REALITY_SNI = "dl.google.com"
 
 
 def normalize_vless_for_happ(
     vless_url: str,
     remark: str | None = None,
     *,
-    with_flow: bool = False,
+    with_flow: bool = True,
 ) -> str:
-    """VLESS TCP + TLS: encryption=none, security=tls, sni=svoygarage.ru."""
+    """VLESS Reality: encryption=none, flow=xtls-rprx-vision, pbk/sid/sni."""
     if not vless_url or not str(vless_url).strip().startswith("vless://"):
         return ""
 
@@ -52,21 +65,26 @@ def normalize_vless_for_happ(
     if parsed.scheme != "vless" or not parsed.netloc:
         return ""
 
-    # Russia: prefer domain so cert CN matches
+    # Reality: IP, not TLS domain
     hostport = parsed.netloc
-    if hostport.startswith("195.24.65.251"):
-        hostport = hostport.replace("195.24.65.251", DEFAULT_TLS_SNI, 1)
+    if "svoygarage.ru" in hostport:
+        hostport = hostport.replace("svoygarage.ru", "195.24.65.251", 1)
 
     params = {
         "encryption": "none",
-        "security": "tls",
+        "security": "reality",
         "type": "tcp",
-        "sni": DEFAULT_TLS_SNI,
+        "flow": "xtls-rprx-vision",
+        "sni": DEFAULT_REALITY_SNI,
         "fp": "chrome",
-        "alpn": "http/1.1",
+        "pbk": DEFAULT_REALITY_PBK,
+        "sid": DEFAULT_REALITY_SID,
     }
-    query = urlencode([(k, params[k]) for k in _PARAM_ORDER], doseq=False)
-    # Флаги и пробелы — percent-encode (Happ нормально декодирует)
+    if not with_flow:
+        params.pop("flow", None)
+        remark = f"{remark} noflow".replace("  ", " ")
+
+    query = urlencode([(k, params[k]) for k in _PARAM_ORDER if k in params], doseq=False)
     safe_remark = quote(remark, safe="")
     return f"vless://{hostport}?{query}#{safe_remark}"
 
@@ -77,11 +95,30 @@ def build_simple_vless_links(vless_list: list[str]) -> list[str]:
     for link in vless_list:
         if not isinstance(link, str) or not link.strip():
             continue
-        n = normalize_vless_for_happ(link)
+        n = normalize_vless_for_happ(link, with_flow=True)
         if n and n not in seen:
             seen.add(n)
             out.append(n)
     return out
+
+
+def generate_reality_vless_subscription(
+    uuid: str,
+    server_ip: str = "195.24.65.251",
+    port: int = 8443,
+    public_key: str = DEFAULT_REALITY_PBK,
+    short_id: str = DEFAULT_REALITY_SID,
+    sni: str = DEFAULT_REALITY_SNI,
+    remark: str = "🇷🇺 Russia",
+) -> str:
+    """Одна VLESS Reality-ссылка (и base64 для raw subscription-строки)."""
+    vless_url = (
+        f"vless://{uuid}@{server_ip}:{port}"
+        f"?encryption=none&security=reality&type=tcp&flow=xtls-rprx-vision"
+        f"&sni={sni}&fp=chrome&pbk={public_key}&sid={short_id}"
+        f"#{quote(remark, safe='')}"
+    )
+    return base64.b64encode(vless_url.encode("utf-8")).decode("utf-8")
 
 
 def build_happ_add_link(sub_url: str) -> str:
