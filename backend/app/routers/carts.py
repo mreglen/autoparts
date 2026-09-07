@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session, selectinload
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.core.auth import get_current_user_optional
 from app.db.database import get_db
@@ -178,14 +181,20 @@ def _new_parts_cart_item_response(
     warehouse_name = None
     if warehouse_names and stock_id:
         warehouse_name = warehouse_names.get(str(stock_id).strip())
+    
+    # Проверяем доступность: если нет дат доставки, значит товара нет на складе
+    delivery_start = getattr(cart_item, "delivery_start", None)
+    delivery_end = getattr(cart_item, "delivery_end", None)
+    available = bool(delivery_start and delivery_end)
+    
     return CartItemResponse(
         id=cart_item.id,
         brand=cart_item.brand,
         partnumber=cart_item.partnumber,
         name=cart_item.name,
         delivery=cart_item.delivery,
-        delivery_start=getattr(cart_item, "delivery_start", None),
-        delivery_end=getattr(cart_item, "delivery_end", None),
+        delivery_start=delivery_start,
+        delivery_end=delivery_end,
         quantity=cart_item.quantity,
         max_quantity=cart_item.max_quantity,
         price=float(cart_item.price) if cart_item.price is not None else None,
@@ -200,6 +209,7 @@ def _new_parts_cart_item_response(
         seller=cart_item.seller,
         created_at=cart_item.created_at,
         basket_id=getattr(cart_item, "basket_id", None),
+        available=available,
     )
 
 
@@ -710,13 +720,13 @@ def get_admin_org_address(db: Session = Depends(get_db)):
     return {"address": admin_organization.address}
 
 @router.get("/", response_model=CartResponse)
-def get_cart(
+async def get_cart(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional)
 ):
-    """Получить содержимое корзины пользователя или гостя."""
+    """Получить содержимое корзины пользователя или гостя с автоматическим обновлением дат доставки."""
     if current_user:
         cart = db.query(Cart).options(
             selectinload(Cart.new_parts_items),
@@ -732,6 +742,14 @@ def get_cart(
             ).filter(Cart.user_id == current_user.id).first()
         else:
             get_or_create_default_user_basket(db, cart.id, current_user.id)
+            # Автоматическое обновление дат доставки
+            from app.services.cart_delivery_refresh import refresh_user_cart_deliveries
+            try:
+                await refresh_user_cart_deliveries(db, cart_id=cart.id, user_id=current_user.id)
+                db.commit()
+            except Exception as e:
+                logger.error(f"Failed to refresh cart deliveries: {e}")
+                # Не прерываем загрузку корзины при ошибке обновления
         return _build_user_cart_response(cart, db)
 
     guest_token = get_guest_token_from_request(request)
@@ -739,6 +757,14 @@ def get_cart(
     if not guest_cart:
         guest_cart = get_or_create_guest_cart(db, request, response)
     get_or_create_default_guest_basket(db, guest_cart.id)
+    # Автоматическое обновление дат доставки для гостей
+    from app.services.cart_delivery_refresh import refresh_guest_cart_deliveries
+    try:
+        await refresh_guest_cart_deliveries(db, guest_cart_id=guest_cart.id)
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to refresh guest cart deliveries: {e}")
+        # Не прерываем загрузку корзины при ошибке обновления
     return _build_guest_cart_response(guest_cart, db)
 
 @router.delete("/new-parts/{item_id}", status_code=204)
