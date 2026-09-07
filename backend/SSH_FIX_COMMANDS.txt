@@ -1,0 +1,16 @@
+# Команды для выполнения на сервере через SSH
+# Выполнить по одной команде за раз
+
+# 1. Исправление rossko_stock_filter.py
+cd /var/www/autoparts/backend && sed -i 's/import json$/import json\nfrom datetime import datetime/' app/services/rossko_stock_filter.py && sed -i 's/return ""$/if isinstance(value, datetime):\n        return value.isoformat()\n    return str(value).strip() if value else ""/' app/services/rossko_stock_filter.py
+
+# 2. Исправление cart_delivery_refresh.py
+cd /var/www/autoparts/backend && sed -i 's/from datetime import datetime/from datetime import datetime, timezone/' app/services/cart_delivery_refresh.py && sed -i 's/datetime.utcnow()/datetime.now(timezone.utc)/g' app/services/cart_delivery_refresh.py
+
+# 3. Исправление carts.py
+cd /var/www/autoparts/backend && sed -i 's/from datetime import datetime/from datetime import datetime, timezone/' app/routers/carts.py && sed -i 's/datetime.utcnow()/datetime.now(timezone.utc)/g' app/routers/carts.py
+
+# 4. Перезапуск приложения (замените на вашу команду)
+# systemctl restart autoparts-backend
+# или
+# supervisorctl restart autoparts
