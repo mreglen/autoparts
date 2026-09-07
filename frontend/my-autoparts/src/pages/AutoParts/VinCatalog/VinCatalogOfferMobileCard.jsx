@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
 import { computeClientPrices } from '../../../utils/clientMarkupUtils';
 import { formatDeliveryParts, formatPriceRub } from '../NewParts/newPartStockUtils';
 import {
@@ -28,7 +29,14 @@ function DeliveryLine({ deliveryStart, deliveryEnd }) {
   );
 }
 
-function MobileCartQtyControl({ quantity, maxQty, onAdd, onRemove, disabled }) {
+function MobileCartQtyControl({
+  quantity,
+  maxQty,
+  onAdd,
+  onAddToBasket,
+  onRemove,
+  disabled,
+}) {
   const safeQty = toSafeInt(quantity, 0);
   const atMax = safeQty >= maxQty;
 
@@ -61,14 +69,14 @@ function MobileCartQtyControl({ quantity, maxQty, onAdd, onRemove, disabled }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={onAdd}
+    <NewPartsBasketHoverMenu
+      onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
       disabled={disabled}
-      className="flex h-11 min-w-[7rem] items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+      buttonClassName="flex h-11 min-w-[7rem] items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+      label="В корзину"
     >
       В корзину
-    </button>
+    </NewPartsBasketHoverMenu>
   );
 }
 
@@ -138,13 +146,13 @@ function MobileStockOffer({
     return item;
   };
 
-  const handleAdd = async () => {
+  const handleAdd = async (basketId) => {
     if (cartQuantity >= maxQty) return;
     setBusy(true);
     try {
       const cartItem = prepareCartItem();
       if (!cartItem.stock_id || cartItem.price <= 0) return;
-      let targetBasketId = vinBasketId;
+      let targetBasketId = basketId ?? cartItemInStore?.basket_id ?? vinBasketId;
       if (!targetBasketId && ensureVinBasket) {
         targetBasketId = await ensureVinBasket();
       }
@@ -158,8 +166,8 @@ function MobileStockOffer({
         path: window.location.pathname + window.location.search,
         section: 'vin',
       });
-    } catch {
-      // silent
+    } catch (err) {
+      throw typeof err === 'string' ? err : 'Не удалось добавить в корзину';
     } finally {
       setBusy(false);
     }
@@ -214,7 +222,8 @@ function MobileStockOffer({
         <MobileCartQtyControl
           quantity={cartQuantity}
           maxQty={maxQty}
-          onAdd={handleAdd}
+          onAdd={() => handleAdd()}
+          onAddToBasket={handleAdd}
           onRemove={handleRemove}
           disabled={disabled}
         />

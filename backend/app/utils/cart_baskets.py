@@ -182,6 +182,84 @@ def resolve_guest_basket(
     return basket
 
 
+def _next_user_basket_sort(db: Session, cart_id: int, user_id: int) -> int:
+    max_sort = (
+        db.query(NewPartsBasket.sort_order)
+        .filter(NewPartsBasket.cart_id == cart_id, NewPartsBasket.user_id == user_id)
+        .order_by(NewPartsBasket.sort_order.desc())
+        .first()
+    )
+    return (max_sort[0] if max_sort else 0) + 1
+
+
+def _next_guest_basket_sort(db: Session, guest_cart_id: int) -> int:
+    max_sort = (
+        db.query(GuestNewPartsBasket.sort_order)
+        .filter(GuestNewPartsBasket.guest_cart_id == guest_cart_id)
+        .order_by(GuestNewPartsBasket.sort_order.desc())
+        .first()
+    )
+    return (max_sort[0] if max_sort else 0) + 1
+
+
+def _unique_user_basket_name(
+    db: Session,
+    cart_id: int,
+    user_id: int,
+    base_name: str,
+    *,
+    exclude_id: int | None = None,
+) -> str:
+    cleaned = _normalize_basket_name(base_name)
+    query = db.query(NewPartsBasket.name).filter(
+        NewPartsBasket.cart_id == cart_id,
+        NewPartsBasket.user_id == user_id,
+    )
+    if exclude_id is not None:
+        query = query.filter(NewPartsBasket.id != exclude_id)
+    existing_names = {row[0] for row in query.all() if row[0]}
+    if cleaned not in existing_names:
+        return cleaned
+    for index in range(2, 1000):
+        candidate = f"{cleaned} {index}"
+        if len(candidate) > 100:
+            candidate = f"{cleaned[: max(1, 100 - len(str(index)) - 1)]} {index}"
+        if candidate not in existing_names:
+            return candidate
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Не удалось подобрать уникальное название корзины",
+    )
+
+
+def _unique_guest_basket_name(
+    db: Session,
+    guest_cart_id: int,
+    base_name: str,
+    *,
+    exclude_id: int | None = None,
+) -> str:
+    cleaned = _normalize_basket_name(base_name)
+    query = db.query(GuestNewPartsBasket.name).filter(
+        GuestNewPartsBasket.guest_cart_id == guest_cart_id
+    )
+    if exclude_id is not None:
+        query = query.filter(GuestNewPartsBasket.id != exclude_id)
+    existing_names = {row[0] for row in query.all() if row[0]}
+    if cleaned not in existing_names:
+        return cleaned
+    for index in range(2, 1000):
+        candidate = f"{cleaned} {index}"
+        if len(candidate) > 100:
+            candidate = f"{cleaned[: max(1, 100 - len(str(index)) - 1)]} {index}"
+        if candidate not in existing_names:
+            return candidate
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Не удалось подобрать уникальное название корзины",
+    )
+
+
 def create_user_basket(db: Session, cart_id: int, user_id: int, name: str) -> NewPartsBasket:
     cleaned = _normalize_basket_name(name)
     get_or_create_default_user_basket(db, cart_id, user_id)
@@ -200,19 +278,12 @@ def create_user_basket(db: Session, cart_id: int, user_id: int, name: str) -> Ne
             detail="Корзина с таким названием уже существует",
         )
 
-    max_sort = (
-        db.query(NewPartsBasket.sort_order)
-        .filter(NewPartsBasket.cart_id == cart_id, NewPartsBasket.user_id == user_id)
-        .order_by(NewPartsBasket.sort_order.desc())
-        .first()
-    )
-    next_sort = (max_sort[0] if max_sort else 0) + 1
     basket = NewPartsBasket(
         cart_id=cart_id,
         user_id=user_id,
         name=cleaned,
         is_default=False,
-        sort_order=next_sort,
+        sort_order=_next_user_basket_sort(db, cart_id, user_id),
     )
     db.add(basket)
     db.flush()
@@ -236,18 +307,54 @@ def create_guest_basket(db: Session, guest_cart_id: int, name: str) -> GuestNewP
             detail="Корзина с таким названием уже существует",
         )
 
-    max_sort = (
-        db.query(GuestNewPartsBasket.sort_order)
-        .filter(GuestNewPartsBasket.guest_cart_id == guest_cart_id)
-        .order_by(GuestNewPartsBasket.sort_order.desc())
-        .first()
-    )
-    next_sort = (max_sort[0] if max_sort else 0) + 1
     basket = GuestNewPartsBasket(
         guest_cart_id=guest_cart_id,
         name=cleaned,
         is_default=False,
-        sort_order=next_sort,
+        sort_order=_next_guest_basket_sort(db, guest_cart_id),
+    )
+    db.add(basket)
+    db.flush()
+    return basket
+
+
+def create_fresh_user_basket(
+    db: Session,
+    cart_id: int,
+    user_id: int,
+    base_name: str | None = None,
+) -> NewPartsBasket:
+    """Create a new named basket; auto-suffix if the base name is taken."""
+    get_or_create_default_user_basket(db, cart_id, user_id)
+    name = _unique_user_basket_name(
+        db, cart_id, user_id, base_name or DEFAULT_NEW_PARTS_BASKET_NAME
+    )
+    basket = NewPartsBasket(
+        cart_id=cart_id,
+        user_id=user_id,
+        name=name,
+        is_default=False,
+        sort_order=_next_user_basket_sort(db, cart_id, user_id),
+    )
+    db.add(basket)
+    db.flush()
+    return basket
+
+
+def create_fresh_guest_basket(
+    db: Session,
+    guest_cart_id: int,
+    base_name: str | None = None,
+) -> GuestNewPartsBasket:
+    get_or_create_default_guest_basket(db, guest_cart_id)
+    name = _unique_guest_basket_name(
+        db, guest_cart_id, base_name or DEFAULT_NEW_PARTS_BASKET_NAME
+    )
+    basket = GuestNewPartsBasket(
+        guest_cart_id=guest_cart_id,
+        name=name,
+        is_default=False,
+        sort_order=_next_guest_basket_sort(db, guest_cart_id),
     )
     db.add(basket)
     db.flush()
@@ -263,11 +370,6 @@ def rename_user_basket(
 ) -> NewPartsBasket:
     cleaned = _normalize_basket_name(name)
     basket = resolve_user_basket(db, cart_id, user_id, basket_id)
-    if basket.is_default and cleaned != basket.name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Основную корзину нельзя переименовать",
-        )
 
     conflict = (
         db.query(NewPartsBasket)
@@ -285,9 +387,26 @@ def rename_user_basket(
             detail="Корзина с таким названием уже существует",
         )
 
+    was_default = bool(basket.is_default)
     basket.name = cleaned
     basket.updated_at = _utcnow()
-    db.flush()
+
+    # Renaming the working «Новые запчасти» basket frees the default slot
+    # so the next add/order can use a fresh default cart with that name.
+    if was_default and cleaned != DEFAULT_NEW_PARTS_BASKET_NAME:
+        basket.is_default = False
+        db.flush()
+        fresh = NewPartsBasket(
+            cart_id=cart_id,
+            user_id=user_id,
+            name=_unique_user_basket_name(db, cart_id, user_id, DEFAULT_NEW_PARTS_BASKET_NAME),
+            is_default=True,
+            sort_order=0,
+        )
+        db.add(fresh)
+        db.flush()
+    else:
+        db.flush()
     return basket
 
 
@@ -299,11 +418,6 @@ def rename_guest_basket(
 ) -> GuestNewPartsBasket:
     cleaned = _normalize_basket_name(name)
     basket = resolve_guest_basket(db, guest_cart_id, basket_id)
-    if basket.is_default and cleaned != basket.name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Основную корзину нельзя переименовать",
-        )
 
     conflict = (
         db.query(GuestNewPartsBasket)
@@ -320,9 +434,23 @@ def rename_guest_basket(
             detail="Корзина с таким названием уже существует",
         )
 
+    was_default = bool(basket.is_default)
     basket.name = cleaned
     basket.updated_at = _utcnow()
-    db.flush()
+
+    if was_default and cleaned != DEFAULT_NEW_PARTS_BASKET_NAME:
+        basket.is_default = False
+        db.flush()
+        fresh = GuestNewPartsBasket(
+            guest_cart_id=guest_cart_id,
+            name=_unique_guest_basket_name(db, guest_cart_id, DEFAULT_NEW_PARTS_BASKET_NAME),
+            is_default=True,
+            sort_order=0,
+        )
+        db.add(fresh)
+        db.flush()
+    else:
+        db.flush()
     return basket
 
 

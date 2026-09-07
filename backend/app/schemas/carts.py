@@ -55,7 +55,8 @@ class NewPartsBasketResponse(BaseModel):
 
 
 class CreateBasketRequest(BaseModel):
-    name: str
+    """If name is empty/omitted, creates «Новые запчасти» (with numeric suffix if needed)."""
+    name: Optional[str] = None
 
 
 class RenameBasketRequest(BaseModel):
@@ -65,6 +66,23 @@ class RenameBasketRequest(BaseModel):
 class MoveNewPartsItemsRequest(BaseModel):
     item_ids: list[int]
     basket_id: int
+
+
+class RefreshNewPartsOfferItem(BaseModel):
+    stock_id: str
+    brand: str
+    partnumber: str
+    delivery_start: Optional[datetime] = None
+    delivery_end: Optional[datetime] = None
+    price: Optional[float] = None
+    purchase_price: Optional[float] = None
+    supplier_unit_price: Optional[float] = None
+    max_quantity: Optional[int] = None
+    name: Optional[str] = None
+
+
+class RefreshNewPartsOffersRequest(BaseModel):
+    items: list[RefreshNewPartsOfferItem]
 
 
 class CartResponse(BaseModel):

@@ -791,6 +791,7 @@ export default function NewPartDetailPage() {
             <NewPartCartQuantityControl
               quantity={cartActions.mainQuantity}
               onAdd={() => cartActions.handleAddToCart(cartActions.mainStock)}
+              onAddToBasket={(basketId) => cartActions.handleAddToCart(cartActions.mainStock, basketId)}
               onRemove={() => cartActions.handleRemoveFromCart(cartActions.mainStock)}
               disabled={cartActions.disabledControl}
               noStock={cartActions.mainStockInfo.noStock}

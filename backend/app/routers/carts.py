@@ -24,11 +24,14 @@ from app.schemas.carts import (
     MoveNewPartsItemsRequest,
     NewPartsBasketResponse,
     NewPartsCartItem,
+    RefreshNewPartsOffersRequest,
     RenameBasketRequest,
     UpdateQuantityRequest,
     UsedPartsCartItem,
 )
 from app.utils.cart_baskets import (
+    create_fresh_guest_basket,
+    create_fresh_user_basket,
     create_guest_basket,
     create_user_basket,
     get_or_create_default_guest_basket,
@@ -88,6 +91,71 @@ def _product_max_quantity(product: Product | None) -> int:
     if qty < 1:
         return 0
     return qty
+
+
+def _delivery_str_from_item(item) -> str | None:
+    delivery = getattr(item, "delivery", None)
+    if delivery is None:
+        return None
+    if isinstance(delivery, dict):
+        text = str(delivery)
+        return text if text != "{}" else None
+    if hasattr(delivery, "__dict__"):
+        return str(delivery)
+    return str(delivery) if delivery else None
+
+
+def _apply_new_parts_offer_fields(
+    cart_item,
+    *,
+    delivery_start=None,
+    delivery_end=None,
+    delivery: str | None = None,
+    price: float | None = None,
+    purchase_price: float | None = None,
+    supplier_unit_price: float | None = None,
+    max_quantity: int | None = None,
+    name: str | None = None,
+    update_delivery: bool = False,
+) -> bool:
+    """Apply live Rossko offer fields onto an existing cart line. Returns True if touched."""
+    changed = False
+
+    if update_delivery:
+        if delivery_start is not None:
+            cart_item.delivery_start = delivery_start
+            changed = True
+        if delivery_end is not None:
+            cart_item.delivery_end = delivery_end
+            changed = True
+        if delivery is not None:
+            cart_item.delivery = delivery
+            changed = True
+        elif delivery_start is not None or delivery_end is not None:
+            # Drop stale text fallback so UI uses fresh date window.
+            if cart_item.delivery is not None:
+                cart_item.delivery = None
+                changed = True
+
+    if price is not None:
+        cart_item.price = price
+        changed = True
+    if purchase_price is not None:
+        cart_item.purchase_price = purchase_price
+        changed = True
+    if supplier_unit_price is not None:
+        cart_item.supplier_unit_price = supplier_unit_price
+        changed = True
+    if max_quantity is not None:
+        cart_item.max_quantity = _merge_new_parts_max(cart_item.max_quantity, max_quantity)
+        changed = True
+    if name:
+        cart_item.name = name
+        changed = True
+
+    if changed:
+        cart_item.updated_at = datetime.utcnow()
+    return changed
 
 
 def _new_parts_cart_item_response(cart_item) -> CartItemResponse:
@@ -222,14 +290,7 @@ async def add_new_parts_to_cart(
 
     incoming_max = _normalize_max_quantity(item.max_quantity)
 
-    delivery_str = None
-    if item.delivery is not None:
-        if isinstance(item.delivery, dict):
-            delivery_str = str(item.delivery) if str(item.delivery) != '{}' else None
-        elif hasattr(item.delivery, '__dict__'):
-            delivery_str = str(item.delivery)
-        else:
-            delivery_str = str(item.delivery) if item.delivery else None
+    delivery_str = _delivery_str_from_item(item)
 
     if current_user:
         cart = get_or_create_user_cart(db, current_user.id)
@@ -263,20 +324,19 @@ async def add_new_parts_to_cart(
         ).first()
         if existing_item:
             merged_max = _merge_new_parts_max(existing_item.max_quantity, incoming_max)
-            existing_item.max_quantity = merged_max
             existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, merged_max)
-            existing_item.price = item.price
-            if item.purchase_price is not None:
-                existing_item.purchase_price = item.purchase_price
-            if item.supplier_unit_price is not None:
-                existing_item.supplier_unit_price = item.supplier_unit_price
-            if delivery_str is not None:
-                existing_item.delivery = delivery_str
-            if item.delivery_start is not None:
-                existing_item.delivery_start = item.delivery_start
-            if item.delivery_end is not None:
-                existing_item.delivery_end = item.delivery_end
-            existing_item.updated_at = datetime.utcnow()
+            _apply_new_parts_offer_fields(
+                existing_item,
+                delivery_start=item.delivery_start,
+                delivery_end=item.delivery_end,
+                delivery=delivery_str,
+                price=item.price,
+                purchase_price=item.purchase_price,
+                supplier_unit_price=item.supplier_unit_price,
+                max_quantity=incoming_max,
+                name=item.name,
+                update_delivery=True,
+            )
             db.commit()
             db.refresh(existing_item)
             return _new_parts_cart_item_response(existing_item)
@@ -312,20 +372,19 @@ async def add_new_parts_to_cart(
         ).first()
         if existing_item:
             merged_max = _merge_new_parts_max(existing_item.max_quantity, incoming_max)
-            existing_item.max_quantity = merged_max
             existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, merged_max)
-            existing_item.price = item.price
-            if item.purchase_price is not None:
-                existing_item.purchase_price = item.purchase_price
-            if item.supplier_unit_price is not None:
-                existing_item.supplier_unit_price = item.supplier_unit_price
-            if delivery_str is not None:
-                existing_item.delivery = delivery_str
-            if item.delivery_start is not None:
-                existing_item.delivery_start = item.delivery_start
-            if item.delivery_end is not None:
-                existing_item.delivery_end = item.delivery_end
-            existing_item.updated_at = datetime.utcnow()
+            _apply_new_parts_offer_fields(
+                existing_item,
+                delivery_start=item.delivery_start,
+                delivery_end=item.delivery_end,
+                delivery=delivery_str,
+                price=item.price,
+                purchase_price=item.purchase_price,
+                supplier_unit_price=item.supplier_unit_price,
+                max_quantity=incoming_max,
+                name=item.name,
+                update_delivery=True,
+            )
             db.commit()
             touch_guest_cart(db, guest_cart)
             db.refresh(existing_item)
@@ -356,6 +415,125 @@ async def add_new_parts_to_cart(
         touch_guest_cart(db, guest_cart)
 
     return _new_parts_cart_item_response(cart_item)
+
+
+@router.post("/new-parts/refresh-offers", response_model=CartResponse)
+def refresh_new_parts_offers(
+    payload: RefreshNewPartsOffersRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional),
+):
+    """Update delivery/price on cart lines that match current Rossko search offers."""
+    offers = payload.items or []
+    if not offers:
+        if current_user:
+            cart = get_or_create_user_cart(db, current_user.id)
+            get_or_create_default_user_basket(db, cart.id, current_user.id)
+            db.commit()
+            cart = (
+                db.query(Cart)
+                .options(
+                    selectinload(Cart.new_parts_items),
+                    selectinload(Cart.used_parts_items)
+                    .selectinload(UsedPartsCart.product)
+                    .selectinload(Product.organization),
+                )
+                .filter(Cart.user_id == current_user.id)
+                .first()
+            )
+            return _build_user_cart_response(cart, db)
+        guest_cart = get_or_create_guest_cart(db, request, response)
+        get_or_create_default_guest_basket(db, guest_cart.id)
+        touch_guest_cart(db, guest_cart)
+        db.commit()
+        guest_cart = load_guest_cart_with_items(db, get_guest_token_from_request(request)) or guest_cart
+        return _build_guest_cart_response(guest_cart, db)
+
+    offer_map: dict[tuple[str, str, str], object] = {}
+    for offer in offers:
+        stock_id = (offer.stock_id or "").strip()
+        brand = (offer.brand or "").strip()
+        partnumber = (offer.partnumber or "").strip()
+        if not stock_id or not brand or not partnumber:
+            continue
+        offer_map[(stock_id, brand, partnumber)] = offer
+
+    changed_any = False
+    if current_user:
+        cart = get_or_create_user_cart(db, current_user.id)
+        rows = (
+            db.query(NewPartsCart)
+            .filter(NewPartsCart.cart_id == cart.id, NewPartsCart.user_id == current_user.id)
+            .all()
+        )
+        for row in rows:
+            key = (str(row.stock_id or "").strip(), str(row.brand or "").strip(), str(row.partnumber or "").strip())
+            offer = offer_map.get(key)
+            if not offer:
+                continue
+            incoming_max = _normalize_max_quantity(offer.max_quantity)
+            if _apply_new_parts_offer_fields(
+                row,
+                delivery_start=offer.delivery_start,
+                delivery_end=offer.delivery_end,
+                price=offer.price,
+                purchase_price=offer.purchase_price,
+                supplier_unit_price=offer.supplier_unit_price,
+                max_quantity=incoming_max,
+                name=offer.name,
+                update_delivery=True,
+            ):
+                changed_any = True
+        if changed_any:
+            db.commit()
+        cart = (
+            db.query(Cart)
+            .options(
+                selectinload(Cart.new_parts_items),
+                selectinload(Cart.used_parts_items)
+                .selectinload(UsedPartsCart.product)
+                .selectinload(Product.organization),
+            )
+            .filter(Cart.user_id == current_user.id)
+            .first()
+        )
+        get_or_create_default_user_basket(db, cart.id, current_user.id)
+        return _build_user_cart_response(cart, db)
+
+    guest_cart = get_or_create_guest_cart(db, request, response)
+    rows = (
+        db.query(GuestNewPartsCart)
+        .filter(GuestNewPartsCart.guest_cart_id == guest_cart.id)
+        .all()
+    )
+    for row in rows:
+        key = (str(row.stock_id or "").strip(), str(row.brand or "").strip(), str(row.partnumber or "").strip())
+        offer = offer_map.get(key)
+        if not offer:
+            continue
+        incoming_max = _normalize_max_quantity(offer.max_quantity)
+        if _apply_new_parts_offer_fields(
+            row,
+            delivery_start=offer.delivery_start,
+            delivery_end=offer.delivery_end,
+            price=offer.price,
+            purchase_price=offer.purchase_price,
+            supplier_unit_price=offer.supplier_unit_price,
+            max_quantity=incoming_max,
+            name=offer.name,
+            update_delivery=True,
+        ):
+            changed_any = True
+    if changed_any:
+        touch_guest_cart(db, guest_cart)
+        db.commit()
+    guest_token = get_guest_token_from_request(request)
+    guest_cart = load_guest_cart_with_items(db, guest_token) if guest_token else guest_cart
+    get_or_create_default_guest_basket(db, guest_cart.id)
+    return _build_guest_cart_response(guest_cart, db)
+
 
 @router.post("/used-parts", response_model=CartItemResponse)
 def add_used_parts_to_cart(
@@ -701,15 +879,22 @@ def create_new_parts_basket(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_optional),
 ):
+    name = (payload.name or "").strip()
     if current_user:
         cart = get_or_create_user_cart(db, current_user.id)
-        basket = create_user_basket(db, cart.id, current_user.id, payload.name)
+        if name:
+            basket = create_user_basket(db, cart.id, current_user.id, name)
+        else:
+            basket = create_fresh_user_basket(db, cart.id, current_user.id)
         db.commit()
         db.refresh(basket)
         return _build_new_parts_basket_response(basket, [])
 
     guest_cart = get_or_create_guest_cart(db, request, response)
-    basket = create_guest_basket(db, guest_cart.id, payload.name)
+    if name:
+        basket = create_guest_basket(db, guest_cart.id, name)
+    else:
+        basket = create_fresh_guest_basket(db, guest_cart.id)
     touch_guest_cart(db, guest_cart)
     db.commit()
     db.refresh(basket)

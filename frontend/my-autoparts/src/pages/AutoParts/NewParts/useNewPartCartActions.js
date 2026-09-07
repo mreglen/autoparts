@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   addNewPartsToCart,
+  refreshNewPartsCartOffers,
   removeFromCart,
   selectCart,
   selectCartLoading,
@@ -26,12 +27,22 @@ const toSafeInt = (value, fallback = 0) => {
   return fallback;
 };
 
+const toIsoOrNull = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+};
+
+const sameDeliveryInstant = (a, b) => toIsoOrNull(a) === toIsoOrNull(b);
+
 export function useNewPartCartActions({ part, stocksData }) {
   const dispatch = useDispatch();
   const cart = useSelector(selectCart);
   const cartLoading = useSelector(selectCartLoading);
   const markupPercent = useNewPartsMarkupPercent('auto');
   const [addingToCart, setAddingToCart] = useState(false);
+  const syncSignatureRef = useRef('');
 
   const brand = toSafeText(part?.brand);
   const number = toSafeText(part?.partnumber);
@@ -50,6 +61,51 @@ export function useNewPartCartActions({ part, stocksData }) {
     ),
     [stocksData],
   );
+
+  useEffect(() => {
+    if (!stocks.length || !cart?.new_parts_items?.length || !brand || !number) return undefined;
+    const refreshItems = [];
+    stocks.forEach((stock) => {
+      const stockId = String(stock?.stock_id || '').trim();
+      if (!stockId) return;
+      const matches = cart.new_parts_items.filter(
+        (item) =>
+          String(item.stock_id || '') === stockId
+          && item.brand === brand
+          && item.partnumber === number
+      );
+      if (!matches.length) return;
+      const deliveryStart = toIsoOrNull(stock.delivery_start);
+      const deliveryEnd = toIsoOrNull(stock.delivery_end);
+      if (!deliveryStart && !deliveryEnd) return;
+      const needsUpdate = matches.some(
+        (item) =>
+          !sameDeliveryInstant(item.delivery_start, deliveryStart)
+          || !sameDeliveryInstant(item.delivery_end, deliveryEnd)
+      );
+      if (!needsUpdate) return;
+      refreshItems.push({
+        stock_id: stockId,
+        brand,
+        partnumber: number,
+        delivery_start: deliveryStart || undefined,
+        delivery_end: deliveryEnd || undefined,
+        max_quantity: Math.max(1, Number(stock.available_count) || 1),
+        name: displayTitle || undefined,
+      });
+    });
+    if (!refreshItems.length) return undefined;
+    const signature = refreshItems
+      .map((item) => `${item.stock_id}|${item.delivery_start || ''}|${item.delivery_end || ''}`)
+      .sort()
+      .join(';');
+    if (signature === syncSignatureRef.current) return undefined;
+    syncSignatureRef.current = signature;
+    const timer = setTimeout(() => {
+      dispatch(refreshNewPartsCartOffers(refreshItems));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [brand, cart?.new_parts_items, dispatch, displayTitle, number, stocks]);
 
   const mainStock = stocks[0] || null;
   const otherStocks = stocks.slice(1);
@@ -109,7 +165,7 @@ export function useNewPartCartActions({ part, stocksData }) {
     return cartItem;
   };
 
-  const handleAddToCart = async (stock) => {
+  const handleAddToCart = async (stock, basketId) => {
     if (!stock) return;
     setAddingToCart(true);
     try {
@@ -118,13 +174,19 @@ export function useNewPartCartActions({ part, stocksData }) {
       if (availableStock <= currentCartQuantity) return;
       const cartItem = prepareCartItem(stock, 1);
       if (!cartItem.stock_id || cartItem.price <= 0) return;
-      await dispatch(addNewPartsToCart(cartItem)).unwrap();
+      const existing = getCartItemByStock(stock);
+      await dispatch(
+        addNewPartsToCart({
+          ...cartItem,
+          basket_id: basketId ?? existing?.basket_id ?? undefined,
+        })
+      ).unwrap();
       trackConversion(CONVERSION_EVENTS.ADD_TO_CART, {
         path: window.location.pathname + window.location.search,
         section: 'new',
       });
-    } catch (_e) {
-      // global cart errors
+    } catch (err) {
+      throw typeof err === 'string' ? err : 'Не удалось добавить в корзину';
     } finally {
       setAddingToCart(false);
     }

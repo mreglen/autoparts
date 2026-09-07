@@ -10,6 +10,7 @@ import {
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
+import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import { applyMarkup } from '../NewParts/newPartStockUtils';
 import {
@@ -63,7 +64,7 @@ function formatDeliveryShort(deliveryStart, deliveryEnd) {
   }
 }
 
-function QtyControl({ quantity, onAdd, onRemove, disabled, noStock }) {
+function QtyControl({ quantity, onAdd, onAddToBasket, onRemove, disabled, noStock }) {
   const q = toSafeInt(quantity, 0);
   if (q > 0) {
     return (
@@ -89,14 +90,14 @@ function QtyControl({ quantity, onAdd, onRemove, disabled, noStock }) {
     );
   }
   return (
-    <button
-      type="button"
-      onClick={onAdd}
-      disabled={disabled}
-      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+    <NewPartsBasketHoverMenu
+      onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
+      disabled={disabled || noStock}
+      buttonClassName="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+      label="В корзину"
     >
       В корзину
-    </button>
+    </NewPartsBasketHoverMenu>
   );
 }
 
@@ -193,7 +194,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
     return cartItem;
   };
 
-  const handleAddToCart = async (stock) => {
+  const handleAddToCart = async (stock, basketId) => {
     if (!stock) return;
     setAddingToCart(true);
     try {
@@ -202,13 +203,19 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
       if (availableStock <= currentCartQuantity) return;
       const cartItem = prepareCartItem(stock, 1);
       if (!cartItem.stock_id || cartItem.price <= 0) return;
-      await dispatch(addNewPartsToCart(cartItem)).unwrap();
+      const existing = getCartItemByStock(stock);
+      await dispatch(
+        addNewPartsToCart({
+          ...cartItem,
+          basket_id: basketId ?? existing?.basket_id ?? undefined,
+        })
+      ).unwrap();
       trackConversion(CONVERSION_EVENTS.ADD_TO_CART, {
         path: window.location.pathname + window.location.search,
         section: 'vin',
       });
-    } catch {
-      // silent
+    } catch (err) {
+      throw typeof err === 'string' ? err : 'Не удалось добавить в корзину';
     } finally {
       setAddingToCart(false);
     }
@@ -285,6 +292,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
         <QtyControl
           quantity={mainQuantity}
           onAdd={() => handleAddToCart(mainStock)}
+          onAddToBasket={(basketId) => handleAddToCart(mainStock, basketId)}
           onRemove={() => handleRemoveFromCart(mainStock)}
           disabled={disabledControl}
           noStock={mainStockInfo.noStock}
@@ -321,6 +329,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
                     <QtyControl
                       quantity={quantity}
                       onAdd={() => handleAddToCart(stock)}
+                      onAddToBasket={(basketId) => handleAddToCart(stock, basketId)}
                       onRemove={() => handleRemoveFromCart(stock)}
                       disabled={disabledControl}
                       noStock={stockInfo.noStock}

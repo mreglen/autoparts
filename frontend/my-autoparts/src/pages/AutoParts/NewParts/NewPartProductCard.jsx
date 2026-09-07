@@ -126,6 +126,7 @@ function NewPartProductCard({
       <NewPartCartQuantityControl
         quantity={mainQuantity}
         onAdd={() => handleAddToCart(mainStock)}
+        onAddToBasket={(basketId) => handleAddToCart(mainStock, basketId)}
         onRemove={() => handleRemoveFromCart(mainStock)}
         disabled={disabledControl}
         noStock={mainStockInfo.noStock}
@@ -193,6 +194,7 @@ function NewPartProductCard({
                         <NewPartCartQuantityControl
                           quantity={quantity}
                           onAdd={() => handleAddToCart(stock)}
+                          onAddToBasket={(basketId) => handleAddToCart(stock, basketId)}
                           onRemove={() => handleRemoveFromCart(stock)}
                           disabled={disabledControl}
                           noStock={stockInfo.noStock}
@@ -303,6 +305,7 @@ function NewPartProductCard({
                       <NewPartCartQuantityControl
                         quantity={quantity}
                         onAdd={() => handleAddToCart(stock)}
+                        onAddToBasket={(basketId) => handleAddToCart(stock, basketId)}
                         onRemove={() => handleRemoveFromCart(stock)}
                         disabled={disabledControl}
                         noStock={stockInfo.noStock}

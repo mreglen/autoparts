@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import ClientMarkupPopover from '../../../components/NewParts/ClientMarkupPopover';
+import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../../redux/slices/ClientMarkupSlice';
 import { canUseClientMarkup, computeClientPrices } from '../../../utils/clientMarkupUtils';
 import { canEditClientMarkupSettings } from '../../../utils/autoservicePermissions';
@@ -14,6 +15,7 @@ import {
 } from '../NewParts/newPartStockUtils';
 import {
   addNewPartsToCart,
+  refreshNewPartsCartOffers,
   removeFromCart,
   selectCart,
   selectCartLoading,
@@ -26,6 +28,64 @@ function toSafeInt(value, fallback = 1) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 1) return fallback;
   return Math.trunc(n);
+}
+
+function toIsoOrNull(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function sameDeliveryInstant(a, b) {
+  const left = toIsoOrNull(a);
+  const right = toIsoOrNull(b);
+  return left === right;
+}
+
+function buildOfferRefreshItems(groups, cartItems) {
+  if (!groups?.length || !cartItems?.length) return [];
+  const cartByKey = new Map();
+  cartItems.forEach((item) => {
+    const key = `${String(item.stock_id || '').trim()}|${String(item.brand || '').trim()}|${String(item.partnumber || '').trim()}`;
+    if (!cartByKey.has(key)) cartByKey.set(key, []);
+    cartByKey.get(key).push(item);
+  });
+
+  const items = [];
+  const seen = new Set();
+  groups.forEach((group) => {
+    const stocks = [group.mainStock, ...(group.otherStocks || [])].filter(Boolean);
+    stocks.forEach((stock) => {
+      const stockId = String(stock.stock_id || '').trim();
+      const brand = String(group.brand || '').trim();
+      const partnumber = String(group.number || '').trim();
+      const key = `${stockId}|${brand}|${partnumber}`;
+      if (!stockId || !brand || !partnumber || seen.has(key)) return;
+      const matches = cartByKey.get(key);
+      if (!matches?.length) return;
+      const deliveryStart = toIsoOrNull(stock.delivery_start);
+      const deliveryEnd = toIsoOrNull(stock.delivery_end);
+      if (!deliveryStart && !deliveryEnd) return;
+      const needsUpdate = matches.some(
+        (item) =>
+          !sameDeliveryInstant(item.delivery_start, deliveryStart)
+          || !sameDeliveryInstant(item.delivery_end, deliveryEnd)
+      );
+      if (!needsUpdate) return;
+      seen.add(key);
+      items.push({
+        stock_id: stockId,
+        brand,
+        partnumber,
+        delivery_start: deliveryStart || undefined,
+        delivery_end: deliveryEnd || undefined,
+        max_quantity: Math.max(1, Number(stock.available_count) || 1),
+        name: group.name || undefined,
+      });
+    });
+  });
+  return items;
 }
 
 function getDeliverySortTime(stock) {
@@ -51,21 +111,15 @@ function DeliveryCell({ deliveryStart, deliveryEnd }) {
   );
 }
 
-function CartIcon({ className = 'h-4 w-4' }) {
-  return (
-    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
-      <path
-        d="M15 15C13.8954 15 13 15.8954 13 17C13 18.1046 13.8954 19 15 19C16.1046 19 17 18.1046 17 17C17 15.8954 16.1046 15 15 15ZM15 15H7.29395C6.83288 15 6.60193 15 6.41211 14.918C6.24466 14.8456 6.09938 14.7291 5.99354 14.5805C5.8749 14.414 5.82719 14.1913 5.73274 13.7505L3.27148 2.26465C3.17484 1.81363 3.12587 1.58838 3.00586 1.41992C2.90002 1.27135 2.75477 1.15441 2.58732 1.08205C2.39746 1 2.16779 1 1.70653 1H1M4 4H16.8732C17.595 4 17.9555 4 18.1978 4.15036C18.41 4.28206 18.5653 4.48862 18.633 4.729C18.7104 5.00343 18.611 5.34996 18.411 6.04346L17.0264 10.8435C16.9068 11.2581 16.8469 11.465 16.7256 11.6189C16.6185 11.7547 16.4772 11.861 16.317 11.9263C16.1361 12 15.9211 12 15.4921 12H5.73047M6 19C4.89543 19 4 18.1046 4 17C4 15.8954 4.89543 15 6 15C7.10457 15 8 15.8954 8 17C8 18.1046 7.10457 19 6 19Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function CartQtyControl({ quantity, maxQty, onAdd, onRemove, disabled }) {
+function CartQtyControl({
+  quantity,
+  maxQty,
+  onAdd,
+  onAddToBasket,
+  onRemove,
+  disabled,
+  showBasketPicker = true,
+}) {
   const safeQty = toSafeInt(quantity, 0);
   const atMax = safeQty >= maxQty;
 
@@ -96,16 +150,11 @@ function CartQtyControl({ quantity, maxQty, onAdd, onRemove, disabled }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={onAdd}
+    <NewPartsBasketHoverMenu
+      onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
       disabled={disabled}
-      className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 bg-white text-indigo-700 transition hover:border-indigo-400 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
-      aria-label="Добавить в корзину"
-      title="Добавить в корзину"
-    >
-      <CartIcon />
-    </button>
+      showPicker={showBasketPicker}
+    />
   );
 }
 
@@ -228,13 +277,13 @@ function StockOfferRow({
     return item;
   };
 
-  const handleAdd = async () => {
+  const handleAdd = async (basketId) => {
     if (cartQuantity >= maxQty) return;
     setBusy(true);
     try {
       const cartItem = prepareCartItem(1);
       if (!cartItem.stock_id || cartItem.price <= 0) return;
-      let targetBasketId = vinBasketId;
+      let targetBasketId = basketId ?? cartItemInStore?.basket_id ?? vinBasketId;
       if (!targetBasketId && ensureVinBasket) {
         targetBasketId = await ensureVinBasket();
       }
@@ -248,8 +297,8 @@ function StockOfferRow({
         path: window.location.pathname + window.location.search,
         section: 'vin',
       });
-    } catch {
-      // silent
+    } catch (err) {
+      throw typeof err === 'string' ? err : 'Не удалось добавить в корзину';
     } finally {
       setBusy(false);
     }
@@ -340,7 +389,8 @@ function StockOfferRow({
           <CartQtyControl
           quantity={cartQuantity}
           maxQty={maxQty}
-          onAdd={handleAdd}
+          onAdd={() => handleAdd()}
+          onAddToBasket={handleAdd}
           onRemove={handleRemove}
           disabled={disabled}
         />
@@ -414,6 +464,8 @@ function PartOfferGroup({
 }
 
 function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBasket }) {
+  const dispatch = useDispatch();
+  const cart = useSelector(selectCart);
   const siteMarkupPercent = useNewPartsMarkupPercent('auto');
   const user = useSelector((state) => state.auth.user);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
@@ -422,8 +474,24 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
   const canEditMarkupSettings = canEditClientMarkupSettings(user, permissionCodes);
   const clientMarkupPercent = showStaffMarkup ? (Number(clientMarkup.percent) || 0) : 0;
   const showBothPrices = showStaffMarkup && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH;
+  const syncSignatureRef = useRef('');
 
   const groups = useMemo(() => buildPartGroups(parts), [parts]);
+
+  useEffect(() => {
+    const refreshItems = buildOfferRefreshItems(groups, cart?.new_parts_items || []);
+    if (!refreshItems.length) return undefined;
+    const signature = refreshItems
+      .map((item) => `${item.stock_id}|${item.brand}|${item.partnumber}|${item.delivery_start || ''}|${item.delivery_end || ''}`)
+      .sort()
+      .join(';');
+    if (signature === syncSignatureRef.current) return undefined;
+    syncSignatureRef.current = signature;
+    const timer = setTimeout(() => {
+      dispatch(refreshNewPartsCartOffers(refreshItems));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [cart?.new_parts_items, dispatch, groups]);
 
   if (!groups.length) {
     return <p className="text-sm text-gray-500">{emptyText}</p>;
@@ -445,8 +513,8 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
           />
         ))}
       </div>
-      <div className="hidden md:block -mx-1 overflow-x-auto">
-      <table className="min-w-[840px] w-full table-fixed border-collapse text-left">
+      <div className="hidden md:block -mx-1 overflow-hidden">
+      <table className="w-full table-fixed border-collapse text-left">
         <colgroup>
           <col style={{ width: '108px' }} />
           <col style={{ width: '92px' }} />

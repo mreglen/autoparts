@@ -331,8 +331,8 @@ function CartTableBlock({
         </div>
       ) : null}
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-left">
+      <div className="overflow-hidden">
+        <table className="w-full table-fixed border-collapse text-left">
           <thead>
             <tr className="border-b border-line bg-surface-muted/60 text-xs font-medium uppercase tracking-wide text-ink-muted">
               <th className="w-10 px-2 py-2.5">
@@ -686,7 +686,7 @@ export default function CartPage() {
   }, [dispatch, isAuthorized, navigate, openAuthModalForCheckout, selectedItems]);
 
   const openRenameModal = (basket) => {
-    if (!basket || basket.is_default) return;
+    if (!basket) return;
     setRenameBasketId(basket.id);
     setRenameValue(basket.name);
     setRenameError('');
@@ -896,6 +896,8 @@ export default function CartPage() {
           emptyText: basket.is_default
             ? 'Добавьте новые запчасти из каталога или VIN-поиска'
             : `Корзина «${basket.name}» пуста`,
+          canRename: true,
+          onRename: () => openRenameModal(basket),
         });
       }
       return;
@@ -904,7 +906,7 @@ export default function CartPage() {
       key: `new-${basket.id}`,
       title: basket.name,
       items,
-      canRename: !basket.is_default,
+      canRename: true,
       onRename: () => openRenameModal(basket),
       showMoveAction: true,
       onMoveSelected: () => openMoveModal(basket.id, items),
@@ -1035,6 +1037,28 @@ export default function CartPage() {
                     key={section.key}
                     className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted"
                   >
+                    {section.title ? (
+                      <div className="mb-3 flex items-center justify-center gap-2 text-base font-semibold text-ink">
+                        <span>{section.title}</span>
+                        {section.canRename && section.onRename ? (
+                          <button
+                            type="button"
+                            onClick={section.onRename}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted transition hover:text-brand-600"
+                            aria-label="Переименовать корзину"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                              />
+                            </svg>
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {section.emptyText}
                   </div>
                 );
@@ -1194,25 +1218,23 @@ export default function CartPage() {
                       <span className="ml-2 text-xs text-ink-muted">основная</span>
                     ) : null}
                   </button>
-                  {!basket.is_default ? (
-                    <button
-                      type="button"
-                      onClick={() => openRenameModal(basket)}
-                      disabled={moveSaving}
-                      className="shrink-0 px-2 py-2 text-ink-muted transition hover:text-brand-600 disabled:opacity-50"
-                      aria-label={`Переименовать «${basket.name}»`}
-                      title="Переименовать"
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                        />
-                      </svg>
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => openRenameModal(basket)}
+                    disabled={moveSaving}
+                    className="shrink-0 px-2 py-2 text-ink-muted transition hover:text-brand-600 disabled:opacity-50"
+                    aria-label={`Переименовать «${basket.name}»`}
+                    title="Переименовать"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                      />
+                    </svg>
+                  </button>
                 </div>
               ))}
               {!moveTargetBaskets.length ? (

@@ -201,6 +201,19 @@ class NewPartsBasketTests(unittest.TestCase):
         self.db.commit()
         self.assertEqual(renamed.name, "Новый")
 
+    def test_rename_default_spawns_fresh_default(self):
+        default_basket = get_or_create_default_user_basket(self.db, self.cart.id, 1)
+        self.db.commit()
+        renamed = rename_user_basket(self.db, self.cart.id, 1, default_basket.id, "Для Touareg")
+        self.db.commit()
+        self.assertEqual(renamed.name, "Для Touareg")
+        self.assertFalse(renamed.is_default)
+        fresh = get_or_create_default_user_basket(self.db, self.cart.id, 1)
+        self.db.commit()
+        self.assertTrue(fresh.is_default)
+        self.assertEqual(fresh.name, "Новые запчасти")
+        self.assertNotEqual(fresh.id, renamed.id)
+
 
 if __name__ == "__main__":
     unittest.main()

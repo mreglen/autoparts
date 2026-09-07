@@ -138,9 +138,12 @@ export const fetchNewPartsBaskets = createAsyncThunk(
 
 export const createNewPartsBasket = createAsyncThunk(
     'cart/createNewPartsBasket',
-    async ({ name }, { rejectWithValue, dispatch }) => {
+    async ({ name } = {}, { rejectWithValue, dispatch }) => {
         try {
-            const response = await apiAxios.post('/cart/new-parts/baskets', { name });
+            const payload = {};
+            const trimmed = typeof name === 'string' ? name.trim() : '';
+            if (trimmed) payload.name = trimmed;
+            const response = await apiAxios.post('/cart/new-parts/baskets', payload);
             dispatch(fetchCart());
             return response.data;
         } catch (error) {
@@ -219,6 +222,22 @@ export const addNewPartsToCart = createAsyncThunk(
         } catch (error) {
             return rejectWithValue(
                 error.response?.data?.detail || 'Ошибка добавления товара в корзину'
+            );
+        }
+    }
+);
+
+export const refreshNewPartsCartOffers = createAsyncThunk(
+    'cart/refreshNewPartsCartOffers',
+    async (items, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.post('/cart/new-parts/refresh-offers', {
+                items: Array.isArray(items) ? items : [],
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка обновления сроков доставки'
             );
         }
     }
@@ -449,6 +468,13 @@ const cartSlice = createSlice({
             .addCase(addNewPartsToCart.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+            .addCase(refreshNewPartsCartOffers.fulfilled, (state, action) => {
+                if (action.payload) {
+                    state.cart = action.payload;
+                    syncBasketsFromCart(state);
+                    syncSummaryFromCart(state);
+                }
             })
             .addCase(fetchCart.pending, (state) => {
                 state.loading = true;

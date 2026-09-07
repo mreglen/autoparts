@@ -1,4 +1,5 @@
 import React from 'react';
+import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
 
 const toSafeInt = (value, fallback = 0) => {
   const n = Number(value);
@@ -9,11 +10,13 @@ const toSafeInt = (value, fallback = 0) => {
 export default function NewPartCartQuantityControl({
   quantity,
   onAdd,
+  onAddToBasket,
   onRemove,
   disabled,
   noStock,
   loading = false,
   className = '',
+  showBasketPicker = true,
 }) {
   const safeQuantity = toSafeInt(quantity, 0);
 
@@ -46,13 +49,15 @@ export default function NewPartCartQuantityControl({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onAdd}
+    <NewPartsBasketHoverMenu
+      onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
       disabled={disabled || noStock}
-      className={`flex h-11 min-w-[7.5rem] items-center justify-center rounded-lg bg-brand-600 px-5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 ${className}`}
+      showPicker={showBasketPicker}
+      className={className}
+      buttonClassName="flex h-11 min-w-[7.5rem] items-center justify-center rounded-lg bg-brand-600 px-5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+      label="В корзину"
     >
       {loading ? '…' : 'В корзину'}
-    </button>
+    </NewPartsBasketHoverMenu>
   );
 }
