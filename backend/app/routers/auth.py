@@ -45,7 +45,7 @@ from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format  
 from app.utils.guest_cart import merge_guest_cart_from_request
 from app.utils.site_settings_db import get_or_create_site_settings
-from app.utils.org_access import resolve_autoservice_organization_id
+from app.utils.org_access import resolve_autoservice_organization_id, org_has_admin_director
 from app.utils.org_markup import (
     autoservice_markup_percent,
     buyer_markup_percent,
@@ -86,6 +86,9 @@ def build_user_profile_response(user: User, db: Session | None = None) -> dict:
             getattr(user.organization, "is_autoservice", False)
             and not getattr(user.organization, "autoservice_paused", False)
         ) if user.organization_id and user.organization else False,
+        "organization_has_admin_director": bool(
+            org_has_admin_director(db, user.organization_id)
+        ) if db and user.organization_id else False,
         "organization_new_parts_markup_tier": (
             org_markup_tier_override(user.organization)
             if user.organization_id and user.organization else None

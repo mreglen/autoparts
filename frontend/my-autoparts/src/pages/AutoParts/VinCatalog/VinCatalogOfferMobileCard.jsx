@@ -18,13 +18,14 @@ function toSafeInt(value, fallback = 0) {
   return Math.trunc(n);
 }
 
-function DeliveryLine({ deliveryStart, deliveryEnd }) {
+function DeliveryLine({ deliveryStart, deliveryEnd, warehouseName }) {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (!parts) return <span className="text-sm text-gray-500">—</span>;
   return (
     <div className="text-sm text-gray-800">
       <div className="font-medium">{parts.dateLine}</div>
       <div className="text-gray-600">{parts.timeLine}</div>
+      {warehouseName ? <div className="text-gray-500">{warehouseName}</div> : null}
     </div>
   );
 }
@@ -90,6 +91,7 @@ function MobileStockOffer({
   siteMarkupPercent,
   clientMarkupPercent,
   showBothPrices,
+  showWarehouseNames = false,
   isAlternate = false,
   onOpenPart,
   vinBasketId,
@@ -208,7 +210,15 @@ function MobileStockOffer({
     <div className={`rounded-lg border p-3 ${isAlternate ? 'border-gray-100 bg-gray-50' : 'border-gray-200 bg-white'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-2">
-          <DeliveryLine deliveryStart={stock.delivery_start} deliveryEnd={stock.delivery_end} />
+          <DeliveryLine
+            deliveryStart={stock.delivery_start}
+            deliveryEnd={stock.delivery_end}
+            warehouseName={
+              showWarehouseNames
+                ? (stock.description || stock.warehouse_name || '')
+                : ''
+            }
+          />
           <div className="text-sm text-gray-600">{maxQty} шт.</div>
         </div>
         <div className="shrink-0 text-right">
@@ -247,6 +257,7 @@ export default function VinCatalogOfferMobileCard({
   siteMarkupPercent,
   clientMarkupPercent,
   showBothPrices,
+  showWarehouseNames = false,
   onOpenPart,
   vinBasketId,
   ensureVinBasket,
@@ -297,6 +308,7 @@ export default function VinCatalogOfferMobileCard({
           siteMarkupPercent={siteMarkupPercent}
           clientMarkupPercent={clientMarkupPercent}
           showBothPrices={showBothPrices}
+          showWarehouseNames={showWarehouseNames}
           onOpenPart={onOpenPart}
           vinBasketId={vinBasketId}
           ensureVinBasket={ensureVinBasket}
@@ -324,6 +336,7 @@ export default function VinCatalogOfferMobileCard({
                   siteMarkupPercent={siteMarkupPercent}
                   clientMarkupPercent={clientMarkupPercent}
                   showBothPrices={showBothPrices}
+                  showWarehouseNames={showWarehouseNames}
                   isAlternate
                   onOpenPart={onOpenPart}
                   vinBasketId={vinBasketId}

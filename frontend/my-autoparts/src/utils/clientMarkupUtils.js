@@ -19,3 +19,11 @@ export function isOrganizationStaff(user) {
 export function canUseClientMarkup(user) {
   return isOrganizationStaff(user) && user?.organization_is_autoservice === true;
 }
+
+/** Названия складов Rossko — только для главной организации (директор с is_admin) и админов. */
+export function canSeeRosskoWarehouseNames(user) {
+  if (!user) return false;
+  if (user.is_admin) return true;
+  if (!user.organization_has_admin_director) return false;
+  return isOrganizationStaff(user);
+}

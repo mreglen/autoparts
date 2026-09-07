@@ -39,6 +39,7 @@ class CartItemResponse(BaseModel):
     purchase_price: Optional[float] = None
     supplier_unit_price: Optional[float] = None
     stock_id: Optional[str] = None
+    warehouse_name: Optional[str] = None
     product_id: Optional[int] = None
     seller: str
     created_at: datetime

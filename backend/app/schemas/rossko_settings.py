@@ -88,6 +88,21 @@ class RosskoMarkupSettingsUpdate(BaseModel):
     autoservice_markup_percent: float = Field(..., ge=0, le=500)
 
 
+class RosskoWarehouseItem(BaseModel):
+    id: str
+    name: str = ""
+    allowed: bool = False
+
+
+class RosskoWarehousesResponse(BaseModel):
+    warehouses: list[RosskoWarehouseItem] = Field(default_factory=list)
+    allowed_stock_ids: list[str] = Field(default_factory=list)
+
+
+class RosskoWarehousesUpdate(BaseModel):
+    allowed_stock_ids: list[str] = Field(default_factory=list)
+
+
 class RosskoCredentialsView(BaseModel):
     key1_configured: bool = False
     key2_configured: bool = False

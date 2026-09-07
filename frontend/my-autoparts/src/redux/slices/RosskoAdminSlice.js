@@ -87,6 +87,45 @@ export const saveRosskoMarkupSettings = createAsyncThunk(
     }
 );
 
+export const fetchRosskoWarehouses = createAsyncThunk(
+    'rosskoAdmin/fetchWarehouses',
+    async (_, { rejectWithValue }) => {
+        try {
+            return await apiRequest('/admin/rossko/warehouses');
+        } catch (error) {
+            return rejectWithValue(error?.message || 'Ошибка загрузки складов Rossko');
+        }
+    }
+);
+
+export const saveRosskoWarehouses = createAsyncThunk(
+    'rosskoAdmin/saveWarehouses',
+    async (payload, { rejectWithValue }) => {
+        try {
+            return await apiRequest('/admin/rossko/warehouses', {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+            });
+        } catch (error) {
+            return rejectWithValue(error?.message || 'Ошибка сохранения складов Rossko');
+        }
+    }
+);
+
+export const discoverRosskoWarehouses = createAsyncThunk(
+    'rosskoAdmin/discoverWarehouses',
+    async (_, { rejectWithValue }) => {
+        try {
+            return await apiRequest('/admin/rossko/warehouses/discover', {
+                method: 'POST',
+                body: JSON.stringify({}),
+            });
+        } catch (error) {
+            return rejectWithValue(error?.message || 'Ошибка обновления списка складов');
+        }
+    }
+);
+
 const rosskoAdminSlice = createSlice({
     name: 'rosskoAdmin',
     initialState: {
@@ -94,17 +133,22 @@ const rosskoAdminSlice = createSlice({
         credentials: null,
         settings: null,
         markupSettings: null,
+        warehouses: null,
         loadingDetails: false,
         loadingCredentials: false,
         loadingSettings: false,
         loadingMarkupSettings: false,
+        loadingWarehouses: false,
+        discoveringWarehouses: false,
         saving: false,
         savingCredentials: false,
         savingMarkup: false,
+        savingWarehouses: false,
         error: null,
         saveError: null,
         credentialsSaveError: null,
         markupSaveError: null,
+        warehousesError: null,
     },
     reducers: {
         clearRosskoAdminErrors: (state) => {
@@ -112,6 +156,7 @@ const rosskoAdminSlice = createSlice({
             state.saveError = null;
             state.credentialsSaveError = null;
             state.markupSaveError = null;
+            state.warehousesError = null;
         },
     },
     extraReducers: (builder) => {
@@ -202,6 +247,42 @@ const rosskoAdminSlice = createSlice({
             .addCase(saveRosskoMarkupSettings.rejected, (state, action) => {
                 state.savingMarkup = false;
                 state.markupSaveError = action.payload;
+            })
+            .addCase(fetchRosskoWarehouses.pending, (state) => {
+                state.loadingWarehouses = true;
+                state.warehousesError = null;
+            })
+            .addCase(fetchRosskoWarehouses.fulfilled, (state, action) => {
+                state.loadingWarehouses = false;
+                state.warehouses = action.payload;
+            })
+            .addCase(fetchRosskoWarehouses.rejected, (state, action) => {
+                state.loadingWarehouses = false;
+                state.warehousesError = action.payload;
+            })
+            .addCase(discoverRosskoWarehouses.pending, (state) => {
+                state.discoveringWarehouses = true;
+                state.warehousesError = null;
+            })
+            .addCase(discoverRosskoWarehouses.fulfilled, (state, action) => {
+                state.discoveringWarehouses = false;
+                state.warehouses = action.payload;
+            })
+            .addCase(discoverRosskoWarehouses.rejected, (state, action) => {
+                state.discoveringWarehouses = false;
+                state.warehousesError = action.payload;
+            })
+            .addCase(saveRosskoWarehouses.pending, (state) => {
+                state.savingWarehouses = true;
+                state.warehousesError = null;
+            })
+            .addCase(saveRosskoWarehouses.fulfilled, (state, action) => {
+                state.savingWarehouses = false;
+                state.warehouses = action.payload;
+            })
+            .addCase(saveRosskoWarehouses.rejected, (state, action) => {
+                state.savingWarehouses = false;
+                state.warehousesError = action.payload;
             });
     },
 });

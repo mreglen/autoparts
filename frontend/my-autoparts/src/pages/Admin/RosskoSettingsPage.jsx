@@ -6,9 +6,12 @@ import {
     fetchRosskoCredentials,
     fetchRosskoSettings,
     fetchRosskoMarkupSettings,
+    fetchRosskoWarehouses,
+    discoverRosskoWarehouses,
     saveRosskoCredentials,
     saveRosskoSettings,
     saveRosskoMarkupSettings,
+    saveRosskoWarehouses,
     clearRosskoAdminErrors,
 } from '../../redux/slices/RosskoAdminSlice';
 import { applyPublicMarkupSettings } from '../../redux/slices/PublicInfoSlice';
@@ -27,17 +30,22 @@ export default function RosskoSettingsPage() {
         credentials,
         settings,
         markupSettings,
+        warehouses,
         loadingDetails,
         loadingCredentials,
         loadingSettings,
         loadingMarkupSettings,
+        loadingWarehouses,
+        discoveringWarehouses,
         saving,
         savingCredentials,
         savingMarkup,
+        savingWarehouses,
         error,
         saveError,
         credentialsSaveError,
         markupSaveError,
+        warehousesError,
     } = useSelector((state) => state.rosskoAdmin);
 
     const [credentialsForm, setCredentialsForm] = useState({
@@ -66,6 +74,7 @@ export default function RosskoSettingsPage() {
         seller_markup_percent: '15',
         autoservice_markup_percent: '7',
     });
+    const [selectedWarehouseIds, setSelectedWarehouseIds] = useState(() => new Set());
     const [notification, setNotification] = useState(null);
 
     useEffect(() => {
@@ -79,7 +88,19 @@ export default function RosskoSettingsPage() {
         dispatch(fetchRosskoCheckoutDetails());
         dispatch(fetchRosskoSettings());
         dispatch(fetchRosskoMarkupSettings());
+        dispatch(fetchRosskoWarehouses());
     }, [isReady, user, navigate, dispatch]);
+
+    useEffect(() => {
+        if (!warehouses?.warehouses) return;
+        setSelectedWarehouseIds(
+            new Set(
+                (warehouses.warehouses || [])
+                    .filter((w) => w.allowed)
+                    .map((w) => String(w.id))
+            )
+        );
+    }, [warehouses]);
 
     useEffect(() => {
         if (!markupSettings) return;
@@ -253,6 +274,60 @@ export default function RosskoSettingsPage() {
             setNotification({ type: 'success', message: 'Наценки сохранены' });
         } catch (err) {
             setNotification({ type: 'error', message: err || 'Не удалось сохранить наценки' });
+        }
+    };
+
+    const warehouseList = warehouses?.warehouses || [];
+
+    const toggleWarehouse = useCallback((warehouseId) => {
+        const id = String(warehouseId);
+        setSelectedWarehouseIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const handleSelectAllWarehouses = useCallback(() => {
+        setSelectedWarehouseIds(new Set(warehouseList.map((w) => String(w.id))));
+    }, [warehouseList]);
+
+    const handleClearWarehouses = useCallback(() => {
+        setSelectedWarehouseIds(new Set());
+    }, []);
+
+    const handleDiscoverWarehouses = async () => {
+        if (discoveringWarehouses) return;
+        setNotification(null);
+        try {
+            await dispatch(discoverRosskoWarehouses()).unwrap();
+            setNotification({
+                type: 'success',
+                message: 'Список складов обновлён из поиска Rossko',
+            });
+        } catch (err) {
+            setNotification({ type: 'error', message: err || 'Не удалось обновить склады' });
+        }
+    };
+
+    const handleSaveWarehouses = async () => {
+        if (savingWarehouses) return;
+        setNotification(null);
+        try {
+            await dispatch(
+                saveRosskoWarehouses({
+                    allowed_stock_ids: Array.from(selectedWarehouseIds),
+                })
+            ).unwrap();
+            setNotification({
+                type: 'success',
+                message: selectedWarehouseIds.size
+                    ? `Сохранено: показываем ${selectedWarehouseIds.size} склад(ов)`
+                    : 'Сохранено: фильтр складов выключен (показываются все)',
+            });
+        } catch (err) {
+            setNotification({ type: 'error', message: err || 'Не удалось сохранить склады' });
         }
     };
 
@@ -554,6 +629,94 @@ export default function RosskoSettingsPage() {
                     </button>
                 </div>
             )}
+
+            <div className="mt-8 space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900">Склады Rossko</h2>
+                        <p className="mt-1 text-sm text-gray-600">
+                            Отметьте склады, которые показывать в поиске и каталоге. Если ничего не выбрано —
+                            фильтр выключен и видны все склады с доставкой. Список пополняется при поиске и
+                            кнопкой «Обновить из Rossko».
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleDiscoverWarehouses}
+                        disabled={discoveringWarehouses}
+                        className="inline-flex rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                        {discoveringWarehouses ? 'Обновление…' : 'Обновить из Rossko'}
+                    </button>
+                </div>
+
+                {warehousesError ? (
+                    <p className="text-sm text-red-600">{warehousesError}</p>
+                ) : null}
+
+                {loadingWarehouses && !warehouseList.length ? (
+                    <p className="text-gray-600">Загрузка складов…</p>
+                ) : !warehouseList.length ? (
+                    <p className="text-sm text-gray-600">
+                        Склады ещё не найдены. Нажмите «Обновить из Rossko» или выполните поиск запчастей.
+                    </p>
+                ) : (
+                    <>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={handleSelectAllWarehouses}
+                                className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                Выбрать все
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleClearWarehouses}
+                                className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                Снять все
+                            </button>
+                            <span className="self-center text-xs text-gray-500">
+                                Выбрано: {selectedWarehouseIds.size} из {warehouseList.length}
+                            </span>
+                        </div>
+                        <div className="max-h-72 space-y-1 overflow-y-auto rounded-lg border border-gray-100 p-2">
+                            {warehouseList.map((warehouse) => {
+                                const id = String(warehouse.id);
+                                const checked = selectedWarehouseIds.has(id);
+                                return (
+                                    <label
+                                        key={id}
+                                        className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-gray-50"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                            checked={checked}
+                                            onChange={() => toggleWarehouse(id)}
+                                        />
+                                        <span className="min-w-0">
+                                            <span className="block text-sm font-medium text-gray-900">
+                                                {warehouse.name || id}
+                                            </span>
+                                            <span className="block text-xs text-gray-500">{id}</span>
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleSaveWarehouses}
+                            disabled={savingWarehouses}
+                            className="inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                            {savingWarehouses ? 'Сохранение…' : 'Сохранить склады'}
+                        </button>
+                    </>
+                )}
+            </div>
 
             <div className="mt-8 space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
                 <div>

@@ -613,7 +613,11 @@ export default function NewPartDetailPage() {
 
   const showStickyCart = hasLiveStocks && inStock && cartActions.mainStock;
   const stickyDeliveryMeta = cartActions.mainStock
-    ? formatDeliveryTimeText(cartActions.mainStock.delivery_start, cartActions.mainStock.delivery_end)
+    ? formatDeliveryTimeText(
+      cartActions.mainStock.delivery_start,
+      cartActions.mainStock.delivery_end,
+      cartActions.mainStock.description || cartActions.mainStock.warehouse_name || '',
+    )
     : '';
 
   return (

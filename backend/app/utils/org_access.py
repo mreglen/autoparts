@@ -23,6 +23,24 @@ def org_has_admin_director(db: Session, org_id: Optional[str]) -> bool:
     return db.query(q.exists()).scalar() is True
 
 
+def can_see_rossko_warehouse_names(db: Session | None, user: object | None) -> bool:
+    """Warehouse names are visible to staff of the main org (director is_admin) and platform admins."""
+    if not user:
+        return False
+    if bool(getattr(user, "is_admin", False)):
+        return True
+    org_id = getattr(user, "organization_id", None)
+    if not org_id or db is None:
+        return False
+    if not org_has_admin_director(db, org_id):
+        return False
+    return bool(
+        getattr(user, "is_seller", False)
+        or getattr(user, "is_director", False)
+        or getattr(user, "is_employee", False)
+    )
+
+
 def resolve_autoservice_organization_id(db: Session) -> Optional[str]:
     """Organization flagged as autoservice in organizations.is_autoservice."""
     row = (

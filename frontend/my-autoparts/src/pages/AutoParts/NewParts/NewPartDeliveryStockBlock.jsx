@@ -15,7 +15,9 @@ function StockMobileCard({ stock, markupPercent }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs text-ink-muted">Склад</p>
-          <p className="text-sm font-semibold text-ink">{stock.stock_id}</p>
+          <p className="text-sm font-semibold text-ink">
+            {stock.description || stock.warehouse_name || stock.stock_id}
+          </p>
         </div>
         <div className="text-right">
           <p className="text-xs text-ink-muted">Цена</p>
@@ -77,7 +79,9 @@ export default function NewPartDeliveryStockBlock({ stocks, inStock, compactMobi
             <tbody>
               {summary.active.map((stock) => (
                 <tr key={stock.stock_id} className="border-b border-line-soft last:border-0">
-                  <td className="px-3 py-2 text-ink-soft">{stock.stock_id}</td>
+                  <td className="px-3 py-2 text-ink-soft">
+                    {stock.description || stock.warehouse_name || stock.stock_id}
+                  </td>
                   <td className="px-3 py-2 text-success-700">{stock.available_count} шт.</td>
                   <td className="px-3 py-2 font-medium text-ink">
                     {formatPriceRub(applyMarkup(stock.price, markupPercent))} ₽

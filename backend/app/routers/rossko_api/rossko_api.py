@@ -142,6 +142,24 @@ async def rossko_search(request: SearchRequest, db: Session = Depends(get_db)):
         # Сохраняем данные о складах в базу данных
         await save_stock_data_to_db(serialized_result, db)
 
+        from app.services.rossko_stock_filter import (
+            collect_stocks_from_payload,
+            filter_search_payload_stocks,
+            load_allowed_stock_ids,
+            merge_known_stocks,
+        )
+
+        try:
+            discovered = collect_stocks_from_payload(serialized_result)
+            if discovered:
+                merge_known_stocks(db, discovered)
+        except Exception:
+            logger.exception("Failed to merge known Rossko warehouses from search")
+
+        allowed = load_allowed_stock_ids(db)
+        if allowed:
+            filter_search_payload_stocks(serialized_result, allowed)
+
         return serialized_result
 
     except RosskoApiKeysError as error:

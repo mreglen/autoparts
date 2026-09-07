@@ -17,6 +17,7 @@ import {
   selectNewPartsBaskets,
   selectCartQuantityUpdatingIds,
   fetchCart,
+  refreshNewPartsCartDeliveries,
   updateCartItemQuantity,
   updateUsedCartItemQuantity,
   removeFromCart,
@@ -60,13 +61,14 @@ function clientPrice(item, markupPercent) {
   return applyMarkup(checkoutPrice(item), markupPercent);
 }
 
-function DeliveryCell({ deliveryStart, deliveryEnd, deliveryFallback }) {
+function DeliveryCell({ deliveryStart, deliveryEnd, deliveryFallback, warehouseName }) {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (parts) {
     return (
       <div className="text-xs leading-snug text-ink">
         <p className="font-semibold text-ink">{parts.dateLine}</p>
         <p className="text-ink-muted">{parts.timeLine}</p>
+        {warehouseName ? <p className="text-ink-muted">{warehouseName}</p> : null}
       </div>
     );
   }
@@ -167,6 +169,7 @@ function CartTableRow({
             deliveryStart={item.deliveryStart}
             deliveryEnd={item.deliveryEnd}
             deliveryFallback={item.deliveryFallback}
+            warehouseName={item.warehouseName}
           />
         </td>
       ) : null}
@@ -331,8 +334,8 @@ function CartTableBlock({
         </div>
       ) : null}
 
-      <div className="overflow-hidden">
-        <table className="w-full table-fixed border-collapse text-left">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-left">
           <thead>
             <tr className="border-b border-line bg-surface-muted/60 text-xs font-medium uppercase tracking-wide text-ink-muted">
               <th className="w-10 px-2 py-2.5">
@@ -432,7 +435,23 @@ export default function CartPage() {
   const [deliverInPartsByBasket, setDeliverInPartsByBasket] = useState(() => readNewPartsDeliverInPartsMap());
 
   useEffect(() => {
-    dispatch(fetchCart());
+    let cancelled = false;
+    (async () => {
+      try {
+        const cartData = await dispatch(fetchCart()).unwrap();
+        if (cancelled) return;
+        const hasNewParts = Array.isArray(cartData?.new_parts_items) && cartData.new_parts_items.length > 0;
+        if (!hasNewParts) return;
+        // Re-query Rossko and replace each line's delivery with the fastest
+        // current window for the same warehouse (stock_id).
+        await dispatch(refreshNewPartsCartDeliveries());
+      } catch {
+        // fetchCart / refresh errors are handled by slice state
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [dispatch]);
 
   const handleDeliverInPartsChange = useCallback((basketId, checked) => {
@@ -454,6 +473,7 @@ export default function CartPage() {
     deliveryStart: item.delivery_start || null,
     deliveryEnd: item.delivery_end || null,
     deliveryFallback: item.delivery || null,
+    warehouseName: item.warehouse_name || null,
     price: truncateRubles(item.price),
     purchasePrice: truncateRubles(item.purchase_price),
     quantity: item.quantity,
@@ -896,8 +916,6 @@ export default function CartPage() {
           emptyText: basket.is_default
             ? 'Добавьте новые запчасти из каталога или VIN-поиска'
             : `Корзина «${basket.name}» пуста`,
-          canRename: true,
-          onRename: () => openRenameModal(basket),
         });
       }
       return;
@@ -1037,28 +1055,6 @@ export default function CartPage() {
                     key={section.key}
                     className="rounded-sg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-muted"
                   >
-                    {section.title ? (
-                      <div className="mb-3 flex items-center justify-center gap-2 text-base font-semibold text-ink">
-                        <span>{section.title}</span>
-                        {section.canRename && section.onRename ? (
-                          <button
-                            type="button"
-                            onClick={section.onRename}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-muted transition hover:text-brand-600"
-                            aria-label="Переименовать корзину"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                              />
-                            </svg>
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
                     {section.emptyText}
                   </div>
                 );

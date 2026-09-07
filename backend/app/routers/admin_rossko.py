@@ -17,6 +17,9 @@ from app.schemas.rossko_settings import (
     RosskoMarkupSettingsUpdate,
     RosskoSettingsResponse,
     RosskoSettingsUpdate,
+    RosskoWarehousesResponse,
+    RosskoWarehousesUpdate,
+    RosskoWarehouseItem,
 )
 from app.services.audit_service import log_audit
 from app.services.rossko_checkout_details import get_checkout_details_error, normalize_checkout_details
@@ -273,3 +276,120 @@ def admin_put_rossko_markup_settings(
         entity_id=row.id,
     )
     return _markup_settings_to_response(row)
+
+
+@router.get("/warehouses", response_model=RosskoWarehousesResponse)
+def admin_get_rossko_warehouses(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.rossko_stock_filter import load_known_stocks, parse_allowed_stock_ids
+
+    row = get_rossko_settings(db)
+    known = load_known_stocks(db)
+    allowed = parse_allowed_stock_ids(getattr(row, "allowed_stock_ids", None)) or frozenset()
+    warehouses = [
+        RosskoWarehouseItem(
+            id=item["id"],
+            name=item.get("name") or item["id"],
+            allowed=item["id"] in allowed,
+        )
+        for item in known
+    ]
+    return RosskoWarehousesResponse(
+        warehouses=warehouses,
+        allowed_stock_ids=sorted(allowed),
+    )
+
+
+@router.put("/warehouses", response_model=RosskoWarehousesResponse)
+def admin_put_rossko_warehouses(
+    payload: RosskoWarehousesUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    import json
+
+    from app.services.rossko_stock_filter import load_known_stocks, parse_allowed_stock_ids
+
+    allowed_ids = sorted({str(x).strip() for x in (payload.allowed_stock_ids or []) if str(x).strip()})
+    row = update_rossko_settings(
+        db,
+        {"allowed_stock_ids": json.dumps(allowed_ids, ensure_ascii=False) if allowed_ids else None},
+        user_id=current_user.id,
+    )
+    log_audit(
+        db,
+        event_type="rossko_warehouses_updated",
+        category="integrations",
+        summary="Склады Rossko обновлены",
+        user=current_user,
+        details={"allowed_count": len(allowed_ids)},
+        entity_type="rossko_settings",
+        entity_id=row.id,
+    )
+    known = load_known_stocks(db)
+    allowed = parse_allowed_stock_ids(getattr(row, "allowed_stock_ids", None)) or frozenset()
+    warehouses = [
+        RosskoWarehouseItem(
+            id=item["id"],
+            name=item.get("name") or item["id"],
+            allowed=item["id"] in allowed,
+        )
+        for item in known
+    ]
+    return RosskoWarehousesResponse(
+        warehouses=warehouses,
+        allowed_stock_ids=sorted(allowed),
+    )
+
+
+@router.post("/warehouses/discover", response_model=RosskoWarehousesResponse)
+async def admin_discover_rossko_warehouses(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Probe Rossko search to refresh the known warehouses catalog."""
+    from app.routers.rossko_api.rossko_api import rossko_address_id, rossko_delivery_id, rossko_search
+    from app.schemas.rossko import SearchRequest
+    from app.services.rossko_stock_filter import (
+        collect_stocks_from_payload,
+        load_known_stocks,
+        merge_known_stocks,
+        parse_allowed_stock_ids,
+    )
+
+    del current_user
+    probes = ["W712/75", "70-31306-00", "фильтр масляный"]
+    for text in probes:
+        try:
+            data = await rossko_search(
+                SearchRequest(
+                    text=text,
+                    delivery_id=rossko_delivery_id,
+                    address_id=rossko_address_id,
+                ),
+                db,
+            )
+            discovered = collect_stocks_from_payload(data)
+            if discovered:
+                merge_known_stocks(db, discovered)
+        except Exception:
+            continue
+
+    row = get_rossko_settings(db)
+    known = load_known_stocks(db)
+    allowed = parse_allowed_stock_ids(getattr(row, "allowed_stock_ids", None)) or frozenset()
+    warehouses = [
+        RosskoWarehouseItem(
+            id=item["id"],
+            name=item.get("name") or item["id"],
+            allowed=item["id"] in allowed,
+        )
+        for item in known
+    ]
+    return RosskoWarehousesResponse(
+        warehouses=warehouses,
+        allowed_stock_ids=sorted(allowed),
+    )

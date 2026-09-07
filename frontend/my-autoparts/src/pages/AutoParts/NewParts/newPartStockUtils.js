@@ -46,10 +46,11 @@ export function formatCartMoney(price) {
   return formatNewPartMoney(price);
 }
 
-export function formatDeliveryTimeText(deliveryStart, deliveryEnd) {
+export function formatDeliveryTimeText(deliveryStart, deliveryEnd, warehouseName = '') {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (!parts) return '—';
-  return `${parts.dateLine}, ${parts.timeLine}`;
+  const base = `${parts.dateLine}, ${parts.timeLine}`;
+  return warehouseName ? `${base} · ${warehouseName}` : base;
 }
 
 /** Returns { dateLine, timeLine } or null. dateLine = day/month/weekday (or Сегодня/Завтра). */

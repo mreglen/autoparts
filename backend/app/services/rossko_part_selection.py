@@ -213,7 +213,11 @@ def pick_ranked_rossko_parts(
     return picked[: max(1, min(card_limit, extract_cap))]
 
 
-def map_rossko_stocks(part: dict[str, Any]) -> list[dict[str, Any]]:
+def map_rossko_stocks(
+    part: dict[str, Any],
+    *,
+    allowed_stock_ids: frozenset[str] | None = None,
+) -> list[dict[str, Any]]:
     stocks = (part.get("stocks") or {}).get("stock")
     if not stocks:
         return []
@@ -224,6 +228,8 @@ def map_rossko_stocks(part: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         stock_id = _safe_text(stock.get("id"))
         if not stock_id:
+            continue
+        if allowed_stock_ids and stock_id not in allowed_stock_ids:
             continue
         try:
             price = float(stock.get("price") or 0)
@@ -242,6 +248,7 @@ def map_rossko_stocks(part: dict[str, Any]) -> list[dict[str, Any]]:
                 "available_count": available_count,
                 "delivery_start": _safe_text(stock.get("deliveryStart")) or None,
                 "delivery_end": _safe_text(stock.get("deliveryEnd")) or None,
+                "description": _safe_text(stock.get("description")) or None,
             }
         )
     return mapped

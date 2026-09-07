@@ -243,6 +243,20 @@ export const refreshNewPartsCartOffers = createAsyncThunk(
     }
 );
 
+export const refreshNewPartsCartDeliveries = createAsyncThunk(
+    'cart/refreshNewPartsCartDeliveries',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.post('/cart/new-parts/refresh-deliveries');
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка обновления сроков доставки'
+            );
+        }
+    }
+);
+
 export const fetchNewPartsCheckoutConfig = createAsyncThunk(
     'cart/fetchNewPartsCheckoutConfig',
     async (_, { rejectWithValue }) => {
@@ -470,6 +484,13 @@ const cartSlice = createSlice({
                 state.error = action.payload;
             })
             .addCase(refreshNewPartsCartOffers.fulfilled, (state, action) => {
+                if (action.payload) {
+                    state.cart = action.payload;
+                    syncBasketsFromCart(state);
+                    syncSummaryFromCart(state);
+                }
+            })
+            .addCase(refreshNewPartsCartDeliveries.fulfilled, (state, action) => {
                 if (action.payload) {
                     state.cart = action.payload;
                     syncBasketsFromCart(state);

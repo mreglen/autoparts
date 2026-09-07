@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import {
   extractProductDescription,
 } from '../../../utils/productDisplayName';
 import { prefetchNewPartOpenChunk } from '../../../utils/prefetchPartDetail';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
+import { canSeeRosskoWarehouseNames } from '../../../utils/clientMarkupUtils';
 import { isRosskoFastDelivery } from './rosskoHelpers';
 import { useNewPartCartActions } from './useNewPartCartActions';
 import NewPartCartQuantityControl from './NewPartCartQuantityControl';
@@ -34,7 +36,7 @@ const toSafeInt = (value, fallback = 0) => {
 const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 
-const formatDeliveryTimeText = (deliveryStart, deliveryEnd) => {
+const formatDeliveryTimeText = (deliveryStart, deliveryEnd, warehouseName = '') => {
   if (!deliveryStart || !deliveryEnd) return '—';
   try {
     const startDate = new Date(deliveryStart);
@@ -60,7 +62,8 @@ const formatDeliveryTimeText = (deliveryStart, deliveryEnd) => {
 
     const startTime = startDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     const endTime = endDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    return `${dateDisplay}, с ${startTime} до ${endTime}`;
+    const base = `${dateDisplay}, с ${startTime} до ${endTime}`;
+    return warehouseName ? `${base} · ${warehouseName}` : base;
   } catch (_e) {
     return '—';
   }
@@ -75,6 +78,8 @@ function NewPartProductCard({
   hideMobileCartCta = false,
 }) {
   const location = useLocation();
+  const user = useSelector((state) => state.auth.user);
+  const showWarehouseNames = canSeeRosskoWarehouseNames(user);
   const [showDetails, setShowDetails] = useState(false);
 
   const {
@@ -97,6 +102,12 @@ function NewPartProductCard({
 
   const rawName = toSafeText(part?.name, '');
   const title = toSafeText(extractProductDescription(rawName, brand, number) || rawName);
+
+  const warehouseOf = (stock) => (
+    showWarehouseNames
+      ? (stock?.description || stock?.warehouse_name || '')
+      : ''
+  );
 
   if (!mainStock) return null;
 
@@ -160,7 +171,11 @@ function NewPartProductCard({
             </span>
           ) : null}
           <p className="text-xs leading-relaxed text-ink-muted">
-            {formatDeliveryTimeText(mainStock.delivery_start, mainStock.delivery_end)}
+            {formatDeliveryTimeText(
+              mainStock.delivery_start,
+              mainStock.delivery_end,
+              mainStock.description || mainStock.warehouse_name || '',
+            )}
           </p>
           {renderMainCartControl(cartControlClassName)}
         </div>
@@ -188,7 +203,11 @@ function NewPartProductCard({
                             {priceWithMarkup(stock.price)} ₽ · {availableCount} шт.
                           </p>
                           <p className="text-xs text-ink-muted">
-                            {formatDeliveryTimeText(stock.delivery_start, stock.delivery_end)}
+                            {formatDeliveryTimeText(
+                              stock.delivery_start,
+                              stock.delivery_end,
+                              stock.description || stock.warehouse_name || '',
+                            )}
                           </p>
                         </div>
                         <NewPartCartQuantityControl
@@ -274,7 +293,13 @@ function NewPartProductCard({
               <p className="text-sm font-semibold text-ink">{mainAvailableCount} шт.</p>
             </div>
           </div>
-          <p className="mb-3 text-xs leading-relaxed text-ink-muted">{formatDeliveryTimeText(mainStock.delivery_start, mainStock.delivery_end)}</p>
+          <p className="mb-3 text-xs leading-relaxed text-ink-muted">
+            {formatDeliveryTimeText(
+              mainStock.delivery_start,
+              mainStock.delivery_end,
+              mainStock.description || mainStock.warehouse_name || '',
+            )}
+          </p>
           {renderMainCartControl('sm:flex-row sm:items-center sm:justify-between')}
         </div>
       </div>
@@ -300,7 +325,13 @@ function NewPartProductCard({
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="text-sm text-ink-soft">
                         <p className="font-medium text-ink">{priceWithMarkup(stock.price)} ₽ · {availableCount} шт.</p>
-                        <p className="text-xs text-ink-muted">{formatDeliveryTimeText(stock.delivery_start, stock.delivery_end)}</p>
+                        <p className="text-xs text-ink-muted">
+                          {formatDeliveryTimeText(
+                            stock.delivery_start,
+                            stock.delivery_end,
+                            stock.description || stock.warehouse_name || '',
+                          )}
+                        </p>
                       </div>
                       <NewPartCartQuantityControl
                         quantity={quantity}

@@ -4,7 +4,7 @@ import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import ClientMarkupPopover from '../../../components/NewParts/ClientMarkupPopover';
 import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../../redux/slices/ClientMarkupSlice';
-import { canUseClientMarkup, computeClientPrices } from '../../../utils/clientMarkupUtils';
+import { canSeeRosskoWarehouseNames, canUseClientMarkup, computeClientPrices } from '../../../utils/clientMarkupUtils';
 import { canEditClientMarkupSettings } from '../../../utils/autoservicePermissions';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
@@ -98,7 +98,7 @@ function partGroupKey(part) {
   return rosskoPartDedupeKey(part);
 }
 
-function DeliveryCell({ deliveryStart, deliveryEnd }) {
+function DeliveryCell({ deliveryStart, deliveryEnd, warehouseName }) {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (!parts) {
     return <span className="text-xs text-gray-500">—</span>;
@@ -107,6 +107,9 @@ function DeliveryCell({ deliveryStart, deliveryEnd }) {
     <div className="text-xs leading-snug text-gray-900">
       <div className="font-semibold">{parts.dateLine}</div>
       <div className="text-gray-600">{parts.timeLine}</div>
+      {warehouseName ? (
+        <div className="mt-0.5 text-gray-500" title={warehouseName}>{warehouseName}</div>
+      ) : null}
     </div>
   );
 }
@@ -220,6 +223,7 @@ function StockOfferRow({
   siteMarkupPercent,
   clientMarkupPercent,
   showBothPrices,
+  showWarehouseNames = false,
   isSubRow = false,
   warehousesToggle = null,
   onOpenPart = null,
@@ -371,7 +375,15 @@ function StockOfferRow({
         ) : null}
       </td>
       <td className="whitespace-nowrap px-3 py-2">
-        <DeliveryCell deliveryStart={stock.delivery_start} deliveryEnd={stock.delivery_end} />
+        <DeliveryCell
+          deliveryStart={stock.delivery_start}
+          deliveryEnd={stock.delivery_end}
+          warehouseName={
+            showWarehouseNames
+              ? (stock.description || stock.warehouse_name || '')
+              : ''
+          }
+        />
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-800">
         <div>{maxQty} шт.</div>
@@ -405,6 +417,7 @@ function PartOfferGroup({
   siteMarkupPercent,
   clientMarkupPercent,
   showBothPrices,
+  showWarehouseNames = false,
   onOpenPart,
   vinBasketId,
   ensureVinBasket,
@@ -434,6 +447,7 @@ function PartOfferGroup({
         siteMarkupPercent={siteMarkupPercent}
         clientMarkupPercent={clientMarkupPercent}
         showBothPrices={showBothPrices}
+        showWarehouseNames={showWarehouseNames}
         warehousesToggle={warehousesToggle}
         onOpenPart={onOpenPart}
         vinBasketId={vinBasketId}
@@ -452,6 +466,7 @@ function PartOfferGroup({
             siteMarkupPercent={siteMarkupPercent}
             clientMarkupPercent={clientMarkupPercent}
             showBothPrices={showBothPrices}
+            showWarehouseNames={showWarehouseNames}
             isSubRow
             onOpenPart={onOpenPart}
             vinBasketId={vinBasketId}
@@ -471,6 +486,7 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
   const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
   const clientMarkup = useSelector((state) => state.clientMarkup);
   const showStaffMarkup = canUseClientMarkup(user);
+  const showWarehouseNames = canSeeRosskoWarehouseNames(user);
   const canEditMarkupSettings = canEditClientMarkupSettings(user, permissionCodes);
   const clientMarkupPercent = showStaffMarkup ? (Number(clientMarkup.percent) || 0) : 0;
   const showBothPrices = showStaffMarkup && clientMarkup.displayMode === CLIENT_MARKUP_DISPLAY_BOTH;
@@ -507,6 +523,7 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
             siteMarkupPercent={siteMarkupPercent}
             clientMarkupPercent={clientMarkupPercent}
             showBothPrices={showBothPrices}
+            showWarehouseNames={showWarehouseNames}
             onOpenPart={onOpenPart}
             vinBasketId={vinBasketId}
             ensureVinBasket={ensureVinBasket}
@@ -550,6 +567,7 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
               siteMarkupPercent={siteMarkupPercent}
               clientMarkupPercent={clientMarkupPercent}
               showBothPrices={showBothPrices}
+              showWarehouseNames={showWarehouseNames}
               onOpenPart={onOpenPart}
               vinBasketId={vinBasketId}
               ensureVinBasket={ensureVinBasket}

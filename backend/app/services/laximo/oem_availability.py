@@ -109,7 +109,10 @@ def _empty_used() -> dict[str, Any]:
     return {"available": False, "count": 0, "sample_product_id": None}
 
 
-def _lookup_rossko(oem: str) -> dict[str, Any]:
+def _lookup_rossko(
+    oem: str,
+    allowed_stock_ids: frozenset[str] | None = None,
+) -> dict[str, Any]:
     empty = _empty_rossko()
     try:
         key1, key2 = get_rossko_api_keys()
@@ -121,6 +124,10 @@ def _lookup_rossko(oem: str) -> dict[str, Any]:
         }
         raw = _get_search_client().service.GetSearch(**params)
         serialized = serialize_object(raw)
+        if allowed_stock_ids:
+            from app.services.rossko_stock_filter import filter_search_payload_stocks
+
+            filter_search_payload_stocks(serialized, allowed_stock_ids)
         parts = _parse_rossko_parts(serialized)
         if not parts:
             return empty
@@ -153,14 +160,18 @@ def _lookup_rossko(oem: str) -> dict[str, Any]:
         return empty
 
 
-def _lookup_rossko_cached(oem: str) -> dict[str, Any]:
-    key = normalize_partnumber(oem) or oem.strip().upper()
+def _lookup_rossko_cached(
+    oem: str,
+    allowed_stock_ids: frozenset[str] | None = None,
+) -> dict[str, Any]:
+    allow_key = ",".join(sorted(allowed_stock_ids)) if allowed_stock_ids else ""
+    key = f"{normalize_partnumber(oem) or oem.strip().upper()}|{allow_key}"
     now = time.monotonic()
     cached = _rossko_cache.get(key)
     if cached and now - cached[0] < _ROSSKO_CACHE_TTL_SEC:
         return cached[1]
 
-    result = _lookup_rossko(oem)
+    result = _lookup_rossko(oem, allowed_stock_ids)
     _rossko_cache[key] = (now, result)
     if len(_rossko_cache) > _ROSSKO_CACHE_MAX:
         stale_before = now - _ROSSKO_CACHE_TTL_SEC
@@ -170,7 +181,10 @@ def _lookup_rossko_cached(oem: str) -> dict[str, Any]:
     return result
 
 
-def _lookup_rossko_many(oems: list[str]) -> dict[str, dict[str, Any]]:
+def _lookup_rossko_many(
+    oems: list[str],
+    allowed_stock_ids: frozenset[str] | None = None,
+) -> dict[str, dict[str, Any]]:
     if not oems:
         return {}
 
@@ -185,11 +199,13 @@ def _lookup_rossko_many(oems: list[str]) -> dict[str, dict[str, Any]]:
 
     if len(unique) == 1:
         key = normalize_partnumber(unique[0]) or unique[0].strip().upper()
-        return {key: _lookup_rossko_cached(unique[0])}
+        return {key: _lookup_rossko_cached(unique[0], allowed_stock_ids)}
 
     out: dict[str, dict[str, Any]] = {}
     pool = _get_rossko_pool()
-    futures = {pool.submit(_lookup_rossko_cached, oem): oem for oem in unique}
+    futures = {
+        pool.submit(_lookup_rossko_cached, oem, allowed_stock_ids): oem for oem in unique
+    }
     for future in as_completed(futures):
         oem = futures[future]
         key = normalize_partnumber(oem) or oem.strip().upper()
@@ -300,7 +316,9 @@ def _lookup_analogs(db: Session, oem: str) -> dict[str, Any]:
         cross_norm = normalize_partnumber(cross_oem) or cross_oem.upper()
         if cross_norm == source_norm:
             continue
-        rossko = _lookup_rossko(cross_oem)
+        from app.services.rossko_stock_filter import load_allowed_stock_ids
+
+        rossko = _lookup_rossko(cross_oem, load_allowed_stock_ids(db))
         used = _lookup_used(db, cross_oem)
         items.append(
             {
@@ -354,7 +372,10 @@ def lookup_oem_availability(
             "items": [],
         }
 
-    rossko_by_norm = _lookup_rossko_many(cleaned)
+    from app.services.rossko_stock_filter import load_allowed_stock_ids
+
+    allowed_stock_ids = load_allowed_stock_ids(db)
+    rossko_by_norm = _lookup_rossko_many(cleaned, allowed_stock_ids)
     used_by_norm = _lookup_used_many(db, cleaned)
 
     items = []

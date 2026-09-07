@@ -17,6 +17,7 @@ from app.models.client import Client as ClientModel
 from app.models.organization import Organization
 from app.models.product import Product
 from app.models.user import User
+from app.utils.org_access import can_see_rossko_warehouse_names
 from app.schemas.carts import (
     CartItemResponse,
     CartResponse,
@@ -158,7 +159,25 @@ def _apply_new_parts_offer_fields(
     return changed
 
 
-def _new_parts_cart_item_response(cart_item) -> CartItemResponse:
+def _warehouse_name_map(db: Session | None) -> dict[str, str]:
+    if db is None:
+        return {}
+    try:
+        from app.services.rossko_stock_filter import load_known_stocks
+
+        return {row["id"]: row["name"] for row in load_known_stocks(db) if row.get("id")}
+    except Exception:
+        return {}
+
+
+def _new_parts_cart_item_response(
+    cart_item,
+    warehouse_names: dict[str, str] | None = None,
+) -> CartItemResponse:
+    stock_id = getattr(cart_item, "stock_id", None)
+    warehouse_name = None
+    if warehouse_names and stock_id:
+        warehouse_name = warehouse_names.get(str(stock_id).strip())
     return CartItemResponse(
         id=cart_item.id,
         brand=cart_item.brand,
@@ -176,15 +195,20 @@ def _new_parts_cart_item_response(cart_item) -> CartItemResponse:
         supplier_unit_price=float(cart_item.supplier_unit_price)
         if getattr(cart_item, "supplier_unit_price", None) is not None
         else None,
-        stock_id=cart_item.stock_id,
+        stock_id=stock_id,
+        warehouse_name=warehouse_name,
         seller=cart_item.seller,
         created_at=cart_item.created_at,
         basket_id=getattr(cart_item, "basket_id", None),
     )
 
 
-def _build_new_parts_basket_response(basket, items) -> NewPartsBasketResponse:
-    mapped_items = [_new_parts_cart_item_response(item) for item in items]
+def _build_new_parts_basket_response(
+    basket,
+    items,
+    warehouse_names: dict[str, str] | None = None,
+) -> NewPartsBasketResponse:
+    mapped_items = [_new_parts_cart_item_response(item, warehouse_names) for item in items]
     item_count = sum(item.quantity for item in mapped_items)
     total_price = sum((item.price or 0) * item.quantity for item in mapped_items)
     return NewPartsBasketResponse(
@@ -197,7 +221,17 @@ def _build_new_parts_basket_response(basket, items) -> NewPartsBasketResponse:
     )
 
 
+def _warehouse_names_for_user(db: Session | None, user: object | None) -> dict[str, str]:
+    if not can_see_rossko_warehouse_names(db, user):
+        return {}
+    return _warehouse_name_map(db)
+
+
 def _build_user_cart_response(cart, db: Session) -> CartResponse:
+    user = getattr(cart, "user", None)
+    if user is None and getattr(cart, "user_id", None):
+        user = db.query(User).filter(User.id == cart.user_id).first()
+    warehouse_names = _warehouse_names_for_user(db, user)
     baskets = list_user_baskets(db, cart.id, cart.user_id)
     items_by_basket: dict[int, list[NewPartsCart]] = {b.id: [] for b in baskets}
     for item in cart.new_parts_items:
@@ -209,10 +243,14 @@ def _build_user_cart_response(cart, db: Session) -> CartResponse:
                 items_by_basket.setdefault(default_basket.id, []).append(item)
 
     basket_views = [
-        _build_new_parts_basket_response(basket, items_by_basket.get(basket.id, []))
+        _build_new_parts_basket_response(
+            basket, items_by_basket.get(basket.id, []), warehouse_names
+        )
         for basket in baskets
     ]
-    all_new_items = [_new_parts_cart_item_response(i) for i in cart.new_parts_items]
+    all_new_items = [
+        _new_parts_cart_item_response(i, warehouse_names) for i in cart.new_parts_items
+    ]
     return CartResponse(
         id=cart.id,
         user_id=cart.user_id,
@@ -225,6 +263,7 @@ def _build_user_cart_response(cart, db: Session) -> CartResponse:
 
 
 def _build_guest_cart_response(guest_cart, db: Session) -> CartResponse:
+    warehouse_names: dict[str, str] = {}
     baskets = list_guest_baskets(db, guest_cart.id)
     items_by_basket: dict[int, list[GuestNewPartsCart]] = {b.id: [] for b in baskets}
     for item in guest_cart.new_parts_items:
@@ -236,10 +275,14 @@ def _build_guest_cart_response(guest_cart, db: Session) -> CartResponse:
                 items_by_basket.setdefault(default_basket.id, []).append(item)
 
     basket_views = [
-        _build_new_parts_basket_response(basket, items_by_basket.get(basket.id, []))
+        _build_new_parts_basket_response(
+            basket, items_by_basket.get(basket.id, []), warehouse_names
+        )
         for basket in baskets
     ]
-    all_new_items = [_new_parts_cart_item_response(i) for i in guest_cart.new_parts_items]
+    all_new_items = [
+        _new_parts_cart_item_response(i, warehouse_names) for i in guest_cart.new_parts_items
+    ]
     return CartResponse(
         id=guest_cart.id,
         user_id=None,
@@ -339,7 +382,7 @@ async def add_new_parts_to_cart(
             )
             db.commit()
             db.refresh(existing_item)
-            return _new_parts_cart_item_response(existing_item)
+            return _new_parts_cart_item_response(existing_item, _warehouse_names_for_user(db, current_user))
 
         cart_item = NewPartsCart(
             cart_id=cart.id,
@@ -388,7 +431,7 @@ async def add_new_parts_to_cart(
             db.commit()
             touch_guest_cart(db, guest_cart)
             db.refresh(existing_item)
-            return _new_parts_cart_item_response(existing_item)
+            return _new_parts_cart_item_response(existing_item, _warehouse_names_for_user(db, current_user))
 
         cart_item = GuestNewPartsCart(
             guest_cart_id=guest_cart.id,
@@ -414,7 +457,7 @@ async def add_new_parts_to_cart(
     if not current_user:
         touch_guest_cart(db, guest_cart)
 
-    return _new_parts_cart_item_response(cart_item)
+    return _new_parts_cart_item_response(cart_item, _warehouse_names_for_user(db, current_user))
 
 
 @router.post("/new-parts/refresh-offers", response_model=CartResponse)
@@ -529,6 +572,44 @@ def refresh_new_parts_offers(
     if changed_any:
         touch_guest_cart(db, guest_cart)
         db.commit()
+    guest_token = get_guest_token_from_request(request)
+    guest_cart = load_guest_cart_with_items(db, guest_token) if guest_token else guest_cart
+    get_or_create_default_guest_basket(db, guest_cart.id)
+    return _build_guest_cart_response(guest_cart, db)
+
+
+@router.post("/new-parts/refresh-deliveries", response_model=CartResponse)
+async def refresh_new_parts_deliveries(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional),
+):
+    """Re-query Rossko and set each cart line to the fastest delivery of its warehouse."""
+    from app.services.cart_delivery_refresh import (
+        refresh_guest_cart_deliveries,
+        refresh_user_cart_deliveries,
+    )
+
+    if current_user:
+        cart = get_or_create_user_cart(db, current_user.id)
+        await refresh_user_cart_deliveries(db, cart_id=cart.id, user_id=current_user.id)
+        cart = (
+            db.query(Cart)
+            .options(
+                selectinload(Cart.new_parts_items),
+                selectinload(Cart.used_parts_items)
+                .selectinload(UsedPartsCart.product)
+                .selectinload(Product.organization),
+            )
+            .filter(Cart.user_id == current_user.id)
+            .first()
+        )
+        get_or_create_default_user_basket(db, cart.id, current_user.id)
+        return _build_user_cart_response(cart, db)
+
+    guest_cart = get_or_create_guest_cart(db, request, response)
+    await refresh_guest_cart_deliveries(db, guest_cart_id=guest_cart.id)
     guest_token = get_guest_token_from_request(request)
     guest_cart = load_guest_cart_with_items(db, guest_token) if guest_token else guest_cart
     get_or_create_default_guest_basket(db, guest_cart.id)
@@ -752,7 +833,8 @@ def update_new_parts_quantity(
     if not current_user:
         touch_guest_cart(db, guest_cart)
 
-    return _new_parts_cart_item_response(cart_item)
+    return _new_parts_cart_item_response(cart_item, _warehouse_names_for_user(db, current_user))
+
 
 @router.delete("/used-parts/{item_id}", status_code=204)
 def remove_used_parts_from_cart(

@@ -43,7 +43,11 @@ function AnalogMobileCard({ part, markupPercent, onNavigateCreate }) {
   const stocks = mapPartToStocksData(part);
   const minPrice = getMinStockPrice(stocks, markupPercent);
   const delivery = stocks[0]
-    ? formatDeliveryTimeText(stocks[0].delivery_start, stocks[0].delivery_end)
+    ? formatDeliveryTimeText(
+      stocks[0].delivery_start,
+      stocks[0].delivery_end,
+      stocks[0].description || stocks[0].warehouse_name || '',
+    )
     : '—';
   const brand = safeText(part?.brand);
   const article = safeText(part?.partnumber || part?.article);
@@ -106,7 +110,11 @@ function AnalogRow({ part, markupPercent, onNavigateCreate }) {
   const stocks = mapPartToStocksData(part);
   const minPrice = getMinStockPrice(stocks, markupPercent);
   const delivery = stocks[0]
-    ? formatDeliveryTimeText(stocks[0].delivery_start, stocks[0].delivery_end)
+    ? formatDeliveryTimeText(
+      stocks[0].delivery_start,
+      stocks[0].delivery_end,
+      stocks[0].description || stocks[0].warehouse_name || '',
+    )
     : '—';
   const brand = safeText(part?.brand);
   const article = safeText(part?.partnumber || part?.article);

@@ -1648,6 +1648,29 @@ def ensure_rossko_settings_api_key_columns() -> None:
     logger.info("Applied rossko_settings API key columns patch")
 
 
+def ensure_rossko_settings_warehouse_columns() -> None:
+    """Add allowed/known Rossko warehouse columns to rossko_settings."""
+    inspector = inspect(engine)
+    if "rossko_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("rossko_settings")}
+    statements: list[str] = []
+    if "allowed_stock_ids" not in columns:
+        statements.append("ALTER TABLE rossko_settings ADD COLUMN allowed_stock_ids TEXT")
+    if "known_stocks_json" not in columns:
+        statements.append("ALTER TABLE rossko_settings ADD COLUMN known_stocks_json TEXT")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied rossko_settings warehouse columns patch")
+
+
 def ensure_garage_new_order_rossko_columns() -> None:
     """Add Rossko order linkage columns to garage_new_orders."""
     inspector = inspect(engine)
