@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session, selectinload
 
@@ -155,7 +155,7 @@ def _apply_new_parts_offer_fields(
         changed = True
 
     if changed:
-        cart_item.updated_at = datetime.utcnow()
+        cart_item.updated_at = datetime.now(timezone.utc)
     return changed
 
 
@@ -662,7 +662,7 @@ def add_used_parts_to_cart(
         ).first()
         if existing_item:
             existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, max_qty)
-            existing_item.updated_at = datetime.utcnow()
+            existing_item.updated_at = datetime.now(timezone.utc)
             db.commit()
             db.refresh(existing_item)
             return _used_parts_cart_item_response(existing_item, product, db)
@@ -679,7 +679,7 @@ def add_used_parts_to_cart(
         ).first()
         if existing_item:
             existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, max_qty)
-            existing_item.updated_at = datetime.utcnow()
+            existing_item.updated_at = datetime.now(timezone.utc)
             db.commit()
             touch_guest_cart(db, guest_cart)
             db.refresh(existing_item)
@@ -827,7 +827,7 @@ def update_new_parts_quantity(
         )
 
     cart_item.quantity = quantity_data.quantity
-    cart_item.updated_at = datetime.utcnow()
+    cart_item.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(cart_item)
     if not current_user:
@@ -903,7 +903,7 @@ def update_used_parts_quantity(
         )
 
     cart_item.quantity = quantity_data.quantity
-    cart_item.updated_at = datetime.utcnow()
+    cart_item.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(cart_item)
     if not current_user:
@@ -1077,11 +1077,11 @@ def _move_user_new_parts_items(
                 existing_item.delivery_start = cart_item.delivery_start
             if cart_item.delivery_end is not None:
                 existing_item.delivery_end = cart_item.delivery_end
-            existing_item.updated_at = datetime.utcnow()
+            existing_item.updated_at = datetime.now(timezone.utc)
             db.delete(cart_item)
         else:
             cart_item.basket_id = target_basket.id
-            cart_item.updated_at = datetime.utcnow()
+            cart_item.updated_at = datetime.now(timezone.utc)
 
     for source_basket_id in source_basket_ids:
         maybe_delete_empty_non_default_user_basket(db, cart_id, user_id, source_basket_id)
@@ -1140,11 +1140,11 @@ def _move_guest_new_parts_items(
                 existing_item.delivery_start = cart_item.delivery_start
             if cart_item.delivery_end is not None:
                 existing_item.delivery_end = cart_item.delivery_end
-            existing_item.updated_at = datetime.utcnow()
+            existing_item.updated_at = datetime.now(timezone.utc)
             db.delete(cart_item)
         else:
             cart_item.basket_id = target_basket.id
-            cart_item.updated_at = datetime.utcnow()
+            cart_item.updated_at = datetime.now(timezone.utc)
 
     for source_basket_id in source_basket_ids:
         maybe_delete_empty_non_default_guest_basket(db, guest_cart_id, source_basket_id)

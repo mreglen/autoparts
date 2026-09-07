@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -17,7 +18,9 @@ def _safe_text(value: object) -> str:
         return value.strip()
     if isinstance(value, (int, float)):
         return str(value)
-    return ""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value).strip() if value else ""
 
 
 def has_rossko_delivery_window(stock: dict[str, Any]) -> bool:

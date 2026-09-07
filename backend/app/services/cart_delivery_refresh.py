@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -134,7 +134,7 @@ def _apply_delivery(cart_item, offer: dict[str, Any]) -> bool:
         # Prefer structured dates over stale text fallback.
         if cart_item.delivery is not None:
             cart_item.delivery = None
-        cart_item.updated_at = datetime.utcnow()
+        cart_item.updated_at = datetime.now(timezone.utc)
     return changed
 
 
