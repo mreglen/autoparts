@@ -396,8 +396,8 @@ function StockOfferRow({
           showBoth={showBothPrices}
         />
       </td>
-      <td className="whitespace-nowrap px-3 py-2 text-right">
-        <div className="inline-flex flex-col items-end">
+      <td className="whitespace-nowrap px-3 py-2 text-right overflow-visible">
+        <div className="inline-flex flex-col items-end relative z-40">
           <CartQtyControl
           quantity={cartQuantity}
           maxQty={maxQty}
@@ -530,7 +530,7 @@ function OffersTable({ parts, emptyText, onOpenPart, vinBasketId, ensureVinBaske
           />
         ))}
       </div>
-      <div className="hidden md:block -mx-1 overflow-hidden">
+      <div className="hidden md:block -mx-1 overflow-visible">
       <table className="w-full table-fixed border-collapse text-left">
         <colgroup>
           <col style={{ width: '108px' }} />

@@ -58,13 +58,14 @@ export default function NewPartsBasketHoverMenu({
   const closeTimerRef = useRef(null);
 
   const liveBaskets = useMemo(() => {
-    const source = cart?.new_parts_baskets?.length ? cart.new_parts_baskets : baskets;
+    // Only show actual baskets from /cart, not cached baskets from Redux state
+    const source = cart?.new_parts_baskets || [];
     return dedupeBaskets(source).sort((a, b) => {
       if (a.is_default && !b.is_default) return -1;
       if (!a.is_default && b.is_default) return 1;
       return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
     });
-  }, [baskets, cart?.new_parts_baskets]);
+  }, [cart?.new_parts_baskets]);
 
   const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current) {
@@ -78,10 +79,11 @@ export default function NewPartsBasketHoverMenu({
     clearCloseTimer();
     setMenuError('');
     setMenuOpen(true);
-    if (!cart?.new_parts_baskets?.length && !baskets?.length) {
+    // Only fetch cart if we don't have actual baskets from the cart
+    if (!cart?.new_parts_baskets?.length) {
       dispatch(fetchCart());
     }
-  }, [baskets?.length, busy, cart?.new_parts_baskets?.length, clearCloseTimer, disabled, dispatch, showPicker]);
+  }, [busy, cart?.new_parts_baskets?.length, clearCloseTimer, disabled, dispatch, showPicker]);
 
   const scheduleClose = useCallback(() => {
     clearCloseTimer();
@@ -157,7 +159,7 @@ export default function NewPartsBasketHoverMenu({
   return (
     <div
       ref={wrapRef}
-      className={`relative inline-flex ${className}`}
+      className={`relative inline-flex z-50 ${className}`}
       onMouseEnter={showPicker ? openMenu : undefined}
       onMouseLeave={showPicker ? scheduleClose : undefined}
     >
@@ -165,7 +167,7 @@ export default function NewPartsBasketHoverMenu({
         type="button"
         onClick={handleIconClick}
         disabled={isDisabled}
-        className={buttonClassName}
+        className={`${buttonClassName} relative z-50`}
         aria-label={label}
         title={label}
         aria-expanded={showPicker ? menuOpen : undefined}
@@ -177,7 +179,7 @@ export default function NewPartsBasketHoverMenu({
       {showPicker && menuOpen ? (
         <div
           role="menu"
-          className={`absolute ${alignClass} top-full z-40 mt-1 w-56 rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg`}
+          className={`absolute ${alignClass} top-full z-[60] mt-1 w-56 rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg`}
           onMouseEnter={clearCloseTimer}
           onMouseLeave={scheduleClose}
         >
