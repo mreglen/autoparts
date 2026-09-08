@@ -62,7 +62,10 @@ def _fastest_stock_offer(
     """Pick the fastest current delivery window for the given warehouse/stock."""
     target_stock_id = _normalize_stock_id(stock_id)
     if not target_stock_id or not search_data:
+        logger.debug(f"No target_stock_id or search_data for {brand} {partnumber} stock_id={stock_id}")
         return None
+
+    logger.debug(f"Searching for fastest stock offer: {brand} {partnumber} stock_id={target_stock_id}")
 
     # Prefer the best matching part, but always scan all parts/crosses for this stock_id.
     preferred = pick_best_rossko_part(
@@ -84,16 +87,21 @@ def _fastest_stock_offer(
     candidates: list[dict[str, Any]] = []
     for row in parts:
         for stock in map_rossko_stocks(row):
-            if _normalize_stock_id(stock.get("stock_id")) != target_stock_id:
+            current_stock_id = _normalize_stock_id(stock.get("stock_id"))
+            if current_stock_id != target_stock_id:
                 continue
             if not stock.get("delivery_start") and not stock.get("delivery_end"):
                 continue
             candidates.append(stock)
+            logger.debug(f"Found candidate: stock_id={current_stock_id} delivery_start={stock.get('delivery_start')} delivery_end={stock.get('delivery_end')}")
 
     if not candidates:
+        logger.debug(f"No candidates found for {brand} {partnumber} stock_id={target_stock_id}")
         return None
     candidates.sort(key=_delivery_sort_key)
-    return candidates[0]
+    fastest = candidates[0]
+    logger.debug(f"Fastest stock for {brand} {partnumber} stock_id={target_stock_id}: delivery_start={fastest.get('delivery_start')} delivery_end={fastest.get('delivery_end')}")
+    return fastest
 
 
 async def _search_rossko(db: Session, text: str) -> dict[str, Any] | None:
@@ -121,17 +129,20 @@ def _apply_delivery(cart_item, offer: dict[str, Any] | None) -> bool:
         current_start = _parse_dt(getattr(cart_item, "delivery_start", None))
         current_end = _parse_dt(getattr(cart_item, "delivery_end", None))
         changed = False
-        
+
+        logger.debug(f"Marking item as out of stock: {getattr(cart_item, 'brand', '')} {getattr(cart_item, 'partnumber', '')} stock_id={getattr(cart_item, 'stock_id', '')}")
+
         if current_start is not None:
             cart_item.delivery_start = None
             changed = True
         if current_end is not None:
             cart_item.delivery_end = None
             changed = True
-        
+
         if changed:
             cart_item.delivery = "нет в наличии"
             cart_item.updated_at = datetime.now(timezone.utc)
+            logger.info(f"Item marked out of stock: {getattr(cart_item, 'brand', '')} {getattr(cart_item, 'partnumber', '')} stock_id={getattr(cart_item, 'stock_id', '')}")
         return changed
     
     start = _parse_dt(offer.get("delivery_start"))
@@ -188,18 +199,24 @@ async def _refresh_rows(db: Session, rows: list) -> int:
     if not rows:
         return 0
 
+    logger.info(f"Starting delivery refresh for {len(rows)} cart items")
+
     queries: dict[str, list] = {}
     for row in rows:
         brand = str(getattr(row, "brand", "") or "").strip()
         partnumber = str(getattr(row, "partnumber", "") or "").strip()
         stock_id = _normalize_stock_id(getattr(row, "stock_id", ""))
         if not brand or not partnumber or not stock_id:
+            logger.debug(f"Skipping row with missing data: brand={brand} partnumber={partnumber} stock_id={stock_id}")
             continue
         key = partnumber
         queries.setdefault(key, []).append(row)
 
     if not queries:
+        logger.warning("No valid queries to process")
         return 0
+
+    logger.info(f"Processing {len(queries)} unique partnumbers")
 
     search_cache: dict[str, dict[str, Any] | None] = {}
 
@@ -208,15 +225,18 @@ async def _refresh_rows(db: Session, rows: list) -> int:
         if not normalized:
             return None
         if normalized not in search_cache:
+            logger.debug(f"Searching Rossko for: {normalized}")
             search_cache[normalized] = await _search_rossko(db, normalized)
             await asyncio.sleep(0)
         return search_cache[normalized]
 
     updated = 0
     for partnumber, group_rows in queries.items():
+        logger.debug(f"Processing partnumber: {partnumber} with {len(group_rows)} items")
         primary_data = await cached_search(partnumber)
         for row in group_rows:
             brand = str(row.brand or "").strip()
+            logger.debug(f"Processing item: {brand} {partnumber} stock_id={row.stock_id}")
             offer = _fastest_stock_offer(
                 primary_data,
                 brand=brand,
@@ -224,6 +244,7 @@ async def _refresh_rows(db: Session, rows: list) -> int:
                 stock_id=str(row.stock_id or ""),
             )
             if not offer and brand:
+                logger.debug(f"No offer found with primary search, trying alternative: {brand} {partnumber}")
                 alt_data = await cached_search(f"{brand} {partnumber}".strip())
                 offer = _fastest_stock_offer(
                     alt_data,
@@ -251,6 +272,7 @@ async def _refresh_rows(db: Session, rows: list) -> int:
                         row.stock_id,
                     )
 
+    logger.info(f"Delivery refresh completed: {updated} items updated")
     if updated:
         db.commit()
     return updated
