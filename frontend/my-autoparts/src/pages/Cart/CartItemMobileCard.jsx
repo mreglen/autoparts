@@ -5,10 +5,10 @@ function DeliveryCell({ deliveryStart, deliveryEnd, deliveryFallback, warehouseN
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (parts) {
     return (
-      <div className="text-xs leading-snug text-ink">
+      <div className="text-xs leading-tight text-ink">
         <p className="font-medium text-ink">{parts.dateLine}</p>
-        <p className="text-ink-muted">{parts.timeLine}</p>
-        {warehouseName ? <p className="text-ink-muted">{warehouseName}</p> : null}
+        <p className="text-ink-muted text-[11px]">{parts.timeLine}</p>
+        {warehouseName ? <p className="text-ink-muted text-[11px] truncate">{warehouseName}</p> : null}
       </div>
     );
   }
@@ -27,7 +27,7 @@ function QuantityStepper({ quantity, onDecrease, onIncrease, max, disabled = fal
         type="button"
         onClick={onDecrease}
         disabled={disabled || atMin}
-        className="flex h-10 w-10 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
+        className="flex h-9 w-9 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
         aria-label="Уменьшить"
       >
         −
@@ -36,7 +36,7 @@ function QuantityStepper({ quantity, onDecrease, onIncrease, max, disabled = fal
         type="text"
         readOnly
         value={quantity}
-        className="h-10 w-9 border-x border-line bg-surface text-center text-sm font-medium text-ink"
+        className="h-9 w-8 border-x border-line bg-surface text-center text-sm font-medium text-ink"
         aria-label="Количество"
         title={max > 0 ? `Доступно: ${max}` : undefined}
       />
@@ -44,7 +44,7 @@ function QuantityStepper({ quantity, onDecrease, onIncrease, max, disabled = fal
         type="button"
         onClick={onIncrease}
         disabled={disabled || atMax}
-        className="flex h-10 w-10 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
+        className="flex h-9 w-9 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
         aria-label="Увеличить"
         title={atMax ? `Максимум ${max} шт.` : undefined}
       >
@@ -90,20 +90,20 @@ export default function CartItemMobileCard({
             type="checkbox"
             checked={selected}
             onChange={onSelect}
-            className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+            className="h-5 w-5 rounded border-line text-brand-600 focus:ring-brand-500"
             aria-label={`Выбрать ${title}`}
           />
         </label>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">{item.brand || '—'}</p>
               <p className="truncate text-sm font-medium text-brand-600">{item.number || '—'}</p>
             </div>
             <button
               type="button"
               onClick={() => onRemove(item.id)}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:bg-danger-50 hover:text-danger-600"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:bg-danger-50 hover:text-danger-600"
               aria-label="Удалить"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,9 +127,9 @@ export default function CartItemMobileCard({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-end justify-between gap-3 border-t border-line pt-3 pl-6">
-        <div className="min-w-[4.5rem]">
-          <p className="text-[11px] uppercase tracking-wide text-ink-muted">Цена</p>
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-2 border-t border-line pt-3 pl-7">
+        <div className="min-w-[4rem]">
+          <p className="text-[10px] uppercase tracking-wide text-ink-muted">Цена</p>
           <p className="text-sm font-semibold tabular-nums text-brand-600">{formatItemPrice(displayedPrice)}</p>
           {showPurchase ? (
             <p className="text-xs tabular-nums text-ink-muted">{formatItemPrice(basePrice)}</p>
@@ -142,8 +142,8 @@ export default function CartItemMobileCard({
           onDecrease={() => onQuantityChange(item.id, quantity - 1)}
           onIncrease={() => onQuantityChange(item.id, quantity + 1)}
         />
-        <div className="min-w-[4.5rem] text-right">
-          <p className="text-[11px] uppercase tracking-wide text-ink-muted">Сумма</p>
+        <div className="min-w-[4rem] text-right">
+          <p className="text-[10px] uppercase tracking-wide text-ink-muted">Сумма</p>
           <p className="text-sm font-bold tabular-nums text-ink">{formatItemPrice(lineTotal)}</p>
         </div>
       </div>

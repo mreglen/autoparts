@@ -34,7 +34,7 @@ function CartMobileMenu({
       showLabel={false}
       label="Дополнительные действия"
       estimatedMenuHeight={220}
-      buttonClassName="inline-flex h-11 w-11 items-center justify-center rounded-sg border border-line bg-surface text-ink transition hover:bg-surface-muted"
+      buttonClassName="inline-flex h-10 w-10 items-center justify-center rounded-sg border border-line bg-surface text-ink transition hover:bg-surface-muted"
       menuClassName="w-52 z-50"
     >
       {actions.map((action) => (
@@ -92,7 +92,7 @@ function CartMobileBlock({
               <button
                 type="button"
                 onClick={section.onRename}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:text-brand-600"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-muted transition hover:text-brand-600"
                 aria-label="Переименовать корзину"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,7 +113,7 @@ function CartMobileBlock({
 
         <div className="mt-2.5 flex items-center gap-2">
           <Button
-            className="min-h-11 flex-1"
+            className="min-h-10 flex-1 text-sm"
             disabled={offline}
             onClick={someSelected ? section.onCheckoutSelected : section.onCheckout}
           >
@@ -122,7 +122,7 @@ function CartMobileBlock({
               : (section.checkoutLabel || 'Оформить заказ')}
           </Button>
           {section.showClientMarkupControl ? (
-            <div className="flex h-11 items-center">
+            <div className="flex h-10 items-center">
               <ClientMarkupPopover bottomInset={120} readOnly={Boolean(section.clientMarkupReadOnly)} />
             </div>
           ) : null}
@@ -160,7 +160,7 @@ function CartMobileBlock({
             if (el) el.indeterminate = someSelected && !allSelected;
           }}
           onChange={() => onSelectAll(items)}
-          className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+          className="h-5 w-5 rounded border-line text-brand-600 focus:ring-brand-500"
           aria-label={`Выбрать все в ${section.title}`}
         />
         <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">Выбрать все</span>
@@ -221,7 +221,7 @@ export default function CartMobileView({
   }
 
   return (
-    <div className="space-y-4 lg:hidden">
+    <div className="space-y-3 lg:hidden px-3">
       {filled.map((section) => (
         <CartMobileBlock
           key={section.key}
