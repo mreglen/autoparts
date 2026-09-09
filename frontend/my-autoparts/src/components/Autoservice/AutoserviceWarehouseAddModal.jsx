@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
+import NumericInput from '../UI/NumericInput';
 import { apiAxios } from '../../utils/apiClient';
 import AutoserviceReceiptSuggestField from './AutoserviceReceiptSuggestField';
 import { pickBestRosskoPart } from '../../pages/AutoParts/NewParts/rosskoHelpers';
@@ -276,8 +277,8 @@ export default function AutoserviceWarehouseAddModal({
           {!isWarehouseEdit ? (
             <label className="block">
               <span className={labelClass}>Кол-во</span>
-              <input
-                type="number"
+              <NumericInput
+                mode={form.unit === 'pcs' ? 'numeric' : 'decimal'}
                 min={form.unit === 'pcs' ? 1 : 0.001}
                 step={form.unit === 'pcs' ? 1 : 0.001}
                 className={fieldClass}
@@ -304,10 +305,9 @@ export default function AutoserviceWarehouseAddModal({
           {!isWarehouseEdit ? (
             <label className="block">
               <span className={labelClass}>Цена, ₽</span>
-              <input
-                type="number"
+              <NumericInput
+                mode="decimal"
                 min="0"
-                step="0.01"
                 className={fieldClass}
                 value={form.unit_price}
                 onChange={(e) => patch('unit_price', e.target.value)}
@@ -317,10 +317,9 @@ export default function AutoserviceWarehouseAddModal({
           ) : (
             <label className="block">
               <span className={labelClass}>Себестоимость, ₽</span>
-              <input
-                type="number"
+              <NumericInput
+                mode="decimal"
                 min="0"
-                step="0.01"
                 className={fieldClass}
                 value={form.unit_price}
                 onChange={(e) => patch('unit_price', e.target.value)}

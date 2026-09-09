@@ -1,6 +1,7 @@
 import React from 'react';
 import Modal from '../../../components/UI/Modal';
 import Button from '../../../components/UI/Button';
+import NumericInput from '../../../components/UI/NumericInput';
 
 const fieldClass =
   'w-full min-h-11 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm max-md:text-base text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30';
@@ -40,8 +41,7 @@ const StockOutModal = ({
 
     <div className="mb-4">
       <label className="mb-1 block text-sm font-medium text-gray-700">Количество</label>
-      <input
-        type="number"
+      <NumericInput
         min="1"
         max={selectedPart?.quantity}
         value={formData.quantity}
@@ -54,10 +54,8 @@ const StockOutModal = ({
       <>
         <div className="mb-4">
           <label className="mb-1 block text-sm font-medium text-gray-700">Цена продажи, ₽</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
+          <NumericInput
+            mode="decimal"
             value={formData.price}
             onChange={(e) => onFormChange('price', e.target.value)}
             className={fieldClass}

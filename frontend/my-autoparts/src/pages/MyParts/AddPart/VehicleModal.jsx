@@ -13,6 +13,7 @@ import {
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { apiRequest, apiRequestFormData, normalizeImageUrl } from '../../../utils/apiClient';
 import SoftServiceNotice from '../../../components/SoftServiceNotice/SoftServiceNotice';
+import NumericInput from '../../../components/UI/NumericInput';
 import {
   candidateLabel,
   mapCandidateToDismantlingPrefill,
@@ -1561,8 +1562,7 @@ const VehicleModal = ({
                     </div>
                     <div>
                       <div className={detailEditLabel}>Пробег (км)</div>
-                      <input
-                        type="number"
+                      <NumericInput
                         value={detailEdit.mileage}
                         onChange={(e) =>
                           setDetailEdit((prev) => ({ ...prev, mileage: e.target.value }))
@@ -1574,9 +1574,8 @@ const VehicleModal = ({
                     </div>
                     <div className="md:col-span-2">
                       <div className={detailEditLabel}>Цена автомобиля</div>
-                      <input
-                        type="text"
-                        inputMode="decimal"
+                      <NumericInput
+                        mode="decimal"
                         value={detailEdit.price}
                         onChange={(e) =>
                           setDetailEdit((prev) => ({ ...prev, price: e.target.value }))
@@ -2164,8 +2163,7 @@ const VehicleModal = ({
 
                 <div>
                   <div className={createLabel}>Пробег (км)</div>
-                  <input
-                    type="number"
+                  <NumericInput
                     value={create.mileage}
                     onChange={(e) =>
                       setCreate((prev) => ({ ...prev, mileage: e.target.value }))
@@ -2179,9 +2177,8 @@ const VehicleModal = ({
 
                 <div className="md:col-span-2">
                   <div className={createLabel}>Цена автомобиля</div>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <NumericInput
+                    mode="decimal"
                     value={create.price}
                     onChange={(e) => setCreate((prev) => ({ ...prev, price: e.target.value }))}
                     className={createInput}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import NumericInput from '../../components/UI/NumericInput';
 import { createStockIn } from '../../redux/slices/StockInSlice';
 
 export default function StockInQuickModal({
@@ -63,8 +64,7 @@ export default function StockInQuickModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Количество</label>
-            <input
-              type="number"
+            <NumericInput
               min="1"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
@@ -75,10 +75,9 @@ export default function StockInQuickModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Цена закупки, ₽ (необязательно)</label>
-            <input
-              type="number"
+            <NumericInput
+              mode="decimal"
               min="0"
-              step="0.01"
               value={salePrice}
               onChange={(e) => setSalePrice(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-3 text-base"

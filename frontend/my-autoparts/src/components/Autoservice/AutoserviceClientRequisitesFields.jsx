@@ -1,4 +1,4 @@
-import { FieldHint, FieldLabel, Input, Textarea } from '../UI';
+import { FieldHint, FieldLabel, Input, NumericInput, Textarea } from '../UI';
 import { formatEmailInput, handlePhoneInputChange } from '../../utils/contactValidation';
 import {
   CLIENT_PLACEHOLDERS,
@@ -136,11 +136,11 @@ export default function AutoserviceClientRequisitesFields({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <FieldLabel htmlFor={`${idPrefix}-inn`}>ИНН</FieldLabel>
-          <Input
+          <NumericInput
             id={`${idPrefix}-inn`}
-            inputMode="numeric"
+            maxLength={12}
             value={form?.inn || ''}
-            onChange={(e) => setField('inn', e.target.value.replace(/\D/g, '').slice(0, 12))}
+            onChange={(e) => setField('inn', e.target.value)}
             placeholder={CLIENT_PLACEHOLDERS.inn}
             disabled={disabled}
           />
@@ -148,11 +148,11 @@ export default function AutoserviceClientRequisitesFields({
         {personType === 'legal' ? (
           <div>
             <FieldLabel htmlFor={`${idPrefix}-kpp`}>КПП</FieldLabel>
-            <Input
+            <NumericInput
               id={`${idPrefix}-kpp`}
-              inputMode="numeric"
+              maxLength={9}
               value={form?.kpp || ''}
-              onChange={(e) => setField('kpp', e.target.value.replace(/\D/g, '').slice(0, 9))}
+              onChange={(e) => setField('kpp', e.target.value)}
               placeholder={CLIENT_PLACEHOLDERS.kpp}
               disabled={disabled}
             />
@@ -161,11 +161,11 @@ export default function AutoserviceClientRequisitesFields({
         {personType === 'legal' ? (
           <div>
             <FieldLabel htmlFor={`${idPrefix}-ogrn`}>ОГРН</FieldLabel>
-            <Input
+            <NumericInput
               id={`${idPrefix}-ogrn`}
-              inputMode="numeric"
+              maxLength={13}
               value={form?.ogrn || ''}
-              onChange={(e) => setField('ogrn', e.target.value.replace(/\D/g, '').slice(0, 13))}
+              onChange={(e) => setField('ogrn', e.target.value)}
               placeholder={CLIENT_PLACEHOLDERS.ogrn}
               disabled={disabled}
             />
@@ -174,11 +174,11 @@ export default function AutoserviceClientRequisitesFields({
         {personType === 'ie' ? (
           <div>
             <FieldLabel htmlFor={`${idPrefix}-ogrn`}>ОГРНИП</FieldLabel>
-            <Input
+            <NumericInput
               id={`${idPrefix}-ogrn`}
-              inputMode="numeric"
+              maxLength={15}
               value={form?.ogrn || ''}
-              onChange={(e) => setField('ogrn', e.target.value.replace(/\D/g, '').slice(0, 15))}
+              onChange={(e) => setField('ogrn', e.target.value)}
               placeholder={CLIENT_PLACEHOLDERS.ogrnip}
               disabled={disabled}
             />

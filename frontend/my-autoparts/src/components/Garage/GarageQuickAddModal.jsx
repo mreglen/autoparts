@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import MobileFormField from '../MobileFormField/MobileFormField';
 import SoftServiceNotice from '../SoftServiceNotice/SoftServiceNotice';
+import NumericInput from '../UI/NumericInput';
 import { apiRequest } from '../../utils/apiClient';
 import {
   candidateLabel,
@@ -124,9 +125,8 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <MobileFormField label="Год" htmlFor="garage-add-year">
-          <input
+          <NumericInput
             id="garage-add-year"
-            type="number"
             className={formInputClass}
             value={form.year}
             onChange={(event) => setForm((prev) => ({ ...prev, year: event.target.value }))}

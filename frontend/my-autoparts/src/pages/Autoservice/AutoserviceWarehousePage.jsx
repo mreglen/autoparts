@@ -9,7 +9,7 @@ import AutoserviceLiveSearchField from '../../components/Autoservice/Autoservice
 import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
-import { Skeleton, UnderlineTabs } from '../../components/UI';
+import { NumericInput, Skeleton, UnderlineTabs } from '../../components/UI';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import AutoserviceWarehouseReturnModal from '../../components/Autoservice/AutoserviceWarehouseReturnModal';
@@ -796,8 +796,7 @@ export default function AutoserviceWarehousePage() {
             <p className="text-sm text-gray-700">{autoserviceWarehouseItemLabel(writeOffItem)}</p>
             <label className="block text-sm">
               <span className="font-medium text-gray-700">Количество</span>
-              <input
-                type="number"
+              <NumericInput
                 min="1"
                 max={writeOffItem.available_qty || 1}
                 value={writeOffQty}
@@ -845,8 +844,7 @@ export default function AutoserviceWarehousePage() {
             <p className="text-sm text-gray-700">{autoserviceWarehouseItemLabel(orderQtyItem)}</p>
             <label className="block text-sm">
               <span className="font-medium text-gray-700">Количество</span>
-              <input
-                type="number"
+              <NumericInput
                 min="1"
                 max={orderQtyItem.available_qty || 1}
                 value={orderQty}

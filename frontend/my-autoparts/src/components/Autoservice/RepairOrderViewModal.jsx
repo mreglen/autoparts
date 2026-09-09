@@ -3,7 +3,7 @@ import Modal from '../UI/Modal';
 import { ActionsDropdownItem } from '../ActionsDropdown/ActionsDropdown';
 import { formatServerDateTime, formatServerDate } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
-import { Skeleton } from '../UI';
+import { NumericInput, Skeleton } from '../UI';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 import {
   formatShopPartQty,
@@ -214,10 +214,9 @@ function PaymentWizard({
 
         <label className="block text-xs font-medium text-gray-700">
           Сумма, ₽
-          <input
-            type="number"
+          <NumericInput
+            mode="decimal"
             min="0.01"
-            step="0.01"
             max={remaining}
             value={amount}
             onChange={(e) => onAmountChange(e.target.value)}

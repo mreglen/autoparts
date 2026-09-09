@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Button from '../UI/Button';
+import NumericInput from '../UI/NumericInput';
 import {
   applyClientMarkupSettings,
   CLIENT_MARKUP_DISPLAY_BOTH,
@@ -142,11 +143,9 @@ export default function ClientMarkupPopover({ onApply, bottomInset = 0, readOnly
           <label className="block text-sm">
             <span className="font-medium text-ink-soft">Наценка, %</span>
             <div className="relative mt-1">
-              <input
-                type="number"
+              <NumericInput
                 min="0"
                 max="500"
-                step="1"
                 value={percent}
                 onChange={(e) => setPercent(e.target.value)}
                 disabled={readOnly}

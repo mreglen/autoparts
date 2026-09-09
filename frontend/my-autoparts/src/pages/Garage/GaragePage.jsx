@@ -6,6 +6,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
+import NumericInput from '../../components/UI/NumericInput';
 import { apiRequest } from '../../utils/apiClient';
 import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
@@ -131,8 +132,7 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="block text-sm font-medium text-gray-700">Год</label>
-          <input
-            type="number"
+          <NumericInput
             className={inputClass}
             value={form.year}
             onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}

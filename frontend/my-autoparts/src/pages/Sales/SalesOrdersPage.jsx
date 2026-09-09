@@ -18,7 +18,7 @@ import {
   warehousePillControlClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
-import { Skeleton, SkeletonHeaderStats, SkeletonListCards } from '../../components/UI';
+import { NumericInput, Skeleton, SkeletonHeaderStats, SkeletonListCards } from '../../components/UI';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
 import {
   getAvitoBuyerAndDelivery,
@@ -1522,9 +1522,8 @@ export default function SalesOrdersPage() {
           <label className="mt-3 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-booking">
             Срок бронирования (дни)
           </label>
-          <input
+          <NumericInput
             id="cnc-prepare-booking"
-            type="number"
             min="1"
             value={cncPrepareModal.bookingPeriod}
             onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, bookingPeriod: e.target.value, error: '' }))}

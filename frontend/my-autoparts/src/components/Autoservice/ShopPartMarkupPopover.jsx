@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import NumericInput from '../UI/NumericInput';
 
 const PANEL_WIDTH = 240;
 const PANEL_GAP = 8;
@@ -82,10 +83,9 @@ export default function ShopPartMarkupPopover({ value, onApply, floorRubles = fa
             style={panelStyle}
           >
             <p className="text-xs font-semibold text-ink">Наценка для клиента, %</p>
-            <input
-              type="number"
+            <NumericInput
+              mode="decimal"
               min={0}
-              step="0.01"
               className={fieldClass}
               value={percent}
               onChange={(e) => setPercent(e.target.value)}

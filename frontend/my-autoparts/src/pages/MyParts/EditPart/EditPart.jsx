@@ -16,6 +16,7 @@ import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoading
 import { INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../../utils/internalCode';
 import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
 import MobileStickyFooter from '../../../components/MobileStickyFooter/MobileStickyFooter';
+import NumericInput from '../../../components/UI/NumericInput';
 import {
   hasPartFormErrors,
   partFieldClass,
@@ -1558,9 +1559,8 @@ const EditPart = () => {
         {/* Количество */}
         <div data-part-field="quantity">
           <label className={partFieldLabelClass(showFieldError('quantity'))}>Количество *</label>
-          <input
+          <NumericInput
             name="quantity"
-            type="number"
             min="0"
             value={formData.quantity}
             onChange={handleInputChange}
@@ -1571,10 +1571,9 @@ const EditPart = () => {
         {/* Цена продажи */}
         <div data-part-field="sale_price">
           <label className={partFieldLabelClass(showFieldError('sale_price'))}>Цена продажи (₽) *</label>
-          <input
+          <NumericInput
             name="sale_price"
-            type="number"
-            step="0.01"
+            mode="decimal"
             min="0"
             value={formData.sale_price}
             onChange={handleInputChange}

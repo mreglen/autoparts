@@ -7,6 +7,7 @@ export { default as SectionHeader, PageHeader } from './SectionHeader';
 export { default as Skeleton, SkeletonCard, SkeletonHeaderStats, SkeletonListCard, SkeletonListCards } from './Skeleton';
 export { default as DataTable, ResponsiveList } from './DataTable';
 export { default as UnderlineTabs } from './UnderlineTabs';
+export { default as NumericInput } from './NumericInput';
 export {
   Input,
   Select,

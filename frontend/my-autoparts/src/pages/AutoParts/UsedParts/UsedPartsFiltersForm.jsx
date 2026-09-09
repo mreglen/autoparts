@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import { trackFormField } from '../../../utils/siteAnalytics';
+import NumericInput from '../../../components/UI/NumericInput';
 import {
   usedDraftFromSearchParams,
   usedDraftHasActiveFilters,
@@ -319,15 +320,15 @@ function UsedPartsFiltersForm({
       <div className="space-y-2">
         <p className={autopartsFilterSectionTitleClass}>Цена, ₽</p>
         <div className="grid grid-cols-2 gap-2">
-          <input
-            type="number"
+          <NumericInput
+            mode="decimal"
             placeholder="От"
             value={activeFilters.priceMin}
             onChange={(e) => setFilter('vmin', e.target.value || null)}
             className={autopartsFilterPriceInputClass}
           />
-          <input
-            type="number"
+          <NumericInput
+            mode="decimal"
             placeholder="До"
             value={activeFilters.priceMax}
             onChange={(e) => setFilter('vmax', e.target.value || null)}

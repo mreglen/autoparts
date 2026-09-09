@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import LabelStorageCellsPreview from '../../components/LabelPrint/LabelStorageCellsPreview';
+import NumericInput from '../../components/UI/NumericInput';
 import {
   warehousePillControlClass,
   warehousePrimaryButtonClass,
@@ -292,10 +293,8 @@ export default function LabelPrintSection() {
 
         <label className="block min-w-0">
           <span className="mb-1.5 block text-xs font-medium text-gray-500">Ширина, мм</span>
-          <input
-            type="number"
+          <NumericInput
             min={10}
-            step={1}
             value={widthMm}
             onChange={(e) => setWidthMm(e.target.value)}
             disabled={!isDirector || !selectedPrinterId}
@@ -305,10 +304,8 @@ export default function LabelPrintSection() {
 
         <label className="block min-w-0">
           <span className="mb-1.5 block text-xs font-medium text-gray-500">Высота, мм</span>
-          <input
-            type="number"
+          <NumericInput
             min={10}
-            step={1}
             value={heightMm}
             onChange={(e) => setHeightMm(e.target.value)}
             disabled={!isDirector || !selectedPrinterId}

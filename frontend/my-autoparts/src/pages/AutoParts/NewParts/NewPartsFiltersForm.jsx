@@ -5,6 +5,7 @@ import { selectRosskoItems } from '../../../redux/slices/RosskoSlice';
 import { trackFormField } from '../../../utils/siteAnalytics';
 import { NEW_SORT_OPTIONS, getNewUiSort } from '../../../utils/autopartsPublic';
 import SortFilterSection from '../../../components/Autoparts/SortFilterSection';
+import NumericInput from '../../../components/UI/NumericInput';
 
 const COLLAPSED_FILTER_LIMIT = 3;
 
@@ -152,15 +153,15 @@ export default function NewPartsFiltersForm({ updateNewPartsUrl, showClearInPane
         )}
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <input
-          type="number"
+        <NumericInput
+          mode="decimal"
           placeholder="Цена от"
           value={priceMin}
           onChange={(e) => setFilter('vmin', e.target.value || null)}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
         />
-        <input
-          type="number"
+        <NumericInput
+          mode="decimal"
           placeholder="Цена до"
           value={priceMax}
           onChange={(e) => setFilter('vmax', e.target.value || null)}

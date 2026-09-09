@@ -18,6 +18,7 @@ import { sanitizeVinInput } from '../../utils/laximoVin';
 import { normalizePlate } from '../../utils/laximoPlate';
 import { detectVehicleLookupKind, formatVehicleLookupInput } from '../../utils/vehicleLookupKind';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
+import NumericInput from '../../components/UI/NumericInput';
 import {
   warehousePageClass,
   warehousePillControlClass,
@@ -283,11 +284,11 @@ export default function DismantlingVehicleAddForm() {
           </label>
           <label>
             <span className="mb-1.5 block text-xs font-medium text-gray-500">Пробег, км</span>
-            <input type="number" min="0" value={form.mileage} onChange={(event) => update('mileage', event.target.value)} className={warehousePillControlClass} />
+            <NumericInput min="0" value={form.mileage} onChange={(event) => update('mileage', event.target.value)} className={warehousePillControlClass} />
           </label>
           <label>
             <span className="mb-1.5 block text-xs font-medium text-gray-500">Цена, ₽</span>
-            <input type="number" min="0" step="0.01" value={form.price} onChange={(event) => update('price', event.target.value)} className={warehousePillControlClass} />
+            <NumericInput mode="decimal" min="0" value={form.price} onChange={(event) => update('price', event.target.value)} className={warehousePillControlClass} />
           </label>
           <label>
             <span className="mb-1.5 block text-xs font-medium text-gray-500">Фото</span>

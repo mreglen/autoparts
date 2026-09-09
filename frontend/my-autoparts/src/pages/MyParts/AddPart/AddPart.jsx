@@ -25,6 +25,7 @@ import {
 } from '../../../redux/slices/PendingProductStorageCellsSlice';
 import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
 import { normalizeImageUrl, apiRequest, apiRequestFormData, apiAxios } from '../../../utils/apiClient';
+import NumericInput from '../../../components/UI/NumericInput';
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import { usePermissionCodes } from '../../../hooks/useWarehousePermissions';
 import { resolvePathFromLabelResolve } from '../../../utils/resolveProductQrScan';
@@ -1850,9 +1851,8 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         {/* Количество */}
         <div data-part-field="quantity">
           <label className={partFieldLabelClass(showFieldError('quantity'))}>Количество *</label>
-          <input
+          <NumericInput
             name="quantity"
-            type="number"
             min="0"
             value={formData.quantity}
             onChange={handleInputChange}
@@ -1863,10 +1863,9 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         {/* Цена продажи */}
         <div data-part-field="sale_price">
           <label className={partFieldLabelClass(showFieldError('sale_price'))}>Цена продажи (₽) *</label>
-          <input
+          <NumericInput
             name="sale_price"
-            type="number"
-            step="0.01"
+            mode="decimal"
             min="0"
             value={formData.sale_price}
             onChange={handleInputChange}

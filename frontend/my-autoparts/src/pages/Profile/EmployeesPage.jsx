@@ -17,6 +17,7 @@ import {
   FieldLabel,
   Input,
   Modal,
+  NumericInput,
   PageHeader,
   Select,
   SkeletonListCards,
@@ -190,9 +191,9 @@ function EmployeeFormFields({ formData, errors, onChange, showAutoserviceToggle 
             <FieldLabel htmlFor="emp-salary-value">
               {formData.salary_type === 'fixed' ? 'Сумма, ₽' : 'Процент, %'}
             </FieldLabel>
-            <Input
+            <NumericInput
               id="emp-salary-value"
-              type="number"
+              mode={formData.salary_type === 'fixed' ? 'decimal' : 'numeric'}
               min={0}
               max={formData.salary_type === 'percent_work' ? 100 : undefined}
               name={formData.salary_type === 'fixed' ? 'salary_amount' : 'work_percent'}

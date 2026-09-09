@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { apiAxios, apiRequestFormData, normalizeImageUrl } from '../../utils/apiClient';
 import { createStockIn } from '../../redux/slices/StockInSlice';
 import { updateProduct, updatePendingProduct } from '../../redux/slices/ProductSlice';
+import NumericInput from '../UI/NumericInput';
 
 function CloseIcon({ className = 'h-5 w-5' }) {
   return (
@@ -649,11 +650,9 @@ export default function ArticleMatchesModal({
                     <p className="text-sm font-semibold text-gray-900">Редактирование</p>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-gray-600">Количество *</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
+                      <NumericInput
                         value={editQty}
-                        onChange={(e) => setEditQty(e.target.value.replace(/[^\d]/g, ''))}
+                        onChange={(e) => setEditQty(e.target.value)}
                         className={`w-full rounded-xl border px-3 py-2.5 text-sm ${
                           editQty === '' || !editQtyValid ? 'border-red-400 bg-red-50' : 'border-gray-200'
                         }`}
@@ -661,11 +660,10 @@ export default function ArticleMatchesModal({
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-gray-600">Цена</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
+                      <NumericInput
+                        mode="decimal"
                         value={editPrice}
-                        onChange={(e) => setEditPrice(e.target.value.replace(/[^\d.]/g, ''))}
+                        onChange={(e) => setEditPrice(e.target.value)}
                         className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
                       />
                     </div>
