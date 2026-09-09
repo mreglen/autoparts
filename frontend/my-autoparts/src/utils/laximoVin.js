@@ -49,6 +49,22 @@ function looksLikePartNumber(norm) {
 
   if (length < VIN_MAX_LENGTH) {
     if (letters < SHORT_VIN_MIN_LETTERS) return true;
+
+    // Accept short Japanese frame numbers like KGC100075792 (3+ letters
+    // followed by digits whose serial part does not start with 0), while
+    // still rejecting typical catalog numbers that use a leading zero
+    // (e.g. VAG059198405).
+    let leadingLetters = 0;
+    while (leadingLetters < length && /[A-Z]/.test(norm[leadingLetters])) {
+      leadingLetters += 1;
+    }
+    if (leadingLetters >= SHORT_VIN_MIN_LETTERS && leadingLetters < length) {
+      const rest = norm.slice(leadingLetters);
+      if (/^\d+$/.test(rest) && rest[0] !== '0') {
+        return false;
+      }
+    }
+
     const total = letters + digits;
     if (total > 0 && digits / total >= SHORT_VIN_MAX_DIGIT_RATIO) return true;
   }

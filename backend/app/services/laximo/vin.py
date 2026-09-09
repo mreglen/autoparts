@@ -58,7 +58,12 @@ def _letter_and_digit_stats(norm: str) -> tuple[int, int]:
 
 
 def _looks_like_part_number(norm: str) -> bool:
-    """Reject strings that resemble long catalog numbers rather than VIN/chassis."""
+    """Reject strings that resemble long catalog numbers rather than VIN/chassis.
+
+    Accepts short Japanese frame numbers like KGC100075792 (3+ letters followed by
+    digits whose serial part does not start with 0), while still rejecting typical
+    catalog numbers that use a leading zero (e.g. VAG059198405).
+    """
     length = len(norm)
     if length < VIN_MIN_LENGTH:
         return True
@@ -70,6 +75,15 @@ def _looks_like_part_number(norm: str) -> bool:
     if length < VIN_MAX_LENGTH:
         if letters < _SHORT_VIN_MIN_LETTERS:
             return True
+
+        leading_letters = 0
+        while leading_letters < length and norm[leading_letters].isalpha():
+            leading_letters += 1
+        if leading_letters >= _SHORT_VIN_MIN_LETTERS and leading_letters < length:
+            rest = norm[leading_letters:]
+            if rest.isdigit() and rest[0] != "0":
+                return False
+
         total = letters + digits
         if total > 0 and digits / total >= _SHORT_VIN_MAX_DIGIT_RATIO:
             return True

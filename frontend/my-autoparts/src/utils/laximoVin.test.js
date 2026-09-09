@@ -37,4 +37,14 @@ describe('laximoVin', () => {
     expect(normalizeVinForLookupOrNull('IFMDU75W74ZA42366')).toBe('1FMDU75W74ZA42366');
     expect(normalizeGarageVinOrNull('IFMDU75W74ZA42366')).toBe('1FMDU75W74ZA42366');
   });
+
+  it('accepts short Japanese frame numbers like KGC100075792', () => {
+    expect(looksLikeVin('KGC100075792')).toBe(true);
+    expect(normalizeVinOrNull('kgc100075792')).toBe('KGC100075792');
+    expect(normalizeVinForSearchOrNull('KGC100075792')).toBe('KGC100075792');
+    expect(normalizeVinForLookupOrNull('KGC100075792')).toBe('KGC100075792');
+    expect(normalizeGarageVinOrNull('KGC100075792')).toBe('KGC100075792');
+    // Leading-zero article-like numbers should still be rejected.
+    expect(normalizeVinForSearchOrNull('VAG059198405')).toBeNull();
+  });
 });

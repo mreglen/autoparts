@@ -67,6 +67,33 @@ class LooksLikeVinTests(unittest.TestCase):
             "1FMDU75W74ZA42366",
         )
 
+    def test_short_japanese_vin_accepted(self):
+        # Short frame numbers like KGC100075792 should be treated as VIN/chassis.
+        self.assertTrue(looks_like_vin("KGC100075792"))
+        self.assertEqual(normalize_vin_or_none("kgc100075792"), "KGC100075792")
+
+    def test_short_japanese_vin_in_search_and_garage(self):
+        from app.services.laximo.vin import (
+            normalize_garage_vin_or_raise,
+            normalize_vin_for_lookup_or_raise,
+            normalize_vin_for_search_or_none,
+        )
+
+        self.assertEqual(
+            normalize_vin_for_search_or_none("KGC100075792"),
+            "KGC100075792",
+        )
+        self.assertEqual(
+            normalize_vin_for_lookup_or_raise("KGC100075792"),
+            "KGC100075792",
+        )
+        self.assertEqual(
+            normalize_garage_vin_or_raise("KGC100075792"),
+            "KGC100075792",
+        )
+        # Typical article-like number with leading zero is still rejected.
+        self.assertIsNone(normalize_vin_for_search_or_none("VAG059198405"))
+
     def test_spaces_and_dashes(self):
         self.assertEqual(
             normalize_vin_or_none("WBA 3A5C58-CF123456"),
