@@ -1,0 +1,28 @@
+name: Local AI Config
+version: 1.0.0
+schema: v1
+
+models:
+  - name: Qwen 2.5 Coder 14B
+    provider: ollama
+    model: qwen2.5-coder:14b
+    systemMessage: "Always adhere to the architectural rules, code style, and constraints defined in AGENTS.md located in the project root."
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: qwen2.5-coder 7b
+    provider: ollama
+    model: qwen2.5-coder:7b
+    systemMessage: "Always adhere to the architectural rules, code style, and constraints defined in AGENTS.md located in the project root."
+    roles:
+      - autocomplete
+      - chat
+
+defaultCompletionOptions:
+  contextLength: 16384
+  maxTokens: 2048
+
+capabilities:
+  - tool_use
