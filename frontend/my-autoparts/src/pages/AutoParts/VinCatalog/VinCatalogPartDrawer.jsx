@@ -31,26 +31,58 @@ function ShowMoreButton({ total, expanded, onToggle }) {
   );
 }
 
-function productImage(p) {
-  if (!p) return null;
-  if (p.main_photo) return p.main_photo;
-  if (p.image) return p.image;
-  if (p.photo) return p.photo;
+function productImages(p) {
+  if (!p) return [];
+  if (p.main_photo) return [p.main_photo];
+  if (p.image) return [p.image];
+  if (p.photo) return [p.photo];
   const photos = p.photos;
   if (Array.isArray(photos) && photos.length) {
-    const first = photos[0];
-    if (typeof first === 'string') return first;
+    return photos
+      .map((photo) => {
+        if (typeof photo === 'string') return photo;
+        return (
+          photo?.list_photo_url ||
+          photo?.thumb_url ||
+          photo?.full_url ||
+          photo?.photo_url ||
+          photo?.url ||
+          photo?.image ||
+          null
+        );
+      })
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function UsedProductImageGallery({ images }) {
+  if (!images || !images.length) {
+    return <span className="text-[10px] text-gray-400">Нет фото</span>;
+  }
+  if (images.length === 1) {
     return (
-      first?.list_photo_url ||
-      first?.thumb_url ||
-      first?.full_url ||
-      first?.photo_url ||
-      first?.url ||
-      first?.image ||
-      null
+      <img
+        src={images[0]}
+        alt=""
+        className="h-full w-full object-cover"
+        loading="lazy"
+      />
     );
   }
-  return null;
+  return (
+    <div className="grid h-full w-full grid-cols-2">
+      <img src={images[0]} alt="" className="h-full w-full object-cover" loading="lazy" />
+      <div className="relative h-full w-full">
+        <img src={images[1]} alt="" className="h-full w-full object-cover" loading="lazy" />
+        {images.length > 2 ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-medium text-white">
+            +{images.length - 2}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function formatPrice(value) {
@@ -301,7 +333,7 @@ export default function VinCatalogPartDrawer({
                 <>
                   <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
                     {previewItems(usedItems, usedExpanded).map((p) => {
-                      const img = productImage(p);
+                      const images = productImages(p);
                       const href = buildPartDetailPath(p);
                       const price = p.price ?? p.min_price;
                       return (
@@ -312,12 +344,8 @@ export default function VinCatalogPartDrawer({
                           rel="noopener noreferrer"
                           className="overflow-hidden rounded-md border border-gray-200 transition hover:border-indigo-300"
                         >
-                          <div className="flex aspect-[4/3] items-center justify-center bg-gray-50">
-                            {img ? (
-                              <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
-                            ) : (
-                              <span className="text-[10px] text-gray-400">Нет фото</span>
-                            )}
+                          <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gray-50">
+                            <UsedProductImageGallery images={images} />
                           </div>
                           <div className="p-1.5">
                             <p className="truncate text-[11px] leading-tight text-gray-700">

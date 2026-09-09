@@ -256,6 +256,7 @@ def normalize_category(row: dict[str, Any]) -> dict[str, Any]:
         ),
         "ssd": _str_or_none(_pick(row, "ssd")),
         "has_children": _boolish(_pick(row, "childrens", "children", "hasChildren")),
+        "image_url": _pick_unit_image(row),
     }
 
 
@@ -320,6 +321,7 @@ def normalize_quick_group(row: dict[str, Any]) -> dict[str, Any]:
         "link": _boolish(_pick(row, "link")),
         "parent_id": _str_or_none(_pick(row, "parentId", "parentid", "parent_id")),
         "synonyms": _str_or_none(_pick(row, "synonyms")),
+        "image_url": _pick_unit_image(row),
     }
 
 
@@ -655,6 +657,7 @@ def get_categories(
         snapshot_key=snap_key,
         snapshot_catalog=c,
         snapshot_vehicle_id=v,
+        materialize_images=True,
     )
 
 
@@ -898,6 +901,7 @@ def get_quick_groups(
         snapshot_key=snap_key,
         snapshot_catalog=c,
         snapshot_vehicle_id=v,
+        materialize_images=True,
     )
 
 

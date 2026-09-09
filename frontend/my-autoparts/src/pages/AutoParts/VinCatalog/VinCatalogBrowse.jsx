@@ -26,6 +26,7 @@ function buildQuickTree(groups) {
         raw: g,
         hasChildren: kids.length > 0 || g.link === false,
         children: kids,
+        imageUrl: g.image_url || null,
       };
     });
   let roots = walk('');
@@ -37,6 +38,7 @@ function buildQuickTree(groups) {
       raw: g,
       hasChildren: g.link === false,
       children: [],
+      imageUrl: g.image_url || null,
     }));
   }
 
@@ -60,6 +62,7 @@ function categoriesToNodes(cats) {
     raw: c,
     hasChildren: Boolean(c.has_children),
     children: undefined,
+    imageUrl: c.image_url || null,
   }));
 }
 
