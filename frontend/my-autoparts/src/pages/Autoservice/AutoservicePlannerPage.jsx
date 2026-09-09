@@ -6,10 +6,9 @@ import RepairOrderViewModal, { OrderStatusBadge } from '../../components/Autoser
 import PlannerCreateChoiceModal from '../../components/Autoservice/PlannerCreateChoiceModal';
 import PlannerCellContextMenu from '../../components/Autoservice/PlannerCellContextMenu';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
-import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
-import { formatServerDate } from '../../utils/serverDate';
+import { toDateInputValue } from '../../utils/serverDate';
 import {
   addDays,
   getWeekStart,
@@ -611,52 +610,26 @@ export default function AutoservicePlannerPage() {
         }}
       />
 
-      <Modal
+      <InspectionBookingAddModal
         open={Boolean(viewInspection)}
         onClose={() => setViewInspection(null)}
-        title="Запись на осмотр"
-        size="sm"
-        footer={
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setViewInspection(null)}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              Закрыть
-            </button>
-          </div>
+        initialBooking={
+          viewInspection
+            ? {
+                id: viewInspection.id,
+                name: viewInspection.client_name,
+                phone: viewInspection.client_phone,
+                preferred_date: toDateInputValue(viewInspection.scheduled_at),
+                notes: viewInspection.notes,
+                vehicle: viewInspection.vehicle,
+              }
+            : null
         }
-      >
-        {viewInspection ? (
-          <div className="space-y-3 text-sm text-gray-700">
-            <p>
-              <span className="font-medium text-gray-900">Клиент:</span>{' '}
-              {viewInspection.client_name || '—'}
-            </p>
-            <p>
-              <span className="font-medium text-gray-900">Телефон:</span>{' '}
-              {viewInspection.client_phone || '—'}
-            </p>
-            <p>
-              <span className="font-medium text-gray-900">Дата:</span>{' '}
-              {formatServerDate(viewInspection.scheduled_at) || '—'}
-            </p>
-            {viewInspection.vehicle && viewInspection.vehicle !== '—' ? (
-              <p>
-                <span className="font-medium text-gray-900">Автомобиль:</span>{' '}
-                {viewInspection.vehicle}
-              </p>
-            ) : null}
-            {viewInspection.notes ? (
-              <p>
-                <span className="font-medium text-gray-900">Заметка:</span>{' '}
-                <span className="whitespace-pre-wrap">{viewInspection.notes}</span>
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-      </Modal>
+        onSaved={() => {
+          setViewInspection(null);
+          load();
+        }}
+      />
     </div>
   );
 }

@@ -45,6 +45,9 @@ class InspectionBookingStaffCreate(BaseModel):
 class InspectionBookingPatch(BaseModel):
     status: Optional[InspectionBookingStatus] = None
     notes: Optional[str] = Field(None, max_length=2000)
+    name: Optional[str] = Field(None, min_length=2, max_length=120)
+    phone: Optional[str] = Field(None, min_length=5, max_length=40)
+    preferred_date: Optional[date] = None
 
 
 class InspectionBookingView(BaseModel):

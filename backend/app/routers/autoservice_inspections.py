@@ -359,6 +359,18 @@ def patch_inspection_booking(
                 detail="Недопустимый статус",
             )
         row.status = data["status"]
+    if "name" in data and data["name"] is not None:
+        name = data["name"].strip()
+        if len(name) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Имя должно содержать минимум 2 символа",
+            )
+        row.name = name[:120]
+    if "phone" in data and data["phone"] is not None:
+        row.phone = _normalize_phone_or_400(data["phone"])
+    if "preferred_date" in data and data["preferred_date"] is not None:
+        row.preferred_date = data["preferred_date"]
     if "notes" in data:
         notes = data["notes"]
         row.notes = (notes or "").strip() or None

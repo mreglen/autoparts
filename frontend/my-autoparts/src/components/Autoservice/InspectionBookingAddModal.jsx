@@ -10,9 +10,11 @@ export default function InspectionBookingAddModal({
   open,
   onClose,
   onCreated,
+  onSaved,
   initialPreferredDate = null,
   workZoneId = null,
   title = 'Запись на осмотр',
+  initialBooking = null,
 }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -21,17 +23,22 @@ export default function InspectionBookingAddModal({
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const isEdit = Boolean(initialBooking?.id);
+  const initialName = (isEdit ? initialBooking.name : '') || '';
+  const initialPhone = (isEdit ? initialBooking.phone : '') || '';
+  const initialPreferred = (isEdit ? initialBooking.preferred_date : initialPreferredDate) || new Date().toISOString().slice(0, 10);
+  const initialNotes = (isEdit ? initialBooking.notes : '') || '';
 
   useEffect(() => {
     if (!open) return;
-    setName('');
-    setPhone('');
-    setPreferredDate(initialPreferredDate || new Date().toISOString().slice(0, 10));
-    setNotes('');
+    setName(initialName);
+    setPhone(initialPhone);
+    setPreferredDate(initialPreferred);
+    setNotes(initialNotes);
     setPhoneError('');
     setError(null);
     setSaving(false);
-  }, [open, initialPreferredDate]);
+  }, [open, initialName, initialPhone, initialPreferred, initialNotes]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,7 +46,7 @@ export default function InspectionBookingAddModal({
     setPhoneError('');
     const trimmedName = name.trim();
     if (trimmedName.length < 2) {
-      setError('Укажите имя');
+      setError(isEdit ? 'Укажите клиента' : 'Укажите имя');
       return;
     }
     const phoneErr = validatePhone(phone);
@@ -48,25 +55,35 @@ export default function InspectionBookingAddModal({
       return;
     }
     if (!preferredDate) {
-      setError('Укажите желаемую дату');
+      setError(isEdit ? 'Укажите дату' : 'Укажите желаемую дату');
       return;
     }
     setSaving(true);
     try {
-      const row = await apiRequest('/autoservice/inspection-bookings', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: trimmedName,
-          phone,
-          preferred_date: preferredDate,
-          notes: notes.trim() || null,
-          ...(workZoneId != null ? { work_zone_id: Number(workZoneId) } : {}),
-        }),
-      });
-      onCreated?.(row);
+      const body = {
+        name: trimmedName,
+        phone,
+        preferred_date: preferredDate,
+        notes: notes.trim() || null,
+      };
+      if (!isEdit && workZoneId != null) {
+        body.work_zone_id = Number(workZoneId);
+      }
+      const row = await apiRequest(
+        isEdit ? `/autoservice/inspection-bookings/${initialBooking.id}` : '/autoservice/inspection-bookings',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          body: JSON.stringify(body),
+        },
+      );
+      if (isEdit) {
+        onSaved?.(row);
+      } else {
+        onCreated?.(row);
+      }
       onClose?.();
     } catch (err) {
-      setError(err?.message || 'Не удалось создать заявку');
+      setError(err?.message || (isEdit ? 'Не удалось сохранить заявку' : 'Не удалось создать заявку'));
     } finally {
       setSaving(false);
     }
@@ -76,7 +93,7 @@ export default function InspectionBookingAddModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={title}
+      title={isEdit ? 'Редактировать запись' : title}
       size="sm"
       footer={
         <div className="flex justify-end gap-2">
@@ -94,14 +111,14 @@ export default function InspectionBookingAddModal({
             disabled={saving}
             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
           >
-            {saving ? 'Сохранение…' : 'Создать'}
+            {saving ? (isEdit ? 'Сохранение…' : 'Создание…') : (isEdit ? 'Сохранить' : 'Создать')}
           </button>
         </div>
       }
     >
       <form id="add-inspection-booking" onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Имя</label>
+          <label className="block text-sm font-medium text-gray-700">{isEdit ? 'Клиент' : 'Имя'}</label>
           <input
             className={inputClass}
             value={name}
@@ -128,7 +145,7 @@ export default function InspectionBookingAddModal({
           {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Желаемая дата</label>
+          <label className="block text-sm font-medium text-gray-700">{isEdit ? 'Дата' : 'Желаемая дата'}</label>
           <input
             type="date"
             className={inputClass}
@@ -138,6 +155,12 @@ export default function InspectionBookingAddModal({
             required
           />
         </div>
+        {isEdit && initialBooking?.vehicle && initialBooking.vehicle !== '—' ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Автомобиль</label>
+            <p className="mt-1 text-sm text-gray-900">{initialBooking.vehicle}</p>
+          </div>
+        ) : null}
         <div>
           <label className="block text-sm font-medium text-gray-700">Заметка</label>
           <textarea
