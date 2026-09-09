@@ -4,7 +4,6 @@ import {
   createNewPartsBasket,
   fetchCart,
   selectCart,
-  selectNewPartsBaskets,
 } from '../../redux/slices/CartSlice';
 
 const DEFAULT_BASKET_NAME = 'Новые запчасти';
@@ -50,7 +49,6 @@ export default function NewPartsBasketHoverMenu({
 }) {
   const dispatch = useDispatch();
   const cart = useSelector(selectCart);
-  const baskets = useSelector(selectNewPartsBaskets);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [menuError, setMenuError] = useState('');
@@ -58,13 +56,15 @@ export default function NewPartsBasketHoverMenu({
   const closeTimerRef = useRef(null);
 
   const liveBaskets = useMemo(() => {
-    // Only show actual baskets from /cart, not cached baskets from Redux state
+    // Only show baskets that actually exist in /cart: default + baskets with items
     const source = cart?.new_parts_baskets || [];
-    return dedupeBaskets(source).sort((a, b) => {
-      if (a.is_default && !b.is_default) return -1;
-      if (!a.is_default && b.is_default) return 1;
-      return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
-    });
+    return dedupeBaskets(source)
+      .filter((basket) => basket.is_default || (basket.item_count ?? 0) > 0)
+      .sort((a, b) => {
+        if (a.is_default && !b.is_default) return -1;
+        if (!a.is_default && b.is_default) return 1;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+      });
   }, [cart?.new_parts_baskets]);
 
   const clearCloseTimer = useCallback(() => {
