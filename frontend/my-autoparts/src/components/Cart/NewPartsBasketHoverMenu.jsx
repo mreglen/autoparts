@@ -142,15 +142,8 @@ export default function NewPartsBasketHoverMenu({
     event.preventDefault();
     event.stopPropagation();
     if (disabled || busy) return;
-    if (!showPicker) {
-      await runAdd(undefined);
-      return;
-    }
-    if (menuOpen) {
-      setMenuOpen(false);
-      return;
-    }
-    openMenu();
+    // Click immediately adds to the default basket; hover opens the picker
+    await runAdd(undefined);
   };
 
   const isDisabled = disabled || busy;
