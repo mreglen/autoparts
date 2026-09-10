@@ -235,6 +235,7 @@ export default function VinCatalogUnitView({
   title,
   imageUrl,
   imageMap,
+  schemas = [],
   details,
   availability,
   availabilityLoading = false,
@@ -249,6 +250,16 @@ export default function VinCatalogUnitView({
   const listPanelRef = useRef(null);
 
   const detailsList = details || [];
+
+  // Группа может содержать несколько узлов — показываем все их схемы.
+  const schemaList = useMemo(() => {
+    const list = (Array.isArray(schemas) ? schemas : []).filter((s) => s?.image_url);
+    if (list.length) return list;
+    if (imageUrl) return [{ image_url: imageUrl, name: title, imageMap }];
+    return [];
+  }, [schemas, imageUrl, imageMap, title]);
+
+  const hasSchemas = schemaList.length > 0;
 
   const codeToRows = useMemo(() => {
     const map = new Map();
@@ -295,25 +306,34 @@ export default function VinCatalogUnitView({
 
   return (
     <div className="space-y-2">
-      <div className={`grid gap-3 items-start ${imageUrl ? 'lg:grid-cols-[1.2fr_1fr]' : ''}`}>
-        {imageUrl ? (
-          <SchemaImage
-            src={imageUrl}
-            alt={title}
-            imageMap={imageMap}
-            hoverCode={hoverCode}
-            onHoverCode={(code) => {
-              if (!code) {
-                setHover(null, null);
-                return;
-              }
-              const rows = codeToRows.get(code) || [];
-              const rowKey = rows[0]?.key || null;
-              setHover(code, rowKey);
-              ensureRowVisible(rowKey);
-            }}
-            onSelectCode={onSelectCode}
-          />
+      <div className={`grid gap-3 items-start ${hasSchemas ? 'lg:grid-cols-[1.2fr_1fr]' : ''}`}>
+        {hasSchemas ? (
+          <div className="space-y-3 lg:max-h-[min(70vh,640px)] lg:overflow-y-auto">
+            {schemaList.map((schema, idx) => (
+              <div key={`${schema.unit_id || 'schema'}-${idx}`} className="space-y-1">
+                {schemaList.length > 1 && schema.name ? (
+                  <p className="text-xs font-medium text-gray-600">{schema.name}</p>
+                ) : null}
+                <SchemaImage
+                  src={schema.image_url}
+                  alt={schema.name || title}
+                  imageMap={schema.imageMap}
+                  hoverCode={hoverCode}
+                  onHoverCode={(code) => {
+                    if (!code) {
+                      setHover(null, null);
+                      return;
+                    }
+                    const rows = codeToRows.get(code) || [];
+                    const rowKey = rows[0]?.key || null;
+                    setHover(code, rowKey);
+                    ensureRowVisible(rowKey);
+                  }}
+                  onSelectCode={onSelectCode}
+                />
+              </div>
+            ))}
+          </div>
         ) : null}
 
         <div

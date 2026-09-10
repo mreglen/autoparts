@@ -67,6 +67,10 @@ class UnitInfoOut(BaseModel):
     filter: Optional[str] = None
 
 
+class UnitWithDetailsOut(UnitInfoOut):
+    details: list["DetailOut"] = Field(default_factory=list)
+
+
 class UnitDetailsResponse(CatalogSoftBase):
     unit: Optional[UnitInfoOut] = None
     details: list[DetailOut] = Field(default_factory=list)
@@ -103,6 +107,7 @@ class QuickGroupsResponse(CatalogSoftBase):
 class QuickGroupDetailsResponse(CatalogSoftBase):
     quick_group_id: Optional[str] = None
     unit: Optional[UnitInfoOut] = None
+    units: list[UnitWithDetailsOut] = Field(default_factory=list)
     details: list[DetailOut] = Field(default_factory=list)
 
 

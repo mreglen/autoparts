@@ -97,6 +97,7 @@ export default function VinCatalogBrowse({
   availability,
   availabilityLoading,
   imageMap,
+  unitSchemas = [],
   searchQuery,
   searchLoading,
   searchEmpty,
@@ -312,7 +313,7 @@ export default function VinCatalogBrowse({
         </button>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside
           className={`rounded-lg border border-gray-200 bg-white ${
             mobileTreeOpen ? 'block' : 'hidden lg:block'
@@ -400,6 +401,7 @@ export default function VinCatalogBrowse({
               title={unitInfo?.name || 'Поиск'}
               imageUrl={null}
               imageMap={[]}
+              schemas={[]}
               details={details}
               availability={availability}
               availabilityLoading={availabilityLoading}
@@ -414,6 +416,7 @@ export default function VinCatalogBrowse({
               title={unitInfo?.name || selectedUnit?.name || 'Узел'}
               imageUrl={unitInfo?.image_url}
               imageMap={imageMap}
+              schemas={unitSchemas}
               details={details}
               availability={availability}
               availabilityLoading={availabilityLoading}

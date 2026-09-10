@@ -79,6 +79,7 @@ export default function VinCatalogPage() {
   const [details, setDetails] = useState([]);
   const [unitInfo, setUnitInfo] = useState(null);
   const [imageMap, setImageMap] = useState([]);
+  const [unitSchemas, setUnitSchemas] = useState([]);
   const [availability, setAvailability] = useState({});
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   // filterStep: { kind, unit, filter, detail?, conditions, answers: { [idx]: string } }
@@ -92,6 +93,7 @@ export default function VinCatalogPage() {
   const [wizardCanList, setWizardCanList] = useState(false);
   const [wizardLoading, setWizardLoading] = useState(false);
   const imageMapReqId = useRef(0);
+  const schemasReqId = useRef(0);
 
   const openWizard = searchParams.get('wizard') === '1';
 
@@ -150,18 +152,15 @@ export default function VinCatalogPage() {
     setDetails([]);
     setUnitInfo(null);
     setImageMap([]);
+    setUnitSchemas([]);
     setAvailability({});
     setSearchEmpty(false);
     setFilterStep(null);
   };
 
-  const loadImageMap = async (unitId, ssd, vehicleOverride = null) => {
+  const fetchImageMap = async (unitId, ssd, vehicleOverride = null) => {
     const v = vehicleOverride || vehicle;
-    if (!v || !unitId) {
-      setImageMap([]);
-      return;
-    }
-    const reqId = ++imageMapReqId.current;
+    if (!v || !unitId) return [];
     const ctx = vehicleCtx(v);
     try {
       const res = await apiRequestUnauth(
@@ -171,16 +170,36 @@ export default function VinCatalogPage() {
           ssd: ssd || ctx.ssd,
         })}`
       );
-      if (reqId !== imageMapReqId.current) return;
-      if (!res?.ok) {
-        setImageMap([]);
-        return;
-      }
-      setImageMap(Array.isArray(res?.image_map) ? res.image_map : []);
+      if (!res?.ok) return [];
+      return Array.isArray(res?.image_map) ? res.image_map : [];
     } catch {
-      if (reqId !== imageMapReqId.current) return;
-      setImageMap([]);
+      return [];
     }
+  };
+
+  const loadImageMap = async (unitId, ssd, vehicleOverride = null) => {
+    const reqId = ++imageMapReqId.current;
+    const map = await fetchImageMap(unitId, ssd, vehicleOverride);
+    if (reqId !== imageMapReqId.current) return;
+    setImageMap(map);
+  };
+
+  /** Загружает схемы всех узлов группы: у одной группы бывает несколько чертежей. */
+  const loadUnitSchemas = async (unitList, fallbackSsd, vehicleOverride = null) => {
+    const list = (Array.isArray(unitList) ? unitList : []).filter((u) => u?.image_url);
+    if (!list.length) {
+      setUnitSchemas([]);
+      return;
+    }
+    const reqId = ++schemasReqId.current;
+    setUnitSchemas(list.map((u) => ({ ...u, imageMap: [] })));
+    const maps = await Promise.all(
+      list.map((u) =>
+        u.unit_id ? fetchImageMap(u.unit_id, u.ssd || fallbackSsd, vehicleOverride) : Promise.resolve([])
+      )
+    );
+    if (reqId !== schemasReqId.current) return;
+    setUnitSchemas(list.map((u, idx) => ({ ...u, imageMap: maps[idx] || [] })));
   };
 
   const startBrowse = async (cand, { wizard = false } = {}) => {
@@ -195,6 +214,7 @@ export default function VinCatalogPage() {
     setDetails([]);
     setUnitInfo(null);
     setImageMap([]);
+    setUnitSchemas([]);
     setAvailability({});
     setSearchQuery('');
     setSearchEmpty(false);
@@ -411,6 +431,7 @@ export default function VinCatalogPage() {
     setDetails([]);
     setUnitInfo(null);
     setImageMap([]);
+    setUnitSchemas([]);
     setAvailability({});
     try {
       const unitsPromise = apiRequestUnauth(
@@ -461,6 +482,7 @@ export default function VinCatalogPage() {
     setFilterStep(null);
     setSelectedUnit(unit);
     setImageMap([]);
+    setUnitSchemas([]);
     try {
       const res = await apiRequestUnauth(
         `/public/laximo/units/${encodeURIComponent(unit.unit_id)}?${qs({
@@ -667,6 +689,7 @@ export default function VinCatalogPage() {
     setSelectedUnit({ name: group.name, unit_id: group.quick_group_id });
     setUnitInfo({ name: group.name });
     setImageMap([]);
+    setUnitSchemas([]);
     try {
       const res = await apiRequestUnauth(
         `/public/laximo/quick-groups/${encodeURIComponent(group.quick_group_id)}/details?${qs({
@@ -687,6 +710,10 @@ export default function VinCatalogPage() {
       setDetails(detailRows);
       setLoading(false);
       void loadAvailability(detailRows);
+      const unitList = Array.isArray(res?.units) && res.units.length
+        ? res.units
+        : (unit ? [unit] : []);
+      void loadUnitSchemas(unitList, ssd);
       if (unit?.unit_id) {
         void loadImageMap(unit.unit_id, unit.ssd || ssd);
       } else {
@@ -707,6 +734,7 @@ export default function VinCatalogPage() {
     setDetails([]);
     setUnitInfo(null);
     setImageMap([]);
+    setUnitSchemas([]);
     setAvailability({});
     setSearchEmpty(false);
     setError(null);
@@ -763,6 +791,7 @@ export default function VinCatalogPage() {
     setSearchEmpty(false);
     setSelectedUnit(null);
     setImageMap([]);
+    setUnitSchemas([]);
     setUnitInfo({ name: `Поиск: ${q}` });
     setMode('search');
     try {
@@ -1075,6 +1104,7 @@ export default function VinCatalogPage() {
           availability={availability}
           availabilityLoading={availabilityLoading}
           imageMap={imageMap}
+          unitSchemas={unitSchemas}
           searchQuery={searchQuery}
           searchLoading={searchLoading}
           searchEmpty={searchEmpty}

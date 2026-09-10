@@ -23,10 +23,10 @@ export default function VinCatalogTree({
     return (
       <li key={node.id}>
         <div
-          className={`flex items-center gap-0.5 rounded-md ${
+          className={`flex items-start gap-0.5 rounded-md ${
             isSelected ? 'bg-indigo-50 text-indigo-900' : 'text-gray-800 hover:bg-gray-50'
           }`}
-          style={{ paddingLeft: `${6 + depth * 12}px` }}
+          style={{ paddingLeft: `${6 + depth * 10}px` }}
         >
           {canExpand ? (
             <button
@@ -39,7 +39,7 @@ export default function VinCatalogTree({
                   onSelect(node);
                 }
               }}
-              className="flex h-7 w-6 shrink-0 items-center justify-center text-gray-400 hover:text-gray-700"
+              className="flex h-6 w-5 shrink-0 items-center justify-center text-gray-400 hover:text-gray-700"
             >
               <svg
                 className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`}
@@ -54,12 +54,13 @@ export default function VinCatalogTree({
               </svg>
             </button>
           ) : (
-            <span className="inline-block w-6 shrink-0" />
+            <span className="inline-block w-5 shrink-0" />
           )}
           <button
             type="button"
             onClick={() => onSelect(node)}
-            className="min-w-0 flex-1 truncate py-1.5 pr-2 text-left text-sm"
+            className="min-w-0 flex-1 whitespace-normal break-words py-1.5 pr-2 text-left text-xs leading-snug"
+            title={node.name}
           >
             {node.name}
           </button>

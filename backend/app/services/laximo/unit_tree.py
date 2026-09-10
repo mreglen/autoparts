@@ -475,6 +475,56 @@ def parse_quick_detail_response(
     return primary_unit, details
 
 
+def parse_quick_detail_units(data: Any) -> list[dict[str, Any]]:
+    """Collect every unit of a quick group with its own schema and details.
+
+    A quick group often maps to several units (each with its own drawing), so
+    returning only the first one hides the remaining schema images.
+    """
+    units: list[dict[str, Any]] = []
+    seen_units: set[str] = set()
+
+    def _add_unit(unit_row: dict[str, Any], detail_rows: list[dict[str, Any]]) -> None:
+        unit_norm = normalize_unit_info(unit_row)
+        key = "|".join(
+            [
+                str(unit_norm.get("unit_id") or ""),
+                str(unit_norm.get("image_url") or ""),
+                str(unit_norm.get("name") or ""),
+            ]
+        )
+        if key in seen_units:
+            return
+        seen_units.add(key)
+        unit_norm["details"] = detail_rows
+        units.append(unit_norm)
+
+    for cat in _quick_detail_categories(data):
+        cat_units = cat.get("units")
+        if not isinstance(cat_units, list):
+            continue
+        for unit in cat_units:
+            if not isinstance(unit, dict):
+                continue
+            raw_details = unit.get("details")
+            detail_rows = [
+                normalize_detail(item)
+                for item in raw_details
+                if isinstance(item, dict)
+            ] if isinstance(raw_details, list) else []
+            _add_unit(unit, detail_rows)
+
+    if units:
+        return units
+
+    for row in _quick_detail_flat_rows(data):
+        if _pick(row, "oem", "OEM", "partNumber", "partnumber"):
+            continue
+        if _pick(row, "unitId", "unitid", "id") and _pick(row, "name"):
+            _add_unit(row, [])
+    return units
+
+
 def normalize_unit_info(row: dict[str, Any]) -> dict[str, Any]:
     filter_raw = _pick(row, "filter")
     filter_text = None
@@ -952,6 +1002,9 @@ def get_quick_group_details(
         }
         if unit:
             payload["unit"] = unit
+        units = parse_quick_detail_units(raw)
+        if units:
+            payload["units"] = units
         return payload
 
     return _execute(
@@ -1195,4 +1248,5 @@ __all__ = [
     "resolve_laximo_image_url",
     "flatten_quick_groups",
     "parse_quick_detail_response",
+    "parse_quick_detail_units",
 ]

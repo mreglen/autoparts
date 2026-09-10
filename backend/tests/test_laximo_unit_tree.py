@@ -23,6 +23,7 @@ from app.services.laximo.unit_tree import (
     normalize_category,
     normalize_detail,
     parse_quick_detail_response,
+    parse_quick_detail_units,
 )
 
 
@@ -150,6 +151,48 @@ class UnitTreeNormalizeTests(unittest.TestCase):
         self.assertEqual(details[0]["oem"], "059198405B")
         self.assertTrue(details[0]["match"])
         self.assertEqual(details[1]["oem"], "059115389AD")
+
+    def test_parse_quick_detail_units_keeps_every_schema(self):
+        raw = [
+            {
+                "categoryId": "1",
+                "name": "Тормозная система",
+                "units": [
+                    {
+                        "unitId": "u1",
+                        "name": "Дисковый тормозной механизм перед",
+                        "imageUrl": "https://img.laximo.ru/AU1587/%size%/1.gif",
+                        "details": [{"oem": "OEM1", "codeOnImage": "1"}],
+                    },
+                    {
+                        "unitId": "u2",
+                        "name": "Дисковый тормозной механизм зад",
+                        "largeImageUrl": "https://img.laximo.ru/AU1587/%size%/2.gif",
+                        "details": [{"oem": "OEM2", "codeOnImage": "2"}],
+                    },
+                ],
+            }
+        ]
+        units = parse_quick_detail_units(raw)
+        self.assertEqual(len(units), 2)
+        self.assertEqual(units[0]["unit_id"], "u1")
+        self.assertEqual(units[1]["unit_id"], "u2")
+        self.assertIn("source", units[0]["image_url"])
+        self.assertIn("source", units[1]["image_url"])
+        self.assertEqual(units[0]["details"][0]["oem"], "OEM1")
+        self.assertEqual(units[1]["details"][0]["oem"], "OEM2")
+
+    def test_parse_quick_detail_units_dedupes_identical_units(self):
+        raw = [
+            {
+                "categoryId": "1",
+                "units": [
+                    {"unitId": "u1", "name": "A", "imageUrl": "https://x/1.gif", "details": []},
+                    {"unitId": "u1", "name": "A", "imageUrl": "https://x/1.gif", "details": []},
+                ],
+            }
+        ]
+        self.assertEqual(len(parse_quick_detail_units(raw)), 1)
 
 
 class AsDictListTests(unittest.TestCase):
