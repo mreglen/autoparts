@@ -4,6 +4,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiRequest } from '../../utils/apiClient';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+import NumericInput from '../../components/UI/NumericInput';
 
 function formatDateTime(value) {
   if (!value) return '—';
@@ -178,14 +179,13 @@ function VpnUserDetailModal({
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-800">Действия</h3>
             <div className="flex flex-wrap items-center gap-2 mb-3">
-              <input
-                type="number"
-                min={1}
-                max={3650}
+              <NumericInput
+                mode="numeric"
                 value={daysInput}
                 onChange={(e) => setDaysInput(e.target.value)}
                 className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
                 aria-label="Дней"
+                maxLength={4}
               />
               <ActionButton
                 tone="primary"
@@ -273,18 +273,15 @@ function VpnUserDetailModal({
           <div>
             <h3 className="mb-2 text-sm font-semibold text-gray-800">Платежи</h3>
             <div className="mb-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <input
-                type="number"
-                min={0}
-                step="1"
+              <NumericInput
+                mode="decimal"
                 placeholder="₽"
                 value={paymentForm.amount_rub}
                 onChange={(e) => setPaymentForm((f) => ({ ...f, amount_rub: e.target.value }))}
                 className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
               />
-              <input
-                type="number"
-                min={0}
+              <NumericInput
+                mode="numeric"
                 placeholder="дней"
                 value={paymentForm.days_granted}
                 onChange={(e) => setPaymentForm((f) => ({ ...f, days_granted: e.target.value }))}

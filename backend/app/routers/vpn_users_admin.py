@@ -334,11 +334,13 @@ def extend_vpn_user(
         raise HTTPException(status_code=400, detail="Сначала снимите бан")
     _extend_user_days(user, body.days)
     user.account_status = "active"
+    db.commit()
     try:
         _sync_active(user)
+        user.verify_note = None
     except Exception as exc:
-        db.rollback()
-        raise HTTPException(status_code=502, detail=f"Marzban: {exc}") from exc
+        user.verify_note = f"Marzban не синхронизирован: {exc}"
+    user.last_verified_at = _utcnow()
     db.commit()
     db.refresh(user)
     return _build_detail(db, user)
@@ -537,6 +539,7 @@ def create_vpn_payment(
         paid_at=paid_at,
     )
     db.add(row)
+    db.commit()
 
     if (
         body.status == "paid"
@@ -546,13 +549,15 @@ def create_vpn_payment(
     ):
         _extend_user_days(user, body.days_granted)
         user.account_status = "active"
+        db.commit()
         try:
             _sync_active(user)
+            user.verify_note = None
         except Exception as exc:
-            db.rollback()
-            raise HTTPException(status_code=502, detail=f"Marzban: {exc}") from exc
+            user.verify_note = f"Marzban не синхронизирован: {exc}"
+        user.last_verified_at = _utcnow()
+        db.commit()
 
-    db.commit()
     db.refresh(user)
     return _build_detail(db, user)
 
