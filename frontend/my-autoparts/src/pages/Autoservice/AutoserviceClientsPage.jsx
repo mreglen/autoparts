@@ -13,7 +13,8 @@ import RepairOrderViewModal, {
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { apiRequest } from '../../utils/apiClient';
 import AutoserviceClientRequisitesFields from '../../components/Autoservice/AutoserviceClientRequisitesFields';
-import { handlePhoneInputChange, validatePhoneOptional, validateEmail } from '../../utils/contactValidation';
+import { validatePhoneOptional, validateEmail } from '../../utils/contactValidation';
+import PhoneInput from '../../components/UI/PhoneInput';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 import { normalizeVinForLookupOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import {
@@ -1246,15 +1247,12 @@ function AddClientModal({ open, onClose, onCreated }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">Телефон (необязательно)</label>
-          <input
-            type="tel"
+          <PhoneInput
             className={`${inputClass} ${phoneError ? 'border-red-500' : ''}`}
             value={phone}
             onChange={(e) => {
-              handlePhoneInputChange(e, (value) => {
-                setPhone(value);
-                setPhoneError('');
-              });
+              setPhone(e.target.value);
+              setPhoneError('');
             }}
             placeholder="+7 (___) ___-__-__"
             disabled={saving}

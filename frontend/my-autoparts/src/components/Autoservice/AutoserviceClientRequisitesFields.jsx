@@ -1,5 +1,5 @@
-import { FieldHint, FieldLabel, Input, NumericInput, Textarea } from '../UI';
-import { formatEmailInput, handlePhoneInputChange } from '../../utils/contactValidation';
+import { FieldHint, FieldLabel, Input, NumericInput, Textarea, PhoneInput } from '../UI';
+import { formatEmailInput } from '../../utils/contactValidation';
 import {
   CLIENT_PLACEHOLDERS,
   PERSON_TYPES,
@@ -66,11 +66,10 @@ export default function AutoserviceClientRequisitesFields({
         </div>
         <div>
           <FieldLabel htmlFor={`${idPrefix}-phone`}>Телефон</FieldLabel>
-          <Input
+          <PhoneInput
             id={`${idPrefix}-phone`}
-            type="tel"
             value={form?.phone || ''}
-            onChange={(e) => handlePhoneInputChange(e, (value) => setField('phone', value))}
+            onChange={(e) => setField('phone', e.target.value)}
             placeholder={CLIENT_PLACEHOLDERS.phone}
             disabled={disabled || lockIdentity}
           />

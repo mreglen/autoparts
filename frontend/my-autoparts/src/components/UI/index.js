@@ -8,6 +8,7 @@ export { default as Skeleton, SkeletonCard, SkeletonHeaderStats, SkeletonListCar
 export { default as DataTable, ResponsiveList } from './DataTable';
 export { default as UnderlineTabs } from './UnderlineTabs';
 export { default as NumericInput } from './NumericInput';
+export { default as PhoneInput } from './PhoneInput';
 export {
   Input,
   Select,

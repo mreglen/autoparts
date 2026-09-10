@@ -7,7 +7,8 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
 import { apiRequest } from '../../utils/apiClient';
-import { handlePhoneInputChange, validatePhoneOptional } from '../../utils/contactValidation';
+import { validatePhoneOptional } from '../../utils/contactValidation';
+import PhoneInput from '../../components/UI/PhoneInput';
 import { parseServerDate } from '../../utils/serverDate';
 import {
   candidateLabel,
@@ -614,13 +615,11 @@ function AddClientModal({ onClose, onCreated }) {
         </div>
         <div>
           <label className="block text-sg-caption font-medium text-ink-muted">Телефон (необязательно)</label>
-          <input
-            type="tel"
-            inputMode="tel"
+          <PhoneInput
             className={`${pillInputClass} ${phoneError ? '!border-danger-600 !bg-danger-50 focus:!border-danger-600' : ''}`}
             value={phone}
             onChange={(e) => {
-              handlePhoneInputChange(e, setPhone);
+              setPhone(e.target.value);
               setPhoneError('');
             }}
             placeholder="+7 (___) ___-__-__"

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
+import PhoneInput from '../UI/PhoneInput';
 import { apiRequest } from '../../utils/apiClient';
 import {
   formatPhoneFromRaw,
-  handlePhoneInputChange,
   validatePhone,
 } from '../../utils/contactValidation';
 
@@ -178,12 +178,11 @@ export default function InspectionBookingAddModal({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Телефон</label>
-            <input
-              type="tel"
+            <PhoneInput
               className={`${inputClass} ${phoneError ? 'border-red-500' : ''}`}
               value={phone}
               onChange={(e) => {
-                handlePhoneInputChange(e, setPhone);
+                setPhone(e.target.value);
                 setPhoneError('');
               }}
               placeholder="+7 (___) ___-__-__"

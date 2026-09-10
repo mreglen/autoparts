@@ -11,7 +11,8 @@ import {
 } from '../../utils/autoserviceConstants';
 import { BECOME_CLIENT_CONFIRM } from '../../utils/autoservicePublic';
 import { apiAxios, apiAxiosUnauth, apiRequest } from '../../utils/apiClient';
-import { formatPhoneInput, handlePhoneInputChange, validatePhone } from '../../utils/contactValidation';
+import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
+import PhoneInput from '../../components/UI/PhoneInput';
 import { buildAutoserviceSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
 const inputClass =
@@ -350,14 +351,13 @@ export default function AutoservicePublicPage() {
                         <label htmlFor="autoservice-phone" className="block text-sm font-medium text-gray-700">
                           Телефон
                         </label>
-                        <input
+                        <PhoneInput
                           id="autoservice-phone"
-                          type="tel"
                           autoComplete="tel"
                           className={`${inputClass} ${phoneError ? 'border-red-400 focus:border-red-400 focus:ring-red-500/20' : ''}`}
                           value={phone}
                           onChange={(e) => {
-                            handlePhoneInputChange(e, setPhone);
+                            setPhone(e.target.value);
                             setPhoneError('');
                           }}
                           placeholder="+7 (___) ___-__-__"
