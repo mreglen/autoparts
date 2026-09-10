@@ -7,7 +7,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
 import { apiRequest } from '../../utils/apiClient';
-import { formatPhoneInput, handlePhoneInputChange, validatePhoneOptional } from '../../utils/contactValidation';
+import { handlePhoneInputChange, validatePhoneOptional } from '../../utils/contactValidation';
 import { parseServerDate } from '../../utils/serverDate';
 import {
   candidateLabel,
@@ -21,6 +21,7 @@ import { canEditClientMarkupSettings } from '../../utils/autoservicePermissions'
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
+import NumericInput from '../../components/UI/NumericInput';
 import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItemsPickerModal';
 import RepairOrderStockPickerModal from '../../components/Autoservice/RepairOrderStockPickerModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
@@ -698,10 +699,8 @@ function AddEmployeeModal({ onClose, onCreated }) {
         </div>
         <div>
           <label className="block text-sg-caption font-medium text-ink-muted">% от работ</label>
-          <input
-            type="number"
-            min={0}
-            max={100}
+          <NumericInput
+            mode="numeric"
             className={pillInputClass}
             value={workPercent}
             onChange={(e) => setWorkPercent(e.target.value)}
@@ -906,10 +905,8 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
           </div>
           <div>
             <label className="block text-sg-caption font-medium text-ink-muted">Год</label>
-            <input
-              type="number"
-              min={1900}
-              max={2100}
+            <NumericInput
+              mode="numeric"
               className={pillInputClass}
               value={form.year}
               onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
@@ -2304,11 +2301,8 @@ export default function AutoserviceOrderFormPage() {
             </div>
             <div className="min-w-0 lg:col-span-2">
               <FieldLabel optional>Пробег, км</FieldLabel>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                inputMode="numeric"
+              <NumericInput
+                mode="numeric"
                 className={pillInputClass}
                 value={mileageKm}
                 onChange={(e) => {
@@ -2425,9 +2419,8 @@ export default function AutoserviceOrderFormPage() {
                       </button>
                     </div>
                     <div className={lineItemControlsClass}>
-                    <input
-                      type="number"
-                      min={1}
+                    <NumericInput
+                      mode="decimal"
                       className={`w-12 ${compactControlInputClass} px-1.5 text-center`}
                       placeholder={ownMode ? 'Н/ч' : 'Кол-во'}
                       value={w.qty}
@@ -2435,10 +2428,8 @@ export default function AutoserviceOrderFormPage() {
                     />
                     {ownMode ? null : (
                     <>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
+                    <NumericInput
+                      mode="decimal"
                       className={`w-[4.75rem] ${compactControlInputClass}`}
                       placeholder="0 ₽"
                       value={w.unit_price ?? ''}
@@ -2474,10 +2465,8 @@ export default function AutoserviceOrderFormPage() {
                             addOptionLabel="Добавить сотрудника"
                             onAddClick={() => openAddEmployeeModal(index, execIndex)}
                           />
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
+                          <NumericInput
+                            mode="numeric"
                             className={`w-12 ${compactControlInputClass} px-1.5 text-center`}
                             value={ex.percent}
                             onChange={(e) => updateWorkExecutor(index, execIndex, { percent: e.target.value })}
@@ -2605,8 +2594,6 @@ export default function AutoserviceOrderFormPage() {
                   { ...pricingOptions, clientUnitPriceOverride: null },
                 );
                 const lineTotal = shopLineSum(p.qty, p.unit_price, p.markup_percent, pricingOptions);
-                const qtyStep = p.unit === 'pcs' ? 1 : 0.001;
-                const qtyMin = p.unit === 'pcs' ? 1 : 0.001;
                 const isImported = Boolean(p.is_imported || p.pending_import);
                 const isWarehouseLinked = isWarehouseLinkedShopPart(p);
                 const isManualEditable = isManualEditableShopPart(p);
@@ -2655,11 +2642,8 @@ export default function AutoserviceOrderFormPage() {
                         </button>
                       </div>
                       <div className={lineItemControlsClass}>
-                      <input
-                        type="number"
-                        min={qtyMin}
-                        max={isWarehouseLinked && p.stock_max_qty != null ? p.stock_max_qty : undefined}
-                        step={qtyStep}
+                      <NumericInput
+                        mode="decimal"
                         className={`w-12 px-1.5 text-center ${shopPartControlInputClass}${isQtyLocked ? ' cursor-not-allowed bg-surface-muted/80 opacity-80' : ''}`}
                         value={qtyValue}
                         readOnly={isQtyLocked}
@@ -2699,10 +2683,8 @@ export default function AutoserviceOrderFormPage() {
                         <option value="kg">кг</option>
                       </select>
                       <div className="inline-flex shrink-0 items-center gap-1">
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
+                        <NumericInput
+                          mode="decimal"
                           className={`w-[4.75rem] ${shopPartControlInputClass}`}
                           value={p.client_unit_price_override ?? ''}
                           placeholder={formatRubles(automaticClientUnit)}
@@ -2734,10 +2716,10 @@ export default function AutoserviceOrderFormPage() {
       </form>
 
       <div
-        className="pointer-events-none mt-4 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-[calc(var(--sg-mobile-sticky-bottom-offset)+0.75rem)] max-lg:mt-0 lg:sticky lg:bottom-4"
+        className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--sg-mobile-sticky-bottom-offset)+0.75rem)] lg:bottom-0"
         style={{ zIndex: Z_MOBILE_STICKY_FOOTER }}
       >
-        <div className="pointer-events-auto min-w-0 rounded-sg-lg border border-line bg-surface px-2.5 py-3 sm:p-5">
+        <div className="pointer-events-auto min-w-0 bg-surface px-2.5 py-3 sm:p-5">
           <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
             <div className="min-w-0 lg:flex-1">
               <p className="text-sm font-semibold text-ink">
