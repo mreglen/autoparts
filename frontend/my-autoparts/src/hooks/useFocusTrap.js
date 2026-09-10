@@ -20,6 +20,11 @@ export function useFocusTrap(containerRef, {
   onEscape,
 }) {
   const previousActiveElementRef = useRef(null);
+  const onEscapeRef = useRef(onEscape);
+
+  useEffect(() => {
+    onEscapeRef.current = onEscape;
+  }, [onEscape]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -38,7 +43,7 @@ export function useFocusTrap(containerRef, {
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
-        onEscape?.();
+        onEscapeRef.current?.();
         return;
       }
 
@@ -78,5 +83,5 @@ export function useFocusTrap(containerRef, {
         target.focus();
       }
     };
-  }, [active, containerRef, initialFocusRef, onEscape, restoreFocus, returnFocusRef]);
+  }, [active, containerRef, initialFocusRef, restoreFocus, returnFocusRef]);
 }
