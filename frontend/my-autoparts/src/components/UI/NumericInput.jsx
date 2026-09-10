@@ -1,4 +1,4 @@
-import { forwardRef, useLayoutEffect, useRef } from 'react';
+import { forwardRef, useEffect, useLayoutEffect, useRef } from 'react';
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ');
@@ -31,6 +31,11 @@ const NumericInput = forwardRef(function NumericInput(
 ) {
   const inputRef = useRef(null);
   const caretRef = useRef({ start: null, end: null });
+  const caretTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    window.clearTimeout(caretTimerRef.current);
+  }, []);
 
   const setRef = (el) => {
     inputRef.current = el;
@@ -39,6 +44,15 @@ const NumericInput = forwardRef(function NumericInput(
     } else if (ref) {
       // eslint-disable-next-line no-param-reassign
       ref.current = el;
+    }
+  };
+
+  const applyCaret = (input, start, end) => {
+    if (!input || document.activeElement !== input) return;
+    try {
+      input.setSelectionRange(start, end);
+    } catch {
+      // ignore
     }
   };
 
@@ -55,13 +69,14 @@ const NumericInput = forwardRef(function NumericInput(
     caretRef.current = { start: nextStart, end: nextEnd };
 
     input.value = sanitized;
-    if (document.activeElement === input) {
-      try {
-        input.setSelectionRange(nextStart, nextEnd);
-      } catch {
-        // ignore
+    applyCaret(input, nextStart, nextEnd);
+
+    window.clearTimeout(caretTimerRef.current);
+    caretTimerRef.current = window.setTimeout(() => {
+      if (inputRef.current && inputRef.current.value === sanitized) {
+        applyCaret(inputRef.current, nextStart, nextEnd);
       }
-    }
+    }, 0);
 
     onChange(e);
   };
@@ -69,13 +84,7 @@ const NumericInput = forwardRef(function NumericInput(
   useLayoutEffect(() => {
     const input = inputRef.current;
     if (!input || caretRef.current.start === null) return;
-    if (document.activeElement === input) {
-      try {
-        input.setSelectionRange(caretRef.current.start, caretRef.current.end);
-      } catch {
-        // some mobile browsers may reject selection updates
-      }
-    }
+    applyCaret(input, caretRef.current.start, caretRef.current.end);
     caretRef.current = { start: null, end: null };
   }, [value]);
 

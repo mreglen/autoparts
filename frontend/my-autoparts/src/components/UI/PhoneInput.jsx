@@ -1,4 +1,4 @@
-import { forwardRef, useLayoutEffect, useRef } from 'react';
+import { forwardRef, useEffect, useLayoutEffect, useRef } from 'react';
 import { formatPhoneInputChange } from '../../utils/contactValidation';
 
 function cx(...parts) {
@@ -11,6 +11,11 @@ const PhoneInput = forwardRef(function PhoneInput(
 ) {
   const inputRef = useRef(null);
   const caretRef = useRef({ start: null, end: null });
+  const caretTimerRef = useRef(null);
+
+  useEffect(() => () => {
+    window.clearTimeout(caretTimerRef.current);
+  }, []);
 
   const setRef = (el) => {
     inputRef.current = el;
@@ -19,6 +24,15 @@ const PhoneInput = forwardRef(function PhoneInput(
     } else if (ref) {
       // eslint-disable-next-line no-param-reassign
       ref.current = el;
+    }
+  };
+
+  const applyCaret = (input, start, end) => {
+    if (!input || document.activeElement !== input) return;
+    try {
+      input.setSelectionRange(start, end);
+    } catch {
+      // ignore
     }
   };
 
@@ -33,13 +47,14 @@ const PhoneInput = forwardRef(function PhoneInput(
     caretRef.current = { start: selectionStart, end: selectionEnd };
 
     input.value = formatted;
-    if (document.activeElement === input) {
-      try {
-        input.setSelectionRange(selectionStart, selectionEnd);
-      } catch {
-        // ignore
+    applyCaret(input, selectionStart, selectionEnd);
+
+    window.clearTimeout(caretTimerRef.current);
+    caretTimerRef.current = window.setTimeout(() => {
+      if (inputRef.current && inputRef.current.value === formatted) {
+        applyCaret(inputRef.current, selectionStart, selectionEnd);
       }
-    }
+    }, 0);
 
     onChange(e);
   };
@@ -47,13 +62,7 @@ const PhoneInput = forwardRef(function PhoneInput(
   useLayoutEffect(() => {
     const input = inputRef.current;
     if (!input || caretRef.current.start === null) return;
-    if (document.activeElement === input) {
-      try {
-        input.setSelectionRange(caretRef.current.start, caretRef.current.end);
-      } catch {
-        // type="tel" / text on some browsers may reject selection updates
-      }
-    }
+    applyCaret(input, caretRef.current.start, caretRef.current.end);
     caretRef.current = { start: null, end: null };
   }, [value]);
 
