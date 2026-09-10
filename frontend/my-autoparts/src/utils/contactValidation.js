@@ -1,4 +1,3 @@
-import { flushSync } from 'react-dom';
 
 /** ФИО: фамилия, имя, отчество (отчество опционально), кириллица, дефис в частях */
 export const FULL_NAME_REGEX =
@@ -114,17 +113,17 @@ export function handlePhoneInputChange(event, setValue) {
   const result = formatPhoneInputChange(input.value, input.selectionStart ?? input.value.length);
   const { selectionStart, selectionEnd, value } = result;
 
-  flushSync(() => {
-    setValue(value);
-  });
+  setValue(value);
 
-  if (document.activeElement === input) {
-    try {
-      input.setSelectionRange(selectionStart, selectionEnd);
-    } catch {
-      // type="tel" on some browsers may reject selection updates
+  requestAnimationFrame(() => {
+    if (document.activeElement === input && input.value === value) {
+      try {
+        input.setSelectionRange(selectionStart, selectionEnd);
+      } catch {
+        // type="tel" on some browsers may reject selection updates
+      }
     }
-  }
+  });
 }
 
 export function validatePhone(value) {
