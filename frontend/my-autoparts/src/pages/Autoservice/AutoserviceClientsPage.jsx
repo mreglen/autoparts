@@ -5,7 +5,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
-import { Skeleton, UnderlineTabs } from '../../components/UI';
+import { Skeleton, UnderlineTabs, NumericInput } from '../../components/UI';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import RepairOrderViewModal, {
   OrderStatusBadge,
@@ -935,13 +935,12 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Год</label>
-            <input
-              type="number"
+            <NumericInput
+              mode="numeric"
               className={inputClass}
               value={form.year}
               onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
-              min={1900}
-              max={2100}
+              maxLength={4}
               disabled={saving}
             />
           </div>
@@ -1108,13 +1107,12 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Год</label>
-            <input
-              type="number"
+            <NumericInput
+              mode="numeric"
               className={inputClass}
               value={form.year}
               onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
-              min={1900}
-              max={2100}
+              maxLength={4}
               disabled={saving}
             />
           </div>

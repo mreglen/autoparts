@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import { Skeleton } from '../UI';
+import NumericInput from '../UI/NumericInput';
 import { apiRequest } from '../../utils/apiClient';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 import { SHOP_PART_UNIT_LABELS } from '../../utils/repairOrderShopPartUtils';
@@ -75,8 +76,6 @@ function ReceiptLineRow({
     return price * qty;
   }, [draft.unit_price, draft.quantity, line.line_total]);
 
-  const qtyStep = draft.unit === 'pcs' ? '1' : '0.001';
-
   const patchDraft = (key, value) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
@@ -114,10 +113,8 @@ function ReceiptLineRow({
         </td>
         <td className="px-2 py-2 text-right tabular-nums">
           <div className="inline-flex items-center justify-end gap-1.5">
-            <input
-              type="number"
-              min={draft.unit === 'pcs' ? 1 : 0.001}
-              step={qtyStep}
+            <NumericInput
+              mode={draft.unit === 'pcs' ? 'numeric' : 'decimal'}
               className={inlineQtyClass}
               value={draft.quantity}
               disabled={saving}
@@ -137,10 +134,8 @@ function ReceiptLineRow({
           </div>
         </td>
         <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">
-          <input
-            type="number"
-            min={0}
-            step="0.01"
+          <NumericInput
+            mode="decimal"
             className={`${inlineInputClass} w-20 text-right tabular-nums`}
             value={draft.unit_price}
             disabled={saving}

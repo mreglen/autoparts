@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
+import NumericInput from '../UI/NumericInput';
 import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
 
 const REASONS = [
@@ -130,10 +131,9 @@ export default function AutoserviceWarehouseReturnModal({
           </div>
           <label className="block text-sm font-medium text-gray-700">
             Количество
-            <input
-              type="number"
-              min="1"
-              max={maxQty}
+            <NumericInput
+              mode="numeric"
+              maxLength={String(maxQty).length}
               value={quantity}
               onChange={(event) => setQuantity(event.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"

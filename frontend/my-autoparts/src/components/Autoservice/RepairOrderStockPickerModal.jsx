@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
+import NumericInput from '../UI/NumericInput';
 import { apiRequest } from '../../utils/apiClient';
 import { formatAutoserviceWarehouseMoney, autoserviceWarehouseItemLabel } from '../../utils/autoserviceWarehouseUi';
 import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
@@ -62,7 +63,6 @@ export default function RepairOrderStockPickerModal({
   const selected = items.find((item) => item.id === selectedId);
   const selectedUnit = selected?.unit === 'l' || selected?.unit === 'kg' ? selected.unit : 'pcs';
   const maxQty = selected?.available_qty ?? selected?.quantity ?? 1;
-  const qtyStep = selectedUnit === 'pcs' ? 1 : 0.001;
   const qtyMin = selectedUnit === 'pcs' ? 1 : 0.001;
 
   const handleConfirm = () => {
@@ -130,11 +130,8 @@ export default function RepairOrderStockPickerModal({
         {selected ? (
           <label className="block text-sm">
             <span className="font-medium text-gray-700">Количество</span>
-            <input
-              type="number"
-              min={qtyMin}
-              max={maxQty}
-              step={qtyStep}
+            <NumericInput
+              mode={selectedUnit === 'pcs' ? 'numeric' : 'decimal'}
               value={qty}
               onChange={(event) => setQty(event.target.value)}
               className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm max-md:min-h-11 max-md:text-base"
