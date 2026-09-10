@@ -1,4 +1,4 @@
-import { forwardRef, useRef } from 'react';
+import { forwardRef, useLayoutEffect, useRef } from 'react';
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ');
@@ -30,6 +30,7 @@ const NumericInput = forwardRef(function NumericInput(
   ref,
 ) {
   const inputRef = useRef(null);
+  const caretRef = useRef({ start: null, end: null });
 
   const setRef = (el) => {
     inputRef.current = el;
@@ -51,18 +52,32 @@ const NumericInput = forwardRef(function NumericInput(
     const diff = raw.length - sanitized.length;
     const nextStart = Math.max(0, start - diff);
     const nextEnd = Math.max(0, end - diff);
+    caretRef.current = { start: nextStart, end: nextEnd };
 
     input.value = sanitized;
     if (document.activeElement === input) {
       try {
         input.setSelectionRange(nextStart, nextEnd);
       } catch {
-        // some mobile browsers may reject selection updates
+        // ignore
       }
     }
 
     onChange(e);
   };
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input || caretRef.current.start === null) return;
+    if (document.activeElement === input) {
+      try {
+        input.setSelectionRange(caretRef.current.start, caretRef.current.end);
+      } catch {
+        // some mobile browsers may reject selection updates
+      }
+    }
+    caretRef.current = { start: null, end: null };
+  }, [value]);
 
   return (
     <input

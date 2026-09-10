@@ -1,4 +1,4 @@
-import { forwardRef, useRef } from 'react';
+import { forwardRef, useLayoutEffect, useRef } from 'react';
 import { formatPhoneInputChange } from '../../utils/contactValidation';
 
 function cx(...parts) {
@@ -10,6 +10,7 @@ const PhoneInput = forwardRef(function PhoneInput(
   ref,
 ) {
   const inputRef = useRef(null);
+  const caretRef = useRef({ start: null, end: null });
 
   const setRef = (el) => {
     inputRef.current = el;
@@ -29,17 +30,32 @@ const PhoneInput = forwardRef(function PhoneInput(
       input.selectionStart ?? raw.length,
     );
 
+    caretRef.current = { start: selectionStart, end: selectionEnd };
+
     input.value = formatted;
     if (document.activeElement === input) {
       try {
         input.setSelectionRange(selectionStart, selectionEnd);
       } catch {
-        // type="tel" on some browsers may reject selection updates
+        // ignore
       }
     }
 
     onChange(e);
   };
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input || caretRef.current.start === null) return;
+    if (document.activeElement === input) {
+      try {
+        input.setSelectionRange(caretRef.current.start, caretRef.current.end);
+      } catch {
+        // type="tel" / text on some browsers may reject selection updates
+      }
+    }
+    caretRef.current = { start: null, end: null };
+  }, [value]);
 
   return (
     <input
