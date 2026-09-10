@@ -453,15 +453,23 @@ export default function SalesOrdersPage() {
             return {
               ...o,
               status_code: orderStatusFromApi,
+              status_manual: true,
               items: (o.items || []).map((item) =>
-                item.id === itemId ? { ...item, status_code: statusCode } : item
+                item.id === itemId
+                  ? { ...item, status_code: statusCode, status_manual: true }
+                  : item
               ),
             };
           }
           return {
             ...o,
             status_code: statusCode,
-            items: (o.items || []).map((item) => ({ ...item, status_code: statusCode })),
+            status_manual: true,
+            items: (o.items || []).map((item) => ({
+              ...item,
+              status_code: statusCode,
+              status_manual: true,
+            })),
           };
         })
       );
@@ -477,6 +485,26 @@ export default function SalesOrdersPage() {
       return false;
     }
   };
+
+  /** Возврат заказа на автоматические статусы Rossko. */
+  const resetNewOrderSupplierStatus = useCallback(async (order) => {
+    if (!order?.id) return;
+    try {
+      const response = await apiAxios.post(
+        `/sales/new-parts-orders/${order.id}/refresh-supplier-status`
+      );
+      const updated = response.data;
+      if (!updated?.id) return;
+      setNewOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+      setUsedOrderStatusMessage(null);
+      dispatch(fetchSalesMenuCounts());
+    } catch (error) {
+      setUsedOrderStatusMessage({
+        type: 'error',
+        text: formatStatusErrorDetail(error?.response?.data?.detail),
+      });
+    }
+  }, [dispatch]);
 
   const openPickupVerifyDirect = useCallback((order, orderKind) => {
     setPickupModal({
@@ -1473,6 +1501,7 @@ export default function SalesOrdersPage() {
                   onOpenUnconfirmItem={openUnconfirmItemModal}
                   onRejectItem={rejectItem}
                   onConfirmRosskoItem={confirmRosskoItem}
+                  onResetSupplierStatus={isUsed ? undefined : resetNewOrderSupplierStatus}
                   getStatusColor={getGarageStatusColor}
                   getStatusName={(code) => getGarageStatusName(code, entry.source)}
                   orderStatusOptions={isUsed ? usedOrderStatusOptions : newOrderStatusOptions}

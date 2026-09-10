@@ -49,7 +49,9 @@ from app.services.new_parts_order_enrichment import (
     build_buyer_new_parts_order_response,
     build_seller_new_parts_order_response,
     fetch_rossko_snapshots_for_orders,
+    mark_manual_status,
     persist_rossko_supplier_statuses,
+    reset_manual_status_flags,
     sync_active_rossko_supplier_statuses,
 )
 from app.services.new_parts_seo_card_service import seo_card_ids_for_order_items
@@ -620,8 +622,12 @@ def refresh_new_parts_supplier_status(
     if not current_user.is_admin and order.organization_id != org_id:
         raise HTTPException(status_code=403, detail="Нет доступа к заказу")
 
+    # Явный запрос статуса поставщика = возврат заказа на автоматические статусы.
+    changed = reset_manual_status_flags(order)
     rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders([order])
     if persist_rossko_supplier_statuses([order], rossko_by_id, rossko_sync_error):
+        changed = True
+    if changed:
         db.commit()
     return _new_order_response(db, order, rossko_by_id=rossko_by_id, rossko_sync_error=rossko_sync_error)
 
@@ -667,6 +673,7 @@ def update_new_parts_order_status(
     order.status_code = payload.status_code
     for item in order.items:
         item.status_code = payload.status_code
+    mark_manual_status(order)
     db.commit()
     log_audit(
         db,
@@ -755,6 +762,7 @@ def update_new_parts_order_item_status(
         priority=NEW_PARTS_STATUS_PRIORITY,
         default="new_waiting_confirmation",
     )
+    mark_manual_status(order, item=item)
     db.commit()
     log_audit(
         db,

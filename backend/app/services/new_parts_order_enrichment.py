@@ -82,7 +82,11 @@ def _display_status_from_rossko_line(
     line: RosskoOrderLine | None,
     *,
     for_seller: bool = False,
+    manual: bool = False,
 ) -> str:
+    # Статус, выставленный вручную, всегда важнее статуса поставщика.
+    if manual:
+        return db_status
     if for_seller and db_status in SELLER_LOCKED_NEW_PARTS_STATUSES:
         return db_status
     if not line:
@@ -105,7 +109,7 @@ def apply_rossko_statuses_to_order(
     order: GarageNewOrder,
     snapshot: RosskoOrderSnapshot | None,
 ) -> bool:
-    """Пишет статусы Rossko в БД. Не трогает «К выдаче» / «Получен»."""
+    """Пишет статусы Rossko в БД. Не трогает ручные статусы, «К выдаче» и «Получен»."""
     if not snapshot or not snapshot.lines:
         return False
     if order.status_code in (NEW_PICKUP_READY_STATUS, "new_received"):
@@ -114,18 +118,24 @@ def apply_rossko_statuses_to_order(
     rossko_by_key = _rossko_lines_by_key(snapshot)
     changed = False
     for item in order.items:
-        if item.status_code in SELLER_LOCKED_NEW_PARTS_STATUSES:
-            continue
         line = rossko_by_key.get(item_match_key(item.brand, item.partnumber))
+        # Цену поставщика обновляем всегда — она не зависит от ручного статуса.
         if line and line.price > 0 and item.supplier_unit_price is not None:
             confirmed = float(line.price)
             if item.supplier_unit_price != confirmed:
                 item.supplier_unit_price = confirmed
                 changed = True
+        if getattr(item, "status_manual", False):
+            continue
+        if item.status_code in SELLER_LOCKED_NEW_PARTS_STATUSES:
+            continue
         mapped = _display_status_from_rossko_line(item.status_code, line, for_seller=True)
         if mapped != item.status_code:
             item.status_code = mapped
             changed = True
+
+    if getattr(order, "status_manual", False):
+        return changed
 
     new_order_status = aggregate_status_from_codes(
         [item.status_code for item in order.items],
@@ -153,6 +163,29 @@ def persist_rossko_supplier_statuses(
         if apply_rossko_statuses_to_order(order, snapshot):
             changed = True
     return changed
+
+
+def reset_manual_status_flags(order: GarageNewOrder) -> bool:
+    """Возвращает заказ на автоматические статусы Rossko."""
+    changed = False
+    if getattr(order, "status_manual", False):
+        order.status_manual = False
+        changed = True
+    for item in order.items:
+        if getattr(item, "status_manual", False):
+            item.status_manual = False
+            changed = True
+    return changed
+
+
+def mark_manual_status(order: GarageNewOrder, *, item: GarageNewOrderItem | None = None) -> None:
+    """Помечает статус как выставленный вручную, чтобы автосинк его не менял."""
+    order.status_manual = True
+    if item is not None:
+        item.status_manual = True
+        return
+    for order_item in order.items:
+        order_item.status_manual = True
 
 
 def orders_pending_rossko_sync(orders: list[GarageNewOrder]) -> list[GarageNewOrder]:
@@ -199,7 +232,9 @@ def merge_seller_items_with_rossko(
                     item.status_code,
                     line,
                     for_seller=True,
+                    manual=bool(getattr(item, "status_manual", False)),
                 ),
+                status_manual=bool(getattr(item, "status_manual", False)),
                 rossko_status=format_rossko_status(line.status_code) if line else None,
                 seo_card_id=resolve_seo_card_id(db, item),
             )
@@ -220,7 +255,11 @@ def merge_buyer_items_with_rossko(
     merged: list[PurchasedNewOrderItemResponse] = []
     for item in order.items:
         line = rossko_by_key.get(item_match_key(item.brand, item.partnumber))
-        status_code = _display_status_from_rossko_line(item.status_code, line)
+        status_code = _display_status_from_rossko_line(
+            item.status_code,
+            line,
+            manual=bool(getattr(item, "status_manual", False)),
+        )
         link = (repair_order_links or {}).get(item.id) or {}
         if seo_card_by_item_id is not None:
             seo_card_id = seo_card_by_item_id.get(int(item.id))
@@ -262,8 +301,9 @@ def build_seller_new_parts_order_response(
     items = merge_seller_items_with_rossko(db, order, snapshot, resolve_seo_card_id=resolve_seo_card_id)
     sync_error = per_order_sync_error(snapshot, rossko_sync_error) if rossko_id else None
 
+    status_manual = bool(getattr(order, "status_manual", False))
     status_code = order.status_code
-    if order.status_code in (NEW_PICKUP_READY_STATUS, "new_received"):
+    if status_manual or order.status_code in (NEW_PICKUP_READY_STATUS, "new_received"):
         status_code = order.status_code
     elif snapshot and not rossko_sync_error:
         status_code = aggregate_status_from_codes(
@@ -274,6 +314,7 @@ def build_seller_new_parts_order_response(
     update: dict = {
         "items": items,
         "status_code": status_code,
+        "status_manual": status_manual,
         "buyer_avatar_url": buyer_avatar_url,
         "buyer_user_id": buyer_user_id,
     }
@@ -312,7 +353,10 @@ def build_buyer_new_parts_order_response(
     )
 
     status_code = order.status_code
-    if order.status_code in (NEW_PICKUP_READY_STATUS, "new_received"):
+    if getattr(order, "status_manual", False) or order.status_code in (
+        NEW_PICKUP_READY_STATUS,
+        "new_received",
+    ):
         status_code = order.status_code
     elif snapshot and not rossko_sync_error:
         status_code = aggregate_status_from_codes(

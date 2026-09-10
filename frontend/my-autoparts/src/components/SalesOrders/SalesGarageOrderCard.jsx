@@ -135,6 +135,7 @@ export default function SalesGarageOrderCard({
   onOpenUnconfirmItem,
   onRejectItem,
   onConfirmRosskoItem,
+  onResetSupplierStatus,
   statusEditable = true,
   getStatusColor,
   getStatusName,
@@ -152,6 +153,7 @@ export default function SalesGarageOrderCard({
   const rosskoStatus = order.rossko_status;
   const rosskoOrderId = order.rossko_order_id;
   const rosskoSyncError = order.rossko_sync_error;
+  const statusIsManual = Boolean(order.status_manual);
   const isPickup = String(order.delivery_type || '').toLowerCase() === 'pickup';
   const isRossko = isNew && isRosskoNewOrder(order);
   const billableItems = items.filter((item) => (item.status_code || '') !== 'rejected');
@@ -398,6 +400,19 @@ export default function SalesGarageOrderCard({
                   {rosskoStatus}
                 </span>
               )}
+              {isNew && statusIsManual && onResetSupplierStatus ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onResetSupplierStatus(order);
+                  }}
+                  className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-200 transition hover:bg-amber-100"
+                  title="Статус выставлен вручную. Нажмите, чтобы снова обновлять его автоматически по данным Rossko"
+                >
+                  Вручную · вернуть авто
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

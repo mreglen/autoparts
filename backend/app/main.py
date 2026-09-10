@@ -107,6 +107,7 @@ from app.db.schema_patches import (
     ensure_supplier_unit_price_columns,
     ensure_yookassa_payment_economics_columns,
     ensure_garage_new_order_yookassa_columns,
+    ensure_garage_new_order_status_manual_columns,
     ensure_seo_landing_pages_table,
     ensure_openrouter_tables,
     ensure_vpn_bot_tables,
@@ -348,6 +349,7 @@ try:
     ensure_supplier_unit_price_columns()
     ensure_yookassa_payment_economics_columns()
     ensure_garage_new_order_yookassa_columns()
+    ensure_garage_new_order_status_manual_columns()
     ensure_seo_landing_pages_table()
     ensure_openrouter_tables()
     ensure_vpn_bot_tables()

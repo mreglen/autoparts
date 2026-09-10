@@ -2359,6 +2359,32 @@ def ensure_garage_new_order_yookassa_columns() -> None:
     logger.info("Applied garage_new_orders YooKassa column patches: %s", statements)
 
 
+def ensure_garage_new_order_status_manual_columns() -> None:
+    """Флаг ручного статуса: автосинхронизация Rossko его не перетирает."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    bool_default = (
+        "BOOLEAN NOT NULL DEFAULT FALSE"
+        if engine.dialect.name == "postgresql"
+        else "BOOLEAN NOT NULL DEFAULT 0"
+    )
+
+    statements: list[str] = []
+    for table in ("garage_new_orders", "garage_new_order_items"):
+        if table not in table_names:
+            continue
+        columns = {col["name"] for col in inspector.get_columns(table)}
+        if "status_manual" not in columns:
+            statements.append(f"ALTER TABLE {table} ADD COLUMN status_manual {bool_default}")
+
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied garage new orders status_manual column patches: %s", statements)
+
+
 def ensure_seo_landing_pages_table() -> None:
     """Create seo_landing_pages table for brand/category/geo SEO landings."""
     inspector = inspect(engine)

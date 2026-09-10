@@ -10,7 +10,9 @@ from app.services.new_parts_order_enrichment import (
     build_buyer_new_parts_order_response,
     build_seller_new_parts_order_response,
     fetch_rossko_snapshots_for_orders,
+    mark_manual_status,
     persist_rossko_supplier_statuses,
+    reset_manual_status_flags,
 )
 from app.services.rossko_get_orders_service import RosskoOrderLine, RosskoOrderSnapshot
 
@@ -29,6 +31,7 @@ def _sample_order(*, rossko_order_id: str | None = "12345"):
         price=450.0,
         supplier_unit_price=420.0,
         status_code="new_waiting_confirmation",
+        status_manual=False,
     )
     return SimpleNamespace(
         id=10,
@@ -46,6 +49,7 @@ def _sample_order(*, rossko_order_id: str | None = "12345"):
         total_amount=900.0,
         is_paid=True,
         status_code="new_waiting_confirmation",
+        status_manual=False,
         seller="Магазин",
         deliver_in_parts=False,
         rossko_order_id=rossko_order_id,
@@ -219,6 +223,59 @@ class NewPartsOrderEnrichmentTests(unittest.TestCase):
         self.assertFalse(changed)
         self.assertEqual(order.status_code, "new_waiting_confirmation")
         self.assertEqual(order.items[0].status_code, "new_waiting_confirmation")
+
+    def test_manual_status_is_not_overwritten_by_rossko(self):
+        order = _sample_order()
+        mark_manual_status(order)
+        order.status_code = "new_assembling"
+        order.items[0].status_code = "new_assembling"
+
+        persist_rossko_supplier_statuses([order], {"12345": _sample_snapshot()}, None)
+
+        self.assertEqual(order.status_code, "new_assembling")
+        self.assertEqual(order.items[0].status_code, "new_assembling")
+
+    def test_manual_status_still_updates_supplier_price(self):
+        order = _sample_order()
+        mark_manual_status(order)
+        order.items[0].supplier_unit_price = 100.0
+
+        changed = persist_rossko_supplier_statuses([order], {"12345": _sample_snapshot()}, None)
+
+        self.assertTrue(changed)
+        self.assertEqual(order.items[0].supplier_unit_price, 450.0)
+        self.assertEqual(order.items[0].status_code, "new_waiting_confirmation")
+
+    def test_reset_manual_flags_restores_auto_sync(self):
+        order = _sample_order()
+        mark_manual_status(order)
+
+        self.assertTrue(reset_manual_status_flags(order))
+        self.assertFalse(order.status_manual)
+        self.assertFalse(order.items[0].status_manual)
+
+        persist_rossko_supplier_statuses([order], {"12345": _sample_snapshot()}, None)
+        self.assertEqual(order.status_code, "new_shipped")
+        self.assertEqual(order.items[0].status_code, "new_shipped")
+
+    def test_seller_response_reports_manual_flag(self):
+        order = _sample_order()
+        mark_manual_status(order)
+        order.status_code = "new_assembling"
+        order.items[0].status_code = "new_assembling"
+
+        response = build_seller_new_parts_order_response(
+            self.db,
+            order,
+            rossko_by_id={"12345": _sample_snapshot()},
+            resolve_seo_card_id=_noop_seo,
+        )
+
+        self.assertTrue(response.status_manual)
+        self.assertEqual(response.status_code, "new_assembling")
+        self.assertEqual(response.items[0].status_code, "new_assembling")
+        # Подпись статуса поставщика всё равно показываем.
+        self.assertEqual(response.items[0].rossko_status, "Отгружено")
 
     def test_pending_rossko_sync_skips_ready_for_pickup(self):
         from app.services.new_parts_order_enrichment import orders_pending_rossko_sync

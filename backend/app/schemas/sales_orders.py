@@ -95,6 +95,7 @@ class NewPartsOrderItemResponse(BaseModel):
     quantity: int
     price: float
     status_code: str
+    status_manual: bool = False
     rossko_status: Optional[str] = None
     seo_card_id: Optional[int] = None
 
@@ -123,6 +124,7 @@ class NewPartsOrderResponse(BaseModel):
     total_amount: float
     is_paid: bool
     status_code: str
+    status_manual: bool = False
     seller: Optional[str] = None
     deliver_in_parts: bool
     rossko_order_id: Optional[str] = None

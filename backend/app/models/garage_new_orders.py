@@ -27,6 +27,8 @@ class GarageNewOrder(Base):
     total_amount = Column(Float, nullable=False, default=0.0)
     is_paid = Column(Boolean, nullable=False, default=False)
     status_code = Column(String(50), nullable=False, default="new_waiting_confirmation", index=True)
+    # Статус выставлен вручную — автоматическая синхронизация Rossko его не перетирает.
+    status_manual = Column(Boolean, nullable=False, default=False)
 
     pickup_code_hash = Column(String(64), nullable=True)
     pickup_code_cipher = Column(Text, nullable=True)
@@ -66,6 +68,7 @@ class GarageNewOrderItem(Base):
     price = Column(Float, nullable=False, default=0.0)
     supplier_unit_price = Column(Float, nullable=True)
     status_code = Column(String(50), nullable=False, default="new_waiting_confirmation", index=True)
+    status_manual = Column(Boolean, nullable=False, default=False)
     seo_card_id = Column(Integer, ForeignKey("new_parts_seo_cards.id"), nullable=True, index=True)
 
     order = relationship("GarageNewOrder", back_populates="items")
