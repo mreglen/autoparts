@@ -1,4 +1,4 @@
-import { forwardRef, useLayoutEffect, useRef } from 'react';
+import { forwardRef, useRef } from 'react';
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ');
@@ -30,7 +30,6 @@ const NumericInput = forwardRef(function NumericInput(
   ref,
 ) {
   const inputRef = useRef(null);
-  const caretRef = useRef({ start: null, end: null });
 
   const setRef = (el) => {
     inputRef.current = el;
@@ -50,21 +49,20 @@ const NumericInput = forwardRef(function NumericInput(
     const sanitized = sanitizeValue(raw, { mode, maxLength });
 
     const diff = raw.length - sanitized.length;
-    caretRef.current = {
-      start: Math.max(0, start - diff),
-      end: Math.max(0, end - diff),
-    };
+    const nextStart = Math.max(0, start - diff);
+    const nextEnd = Math.max(0, end - diff);
 
     input.value = sanitized;
+    if (document.activeElement === input) {
+      try {
+        input.setSelectionRange(nextStart, nextEnd);
+      } catch {
+        // some mobile browsers may reject selection updates
+      }
+    }
+
     onChange(e);
   };
-
-  useLayoutEffect(() => {
-    const input = inputRef.current;
-    if (!input || caretRef.current.start === null) return;
-    input.setSelectionRange(caretRef.current.start, caretRef.current.end);
-    caretRef.current = { start: null, end: null };
-  }, [value]);
 
   return (
     <input
