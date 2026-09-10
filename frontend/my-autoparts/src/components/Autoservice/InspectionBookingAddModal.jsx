@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
-import { handlePhoneInputChange, validatePhone } from '../../utils/contactValidation';
+import {
+  formatPhoneFromRaw,
+  handlePhoneInputChange,
+  validatePhone,
+} from '../../utils/contactValidation';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
@@ -23,6 +27,7 @@ export default function InspectionBookingAddModal({
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const isEdit = Boolean(initialBooking?.id);
   const initialName = (isEdit ? initialBooking.name : '') || '';
   const initialPhone = (isEdit ? initialBooking.phone : '') || '';
@@ -38,7 +43,8 @@ export default function InspectionBookingAddModal({
     setPhoneError('');
     setError(null);
     setSaving(false);
-  }, [open, initialName, initialPhone, initialPreferred, initialNotes]);
+    setIsEditing(!isEdit);
+  }, [open, initialName, initialPhone, initialPreferred, initialNotes, isEdit]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,91 +95,159 @@ export default function InspectionBookingAddModal({
     }
   };
 
+  function formatDateView(value) {
+    if (!value) return '—';
+    const date = new Date(`${value}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('ru-RU');
+  }
+
+  const modalTitle = isEdit
+    ? (isEditing ? 'Редактировать запись' : 'Запись на осмотр')
+    : title;
+
+  const footer = isEditing ? (
+    <div className="flex justify-end gap-2">
+      <button
+        type="button"
+        onClick={() => {
+          if (isEdit) {
+            setName(initialName);
+            setPhone(initialPhone);
+            setPreferredDate(initialPreferred);
+            setNotes(initialNotes);
+            setPhoneError('');
+            setError(null);
+            setIsEditing(false);
+          } else {
+            onClose?.();
+          }
+        }}
+        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+        disabled={saving}
+      >
+        {isEdit ? 'Отмена' : 'Закрыть'}
+      </button>
+      <button
+        type="submit"
+        form="add-inspection-booking"
+        disabled={saving}
+        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+      >
+        {saving ? 'Сохранение…' : 'Сохранить'}
+      </button>
+    </div>
+  ) : (
+    <div className="flex justify-end gap-2">
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+      >
+        Закрыть
+      </button>
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
+        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+      >
+        Редактировать
+      </button>
+    </div>
+  );
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Редактировать запись' : title}
+      title={modalTitle}
       size="sm"
-      footer={
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            disabled={saving}
-          >
-            Отмена
-          </button>
-          <button
-            type="submit"
-            form="add-inspection-booking"
-            disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
-          >
-            {saving ? (isEdit ? 'Сохранение…' : 'Создание…') : (isEdit ? 'Сохранить' : 'Создать')}
-          </button>
-        </div>
-      }
+      footer={footer}
     >
-      <form id="add-inspection-booking" onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">{isEdit ? 'Клиент' : 'Имя'}</label>
-          <input
-            className={inputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={saving}
-            required
-            maxLength={120}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Телефон</label>
-          <input
-            type="tel"
-            className={`${inputClass} ${phoneError ? 'border-red-500' : ''}`}
-            value={phone}
-            onChange={(e) => {
-              handlePhoneInputChange(e, setPhone);
-              setPhoneError('');
-            }}
-            placeholder="+7 (___) ___-__-__"
-            disabled={saving}
-            required
-          />
-          {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">{isEdit ? 'Дата' : 'Желаемая дата'}</label>
-          <input
-            type="date"
-            className={inputClass}
-            value={preferredDate}
-            onChange={(e) => setPreferredDate(e.target.value)}
-            disabled={saving}
-            required
-          />
-        </div>
-        {isEdit && initialBooking?.vehicle && initialBooking.vehicle !== '—' ? (
+      {isEditing ? (
+        <form id="add-inspection-booking" onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Автомобиль</label>
-            <p className="mt-1 text-sm text-gray-900">{initialBooking.vehicle}</p>
+            <label className="block text-sm font-medium text-gray-700">{isEdit ? 'Клиент' : 'Имя'}</label>
+            <input
+              className={inputClass}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={saving}
+              required
+              maxLength={120}
+            />
           </div>
-        ) : null}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Заметка</label>
-          <textarea
-            className={inputClass}
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            disabled={saving}
-            maxLength={2000}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Телефон</label>
+            <input
+              type="tel"
+              className={`${inputClass} ${phoneError ? 'border-red-500' : ''}`}
+              value={phone}
+              onChange={(e) => {
+                handlePhoneInputChange(e, setPhone);
+                setPhoneError('');
+              }}
+              placeholder="+7 (___) ___-__-__"
+              disabled={saving}
+              required
+            />
+            {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">{isEdit ? 'Дата' : 'Желаемая дата'}</label>
+            <input
+              type="date"
+              className={inputClass}
+              value={preferredDate}
+              onChange={(e) => setPreferredDate(e.target.value)}
+              disabled={saving}
+              required
+            />
+          </div>
+          {isEdit && initialBooking?.vehicle && initialBooking.vehicle !== '—' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Автомобиль</label>
+              <p className="mt-1 text-sm text-gray-900">{initialBooking.vehicle}</p>
+            </div>
+          ) : null}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Заметка</label>
+            <textarea
+              className={inputClass}
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={saving}
+              maxLength={2000}
+            />
+          </div>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        </form>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Клиент</label>
+            <p className="mt-0.5 text-sm text-gray-900">{name || '—'}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Телефон</label>
+            <p className="mt-0.5 text-sm text-gray-900">{formatPhoneFromRaw(phone) || '—'}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Дата</label>
+            <p className="mt-0.5 text-sm text-gray-900">{formatDateView(preferredDate)}</p>
+          </div>
+          {initialBooking?.vehicle && initialBooking.vehicle !== '—' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Автомобиль</label>
+              <p className="mt-0.5 text-sm text-gray-900">{initialBooking.vehicle}</p>
+            </div>
+          ) : null}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Заметка</label>
+            <p className="mt-0.5 whitespace-pre-wrap text-sm text-gray-900">{notes || '—'}</p>
+          </div>
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      </form>
+      )}
     </Modal>
   );
 }
