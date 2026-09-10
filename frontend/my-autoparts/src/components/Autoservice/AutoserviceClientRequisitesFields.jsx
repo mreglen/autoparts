@@ -25,7 +25,7 @@ export default function AutoserviceClientRequisitesFields({
     <div className="space-y-4">
       <div>
         <FieldLabel>Тип</FieldLabel>
-        <div className="grid grid-cols-3 gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+        <div className="grid grid-cols-3 gap-1 rounded-sg-sm border border-line bg-surface-muted p-1">
           {PERSON_TYPES.map((item) => {
             const active = personType === item.id;
             return (
@@ -37,8 +37,8 @@ export default function AutoserviceClientRequisitesFields({
                 className={cx(
                   'rounded-md px-2 py-2 text-sm font-medium transition',
                   active
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900',
+                    ? 'bg-surface text-ink shadow-sm'
+                    : 'text-ink-muted hover:text-ink',
                   disabled ? 'cursor-not-allowed opacity-60' : '',
                 )}
               >

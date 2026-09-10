@@ -10,11 +10,11 @@ import { toDateInputValue } from '../../utils/serverDate';
 import AutoserviceWarehouseReturnModal from './AutoserviceWarehouseReturnModal';
 
 const inlineInputClass =
-  'block w-full min-w-0 rounded-md border border-line bg-white px-2 py-1 text-xs leading-tight text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
+  'block w-full min-w-0 rounded-md border border-line bg-surface px-2 py-1 text-xs leading-tight text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
 const inlineQtyClass =
-  'w-14 shrink-0 rounded-md border border-line bg-white px-2 py-1 text-right text-xs tabular-nums text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
+  'w-14 shrink-0 rounded-md border border-line bg-surface px-2 py-1 text-right text-xs tabular-nums text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
 const inlineSelectClass =
-  'shrink-0 min-w-[3.5rem] rounded-md border border-line bg-white py-1 pl-2 pr-7 text-xs leading-tight text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
+  'shrink-0 min-w-[3.5rem] rounded-md border border-line bg-surface py-1 pl-2 pr-7 text-xs leading-tight text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 disabled:bg-surface-subtle';
 
 function receiptDocDateSource(doc) {
   if (!doc) return '';

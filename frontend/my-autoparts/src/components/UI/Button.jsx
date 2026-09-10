@@ -4,7 +4,7 @@ const VARIANT_CLASS = {
   primary:
     'bg-brand-600 text-white hover:bg-brand-700 focus-visible:ring-brand-500 shadow-sg-sm',
   secondary:
-    'border border-line bg-white text-ink-soft hover:bg-surface-muted focus-visible:ring-brand-500',
+    'border border-line bg-surface text-ink-soft hover:bg-surface-muted focus-visible:ring-brand-500',
   ghost:
     'bg-transparent text-ink-soft hover:bg-surface-subtle focus-visible:ring-brand-500',
   danger:
@@ -13,8 +13,6 @@ const VARIANT_CLASS = {
     'bg-accent-600 text-white hover:bg-accent-700 focus-visible:ring-accent-500 shadow-sg-sm',
   soft:
     'bg-brand-50 text-brand-700 hover:bg-brand-100 focus-visible:ring-brand-500',
-  softAccent:
-    'bg-accent-50 text-accent-700 hover:bg-accent-100 focus-visible:ring-accent-500',
   softAccent:
     'bg-accent-50 text-accent-700 hover:bg-accent-100 focus-visible:ring-accent-500',
 };

@@ -34,8 +34,8 @@ const METHOD_BLOCKS = [
 const tabFilterButtonClass = (active) =>
   `inline-flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
     active
-      ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200'
-      : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
+      ? 'bg-surface text-ink shadow-sm ring-1 ring-line'
+      : 'text-ink-muted hover:bg-surface/60 hover:text-ink'
   }`;
 
 function receiptsWord(count) {
@@ -47,14 +47,14 @@ function receiptsWord(count) {
 function FinanceField({ label, children }) {
   return (
     <div className="flex justify-between gap-3 text-sm">
-      <span className="shrink-0 text-gray-500">{label}</span>
-      <span className="min-w-0 text-right font-medium text-gray-900 break-words">{children}</span>
+      <span className="shrink-0 text-ink-muted">{label}</span>
+      <span className="min-w-0 text-right font-medium text-ink break-words">{children}</span>
     </div>
   );
 }
 
 const paymentDateInputClass =
-  'block w-full min-w-[9.5rem] rounded-full border border-transparent bg-gray-100 px-3 py-1.5 text-sm text-gray-900 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-wait disabled:opacity-60';
+  'sg-pill-input sg-native-date-input w-full min-w-[9.5rem] disabled:cursor-wait disabled:opacity-60';
 
 function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
   const [draft, setDraft] = useState(() => toDateInputValue(row.created_at));
@@ -97,7 +97,7 @@ function FinanceReceiptRows({
 }) {
   if (!entries.length) {
     return (
-      <p className={`${warehouseEmptyShellClass} text-sm text-gray-500`}>
+      <p className={`${warehouseEmptyShellClass} text-sm text-ink-muted`}>
         {emptyText}
       </p>
     );
@@ -109,7 +109,7 @@ function FinanceReceiptRows({
         {entries.map(({ row, hint }) => (
           <div
             key={row.id}
-            className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80"
+            className="space-y-2 rounded-sg-lg bg-surface p-4 ring-1 ring-line/80"
           >
             <FinanceField label="Клиент">{financeReceiptClientLabel(row)}</FinanceField>
             {showMethod ? (
@@ -118,14 +118,14 @@ function FinanceReceiptRows({
             <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
             <FinanceField label="Дата">{formatServerDateTime(row.created_at)}</FinanceField>
             {showMatchHint && hint ? (
-              <p className="text-xs text-indigo-700">{hint}</p>
+              <p className="text-xs text-brand-700">{hint}</p>
             ) : null}
             {!showMethod ? (
               <>
                 <FinanceField label="№">{row.sequential_number}</FinanceField>
                 <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
                 <div className="flex justify-between gap-3 text-sm">
-                  <span className="shrink-0 text-gray-500">Дата</span>
+                  <span className="shrink-0 text-ink-muted">Дата</span>
                   <PaymentReceiptDateField
                     row={row}
                     todayDate={todayDate}
@@ -138,7 +138,7 @@ function FinanceReceiptRows({
                     type="button"
                     onClick={() => onDeletePayment(row)}
                     disabled={Boolean(deletingPaymentId)}
-                    className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-wait disabled:opacity-60"
+                    className="text-sm font-medium text-danger-600 transition hover:text-danger-700 disabled:cursor-wait disabled:opacity-60"
                   >
                     Отменить оплату
                   </button>
@@ -149,9 +149,9 @@ function FinanceReceiptRows({
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto rounded-2xl bg-white ring-1 ring-gray-200/80 md:block">
+      <div className="hidden overflow-x-auto rounded-sg-lg bg-surface ring-1 ring-line/80 md:block">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+          <thead className="bg-surface-muted text-left text-xs uppercase tracking-wide text-ink-muted">
             <tr>
               {showMethod ? null : <th className="px-4 py-3 font-medium">№</th>}
               {showMethod ? null : <th className="px-4 py-3 font-medium">Заказ-наряд</th>}
@@ -163,11 +163,11 @@ function FinanceReceiptRows({
               {showMethod ? null : <th className="px-4 py-3 text-right font-medium">Действия</th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-line-soft">
             {entries.map(({ row, hint }) => (
-              <tr key={row.id} className="hover:bg-gray-50/80">
+              <tr key={row.id} className="hover:bg-surface-muted/80">
                 {showMethod ? null : (
-                  <td className="px-4 py-3 tabular-nums font-medium text-gray-900">
+                  <td className="px-4 py-3 tabular-nums font-medium text-ink">
                     {row.sequential_number}
                   </td>
                 )}
@@ -196,7 +196,7 @@ function FinanceReceiptRows({
                   )}
                 </td>
                 {showMatchHint ? (
-                  <td className="px-4 py-3 text-gray-600">{hint || '—'}</td>
+                  <td className="px-4 py-3 text-ink-muted">{hint || '—'}</td>
                 ) : null}
                 {showMethod ? null : (
                   <td className="px-4 py-3 text-right">
@@ -204,7 +204,7 @@ function FinanceReceiptRows({
                       type="button"
                       onClick={() => onDeletePayment(row)}
                       disabled={Boolean(deletingPaymentId)}
-                      className="text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-wait disabled:opacity-60"
+                      className="text-sm font-medium text-danger-600 transition hover:text-danger-700 disabled:cursor-wait disabled:opacity-60"
                     >
                       Отменить
                     </button>
@@ -296,7 +296,7 @@ export default function AutoserviceFinancePage() {
     }
   };
 
-  const items = data.items || [];
+  const items = useMemo(() => data.items || [], [data.items]);
   const searchApplied = Boolean(searchQuery.trim());
 
   const searchResults = useMemo(
@@ -341,27 +341,27 @@ export default function AutoserviceFinancePage() {
   return (
     <div className={`${warehousePageClass} min-w-0 space-y-4`}>
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Финансы</h1>
+        <h1 className="text-2xl font-bold text-ink sm:text-[1.75rem]">Финансы</h1>
         <div className="grid grid-cols-2 gap-4 sm:flex sm:shrink-0 sm:gap-8">
           <div className="text-center">
             {loading ? (
               <Skeleton className="mx-auto h-8 w-24 sm:h-9" />
             ) : (
-              <div className="text-2xl font-bold tabular-nums leading-none text-gray-900 sm:text-[1.75rem]">
+              <div className="text-2xl font-bold tabular-nums leading-none text-ink sm:text-[1.75rem]">
                 {formatFinanceCurrency(data.total_amount)}
               </div>
             )}
-            <div className="mt-1.5 text-xs text-gray-500 sm:text-sm">Итого</div>
+            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">Итого</div>
           </div>
           <div className="text-center">
             {loading ? (
               <Skeleton className="mx-auto h-8 w-12 sm:h-9" />
             ) : (
-              <div className="text-2xl font-bold tabular-nums leading-none text-indigo-600 sm:text-[1.75rem]">
+              <div className="text-2xl font-bold tabular-nums leading-none text-brand-600 sm:text-[1.75rem]">
                 {data.count ?? 0}
               </div>
             )}
-            <div className="mt-1.5 text-xs text-gray-500 sm:text-sm">Платежей</div>
+            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">Платежей</div>
           </div>
         </div>
       </div>
@@ -369,7 +369,7 @@ export default function AutoserviceFinancePage() {
       <MobileCollapsibleFilters title="Период">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block min-w-0">
-            <span className="mb-1.5 block text-xs font-medium text-gray-500">Период с</span>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
             <input
               type="date"
               value={dateFrom}
@@ -383,7 +383,7 @@ export default function AutoserviceFinancePage() {
             />
           </label>
           <label className="block min-w-0">
-            <span className="mb-1.5 block text-xs font-medium text-gray-500">Период по</span>
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
             <input
               type="date"
               value={dateTo}
@@ -401,7 +401,7 @@ export default function AutoserviceFinancePage() {
       </MobileCollapsibleFilters>
 
       {error ? (
-        <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200/80">
+        <div className="rounded-sg-lg bg-danger-50 px-4 py-3 text-sm text-danger-700 ring-1 ring-danger-200/80">
           {error}
         </div>
       ) : null}
@@ -424,7 +424,7 @@ export default function AutoserviceFinancePage() {
       />
 
       {searchApplied && !selectedMethod ? (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-ink-muted">
           {loading ? 'Поиск…' : `Найдено ${searchResults.length} из ${items.length}`}
         </p>
       ) : null}
@@ -441,15 +441,15 @@ export default function AutoserviceFinancePage() {
             </div>
             <div className="space-y-3 md:hidden">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">
+                <div key={i} className="space-y-3 rounded-sg-lg bg-surface p-4 ring-1 ring-line/80">
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-4/5" />
                   <Skeleton className="h-4 w-3/5" />
                 </div>
               ))}
             </div>
-            <div className="hidden overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/80 md:block">
-              <div className="space-y-0 divide-y divide-gray-100 px-4 py-2">
+            <div className="hidden overflow-hidden rounded-sg-lg bg-surface ring-1 ring-line/80 md:block">
+              <div className="space-y-0 divide-y divide-line-soft px-4 py-2">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="flex items-center gap-4 py-3">
                     <Skeleton className="h-4 w-10" />
@@ -467,7 +467,7 @@ export default function AutoserviceFinancePage() {
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80 sm:p-5"
+                className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80 sm:p-5"
               >
                 <Skeleton className="h-3 w-16 sm:h-4 sm:w-24" />
                 <div className="mt-3 space-y-2">
@@ -496,7 +496,7 @@ export default function AutoserviceFinancePage() {
             <button
               type="button"
               onClick={() => setSelectedMethod(null)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-gray-100 px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-200"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-subtle px-3 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -504,8 +504,8 @@ export default function AutoserviceFinancePage() {
               Назад
             </button>
             <div className="text-right">
-              <p className="text-sm font-semibold text-gray-900">{selectedBlock.label}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm font-semibold text-ink">{selectedBlock.label}</p>
+              <p className="text-xs text-ink-muted">
                 {formatFinanceCurrency(selectedBlock.amount)} · {selectedBlock.count} {receiptsWord(selectedBlock.count)}
                 {searchApplied ? ` · по запросу «${searchQuery.trim()}»` : ''}
               </p>
@@ -530,14 +530,14 @@ export default function AutoserviceFinancePage() {
               key={block.id}
               type="button"
               onClick={() => setSelectedMethod(block.id)}
-              className="rounded-2xl bg-white p-4 text-left ring-1 ring-gray-200/80 transition hover:bg-gray-50 hover:ring-gray-300 sm:p-5"
+              className="rounded-sg-lg bg-surface p-4 text-left ring-1 ring-line/80 transition hover:bg-surface-muted hover:ring-line-strong sm:p-5"
             >
-              <p className="text-[11px] font-medium leading-tight text-gray-500 sm:text-sm">{block.label}</p>
+              <p className="text-[11px] font-medium leading-tight text-ink-muted sm:text-sm">{block.label}</p>
               <div className="mt-3">
-                <p className="text-base font-bold tabular-nums leading-tight text-gray-900 sm:text-2xl">
+                <p className="text-base font-bold tabular-nums leading-tight text-ink sm:text-2xl">
                   {formatFinanceCurrency(block.amount)}
                 </p>
-                <p className="mt-1 text-[11px] text-gray-500 sm:text-xs">
+                <p className="mt-1 text-[11px] text-ink-muted sm:text-xs">
                   {block.count} {receiptsWord(block.count)}
                 </p>
               </div>

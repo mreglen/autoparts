@@ -83,19 +83,19 @@ export default function RepairOrderStockPickerModal({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Поиск по названию, артикулу, бренду"
-          className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm max-md:min-h-11 max-md:text-base"
+          className="sg-pill-input w-full"
           autoFocus
         />
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <div className="rounded-sg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700">
             {error}
           </div>
         ) : null}
-        <div className="max-h-72 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+        <div className="max-h-72 overflow-y-auto rounded-sg border border-line divide-y divide-line-soft">
           {loading ? (
-            <div className="px-4 py-8 text-center text-sm text-gray-500">Загрузка…</div>
+            <div className="px-4 py-8 text-center text-sm text-ink-muted">Загрузка…</div>
           ) : items.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-gray-500">Позиции не найдены</div>
+            <div className="px-4 py-8 text-center text-sm text-ink-muted">Позиции не найдены</div>
           ) : (
             items.map((item) => {
               const label = autoserviceWarehouseItemLabel(item);
@@ -110,16 +110,16 @@ export default function RepairOrderStockPickerModal({
                     setQty('1');
                   }}
                   className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left text-sm transition ${
-                    selectedId === item.id ? 'bg-indigo-50' : 'hover:bg-gray-50'
+                    selectedId === item.id ? 'bg-brand-50' : 'hover:bg-surface-muted'
                   }`}
                 >
                   <div className="min-w-0">
-                    <div className="font-medium text-gray-900">{label || '—'}</div>
-                    <div className="mt-0.5 text-xs text-gray-500">
+                    <div className="font-medium text-ink">{label || '—'}</div>
+                    <div className="mt-0.5 text-xs text-ink-muted">
                       Доступно: {available} {unitLabel}
                     </div>
                   </div>
-                  <div className="shrink-0 font-semibold tabular-nums text-gray-900">
+                  <div className="shrink-0 font-semibold tabular-nums text-ink">
                     {formatAutoserviceWarehouseMoney(item.price ?? item.unit_price)}
                   </div>
                 </button>
@@ -129,14 +129,14 @@ export default function RepairOrderStockPickerModal({
         </div>
         {selected ? (
           <label className="block text-sm">
-            <span className="font-medium text-gray-700">Количество</span>
+            <span className="font-medium text-ink-soft">Количество</span>
             <NumericInput
               mode={selectedUnit === 'pcs' ? 'numeric' : 'decimal'}
               value={qty}
               onChange={(event) => setQty(event.target.value)}
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm max-md:min-h-11 max-md:text-base"
+              className="sg-pill-input mt-1 w-full"
             />
-            <span className="mt-1 block text-xs text-gray-500">
+            <span className="mt-1 block text-xs text-ink-muted">
               Доступно: {maxQty} {formatShopPartUnit(selectedUnit)}
             </span>
           </label>

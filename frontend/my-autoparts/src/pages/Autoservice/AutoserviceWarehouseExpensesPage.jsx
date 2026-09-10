@@ -32,21 +32,21 @@ function formatDate(value) {
 
 function ExpenseMobileCard({ row }) {
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
+    <div className="border-b border-line-soft py-3 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-gray-900">{row.name || '—'}</p>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="font-medium text-ink">{row.name || '—'}</p>
+          <p className="mt-0.5 text-xs text-ink-muted">
             {[row.brand, row.article].filter(Boolean).join(' · ') || '—'}
           </p>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-ink-muted">
             {formatDate(row.created_at)}
             {row.reason ? ` · ${row.reason}` : ''}
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="tabular-nums text-sm font-semibold text-gray-900">{row.quantity} шт.</p>
-          <p className="mt-0.5 tabular-nums text-xs text-gray-600">
+          <p className="tabular-nums text-sm font-semibold text-ink">{row.quantity} шт.</p>
+          <p className="mt-0.5 tabular-nums text-xs text-ink-muted">
             {formatAutoserviceWarehouseMoney(row.unit_price)}
           </p>
         </div>
@@ -156,7 +156,7 @@ export default function AutoserviceWarehouseExpensesPage() {
               ))
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-gray-500">
+                <td colSpan={7} className="py-12 text-center text-ink-muted">
                   Расходов пока нет
                 </td>
               </tr>
@@ -165,13 +165,13 @@ export default function AutoserviceWarehouseExpensesPage() {
                 <tr key={row.id} className={autoserviceListTrClass}>
                   <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.created_at)}</td>
                   <td className={`${autoserviceListTdClass} font-medium`}>{row.brand || '—'}</td>
-                  <td className={`${autoserviceListTdClass} font-mono text-gray-600`}>{row.article || '—'}</td>
+                  <td className={`${autoserviceListTdClass} font-mono text-ink-muted`}>{row.article || '—'}</td>
                   <td className={autoserviceListTdClass}>{row.name || '—'}</td>
                   <td className={`${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
                   <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                     {formatAutoserviceWarehouseMoney(row.unit_price)}
                   </td>
-                  <td className={`${autoserviceListTdClass} text-gray-600`}>{row.reason || '—'}</td>
+                  <td className={`${autoserviceListTdClass} text-ink-muted`}>{row.reason || '—'}</td>
                 </tr>
               ))
             )}
@@ -181,7 +181,7 @@ export default function AutoserviceWarehouseExpensesPage() {
 
       <div className={autoserviceListMobileWrapClass}>
         {loading ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-line-soft">
             {Array.from({ length: 5 }).map((_, index) => (
               <div key={`msk-${index}`} className="py-3">
                 <Skeleton className="h-4 w-32" />
@@ -190,7 +190,7 @@ export default function AutoserviceWarehouseExpensesPage() {
             ))}
           </div>
         ) : filteredRows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">Расходов пока нет</p>
+          <p className="py-10 text-center text-sm text-ink-muted">Расходов пока нет</p>
         ) : (
           filteredRows.map((row) => <ExpenseMobileCard key={row.id} row={row} />)
         )}

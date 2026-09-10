@@ -63,7 +63,7 @@ export default function Modal({
       <button
         type="button"
         className={cx(
-          'pointer-events-auto absolute inset-x-0 top-0 bg-slate-900/40',
+          'pointer-events-auto absolute inset-x-0 top-0 bg-ink/40',
           // Leave MobileBottomNav undimmed on mobile/tablet shell (< lg)
           'bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-0',
         )}
@@ -159,14 +159,15 @@ export function ConfirmDialog({
       wrapperZIndex={Z_CONTEXT_MENU}
       returnFocusRef={returnFocusRef}
       footer={(
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" onClick={onClose} disabled={loading}>
+        <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
+          <Button variant="secondary" onClick={onClose} disabled={loading} className="max-md:min-h-11">
             {cancelLabel}
           </Button>
           <Button
             variant={danger ? 'danger' : 'primary'}
             loading={loading}
             onClick={onConfirm}
+            className="max-md:min-h-11"
           >
             {confirmLabel}
           </Button>

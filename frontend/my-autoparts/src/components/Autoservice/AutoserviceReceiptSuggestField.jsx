@@ -92,11 +92,11 @@ export default function AutoserviceReceiptSuggestField({
         onFocus={() => setOpen(true)}
       />
       {open && !disabled ? (
-        <ul className="absolute z-40 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <ul className="absolute z-40 mt-1 max-h-48 w-full overflow-y-auto rounded-sg border border-line bg-surface py-1 shadow-sg-md">
           {loading ? (
-            <li className="px-3 py-2 text-sm text-gray-500">Загрузка…</li>
+            <li className="px-3 py-2 text-sm text-ink-muted">Загрузка…</li>
           ) : options.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-gray-500">Ничего не найдено</li>
+            <li className="px-3 py-2 text-sm text-ink-muted">Ничего не найдено</li>
           ) : (
             options.map((row, index) => {
               const hint = optionHint(field, row);
@@ -104,12 +104,12 @@ export default function AutoserviceReceiptSuggestField({
                 <li key={`${row.brand}-${row.article}-${row.name}-${index}`}>
                   <button
                     type="button"
-                    className="block w-full px-3 py-2 text-left hover:bg-indigo-50"
+                    className="block w-full px-3 py-2 text-left hover:bg-brand-50"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => handlePick(row)}
                   >
-                    <div className="text-sm font-medium text-gray-900">{optionLabel(field, row)}</div>
-                    {hint ? <div className="mt-0.5 text-xs text-gray-500">{hint}</div> : null}
+                    <div className="text-sm font-medium text-ink">{optionLabel(field, row)}</div>
+                    {hint ? <div className="mt-0.5 text-xs text-ink-muted">{hint}</div> : null}
                   </button>
                 </li>
               );

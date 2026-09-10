@@ -29,7 +29,7 @@ import {
 } from '../../utils/warehouseListUi';
 
 const deleteButtonClass =
-  'text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-wait disabled:opacity-60';
+  'text-sm font-medium text-danger-600 transition hover:text-danger-700 disabled:cursor-wait disabled:opacity-60';
 
 function formatDate(value) {
   if (!value) return '—';
@@ -38,15 +38,15 @@ function formatDate(value) {
 
 function ReceiptMobileCard({ row, onOpen, onDelete, deleting }) {
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
+    <div className="border-b border-line-soft py-3 last:border-b-0">
       <button type="button" onClick={onOpen} className="w-full text-left">
         <div className="flex items-start justify-between gap-2">
-          <span className="font-semibold text-indigo-700">{row.number}</span>
-          <span className="shrink-0 tabular-nums font-semibold text-gray-900">
+          <span className="font-semibold text-brand-700">{row.number}</span>
+          <span className="shrink-0 tabular-nums font-semibold text-ink">
             {formatAutoserviceWarehouseMoney(row.total_amount)}
           </span>
         </div>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm text-ink-muted">
           {formatDate(row.doc_date)}
           {' · '}
           {row.supplier_name}
@@ -182,7 +182,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
               ))
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-gray-500">
+                <td colSpan={5} className="py-12 text-center text-ink-muted">
                   Поступлений пока нет
                 </td>
               </tr>
@@ -194,7 +194,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
                   onClick={() => setSelectedDocId(row.id)}
                 >
                   <td className={autoserviceListTdClass}>
-                    <span className="font-semibold text-indigo-700">{row.number}</span>
+                    <span className="font-semibold text-brand-700">{row.number}</span>
                   </td>
                   <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.doc_date)}</td>
                   <td className={autoserviceListTdClass}>{row.supplier_name}</td>
@@ -223,7 +223,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
 
       <div className={autoserviceListMobileWrapClass}>
         {loading ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-line-soft">
             {Array.from({ length: 5 }).map((_, index) => (
               <div key={`msk-${index}`} className="py-3">
                 <Skeleton className="h-4 w-24" />
@@ -232,7 +232,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
             ))}
           </div>
         ) : filteredRows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">Поступлений пока нет</p>
+          <p className="py-10 text-center text-sm text-ink-muted">Поступлений пока нет</p>
         ) : (
           filteredRows.map((row) => (
             <ReceiptMobileCard

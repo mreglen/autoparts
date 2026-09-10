@@ -6,9 +6,9 @@ function MenuButton({ children, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-800 transition hover:bg-gray-100"
+      className="flex w-full min-h-11 items-center gap-2 rounded-sg-sm px-3 py-2 text-left text-sm font-medium text-ink transition hover:bg-surface-muted"
     >
-      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-indigo-100 text-xs font-bold text-indigo-700">
+      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-brand-100 text-xs font-bold text-brand-700">
         +
       </span>
       <span>{children}</span>
@@ -59,7 +59,7 @@ export default function PlannerCellContextMenu({
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[120] min-w-[13.5rem] rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg ring-1 ring-black/5"
+      className="fixed z-[120] min-w-[13.5rem] rounded-sg border border-line bg-surface p-1.5 shadow-sg-lg ring-1 ring-ink/5"
       style={{ left, top }}
       role="menu"
     >

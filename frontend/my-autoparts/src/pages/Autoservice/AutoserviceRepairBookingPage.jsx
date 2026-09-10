@@ -14,30 +14,28 @@ import {
 } from '../../redux/slices/AutoserviceClientSlice';
 import { formatGarageVehicleLabel, garageVehicleSearchText } from '../../utils/garageVehicleUi';
 
-const pillControlClass =
-  'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+const pillControlClass = 'sg-pill-input w-full';
 
-const formTextareaClass =
-  'mt-0 block w-full min-h-[96px] resize-y rounded-xl border border-transparent bg-gray-100 px-4 py-3 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60';
+const formTextareaClass = 'sg-pill-textarea w-full';
 
 const btnPrimary =
-  'inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60';
+  'inline-flex min-h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:min-h-10';
 
 const btnGhost =
-  'inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50';
+  'inline-flex min-h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted sm:min-h-10';
 
 const STATUS_META = {
   new: {
     label: 'В ожидании',
-    className: 'bg-amber-50 text-amber-800 ring-amber-200',
+    className: 'bg-warning-50 text-warning-700 ring-warning-100',
   },
   processed: {
     label: 'Обработана',
-    className: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+    className: 'bg-success-50 text-success-700 ring-success-100',
   },
   cancelled: {
     label: 'Отменена',
-    className: 'bg-gray-100 text-gray-600 ring-gray-200',
+    className: 'bg-surface-subtle text-ink-muted ring-line',
   },
 };
 
@@ -68,7 +66,7 @@ function formatCreatedAt(value) {
 function StatusBadge({ status }) {
   const meta = STATUS_META[status] || {
     label: status,
-    className: 'bg-gray-100 text-gray-700 ring-gray-200',
+    className: 'bg-surface-subtle text-ink-soft ring-line',
   };
   return (
     <span
@@ -85,26 +83,26 @@ function BookingRow({ row }) {
   const note = row.notes || row.comment;
 
   return (
-    <article className="border-b border-gray-100 py-4 last:border-b-0">
+    <article className="border-b border-line-soft py-4 last:border-b-0">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold tabular-nums text-gray-900">
+            <p className="text-sm font-semibold tabular-nums text-ink">
               {formatDate(row.preferred_date)}
             </p>
             <StatusBadge status={row.status} />
           </div>
           {vehicleLabel ? (
-            <p className="mt-1 truncate text-sm font-medium text-gray-800">{vehicleLabel}</p>
+            <p className="mt-1 truncate text-sm font-medium text-ink">{vehicleLabel}</p>
           ) : (
-            <p className="mt-1 text-sm text-gray-500">Без автомобиля</p>
+            <p className="mt-1 text-sm text-ink-muted">Без автомобиля</p>
           )}
           {note ? (
-            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-600 line-clamp-3">{note}</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-ink-muted line-clamp-3">{note}</p>
           ) : (
-            <p className="mt-1 text-sm text-gray-400">Комментарий не указан</p>
+            <p className="mt-1 text-sm text-ink-faint">Комментарий не указан</p>
           )}
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-ink-muted">
             {[createdLabel ? `Создана ${createdLabel}` : null, row.name, row.phone]
               .filter(Boolean)
               .join(' · ')}
@@ -119,10 +117,10 @@ function BookingsSkeleton() {
   return (
     <div className="space-y-0" aria-hidden>
       {[1, 2, 3].map((key) => (
-        <div key={key} className="animate-pulse border-b border-gray-100 py-4 last:border-b-0">
-          <div className="h-4 w-28 rounded bg-gray-100" />
-          <div className="mt-2 h-4 w-48 rounded bg-gray-100" />
-          <div className="mt-2 h-3 w-full max-w-md rounded bg-gray-100" />
+        <div key={key} className="animate-pulse border-b border-line-soft py-4 last:border-b-0">
+          <div className="h-4 w-28 rounded bg-surface-subtle" />
+          <div className="mt-2 h-4 w-48 rounded bg-surface-subtle" />
+          <div className="mt-2 h-3 w-full max-w-md rounded bg-surface-subtle" />
         </div>
       ))}
     </div>
@@ -342,7 +340,7 @@ export default function AutoserviceRepairBookingPage() {
       </MobileFormField>
 
       {error ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+        <p className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
           {error}
         </p>
       ) : null}
@@ -361,7 +359,7 @@ export default function AutoserviceRepairBookingPage() {
   const listBlock = (
     <>
       {rowsError ? (
-        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+        <p className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
           {rowsError}
         </p>
       ) : null}
@@ -370,8 +368,8 @@ export default function AutoserviceRepairBookingPage() {
         <BookingsSkeleton />
       ) : rows.length === 0 ? (
         <div className="py-12 text-center">
-          <h3 className="text-base font-semibold text-gray-900">Заявок пока нет</h3>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
+          <h3 className="text-base font-semibold text-ink">Заявок пока нет</h3>
+          <p className="mx-auto mt-2 max-w-sm text-sm text-ink-muted">
             Заполните форму — заявка появится здесь, и мы свяжемся с вами для подтверждения
           </p>
           <button type="button" onClick={() => setTab('form')} className={`${btnPrimary} mt-5`}>
@@ -392,8 +390,8 @@ export default function AutoserviceRepairBookingPage() {
     <div className="w-full min-w-0">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Запись на ремонт</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">Запись на ремонт</h1>
+          <p className="mt-0.5 text-sm text-ink-muted">
             {rowsLoading
               ? 'Загрузка…'
               : activeCount > 0
@@ -408,7 +406,7 @@ export default function AutoserviceRepairBookingPage() {
           <button
             type="button"
             onClick={loadBookings}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-subtle text-ink-muted transition hover:bg-surface-muted hover:text-ink"
             title="Обновить"
             aria-label="Обновить"
           >
@@ -443,7 +441,7 @@ export default function AutoserviceRepairBookingPage() {
 
       <div className="lg:grid lg:grid-cols-5 lg:items-start lg:gap-10">
         <section className={`lg:col-span-2 ${tab === 'form' ? 'block' : 'hidden lg:block'}`}>
-          <h2 className="mb-4 hidden text-sm font-semibold uppercase tracking-wide text-gray-500 lg:block">
+          <h2 className="mb-4 hidden text-sm font-semibold uppercase tracking-wide text-ink-muted lg:block">
             Новая заявка
           </h2>
           {formBlock}
@@ -451,9 +449,9 @@ export default function AutoserviceRepairBookingPage() {
 
         <section className={`mt-2 lg:col-span-3 lg:mt-0 ${tab === 'list' ? 'block' : 'hidden lg:block'}`}>
           <div className="mb-3 hidden items-baseline justify-between gap-3 lg:flex">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Мои заявки</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Мои заявки</h2>
             {!rowsLoading && rows.length > 0 ? (
-              <p className="text-sm text-gray-500">{rows.length}</p>
+              <p className="text-sm text-ink-muted">{rows.length}</p>
             ) : null}
           </div>
           {listBlock}

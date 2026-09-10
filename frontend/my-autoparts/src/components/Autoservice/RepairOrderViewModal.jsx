@@ -40,16 +40,16 @@ export function normalizeRepairOrderStatus(status) {
 }
 
 const STATUS_STYLES = {
-  pending: 'bg-amber-50 text-amber-800 ring-amber-200',
-  in_progress: 'bg-sky-50 text-sky-800 ring-sky-200',
-  done: 'bg-violet-50 text-violet-800 ring-violet-200',
-  completed: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  cancelled: 'bg-gray-100 text-gray-600 ring-gray-200',
-  review: 'bg-orange-50 text-orange-800 ring-orange-200',
-  accepted: 'bg-amber-50 text-amber-800 ring-amber-200',
-  ready: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  issued: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  open: 'bg-amber-50 text-amber-800 ring-amber-200',
+  pending: 'bg-warning-50 text-warning-700 ring-warning-100',
+  in_progress: 'bg-brand-50 text-brand-700 ring-brand-100',
+  done: 'bg-success-50 text-success-700 ring-success-100',
+  completed: 'bg-success-100 text-success-700 ring-success-100',
+  cancelled: 'bg-surface-subtle text-ink-muted ring-line',
+  review: 'bg-accent-50 text-accent-700 ring-accent-100',
+  accepted: 'bg-warning-50 text-warning-700 ring-warning-100',
+  ready: 'bg-success-100 text-success-700 ring-success-100',
+  issued: 'bg-success-100 text-success-700 ring-success-100',
+  open: 'bg-warning-50 text-warning-700 ring-warning-100',
 };
 
 function formatDateTime(value) {
@@ -110,15 +110,15 @@ function PaymentWizard({
     return (
       <div className="flex min-h-[22rem] flex-col justify-center">
         <div className="mx-auto w-full max-w-md space-y-5 text-center">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-5">
-            <p className="text-base font-semibold text-emerald-900">Оплата прошла успешно</p>
-            <p className="mt-2 text-sm text-emerald-800">
+          <div className="rounded-sg border border-success-100 bg-success-50 px-4 py-5">
+            <p className="text-base font-semibold text-success-700">Оплата прошла успешно</p>
+            <p className="mt-2 text-sm text-success-700">
               Принято: <span className="font-semibold tabular-nums">{formatMoney(paidAmount)} ₽</span>
             </p>
             {fullyPaid ? (
-              <p className="mt-1 text-sm text-emerald-800">Заказ-наряд оплачен полностью</p>
+              <p className="mt-1 text-sm text-success-700">Заказ-наряд оплачен полностью</p>
             ) : (
-              <p className="mt-1 text-sm text-emerald-800">
+              <p className="mt-1 text-sm text-success-700">
                 Осталось к оплате:{' '}
                 <span className="font-semibold tabular-nums">{formatMoney(remaining)} ₽</span>
               </p>
@@ -129,7 +129,7 @@ function PaymentWizard({
               <button
                 type="button"
                 onClick={onPrintReceipt}
-                className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
               >
                 Печать чека
               </button>
@@ -138,7 +138,7 @@ function PaymentWizard({
               <button
                 type="button"
                 onClick={onBackToDetails}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 К заказ-наряду
               </button>
@@ -147,14 +147,14 @@ function PaymentWizard({
                 <button
                   type="button"
                   onClick={onPayMore}
-                  className="inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                  className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Оплатить ещё
                 </button>
                 <button
                   type="button"
                   onClick={onBackToDetails}
-                  className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                  className="inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
                 >
                   К заказ-наряду
                 </button>
@@ -174,9 +174,9 @@ function PaymentWizard({
     <div className="flex min-h-[22rem] flex-col justify-center">
       <div className="mx-auto w-full max-w-md space-y-5">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">Оплата заказ-наряда</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            К оплате: <span className="font-semibold tabular-nums text-gray-800">{formatMoney(remaining)} ₽</span>
+          <h3 className="text-sm font-semibold text-ink">Оплата заказ-наряда</h3>
+          <p className="mt-1 text-sm text-ink-muted">
+            К оплате: <span className="font-semibold tabular-nums text-ink">{formatMoney(remaining)} ₽</span>
           </p>
         </div>
 
@@ -189,10 +189,10 @@ function PaymentWizard({
                 type="button"
                 disabled={saving}
                 onClick={() => onMethodChange(option.value)}
-                className={`inline-flex h-11 items-center justify-center rounded-lg border px-3 text-sm font-medium transition disabled:opacity-50 ${
+                className={`inline-flex h-11 items-center justify-center rounded-sg-sm border px-3 text-sm font-medium transition disabled:opacity-50 ${
                   active
-                    ? 'border-indigo-500 bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200'
-                    : 'border-gray-200 bg-white text-gray-800 hover:border-indigo-300 hover:bg-indigo-50'
+                    ? 'border-brand-500 bg-brand-50 text-brand-800 ring-1 ring-brand-200'
+                    : 'border-line bg-surface text-ink hover:border-brand-300 hover:bg-brand-50'
                 }`}
               >
                 {option.label}
@@ -201,18 +201,18 @@ function PaymentWizard({
           })}
         </div>
 
-        <label className="block text-xs font-medium text-gray-700">
+        <label className="block text-xs font-medium text-ink-soft">
           Дата оплаты
           <input
             type="date"
             value={payDate}
             onChange={(e) => onPayDateChange(e.target.value)}
             disabled={saving}
-            className="mt-1 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+            className="sg-pill-input sg-native-date-input mt-1 w-full"
           />
         </label>
 
-        <label className="block text-xs font-medium text-gray-700">
+        <label className="block text-xs font-medium text-ink-soft">
           Сумма, ₽
           <NumericInput
             mode="decimal"
@@ -221,19 +221,19 @@ function PaymentWizard({
             value={amount}
             onChange={(e) => onAmountChange(e.target.value)}
             disabled={saving}
-            className="mt-1 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm tabular-nums text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="sg-pill-input mt-1 w-full"
           />
         </label>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-ink-muted">
           Останется после оплаты:{' '}
-          <span className="font-semibold tabular-nums text-gray-800">{formatMoney(afterPay)} ₽</span>
+          <span className="font-semibold tabular-nums text-ink">{formatMoney(afterPay)} ₽</span>
         </p>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
         <button
           type="button"
           onClick={onSubmit}
           disabled={saving || !canSubmit}
-          className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-11 w-full items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? 'Оплата…' : 'Оплатить'}
         </button>
@@ -327,10 +327,10 @@ export function RepairOrderStatusPicker({
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = isOpen !== undefined;
   const open = isControlled ? isOpen : internalOpen;
-  const setOpen = (next) => {
+  const setOpen = useCallback((next) => {
     if (!isControlled) setInternalOpen(next);
     onOpenChange?.(next);
-  };
+  }, [isControlled, onOpenChange]);
   const rootRef = useRef(null);
   const normalized = normalizeRepairOrderStatus(status);
   const available = (options || []).filter((option) => option.value !== normalized);
@@ -359,7 +359,7 @@ export function RepairOrderStatusPicker({
           e.stopPropagation();
           setOpen(!open);
         }}
-        className="inline-flex max-w-full items-center rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:cursor-wait disabled:opacity-60"
+        className="inline-flex max-w-full items-center rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 disabled:cursor-wait disabled:opacity-60"
         title="Сменить статус"
         aria-label="Сменить статус"
       >
@@ -391,19 +391,19 @@ export function RepairOrderStatusPicker({
 function MetaItem({ label, children, className = '' }) {
   return (
     <div className={`min-w-0 ${className}`}>
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
-      <dd className="mt-1 text-sm font-medium text-gray-900">{children}</dd>
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-ink">{children}</dd>
     </div>
   );
 }
 
 function Section({ title, children, total }) {
   return (
-    <section className="border-t border-gray-100 pt-4">
+    <section className="border-t border-line-soft pt-4">
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{title}</h3>
         {total != null ? (
-          <p className="text-xs tabular-nums text-gray-500">{total}</p>
+          <p className="text-xs tabular-nums text-ink-muted">{total}</p>
         ) : null}
       </div>
       {children}
@@ -412,7 +412,7 @@ function Section({ title, children, total }) {
 }
 
 function EmptyLine({ children }) {
-  return <p className="py-1 text-sm text-gray-400">{children}</p>;
+  return <p className="py-1 text-sm text-ink-faint">{children}</p>;
 }
 
 function LinesTable({ columns, children }) {
@@ -420,7 +420,7 @@ function LinesTable({ columns, children }) {
     <div className="overflow-x-auto">
       <table className="min-w-full text-left text-xs">
         <thead>
-          <tr className="text-gray-400">
+          <tr className="text-ink-faint">
             {columns.map((col) => (
               <th key={col} className="pb-1.5 pr-3 font-medium">
                 {col}
@@ -428,7 +428,7 @@ function LinesTable({ columns, children }) {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-50 text-gray-700">{children}</tbody>
+        <tbody className="divide-y divide-line-soft text-ink-soft">{children}</tbody>
       </table>
     </div>
   );
@@ -463,8 +463,8 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
           >
             {works.map((w) => (
               <tr key={w.id || `${w.position}-${w.title}`}>
-                <td className="py-1.5 pr-3 tabular-nums text-gray-500">{w.position}</td>
-                <td className="py-1.5 pr-3 font-medium text-gray-900">{w.title}</td>
+                <td className="py-1.5 pr-3 tabular-nums text-ink-muted">{w.position}</td>
+                <td className="py-1.5 pr-3 font-medium text-ink">{w.title}</td>
                 <td className="py-1.5 pr-3 tabular-nums">{w.qty}</td>
                 <td className="py-1.5 pr-3 tabular-nums">{formatMoney(w.unit_price)}</td>
                 <td className="py-1.5 pr-3 tabular-nums">
@@ -494,8 +494,8 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
           <LinesTable columns={['№', 'Название', 'Кол-во', 'Ед.']}>
             {parts.map((p) => (
               <tr key={p.id || `${p.position}-${p.title}`}>
-                <td className="py-1.5 pr-3 tabular-nums text-gray-500">{p.position}</td>
-                <td className="py-1.5 pr-3 font-medium text-gray-900">{p.title}</td>
+                <td className="py-1.5 pr-3 tabular-nums text-ink-muted">{p.position}</td>
+                <td className="py-1.5 pr-3 font-medium text-ink">{p.title}</td>
                 <td className="py-1.5 pr-3 tabular-nums">{p.qty}</td>
                 <td className="py-1.5 tabular-nums">{formatShopPartUnit(p.unit || 'pcs')}</td>
               </tr>
@@ -519,11 +519,11 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
                 ?? shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p));
               return (
                 <tr key={p.id || `${p.position}-${p.title}`}>
-                  <td className="py-1.5 pr-3 tabular-nums text-gray-500">{p.position}</td>
-                  <td className="py-1.5 pr-3 font-medium text-gray-900">
+                  <td className="py-1.5 pr-3 tabular-nums text-ink-muted">{p.position}</td>
+                  <td className="py-1.5 pr-3 font-medium text-ink">
                     <span>{name}</span>
                     {p.is_in_cart ? (
-                      <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                      <span className="ml-2 inline-flex rounded-full bg-warning-100 px-2 py-0.5 text-[10px] font-medium text-warning-700">
                         В корзине
                       </span>
                     ) : null}
@@ -774,9 +774,9 @@ export default function RepairOrderViewModal({
   const hasClientComment = Boolean(order?.client_comment?.trim());
   const hasStaffComment = Boolean(order?.staff_comment?.trim());
   const secondaryBtnClass =
-    'inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60 md:h-10';
+    'inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60 md:h-10';
   const primaryBtnClass =
-    'inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 md:h-10';
+    'inline-flex h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60 md:h-10';
 
   return (
     <>
@@ -793,7 +793,7 @@ export default function RepairOrderViewModal({
         order ? (
           <div className="space-y-1 pr-2">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="text-base font-semibold text-gray-900">
+              <h2 className="text-base font-semibold text-ink">
                 {order.status === 'review' ? repairOrderNumberLabel(order) : `Заказ-наряд ${repairOrderNumberLabel(order)}`}
               </h2>
               {showExecutors ? (
@@ -811,7 +811,7 @@ export default function RepairOrderViewModal({
               )}
             </div>
             {statusError ? (
-              <p className="text-xs text-red-600" role="alert">{statusError}</p>
+              <p className="text-xs text-danger-600" role="alert">{statusError}</p>
             ) : null}
           </div>
         ) : (
@@ -826,14 +826,14 @@ export default function RepairOrderViewModal({
               <Skeleton className="h-6 w-28" />
             </div>
             <div className="flex gap-2">
-              <Skeleton className="h-10 w-24 rounded-lg" />
-              <Skeleton className="h-10 w-20 rounded-lg" />
+              <Skeleton className="h-10 w-24 rounded-sg-sm" />
+              <Skeleton className="h-10 w-20 rounded-sg-sm" />
             </div>
           </div>
         ) : order ? (
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 space-y-0.5 text-sm text-gray-900">
+              <div className="min-w-0 space-y-0.5 text-sm text-ink">
                 <p>
                   Итого заказ:{' '}
                   <span className="tabular-nums">{formatMoney(totals.grand)} ₽</span>
@@ -846,21 +846,21 @@ export default function RepairOrderViewModal({
               {enablePayment && payment ? (
                 <div className="flex flex-wrap gap-4 text-sm">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Оплачено</p>
-                    <p className="mt-0.5 font-semibold tabular-nums text-emerald-700">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Оплачено</p>
+                    <p className="mt-0.5 font-semibold tabular-nums text-success-700">
                       {formatMoney(payment.paid)} ₽
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Осталось</p>
-                    <p className="mt-0.5 font-semibold tabular-nums text-gray-900">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Осталось</p>
+                    <p className="mt-0.5 font-semibold tabular-nums text-ink">
                       {formatMoney(payment.remaining)} ₽
                     </p>
                   </div>
                 </div>
               ) : null}
             </div>
-            {completeError ? <p className="text-xs text-red-600">{completeError}</p> : null}
+            {completeError ? <p className="text-xs text-danger-600">{completeError}</p> : null}
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {showPayButton && !payOpen ? (
@@ -925,7 +925,7 @@ export default function RepairOrderViewModal({
               </div>
             ))}
           </div>
-          <div className="space-y-2 rounded-xl bg-gray-50 px-3.5 py-3">
+          <div className="space-y-2 rounded-sg bg-surface-muted px-3.5 py-3">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-3/4" />
@@ -985,17 +985,17 @@ export default function RepairOrderViewModal({
           </dl>
 
           {(hasClientComment || hasStaffComment || showExecutors) && (
-            <div className="space-y-2 rounded-xl bg-gray-50 px-3.5 py-3 text-sm">
+            <div className="space-y-2 rounded-sg bg-surface-muted px-3.5 py-3 text-sm">
               <p>
-                <span className="font-medium text-gray-900">Комментарий клиента</span>
-                <span className="mt-0.5 block whitespace-pre-wrap text-gray-700">
+                <span className="font-medium text-ink">Комментарий клиента</span>
+                <span className="mt-0.5 block whitespace-pre-wrap text-ink-soft">
                   {order.client_comment?.trim() || '—'}
                 </span>
               </p>
               {showExecutors ? (
-                <p className="border-t border-gray-100 pt-2">
-                  <span className="font-medium text-gray-900">Комментарий сотрудника</span>
-                  <span className="mt-0.5 block whitespace-pre-wrap text-gray-700">
+                <p className="border-t border-line-soft pt-2">
+                  <span className="font-medium text-ink">Комментарий сотрудника</span>
+                  <span className="mt-0.5 block whitespace-pre-wrap text-ink-soft">
                     {order.staff_comment?.trim() || '—'}
                   </span>
                 </p>
@@ -1055,23 +1055,23 @@ export default function RepairOrderViewModal({
       wrapperClassName="z-[120]"
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-ink-muted">
           Выберите операции оплаты по заказ-наряду. В документ попадут только отмеченные строки.
         </p>
         {paymentsLoading ? (
           <div className="space-y-2">
-            <Skeleton className="h-10 w-full rounded-lg" />
-            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-10 w-full rounded-sg-sm" />
+            <Skeleton className="h-10 w-full rounded-sg-sm" />
           </div>
         ) : paymentsError ? (
-          <p className="text-sm text-red-600">{paymentsError}</p>
+          <p className="text-sm text-danger-600">{paymentsError}</p>
         ) : orderPayments.length === 0 ? (
-          <p className="text-sm text-gray-500">Оплат по этому заказ-наряду пока нет.</p>
+          <p className="text-sm text-ink-muted">Оплат по этому заказ-наряду пока нет.</p>
         ) : (
           <div className="max-h-[50vh] space-y-4 overflow-y-auto pr-1">
             {paymentsByDate.map(([dateLabel, rows]) => (
               <section key={dateLabel} className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   {dateLabel}
                 </h3>
                 <div className="space-y-2">
@@ -1080,11 +1080,11 @@ export default function RepairOrderViewModal({
                     return (
                       <label
                         key={payment.id}
-                        className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 px-3 py-2.5 hover:bg-gray-50"
+                        className="flex cursor-pointer items-start gap-3 rounded-sg-sm border border-line px-3 py-2.5 hover:bg-surface-muted"
                       >
                         <input
                           type="checkbox"
-                          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="mt-0.5 h-4 w-4 rounded border-line-strong text-brand-600 focus:ring-brand-500"
                           checked={checked}
                           onChange={() => {
                             setSelectedPaymentIds((prev) => (
@@ -1095,12 +1095,12 @@ export default function RepairOrderViewModal({
                           }}
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-medium text-gray-900">
+                          <span className="block text-sm font-medium text-ink">
                             {AUTOSERVICE_PAYMENT_METHOD_LABELS[payment.method] || payment.method}
                             {' · '}
                             <span className="tabular-nums">{formatMoney(payment.amount)} ₽</span>
                           </span>
-                          <span className="mt-0.5 block text-xs text-gray-500">
+                          <span className="mt-0.5 block text-xs text-ink-muted">
                             Чек № {payment.sequential_number}
                             {formatServerDateTime(payment.created_at) !== '—'
                               ? ` · ${formatServerDateTime(payment.created_at)}`

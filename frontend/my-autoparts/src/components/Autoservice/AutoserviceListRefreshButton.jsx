@@ -3,7 +3,7 @@ export default function AutoserviceListRefreshButton({ loading, onClick, title =
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-subtle text-ink-muted transition hover:bg-surface-muted hover:text-ink"
       title={title}
       aria-label={title}
     >

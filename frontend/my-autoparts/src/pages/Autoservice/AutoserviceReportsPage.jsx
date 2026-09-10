@@ -68,8 +68,8 @@ const PAYMENT_STATUS_LABELS = {
 const tabFilterButtonClass = (active) =>
   `inline-flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
     active
-      ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200'
-      : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
+      ? 'bg-surface text-ink shadow-sm ring-1 ring-line'
+      : 'text-ink-muted hover:bg-surface/60 hover:text-ink'
   }`;
 
 const EMPTY_WAREHOUSE_STOCK = {
@@ -145,8 +145,8 @@ function parseMonthValue(value) {
 function ReportField({ label, children }) {
   return (
     <div className="flex justify-between gap-3 text-sm">
-      <span className="shrink-0 text-gray-500">{label}</span>
-      <span className="min-w-0 text-right font-medium text-gray-900 break-words">{children}</span>
+      <span className="shrink-0 text-ink-muted">{label}</span>
+      <span className="min-w-0 text-right font-medium text-ink break-words">{children}</span>
     </div>
   );
 }
@@ -156,7 +156,7 @@ function RepairOrderLink({ orderId, orderNumber, onOpen }) {
   return (
     <button
       type="button"
-      className="text-indigo-600 hover:underline"
+      className="text-brand-600 hover:underline"
       onClick={(e) => {
         e.stopPropagation();
         onOpen(orderId);
@@ -170,7 +170,7 @@ function RepairOrderLink({ orderId, orderNumber, onOpen }) {
 function ExpandChevron({ expanded, className = 'h-4 w-4' }) {
   return (
     <svg
-      className={`${className} shrink-0 text-gray-500 transition-transform ${expanded ? 'rotate-90' : ''}`}
+      className={`${className} shrink-0 text-ink-muted transition-transform ${expanded ? 'rotate-90' : ''}`}
       viewBox="0 0 20 20"
       fill="currentColor"
       aria-hidden="true"
@@ -205,7 +205,7 @@ function MonthPickerField({ label = 'Месяц', value, onChange, className }) 
   return (
     <div className="block max-w-xs">
       {label ? (
-        <span className="mb-1.5 block text-xs font-medium text-gray-500">{label}</span>
+        <span className="mb-1.5 block text-xs font-medium text-ink-muted">{label}</span>
       ) : null}
       <input
         ref={inputRef}
@@ -696,10 +696,10 @@ export default function AutoserviceReportsPage() {
                 <Skeleton className="ml-auto h-8 w-24" />
               ) : (
                 <>
-                  <p className="text-2xl font-bold tabular-nums leading-none text-gray-900">
+                  <p className="text-2xl font-bold tabular-nums leading-none text-ink">
                     {formatFinanceCurrency(payments.total_amount)}
                   </p>
-                  <p className="mt-1.5 text-xs text-gray-500 sm:text-sm">{payments.count ?? 0} платежей</p>
+                  <p className="mt-1.5 text-xs text-ink-muted sm:text-sm">{payments.count ?? 0} платежей</p>
                 </>
               )}
             </div>
@@ -709,10 +709,10 @@ export default function AutoserviceReportsPage() {
                 <Skeleton className="ml-auto h-8 w-24" />
               ) : (
                 <>
-                  <p className="text-2xl font-bold tabular-nums leading-none text-gray-900">
+                  <p className="text-2xl font-bold tabular-nums leading-none text-ink">
                     {formatFinanceCurrency(payroll.total)}
                   </p>
-                  <p className="mt-1.5 text-xs text-gray-500 sm:text-sm">к выплате за месяц</p>
+                  <p className="mt-1.5 text-xs text-ink-muted sm:text-sm">к выплате за месяц</p>
                 </>
               )}
             </div>
@@ -722,10 +722,10 @@ export default function AutoserviceReportsPage() {
                 <Skeleton className="ml-auto h-8 w-24" />
               ) : (
                 <>
-                  <p className="text-2xl font-bold tabular-nums leading-none text-gray-900">
+                  <p className="text-2xl font-bold tabular-nums leading-none text-ink">
                     {formatFinanceCurrency(economicsSummary.net_profit)}
                   </p>
-                  <p className="mt-1.5 text-xs text-gray-500 sm:text-sm">чистая прибыль за период</p>
+                  <p className="mt-1.5 text-xs text-ink-muted sm:text-sm">чистая прибыль за период</p>
                 </>
               )}
             </div>
@@ -735,10 +735,10 @@ export default function AutoserviceReportsPage() {
                 <Skeleton className="ml-auto h-8 w-24" />
               ) : (
                 <>
-                  <p className="text-2xl font-bold tabular-nums leading-none text-gray-900">
+                  <p className="text-2xl font-bold tabular-nums leading-none text-ink">
                     {formatAutoserviceWarehouseMoney(warehouseStockSummary.closing_value)}
                   </p>
-                  <p className="mt-1.5 text-xs text-gray-500 sm:text-sm">
+                  <p className="mt-1.5 text-xs text-ink-muted sm:text-sm">
                     {warehouseStockSummary.positions ?? 0} позиций на конец месяца
                   </p>
                 </>
@@ -750,10 +750,10 @@ export default function AutoserviceReportsPage() {
                 <Skeleton className="ml-auto h-8 w-24" />
               ) : (
                 <>
-                  <p className="text-2xl font-bold tabular-nums leading-none text-gray-900">
+                  <p className="text-2xl font-bold tabular-nums leading-none text-ink">
                     {formatFinanceCurrency(rosskoSalesSummary.organization_income)}
                   </p>
-                  <p className="mt-1.5 text-xs text-gray-500 sm:text-sm">доход организации за период</p>
+                  <p className="mt-1.5 text-xs text-ink-muted sm:text-sm">доход организации за период</p>
                 </>
               )}
             </div>
@@ -768,7 +768,7 @@ export default function AutoserviceReportsPage() {
           <MobileCollapsibleFilters title="Период">
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block min-w-0">
-                <span className="mb-1.5 block text-xs font-medium text-gray-500">Период с</span>
+                <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
                 <input
                   type="date"
                   value={dateFrom}
@@ -782,7 +782,7 @@ export default function AutoserviceReportsPage() {
                 />
               </label>
               <label className="block min-w-0">
-                <span className="mb-1.5 block text-xs font-medium text-gray-500">Период по</span>
+                <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
                 <input
                   type="date"
                   value={dateTo}
@@ -800,7 +800,7 @@ export default function AutoserviceReportsPage() {
           </MobileCollapsibleFilters>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-muted">
               {payments.count ?? 0} платеж{(payments.count ?? 0) === 1 ? '' : (payments.count ?? 0) >= 2 && (payments.count ?? 0) <= 4 ? 'а' : 'ей'} за период
             </p>
             <button
@@ -814,11 +814,11 @@ export default function AutoserviceReportsPage() {
           </div>
 
           {paymentsError ? (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{paymentsError}</div>
+            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{paymentsError}</div>
           ) : null}
 
           {viewOrderError ? (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{viewOrderError}</div>
+            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{viewOrderError}</div>
           ) : null}
 
           {paymentsLoading ? (
@@ -831,7 +831,7 @@ export default function AutoserviceReportsPage() {
             <>
               <div className="space-y-3 md:hidden">
                 {!paymentItems.length ? (
-                  <p className={`${warehouseEmptyShellClass} text-sm text-gray-500`}>
+                  <p className={`${warehouseEmptyShellClass} text-sm text-ink-muted`}>
                     Нет платежей за период
                   </p>
                 ) : (
@@ -914,11 +914,11 @@ export default function AutoserviceReportsPage() {
           </div>
 
           {payrollError ? (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{payrollError}</div>
+            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{payrollError}</div>
           ) : null}
 
           {viewOrderError ? (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{viewOrderError}</div>
+            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{viewOrderError}</div>
           ) : null}
 
           {payrollLoading ? (
@@ -930,7 +930,7 @@ export default function AutoserviceReportsPage() {
             <>
               <div className="space-y-3 md:hidden">
                 {!payrollRows.length ? (
-                  <p className={`${warehouseEmptyShellClass} text-sm text-gray-500`}>
+                  <p className={`${warehouseEmptyShellClass} text-sm text-ink-muted`}>
                     Нет сотрудников для отчёта
                   </p>
                 ) : (
@@ -939,7 +939,7 @@ export default function AutoserviceReportsPage() {
                       const isExpanded = expandedEmployeeId === row.employee_id;
                       const orders = row.orders || [];
                       return (
-                        <div key={row.employee_id} className="border-b border-gray-200 pb-3">
+                        <div key={row.employee_id} className="border-b border-line pb-3">
                           <button
                             type="button"
                             className="flex w-full items-start gap-2 text-left"
@@ -949,12 +949,12 @@ export default function AutoserviceReportsPage() {
                             <ExpandChevron expanded={isExpanded} className="mt-0.5 h-4 w-4" />
                             <span className="min-w-0 flex-1">
                               <span className="flex items-center justify-between gap-3">
-                                <span className="text-sm font-semibold text-gray-900">{row.name}</span>
-                                <span className="shrink-0 text-sm font-medium tabular-nums text-gray-900">
+                                <span className="text-sm font-semibold text-ink">{row.name}</span>
+                                <span className="shrink-0 text-sm font-medium tabular-nums text-ink">
                                   {formatFinanceCurrency(row.total)}
                                 </span>
                               </span>
-                              <span className="mt-1 block text-xs text-gray-500">
+                              <span className="mt-1 block text-xs text-ink-muted">
                                 {row.completed_orders} заказ-наряд{row.completed_orders === 1 ? '' : row.completed_orders >= 2 && row.completed_orders <= 4 ? 'а' : 'ов'}
                               </span>
                             </span>
@@ -962,10 +962,10 @@ export default function AutoserviceReportsPage() {
                           {isExpanded ? (
                             <div className="mt-3 space-y-3 pl-2">
                               {!orders.length ? (
-                                <p className="text-sm text-gray-500">Нет начислений по заказ-нарядам</p>
+                                <p className="text-sm text-ink-muted">Нет начислений по заказ-нарядам</p>
                               ) : (
                                 orders.map((order) => (
-                                  <div key={order.order_id} className="space-y-1 rounded-lg bg-gray-50 px-3 py-2">
+                                  <div key={order.order_id} className="space-y-1 rounded-sg-sm bg-surface-muted px-3 py-2">
                                     <ReportField label="Заказ-наряд">
                                       <RepairOrderLink
                                         orderId={order.order_id}
@@ -983,7 +983,7 @@ export default function AutoserviceReportsPage() {
                         </div>
                       );
                     })}
-                    <div className="border-t border-gray-200 pt-3">
+                    <div className="border-t border-line pt-3">
                       <ReportField label="Итого">{formatFinanceCurrency(payroll.total)}</ReportField>
                     </div>
                   </>
@@ -1034,7 +1034,7 @@ export default function AutoserviceReportsPage() {
                                 <tr>
                                   <td colSpan={4} className="bg-surface-muted/40 px-4 py-3">
                                     {!orders.length ? (
-                                      <p className="text-sm text-gray-500">Нет начислений по заказ-нарядам</p>
+                                      <p className="text-sm text-ink-muted">Нет начислений по заказ-нарядам</p>
                                     ) : (
                                       <table className="min-w-full text-left text-sm">
                                         <thead>
@@ -1093,7 +1093,7 @@ export default function AutoserviceReportsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="block min-w-0">
-                  <span className="mb-1.5 block text-xs font-medium text-gray-500">Период с</span>
+                  <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
                   <input
                     type="date"
                     value={dateFrom}
@@ -1107,7 +1107,7 @@ export default function AutoserviceReportsPage() {
                   />
                 </label>
                 <label className="block min-w-0">
-                  <span className="mb-1.5 block text-xs font-medium text-gray-500">Период по</span>
+                  <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
                   <input
                     type="date"
                     value={dateTo}
@@ -1129,7 +1129,7 @@ export default function AutoserviceReportsPage() {
                 ariaLabel="Поиск заказ-нарядов"
               />
               <div className="space-y-2">
-                <p className="text-xs font-medium text-gray-500">Статус</p>
+                <p className="text-xs font-medium text-ink-muted">Статус</p>
                 <div className={`${warehouseToolbarClass} flex-wrap`}>
                   {ECONOMICS_STATUS_FILTERS.map((item) => (
                     <button
@@ -1144,7 +1144,7 @@ export default function AutoserviceReportsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-xs font-medium text-gray-500">Оплата</p>
+                <p className="text-xs font-medium text-ink-muted">Оплата</p>
                 <div className={`${warehouseToolbarClass} flex-wrap`}>
                   {ECONOMICS_PAYMENT_FILTERS.map((item) => (
                     <button
@@ -1162,7 +1162,7 @@ export default function AutoserviceReportsPage() {
           </MobileCollapsibleFilters>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-muted">
               {economicsSummary.count ?? 0} заказ-наряд{economicsSummary.count === 1 ? '' : economicsSummary.count >= 2 && economicsSummary.count <= 4 ? 'а' : 'ов'} за период
             </p>
             <button
@@ -1185,10 +1185,10 @@ export default function AutoserviceReportsPage() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80"
+                className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80"
               >
-                <p className="text-xs text-gray-500">{item.label}</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-gray-900">
+                <p className="text-xs text-ink-muted">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
                   {economicsLoading ? '…' : formatFinanceCurrency(item.value)}
                 </p>
               </div>
@@ -1196,11 +1196,11 @@ export default function AutoserviceReportsPage() {
           </div>
 
           {economicsError ? (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{economicsError}</div>
+            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{economicsError}</div>
           ) : null}
 
           {viewOrderError ? (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{viewOrderError}</div>
+            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{viewOrderError}</div>
           ) : null}
 
           {economicsLoading ? (
@@ -1222,7 +1222,7 @@ export default function AutoserviceReportsPage() {
                 return (
                   <div
                     key={row.order_id}
-                    className="cursor-pointer rounded-2xl bg-white p-4 ring-1 ring-gray-200/80 transition hover:bg-gray-50/80"
+                    className="cursor-pointer rounded-sg-lg bg-surface p-4 ring-1 ring-line/80 transition hover:bg-surface-muted/80"
                     onClick={() => toggleOrderExpand(row.order_id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -1245,29 +1245,29 @@ export default function AutoserviceReportsPage() {
                           />
                           <OrderStatusBadge status={row.status} />
                           {row.is_preliminary ? (
-                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+                            <span className="rounded-full bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700 ring-1 ring-inset ring-warning-100">
                               Предварительный расчёт
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-sm text-gray-900">{row.client_name || '—'}</p>
-                        <p className="text-sm text-gray-500">{vehicleLabel(row.vehicle)}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-sm text-ink">{row.client_name || '—'}</p>
+                        <p className="text-sm text-ink-muted">{vehicleLabel(row.vehicle)}</p>
+                        <p className="text-xs text-ink-faint">
                           {row.scheduled_at ? formatServerDateTime(row.scheduled_at) : '—'}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-lg font-semibold tabular-nums text-gray-900">
+                        <p className="text-lg font-semibold tabular-nums text-ink">
                           {formatFinanceCurrency(row.grand_total)}
                         </p>
-                        <p className={`mt-1 text-xs font-medium ${row.payment_status === 'unpaid' ? 'text-red-600' : 'text-gray-500'}`}>
+                        <p className={`mt-1 text-xs font-medium ${row.payment_status === 'unpaid' ? 'text-danger-600' : 'text-ink-muted'}`}>
                           {PAYMENT_STATUS_LABELS[row.payment_status] || row.payment_status}
                           {Number(row.remaining_amount) > 0 ? ` · ${formatFinanceCurrency(row.remaining_amount)}` : ''}
                         </p>
                       </div>
                     </div>
                     {isExpanded ? (
-                      <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                      <div className="mt-3 space-y-2 border-t border-line-soft pt-3">
                         <ReportField label="Сумма заказа">{formatFinanceCurrency(row.grand_total)}</ReportField>
                         <ReportField label="Себестоимость запчастей">{formatFinanceCurrency(row.parts_cost)}</ReportField>
                         <ReportField label="Зарплата мастеру">{formatFinanceCurrency(row.payroll_total)}</ReportField>
@@ -1300,12 +1300,12 @@ export default function AutoserviceReportsPage() {
                 placeholder="Бренд, артикул, наименование"
                 loading={warehouseStockLoading}
               />
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <label className="inline-flex items-center gap-2 text-sm text-ink-soft">
                 <input
                   type="checkbox"
                   checked={warehouseStockHideZero}
                   onChange={(e) => setWarehouseStockHideZero(e.target.checked)}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-line-strong text-brand-600 focus:ring-brand-500"
                 />
                 Скрыть нулевые остатки
               </label>
@@ -1313,7 +1313,7 @@ export default function AutoserviceReportsPage() {
           </MobileCollapsibleFilters>
 
           <div className={`${warehouseToolbarClass} flex-wrap`}>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-ink-muted">
               {warehouseStockItems.length} позиц{warehouseStockItems.length === 1 ? 'ия' : warehouseStockItems.length >= 2 && warehouseStockItems.length <= 4 ? 'ии' : 'ий'}
               {warehouseStock.as_of ? ` · на ${warehouseStock.as_of}` : ''}
             </p>
@@ -1335,8 +1335,8 @@ export default function AutoserviceReportsPage() {
               { label: 'Сумма на начало', value: formatAutoserviceWarehouseMoney(warehouseStockSummary.opening_value) },
             ].map((item) => (
               <div key={item.label} className="rounded-sg-lg border border-line bg-surface px-4 py-3">
-                <p className="text-xs text-gray-500">{item.label}</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-gray-900">
+                <p className="text-xs text-ink-muted">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
                   {warehouseStockLoading ? '…' : item.value}
                 </p>
               </div>
@@ -1344,7 +1344,7 @@ export default function AutoserviceReportsPage() {
           </div>
 
           {warehouseStockError ? (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{warehouseStockError}</div>
+            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{warehouseStockError}</div>
           ) : null}
 
           {warehouseStockLoading ? (
@@ -1366,8 +1366,8 @@ export default function AutoserviceReportsPage() {
                   const { primary, secondary } = warehouseStockNameParts(row);
                   return (
                     <div key={row.id} className="rounded-sg-lg border border-line bg-surface px-3 py-3">
-                      <p className="text-sm font-semibold text-gray-900">{primary}</p>
-                      {secondary ? <p className="mt-0.5 text-xs text-gray-500">{secondary}</p> : null}
+                      <p className="text-sm font-semibold text-ink">{primary}</p>
+                      {secondary ? <p className="mt-0.5 text-xs text-ink-muted">{secondary}</p> : null}
                       <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                         <ReportField label="Остаток">{row.closing_qty} {formatShopPartUnit(row.unit)}</ReportField>
                         <ReportField label="Сумма">{formatAutoserviceWarehouseMoney(row.stock_amount)}</ReportField>
@@ -1431,7 +1431,7 @@ export default function AutoserviceReportsPage() {
           )}
 
           {!warehouseStock.is_current_month ? (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-ink-muted">
               Для прошлых месяцев резерв и доступно не рассчитываются — показан фактический остаток на последний день месяца.
             </p>
           ) : null}
@@ -1442,7 +1442,7 @@ export default function AutoserviceReportsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="block min-w-0">
-                  <span className="mb-1.5 block text-xs font-medium text-gray-500">Период с</span>
+                  <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
                   <input
                     type="date"
                     value={dateFrom}
@@ -1456,7 +1456,7 @@ export default function AutoserviceReportsPage() {
                   />
                 </label>
                 <label className="block min-w-0">
-                  <span className="mb-1.5 block text-xs font-medium text-gray-500">Период по</span>
+                  <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
                   <input
                     type="date"
                     value={dateTo}
@@ -1481,7 +1481,7 @@ export default function AutoserviceReportsPage() {
           </MobileCollapsibleFilters>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-ink-muted">
               {rosskoSalesSummary.count ?? 0} операц{(rosskoSalesSummary.count ?? 0) === 1 ? 'ия' : (rosskoSalesSummary.count ?? 0) >= 2 && (rosskoSalesSummary.count ?? 0) <= 4 ? 'ии' : 'ий'} за период
             </p>
             <button
@@ -1504,9 +1504,9 @@ export default function AutoserviceReportsPage() {
               { label: 'Сайт 7%', value: rosskoSalesSummary.site_income },
               { label: 'Организация', value: rosskoSalesSummary.organization_income },
             ].map((item) => (
-              <div key={item.label} className="rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">
-                <p className="text-xs text-gray-500">{item.label}</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-gray-900">
+              <div key={item.label} className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80">
+                <p className="text-xs text-ink-muted">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
                   {rosskoSalesLoading ? '…' : formatFinanceCurrency(item.value)}
                 </p>
               </div>
@@ -1514,7 +1514,7 @@ export default function AutoserviceReportsPage() {
           </div>
 
           {rosskoSalesError ? (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{rosskoSalesError}</div>
+            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{rosskoSalesError}</div>
           ) : null}
 
           {rosskoSalesLoading ? (
@@ -1535,7 +1535,7 @@ export default function AutoserviceReportsPage() {
                 return (
                   <div
                     key={row.order_id}
-                    className="cursor-pointer rounded-2xl bg-white p-4 ring-1 ring-gray-200/80 transition hover:bg-gray-50/80"
+                    className="cursor-pointer rounded-sg-lg bg-surface p-4 ring-1 ring-line/80 transition hover:bg-surface-muted/80"
                     onClick={() => toggleRosskoOrderExpand(row.order_id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -1551,30 +1551,30 @@ export default function AutoserviceReportsPage() {
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <ExpandChevron expanded={isExpanded} className="h-4 w-4" />
-                          <span className="text-sm font-semibold text-gray-900">Заказ № {row.order_id}</span>
+                          <span className="text-sm font-semibold text-ink">Заказ № {row.order_id}</span>
                           {row.rossko_order_id ? (
-                            <span className="text-xs text-gray-500">Росско № {row.rossko_order_id}</span>
+                            <span className="text-xs text-ink-muted">Росско № {row.rossko_order_id}</span>
                           ) : null}
                           {row.pending_acquiring ? (
-                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+                            <span className="rounded-full bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700 ring-1 ring-inset ring-warning-100">
                               Ожидается комиссия
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-sm text-gray-900">{row.buyer_name || '—'}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm text-ink">{row.buyer_name || '—'}</p>
+                        <p className="text-xs text-ink-muted">
                           {row.operation_at ? formatServerDateTime(row.operation_at) : '—'} · {row.payment_method_label}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-lg font-semibold tabular-nums text-gray-900">
+                        <p className="text-lg font-semibold tabular-nums text-ink">
                           {formatFinanceCurrency(row.organization_income ?? 0)}
                         </p>
-                        <p className="mt-1 text-xs text-gray-500">организации</p>
+                        <p className="mt-1 text-xs text-ink-muted">организации</p>
                       </div>
                     </div>
                     {isExpanded ? (
-                      <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                      <div className="mt-3 space-y-2 border-t border-line-soft pt-3">
                         <ReportField label="Продажа">{formatFinanceCurrency(row.sale_total)}</ReportField>
                         <ReportField label="Закупка Росско">{formatFinanceCurrency(row.supplier_total)}</ReportField>
                         <ReportField label="Эквайринг">
@@ -1596,15 +1596,15 @@ export default function AutoserviceReportsPage() {
                         </ReportField>
                         {(row.items || []).length ? (
                           <div className="pt-2">
-                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Позиции</p>
+                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-muted">Позиции</p>
                             <div className="space-y-2">
                               {(row.items || []).map((item) => (
-                                <div key={item.item_id} className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
-                                  <p className="font-medium text-gray-900">
+                                <div key={item.item_id} className="rounded-sg-sm bg-surface-muted px-3 py-2 text-sm">
+                                  <p className="font-medium text-ink">
                                     {[item.brand, item.partnumber].filter(Boolean).join(' ') || item.name}
                                   </p>
-                                  {item.name ? <p className="text-xs text-gray-500">{item.name}</p> : null}
-                                  <div className="mt-1 grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                  {item.name ? <p className="text-xs text-ink-muted">{item.name}</p> : null}
+                                  <div className="mt-1 grid grid-cols-2 gap-2 text-xs text-ink-muted">
                                     <span>Кол-во: {item.quantity}</span>
                                     <span>Продажа: {formatFinanceCurrency(item.sale_total)}</span>
                                     <span>Закупка: {formatFinanceCurrency(item.supplier_total)}</span>

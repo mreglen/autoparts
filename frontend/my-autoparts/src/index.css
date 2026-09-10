@@ -308,11 +308,135 @@ input[type="password"] {
   flex-shrink: 0;
 }
 
+/* Pill form controls: reused in order form, clients and warehouse forms */
+@layer components {
+  .sg-pill-input,
+  .sg-pill-select {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 2.25rem;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    background-color: var(--sg-surface-muted, #f8fafc);
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--sg-ink, #0f172a);
+    transition-property: color, background-color, border-color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+
+  .sg-pill-input::placeholder,
+  .sg-pill-select::placeholder {
+    color: var(--sg-ink-faint, #94a3b8);
+  }
+
+  .sg-pill-input:hover,
+  .sg-pill-select:hover {
+    background-color: var(--sg-surface-subtle, #f1f5f9);
+  }
+
+  .sg-pill-input:focus,
+  .sg-pill-select:focus {
+    border-color: var(--sg-brand-400, #818cf8);
+    background-color: var(--sg-surface, #ffffff);
+    outline: none;
+    box-shadow: none;
+  }
+
+  .sg-pill-input:disabled,
+  .sg-pill-select:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  @media (max-width: 1023px) {
+    .sg-pill-input,
+    .sg-pill-select {
+      min-height: 2.5rem;
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+  }
+
+  .sg-pill-input-sm {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+
+  .sg-pill-textarea {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 5rem;
+    border-radius: 1rem;
+    border: 1px solid transparent;
+    background-color: var(--sg-surface-muted, #f8fafc);
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--sg-ink, #0f172a);
+    transition-property: color, background-color, border-color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+    resize: vertical;
+  }
+
+  .sg-pill-textarea::placeholder {
+    color: var(--sg-ink-faint, #94a3b8);
+  }
+
+  .sg-pill-textarea:hover {
+    background-color: var(--sg-surface-subtle, #f1f5f9);
+  }
+
+  .sg-pill-textarea:focus {
+    border-color: var(--sg-brand-400, #818cf8);
+    background-color: var(--sg-surface, #ffffff);
+    outline: none;
+    box-shadow: none;
+  }
+
+  .sg-pill-textarea:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  @media (max-width: 1023px) {
+    .sg-pill-textarea {
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+  }
+}
+
 @media (max-width: 1023px) {
   select {
     min-width: 0;
     max-width: 100%;
   }
+}
+
+:root {
+  --sg-surface: #ffffff;
+  --sg-surface-muted: #f8fafc;
+  --sg-surface-subtle: #f1f5f9;
+  --sg-ink: #0f172a;
+  --sg-ink-soft: #334155;
+  --sg-ink-muted: #64748b;
+  --sg-ink-faint: #94a3b8;
+  --sg-brand-400: #818cf8;
+  --sg-brand-600: #4f46e5;
+  --sg-brand-700: #4338ca;
+  --sg-line: #e2e8f0;
+  --sg-line-strong: #cbd5e1;
 }
 
 /* Заказ-наряд: на экране — лист A4; при печати — 100% области печати */

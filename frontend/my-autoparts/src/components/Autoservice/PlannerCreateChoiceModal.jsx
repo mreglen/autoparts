@@ -5,12 +5,12 @@ function ChoiceCard({ icon, title, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30"
+      className="flex w-full min-h-11 items-center gap-3 rounded-sg border border-line bg-surface px-4 py-3.5 text-left transition hover:border-brand-300 hover:bg-brand-50/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30"
     >
-      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-lg font-semibold text-indigo-700">
+      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-sg-sm bg-brand-100 text-lg font-semibold text-brand-700">
         {icon}
       </span>
-      <span className="text-sm font-semibold text-gray-900">{title}</span>
+      <span className="text-sm font-semibold text-ink">{title}</span>
     </button>
   );
 }

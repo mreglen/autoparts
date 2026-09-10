@@ -3,11 +3,11 @@ import Modal from '../UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 
 const inputClass =
-  'mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 disabled:bg-gray-50';
+  'sg-pill-input mt-1 w-full';
 const secondaryBtnClass =
-  'inline-flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60 md:h-10';
+  'inline-flex min-h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60 sm:min-h-10';
 const primaryBtnClass =
-  'inline-flex h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60 md:h-10';
+  'inline-flex min-h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:min-h-10';
 
 function buyerLabel(row) {
   const parts = [];
@@ -161,13 +161,13 @@ export default function UpdBuyerPickerModal({
     >
       {formMode !== 'list' ? (
         <form onSubmit={handleSubmit} className="space-y-3">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-ink-muted">
             {formMode === 'edit'
               ? 'Изменения сохранятся в справочнике.'
               : 'Новый покупатель сохранится в справочнике.'}
           </p>
           <div>
-            <label className="block text-xs font-medium text-gray-600">Наименование</label>
+            <label className="block text-xs font-medium text-ink-muted">Наименование</label>
             <input
               className={inputClass}
               value={form.name}
@@ -177,7 +177,7 @@ export default function UpdBuyerPickerModal({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600">Адрес</label>
+            <label className="block text-xs font-medium text-ink-muted">Адрес</label>
             <input
               className={inputClass}
               value={form.address}
@@ -186,7 +186,7 @@ export default function UpdBuyerPickerModal({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-medium text-gray-600">ИНН</label>
+              <label className="block text-xs font-medium text-ink-muted">ИНН</label>
               <input
                 className={inputClass}
                 inputMode="numeric"
@@ -198,7 +198,7 @@ export default function UpdBuyerPickerModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600">КПП</label>
+              <label className="block text-xs font-medium text-ink-muted">КПП</label>
               <input
                 className={inputClass}
                 inputMode="numeric"
@@ -211,7 +211,7 @@ export default function UpdBuyerPickerModal({
               />
             </div>
           </div>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-danger-600">{error}</p> : null}
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
@@ -238,32 +238,32 @@ export default function UpdBuyerPickerModal({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Поиск по имени или ИНН"
           />
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-danger-600">{error}</p> : null}
           {loading ? (
-            <p className="py-6 text-center text-sm text-gray-500">Загрузка…</p>
+            <p className="py-6 text-center text-sm text-ink-muted">Загрузка…</p>
           ) : filtered.length === 0 ? (
-            <p className="py-4 text-center text-sm text-gray-500">
+            <p className="py-4 text-center text-sm text-ink-muted">
               {buyers.length === 0 ? 'Покупателей пока нет' : 'Нет совпадений'}
             </p>
           ) : (
-            <ul className="max-h-56 overflow-y-auto rounded-lg border border-gray-200">
+            <ul className="max-h-56 overflow-y-auto rounded-sg-sm border border-line">
               {filtered.map((row) => {
                 const details = buyerLabel(row);
                 return (
-                  <li key={row.id} className="flex items-stretch border-b border-gray-100 last:border-b-0">
+                  <li key={row.id} className="flex items-stretch border-b border-line-soft last:border-b-0">
                     <button
                       type="button"
-                      className="min-w-0 flex-1 px-3 py-2.5 text-left text-sm hover:bg-indigo-50"
+                      className="min-w-0 flex-1 px-3 py-2.5 text-left text-sm hover:bg-brand-50"
                       onClick={() => openPrint(row.id)}
                     >
-                      <span className="block font-medium text-gray-900">{row.name}</span>
+                      <span className="block font-medium text-ink">{row.name}</span>
                       {details ? (
-                        <span className="mt-0.5 block text-xs text-gray-500">{details}</span>
+                        <span className="mt-0.5 block text-xs text-ink-muted">{details}</span>
                       ) : null}
                     </button>
                     <button
                       type="button"
-                      className="shrink-0 border-l border-gray-100 px-3 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+                      className="shrink-0 border-l border-line-soft px-3 text-sm font-medium text-brand-600 hover:bg-brand-50"
                       onClick={() => startEdit(row)}
                     >
                       Изменить

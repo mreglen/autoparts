@@ -16,9 +16,9 @@ const EMPTY_FORM = {
 };
 
 const fieldClass =
-  'h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-indigo-400 focus:ring-0 max-md:h-11 max-md:min-h-11 max-md:text-base';
+  'sg-pill-input w-full h-10 max-md:min-h-11';
 
-const labelClass = 'mb-1 block text-xs font-medium text-gray-500';
+const labelClass = 'mb-1 block text-xs font-medium text-ink-muted';
 
 export default function AutoserviceWarehouseAddModal({
   open,
@@ -217,7 +217,7 @@ export default function AutoserviceWarehouseAddModal({
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
           <span className={labelClass}>
-            Наименование <span className="text-red-500">*</span>
+            Наименование <span className="text-danger-600">*</span>
           </span>
           <AutoserviceReceiptSuggestField
             field="name"
@@ -260,15 +260,15 @@ export default function AutoserviceWarehouseAddModal({
               type="button"
               onClick={handleFillFromRossko}
               disabled={rosskoLookupLoading || !form.article.trim()}
-              className="inline-flex h-9 min-h-11 items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 max-md:w-full max-md:justify-center md:min-h-9"
+              className="inline-flex h-9 min-h-11 items-center rounded-sg-sm border border-brand-200 bg-brand-50 px-3 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60 max-md:w-full max-md:justify-center md:min-h-9"
             >
               {rosskoLookupLoading ? 'Поиск в Rossko…' : 'Заполнить из Rossko'}
             </button>
             {rosskoLookupError ? (
-              <p className="text-sm text-red-600">{rosskoLookupError}</p>
+              <p className="text-sm text-danger-600">{rosskoLookupError}</p>
             ) : null}
             {rosskoLookupNotice ? (
-              <p className="text-sm text-green-700">{rosskoLookupNotice}</p>
+              <p className="text-sm text-success-700">{rosskoLookupNotice}</p>
             ) : null}
           </div>
         ) : null}
@@ -330,14 +330,14 @@ export default function AutoserviceWarehouseAddModal({
         </div>
 
         {isWarehouseEdit ? (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ink-muted">
             Себестоимость обновит карточку товара. Даты и суммы в уже созданных поступлениях и расходах не изменятся.
           </p>
         ) : null}
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
 
-        <div className="flex justify-end gap-2 border-t border-gray-100 pt-3 max-md:flex-col">
+        <div className="flex justify-end gap-2 border-t border-line-soft pt-3 max-md:flex-col">
           <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting} className="max-md:min-h-11">
             Отмена
           </Button>

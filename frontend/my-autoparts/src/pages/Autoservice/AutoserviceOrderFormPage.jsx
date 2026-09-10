@@ -67,17 +67,9 @@ import {
 } from '../../utils/repairOrderShopPartUtils';
 import { splitVatInclusive } from '../../utils/updDocument';
 
-const pillInputClass =
-  'mt-1 box-border block h-9 w-full min-w-0 max-w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
-
-const pillInputSmClass =
-  'box-border block h-9 w-full min-w-0 max-w-full rounded-full border border-transparent bg-gray-100 px-3 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
-
-const pillTextareaClass =
-  'mt-1 box-border block w-full min-w-0 max-w-full rounded-2xl border border-transparent bg-gray-100 px-3 py-2 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 md:rounded-sg';
-
-const pillDateInputClass =
-  'mt-1 box-border block h-9 w-full min-w-0 max-w-full rounded-full border border-transparent bg-gray-100 px-3 text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 lg:px-4 lg:text-sm sg-native-date-input';
+const pillInputClass = 'sg-pill-input mt-1';
+const pillTextareaClass = 'sg-pill-textarea mt-1';
+const pillDateInputClass = 'sg-pill-input sg-native-date-input mt-1';
 
 const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700';
 
@@ -97,7 +89,7 @@ const btnPrimaryClass =
   'inline-flex min-h-11 items-center justify-center rounded-full bg-brand-600 px-5 text-sm font-semibold text-white shadow-sg-sm transition hover:bg-brand-700 disabled:opacity-60';
 
 const btnSecondaryClass =
-  'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-white px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
+  'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-surface px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
 
 const orderFormPageClass =
   'w-full min-w-0 pt-0 pb-28 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)] lg:pb-24';
@@ -115,15 +107,12 @@ const lineIndexClass = 'w-3.5 shrink-0 text-center text-[11px] tabular-nums text
 const lineDeleteBtnCompactClass =
   'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs leading-none text-danger-600 transition hover:bg-danger-50 hover:text-danger-700';
 
-const lineDeleteBtnClass =
-  'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-base leading-none text-danger-600 transition hover:bg-danger-50 hover:text-danger-700 lg:h-6 lg:w-6 lg:text-xs';
-
 function FieldLabel({ children, optional = false, action }) {
   return (
     <div className="flex items-end justify-between gap-2">
       <span className="block min-w-0 text-sg-caption font-medium text-ink-muted">
         {children}
-        {optional ? <span className="font-normal text-gray-400"> (необязательно)</span> : null}
+        {optional ? <span className="font-normal text-ink-faint"> (необязательно)</span> : null}
       </span>
       {action}
     </div>
@@ -373,20 +362,20 @@ function ShopPartNameField({
 }
 
 const compactControlInputClass =
-  'h-9 shrink-0 rounded-full border border-transparent bg-gray-100 px-2 text-sm tabular-nums text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
+  'sg-pill-input sg-pill-input-sm shrink-0 tabular-nums lg:h-8';
 
 const compactControlSelectClass =
-  'h-9 shrink-0 rounded-full border border-transparent bg-gray-100 px-1.5 text-sm text-ink focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base disabled:cursor-not-allowed disabled:opacity-60 lg:h-8';
+  'sg-pill-select sg-pill-input-sm shrink-0 lg:h-8';
 
 const shopPartControlInputClass = compactControlInputClass;
 const shopPartControlSelectClass = compactControlSelectClass;
 
 const clientPartTitleInputClass =
-  'box-border h-9 min-w-0 flex-1 rounded-full border border-transparent bg-gray-100 px-2.5 text-sm text-ink transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 max-md:text-base lg:h-8';
+  'sg-pill-input sg-pill-input-sm min-w-0 flex-1 lg:h-8';
 
 const clientPartControlInputClass = `${compactControlInputClass} w-12 px-1.5 text-center`;
 
-const clientPartControlSelectClass = `${compactControlSelectClass} w-[3.75rem]`;
+const clientPartControlSelectClass = `${compactControlSelectClass} w-[3.75rem] px-1.5`;
 
 function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
   return {
@@ -626,9 +615,9 @@ function AddClientModal({ onClose, onCreated }) {
             disabled={saving}
             autoComplete="tel"
           />
-          {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
+          {phoneError ? <p className="mt-1 text-sm text-danger-600">{phoneError}</p> : null}
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
         <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
           <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
             Отмена
@@ -706,7 +695,7 @@ function AddEmployeeModal({ onClose, onCreated }) {
             disabled={saving}
           />
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
         <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
           <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
             Отмена
@@ -906,6 +895,7 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
             <label className="block text-sg-caption font-medium text-ink-muted">Год</label>
             <NumericInput
               mode="numeric"
+              maxLength={4}
               className={pillInputClass}
               value={form.year}
               onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
@@ -944,7 +934,7 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
             />
           </div>
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
         <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
           <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
             Отмена
@@ -2178,8 +2168,9 @@ export default function AutoserviceOrderFormPage() {
     goBack();
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    await handleClose();
   };
 
   if (!isReady) return <AuthLoadingScreen />;
@@ -2210,7 +2201,7 @@ export default function AutoserviceOrderFormPage() {
         <button type="button" onClick={goBack} className={`${linkActionClass} max-lg:hidden`}>
           ← Закрыть
         </button>
-        <p className="mt-6 text-sm text-red-600 max-lg:mt-0" role="alert">
+        <p className="mt-6 text-sm text-danger-600 max-lg:mt-0" role="alert">
           {orderError}
         </p>
       </div>
@@ -2312,7 +2303,7 @@ export default function AutoserviceOrderFormPage() {
                 disabled={!vehicleId}
               />
               {selectedVehicle?.mileage_km != null && selectedVehicle.mileage_km !== '' && !mileageKm ? (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-ink-muted">
                   Последний пробег по автомобилю:{' '}
                   {Number(selectedVehicle.mileage_km).toLocaleString('ru-RU')} км
                 </p>
@@ -2454,7 +2445,7 @@ export default function AutoserviceOrderFormPage() {
                         <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1">
                           <SearchableSelect
                             className="min-w-0 flex-1"
-                            inputClassName="block h-9 w-full rounded-full border border-transparent bg-gray-100 px-2.5 text-sm max-md:text-base text-ink shadow-none transition hover:bg-gray-50 focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0 lg:h-8"
+                            inputClassName="sg-pill-input sg-pill-input-sm w-full min-w-0 flex-1 lg:h-8"
                             value={ex.employee_id}
                             onChange={(next) => updateWorkExecutor(index, execIndex, { employee_id: next })}
                             options={employeeOptions}
@@ -2625,7 +2616,7 @@ export default function AutoserviceOrderFormPage() {
                             })}
                           />
                           {p.is_in_cart || p.pending_cart_import ? (
-                            <span className="mt-0.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                            <span className="mt-0.5 inline-flex rounded-full bg-warning-100 px-2 py-0.5 text-[10px] font-medium text-warning-700">
                               В корзине
                             </span>
                           ) : null}
@@ -2743,8 +2734,8 @@ export default function AutoserviceOrderFormPage() {
                 </p>
               ) : null}
               <button
-                type="button"
-                onClick={handleClose}
+                type="submit"
+                form="repair-order-form"
                 disabled={saving}
                 className={`${btnSecondaryClass} max-lg:w-full max-lg:px-3`}
               >

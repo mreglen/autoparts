@@ -100,14 +100,14 @@ function WarehouseItemMobileCard({
   onWriteOff,
 }) {
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
+    <div className="border-b border-line-soft py-3 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
-          <p className="font-medium text-gray-900">{item.name || '—'}</p>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="font-medium text-ink">{item.name || '—'}</p>
+          <p className="mt-0.5 text-xs text-ink-muted">
             {[item.brand, item.article].filter(Boolean).join(' · ') || `№${item.id}`}
           </p>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-ink-muted">
             {formatAutoserviceWarehouseQty(item)}
             {' · '}
             {formatAutoserviceWarehouseMoney(displayPrice)}
@@ -129,24 +129,24 @@ function WarehouseItemMobileCard({
 
 function PurchaseLotMobileCard({ lot, onReturn }) {
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
+    <div className="border-b border-line-soft py-3 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-gray-900">{lot.name}</p>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="font-medium text-ink">{lot.name}</p>
+          <p className="mt-0.5 text-xs text-ink-muted">
             {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
           </p>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-ink-muted">
             {lot.supplier_name}
             {lot.source_order_id ? ` · Заказ №${lot.source_order_id}` : ''}
           </p>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-ink-muted">
             Поступило {lot.quantity} · Доступно к возврату {lot.max_returnable_qty}
           </p>
         </div>
         <div className="shrink-0">
           {lot.active_return ? (
-            <span className="text-xs font-medium text-indigo-700">
+            <span className="text-xs font-medium text-brand-700">
               №{lot.active_return.id}
             </span>
           ) : (
@@ -487,12 +487,12 @@ export default function AutoserviceWarehousePage() {
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
-                      <td className={autoserviceListTdActionsClass}><Skeleton className="ml-auto h-8 w-16 rounded-lg" /></td>
+                      <td className={autoserviceListTdActionsClass}><Skeleton className="ml-auto h-8 w-16 rounded-sg-sm" /></td>
                     </tr>
                   ))
                 ) : filteredLots.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-gray-500">
+                    <td colSpan={7} className="py-12 text-center text-ink-muted">
                       На складе нет партий из оформленных заказов
                     </td>
                   </tr>
@@ -500,8 +500,8 @@ export default function AutoserviceWarehousePage() {
                   filteredLots.map((lot) => (
                     <tr key={lot.receipt_id} className={autoserviceListTrClass}>
                       <td className={autoserviceListTdClass}>
-                        <p className="font-medium text-gray-900">{lot.name}</p>
-                        <p className="mt-0.5 text-xs text-gray-500">
+                        <p className="font-medium text-ink">{lot.name}</p>
+                        <p className="mt-0.5 text-xs text-ink-muted">
                           {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
                         </p>
                       </td>
@@ -516,7 +516,7 @@ export default function AutoserviceWarehousePage() {
                       </td>
                       <td className={autoserviceListTdActionsClass}>
                         {lot.active_return ? (
-                          <span className="text-xs font-medium text-indigo-700">
+                          <span className="text-xs font-medium text-brand-700">
                             Заявка №{lot.active_return.id} · {lot.active_return.status_code}
                           </span>
                         ) : (
@@ -539,7 +539,7 @@ export default function AutoserviceWarehousePage() {
 
           <div className={autoserviceListMobileWrapClass}>
             {loading ? (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-line-soft">
                 {Array.from({ length: 5 }).map((_, index) => (
                   <div key={`msk-lot-${index}`} className="py-3">
                     <Skeleton className="h-4 w-32" />
@@ -548,7 +548,7 @@ export default function AutoserviceWarehousePage() {
                 ))}
               </div>
             ) : filteredLots.length === 0 ? (
-              <p className="py-10 text-center text-sm text-gray-500">
+              <p className="py-10 text-center text-sm text-ink-muted">
                 На складе нет партий из оформленных заказов
               </p>
             ) : (
@@ -592,12 +592,12 @@ export default function AutoserviceWarehousePage() {
                       <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-12" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
-                      <td className={autoserviceListTdActionsClass}><Skeleton className="ml-auto h-8 w-20 rounded-lg" /></td>
+                      <td className={autoserviceListTdActionsClass}><Skeleton className="ml-auto h-8 w-20 rounded-sg-sm" /></td>
                     </tr>
                   ))
                 ) : filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-gray-500">
+                    <td colSpan={6} className="py-12 text-center text-ink-muted">
                       На складе автосервиса пока нет позиций
                     </td>
                   </tr>
@@ -618,11 +618,11 @@ export default function AutoserviceWarehousePage() {
                         }}
                       >
                         <td className={`${autoserviceListTdClass} font-medium`}>{item.brand || '—'}</td>
-                        <td className={`${autoserviceListTdClass} font-mono text-gray-600`}>{item.article || '—'}</td>
+                        <td className={`${autoserviceListTdClass} font-mono text-ink-muted`}>{item.article || '—'}</td>
                         <td className={autoserviceListTdClass}>
-                          <div className="font-medium text-gray-900">{item.name || '—'}</div>
+                          <div className="font-medium text-ink">{item.name || '—'}</div>
                           {!item.brand && !item.article ? (
-                            <div className="mt-0.5 text-xs text-gray-400">№{item.id}</div>
+                            <div className="mt-0.5 text-xs text-ink-faint">№{item.id}</div>
                           ) : null}
                         </td>
                         <td className={`${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
@@ -649,19 +649,19 @@ export default function AutoserviceWarehousePage() {
 
           <div className={autoserviceListMobileWrapClass}>
             {loading ? (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-line-soft">
                 {Array.from({ length: 5 }).map((_, index) => (
                   <div key={`msk-item-${index}`} className="flex items-start justify-between gap-3 py-3">
                     <div className="min-w-0 flex-1 space-y-2">
                       <Skeleton className="h-4 w-32" />
                       <Skeleton className="h-3 w-24" />
                     </div>
-                    <Skeleton className="h-8 w-8 rounded-lg" />
+                    <Skeleton className="h-8 w-8 rounded-sg-sm" />
                   </div>
                 ))}
               </div>
             ) : filteredItems.length === 0 ? (
-              <p className="py-10 text-center text-sm text-gray-500">
+              <p className="py-10 text-center text-sm text-ink-muted">
                 На складе автосервиса пока нет позиций
               </p>
             ) : (
@@ -705,24 +705,24 @@ export default function AutoserviceWarehousePage() {
           <div className="space-y-4">
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-gray-500">Бренд</dt>
-                <dd className="font-medium text-gray-900">{detailsItem.brand || '—'}</dd>
+                <dt className="text-ink-muted">Бренд</dt>
+                <dd className="font-medium text-ink">{detailsItem.brand || '—'}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">Артикул</dt>
-                <dd className="font-mono text-gray-900">{detailsItem.article || '—'}</dd>
+                <dt className="text-ink-muted">Артикул</dt>
+                <dd className="font-mono text-ink">{detailsItem.article || '—'}</dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-gray-500">Наименование</dt>
-                <dd className="font-medium text-gray-900">{detailsItem.name || '—'}</dd>
+                <dt className="text-ink-muted">Наименование</dt>
+                <dd className="font-medium text-ink">{detailsItem.name || '—'}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">Количество</dt>
-                <dd className="tabular-nums text-gray-900">{formatAutoserviceWarehouseQty(detailsItem)}</dd>
+                <dt className="text-ink-muted">Количество</dt>
+                <dd className="tabular-nums text-ink">{formatAutoserviceWarehouseQty(detailsItem)}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">Цена</dt>
-                <dd className="tabular-nums font-semibold text-gray-900">
+                <dt className="text-ink-muted">Цена</dt>
+                <dd className="tabular-nums font-semibold text-ink">
                   {formatAutoserviceWarehouseMoney(
                     autoserviceWarehouseClientPrice(detailsItem.unit_price, catalogMarkupPercent),
                   )}
@@ -732,15 +732,15 @@ export default function AutoserviceWarehousePage() {
 
             {Number(detailsItem.reserved_qty) > 0 ? (
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-gray-900">Резерв в заказ-нарядах</h3>
+                <h3 className="mb-2 text-sm font-semibold text-ink">Резерв в заказ-нарядах</h3>
                 {reservationsLoading ? (
-                  <p className="text-sm text-gray-500">Загрузка…</p>
+                  <p className="text-sm text-ink-muted">Загрузка…</p>
                 ) : reservationsError ? (
-                  <p className="text-sm text-red-600" role="alert">{reservationsError}</p>
+                  <p className="text-sm text-danger-600" role="alert">{reservationsError}</p>
                 ) : reservations.length === 0 ? (
-                  <p className="text-sm text-gray-500">Нет активных резервов в заказ-нарядах</p>
+                  <p className="text-sm text-ink-muted">Нет активных резервов в заказ-нарядах</p>
                 ) : (
-                  <ul className="divide-y divide-gray-100 rounded-xl border border-gray-200">
+                  <ul className="divide-y divide-line-soft rounded-sg border border-line">
                     {reservations.map((row) => (
                       <li
                         key={row.repair_order_id}
@@ -749,7 +749,7 @@ export default function AutoserviceWarehousePage() {
                         <div className="min-w-0">
                           <Link
                             to={`/autoservice/orders/${row.repair_order_id}/edit`}
-                            className="font-medium text-indigo-700 hover:text-indigo-900"
+                            className="font-medium text-brand-700 hover:text-brand-900"
                             onClick={() => setDetailsItem(null)}
                           >
                             {repairOrderNumberLabel({
@@ -757,11 +757,11 @@ export default function AutoserviceWarehousePage() {
                               order_number: row.repair_order_number,
                             })}
                           </Link>
-                          <p className="mt-0.5 text-xs text-gray-500">
+                          <p className="mt-0.5 text-xs text-ink-muted">
                             {REPAIR_ORDER_STATUS_LABELS[row.order_status] || row.order_status}
                           </p>
                         </div>
-                        <span className="shrink-0 tabular-nums font-medium text-gray-900">
+                        <span className="shrink-0 tabular-nums font-medium text-ink">
                           {formatReservationQty(row.qty, row.unit || detailsItem.unit || 'pcs')}
                         </span>
                       </li>
@@ -793,31 +793,31 @@ export default function AutoserviceWarehousePage() {
       >
         {writeOffItem ? (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">{autoserviceWarehouseItemLabel(writeOffItem)}</p>
+            <p className="text-sm text-ink-soft">{autoserviceWarehouseItemLabel(writeOffItem)}</p>
             <label className="block text-sm">
-              <span className="font-medium text-gray-700">Количество</span>
+              <span className="font-medium text-ink-soft">Количество</span>
               <NumericInput
                 min="1"
                 max={writeOffItem.available_qty || 1}
                 value={writeOffQty}
                 onChange={(event) => setWriteOffQty(event.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="sg-pill-input mt-1 w-full"
               />
-              <span className="mt-1 block text-xs text-gray-500">
+              <span className="mt-1 block text-xs text-ink-muted">
                 Доступно: {writeOffItem.available_qty} {formatShopPartUnit(writeOffItem.unit || 'pcs')}
               </span>
             </label>
             <label className="block text-sm">
-              <span className="font-medium text-gray-700">Причина</span>
+              <span className="font-medium text-ink-soft">Причина</span>
               <input
                 type="text"
                 value={writeOffReason}
                 onChange={(event) => setWriteOffReason(event.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="sg-pill-input mt-1 w-full"
                 placeholder="Необязательно"
               />
             </label>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 max-md:flex-col">
               <button type="button" className={warehouseSecondaryButtonClass} onClick={() => setWriteOffItem(null)}>
                 Отмена
               </button>
@@ -841,21 +841,21 @@ export default function AutoserviceWarehousePage() {
       >
         {orderQtyItem ? (
           <div className="space-y-4">
-            <p className="text-sm text-gray-700">{autoserviceWarehouseItemLabel(orderQtyItem)}</p>
+            <p className="text-sm text-ink-soft">{autoserviceWarehouseItemLabel(orderQtyItem)}</p>
             <label className="block text-sm">
-              <span className="font-medium text-gray-700">Количество</span>
+              <span className="font-medium text-ink-soft">Количество</span>
               <NumericInput
                 min="1"
                 max={orderQtyItem.available_qty || 1}
                 value={orderQty}
                 onChange={(event) => setOrderQty(event.target.value)}
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="sg-pill-input mt-1 w-full"
               />
-              <span className="mt-1 block text-xs text-gray-500">
+              <span className="mt-1 block text-xs text-ink-muted">
                 Доступно: {orderQtyItem.available_qty} {formatShopPartUnit(orderQtyItem.unit || 'pcs')}
               </span>
             </label>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 max-md:flex-col">
               <button type="button" className={warehouseSecondaryButtonClass} onClick={() => setOrderQtyItem(null)}>
                 Отмена
               </button>

@@ -27,22 +27,22 @@ import {
   validateInn,
 } from '../../utils/autoserviceClientRequisites';
 
-const inputClass =
-  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+const inputClass = 'sg-pill-input mt-1';
+const textareaClass = 'sg-pill-textarea mt-1';
 
 function ClientMobileCard({ row, hint, onOpen }) {
   return (
     <button
       type="button"
       onClick={() => onOpen(row)}
-      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/30"
+      className="w-full rounded-sg border border-line bg-surface px-4 py-3 text-left shadow-sm transition hover:border-brand-200 hover:bg-brand-50/30"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold text-gray-900">{row.name}</p>
-          <p className="mt-0.5 truncate text-sm text-gray-600">{row.phone || '—'}</p>
+          <p className="truncate text-base font-semibold text-ink">{row.name}</p>
+          <p className="mt-0.5 truncate text-sm text-ink-muted">{row.phone || '—'}</p>
           {hint ? (
-            <p className="mt-1 truncate text-xs text-indigo-600" title={hint}>
+            <p className="mt-1 truncate text-xs text-brand-600" title={hint}>
               Найдено по: {hint}
             </p>
           ) : null}
@@ -56,13 +56,13 @@ function ClientMobileCard({ row, hint, onOpen }) {
 function AccountBadge({ userId }) {
   if (userId) {
     return (
-      <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
+      <span className="inline-flex rounded-full bg-success-50 px-2.5 py-0.5 text-xs font-medium text-success-700 ring-1 ring-inset ring-success-100">
         С аккаунтом
       </span>
     );
   }
   return (
-    <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200">
+    <span className="inline-flex rounded-full bg-surface-subtle px-2.5 py-0.5 text-xs font-medium text-ink-muted ring-1 ring-inset ring-line">
       Гость
     </span>
   );
@@ -108,18 +108,18 @@ function VehicleList({
   ordersByVehicle = {},
 }) {
   if (loading) {
-    return <p className="text-sm text-gray-500">Загрузка автомобилей…</p>;
+    return <p className="text-sm text-ink-muted">Загрузка автомобилей…</p>;
   }
   if (!vehicles?.length) {
-    return <p className="text-sm text-gray-500">Автомобилей нет</p>;
+    return <p className="text-sm text-ink-muted">Автомобилей нет</p>;
   }
   return (
     <ul className="space-y-2">
       {vehicles.map((v) => (
-        <li key={v.id} className="rounded-lg border border-gray-100 p-3 text-sm text-gray-700">
+        <li key={v.id} className="rounded-sg-sm border border-line-soft p-3 text-sm text-ink-soft">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-            <span className="font-medium text-gray-900">
+            <span className="font-medium text-ink">
               {v.make} {v.model}
               {v.year ? `, ${v.year}` : ''}
             </span>
@@ -132,7 +132,7 @@ function VehicleList({
                     e.stopPropagation();
                     onVinClick?.(v.vin);
                   }}
-                  className="font-mono text-indigo-600 underline decoration-indigo-300 underline-offset-2 transition hover:text-indigo-800 hover:decoration-indigo-600"
+                  className="font-mono text-brand-600 underline decoration-brand-300 underline-offset-2 transition hover:text-brand-800 hover:decoration-brand-600"
                   title="Открыть VIN-каталог"
                 >
                   VIN {v.vin}
@@ -148,7 +148,7 @@ function VehicleList({
                     e.stopPropagation();
                     onShowVehicleOrders?.(v);
                   }}
-                  className="text-sm font-medium text-indigo-600 underline decoration-indigo-300 underline-offset-2 transition hover:text-indigo-800 hover:decoration-indigo-600"
+                  className="text-sm font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 transition hover:text-brand-800 hover:decoration-brand-600"
                 >
                   Заказ-наряды
                 </button>
@@ -158,7 +158,7 @@ function VehicleList({
               <button
                 type="button"
                 onClick={() => onEdit?.(v)}
-                className="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
+                className="shrink-0 rounded-sg-sm px-2 py-1 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
               >
                 Изменить
               </button>
@@ -166,11 +166,11 @@ function VehicleList({
           </div>
 
           {ordersByVehicle[v.id]?.length ? (
-            <div className="mt-3 border-t border-gray-100 pt-2">
-              <p className="mb-1 text-xs font-medium text-gray-500">Заказ-наряды по этому авто</p>
+            <div className="mt-3 border-t border-line-soft pt-2">
+              <p className="mb-1 text-xs font-medium text-ink-muted">Заказ-наряды по этому авто</p>
               <ul className="space-y-1">
                 {ordersByVehicle[v.id].map((order) => (
-                  <li key={order.id} className="text-xs text-gray-700">
+                  <li key={order.id} className="text-xs text-ink-soft">
                     №{order.order_number || order.id} · {formatServerDateTime(order.scheduled_at || order.created_at) || '—'}
                   </li>
                 ))}
@@ -186,7 +186,7 @@ function VehicleList({
 function ProfileValue({ value }) {
   const text = String(value || '').trim();
   if (!text) {
-    return <span className="text-gray-400">не указано</span>;
+    return <span className="text-ink-faint">не указано</span>;
   }
   return text;
 }
@@ -218,8 +218,8 @@ function ClientProfileFields({ client }) {
     <dl className="grid gap-3 sm:grid-cols-2">
       {rows.map(([label, value]) => (
         <div key={label} className={label.includes('адрес') || label.includes('Адрес') ? 'sm:col-span-2' : ''}>
-          <dt className="text-xs font-medium text-gray-500">{label}</dt>
-          <dd className="mt-0.5 whitespace-pre-wrap text-sm text-gray-900">
+          <dt className="text-xs font-medium text-ink-muted">{label}</dt>
+          <dd className="mt-0.5 whitespace-pre-wrap text-sm text-ink">
             <ProfileValue value={value} />
           </dd>
         </div>
@@ -235,9 +235,9 @@ const BOOKING_STATUS_LABELS = {
 };
 
 const BOOKING_STATUS_STYLES = {
-  new: 'bg-amber-50 text-amber-800 ring-amber-200',
-  processed: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  cancelled: 'bg-gray-100 text-gray-600 ring-gray-200',
+  new: 'bg-warning-50 text-warning-700 ring-warning-100',
+  processed: 'bg-success-50 text-success-700 ring-success-100',
+  cancelled: 'bg-surface-subtle text-ink-muted ring-line',
 };
 
 const BOOKING_SOURCE_LABELS = {
@@ -266,12 +266,12 @@ function BookingStatusBadge({ status }) {
 
 function ClientHistoryList({ loading, empty, children }) {
   if (loading) {
-    return <p className="text-sm text-gray-500">Загрузка…</p>;
+    return <p className="text-sm text-ink-muted">Загрузка…</p>;
   }
   if (!children) {
-    return <p className="text-sm text-gray-500">{empty}</p>;
+    return <p className="text-sm text-ink-muted">{empty}</p>;
   }
-  return <ul className="divide-y divide-gray-100">{children}</ul>;
+  return <ul className="divide-y divide-line-soft">{children}</ul>;
 }
 
 function ClientOrderRow({ row, onOpen }) {
@@ -280,20 +280,20 @@ function ClientOrderRow({ row, onOpen }) {
       <button
         type="button"
         onClick={() => onOpen(row)}
-        className="flex w-full items-start justify-between gap-3 py-2.5 text-left transition hover:bg-gray-50/80"
+        className="flex w-full items-start justify-between gap-3 py-2.5 text-left transition hover:bg-surface-muted/80"
       >
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900">
+          <p className="text-sm font-medium text-ink">
             Заказ-наряд №{row.order_number || row.id}
           </p>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="mt-0.5 text-xs text-ink-muted">
             {formatServerDateTime(row.scheduled_at || row.created_at) || '—'}
             {row.vehicle ? ` · ${vehicleLabel(row.vehicle)}` : ''}
           </p>
         </div>
         <div className="shrink-0 text-right">
           <OrderStatusBadge status={row.status} />
-          <p className="mt-1 text-xs tabular-nums text-gray-600">
+          <p className="mt-1 text-xs tabular-nums text-ink-muted">
             {formatMoney(row.grand_total)} ₽
           </p>
         </div>
@@ -311,13 +311,13 @@ function ClientBookingRow({ row, onOpen }) {
       <button
         type="button"
         onClick={() => onOpen(row)}
-        className="flex w-full items-start justify-between gap-3 py-2.5 text-left transition hover:bg-gray-50/80"
+        className="flex w-full items-start justify-between gap-3 py-2.5 text-left transition hover:bg-surface-muted/80"
       >
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900">
+          <p className="text-sm font-medium text-ink">
             {formatServerDate(row.preferred_date) || 'Заявка'}
           </p>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="mt-0.5 text-xs text-ink-muted">
             {BOOKING_SOURCE_LABELS[row.source] || row.source || '—'}
             {vehicle ? ` · ${vehicle}` : ''}
           </p>
@@ -347,40 +347,40 @@ function ClientBookingViewModal({ booking, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
           >
             Закрыть
           </button>
         </div>
       }
     >
-      <div className="space-y-3 text-sm text-gray-700">
+      <div className="space-y-3 text-sm text-ink-soft">
         <div className="flex flex-wrap items-center gap-2">
           <BookingStatusBadge status={booking.status} />
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-ink-muted">
             {BOOKING_SOURCE_LABELS[booking.source] || booking.source || '—'}
           </span>
         </div>
         <p>
-          <span className="font-medium text-gray-900">Имя:</span> {booking.name || '—'}
+          <span className="font-medium text-ink">Имя:</span> {booking.name || '—'}
         </p>
         <p>
-          <span className="font-medium text-gray-900">Телефон:</span> {booking.phone || '—'}
+          <span className="font-medium text-ink">Телефон:</span> {booking.phone || '—'}
         </p>
         <p>
-          <span className="font-medium text-gray-900">Желаемая дата:</span>{' '}
+          <span className="font-medium text-ink">Желаемая дата:</span>{' '}
           {formatServerDate(booking.preferred_date) || '—'}
         </p>
         <p>
-          <span className="font-medium text-gray-900">Автомобиль:</span> {vehicle || '—'}
+          <span className="font-medium text-ink">Автомобиль:</span> {vehicle || '—'}
         </p>
         <p>
-          <span className="font-medium text-gray-900">Создана:</span>{' '}
+          <span className="font-medium text-ink">Создана:</span>{' '}
           {formatServerDateTime(booking.created_at) || '—'}
         </p>
-        <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
+        <div className="rounded-sg border border-line-soft bg-surface-muted/80 px-3 py-3">
           <p>
-            <span className="font-medium text-gray-900">Комментарий:</span>{' '}
+            <span className="font-medium text-ink">Комментарий:</span>{' '}
             <span className="whitespace-pre-wrap">{booking.notes?.trim() || '—'}</span>
           </p>
         </div>
@@ -606,7 +606,7 @@ function ClientProfileModal({
               type="button"
               onClick={() => setCreateAccountConfirmOpen(true)}
               disabled={saving || creatingAccount}
-              className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
+              className="rounded-sg-sm border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
             >
               {creatingAccount ? 'Создание…' : 'Создать аккаунт'}
             </button>
@@ -620,7 +620,7 @@ function ClientProfileModal({
                   setForm(emptyClientRequisites(client));
                   setError('');
                 }}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
                 disabled={saving}
               >
                 Отмена
@@ -629,7 +629,7 @@ function ClientProfileModal({
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+                className="rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
               >
                 {saving ? 'Сохранение…' : 'Сохранить'}
               </button>
@@ -639,7 +639,7 @@ function ClientProfileModal({
               <button
                 type="button"
                 onClick={handleClose}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
               >
                 Закрыть
               </button>
@@ -648,7 +648,7 @@ function ClientProfileModal({
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={startEditing}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                  className="rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Редактировать
                 </button>
@@ -674,12 +674,12 @@ function ClientProfileModal({
               <div className="flex flex-wrap items-center gap-2">
                 <AccountBadge userId={client.user_id} />
                 {isGuest ? (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-ink-muted">
                     Гость — можно менять ФИО, телефон и автомобили.
                     {canCreateAccount ? ' Email указан — можно создать личный кабинет.' : ''}
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-ink-muted">
                     ФИО и телефон берутся из аккаунта.
                   </p>
                 )}
@@ -694,15 +694,15 @@ function ClientProfileModal({
                     disabled={saving}
                     idPrefix="client-card"
                   />
-                  {error ? <p className="text-sm text-red-600">{error}</p> : null}
-                  {accountMessage ? <p className="text-sm text-emerald-700">{accountMessage}</p> : null}
+                  {error ? <p className="text-sm text-danger-600">{error}</p> : null}
+                  {accountMessage ? <p className="text-sm text-success-700">{accountMessage}</p> : null}
                 </form>
               ) : (
                 <ClientProfileFields client={client} />
               )}
 
               {!editing && accountMessage ? (
-                <p className="text-sm text-emerald-700">{accountMessage}</p>
+                <p className="text-sm text-success-700">{accountMessage}</p>
               ) : null}
 
             </>
@@ -715,7 +715,7 @@ function ClientProfileModal({
                   <button
                     type="button"
                     onClick={onAddVehicle}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                    className="rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
                     Добавить авто
                   </button>
@@ -740,13 +740,13 @@ function ClientProfileModal({
             <div className="space-y-3">
               {vehicleOrderFilterId && filteredVehicleLabel ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-800 ring-1 ring-inset ring-indigo-200">
+                  <span className="inline-flex items-center rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-800 ring-1 ring-inset ring-brand-200">
                     Фильтр: авто {filteredVehicleLabel}
                   </span>
                   <button
                     type="button"
                     onClick={() => setVehicleOrderFilterId(null)}
-                    className="text-xs font-medium text-indigo-600 underline decoration-indigo-300 underline-offset-2 transition hover:text-indigo-800 hover:decoration-indigo-600"
+                    className="text-xs font-medium text-brand-600 underline decoration-brand-300 underline-offset-2 transition hover:text-brand-800 hover:decoration-brand-600"
                   >
                     Сбросить фильтр
                   </button>
@@ -885,7 +885,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
             disabled={saving}
           >
             Отмена
@@ -894,7 +894,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
             type="submit"
             form="edit-guest-vehicle"
             disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+            className="rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
@@ -904,7 +904,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
       <form id="edit-guest-vehicle" onSubmit={handleSubmit} className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">VIN</label>
+            <label className="block text-sm font-medium text-ink-soft">VIN</label>
             <input
               className={inputClass}
               value={form.vin}
@@ -914,7 +914,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Марка</label>
+            <label className="block text-sm font-medium text-ink-soft">Марка</label>
             <input
               className={inputClass}
               value={form.make}
@@ -924,7 +924,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Модель</label>
+            <label className="block text-sm font-medium text-ink-soft">Модель</label>
             <input
               className={inputClass}
               value={form.model}
@@ -934,7 +934,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Год</label>
+            <label className="block text-sm font-medium text-ink-soft">Год</label>
             <NumericInput
               mode="numeric"
               className={inputClass}
@@ -945,7 +945,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Цвет</label>
+            <label className="block text-sm font-medium text-ink-soft">Цвет</label>
             <input
               className={inputClass}
               value={form.color}
@@ -954,7 +954,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Госномер</label>
+            <label className="block text-sm font-medium text-ink-soft">Госномер</label>
             <input
               className={inputClass}
               value={form.plate}
@@ -963,9 +963,9 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Заметка</label>
+            <label className="block text-sm font-medium text-ink-soft">Заметка</label>
             <textarea
-              className={inputClass}
+              className={textareaClass}
               rows={2}
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
@@ -973,7 +973,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
             />
           </div>
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
       </form>
     </Modal>
   );
@@ -1057,7 +1057,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
             disabled={saving}
           >
             Отмена
@@ -1066,7 +1066,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
             type="submit"
             form="add-guest-vehicle"
             disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+            className="rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             {saving ? 'Сохранение…' : 'Добавить'}
           </button>
@@ -1076,7 +1076,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
       <form id="add-guest-vehicle" onSubmit={handleSubmit} className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">VIN</label>
+            <label className="block text-sm font-medium text-ink-soft">VIN</label>
             <input
               className={inputClass}
               value={form.vin}
@@ -1086,7 +1086,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Марка</label>
+            <label className="block text-sm font-medium text-ink-soft">Марка</label>
             <input
               className={inputClass}
               value={form.make}
@@ -1096,7 +1096,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Модель</label>
+            <label className="block text-sm font-medium text-ink-soft">Модель</label>
             <input
               className={inputClass}
               value={form.model}
@@ -1106,7 +1106,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Год</label>
+            <label className="block text-sm font-medium text-ink-soft">Год</label>
             <NumericInput
               mode="numeric"
               className={inputClass}
@@ -1117,7 +1117,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Цвет</label>
+            <label className="block text-sm font-medium text-ink-soft">Цвет</label>
             <input
               className={inputClass}
               value={form.color}
@@ -1126,7 +1126,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Госномер</label>
+            <label className="block text-sm font-medium text-ink-soft">Госномер</label>
             <input
               className={inputClass}
               value={form.plate}
@@ -1135,9 +1135,9 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">Заметка</label>
+            <label className="block text-sm font-medium text-ink-soft">Заметка</label>
             <textarea
-              className={inputClass}
+              className={textareaClass}
               rows={2}
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
@@ -1145,7 +1145,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
             />
           </div>
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
       </form>
     </Modal>
   );
@@ -1214,7 +1214,7 @@ function AddClientModal({ open, onClose, onCreated }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
             disabled={saving}
           >
             Отмена
@@ -1223,7 +1223,7 @@ function AddClientModal({ open, onClose, onCreated }) {
             type="submit"
             form="add-autoservice-client"
             disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+            className="rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             {saving ? 'Сохранение…' : 'Добавить'}
           </button>
@@ -1232,7 +1232,7 @@ function AddClientModal({ open, onClose, onCreated }) {
     >
       <form id="add-autoservice-client" onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">ФИО</label>
+          <label className="block text-sm font-medium text-ink-soft">ФИО</label>
           <input
             className={inputClass}
             value={name}
@@ -1244,9 +1244,9 @@ function AddClientModal({ open, onClose, onCreated }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Телефон (необязательно)</label>
+          <label className="block text-sm font-medium text-ink-soft">Телефон (необязательно)</label>
           <PhoneInput
-            className={`${inputClass} ${phoneError ? 'border-red-500' : ''}`}
+            className={`${inputClass} ${phoneError ? '!border-danger-600 !bg-danger-50 focus:!border-danger-600' : ''}`}
             value={phone}
             onChange={(e) => {
               setPhone(e.target.value);
@@ -1255,9 +1255,9 @@ function AddClientModal({ open, onClose, onCreated }) {
             placeholder="+7 (___) ___-__-__"
             disabled={saving}
           />
-          {phoneError ? <p className="mt-1 text-sm text-red-600">{phoneError}</p> : null}
+          {phoneError ? <p className="mt-1 text-sm text-danger-600">{phoneError}</p> : null}
         </div>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
       </form>
     </Modal>
   );
@@ -1351,8 +1351,8 @@ export default function AutoserviceClientsPage() {
     <div className="w-full min-w-0">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Клиенты</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">Клиенты</h1>
+          <p className="mt-0.5 text-sm text-ink-muted">
             {loading
               ? 'Загрузка…'
               : qApplied.trim()
@@ -1363,7 +1363,7 @@ export default function AutoserviceClientsPage() {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          className="inline-flex min-h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
           Добавить
         </button>
@@ -1379,7 +1379,7 @@ export default function AutoserviceClientsPage() {
         <button
           type="button"
           onClick={load}
-          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-surface-subtle text-ink-muted transition hover:bg-surface-subtle hover:text-ink"
           title="Обновить"
           aria-label="Обновить"
         >
@@ -1395,30 +1395,30 @@ export default function AutoserviceClientsPage() {
       </div>
 
       {error ? (
-        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+        <p className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
           {error}
         </p>
       ) : null}
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
+        <table className="min-w-full table-fixed divide-y divide-line text-sm">
           <thead>
-            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">
               <th className="py-3 pr-3">Имя</th>
               <th className="w-44 py-3 pr-3">Телефон</th>
               <th className="w-28 py-3">Аккаунт</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-line-soft">
             {loading ? (
               <tr>
-                <td colSpan={3} className="py-12 text-center text-gray-500">
+                <td colSpan={3} className="py-12 text-center text-ink-muted">
                   Загрузка…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={3} className="py-12 text-center text-gray-500">
+                <td colSpan={3} className="py-12 text-center text-ink-muted">
                   {qApplied.trim() ? 'Ничего не найдено' : 'Клиентов пока нет'}
                 </td>
               </tr>
@@ -1428,18 +1428,18 @@ export default function AutoserviceClientsPage() {
                 return (
                   <tr
                     key={row.id}
-                    className="cursor-pointer transition-colors hover:bg-gray-50/70"
+                    className="cursor-pointer transition-colors hover:bg-surface-muted/70"
                     onClick={() => openClientVehicles(row)}
                   >
                     <td className="py-3 pr-3 align-middle">
-                      <p className="font-medium text-gray-900">{row.name}</p>
+                      <p className="font-medium text-ink">{row.name}</p>
                       {hint ? (
-                        <p className="mt-0.5 truncate text-xs text-indigo-600" title={hint}>
+                        <p className="mt-0.5 truncate text-xs text-brand-600" title={hint}>
                           Найдено по: {hint}
                         </p>
                       ) : null}
                     </td>
-                    <td className="whitespace-nowrap py-3 pr-3 align-middle tabular-nums text-gray-700">
+                    <td className="whitespace-nowrap py-3 pr-3 align-middle tabular-nums text-ink-soft">
                       {row.phone || '—'}
                     </td>
                     <td className="py-3 align-middle">
@@ -1457,11 +1457,11 @@ export default function AutoserviceClientsPage() {
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={`client-sk-${i}`} className="h-20 w-full rounded-xl" />
+              <Skeleton key={`client-sk-${i}`} className="h-20 w-full rounded-sg" />
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">
+          <p className="py-10 text-center text-sm text-ink-muted">
             {qApplied.trim() ? 'Ничего не найдено' : 'Клиентов пока нет'}
           </p>
         ) : (

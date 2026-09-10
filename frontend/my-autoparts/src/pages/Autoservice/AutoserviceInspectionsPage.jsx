@@ -19,9 +19,9 @@ const STATUS_LABELS = {
 };
 
 const STATUS_STYLES = {
-  new: 'bg-amber-50 text-amber-800 ring-amber-200',
-  processed: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  cancelled: 'bg-gray-100 text-gray-600 ring-gray-200',
+  new: 'bg-warning-50 text-warning-700 ring-warning-100',
+  processed: 'bg-success-50 text-success-700 ring-success-100',
+  cancelled: 'bg-surface-subtle text-ink-muted ring-line',
 };
 
 const SOURCE_LABELS = {
@@ -65,10 +65,10 @@ function StatusPicker({ status, disabled, saving, onChange, isOpen, onOpenChange
   const isControlled = isOpen !== undefined;
   const open = isControlled ? isOpen : internalOpen;
 
-  const setOpen = (next) => {
+  const setOpen = useCallback((next) => {
     if (!isControlled) setInternalOpen(next);
     onOpenChange?.(next);
-  };
+  }, [isControlled, onOpenChange]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -79,7 +79,7 @@ function StatusPicker({ status, disabled, saving, onChange, isOpen, onOpenChange
     };
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open]);
+  }, [open, setOpen]);
 
   if (available.length === 0) {
     return <StatusBadge status={status} />;
@@ -94,7 +94,7 @@ function StatusPicker({ status, disabled, saving, onChange, isOpen, onOpenChange
           e.stopPropagation();
           setOpen(!open);
         }}
-        className="rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 disabled:cursor-wait disabled:opacity-60"
+        className="rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 disabled:cursor-wait disabled:opacity-60"
         title="Сменить статус"
       >
         <StatusBadge status={status} className={saving ? 'opacity-70' : ''} />
@@ -122,11 +122,11 @@ function BookingMobileCard({ row, updatingId, onStatusChange, onView, openMenuKe
   const statusOpen = openMenuKey === `status:${row.id}`;
   const actionsOpen = openMenuKey === `actions:${row.id}`;
   return (
-    <div className={`border-b border-gray-100 py-3 last:border-b-0 ${statusOpen || actionsOpen ? 'relative z-30' : ''}`}>
+    <div className={`border-b border-line-soft py-3 last:border-b-0 ${statusOpen || actionsOpen ? 'relative z-30' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">{row.name}</span>
+            <span className="text-sm font-semibold text-ink">{row.name}</span>
             <StatusPicker
               status={row.status}
               saving={updatingId === row.id}
@@ -136,12 +136,12 @@ function BookingMobileCard({ row, updatingId, onStatusChange, onView, openMenuKe
               onChange={(nextStatus) => onStatusChange(row.id, nextStatus)}
             />
           </div>
-          <p className="mt-1 text-sm text-gray-600">{row.phone || '—'}</p>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="mt-1 text-sm text-ink-muted">{row.phone || '—'}</p>
+          <p className="mt-0.5 text-xs text-ink-muted">
             Дата: {formatServerDate(row.preferred_date) || '—'}
             {row.vehicle ? ` · ${formatVehicleBrief(row.vehicle)}` : ''}
           </p>
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="mt-0.5 text-xs text-ink-muted">
             {SOURCE_LABELS[row.source] || row.source || '—'} · {formatServerDateTime(row.created_at)}
           </p>
         </button>
@@ -152,7 +152,7 @@ function BookingMobileCard({ row, updatingId, onStatusChange, onView, openMenuKe
             menuClassName="w-40 z-50"
             estimatedMenuHeight={80}
             showLabel={false}
-            buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+            buttonClassName="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface text-ink-soft transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
           >
             <ActionsDropdownItem onClick={onView}>Подробнее</ActionsDropdownItem>
           </ActionsDropdown>
@@ -182,38 +182,38 @@ function BookingViewModal({ booking, onClose, updatingId, onStatusChange }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
           >
             Закрыть
           </button>
         </div>
       }
     >
-      <div className="space-y-3 text-sm text-gray-700">
+      <div className="space-y-3 text-sm text-ink-soft">
         <div className="grid gap-3 sm:grid-cols-2">
           <p>
-            <span className="font-medium text-gray-900">Телефон:</span> {booking.phone || '—'}
+            <span className="font-medium text-ink">Телефон:</span> {booking.phone || '—'}
           </p>
           <p>
-            <span className="font-medium text-gray-900">Желаемая дата:</span>{' '}
+            <span className="font-medium text-ink">Желаемая дата:</span>{' '}
             {formatServerDate(booking.preferred_date) || '—'}
           </p>
           <p>
-            <span className="font-medium text-gray-900">Создана:</span>{' '}
+            <span className="font-medium text-ink">Создана:</span>{' '}
             {formatServerDateTime(booking.created_at) || '—'}
           </p>
           <p>
-            <span className="font-medium text-gray-900">Источник:</span>{' '}
+            <span className="font-medium text-ink">Источник:</span>{' '}
             {SOURCE_LABELS[booking.source] || booking.source || '—'}
           </p>
           <p className="sm:col-span-2">
-            <span className="font-medium text-gray-900">Автомобиль:</span> {formatVehicleBrief(booking.vehicle)}
+            <span className="font-medium text-ink">Автомобиль:</span> {formatVehicleBrief(booking.vehicle)}
           </p>
         </div>
-        <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-3">
+        <div className="rounded-sg border border-line-soft bg-surface-muted/80 px-3 py-3">
           <p>
-            <span className="font-medium text-gray-900">Комментарий:</span>{' '}
-            <span className="whitespace-pre-wrap text-gray-700">{booking.notes?.trim() || '—'}</span>
+            <span className="font-medium text-ink">Комментарий:</span>{' '}
+            <span className="whitespace-pre-wrap text-ink-soft">{booking.notes?.trim() || '—'}</span>
           </p>
         </div>
       </div>
@@ -310,8 +310,8 @@ export default function AutoserviceInspectionsPage() {
     <div className="w-full min-w-0">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Заявки</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">Заявки</h1>
+          <p className="mt-0.5 text-sm text-ink-muted">
             {loading
               ? 'Загрузка…'
               : qApplied.trim()
@@ -322,7 +322,7 @@ export default function AutoserviceInspectionsPage() {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          className="inline-flex min-h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 sm:min-h-10"
         >
           Добавить
         </button>
@@ -356,7 +356,7 @@ export default function AutoserviceInspectionsPage() {
         <button
           type="button"
           onClick={load}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-subtle text-ink-muted transition hover:bg-surface-muted hover:text-ink"
           title="Обновить"
           aria-label="Обновить"
         >
@@ -372,15 +372,15 @@ export default function AutoserviceInspectionsPage() {
       </div>
 
       {error ? (
-        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+        <p className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
           {error}
         </p>
       ) : null}
 
       <div className={`hidden w-full md:block ${menuOpen ? 'overflow-visible' : 'overflow-x-auto'}`}>
-        <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
+        <table className="min-w-full table-fixed divide-y divide-line text-sm">
           <thead>
-            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">
               <th className="w-40 py-3 pr-3">Создана</th>
               <th className="py-3 pr-3">Клиент</th>
               <th className="w-36 py-3 pr-3">Дата</th>
@@ -390,16 +390,16 @@ export default function AutoserviceInspectionsPage() {
               <th className="w-28 py-3 text-right">Действия</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-line-soft">
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-gray-500">
+                <td colSpan={7} className="py-12 text-center text-ink-muted">
                   Загрузка…
                 </td>
               </tr>
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-gray-500">
+                <td colSpan={7} className="py-12 text-center text-ink-muted">
                   {rows.length === 0 ? 'Заявок пока нет' : 'Ничего не найдено'}
                 </td>
               </tr>
@@ -411,7 +411,7 @@ export default function AutoserviceInspectionsPage() {
                 return (
                   <tr
                     key={row.id}
-                    className={`cursor-pointer transition-colors hover:bg-gray-50/70 ${rowMenuOpen ? 'relative z-30' : ''}`}
+                    className={`cursor-pointer transition-colors hover:bg-surface-muted/70 ${rowMenuOpen ? 'relative z-30' : ''}`}
                     onDoubleClick={(e) => {
                       if (e.target.closest('.status-picker') || e.target.closest('.actions-dropdown')) {
                         return;
@@ -419,23 +419,23 @@ export default function AutoserviceInspectionsPage() {
                       setViewBooking(row);
                     }}
                   >
-                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-600">
+                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-ink-muted">
                       {formatServerDateTime(row.created_at)}
                     </td>
                     <td className="py-3 pr-3 align-middle">
-                      <div className="font-medium text-gray-900">{row.name}</div>
-                      {row.phone ? <div className="mt-0.5 text-xs text-gray-500">{row.phone}</div> : null}
+                      <div className="font-medium text-ink">{row.name}</div>
+                      {row.phone ? <div className="mt-0.5 text-xs text-ink-muted">{row.phone}</div> : null}
                     </td>
-                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">
+                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-ink-soft">
                       {formatServerDate(row.preferred_date) || '—'}
                     </td>
                     <td
-                      className="hidden max-w-[12rem] truncate py-3 pr-3 align-middle text-gray-700 lg:table-cell"
+                      className="hidden max-w-[12rem] truncate py-3 pr-3 align-middle text-ink-soft lg:table-cell"
                       title={formatVehicleBrief(row.vehicle)}
                     >
                       {formatVehicleBrief(row.vehicle)}
                     </td>
-                    <td className="hidden py-3 pr-3 align-middle text-gray-600 xl:table-cell">
+                    <td className="hidden py-3 pr-3 align-middle text-ink-muted xl:table-cell">
                       {SOURCE_LABELS[row.source] || row.source || '—'}
                     </td>
                     <td className={`py-3 pr-3 align-middle ${statusOpen ? 'relative z-30' : ''}`}>
@@ -455,7 +455,7 @@ export default function AutoserviceInspectionsPage() {
                         menuClassName="w-40 z-50"
                         estimatedMenuHeight={80}
                         showLabel
-                        buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                        buttonClassName="inline-flex min-h-11 items-center gap-1.5 rounded-sg-sm border border-line-strong bg-surface px-2.5 text-sm font-medium text-ink-soft transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 md:min-h-9"
                       >
                         <ActionsDropdownItem onClick={() => setViewBooking(row)}>Подробнее</ActionsDropdownItem>
                       </ActionsDropdown>
@@ -470,9 +470,9 @@ export default function AutoserviceInspectionsPage() {
 
       <div className={`md:hidden ${menuOpen ? 'overflow-visible' : ''}`}>
         {loading ? (
-          <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+          <p className="py-10 text-center text-sm text-ink-muted">Загрузка…</p>
         ) : filteredRows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">
+          <p className="py-10 text-center text-sm text-ink-muted">
             {rows.length === 0 ? 'Заявок пока нет' : 'Ничего не найдено'}
           </p>
         ) : (

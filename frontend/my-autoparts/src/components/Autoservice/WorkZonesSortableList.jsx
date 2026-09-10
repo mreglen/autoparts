@@ -37,8 +37,8 @@ function ZoneActions({ zone, onEdit, onRemove, compact = false }) {
       showLabel={!compact}
       buttonClassName={
         compact
-          ? 'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50'
-          : 'inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1'
+          ? 'inline-flex h-9 w-9 items-center justify-center rounded-sg-sm border border-line-strong bg-surface text-ink-soft transition hover:bg-surface-muted'
+          : 'inline-flex h-9 items-center gap-1.5 rounded-sg-sm border border-line-strong bg-surface px-2.5 text-sm font-medium text-ink-soft transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1'
       }
     >
       <ActionsDropdownItem onClick={() => onEdit(zone)}>Изменить</ActionsDropdownItem>
@@ -149,22 +149,22 @@ export default function WorkZonesSortableList({
   }, [disabled, loading]);
 
   if (loading) {
-    return <p className="py-12 text-center text-sm text-gray-500">Загрузка…</p>;
+    return <p className="py-12 text-center text-sm text-ink-muted">Загрузка…</p>;
   }
 
   if (!items.length) {
-    return <p className="py-12 text-center text-sm text-gray-500">Зон пока нет</p>;
+    return <p className="py-12 text-center text-sm text-ink-muted">Зон пока нет</p>;
   }
 
   return (
     <div ref={listRef}>
-      <div className="hidden border-b border-gray-200 pb-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 md:grid md:grid-cols-[3rem_minmax(0,1fr)_10rem] md:gap-3">
+      <div className="hidden border-b border-line pb-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted md:grid md:grid-cols-[3rem_minmax(0,1fr)_10rem] md:gap-3">
         <span>Порядок</span>
         <span>Название</span>
         <span className="text-right">Действия</span>
       </div>
 
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-line-soft">
         {items.map((zone) => {
           const isDragging = sameZoneId(draggingId, zone.id);
           const isOver = overId != null
@@ -178,18 +178,18 @@ export default function WorkZonesSortableList({
               data-zone-row-id={zone.id}
               className={`grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 py-3 transition-colors md:grid-cols-[3rem_minmax(0,1fr)_10rem] ${
                 isDragging ? 'opacity-60' : ''
-              } ${isOver ? 'bg-indigo-50/80' : 'hover:bg-gray-50/70'}`}
+              } ${isOver ? 'bg-brand-50/80' : 'hover:bg-surface-muted/70'}`}
             >
               <button
                 type="button"
                 aria-label={`Перетащить ${zone.name}`}
                 disabled={disabled || loading}
                 onPointerDown={(event) => startDrag(event, zone.id)}
-                className="inline-flex h-9 w-9 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-9 w-9 shrink-0 touch-none cursor-grab items-center justify-center rounded-sg-sm text-ink-faint transition hover:bg-surface-subtle hover:text-ink-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <DragHandleIcon />
               </button>
-              <p className="min-w-0 truncate text-sm font-semibold text-gray-900 md:font-medium">{zone.name}</p>
+              <p className="min-w-0 truncate text-sm font-semibold text-ink md:font-medium">{zone.name}</p>
               <div className="justify-self-end">
                 <div className="hidden md:block">
                   <ZoneActions zone={zone} onEdit={onEdit} onRemove={onRemove} />

@@ -6,7 +6,7 @@ const PANEL_WIDTH = 240;
 const PANEL_GAP = 8;
 
 const fieldClass =
-  'mt-1 block w-full rounded-sg border border-line bg-white px-3 py-2 text-sm text-ink shadow-sg-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
+  'sg-pill-input mt-1 w-full shadow-sg-sm';
 
 function clampPanelLeft(triggerRect) {
   const ideal = triggerRect.right - PANEL_WIDTH;
@@ -79,7 +79,7 @@ export default function ShopPartMarkupPopover({ value, onApply, floorRubles = fa
         ? createPortal(
           <div
             ref={panelRef}
-            className="fixed z-[1200] w-60 rounded-sg border border-line bg-white p-3 shadow-sg-md"
+            className="fixed z-[1200] w-60 rounded-sg border border-line bg-surface p-3 shadow-sg-md"
             style={panelStyle}
           >
             <p className="text-xs font-semibold text-ink">Наценка для клиента, %</p>

@@ -20,17 +20,17 @@ import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 const ORDER_STATUS_STYLES = {
-  pending: 'bg-amber-400 text-amber-950 hover:bg-amber-500',
-  in_progress: 'bg-sky-500 text-white hover:bg-sky-600',
-  done: 'bg-indigo-500 text-white hover:bg-indigo-600',
-  completed: 'bg-gray-400 text-white hover:bg-gray-500',
-  cancelled: 'bg-gray-300 text-gray-700 line-through hover:bg-gray-400',
+  pending: 'bg-warning-100 text-warning-700 hover:bg-warning-50',
+  in_progress: 'bg-brand-400 text-white hover:bg-brand-500',
+  done: 'bg-brand-500 text-white hover:bg-brand-600',
+  completed: 'bg-ink-muted text-white hover:bg-ink-faint',
+  cancelled: 'bg-line text-ink-soft line-through hover:bg-line-strong',
 };
 
 const INSPECTION_STATUS_STYLES = {
-  new: 'bg-emerald-500 text-white hover:bg-emerald-600',
-  processed: 'bg-emerald-600 text-white hover:bg-emerald-700',
-  cancelled: 'bg-gray-300 text-gray-700 line-through hover:bg-gray-400',
+  new: 'bg-success-600 text-white hover:bg-success-700',
+  processed: 'bg-success-700 text-white hover:bg-success-600',
+  cancelled: 'bg-line text-ink-soft line-through hover:bg-line-strong',
 };
 
 function plannerItemStyle(item) {
@@ -74,8 +74,8 @@ function formatLongDay(isoDate) {
 
 function PlannerDayCell({ orders, onItemClick, isToday, onContextMenu }) {
   const items = useMemo(() => sortDayOrders(orders), [orders]);
-  const cellClass = `min-h-[3rem] border-b border-r border-gray-100 transition-colors hover:bg-gray-200/45 ${
-    isToday ? 'bg-brand-50/30' : 'bg-white'
+  const cellClass = `min-h-[3rem] border-b border-r border-line-soft transition-colors hover:bg-surface-subtle/45 ${
+    isToday ? 'bg-brand-50/30' : 'bg-surface'
   }`;
 
   const handleContextMenu = (event) => {
@@ -106,7 +106,7 @@ function PlannerDayCell({ orders, onItemClick, isToday, onContextMenu }) {
             key={plannerItemKey(order)}
             type="button"
             onClick={() => onItemClick(order)}
-            className={`w-full rounded-lg px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:text-xs ${styleClass}`}
+            className={`w-full rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:text-xs ${styleClass}`}
             title={`${order.kind === 'inspection' ? 'Осмотр' : `№ ${order.order_number}`} · ${clientName}`}
           >
             <span className="block tabular-nums">{plannerItemTimeLabel(order)}</span>
@@ -127,11 +127,11 @@ function WeekToolbar({
   onJumpDate,
 }) {
   return (
-    <div className="inline-flex w-full items-center gap-1 rounded-xl bg-gray-100 p-1 md:w-auto">
+    <div className="inline-flex w-full items-center gap-1 rounded-sg bg-surface-subtle p-1 md:w-auto">
       <button
         type="button"
         onClick={onPrev}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-600 transition hover:bg-white hover:text-gray-900 md:h-9 md:w-9"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm text-ink-muted transition hover:bg-surface hover:text-ink md:h-9 md:w-9"
         aria-label="Предыдущая неделя"
       >
         ←
@@ -139,25 +139,25 @@ function WeekToolbar({
       <button
         type="button"
         onClick={onToday}
-        className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg px-3 text-sm font-medium text-gray-700 transition hover:bg-white md:h-9"
+        className="inline-flex h-11 shrink-0 items-center justify-center rounded-sg-sm px-3 text-sm font-medium text-ink-soft transition hover:bg-surface md:h-9"
       >
         Сегодня
       </button>
-      <span className="min-w-0 flex-1 truncate px-1 text-center text-sm font-semibold text-gray-900 md:hidden">
+      <span className="min-w-0 flex-1 truncate px-1 text-center text-sm font-semibold text-ink md:hidden">
         {weekRangeLabel}
       </span>
-      <span className="hidden min-w-[9rem] px-2 text-center text-sm font-medium text-gray-900 md:inline">
+      <span className="hidden min-w-[9rem] px-2 text-center text-sm font-medium text-ink md:inline">
         {weekRangeLabel}
       </span>
       <button
         type="button"
         onClick={onNext}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-gray-600 transition hover:bg-white hover:text-gray-900 md:h-9 md:w-9"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm text-ink-muted transition hover:bg-surface hover:text-ink md:h-9 md:w-9"
         aria-label="Следующая неделя"
       >
         →
       </button>
-      <label className="relative ml-0.5 inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-white text-gray-600 shadow-sm ring-1 ring-gray-200/80 transition hover:text-gray-900 md:h-9 md:w-auto md:px-2.5">
+      <label className="relative ml-0.5 inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-sg-sm bg-surface text-ink-muted shadow-sm ring-1 ring-line/80 transition hover:text-ink md:h-9 md:w-auto md:px-2.5">
         <span className="sr-only">Выбрать дату</span>
         <svg className="h-5 w-5 shrink-0 md:h-4 md:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -201,12 +201,12 @@ function MobileDayPlanner({
               key={iso}
               type="button"
               onClick={() => onSelectDay(iso)}
-              className={`flex min-h-11 flex-col items-center justify-center rounded-xl px-0.5 py-1.5 text-center transition ${
+              className={`flex min-h-11 flex-col items-center justify-center rounded-sg px-0.5 py-1.5 text-center transition ${
                 isSelected
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-brand-600 text-white shadow-sm'
                   : isToday
                     ? 'bg-brand-50 text-brand-800'
-                    : 'bg-gray-100 text-gray-700'
+                    : 'bg-surface-subtle text-ink-soft'
               }`}
             >
               <span className={`text-[10px] font-semibold uppercase tracking-wide ${isSelected ? 'text-white/80' : ''}`}>
@@ -218,14 +218,14 @@ function MobileDayPlanner({
         })}
       </div>
 
-      <p className="mt-3 text-base font-semibold capitalize text-gray-900">
+      <p className="mt-3 text-base font-semibold capitalize text-ink">
         {formatLongDay(selectedDayIso)}
       </p>
 
       {loading && zones.length === 0 ? (
-        <p className="mt-4 text-sm text-gray-500">Загрузка…</p>
+        <p className="mt-4 text-sm text-ink-muted">Загрузка…</p>
       ) : zones.length === 0 ? (
-        <p className="mt-4 rounded-2xl border border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">
+        <p className="mt-4 rounded-sg-lg border border-line bg-surface px-4 py-8 text-center text-sm text-ink-muted">
           Нет рабочих зон. Добавьте их в настройках автосервиса.
         </p>
       ) : (
@@ -236,7 +236,7 @@ function MobileDayPlanner({
             return (
               <section
                 key={zone.id ?? 'unassigned'}
-                className="rounded-2xl border border-gray-200 bg-white px-3.5 py-3 shadow-sm transition-colors hover:bg-gray-50/80"
+                className="rounded-sg-lg border border-line bg-surface px-3.5 py-3 shadow-sm transition-colors hover:bg-surface-muted/80"
                 onContextMenu={(event) => {
                   event.preventDefault();
                   onCellContextMenu?.({
@@ -248,12 +248,12 @@ function MobileDayPlanner({
                 }}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-base font-semibold text-gray-900">{zone.name}</h2>
+                  <h2 className="text-base font-semibold text-ink">{zone.name}</h2>
                   {onAddInZone ? (
                     <button
                       type="button"
                       onClick={() => onAddInZone({ dayIso: selectedDayIso, zoneId: zone.id ?? null })}
-                      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 text-lg font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-sg border border-brand-200 bg-brand-50 text-lg font-semibold text-brand-700 transition hover:bg-brand-100"
                       aria-label={`Добавить в ${zone.name}`}
                     >
                       +
@@ -261,9 +261,9 @@ function MobileDayPlanner({
                   ) : null}
                 </div>
                 {orders.length === 0 ? (
-                  <p className="mt-2 text-sm text-gray-400">Нет записей</p>
+                  <p className="mt-2 text-sm text-ink-faint">Нет записей</p>
                 ) : (
-                  <ul className="mt-2 divide-y divide-gray-100">
+                  <ul className="mt-2 divide-y divide-line-soft">
                     {orders.map((order) => (
                       <li key={plannerItemKey(order)}>
                         <button
@@ -272,26 +272,26 @@ function MobileDayPlanner({
                           className="flex w-full min-h-11 items-start gap-3 py-2.5 text-left"
                         >
                           <span className={`w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums ${
-                            order.kind === 'inspection' ? 'text-emerald-700' : 'text-sky-700'
+                            order.kind === 'inspection' ? 'text-success-700' : 'text-brand-700'
                           }`}>
                             {plannerItemTimeLabel(order)}
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-sm font-medium text-gray-900">
+                              <span className="text-sm font-medium text-ink">
                                 {order.vehicle && order.vehicle !== '—'
                                   ? order.vehicle
                                   : (order.kind === 'inspection' ? 'Осмотр' : 'Авто')}
                               </span>
                               {order.kind === 'inspection' ? (
-                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
+                                <span className="inline-flex items-center rounded-full bg-success-50 px-2 py-0.5 text-[11px] font-medium text-success-700 ring-1 ring-inset ring-success-100">
                                   Осмотр
                                 </span>
                               ) : (
                                 <OrderStatusBadge status={order.status} />
                               )}
                             </span>
-                            <span className="mt-0.5 block truncate text-sm text-gray-500">
+                            <span className="mt-0.5 block truncate text-sm text-ink-muted">
                               {formatPersonNameWithInitials(order.client_name)}
                               {order.client_phone ? ` · ${order.client_phone}` : ''}
                             </span>
@@ -454,13 +454,13 @@ export default function AutoservicePlannerPage() {
   return (
     <div className="w-full min-w-0">
       <div className="mb-3 flex flex-col gap-3 md:mb-5 md:flex-row md:items-center md:justify-between">
-        <h1 className="max-md:hidden text-xl font-bold text-gray-900 sm:text-2xl">Планировщик</h1>
+        <h1 className="max-md:hidden text-xl font-bold text-ink sm:text-2xl">Планировщик</h1>
 
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
           <button
             type="button"
             onClick={handleOpenCreate}
-            className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-base font-semibold text-white transition hover:bg-indigo-700 md:h-10 md:w-auto md:text-sm"
+            className="inline-flex h-11 w-full items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-base font-semibold text-white transition hover:bg-brand-700 md:h-10 md:w-auto md:text-sm"
           >
             Создать
           </button>
@@ -479,7 +479,7 @@ export default function AutoservicePlannerPage() {
       </div>
 
       {error ? (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+        <div className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
           {error}
         </div>
       ) : null}
@@ -497,12 +497,12 @@ export default function AutoservicePlannerPage() {
       />
 
       <div className="hidden overflow-x-auto md:block">
-        <div className="min-w-[36rem] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="min-w-[36rem] overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
           <div
             className="grid w-full"
             style={{ gridTemplateColumns: 'minmax(7.5rem, 11rem) repeat(7, minmax(4.5rem, 1fr))' }}
           >
-            <div className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <div className="sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
               Зона
             </div>
             {dayHeaders.map((day, index) => {
@@ -511,14 +511,14 @@ export default function AutoservicePlannerPage() {
               return (
                 <div
                   key={iso}
-                  className={`border-b border-r border-gray-200 px-2 py-2 text-center ${
-                    isToday ? 'bg-brand-50 text-brand-800' : 'bg-gray-50 text-gray-600'
+                  className={`border-b border-r border-line px-2 py-2 text-center ${
+                    isToday ? 'bg-brand-50 text-brand-800' : 'bg-surface-muted text-ink-muted'
                   }`}
                 >
                   <div className="text-[11px] font-semibold uppercase tracking-wide sm:text-xs">
                     {WEEKDAYS[index]}
                   </div>
-                  <div className={`mt-0.5 text-sm font-medium ${isToday ? 'text-brand-900' : 'text-gray-800'}`}>
+                  <div className={`mt-0.5 text-sm font-medium ${isToday ? 'text-brand-900' : 'text-ink'}`}>
                     {formatDayHeader(iso)}
                   </div>
                 </div>
@@ -526,13 +526,13 @@ export default function AutoservicePlannerPage() {
             })}
 
             {zones.length === 0 && !loading ? (
-              <div className="col-span-8 px-4 py-8 text-center text-sm text-gray-500">
+              <div className="col-span-8 px-4 py-8 text-center text-sm text-ink-muted">
                 Нет рабочих зон. Добавьте их в настройках автосервиса.
               </div>
             ) : (
               zones.map((zone) => (
                 <div key={zone.id ?? 'unassigned'} className="contents">
-                  <div className="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-3 py-2.5 text-sm font-medium leading-snug text-gray-900">
+                  <div className="sticky left-0 z-10 border-b border-r border-line bg-surface px-3 py-2.5 text-sm font-medium leading-snug text-ink">
                     {zone.name}
                   </div>
                   {(zone.days || []).map((dayCell) => {
@@ -561,7 +561,7 @@ export default function AutoservicePlannerPage() {
       </div>
 
       {loading ? (
-        <p className="mt-3 hidden text-sm text-gray-500 md:block" aria-live="polite">
+        <p className="mt-3 hidden text-sm text-ink-muted md:block" aria-live="polite">
           Загрузка…
         </p>
       ) : null}

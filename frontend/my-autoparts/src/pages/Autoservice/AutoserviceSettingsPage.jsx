@@ -7,16 +7,19 @@ import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 
 const inputClass =
-  'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+  'sg-pill-input mt-1 w-full';
 
 const fieldClass =
-  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+  'sg-pill-input w-full';
+
+const textareaClass =
+  'sg-pill-textarea mt-1 w-full';
 
 const btnPrimary =
-  'inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60';
+  'inline-flex min-h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:min-h-10';
 
 const btnGhost =
-  'inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50';
+  'inline-flex min-h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60 sm:min-h-10';
 
 function WorksModal({ open, works, loading, onClose, onAdd, onRefresh }) {
   const [name, setName] = useState('');
@@ -50,10 +53,10 @@ function WorksModal({ open, works, loading, onClose, onAdd, onRefresh }) {
 
   return (
     <Modal open={open} onClose={onClose} title="Работы" size="md">
-      <form onSubmit={handleAdd} className="mb-4 border-b border-gray-100 pb-4">
+      <form onSubmit={handleAdd} className="mb-4 border-b border-line-soft pb-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
-            <label htmlFor="work-name" className="mb-1 block text-xs font-medium text-gray-500">
+            <label htmlFor="work-name" className="mb-1 block text-xs font-medium text-ink-muted">
               Название
             </label>
             <input
@@ -65,7 +68,7 @@ function WorksModal({ open, works, loading, onClose, onAdd, onRefresh }) {
             />
           </div>
           <div className="w-full sm:w-36">
-            <label htmlFor="work-price" className="mb-1 block text-xs font-medium text-gray-500">
+            <label htmlFor="work-price" className="mb-1 block text-xs font-medium text-ink-muted">
               Цена, ₽
             </label>
             <input
@@ -83,15 +86,15 @@ function WorksModal({ open, works, loading, onClose, onAdd, onRefresh }) {
         </div>
       </form>
       {loading ? (
-        <p className="py-6 text-center text-sm text-gray-500">Загрузка…</p>
+        <p className="py-6 text-center text-sm text-ink-muted">Загрузка…</p>
       ) : activeWorks.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-500">Пока пусто</p>
+        <p className="py-6 text-center text-sm text-ink-muted">Пока пусто</p>
       ) : (
-        <ul className="divide-y divide-gray-100">
+        <ul className="divide-y divide-line-soft">
           {activeWorks.map((w) => (
             <li key={w.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-              <span className="min-w-0 truncate font-medium text-gray-900">{w.name}</span>
-              <span className="shrink-0 tabular-nums text-gray-600">
+              <span className="min-w-0 truncate font-medium text-ink">{w.name}</span>
+              <span className="shrink-0 tabular-nums text-ink-muted">
                 {Number(w.default_unit_price).toLocaleString('ru-RU')} ₽
               </span>
             </li>
@@ -162,7 +165,7 @@ function WorkZoneModal({ open, mode, zone, onClose, onSaved }) {
       }
     >
       <form id="work-zone-form" onSubmit={handleSubmit}>
-        <label className="block text-sm font-medium text-gray-700">Название</label>
+        <label className="block text-sm font-medium text-ink-soft">Название</label>
         <input
           autoFocus
           className={inputClass}
@@ -171,7 +174,7 @@ function WorkZoneModal({ open, mode, zone, onClose, onSaved }) {
           onChange={(e) => setName(e.target.value)}
           maxLength={120}
         />
-        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="mt-2 text-sm text-danger-600">{error}</p> : null}
       </form>
     </Modal>
   );
@@ -306,12 +309,12 @@ export default function AutoserviceSettingsPage() {
     <div className="w-full min-w-0">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Настройки</h1>
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">Настройки</h1>
         </div>
         <button
           type="button"
           onClick={load}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900 sm:self-auto"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-full bg-surface-subtle text-ink-muted transition hover:bg-surface-muted hover:text-ink sm:self-auto"
           title="Обновить"
           aria-label="Обновить"
         >
@@ -340,24 +343,24 @@ export default function AutoserviceSettingsPage() {
       />
 
       {error ? (
-        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+        <p className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
           {error}
         </p>
       ) : null}
       {savedMessage && !error ? (
-        <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
+        <p className="mb-4 rounded-sg border border-success-100 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">
           {savedMessage}
         </p>
       ) : null}
 
       {loading ? (
-        <p className="py-12 text-center text-sm text-gray-500">Загрузка…</p>
+        <p className="py-12 text-center text-sm text-ink-muted">Загрузка…</p>
       ) : (
         <>
           {tab === 'general' ? (
             <form onSubmit={handleSave} className="max-w-2xl space-y-5">
               <div>
-                <label htmlFor="public_name" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="public_name" className="block text-sm font-medium text-ink-soft">
                   Название автосервиса
                 </label>
                 <input
@@ -369,7 +372,7 @@ export default function AutoserviceSettingsPage() {
                 />
               </div>
               <div>
-                <label htmlFor="public_description" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="public_description" className="block text-sm font-medium text-ink-soft">
                   Описание
                 </label>
                 <textarea
@@ -378,7 +381,7 @@ export default function AutoserviceSettingsPage() {
                   value={publicDescription}
                   onChange={(ev) => setPublicDescription(ev.target.value)}
                   maxLength={2000}
-                  className={inputClass}
+                  className={textareaClass}
                 />
               </div>
               <button type="submit" disabled={saving} className={btnPrimary}>
@@ -390,7 +393,7 @@ export default function AutoserviceSettingsPage() {
           {tab === 'zones' ? (
             <section>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-ink-muted">
                   {workZonesLoading
                     ? 'Загрузка…'
                     : `${workZones.length} зон${zonesReordering ? ' · сохранение порядка…' : ''}`}
@@ -413,7 +416,7 @@ export default function AutoserviceSettingsPage() {
           {tab === 'works' ? (
             <section>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-ink-muted">
                   {worksLoading ? 'Загрузка…' : `${activeWorks.length} работ`}
                 </p>
                 <button type="button" onClick={() => setWorksOpen(true)} className={btnPrimary}>
@@ -421,31 +424,31 @@ export default function AutoserviceSettingsPage() {
                 </button>
               </div>
               <div className="hidden md:block">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <table className="min-w-full divide-y divide-line text-sm">
                   <thead>
-                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">
                       <th className="py-3 pr-3">Название</th>
                       <th className="w-36 py-3 text-right">Цена</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-line-soft">
                     {worksLoading ? (
                       <tr>
-                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                        <td colSpan={2} className="py-12 text-center text-ink-muted">
                           Загрузка…
                         </td>
                       </tr>
                     ) : activeWorks.length === 0 ? (
                       <tr>
-                        <td colSpan={2} className="py-12 text-center text-gray-500">
+                        <td colSpan={2} className="py-12 text-center text-ink-muted">
                           Работ пока нет
                         </td>
                       </tr>
                     ) : (
                       activeWorks.map((w) => (
-                        <tr key={w.id} className="transition-colors hover:bg-gray-50/70">
-                          <td className="py-3 pr-3 align-middle font-medium text-gray-900">{w.name}</td>
-                          <td className="py-3 text-right align-middle tabular-nums text-gray-700">
+                        <tr key={w.id} className="transition-colors hover:bg-surface-muted/70">
+                          <td className="py-3 pr-3 align-middle font-medium text-ink">{w.name}</td>
+                          <td className="py-3 text-right align-middle tabular-nums text-ink-soft">
                             {Number(w.default_unit_price).toLocaleString('ru-RU')} ₽
                           </td>
                         </tr>
@@ -456,17 +459,17 @@ export default function AutoserviceSettingsPage() {
               </div>
               <div className="md:hidden">
                 {worksLoading ? (
-                  <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+                  <p className="py-10 text-center text-sm text-ink-muted">Загрузка…</p>
                 ) : activeWorks.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-gray-500">Работ пока нет</p>
+                  <p className="py-10 text-center text-sm text-ink-muted">Работ пока нет</p>
                 ) : (
                   activeWorks.map((w) => (
                     <div
                       key={w.id}
-                      className="flex items-center justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0"
+                      className="flex items-center justify-between gap-3 border-b border-line-soft py-3 last:border-b-0"
                     >
-                      <p className="min-w-0 truncate text-sm font-semibold text-gray-900">{w.name}</p>
-                      <p className="shrink-0 text-sm tabular-nums text-gray-600">
+                      <p className="min-w-0 truncate text-sm font-semibold text-ink">{w.name}</p>
+                      <p className="shrink-0 text-sm tabular-nums text-ink-muted">
                         {Number(w.default_unit_price).toLocaleString('ru-RU')} ₽
                       </p>
                     </div>
