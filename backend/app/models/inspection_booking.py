@@ -26,6 +26,8 @@ class InspectionBooking(Base):
     phone = Column(String(32), nullable=False)
     preferred_date = Column(Date, nullable=False)
     preferred_time = Column(Time, nullable=True)
+    vehicle_make = Column(String(80), nullable=True)
+    vehicle_model = Column(String(120), nullable=True)
     status = Column(String(32), nullable=False, default="new")
     source = Column(String(32), nullable=False)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)

@@ -24,6 +24,8 @@ class InspectionBookingPublicCreate(BaseModel):
     phone: str = Field(min_length=5, max_length=40)
     preferred_date: date
     preferred_time: Optional[time] = None
+    vehicle_make: Optional[str] = Field(None, max_length=80)
+    vehicle_model: Optional[str] = Field(None, max_length=120)
 
 
 class InspectionBookingClientCreate(BaseModel):
@@ -31,6 +33,8 @@ class InspectionBookingClientCreate(BaseModel):
     phone: Optional[str] = Field(None, min_length=5, max_length=40)
     preferred_date: date
     preferred_time: Optional[time] = None
+    vehicle_make: Optional[str] = Field(None, max_length=80)
+    vehicle_model: Optional[str] = Field(None, max_length=120)
     notes: Optional[str] = Field(None, max_length=2000)
     garage_vehicle_id: Optional[int] = Field(None, ge=1)
 
@@ -40,6 +44,8 @@ class InspectionBookingStaffCreate(BaseModel):
     phone: str = Field(min_length=5, max_length=40)
     preferred_date: date
     preferred_time: Optional[time] = None
+    vehicle_make: Optional[str] = Field(None, max_length=80)
+    vehicle_model: Optional[str] = Field(None, max_length=120)
     notes: Optional[str] = Field(None, max_length=2000)
     garage_vehicle_id: Optional[int] = Field(None, ge=1)
     work_zone_id: Optional[int] = Field(None, ge=1)
@@ -52,6 +58,8 @@ class InspectionBookingPatch(BaseModel):
     phone: Optional[str] = Field(None, min_length=5, max_length=40)
     preferred_date: Optional[date] = None
     preferred_time: Optional[time] = None
+    vehicle_make: Optional[str] = Field(None, max_length=80)
+    vehicle_model: Optional[str] = Field(None, max_length=120)
     work_zone_id: Optional[int] = Field(None, ge=1)
 
 
@@ -65,6 +73,8 @@ class InspectionBookingView(BaseModel):
     phone: str
     preferred_date: date
     preferred_time: Optional[time] = None
+    vehicle_make: Optional[str] = Field(None, max_length=80)
+    vehicle_model: Optional[str] = Field(None, max_length=120)
     status: str
     source: str
     created_by_user_id: Optional[int] = None

@@ -75,6 +75,8 @@ def _planner_inspection(row: InspectionBooking) -> PlannerRepairOrder:
         scheduled_at=datetime.combine(row.preferred_date, row.preferred_time or time.min),
         scheduled_end_at=None,
         preferred_time=row.preferred_time,
+        vehicle_make=row.vehicle_make or (row.vehicle.make if row.vehicle else None),
+        vehicle_model=row.vehicle_model or (row.vehicle.model if row.vehicle else None),
         work_zone_id=row.work_zone_id,
         work_zone_name=row.work_zone.name if row.work_zone else None,
         notes=row.notes,

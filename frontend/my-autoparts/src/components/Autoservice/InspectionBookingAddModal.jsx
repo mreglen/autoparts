@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Modal from '../UI/Modal';
 import PhoneInput from '../UI/PhoneInput';
 import SearchablePillSelect from '../SearchablePillSelect/SearchablePillSelect';
@@ -22,6 +22,7 @@ export default function InspectionBookingAddModal({
   onClose,
   onCreated,
   onSaved,
+  onCreateOrder,
   initialPreferredDate = null,
   workZoneId = null,
   zones = [],
@@ -32,8 +33,14 @@ export default function InspectionBookingAddModal({
   const [phone, setPhone] = useState('');
   const [preferredDate, setPreferredDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [preferredTime, setPreferredTime] = useState('');
+  const [vehicleMake, setVehicleMake] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [manufacturers, setManufacturers] = useState([]);
+  const [models, setModels] = useState([]);
   const [notes, setNotes] = useState('');
   const [selectedWorkZoneId, setSelectedWorkZoneId] = useState(null);
+  const makeListId = useId();
+  const modelListId = useId();
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -44,6 +51,8 @@ export default function InspectionBookingAddModal({
   const initialPhone = (isEdit ? initialBooking.phone : '') || '';
   const initialPreferred = (isEdit ? initialBooking.preferred_date : initialPreferredDate) || new Date().toISOString().slice(0, 10);
   const initialPreferredTime = (isEdit ? initialBooking.preferred_time : '')?.slice(0, 5) || '';
+  const initialVehicleMake = (isEdit ? initialBooking.vehicle_make || initialBooking.vehicle?.make : '') || '';
+  const initialVehicleModel = (isEdit ? initialBooking.vehicle_model || initialBooking.vehicle?.model : '') || '';
   const initialNotes = (isEdit ? initialBooking.notes : '') || '';
   const initialWorkZoneId = (isEdit ? initialBooking.work_zone_id : workZoneId) ?? null;
 
@@ -53,13 +62,54 @@ export default function InspectionBookingAddModal({
     setPhone(initialPhone);
     setPreferredDate(initialPreferred);
     setPreferredTime(initialPreferredTime);
+    setVehicleMake(initialVehicleMake);
+    setVehicleModel(initialVehicleModel);
     setNotes(initialNotes);
     setSelectedWorkZoneId(initialWorkZoneId);
     setPhoneError('');
     setError(null);
     setSaving(false);
     setIsEditing(!isEdit);
-  }, [open, initialName, initialPhone, initialPreferred, initialPreferredTime, initialNotes, initialWorkZoneId, isEdit]);
+  }, [open, initialName, initialPhone, initialPreferred, initialPreferredTime, initialVehicleMake, initialVehicleModel, initialNotes, initialWorkZoneId, isEdit]);
+
+  useEffect(() => {
+    if (!open || manufacturers.length > 0) return;
+    let cancelled = false;
+    apiRequest('/vehicle-catalog/manufacturers?limit=200')
+      .then((rows) => {
+        if (!cancelled) setManufacturers(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setManufacturers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, manufacturers.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const normalizedMake = vehicleMake.trim().toLocaleLowerCase('ru-RU');
+    const manufacturer = manufacturers.find((item) => (
+      item.description?.trim().toLocaleLowerCase('ru-RU') === normalizedMake
+      || item.matchcode?.trim().toLocaleLowerCase('ru-RU') === normalizedMake
+    ));
+    if (!manufacturer) {
+      setModels([]);
+      return;
+    }
+    let cancelled = false;
+    apiRequest(`/vehicle-catalog/manufacturers/${manufacturer.id}/models`)
+      .then((rows) => {
+        if (!cancelled) setModels(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setModels([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, vehicleMake, manufacturers]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -87,6 +137,8 @@ export default function InspectionBookingAddModal({
         phone,
         preferred_date: preferredDate,
         preferred_time: preferredTime || null,
+        vehicle_make: vehicleMake.trim() || null,
+        vehicle_model: vehicleModel.trim() || null,
         notes: notes.trim() || null,
       };
       if (selectedWorkZoneId != null) {
@@ -138,6 +190,8 @@ export default function InspectionBookingAddModal({
             setPhone(initialPhone);
             setPreferredDate(initialPreferred);
             setPreferredTime(initialPreferredTime);
+            setVehicleMake(initialVehicleMake);
+            setVehicleModel(initialVehicleModel);
             setNotes(initialNotes);
             setSelectedWorkZoneId(initialWorkZoneId);
             setPhoneError('');
@@ -162,7 +216,29 @@ export default function InspectionBookingAddModal({
       </button>
     </div>
   ) : (
-    <div className="flex justify-end gap-2">
+    <div className="flex flex-wrap justify-end gap-2">
+      {isEdit && onCreateOrder ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCreateOrder({
+              ...initialBooking,
+              name,
+              phone,
+              preferred_date: preferredDate,
+              preferred_time: preferredTime || null,
+              vehicle_make: vehicleMake || null,
+              vehicle_model: vehicleModel || null,
+              work_zone_id: selectedWorkZoneId,
+              notes,
+            });
+          }}
+          className="rounded-sg-sm min-h-11 border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+        >
+          Создать заказ-наряд
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={(e) => {
@@ -226,6 +302,46 @@ export default function InspectionBookingAddModal({
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
+              <label className="block text-sm font-medium text-ink-soft">Марка</label>
+              <input
+                type="text"
+                list={makeListId}
+                className={inputClass}
+                value={vehicleMake}
+                onChange={(e) => setVehicleMake(e.target.value)}
+                placeholder="Выберите или введите"
+                disabled={saving}
+                maxLength={80}
+                autoComplete="off"
+              />
+              <datalist id={makeListId}>
+                {manufacturers.map((item) => (
+                  <option key={item.id} value={item.description || item.matchcode || ''} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink-soft">Модель</label>
+              <input
+                type="text"
+                list={modelListId}
+                className={inputClass}
+                value={vehicleModel}
+                onChange={(e) => setVehicleModel(e.target.value)}
+                placeholder="Выберите или введите"
+                disabled={saving}
+                maxLength={120}
+                autoComplete="off"
+              />
+              <datalist id={modelListId}>
+                {models.map((item) => (
+                  <option key={item.id} value={item.description || ''} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
               <label className="block text-sm font-medium text-ink-soft">{isEdit ? 'Дата' : 'Желаемая дата'}</label>
               <input
                 type="date"
@@ -262,12 +378,6 @@ export default function InspectionBookingAddModal({
               ariaLabel="Рабочая зона"
             />
           </div>
-          {isEdit && initialBooking?.vehicle && initialBooking.vehicle !== '—' ? (
-            <div>
-              <label className="block text-sm font-medium text-ink-soft">Автомобиль</label>
-              <p className="mt-1 text-sm text-ink">{initialBooking.vehicle}</p>
-            </div>
-          ) : null}
           <div>
             <label className="block text-sm font-medium text-ink-soft">Заметка</label>
             <textarea
@@ -299,10 +409,10 @@ export default function InspectionBookingAddModal({
             <label className="block text-sm font-medium text-ink-soft">Рабочая зона</label>
             <p className="mt-0.5 text-sm text-ink">{zoneNameById(zones, selectedWorkZoneId) || '—'}</p>
           </div>
-          {initialBooking?.vehicle && initialBooking.vehicle !== '—' ? (
+          {vehicleMake || vehicleModel ? (
             <div>
               <label className="block text-sm font-medium text-ink-soft">Автомобиль</label>
-              <p className="mt-0.5 text-sm text-ink">{initialBooking.vehicle}</p>
+              <p className="mt-0.5 text-sm text-ink">{[vehicleMake, vehicleModel].filter(Boolean).join(' ')}</p>
             </div>
           ) : null}
           <div>

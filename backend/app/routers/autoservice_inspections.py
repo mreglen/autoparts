@@ -104,6 +104,8 @@ def _booking_to_view(row: InspectionBooking) -> InspectionBookingView:
         phone=row.phone,
         preferred_date=row.preferred_date,
         preferred_time=row.preferred_time,
+        vehicle_make=row.vehicle_make or (row.vehicle.make if row.vehicle else None),
+        vehicle_model=row.vehicle_model or (row.vehicle.model if row.vehicle else None),
         status=row.status,
         source=row.source,
         created_by_user_id=row.created_by_user_id,
@@ -132,6 +134,8 @@ def create_public_inspection_booking(
         phone=phone,
         preferred_date=payload.preferred_date,
         preferred_time=payload.preferred_time,
+        vehicle_make=(payload.vehicle_make or "").strip() or None,
+        vehicle_model=(payload.vehicle_model or "").strip() or None,
         status="new",
         source="site",
         created_by_user_id=current_user.id if current_user else None,
@@ -197,6 +201,8 @@ def create_client_inspection_booking(
         phone=phone,
         preferred_date=payload.preferred_date,
         preferred_time=payload.preferred_time,
+        vehicle_make=(payload.vehicle_make or "").strip() or None,
+        vehicle_model=(payload.vehicle_model or "").strip() or None,
         status="new",
         source="client",
         created_by_user_id=current_user.id,
@@ -311,6 +317,8 @@ def create_staff_inspection_booking(
         phone=phone,
         preferred_date=payload.preferred_date,
         preferred_time=payload.preferred_time,
+        vehicle_make=(payload.vehicle_make or "").strip() or None,
+        vehicle_model=(payload.vehicle_model or "").strip() or None,
         status="new",
         source="staff",
         created_by_user_id=current_user.id,
@@ -377,6 +385,10 @@ def patch_inspection_booking(
         row.preferred_date = data["preferred_date"]
     if "preferred_time" in data:
         row.preferred_time = data["preferred_time"]
+    if "vehicle_make" in data:
+        row.vehicle_make = (data["vehicle_make"] or "").strip() or None
+    if "vehicle_model" in data:
+        row.vehicle_model = (data["vehicle_model"] or "").strip() or None
     if "work_zone_id" in data:
         work_zone_id = data["work_zone_id"]
         if work_zone_id is not None:

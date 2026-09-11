@@ -3999,6 +3999,8 @@ def ensure_inspection_bookings_table() -> None:
             phone VARCHAR(32) NOT NULL,
             preferred_date DATE NOT NULL,
             preferred_time TIME,
+            vehicle_make VARCHAR(80),
+            vehicle_model VARCHAR(120),
             status VARCHAR(32) NOT NULL DEFAULT 'new',
             source VARCHAR(32) NOT NULL,
             created_by_user_id INTEGER REFERENCES users(id),
@@ -4015,6 +4017,8 @@ def ensure_inspection_bookings_table() -> None:
             phone VARCHAR(32) NOT NULL,
             preferred_date DATE NOT NULL,
             preferred_time TIME,
+            vehicle_make VARCHAR(80),
+            vehicle_model VARCHAR(120),
             status VARCHAR(32) NOT NULL DEFAULT 'new',
             source VARCHAR(32) NOT NULL,
             created_by_user_id INTEGER REFERENCES users(id),
@@ -5207,6 +5211,25 @@ def ensure_inspection_bookings_preferred_time_column() -> None:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE inspection_bookings ADD COLUMN preferred_time TIME"))
     logger.info("Applied inspection_bookings preferred_time column patch")
+
+
+def ensure_inspection_bookings_vehicle_columns() -> None:
+    """Allow inspection bookings to retain a manually entered vehicle make and model."""
+    inspector = inspect(engine)
+    if "inspection_bookings" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("inspection_bookings")}
+    statements = []
+    if "vehicle_make" not in columns:
+        statements.append("ALTER TABLE inspection_bookings ADD COLUMN vehicle_make VARCHAR(80)")
+    if "vehicle_model" not in columns:
+        statements.append("ALTER TABLE inspection_bookings ADD COLUMN vehicle_model VARCHAR(120)")
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for statement in statements:
+            conn.execute(text(statement))
+    logger.info("Applied inspection_bookings vehicle columns patch: %s", statements)
 
 
 WORK_ZONES_MIGRATION_MARKER = "autoservice_work_zones_v1"

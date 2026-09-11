@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
@@ -167,7 +168,7 @@ function BookingMobileCard({ row, updatingId, onStatusChange, onView, openMenuKe
   );
 }
 
-function BookingViewModal({ booking, onClose, updatingId, onStatusChange }) {
+function BookingViewModal({ booking, onClose, updatingId, onStatusChange, onCreateOrder }) {
   if (!booking) return null;
 
   return (
@@ -184,13 +185,22 @@ function BookingViewModal({ booking, onClose, updatingId, onStatusChange }) {
             disabled={updatingId === booking.id}
             onChange={(nextStatus) => onStatusChange(booking.id, nextStatus)}
           />
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
-          >
-            Закрыть
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => onCreateOrder(booking)}
+              className="rounded-sg-sm min-h-11 border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+            >
+              Создать заказ-наряд
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-sg-sm min-h-11 border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
+            >
+              Закрыть
+            </button>
+          </div>
         </div>
       }
     >
@@ -212,7 +222,10 @@ function BookingViewModal({ booking, onClose, updatingId, onStatusChange }) {
             {SOURCE_LABELS[booking.source] || booking.source || '—'}
           </p>
           <p className="sm:col-span-2">
-            <span className="font-medium text-ink">Автомобиль:</span> {formatVehicleBrief(booking.vehicle)}
+            <span className="font-medium text-ink">Автомобиль:</span>{' '}
+            {booking.vehicle
+              ? formatVehicleBrief(booking.vehicle)
+              : [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(' ') || '—'}
           </p>
         </div>
         <div className="rounded-sg border border-line-soft bg-surface-muted/80 px-3 py-3">
@@ -228,6 +241,7 @@ function BookingViewModal({ booking, onClose, updatingId, onStatusChange }) {
 
 export default function AutoserviceInspectionsPage() {
   const { isReady, user, isAuthenticated } = useAuthReady();
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -509,6 +523,20 @@ export default function AutoserviceInspectionsPage() {
         onClose={() => setViewBooking(null)}
         updatingId={updatingId}
         onStatusChange={handleStatusChange}
+        onCreateOrder={(booking) => {
+          setViewBooking(null);
+          navigate('/autoservice/orders/new', {
+            state: {
+              scheduledAtLocal: `${booking.preferred_date}T${booking.preferred_time?.slice(0, 5) || '10:00'}`,
+              workZoneId: booking.work_zone_id,
+              clientName: booking.name,
+              clientPhone: booking.phone,
+              vehicleMake: booking.vehicle_make || booking.vehicle?.make,
+              vehicleModel: booking.vehicle_model || booking.vehicle?.model,
+              inspectionBookingId: booking.id,
+            },
+          });
+        }}
       />
     </div>
   );

@@ -1116,6 +1116,10 @@ export default function AutoserviceOrderFormPage() {
   const [shopPartRemoveConfirm, setShopPartRemoveConfirm] = useState(null);
   const [lineDeleteConfirm, setLineDeleteConfirm] = useState(null);
   const plannerPrefillRef = useRef(location.state);
+  const vehiclePrefillRef = useRef({
+    make: location.state?.vehicleMake || '',
+    model: location.state?.vehicleModel || '',
+  });
   const createInitRef = useRef(false);
   const autoSaveTimerRef = useRef(null);
   const autoSaveResumeTimerRef = useRef(null);
@@ -1358,7 +1362,15 @@ export default function AutoserviceOrderFormPage() {
         setVehicles(list);
         setVehicleId((prev) => {
           if (prev && list.some((v) => String(v.id) === String(prev))) return String(prev);
-          return list[0] ? String(list[0].id) : '';
+          const prefill = vehiclePrefillRef.current;
+          const normalizedMake = prefill.make.trim().toLocaleLowerCase('ru-RU');
+          const normalizedModel = prefill.model.trim().toLocaleLowerCase('ru-RU');
+          const match = list.find((vehicle) => (
+            (!normalizedMake || vehicle.make?.trim().toLocaleLowerCase('ru-RU') === normalizedMake)
+            && (!normalizedModel || vehicle.model?.trim().toLocaleLowerCase('ru-RU') === normalizedModel)
+          ));
+          vehiclePrefillRef.current = { make: '', model: '' };
+          return match ? String(match.id) : list[0] ? String(list[0].id) : '';
         });
       } catch (err) {
         if (!cancelled) {

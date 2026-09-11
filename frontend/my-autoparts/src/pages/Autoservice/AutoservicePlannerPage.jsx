@@ -612,6 +612,20 @@ export default function AutoservicePlannerPage() {
         open={Boolean(viewInspection)}
         onClose={() => setViewInspection(null)}
         zones={zones}
+        onCreateOrder={(booking) => {
+          setViewInspection(null);
+          navigate('/autoservice/orders/new', {
+            state: {
+              scheduledAtLocal: `${booking.preferred_date}T${booking.preferred_time || '10:00'}`,
+              workZoneId: booking.work_zone_id,
+              clientName: booking.name,
+              clientPhone: booking.phone,
+              vehicleMake: booking.vehicle_make,
+              vehicleModel: booking.vehicle_model,
+              inspectionBookingId: booking.id,
+            },
+          });
+        }}
         initialBooking={
           viewInspection
             ? {
@@ -620,6 +634,8 @@ export default function AutoservicePlannerPage() {
                 phone: viewInspection.client_phone,
                 preferred_date: toDateInputValue(viewInspection.scheduled_at),
                 preferred_time: viewInspection.preferred_time,
+                vehicle_make: viewInspection.vehicle_make,
+                vehicle_model: viewInspection.vehicle_model,
                 notes: viewInspection.notes,
                 vehicle: viewInspection.vehicle,
                 work_zone_id: viewInspection.work_zone_id,

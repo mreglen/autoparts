@@ -18,6 +18,8 @@ class PlannerRepairOrder(BaseModel):
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
     preferred_time: Optional[time] = None
+    vehicle_make: Optional[str] = None
+    vehicle_model: Optional[str] = None
     work_zone_id: Optional[int] = None
     work_zone_name: Optional[str] = None
     notes: Optional[str] = None
