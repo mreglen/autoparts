@@ -439,6 +439,7 @@ export function SearchableSelect({
   inputClassName = pillInputClass,
   remoteSearch = false,
   onQueryChange,
+  onInputChange,
 }) {
   const rootRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -485,6 +486,7 @@ export function SearchableSelect({
         value={displayValue}
         onChange={(e) => {
           setQuery(e.target.value);
+          onInputChange?.(e.target.value);
           setOpen(true);
         }}
         onFocus={() => {
@@ -555,8 +557,8 @@ export function SearchableSelect({
   );
 }
 
-function AddClientModal({ onClose, onCreated }) {
-  const [name, setName] = useState('');
+export function AddClientModal({ onClose, onCreated, initialName = '' }) {
+  const [name, setName] = useState(() => String(initialName || '').trim());
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState('');
@@ -1138,6 +1140,7 @@ export default function AutoserviceOrderFormPage() {
   const autoSaveTimerRef = useRef(null);
   const autoSaveResumeTimerRef = useRef(null);
   const clientSearchRequestRef = useRef(0);
+  const clientSearchQueryRef = useRef('');
   const skipAutoSaveRef = useRef(true);
   const lastSavedSnapshotRef = useRef('');
   const justAutoCreatedOrderIdRef = useRef(null);
@@ -1246,6 +1249,10 @@ export default function AutoserviceOrderFormPage() {
         setClientSearchLoading(false);
       }
     }
+  }, []);
+
+  const handleClientSearchInput = useCallback((query) => {
+    clientSearchQueryRef.current = String(query || '');
   }, []);
 
   const loadServiceEmployees = useCallback(async () => {
@@ -1457,6 +1464,7 @@ export default function AutoserviceOrderFormPage() {
 
   const handleClientSelect = useCallback((nextClientId) => {
     const option = clientOptions.find((item) => item.value === String(nextClientId));
+    clientSearchQueryRef.current = '';
     setClientId(String(nextClientId));
     if (nextClientId) {
       setPendingClientName('');
@@ -2383,6 +2391,7 @@ export default function AutoserviceOrderFormPage() {
                 searching={clientSearchLoading}
                 remoteSearch
                 onQueryChange={handleClientSearchQuery}
+                onInputChange={handleClientSearchInput}
               />
             </div>
             <div className="min-w-0">
@@ -2880,7 +2889,11 @@ export default function AutoserviceOrderFormPage() {
       </div>
 
       {addClientOpen && !ownMode ? (
-        <AddClientModal onClose={() => setAddClientOpen(false)} onCreated={handleClientCreated} />
+        <AddClientModal
+          initialName={clientSearchQueryRef.current}
+          onClose={() => setAddClientOpen(false)}
+          onCreated={handleClientCreated}
+        />
       ) : null}
 
       {addVehicleOpen && clientId && !ownMode ? (

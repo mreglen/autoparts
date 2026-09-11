@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { SearchableSelect } from './AutoserviceOrderFormPage';
+import { AddClientModal, SearchableSelect } from './AutoserviceOrderFormPage';
 
 jest.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: '/autoservice/orders/new', state: null }),
@@ -14,6 +14,7 @@ const baseProps = {
   options: [{ value: '1', label: 'Иван · +7 900 000-00-00' }],
   placeholder: 'Поиск клиента',
   remoteSearch: true,
+  onInputChange: jest.fn(),
 };
 
 test('keeps the client search focused and open while remote results are loading', () => {
@@ -25,6 +26,7 @@ test('keeps the client search focused and open while remote results are loading'
 
   expect(input).toHaveFocus();
   expect(input).toHaveValue('Ива');
+  expect(baseProps.onInputChange).toHaveBeenLastCalledWith('Ива');
   expect(screen.getByRole('list')).toBeInTheDocument();
 
   rerender(
@@ -40,4 +42,16 @@ test('keeps the client search focused and open while remote results are loading'
   expect(input).toHaveValue('Ива');
   expect(screen.getByRole('list')).toHaveAttribute('aria-busy', 'true');
   expect(screen.getByText('Поиск клиентов…')).toBeInTheDocument();
+});
+
+test('prefills the add-client name from the current search query', () => {
+  render(
+    <AddClientModal
+      initialName="Иванов Иван Иванович"
+      onClose={jest.fn()}
+      onCreated={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByPlaceholderText('Иванов Иван Иванович')).toHaveValue('Иванов Иван Иванович');
 });
