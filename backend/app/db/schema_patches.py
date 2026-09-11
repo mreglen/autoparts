@@ -3998,6 +3998,7 @@ def ensure_inspection_bookings_table() -> None:
             name VARCHAR(120) NOT NULL,
             phone VARCHAR(32) NOT NULL,
             preferred_date DATE NOT NULL,
+            preferred_time TIME,
             status VARCHAR(32) NOT NULL DEFAULT 'new',
             source VARCHAR(32) NOT NULL,
             created_by_user_id INTEGER REFERENCES users(id),
@@ -4013,6 +4014,7 @@ def ensure_inspection_bookings_table() -> None:
             name VARCHAR(120) NOT NULL,
             phone VARCHAR(32) NOT NULL,
             preferred_date DATE NOT NULL,
+            preferred_time TIME,
             status VARCHAR(32) NOT NULL DEFAULT 'new',
             source VARCHAR(32) NOT NULL,
             created_by_user_id INTEGER REFERENCES users(id),
@@ -5192,6 +5194,19 @@ def ensure_inspection_bookings_work_zone_column() -> None:
             )
         )
     logger.info("Applied inspection_bookings work_zone_id column patch")
+
+
+def ensure_inspection_bookings_preferred_time_column() -> None:
+    """Allow inspection bookings to store an optional appointment time."""
+    inspector = inspect(engine)
+    if "inspection_bookings" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("inspection_bookings")}
+    if "preferred_time" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE inspection_bookings ADD COLUMN preferred_time TIME"))
+    logger.info("Applied inspection_bookings preferred_time column patch")
 
 
 WORK_ZONES_MIGRATION_MARKER = "autoservice_work_zones_v1"

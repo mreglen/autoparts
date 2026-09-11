@@ -2075,7 +2075,7 @@ export default function AutoserviceOrderFormPage() {
   };
 
   useEffect(() => {
-    if (!formInitialized || skipAutoSaveRef.current) return undefined;
+    if (!formInitialized || !isEdit || skipAutoSaveRef.current) return undefined;
 
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
@@ -2142,6 +2142,12 @@ export default function AutoserviceOrderFormPage() {
       autoSaveTimerRef.current = null;
     }
 
+    if (isCreate) {
+      writeRepairOrderFormDraft('create', null, captureFormSnapshot());
+      goBack();
+      return;
+    }
+
     if (canAttemptAutoSave()) {
       const validationError = validateForAutoSave();
       if (validationError) {
@@ -2150,10 +2156,10 @@ export default function AutoserviceOrderFormPage() {
       }
 
       const snapshot = JSON.stringify(captureFormSnapshot());
-      if (snapshot !== lastSavedSnapshotRef.current || isCreate) {
+      if (snapshot !== lastSavedSnapshotRef.current) {
         setSaving(true);
         setAutoSaveStatus('saving');
-        const err = await persistRepairOrder({ afterCreate: isCreate ? 'none' : 'edit' });
+        const err = await persistRepairOrder();
         setSaving(false);
         if (err) {
           setAutoSaveStatus('error');
@@ -2164,13 +2170,33 @@ export default function AutoserviceOrderFormPage() {
       }
     }
 
-    clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null);
+    clearRepairOrderFormDraft('edit', orderId);
     goBack();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await handleClose();
+    const snapshot = captureFormSnapshot();
+    const validationError = validateForAutoSave();
+    if (!canAttemptAutoSave() || validationError) {
+      writeRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null, snapshot);
+      setError('');
+      setAutoSaveStatus('saved');
+      return;
+    }
+
+    setSaving(true);
+    setAutoSaveStatus('saving');
+    setError('');
+    const err = await persistRepairOrder();
+    setSaving(false);
+    if (err) {
+      setAutoSaveStatus('error');
+      setError(err);
+      return;
+    }
+    lastSavedSnapshotRef.current = JSON.stringify(snapshot);
+    setAutoSaveStatus('saved');
   };
 
   if (!isReady) return <AuthLoadingScreen />;
@@ -2737,9 +2763,17 @@ export default function AutoserviceOrderFormPage() {
                 type="submit"
                 form="repair-order-form"
                 disabled={saving}
+                className={`${btnPrimaryClass} max-lg:w-full max-lg:px-3`}
+              >
+                {saving ? 'Сохранение…' : 'Сохранить'}
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={saving}
                 className={`${btnSecondaryClass} max-lg:w-full max-lg:px-3`}
               >
-                {saving ? 'Сохранение…' : 'Закрыть'}
+                Закрыть
               </button>
             </div>
           </div>

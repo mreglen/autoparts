@@ -30,6 +30,11 @@ const SOURCE_LABELS = {
   client: 'Клиент',
 };
 
+function formatPreferredDateTime(row) {
+  const date = formatServerDate(row?.preferred_date) || '—';
+  return row?.preferred_time ? `${date}, ${row.preferred_time.slice(0, 5)}` : date;
+}
+
 const STATUS_OPTIONS = [
   { value: 'new', label: 'В ожидании' },
   { value: 'processed', label: 'Обработано' },
@@ -138,7 +143,7 @@ function BookingMobileCard({ row, updatingId, onStatusChange, onView, openMenuKe
           </div>
           <p className="mt-1 text-sm text-ink-muted">{row.phone || '—'}</p>
           <p className="mt-0.5 text-xs text-ink-muted">
-            Дата: {formatServerDate(row.preferred_date) || '—'}
+            Дата: {formatPreferredDateTime(row)}
             {row.vehicle ? ` · ${formatVehicleBrief(row.vehicle)}` : ''}
           </p>
           <p className="mt-0.5 text-xs text-ink-muted">
@@ -195,8 +200,8 @@ function BookingViewModal({ booking, onClose, updatingId, onStatusChange }) {
             <span className="font-medium text-ink">Телефон:</span> {booking.phone || '—'}
           </p>
           <p>
-            <span className="font-medium text-ink">Желаемая дата:</span>{' '}
-            {formatServerDate(booking.preferred_date) || '—'}
+            <span className="font-medium text-ink">Желаемая дата и время:</span>{' '}
+            {formatPreferredDateTime(booking)}
           </p>
           <p>
             <span className="font-medium text-ink">Создана:</span>{' '}
@@ -427,7 +432,7 @@ export default function AutoserviceInspectionsPage() {
                       {row.phone ? <div className="mt-0.5 text-xs text-ink-muted">{row.phone}</div> : null}
                     </td>
                     <td className="whitespace-nowrap py-3 pr-3 align-middle text-ink-soft">
-                      {formatServerDate(row.preferred_date) || '—'}
+                      {formatPreferredDateTime(row)}
                     </td>
                     <td
                       className="hidden max-w-[12rem] truncate py-3 pr-3 align-middle text-ink-soft lg:table-cell"

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text, Time, func
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -25,6 +25,7 @@ class InspectionBooking(Base):
     name = Column(String(120), nullable=False)
     phone = Column(String(32), nullable=False)
     preferred_date = Column(Date, nullable=False)
+    preferred_time = Column(Time, nullable=True)
     status = Column(String(32), nullable=False, default="new")
     source = Column(String(32), nullable=False)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)

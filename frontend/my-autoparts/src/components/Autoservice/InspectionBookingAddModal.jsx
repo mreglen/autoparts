@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Modal from '../UI/Modal';
 import PhoneInput from '../UI/PhoneInput';
+import SearchablePillSelect from '../SearchablePillSelect/SearchablePillSelect';
 import { apiRequest } from '../../utils/apiClient';
 import {
   formatPhoneFromRaw,
@@ -8,7 +9,6 @@ import {
 } from '../../utils/contactValidation';
 
 const inputClass = 'sg-pill-input mt-1';
-const selectClass = 'sg-pill-select mt-1';
 const textareaClass = 'sg-pill-textarea mt-1';
 
 function zoneNameById(zones, zoneId) {
@@ -31,6 +31,7 @@ export default function InspectionBookingAddModal({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [preferredDate, setPreferredDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [preferredTime, setPreferredTime] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedWorkZoneId, setSelectedWorkZoneId] = useState(null);
   const [phoneError, setPhoneError] = useState('');
@@ -42,6 +43,7 @@ export default function InspectionBookingAddModal({
   const initialName = (isEdit ? initialBooking.name : '') || '';
   const initialPhone = (isEdit ? initialBooking.phone : '') || '';
   const initialPreferred = (isEdit ? initialBooking.preferred_date : initialPreferredDate) || new Date().toISOString().slice(0, 10);
+  const initialPreferredTime = (isEdit ? initialBooking.preferred_time : '')?.slice(0, 5) || '';
   const initialNotes = (isEdit ? initialBooking.notes : '') || '';
   const initialWorkZoneId = (isEdit ? initialBooking.work_zone_id : workZoneId) ?? null;
 
@@ -50,13 +52,14 @@ export default function InspectionBookingAddModal({
     setName(initialName);
     setPhone(initialPhone);
     setPreferredDate(initialPreferred);
+    setPreferredTime(initialPreferredTime);
     setNotes(initialNotes);
     setSelectedWorkZoneId(initialWorkZoneId);
     setPhoneError('');
     setError(null);
     setSaving(false);
     setIsEditing(!isEdit);
-  }, [open, initialName, initialPhone, initialPreferred, initialNotes, initialWorkZoneId, isEdit]);
+  }, [open, initialName, initialPhone, initialPreferred, initialPreferredTime, initialNotes, initialWorkZoneId, isEdit]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,6 +86,7 @@ export default function InspectionBookingAddModal({
         name: trimmedName,
         phone,
         preferred_date: preferredDate,
+        preferred_time: preferredTime || null,
         notes: notes.trim() || null,
       };
       if (selectedWorkZoneId != null) {
@@ -114,6 +118,11 @@ export default function InspectionBookingAddModal({
     return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('ru-RU');
   }
 
+  function formatDateTimeView(dateValue, timeValue) {
+    const date = formatDateView(dateValue);
+    return timeValue ? `${date}, ${timeValue.slice(0, 5)}` : date;
+  }
+
   const modalTitle = isEdit
     ? (isEditing ? 'Редактировать запись' : 'Запись на осмотр')
     : title;
@@ -128,6 +137,7 @@ export default function InspectionBookingAddModal({
             setName(initialName);
             setPhone(initialPhone);
             setPreferredDate(initialPreferred);
+            setPreferredTime(initialPreferredTime);
             setNotes(initialNotes);
             setSelectedWorkZoneId(initialWorkZoneId);
             setPhoneError('');
@@ -214,32 +224,43 @@ export default function InspectionBookingAddModal({
             />
             {phoneError ? <p className="mt-1 text-sm text-danger-600">{phoneError}</p> : null}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-ink-soft">{isEdit ? 'Дата' : 'Желаемая дата'}</label>
-            <input
-              type="date"
-              className={`${inputClass} sg-native-date-input`}
-              value={preferredDate}
-              onChange={(e) => setPreferredDate(e.target.value)}
-              disabled={saving}
-              required
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-ink-soft">{isEdit ? 'Дата' : 'Желаемая дата'}</label>
+              <input
+                type="date"
+                className={`${inputClass} sg-native-date-input`}
+                value={preferredDate}
+                onChange={(e) => setPreferredDate(e.target.value)}
+                disabled={saving}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink-soft">Время</label>
+              <input
+                type="time"
+                className={inputClass}
+                value={preferredTime}
+                onChange={(e) => setPreferredTime(e.target.value)}
+                disabled={saving}
+                step="60"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-ink-soft">Рабочая зона</label>
-            <select
-              className={selectClass}
+            <SearchablePillSelect
+              className="mt-1"
+              inputClassName="sg-pill-input"
               value={selectedWorkZoneId ?? ''}
-              onChange={(e) => setSelectedWorkZoneId(e.target.value ? Number(e.target.value) : null)}
+              onChange={(value) => setSelectedWorkZoneId(value ? Number(value) : null)}
+              options={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
+              placeholder="Введите рабочую зону"
+              emptyOptionLabel="Не указано"
               disabled={saving || zones.length === 0}
-            >
-              <option value="">Не указано</option>
-              {zones.map((zone) => (
-                <option key={zone.id} value={String(zone.id)}>
-                  {zone.name}
-                </option>
-              ))}
-            </select>
+              ariaLabel="Рабочая зона"
+            />
           </div>
           {isEdit && initialBooking?.vehicle && initialBooking.vehicle !== '—' ? (
             <div>
@@ -271,8 +292,8 @@ export default function InspectionBookingAddModal({
             <p className="mt-0.5 text-sm text-ink">{formatPhoneFromRaw(phone) || '—'}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-ink-soft">Дата</label>
-            <p className="mt-0.5 text-sm text-ink">{formatDateView(preferredDate)}</p>
+            <label className="block text-sm font-medium text-ink-soft">Дата и время</label>
+            <p className="mt-0.5 text-sm text-ink">{formatDateTimeView(preferredDate, preferredTime)}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-ink-soft">Рабочая зона</label>

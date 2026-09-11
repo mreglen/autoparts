@@ -103,6 +103,7 @@ def _booking_to_view(row: InspectionBooking) -> InspectionBookingView:
         name=row.name,
         phone=row.phone,
         preferred_date=row.preferred_date,
+        preferred_time=row.preferred_time,
         status=row.status,
         source=row.source,
         created_by_user_id=row.created_by_user_id,
@@ -130,6 +131,7 @@ def create_public_inspection_booking(
         name=payload.name.strip(),
         phone=phone,
         preferred_date=payload.preferred_date,
+        preferred_time=payload.preferred_time,
         status="new",
         source="site",
         created_by_user_id=current_user.id if current_user else None,
@@ -194,6 +196,7 @@ def create_client_inspection_booking(
         name=name[:120],
         phone=phone,
         preferred_date=payload.preferred_date,
+        preferred_time=payload.preferred_time,
         status="new",
         source="client",
         created_by_user_id=current_user.id,
@@ -307,6 +310,7 @@ def create_staff_inspection_booking(
         name=payload.name.strip(),
         phone=phone,
         preferred_date=payload.preferred_date,
+        preferred_time=payload.preferred_time,
         status="new",
         source="staff",
         created_by_user_id=current_user.id,
@@ -371,6 +375,8 @@ def patch_inspection_booking(
         row.phone = _normalize_phone_or_400(data["phone"])
     if "preferred_date" in data and data["preferred_date"] is not None:
         row.preferred_date = data["preferred_date"]
+    if "preferred_time" in data:
+        row.preferred_time = data["preferred_time"]
     if "work_zone_id" in data:
         work_zone_id = data["work_zone_id"]
         if work_zone_id is not None:

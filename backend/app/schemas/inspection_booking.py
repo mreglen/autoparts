@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -23,12 +23,14 @@ class InspectionBookingPublicCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     phone: str = Field(min_length=5, max_length=40)
     preferred_date: date
+    preferred_time: Optional[time] = None
 
 
 class InspectionBookingClientCreate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=120)
     phone: Optional[str] = Field(None, min_length=5, max_length=40)
     preferred_date: date
+    preferred_time: Optional[time] = None
     notes: Optional[str] = Field(None, max_length=2000)
     garage_vehicle_id: Optional[int] = Field(None, ge=1)
 
@@ -37,6 +39,7 @@ class InspectionBookingStaffCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     phone: str = Field(min_length=5, max_length=40)
     preferred_date: date
+    preferred_time: Optional[time] = None
     notes: Optional[str] = Field(None, max_length=2000)
     garage_vehicle_id: Optional[int] = Field(None, ge=1)
     work_zone_id: Optional[int] = Field(None, ge=1)
@@ -48,6 +51,7 @@ class InspectionBookingPatch(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=120)
     phone: Optional[str] = Field(None, min_length=5, max_length=40)
     preferred_date: Optional[date] = None
+    preferred_time: Optional[time] = None
     work_zone_id: Optional[int] = Field(None, ge=1)
 
 
@@ -60,6 +64,7 @@ class InspectionBookingView(BaseModel):
     name: str
     phone: str
     preferred_date: date
+    preferred_time: Optional[time] = None
     status: str
     source: str
     created_by_user_id: Optional[int] = None

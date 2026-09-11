@@ -41,7 +41,7 @@ function plannerItemStyle(item) {
 }
 
 function plannerItemTimeLabel(item) {
-  if (item?.kind === 'inspection') return 'Осмотр';
+  if (item?.kind === 'inspection') return item.preferred_time?.slice(0, 5) || 'Осмотр';
   return formatOrderClockRange(item);
 }
 
@@ -260,9 +260,7 @@ function MobileDayPlanner({
                     </button>
                   ) : null}
                 </div>
-                {orders.length === 0 ? (
-                  <p className="mt-2 text-sm text-ink-faint">Нет записей</p>
-                ) : (
+                {orders.length > 0 ? (
                   <ul className="mt-2 divide-y divide-line-soft">
                     {orders.map((order) => (
                       <li key={plannerItemKey(order)}>
@@ -300,7 +298,7 @@ function MobileDayPlanner({
                       </li>
                     ))}
                   </ul>
-                )}
+                ) : null}
               </section>
             );
           })}
@@ -621,6 +619,7 @@ export default function AutoservicePlannerPage() {
                 name: viewInspection.client_name,
                 phone: viewInspection.client_phone,
                 preferred_date: toDateInputValue(viewInspection.scheduled_at),
+                preferred_time: viewInspection.preferred_time,
                 notes: viewInspection.notes,
                 vehicle: viewInspection.vehicle,
                 work_zone_id: viewInspection.work_zone_id,

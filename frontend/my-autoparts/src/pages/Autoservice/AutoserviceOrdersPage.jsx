@@ -18,6 +18,10 @@ import { formatServerDateTime } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+import {
+  readRepairOrderFormDraft,
+  repairOrderFormSnapshotHasContent,
+} from '../../utils/repairOrderFormDraft';
 import AutoserviceOrdersMobileView from './AutoserviceOrdersMobileView';
 
 function formatDateTime(value) {
@@ -86,6 +90,9 @@ export default function AutoserviceOrdersPage() {
   const viewParam = searchParams.get('view');
   const viewHistory = viewParam === 'history';
   const viewReview = viewParam === 'review';
+  const viewDrafts = viewParam === 'drafts';
+  const createDraft = readRepairOrderFormDraft('create');
+  const hasCreateDraft = repairOrderFormSnapshotHasContent(createDraft?.form);
 
   const [rows, setRows] = useState([]);
   const [reviewCount, setReviewCount] = useState(0);
@@ -105,6 +112,12 @@ export default function AutoserviceOrdersPage() {
   const scope = viewReview ? 'review' : viewHistory ? 'history' : 'active';
 
   const load = useCallback(async ({ silent = false } = {}) => {
+    if (viewDrafts) {
+      setRows([]);
+      setError('');
+      setLoading(false);
+      return;
+    }
     if (!silent) setLoading(true);
     setError('');
     try {
@@ -130,7 +143,7 @@ export default function AutoserviceOrdersPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [scope, qApplied, viewHistory, historyStatus, canReview]);
+  }, [scope, qApplied, viewHistory, viewDrafts, historyStatus, canReview]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
@@ -160,6 +173,7 @@ export default function AutoserviceOrdersPage() {
   const setListView = (id) => {
     if (id === 'history') setSearchParams({ view: 'history' });
     else if (id === 'review') setSearchParams({ view: 'review' });
+    else if (id === 'drafts') setSearchParams({ view: 'drafts' });
     else setSearchParams({});
     setViewOrder(null);
   };
@@ -308,10 +322,14 @@ export default function AutoserviceOrdersPage() {
     ? 'История заказ-нарядов'
     : viewReview
       ? 'На проверке'
-      : 'Заказ-наряды';
+      : viewDrafts
+        ? 'Черновики'
+        : 'Заказ-наряды';
   const pageSubtitle = loading
     ? 'Загрузка…'
-    : viewHistory
+    : viewDrafts
+      ? `${hasCreateDraft ? 1 : 0} черновиков`
+      : viewHistory
       ? canReview
         ? `${rows.length} завершённых и отменённых`
         : `${rows.length} ваших завершённых и отменённых`
@@ -322,15 +340,55 @@ export default function AutoserviceOrdersPage() {
           : `${rows.length} ваших активных`;
   const orderTabs = [
     { id: 'active', label: 'Активные' },
+    { id: 'drafts', label: 'Черновики', count: hasCreateDraft ? 1 : undefined },
     ...(canReview ? [{ id: 'review', label: 'На проверке', shortLabel: 'Проверка', count: reviewCount }] : []),
     { id: 'history', label: 'История' },
   ];
-  const tabValue = viewReview ? 'review' : viewHistory ? 'history' : 'active';
+  const tabValue = viewReview ? 'review' : viewHistory ? 'history' : viewDrafts ? 'drafts' : 'active';
   const emptyMessage = viewHistory
     ? 'В истории пока нет заказ-нарядов'
     : viewReview
       ? 'Заявок на проверке нет'
       : 'Активных заказ-нарядов нет';
+
+  if (viewDrafts) {
+    return (
+      <div className="w-full min-w-0">
+        <div className="mb-4">
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">{pageTitle}</h1>
+          <p className="mt-0.5 text-sm text-ink-muted">{pageSubtitle}</p>
+        </div>
+        <UnderlineTabs
+          className="mb-4"
+          ariaLabel="Разделы заказ-нарядов"
+          gapClassName="gap-4"
+          tabClassName="pb-3 pt-1 text-sm font-medium sm:text-[15px]"
+          tabs={orderTabs}
+          value={tabValue}
+          onChange={setListView}
+        />
+        {hasCreateDraft ? (
+          <button
+            type="button"
+            onClick={() => navigate('/autoservice/orders/new')}
+            className="flex w-full min-h-11 items-center justify-between gap-3 rounded-sg border border-line bg-surface p-4 text-left transition hover:bg-surface-muted"
+          >
+            <span>
+              <span className="block text-sm font-semibold text-ink">Новый заказ-наряд</span>
+              <span className="mt-1 block text-xs text-ink-muted">
+                Сохранён {new Date(createDraft.savedAt).toLocaleString('ru-RU')}
+              </span>
+            </span>
+            <span className="text-sm font-medium text-brand-600">Продолжить</span>
+          </button>
+        ) : (
+          <div className="rounded-sg border border-line bg-surface p-6 text-center text-sm text-ink-muted">
+            Черновиков пока нет
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-w-0">
