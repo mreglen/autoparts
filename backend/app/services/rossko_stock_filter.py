@@ -1,9 +1,9 @@
-"""Фильтрация складов Rossko: доставка + whitelist из настроек."""
+"""Фильтрация доставки Rossko и выделение предпочтительных складов."""
 from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -18,9 +18,9 @@ def _safe_text(value: object) -> str:
         return value.strip()
     if isinstance(value, (int, float)):
         return str(value)
-    if isinstance(value, datetime):
+    if isinstance(value, (datetime, date)):
         return value.isoformat()
-    return str(value).strip() if value else ""
+    return ""
 
 
 def has_rossko_delivery_window(stock: dict[str, Any]) -> bool:
@@ -54,8 +54,8 @@ def parse_json_list(raw: object) -> list:
 def parse_allowed_stock_ids(raw: object) -> frozenset[str] | None:
     """
     Returns:
-      None — фильтр выключен (показывать все deliverable-склады)
-      frozenset — только эти stock id
+      None — склады для выделения не выбраны
+      frozenset — stock id складов, выделяемых в интерфейсе
     """
     items = parse_json_list(raw)
     ids = {_safe_text(x) for x in items if _safe_text(x)}
@@ -123,7 +123,7 @@ def is_stock_allowed(stock: dict[str, Any], allowed: frozenset[str] | None) -> b
 
 def filter_stocks_list(
     stocks: list[dict[str, Any]] | dict[str, Any] | None,
-    allowed: frozenset[str] | None,
+    preferred: frozenset[str] | None,
 ) -> list[dict[str, Any]]:
     if not stocks:
         return []
@@ -134,17 +134,16 @@ def filter_stocks_list(
             continue
         if not is_rossko_deliverable_stock(stock):
             continue
-        if not is_stock_allowed(stock, allowed):
-            continue
+        stock["is_preferred"] = bool(preferred and stock_id_of(stock) in preferred)
         out.append(stock)
     return out
 
 
-def _filter_part_stocks_inplace(part: dict[str, Any], allowed: frozenset[str] | None) -> None:
+def _filter_part_stocks_inplace(part: dict[str, Any], preferred: frozenset[str] | None) -> None:
     stocks_wrap = part.get("stocks")
     if not isinstance(stocks_wrap, dict):
         return
-    filtered = filter_stocks_list(stocks_wrap.get("stock"), allowed)
+    filtered = filter_stocks_list(stocks_wrap.get("stock"), preferred)
     if not filtered:
         stocks_wrap["stock"] = []
     elif len(filtered) == 1:
@@ -155,16 +154,16 @@ def _filter_part_stocks_inplace(part: dict[str, Any], allowed: frozenset[str] | 
 
 def filter_search_payload_stocks(
     data: dict[str, Any] | None,
-    allowed: frozenset[str] | None,
+    preferred: frozenset[str] | None,
 ) -> dict[str, Any] | None:
-    """Filter stocks in Rossko GetSearch payload by allowlist (in-place)."""
-    if not data or not allowed:
+    """Keep deliverable stocks and mark preferred ones in-place."""
+    if not data:
         return data
 
     def walk(part: dict[str, Any], *, depth: int = 0) -> None:
         if depth > 3:
             return
-        _filter_part_stocks_inplace(part, allowed)
+        _filter_part_stocks_inplace(part, preferred)
         crosses = part.get("crosses") or {}
         cross_parts = crosses.get("Part") or []
         if isinstance(cross_parts, dict):

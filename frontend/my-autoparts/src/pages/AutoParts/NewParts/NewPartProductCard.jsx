@@ -170,11 +170,11 @@ function NewPartProductCard({
               Быстрая поставка
             </span>
           ) : null}
-          <p className="text-xs leading-relaxed text-ink-muted">
+          <p className={`text-xs leading-relaxed text-ink-muted ${showWarehouseNames && mainStock.is_preferred ? 'font-bold' : ''}`}>
             {formatDeliveryTimeText(
               mainStock.delivery_start,
               mainStock.delivery_end,
-              mainStock.description || mainStock.warehouse_name || '',
+              warehouseOf(mainStock),
             )}
           </p>
           {renderMainCartControl(cartControlClassName)}
@@ -202,11 +202,11 @@ function NewPartProductCard({
                           <p className="font-medium text-ink">
                             {priceWithMarkup(stock.price)} ₽ · {availableCount} шт.
                           </p>
-                          <p className="text-xs text-ink-muted">
+                          <p className={`text-xs text-ink-muted ${showWarehouseNames && stock.is_preferred ? 'font-bold' : ''}`}>
                             {formatDeliveryTimeText(
                               stock.delivery_start,
                               stock.delivery_end,
-                              stock.description || stock.warehouse_name || '',
+                              warehouseOf(stock),
                             )}
                           </p>
                         </div>
@@ -293,11 +293,11 @@ function NewPartProductCard({
               <p className="text-sm font-semibold text-ink">{mainAvailableCount} шт.</p>
             </div>
           </div>
-          <p className="mb-3 text-xs leading-relaxed text-ink-muted">
+          <p className={`mb-3 text-xs leading-relaxed text-ink-muted ${showWarehouseNames && mainStock.is_preferred ? 'font-bold' : ''}`}>
             {formatDeliveryTimeText(
               mainStock.delivery_start,
               mainStock.delivery_end,
-              mainStock.description || mainStock.warehouse_name || '',
+              warehouseOf(mainStock),
             )}
           </p>
           {renderMainCartControl('sm:flex-row sm:items-center sm:justify-between')}
@@ -325,11 +325,11 @@ function NewPartProductCard({
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="text-sm text-ink-soft">
                         <p className="font-medium text-ink">{priceWithMarkup(stock.price)} ₽ · {availableCount} шт.</p>
-                        <p className="text-xs text-ink-muted">
+                        <p className={`text-xs text-ink-muted ${showWarehouseNames && stock.is_preferred ? 'font-bold' : ''}`}>
                           {formatDeliveryTimeText(
                             stock.delivery_start,
                             stock.delivery_end,
-                            stock.description || stock.warehouse_name || '',
+                            warehouseOf(stock),
                           )}
                         </p>
                       </div>

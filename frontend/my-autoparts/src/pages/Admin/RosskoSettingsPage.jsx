@@ -323,8 +323,8 @@ export default function RosskoSettingsPage() {
             setNotification({
                 type: 'success',
                 message: selectedWarehouseIds.size
-                    ? `Сохранено: показываем ${selectedWarehouseIds.size} склад(ов)`
-                    : 'Сохранено: фильтр складов выключен (показываются все)',
+                    ? `Сохранено: выделяем ${selectedWarehouseIds.size} склад(ов)`
+                    : 'Сохранено: склады для выделения не выбраны',
             });
         } catch (err) {
             setNotification({ type: 'error', message: err || 'Не удалось сохранить склады' });
@@ -635,9 +635,9 @@ export default function RosskoSettingsPage() {
                     <div>
                         <h2 className="text-lg font-semibold text-gray-900">Склады Rossko</h2>
                         <p className="mt-1 text-sm text-gray-600">
-                            Отметьте склады, которые показывать в поиске и каталоге. Если ничего не выбрано —
-                            фильтр выключен и видны все склады с доставкой. Список пополняется при поиске и
-                            кнопкой «Обновить из Rossko».
+                            Отмеченные склады выделяются жирным шрифтом в поиске, VIN-каталоге и корзине.
+                            На состав предложений выбор не влияет: показываются все склады с доставкой,
+                            а самовывоз исключается. Список пополняется при поиске и кнопкой «Обновить из Rossko».
                         </p>
                     </div>
                     <button

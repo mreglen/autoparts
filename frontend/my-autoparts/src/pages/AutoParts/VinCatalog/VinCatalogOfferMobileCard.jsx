@@ -18,14 +18,18 @@ function toSafeInt(value, fallback = 0) {
   return Math.trunc(n);
 }
 
-function DeliveryLine({ deliveryStart, deliveryEnd, warehouseName }) {
+function DeliveryLine({ deliveryStart, deliveryEnd, warehouseName, preferredWarehouse = false }) {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (!parts) return <span className="text-sm text-gray-500">—</span>;
   return (
     <div className="text-sm text-gray-800">
       <div className="font-medium">{parts.dateLine}</div>
       <div className="text-gray-600">{parts.timeLine}</div>
-      {warehouseName ? <div className="text-gray-500">{warehouseName}</div> : null}
+      {warehouseName ? (
+        <div className={`text-gray-500 ${preferredWarehouse ? 'font-bold' : ''}`}>
+          {warehouseName}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -218,6 +222,7 @@ function MobileStockOffer({
                 ? (stock.description || stock.warehouse_name || '')
                 : ''
             }
+            preferredWarehouse={Boolean(stock.is_preferred)}
           />
           <div className="text-sm text-gray-600">{maxQty} шт.</div>
         </div>

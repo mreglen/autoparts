@@ -136,9 +136,10 @@ export function useNewPartCartActions({ part, stocksData }) {
     const hasStockOnOther = stocks
       .filter((stock) => String(stock.stock_id) !== String(currentStock?.stock_id))
       .some((stock) => (Number(stock.available_count) || 0) > 0);
+    const currentStockExhausted = availableOnCurrent <= currentCartQuantity;
     return {
-      noStock: availableOnCurrent <= currentCartQuantity && !hasStockOnOther,
-      limitedStock: availableOnCurrent <= currentCartQuantity && hasStockOnOther,
+      noStock: availableOnCurrent <= 0 && currentCartQuantity === 0 && !hasStockOnOther,
+      limitedStock: currentStockExhausted && hasStockOnOther,
     };
   };
 

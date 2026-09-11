@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any
 
 from app.services.rossko_stock_filter import is_rossko_deliverable_stock
@@ -12,7 +13,47 @@ def _safe_text(value: object, default: str = "") -> str:
         return value.strip() or default
     if isinstance(value, (int, float)):
         return str(value)
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
     return default
+
+
+def _merge_part_stocks(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    def stock_list(part: dict[str, Any]) -> list[dict[str, Any]]:
+        raw = (part.get("stocks") or {}).get("stock")
+        values = raw if isinstance(raw, list) else ([raw] if raw else [])
+        return [stock for stock in values if isinstance(stock, dict)]
+
+    merged = dict(existing)
+    by_id: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for stock in [*stock_list(existing), *stock_list(incoming)]:
+        stock_id = _safe_text(stock.get("id") or stock.get("stock_id"))
+        if not stock_id:
+            continue
+        current = by_id.get(stock_id)
+        if current is None:
+            by_id[stock_id] = stock
+            order.append(stock_id)
+            continue
+        try:
+            current_count = int(current.get("count") or 0)
+        except (TypeError, ValueError):
+            current_count = 0
+        try:
+            next_count = int(stock.get("count") or 0)
+        except (TypeError, ValueError):
+            next_count = 0
+        if (
+            not is_rossko_deliverable_stock(current)
+            and is_rossko_deliverable_stock(stock)
+        ) or next_count > current_count:
+            by_id[stock_id] = stock
+
+    stocks = [by_id[stock_id] for stock_id in order]
+    if stocks:
+        merged["stocks"] = {"stock": stocks[0] if len(stocks) == 1 else stocks}
+    return merged
 
 
 def extract_rossko_parts(
@@ -34,19 +75,21 @@ def extract_rossko_parts(
         return []
 
     results: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    seen: dict[str, int] = {}
 
     def add_part(part: dict[str, Any]) -> None:
-        if len(results) >= max_parts:
-            return
         brand = _safe_text(part.get("brand"))
         article = _normalize_article(part.get("partnumber"))
         if not brand and not article:
             return
         stable = f"{brand.casefold()}|{article}"
-        if stable in seen:
+        existing_index = seen.get(stable)
+        if existing_index is not None:
+            results[existing_index] = _merge_part_stocks(results[existing_index], part)
             return
-        seen.add(stable)
+        if len(results) >= max_parts:
+            return
+        seen[stable] = len(results)
         results.append(part)
 
     def walk_crosses(part: dict[str, Any], *, depth: int = 0) -> None:
@@ -229,8 +272,6 @@ def map_rossko_stocks(
         stock_id = _safe_text(stock.get("id"))
         if not stock_id:
             continue
-        if allowed_stock_ids and stock_id not in allowed_stock_ids:
-            continue
         try:
             price = float(stock.get("price") or 0)
         except (TypeError, ValueError):
@@ -246,9 +287,13 @@ def map_rossko_stocks(
                 "stock_id": stock_id,
                 "price": price,
                 "available_count": available_count,
-                "delivery_start": _safe_text(stock.get("deliveryStart")) or None,
-                "delivery_end": _safe_text(stock.get("deliveryEnd")) or None,
+                "delivery_start": _safe_text(stock.get("deliveryStart") or stock.get("delivery_start")) or None,
+                "delivery_end": _safe_text(stock.get("deliveryEnd") or stock.get("delivery_end")) or None,
                 "description": _safe_text(stock.get("description")) or None,
+                "is_preferred": bool(
+                    stock.get("is_preferred")
+                    or (allowed_stock_ids and stock_id in allowed_stock_ids)
+                ),
             }
         )
     return mapped

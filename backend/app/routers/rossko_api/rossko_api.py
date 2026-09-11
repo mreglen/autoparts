@@ -156,9 +156,8 @@ async def rossko_search(request: SearchRequest, db: Session = Depends(get_db)):
         except Exception:
             logger.exception("Failed to merge known Rossko warehouses from search")
 
-        allowed = load_allowed_stock_ids(db)
-        if allowed:
-            filter_search_payload_stocks(serialized_result, allowed)
+        preferred = load_allowed_stock_ids(db)
+        filter_search_payload_stocks(serialized_result, preferred)
 
         return serialized_result
 

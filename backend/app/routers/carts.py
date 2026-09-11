@@ -74,12 +74,15 @@ def _normalize_max_quantity(value: int | None) -> int | None:
     return parsed if parsed > 0 else None
 
 
-def _merge_new_parts_max(existing_max: int | None, incoming_max: int | None) -> int | None:
-    if incoming_max is None:
-        return existing_max
-    if existing_max is None:
-        return incoming_max
-    return max(existing_max, incoming_max)
+def _merge_new_parts_max(
+    existing_max: int | None,
+    incoming_max: int | None,
+    current_quantity: int = 0,
+) -> int | None:
+    target = incoming_max if incoming_max is not None else existing_max
+    if target is None:
+        return None
+    return max(target, current_quantity)
 
 
 def _cap_to_max(quantity: int, max_qty: int | None) -> int:
@@ -151,7 +154,11 @@ def _apply_new_parts_offer_fields(
         cart_item.supplier_unit_price = supplier_unit_price
         changed = True
     if max_quantity is not None:
-        cart_item.max_quantity = _merge_new_parts_max(cart_item.max_quantity, max_quantity)
+        cart_item.max_quantity = _merge_new_parts_max(
+            cart_item.max_quantity,
+            max_quantity,
+            int(cart_item.quantity or 0),
+        )
         changed = True
     if name:
         cart_item.name = name
@@ -173,9 +180,21 @@ def _warehouse_name_map(db: Session | None) -> dict[str, str]:
         return {}
 
 
+def _preferred_stock_ids(db: Session | None) -> frozenset[str]:
+    if db is None:
+        return frozenset()
+    try:
+        from app.services.rossko_stock_filter import load_allowed_stock_ids
+
+        return load_allowed_stock_ids(db) or frozenset()
+    except Exception:
+        return frozenset()
+
+
 def _new_parts_cart_item_response(
     cart_item,
     warehouse_names: dict[str, str] | None = None,
+    preferred_stock_ids: frozenset[str] | None = None,
 ) -> CartItemResponse:
     stock_id = getattr(cart_item, "stock_id", None)
     warehouse_name = None
@@ -210,6 +229,9 @@ def _new_parts_cart_item_response(
         created_at=cart_item.created_at,
         basket_id=getattr(cart_item, "basket_id", None),
         available=available,
+        preferred_warehouse=bool(
+            stock_id and preferred_stock_ids and str(stock_id).strip() in preferred_stock_ids
+        ),
     )
 
 
@@ -217,8 +239,12 @@ def _build_new_parts_basket_response(
     basket,
     items,
     warehouse_names: dict[str, str] | None = None,
+    preferred_stock_ids: frozenset[str] | None = None,
 ) -> NewPartsBasketResponse:
-    mapped_items = [_new_parts_cart_item_response(item, warehouse_names) for item in items]
+    mapped_items = [
+        _new_parts_cart_item_response(item, warehouse_names, preferred_stock_ids)
+        for item in items
+    ]
     item_count = sum(item.quantity for item in mapped_items)
     total_price = sum((item.price or 0) * item.quantity for item in mapped_items)
     return NewPartsBasketResponse(
@@ -242,6 +268,7 @@ def _build_user_cart_response(cart, db: Session) -> CartResponse:
     if user is None and getattr(cart, "user_id", None):
         user = db.query(User).filter(User.id == cart.user_id).first()
     warehouse_names = _warehouse_names_for_user(db, user)
+    preferred_stock_ids = _preferred_stock_ids(db)
     baskets = list_user_baskets(db, cart.id, cart.user_id)
     items_by_basket: dict[int, list[NewPartsCart]] = {b.id: [] for b in baskets}
     for item in cart.new_parts_items:
@@ -254,12 +281,16 @@ def _build_user_cart_response(cart, db: Session) -> CartResponse:
 
     basket_views = [
         _build_new_parts_basket_response(
-            basket, items_by_basket.get(basket.id, []), warehouse_names
+            basket,
+            items_by_basket.get(basket.id, []),
+            warehouse_names,
+            preferred_stock_ids,
         )
         for basket in baskets
     ]
     all_new_items = [
-        _new_parts_cart_item_response(i, warehouse_names) for i in cart.new_parts_items
+        _new_parts_cart_item_response(i, warehouse_names, preferred_stock_ids)
+        for i in cart.new_parts_items
     ]
     return CartResponse(
         id=cart.id,
@@ -274,6 +305,7 @@ def _build_user_cart_response(cart, db: Session) -> CartResponse:
 
 def _build_guest_cart_response(guest_cart, db: Session) -> CartResponse:
     warehouse_names: dict[str, str] = {}
+    preferred_stock_ids = _preferred_stock_ids(db)
     baskets = list_guest_baskets(db, guest_cart.id)
     items_by_basket: dict[int, list[GuestNewPartsCart]] = {b.id: [] for b in baskets}
     for item in guest_cart.new_parts_items:
@@ -286,12 +318,16 @@ def _build_guest_cart_response(guest_cart, db: Session) -> CartResponse:
 
     basket_views = [
         _build_new_parts_basket_response(
-            basket, items_by_basket.get(basket.id, []), warehouse_names
+            basket,
+            items_by_basket.get(basket.id, []),
+            warehouse_names,
+            preferred_stock_ids,
         )
         for basket in baskets
     ]
     all_new_items = [
-        _new_parts_cart_item_response(i, warehouse_names) for i in guest_cart.new_parts_items
+        _new_parts_cart_item_response(i, warehouse_names, preferred_stock_ids)
+        for i in guest_cart.new_parts_items
     ]
     return CartResponse(
         id=guest_cart.id,
@@ -376,7 +412,11 @@ async def add_new_parts_to_cart(
             NewPartsCart.partnumber == item.partnumber
         ).first()
         if existing_item:
-            merged_max = _merge_new_parts_max(existing_item.max_quantity, incoming_max)
+            merged_max = _merge_new_parts_max(
+                existing_item.max_quantity,
+                incoming_max,
+                existing_item.quantity,
+            )
             existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, merged_max)
             _apply_new_parts_offer_fields(
                 existing_item,
@@ -392,7 +432,11 @@ async def add_new_parts_to_cart(
             )
             db.commit()
             db.refresh(existing_item)
-            return _new_parts_cart_item_response(existing_item, _warehouse_names_for_user(db, current_user))
+            return _new_parts_cart_item_response(
+                existing_item,
+                _warehouse_names_for_user(db, current_user),
+                _preferred_stock_ids(db),
+            )
 
         cart_item = NewPartsCart(
             cart_id=cart.id,
@@ -424,7 +468,11 @@ async def add_new_parts_to_cart(
             GuestNewPartsCart.partnumber == item.partnumber
         ).first()
         if existing_item:
-            merged_max = _merge_new_parts_max(existing_item.max_quantity, incoming_max)
+            merged_max = _merge_new_parts_max(
+                existing_item.max_quantity,
+                incoming_max,
+                existing_item.quantity,
+            )
             existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, merged_max)
             _apply_new_parts_offer_fields(
                 existing_item,
@@ -441,7 +489,11 @@ async def add_new_parts_to_cart(
             db.commit()
             touch_guest_cart(db, guest_cart)
             db.refresh(existing_item)
-            return _new_parts_cart_item_response(existing_item, _warehouse_names_for_user(db, current_user))
+            return _new_parts_cart_item_response(
+                existing_item,
+                _warehouse_names_for_user(db, current_user),
+                _preferred_stock_ids(db),
+            )
 
         cart_item = GuestNewPartsCart(
             guest_cart_id=guest_cart.id,
@@ -467,7 +519,11 @@ async def add_new_parts_to_cart(
     if not current_user:
         touch_guest_cart(db, guest_cart)
 
-    return _new_parts_cart_item_response(cart_item, _warehouse_names_for_user(db, current_user))
+    return _new_parts_cart_item_response(
+        cart_item,
+        _warehouse_names_for_user(db, current_user),
+        _preferred_stock_ids(db),
+    )
 
 
 @router.post("/new-parts/refresh-offers", response_model=CartResponse)
@@ -859,7 +915,11 @@ def update_new_parts_quantity(
     if not current_user:
         touch_guest_cart(db, guest_cart)
 
-    return _new_parts_cart_item_response(cart_item, _warehouse_names_for_user(db, current_user))
+    return _new_parts_cart_item_response(
+        cart_item,
+        _warehouse_names_for_user(db, current_user),
+        _preferred_stock_ids(db),
+    )
 
 
 @router.delete("/used-parts/{item_id}", status_code=204)
@@ -957,8 +1017,15 @@ def list_new_parts_baskets(
         for item in items:
             if item.basket_id and item.basket_id in items_by_basket:
                 items_by_basket[item.basket_id].append(item)
+        warehouse_names = _warehouse_names_for_user(db, current_user)
+        preferred_stock_ids = _preferred_stock_ids(db)
         return [
-            _build_new_parts_basket_response(basket, items_by_basket.get(basket.id, []))
+            _build_new_parts_basket_response(
+                basket,
+                items_by_basket.get(basket.id, []),
+                warehouse_names,
+                preferred_stock_ids,
+            )
             for basket in baskets
         ]
 
@@ -973,8 +1040,13 @@ def list_new_parts_baskets(
     for item in items:
         if item.basket_id and item.basket_id in items_by_basket:
             items_by_basket[item.basket_id].append(item)
+    preferred_stock_ids = _preferred_stock_ids(db)
     return [
-        _build_new_parts_basket_response(basket, items_by_basket.get(basket.id, []))
+        _build_new_parts_basket_response(
+            basket,
+            items_by_basket.get(basket.id, []),
+            preferred_stock_ids=preferred_stock_ids,
+        )
         for basket in baskets
     ]
 
@@ -1032,7 +1104,12 @@ def rename_new_parts_basket(
         )
         db.commit()
         db.refresh(basket)
-        return _build_new_parts_basket_response(basket, items)
+        return _build_new_parts_basket_response(
+            basket,
+            items,
+            _warehouse_names_for_user(db, current_user),
+            _preferred_stock_ids(db),
+        )
 
     guest_cart = get_or_create_guest_cart(db, request, response)
     basket = rename_guest_basket(db, guest_cart.id, basket_id, payload.name)
@@ -1047,7 +1124,11 @@ def rename_new_parts_basket(
     touch_guest_cart(db, guest_cart)
     db.commit()
     db.refresh(basket)
-    return _build_new_parts_basket_response(basket, items)
+    return _build_new_parts_basket_response(
+        basket,
+        items,
+        preferred_stock_ids=_preferred_stock_ids(db),
+    )
 
 
 def _move_user_new_parts_items(

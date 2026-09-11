@@ -124,10 +124,9 @@ def _lookup_rossko(
         }
         raw = _get_search_client().service.GetSearch(**params)
         serialized = serialize_object(raw)
-        if allowed_stock_ids:
-            from app.services.rossko_stock_filter import filter_search_payload_stocks
+        from app.services.rossko_stock_filter import filter_search_payload_stocks
 
-            filter_search_payload_stocks(serialized, allowed_stock_ids)
+        filter_search_payload_stocks(serialized, allowed_stock_ids)
         parts = _parse_rossko_parts(serialized)
         if not parts:
             return empty

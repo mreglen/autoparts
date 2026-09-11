@@ -83,9 +83,10 @@ export const mapPartToStocksData = (part) => {
       stock_id: stock.id,
       price: parseFloat(stock.price) || 0,
       available_count: parseInt(stock.count, 10) || 0,
-      delivery_start: stock.deliveryStart,
-      delivery_end: stock.deliveryEnd,
+      delivery_start: stock.deliveryStart ?? stock.delivery_start,
+      delivery_end: stock.deliveryEnd ?? stock.delivery_end,
       description: stock.description,
+      is_preferred: Boolean(stock.is_preferred),
     }));
 };
 
@@ -147,7 +148,12 @@ function mergeRosskoPartStocks(existingPart, incomingPart) {
     const prevCount = parseInt(prev.count, 10) || 0;
     const nextCount = parseInt(stock.count, 10) || 0;
     if (nextCount > prevCount) {
-      byId.set(id, stock);
+      byId.set(id, {
+        ...stock,
+        is_preferred: Boolean(prev.is_preferred || stock.is_preferred),
+      });
+    } else if (stock.is_preferred && !prev.is_preferred) {
+      byId.set(id, { ...prev, is_preferred: true });
     }
   });
   const merged = Array.from(byId.values());

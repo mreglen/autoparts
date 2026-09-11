@@ -98,7 +98,7 @@ function partGroupKey(part) {
   return rosskoPartDedupeKey(part);
 }
 
-function DeliveryCell({ deliveryStart, deliveryEnd, warehouseName }) {
+function DeliveryCell({ deliveryStart, deliveryEnd, warehouseName, preferredWarehouse = false }) {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (!parts) {
     return <span className="text-xs text-gray-500">—</span>;
@@ -108,7 +108,12 @@ function DeliveryCell({ deliveryStart, deliveryEnd, warehouseName }) {
       <div className="font-semibold">{parts.dateLine}</div>
       <div className="text-gray-600">{parts.timeLine}</div>
       {warehouseName ? (
-        <div className="mt-0.5 text-gray-500" title={warehouseName}>{warehouseName}</div>
+        <div
+          className={`mt-0.5 text-gray-500 ${preferredWarehouse ? 'font-bold' : ''}`}
+          title={warehouseName}
+        >
+          {warehouseName}
+        </div>
       ) : null}
     </div>
   );
@@ -383,6 +388,7 @@ function StockOfferRow({
               ? (stock.description || stock.warehouse_name || '')
               : ''
           }
+          preferredWarehouse={Boolean(stock.is_preferred)}
         />
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-800">

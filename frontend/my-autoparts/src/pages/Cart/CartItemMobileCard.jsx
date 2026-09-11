@@ -1,14 +1,24 @@
 import React from 'react';
 import { formatDeliveryParts } from '../AutoParts/NewParts/newPartStockUtils';
 
-function DeliveryCell({ deliveryStart, deliveryEnd, deliveryFallback, warehouseName }) {
+function DeliveryCell({
+  deliveryStart,
+  deliveryEnd,
+  deliveryFallback,
+  warehouseName,
+  preferredWarehouse = false,
+}) {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (parts) {
     return (
       <div className="text-xs leading-tight text-ink">
         <p className="font-medium text-ink">{parts.dateLine}</p>
         <p className="text-ink-muted text-[11px]">{parts.timeLine}</p>
-        {warehouseName ? <p className="text-ink-muted text-[11px] truncate">{warehouseName}</p> : null}
+        {warehouseName ? (
+          <p className={`truncate text-[11px] text-ink-muted ${preferredWarehouse ? 'font-bold' : ''}`}>
+            {warehouseName}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -121,6 +131,7 @@ export default function CartItemMobileCard({
                 deliveryEnd={item.deliveryEnd}
                 deliveryFallback={item.deliveryFallback}
                 warehouseName={item.warehouseName}
+                preferredWarehouse={item.preferredWarehouse}
               />
             </div>
           ) : null}

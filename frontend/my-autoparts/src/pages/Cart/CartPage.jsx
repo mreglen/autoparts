@@ -61,14 +61,24 @@ function clientPrice(item, markupPercent) {
   return applyMarkup(checkoutPrice(item), markupPercent);
 }
 
-function DeliveryCell({ deliveryStart, deliveryEnd, deliveryFallback, warehouseName }) {
+function DeliveryCell({
+  deliveryStart,
+  deliveryEnd,
+  deliveryFallback,
+  warehouseName,
+  preferredWarehouse = false,
+}) {
   const parts = formatDeliveryParts(deliveryStart, deliveryEnd);
   if (parts) {
     return (
       <div className="text-xs leading-snug text-ink">
         <p className="font-semibold text-ink">{parts.dateLine}</p>
         <p className="text-ink-muted">{parts.timeLine}</p>
-        {warehouseName ? <p className="text-ink-muted">{warehouseName}</p> : null}
+        {warehouseName ? (
+          <p className={`text-ink-muted ${preferredWarehouse ? 'font-bold' : ''}`}>
+            {warehouseName}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -170,6 +180,7 @@ function CartTableRow({
             deliveryEnd={item.deliveryEnd}
             deliveryFallback={item.deliveryFallback}
             warehouseName={item.warehouseName}
+            preferredWarehouse={item.preferredWarehouse}
           />
         </td>
       ) : null}
@@ -474,6 +485,7 @@ export default function CartPage() {
     deliveryEnd: item.delivery_end || null,
     deliveryFallback: item.delivery || null,
     warehouseName: item.warehouse_name || null,
+    preferredWarehouse: Boolean(item.preferred_warehouse),
     price: truncateRubles(item.price),
     purchasePrice: truncateRubles(item.purchase_price),
     quantity: item.quantity,

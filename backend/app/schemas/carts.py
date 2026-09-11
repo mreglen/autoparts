@@ -45,6 +45,7 @@ class CartItemResponse(BaseModel):
     created_at: datetime
     basket_id: Optional[int] = None
     available: bool = True  # True если товар в наличии, False если нет
+    preferred_warehouse: bool = False
 
 
 class NewPartsBasketResponse(BaseModel):

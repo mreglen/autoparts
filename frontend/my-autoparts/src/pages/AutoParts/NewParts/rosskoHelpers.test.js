@@ -5,6 +5,7 @@ import {
   buildRosskoOemSearchQueries,
   hasRosskoInStock,
   isRosskoDeliverableStock,
+  mapPartToStocksData,
 } from './rosskoHelpers';
 
 describe('rosskoHelpers dedupe', () => {
@@ -88,5 +89,31 @@ describe('rosskoHelpers dedupe', () => {
       deliveryStart: '2026-01-01T10:00:00',
       deliveryEnd: '2026-01-01T18:00:00',
     })).toBe(true);
+  });
+
+  it('maps only delivered stock and keeps preferred marker', () => {
+    const stocks = mapPartToStocksData({
+      stocks: {
+        stock: [
+          { id: 'pickup', price: '90', count: '3' },
+          {
+            id: 'delivery',
+            price: '100',
+            count: '1',
+            deliveryStart: '2026-01-01T10:00:00',
+            deliveryEnd: '2026-01-01T18:00:00',
+            is_preferred: true,
+          },
+        ],
+      },
+    });
+
+    expect(stocks).toEqual([
+      expect.objectContaining({
+        stock_id: 'delivery',
+        available_count: 1,
+        is_preferred: true,
+      }),
+    ]);
   });
 });

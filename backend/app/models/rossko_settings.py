@@ -26,7 +26,7 @@ class RosskoSettings(Base):
     requires_requisite = Column(Boolean, nullable=True)
     key1_encrypted = Column(Text, nullable=True)
     key2_encrypted = Column(Text, nullable=True)
-    # JSON: ["STOCK_ID", ...] — пусто/null = показывать все склады с доставкой
+    # JSON: ["STOCK_ID", ...] — склады, выделяемые в выдаче и корзине
     allowed_stock_ids = Column(Text, nullable=True)
     # JSON: [{"id": "...", "name": "..."}, ...] — каталог известных складов для админки
     known_stocks_json = Column(Text, nullable=True)

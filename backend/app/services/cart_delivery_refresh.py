@@ -123,28 +123,10 @@ async def _search_rossko(db: Session, text: str) -> dict[str, Any] | None:
 
 
 def _apply_delivery(cart_item, offer: dict[str, Any] | None) -> bool:
-    """Apply delivery offer to cart item. If offer is None, clear delivery dates (out of stock)."""
+    """Apply a confirmed delivery offer without clearing last-known data on a miss."""
     if offer is None:
-        # Товара нет на складе - очищаем даты доставки
-        current_start = _parse_dt(getattr(cart_item, "delivery_start", None))
-        current_end = _parse_dt(getattr(cart_item, "delivery_end", None))
-        changed = False
+        return False
 
-        logger.debug(f"Marking item as out of stock: {getattr(cart_item, 'brand', '')} {getattr(cart_item, 'partnumber', '')} stock_id={getattr(cart_item, 'stock_id', '')}")
-
-        if current_start is not None:
-            cart_item.delivery_start = None
-            changed = True
-        if current_end is not None:
-            cart_item.delivery_end = None
-            changed = True
-
-        if changed:
-            cart_item.delivery = "нет в наличии"
-            cart_item.updated_at = datetime.now(timezone.utc)
-            logger.info(f"Item marked out of stock: {getattr(cart_item, 'brand', '')} {getattr(cart_item, 'partnumber', '')} stock_id={getattr(cart_item, 'stock_id', '')}")
-        return changed
-    
     start = _parse_dt(offer.get("delivery_start"))
     end = _parse_dt(offer.get("delivery_end"))
     if not start and not end:
@@ -252,25 +234,17 @@ async def _refresh_rows(db: Session, rows: list) -> int:
                     partnumber=partnumber,
                     stock_id=str(row.stock_id or ""),
                 )
-            # Если offer не найден, передаем None чтобы обозначить "нет в наличии"
+            # Если offer не найден, сохраняем последние подтверждённые данные корзины
             if _apply_delivery(row, offer):
                 updated += 1
-                if offer:
-                    logger.info(
-                        "Cart delivery refreshed: %s %s stock=%s -> %s .. %s",
-                        row.brand,
-                        row.partnumber,
-                        row.stock_id,
-                        offer.get("delivery_start"),
-                        offer.get("delivery_end"),
-                    )
-                else:
-                    logger.info(
-                        "Cart item marked out of stock: %s %s stock=%s",
-                        row.brand,
-                        row.partnumber,
-                        row.stock_id,
-                    )
+                logger.info(
+                    "Cart delivery refreshed: %s %s stock=%s -> %s .. %s",
+                    row.brand,
+                    row.partnumber,
+                    row.stock_id,
+                    offer.get("delivery_start"),
+                    offer.get("delivery_end"),
+                )
 
     logger.info(f"Delivery refresh completed: {updated} items updated")
     if updated:
