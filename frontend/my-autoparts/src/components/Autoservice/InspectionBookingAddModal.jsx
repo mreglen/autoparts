@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Modal from '../UI/Modal';
 import PhoneInput from '../UI/PhoneInput';
 import { apiRequest } from '../../utils/apiClient';
@@ -37,6 +37,7 @@ export default function InspectionBookingAddModal({
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const editStartedAtRef = useRef(0);
   const isEdit = Boolean(initialBooking?.id);
   const initialName = (isEdit ? initialBooking.name : '') || '';
   const initialPhone = (isEdit ? initialBooking.phone : '') || '';
@@ -59,6 +60,7 @@ export default function InspectionBookingAddModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isEdit && Date.now() - editStartedAtRef.current < 500) return;
     setError(null);
     setPhoneError('');
     const trimmedName = name.trim();
@@ -127,6 +129,7 @@ export default function InspectionBookingAddModal({
             setPhone(initialPhone);
             setPreferredDate(initialPreferred);
             setNotes(initialNotes);
+            setSelectedWorkZoneId(initialWorkZoneId);
             setPhoneError('');
             setError(null);
             setIsEditing(false);
@@ -163,7 +166,9 @@ export default function InspectionBookingAddModal({
       <button
         type="button"
         onClick={(e) => {
+          e.preventDefault();
           e.stopPropagation();
+          editStartedAtRef.current = Date.now();
           setIsEditing(true);
         }}
         className="rounded-sg-sm min-h-11 bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"

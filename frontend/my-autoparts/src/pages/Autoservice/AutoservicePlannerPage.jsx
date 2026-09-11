@@ -443,7 +443,7 @@ export default function AutoservicePlannerPage() {
     : (dayIsos.includes(todayIso) ? todayIso : dayIsos[0]);
 
   const handleOpenCreate = () => {
-    beginCreateOrder({ dayIso: activeDayIso, zoneId: null });
+    beginCreateInspection({ dayIso: activeDayIso, zoneId: null });
   };
 
   const resolvedCreateContext = createContext || { dayIso: activeDayIso, zoneId: null };
