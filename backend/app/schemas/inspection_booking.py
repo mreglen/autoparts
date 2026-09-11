@@ -48,6 +48,7 @@ class InspectionBookingPatch(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=120)
     phone: Optional[str] = Field(None, min_length=5, max_length=40)
     preferred_date: Optional[date] = None
+    work_zone_id: Optional[int] = Field(None, ge=1)
 
 
 class InspectionBookingView(BaseModel):

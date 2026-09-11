@@ -371,6 +371,24 @@ def patch_inspection_booking(
         row.phone = _normalize_phone_or_400(data["phone"])
     if "preferred_date" in data and data["preferred_date"] is not None:
         row.preferred_date = data["preferred_date"]
+    if "work_zone_id" in data:
+        work_zone_id = data["work_zone_id"]
+        if work_zone_id is not None:
+            zone = (
+                db.query(AutoserviceWorkZone)
+                .filter(
+                    AutoserviceWorkZone.id == work_zone_id,
+                    AutoserviceWorkZone.organization_id == org_id,
+                    AutoserviceWorkZone.is_active.is_(True),
+                )
+                .first()
+            )
+            if not zone:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Рабочая зона не найдена",
+                )
+        row.work_zone_id = work_zone_id
     if "notes" in data:
         notes = data["notes"]
         row.notes = (notes or "").strip() or None

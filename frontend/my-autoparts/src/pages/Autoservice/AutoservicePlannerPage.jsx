@@ -443,7 +443,7 @@ export default function AutoservicePlannerPage() {
     : (dayIsos.includes(todayIso) ? todayIso : dayIsos[0]);
 
   const handleOpenCreate = () => {
-    openCreateChoice({ dayIso: activeDayIso, zoneId: null });
+    beginCreateOrder({ dayIso: activeDayIso, zoneId: null });
   };
 
   const resolvedCreateContext = createContext || { dayIso: activeDayIso, zoneId: null };
@@ -595,7 +595,6 @@ export default function AutoservicePlannerPage() {
       <PlannerCellContextMenu
         position={contextMenu ? { x: contextMenu.x, y: contextMenu.y } : null}
         onClose={() => setContextMenu(null)}
-        onCreateOrder={() => beginCreateOrder(contextMenuContext)}
         onCreateInspection={() => beginCreateInspection(contextMenuContext)}
       />
 
@@ -604,6 +603,7 @@ export default function AutoservicePlannerPage() {
         onClose={() => setInspectionModalOpen(false)}
         initialPreferredDate={inspectionPrefillDate}
         workZoneId={inspectionPrefillZoneId}
+        zones={zones}
         onCreated={() => {
           setInspectionModalOpen(false);
           load();
@@ -613,6 +613,7 @@ export default function AutoservicePlannerPage() {
       <InspectionBookingAddModal
         open={Boolean(viewInspection)}
         onClose={() => setViewInspection(null)}
+        zones={zones}
         initialBooking={
           viewInspection
             ? {
@@ -622,6 +623,7 @@ export default function AutoservicePlannerPage() {
                 preferred_date: toDateInputValue(viewInspection.scheduled_at),
                 notes: viewInspection.notes,
                 vehicle: viewInspection.vehicle,
+                work_zone_id: viewInspection.work_zone_id,
               }
             : null
         }

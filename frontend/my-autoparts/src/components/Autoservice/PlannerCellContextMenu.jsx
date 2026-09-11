@@ -19,7 +19,6 @@ function MenuButton({ children, onClick }) {
 export default function PlannerCellContextMenu({
   position,
   onClose,
-  onCreateOrder,
   onCreateInspection,
 }) {
   const menuRef = useRef(null);
@@ -51,7 +50,7 @@ export default function PlannerCellContextMenu({
   if (!position) return null;
 
   const menuWidth = 220;
-  const menuHeight = 96;
+  const menuHeight = 48;
   const padding = 8;
   const left = Math.min(position.x, window.innerWidth - menuWidth - padding);
   const top = Math.min(position.y, window.innerHeight - menuHeight - padding);
@@ -63,14 +62,6 @@ export default function PlannerCellContextMenu({
       style={{ left, top }}
       role="menu"
     >
-      <MenuButton
-        onClick={() => {
-          onCreateOrder?.();
-          onClose?.();
-        }}
-      >
-        Заказ-наряд
-      </MenuButton>
       <MenuButton
         onClick={() => {
           onCreateInspection?.();

@@ -8,7 +8,14 @@ import {
 } from '../../utils/contactValidation';
 
 const inputClass = 'sg-pill-input mt-1';
+const selectClass = 'sg-pill-select mt-1';
 const textareaClass = 'sg-pill-textarea mt-1';
+
+function zoneNameById(zones, zoneId) {
+  if (zoneId == null) return null;
+  const id = Number(zoneId);
+  return zones.find((z) => Number(z.id) === id)?.name || null;
+}
 
 export default function InspectionBookingAddModal({
   open,
@@ -17,6 +24,7 @@ export default function InspectionBookingAddModal({
   onSaved,
   initialPreferredDate = null,
   workZoneId = null,
+  zones = [],
   title = 'Запись на осмотр',
   initialBooking = null,
 }) {
@@ -24,6 +32,7 @@ export default function InspectionBookingAddModal({
   const [phone, setPhone] = useState('');
   const [preferredDate, setPreferredDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+  const [selectedWorkZoneId, setSelectedWorkZoneId] = useState(null);
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -33,6 +42,7 @@ export default function InspectionBookingAddModal({
   const initialPhone = (isEdit ? initialBooking.phone : '') || '';
   const initialPreferred = (isEdit ? initialBooking.preferred_date : initialPreferredDate) || new Date().toISOString().slice(0, 10);
   const initialNotes = (isEdit ? initialBooking.notes : '') || '';
+  const initialWorkZoneId = (isEdit ? initialBooking.work_zone_id : workZoneId) ?? null;
 
   useEffect(() => {
     if (!open) return;
@@ -40,11 +50,12 @@ export default function InspectionBookingAddModal({
     setPhone(initialPhone);
     setPreferredDate(initialPreferred);
     setNotes(initialNotes);
+    setSelectedWorkZoneId(initialWorkZoneId);
     setPhoneError('');
     setError(null);
     setSaving(false);
     setIsEditing(!isEdit);
-  }, [open, initialName, initialPhone, initialPreferred, initialNotes, isEdit]);
+  }, [open, initialName, initialPhone, initialPreferred, initialNotes, initialWorkZoneId, isEdit]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -72,8 +83,8 @@ export default function InspectionBookingAddModal({
         preferred_date: preferredDate,
         notes: notes.trim() || null,
       };
-      if (!isEdit && workZoneId != null) {
-        body.work_zone_id = Number(workZoneId);
+      if (selectedWorkZoneId != null) {
+        body.work_zone_id = Number(selectedWorkZoneId);
       }
       const row = await apiRequest(
         isEdit ? `/autoservice/inspection-bookings/${initialBooking.id}` : '/autoservice/inspection-bookings',
@@ -109,7 +120,8 @@ export default function InspectionBookingAddModal({
     <div className="flex justify-end gap-2">
       <button
         type="button"
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           if (isEdit) {
             setName(initialName);
             setPhone(initialPhone);
@@ -140,14 +152,20 @@ export default function InspectionBookingAddModal({
     <div className="flex justify-end gap-2">
       <button
         type="button"
-        onClick={onClose}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose?.();
+        }}
         className="rounded-sg-sm min-h-11 border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
       >
         Закрыть
       </button>
       <button
         type="button"
-        onClick={() => setIsEditing(true)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsEditing(true);
+        }}
         className="rounded-sg-sm min-h-11 bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
       >
         Редактировать
@@ -202,6 +220,22 @@ export default function InspectionBookingAddModal({
               required
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-soft">Рабочая зона</label>
+            <select
+              className={selectClass}
+              value={selectedWorkZoneId ?? ''}
+              onChange={(e) => setSelectedWorkZoneId(e.target.value ? Number(e.target.value) : null)}
+              disabled={saving || zones.length === 0}
+            >
+              <option value="">Не указано</option>
+              {zones.map((zone) => (
+                <option key={zone.id} value={String(zone.id)}>
+                  {zone.name}
+                </option>
+              ))}
+            </select>
+          </div>
           {isEdit && initialBooking?.vehicle && initialBooking.vehicle !== '—' ? (
             <div>
               <label className="block text-sm font-medium text-ink-soft">Автомобиль</label>
@@ -234,6 +268,10 @@ export default function InspectionBookingAddModal({
           <div>
             <label className="block text-sm font-medium text-ink-soft">Дата</label>
             <p className="mt-0.5 text-sm text-ink">{formatDateView(preferredDate)}</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-soft">Рабочая зона</label>
+            <p className="mt-0.5 text-sm text-ink">{zoneNameById(zones, selectedWorkZoneId) || '—'}</p>
           </div>
           {initialBooking?.vehicle && initialBooking.vehicle !== '—' ? (
             <div>
