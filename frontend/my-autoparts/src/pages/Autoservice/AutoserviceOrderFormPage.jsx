@@ -423,13 +423,14 @@ function SectionCard({ title, children, action, compact = false }) {
   );
 }
 
-function SearchableSelect({
+export function SearchableSelect({
   value,
   onChange,
   options,
   placeholder = 'Выберите…',
   disabled = false,
   loading = false,
+  searching = false,
   emptyMessage = 'Ничего не найдено',
   noResultsMessage = 'Ничего не найдено',
   addOptionLabel = 'Добавить',
@@ -495,9 +496,17 @@ function SearchableSelect({
         autoComplete="off"
       />
       {open && !disabled && !loading ? (
-        <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-sg-lg border border-line bg-surface py-1 shadow-sg-md">
+        <ul
+          aria-busy={searching}
+          className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-sg-lg border border-line bg-surface py-1 shadow-sg-md"
+        >
+          {searching ? (
+            <li className="px-4 py-2 text-xs text-ink-muted">Поиск клиентов…</li>
+          ) : null}
           {filtered.length === 0 ? (
-            <li className="px-4 py-2.5 text-sm text-ink-muted">{listEmptyMessage}</li>
+            <li className="px-4 py-2.5 text-sm text-ink-muted">
+              {searching ? 'Введите ещё символы или дождитесь результатов' : listEmptyMessage}
+            </li>
           ) : (
             filtered.map((o) => (
               <li key={String(o.value) || '__empty__'}>
@@ -1128,6 +1137,7 @@ export default function AutoserviceOrderFormPage() {
   const createInitRef = useRef(false);
   const autoSaveTimerRef = useRef(null);
   const autoSaveResumeTimerRef = useRef(null);
+  const clientSearchRequestRef = useRef(0);
   const skipAutoSaveRef = useRef(true);
   const lastSavedSnapshotRef = useRef('');
   const justAutoCreatedOrderIdRef = useRef(null);
@@ -1219,15 +1229,24 @@ export default function AutoserviceOrderFormPage() {
   }, []);
 
   const handleClientSearchQuery = useCallback(async (query) => {
+    const requestId = clientSearchRequestRef.current + 1;
+    clientSearchRequestRef.current = requestId;
+    const q = String(query || '').trim();
+    const suffix = q ? `?q=${encodeURIComponent(q)}` : '';
     setClientSearchLoading(true);
     try {
-      await loadClients(query);
+      const data = await apiRequest(`/autoservice/clients${suffix}`);
+      if (requestId === clientSearchRequestRef.current) {
+        setClients(Array.isArray(data) ? data : []);
+      }
     } catch {
       /* metaError handled elsewhere when needed */
     } finally {
-      setClientSearchLoading(false);
+      if (requestId === clientSearchRequestRef.current) {
+        setClientSearchLoading(false);
+      }
     }
-  }, [loadClients]);
+  }, []);
 
   const loadServiceEmployees = useCallback(async () => {
     const data = await apiRequest('/autoservice/repair-orders/service-employees-options');
@@ -2360,7 +2379,8 @@ export default function AutoserviceOrderFormPage() {
                 onChange={handleClientSelect}
                 options={clientOptions}
                 placeholder="Поиск по имени, телефону или авто"
-                loading={metaLoading || clientSearchLoading}
+                loading={metaLoading}
+                searching={clientSearchLoading}
                 remoteSearch
                 onQueryChange={handleClientSearchQuery}
               />
