@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 venv/
 .venv/
+agent/.venv-build/
 alert-bot/.env
 .env
 .env.*

@@ -67,12 +67,29 @@ export default function PrinterTokenSection() {
             download="AutoParts_PrinterAgent_Setup.exe"
             className={warehousePillButtonClass}
           >
-            Установщик
+            Скачать новый агент
           </a>
-          <a href={xprinterDriverHref} download className={warehousePillButtonClass}>
-            Драйвер Xprinter
+          <a
+            href={xprinterDriverHref}
+            download="Xprinter_2021.3.exe"
+            className={warehousePillButtonClass}
+          >
+            Скачать драйвер Xprinter
           </a>
         </div>
+      </div>
+
+      <div className="space-y-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-950 ring-1 ring-blue-200/80">
+        <p className="font-semibold">Настройка Xprinter XP-365B для этикетки 58×40 мм</p>
+        <ol className="list-decimal space-y-1 pl-5">
+          <li>Установите драйвер Xprinter и выберите размер бумаги 58×40 мм.</li>
+          <li>Установите масштаб 100%, горизонтальное и вертикальное смещение 0.</li>
+          <li>Выберите тип материала «Этикетка с зазором» и выполните калибровку.</li>
+          <li>Установите новый агент поверх текущего и перезапустите его.</li>
+        </ol>
+        <p className="text-xs text-blue-800">
+          Новый агент не увеличивает этикетку и не прибавляет аппаратные отступы драйвера повторно.
+        </p>
       </div>
 
       {isDirector && tokenError ? (

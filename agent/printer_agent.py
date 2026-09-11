@@ -562,6 +562,8 @@ class PrinterAgent:
                     raise RuntimeError("Empty PDF")
 
                 page = doc.load_page(0)
+                pdf_width_pt = float(page.rect.width)
+                pdf_height_pt = float(page.rect.height)
                 # 203 DPI is common for label printers
                 pix = page.get_pixmap(dpi=203, alpha=False)
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -600,21 +602,18 @@ class PrinterAgent:
                     # Calculate aspect ratios
                     page_aspect = page_w / page_h
                     img_aspect = img_width / img_height
+                    dpi_x = max(1, dc.GetDeviceCaps(win32con.LOGPIXELSX))
+                    dpi_y = max(1, dc.GetDeviceCaps(win32con.LOGPIXELSY))
+                    target_w = max(1, round(pdf_width_pt * dpi_x / 72.0))
+                    target_h = max(1, round(pdf_height_pt * dpi_y / 72.0))
+                    scale = min(1.0, page_w / target_w, page_h / target_h)
                     
                     # Fit image while preserving aspect ratio - SCALE TO FIT PRINTABLE AREA
                     # Ensure the entire label fits within the printable area with margins
-                    if img_aspect > page_aspect:
-                        # Image is wider - fit to width
-                        draw_w = page_w
-                        draw_h = int(page_w / img_aspect)
-                        x_offset = phys_offset_x
-                        y_offset = phys_offset_y + (page_h - draw_h) // 2
-                    else:
-                        # Image is taller - fit to height
-                        draw_h = page_h
-                        draw_w = int(page_h * img_aspect)
-                        x_offset = phys_offset_x + (page_w - draw_w) // 2
-                        y_offset = phys_offset_y
+                    draw_w = max(1, round(target_w * scale))
+                    draw_h = max(1, round(target_h * scale))
+                    x_offset = max(0, (page_w - draw_w) // 2)
+                    y_offset = 0
 
                     dc.StartDoc("AutoParts Label (PDF)")
                     dc.StartPage()
