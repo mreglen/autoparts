@@ -26,6 +26,7 @@ from app.services.laximo.vehicle_lookup import lookup_by_frame, lookup_by_plate,
 from app.services.laximo.vin import normalize_garage_vin_or_raise
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_CLIENTS,
+    AUTOSERVICE_PERMISSION_INSPECTIONS,
     AUTOSERVICE_PERMISSION_ORDERS,
     AUTOSERVICE_PERMISSION_ORDERS_OWN,
     related_autoservice_client_ids,
@@ -186,6 +187,7 @@ def list_garage_vehicles(
             AUTOSERVICE_PERMISSION_CLIENTS,
             AUTOSERVICE_PERMISSION_ORDERS,
             AUTOSERVICE_PERMISSION_ORDERS_OWN,
+            AUTOSERVICE_PERMISSION_INSPECTIONS,
         )
         client = (
             db.query(AutoserviceClient)

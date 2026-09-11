@@ -68,6 +68,7 @@ def _planner_inspection(row: InspectionBooking) -> PlannerRepairOrder:
         kind="inspection",
         order_number="Осмотр",
         client_id=row.client_id,
+        garage_vehicle_id=row.garage_vehicle_id,
         client_name=row.name or "—",
         client_phone=row.phone or "",
         vehicle=_vehicle_label(row.vehicle),

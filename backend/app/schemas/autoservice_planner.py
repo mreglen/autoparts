@@ -11,6 +11,7 @@ class PlannerRepairOrder(BaseModel):
     kind: PlannerItemKind = "order"
     order_number: str
     client_id: Optional[int] = None
+    garage_vehicle_id: Optional[int] = None
     client_name: str
     client_phone: str
     vehicle: str

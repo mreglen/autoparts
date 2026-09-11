@@ -1076,6 +1076,11 @@ export default function AutoserviceOrderFormPage() {
 
   const [clientId, setClientId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
+  const [pendingClientName, setPendingClientName] = useState('');
+  const [pendingClientPhone, setPendingClientPhone] = useState('');
+  const [pendingVehicleMake, setPendingVehicleMake] = useState('');
+  const [pendingVehicleModel, setPendingVehicleModel] = useState('');
+  const [inspectionBookingId, setInspectionBookingId] = useState(null);
   const [scheduledAt, setScheduledAt] = useState(() => toLocalInputValue(new Date().toISOString()));
   const [comment, setComment] = useState('');
   const [staffComment, setStaffComment] = useState('');
@@ -1132,6 +1137,11 @@ export default function AutoserviceOrderFormPage() {
   const applyFormState = useCallback((state) => {
     setClientId(state.clientId);
     setVehicleId(state.vehicleId);
+    setPendingClientName(state.pendingClientName || '');
+    setPendingClientPhone(state.pendingClientPhone || '');
+    setPendingVehicleMake(state.pendingVehicleMake || '');
+    setPendingVehicleModel(state.pendingVehicleModel || '');
+    setInspectionBookingId(state.inspectionBookingId || null);
     setScheduledAt(state.scheduledAt);
     setComment(state.comment);
     setStaffComment(state.staffComment);
@@ -1151,6 +1161,11 @@ export default function AutoserviceOrderFormPage() {
   const captureFormSnapshot = useCallback(() => ({
     clientId,
     vehicleId,
+    pendingClientName,
+    pendingClientPhone,
+    pendingVehicleMake,
+    pendingVehicleModel,
+    inspectionBookingId,
     scheduledAt,
     comment,
     staffComment,
@@ -1164,6 +1179,11 @@ export default function AutoserviceOrderFormPage() {
   }), [
     clientId,
     vehicleId,
+    pendingClientName,
+    pendingClientPhone,
+    pendingVehicleMake,
+    pendingVehicleModel,
+    inspectionBookingId,
     scheduledAt,
     comment,
     staffComment,
@@ -1279,6 +1299,13 @@ export default function AutoserviceOrderFormPage() {
     if (prefill.workZoneId != null) {
       initial.workZoneId = String(prefill.workZoneId);
     }
+    if (prefill.clientId != null) initial.clientId = String(prefill.clientId);
+    if (prefill.vehicleId != null) initial.vehicleId = String(prefill.vehicleId);
+    initial.pendingClientName = prefill.clientName || '';
+    initial.pendingClientPhone = prefill.clientPhone || '';
+    initial.pendingVehicleMake = prefill.vehicleMake || '';
+    initial.pendingVehicleModel = prefill.vehicleModel || '';
+    initial.inspectionBookingId = prefill.inspectionBookingId || null;
     const draft = readRepairOrderPurchaseDraft();
     if (draft?.groups?.length) {
       setPendingPurchaseGroups(draft.groups);
@@ -1293,7 +1320,7 @@ export default function AutoserviceOrderFormPage() {
       }
     }
     const formDraft = readRepairOrderFormDraft('create');
-    if (formDraft?.form && repairOrderFormSnapshotHasContent(formDraft.form)) {
+    if (!prefill.inspectionBookingId && formDraft?.form && repairOrderFormSnapshotHasContent(formDraft.form)) {
       const { shopParts: draftShopParts, ...restDraft } = formDraft.form;
       Object.assign(initial, restDraft);
       const hasImportShopParts = Boolean(draft?.groups?.length)
@@ -1365,12 +1392,14 @@ export default function AutoserviceOrderFormPage() {
           const prefill = vehiclePrefillRef.current;
           const normalizedMake = prefill.make.trim().toLocaleLowerCase('ru-RU');
           const normalizedModel = prefill.model.trim().toLocaleLowerCase('ru-RU');
+          const hasPrefill = Boolean(normalizedMake || normalizedModel);
           const match = list.find((vehicle) => (
             (!normalizedMake || vehicle.make?.trim().toLocaleLowerCase('ru-RU') === normalizedMake)
             && (!normalizedModel || vehicle.model?.trim().toLocaleLowerCase('ru-RU') === normalizedModel)
           ));
           vehiclePrefillRef.current = { make: '', model: '' };
-          return match ? String(match.id) : list[0] ? String(list[0].id) : '';
+          if (match) return String(match.id);
+          return hasPrefill ? '' : list[0] ? String(list[0].id) : '';
         });
       } catch (err) {
         if (!cancelled) {
@@ -1388,33 +1417,52 @@ export default function AutoserviceOrderFormPage() {
   }, [clientId, formInitialized]);
 
   const clientOptions = useMemo(
-    () =>
-      clients.map((c) => ({
+    () => [
+      ...(pendingClientName || pendingClientPhone ? [{
+        value: '',
+        label: [pendingClientName, pendingClientPhone].filter(Boolean).join(' · '),
+        hint: 'Новый клиент будет создан при сохранении',
+        matchedVehicleId: null,
+        searchText: `${pendingClientName} ${pendingClientPhone}`.toLowerCase(),
+      }] : []),
+      ...clients.map((c) => ({
         value: String(c.id),
         label: `${c.name} · ${c.phone}`,
         hint: c.matched_vehicle_label || null,
         matchedVehicleId: c.matched_vehicle_id || null,
         searchText: `${c.name} ${c.phone} ${c.matched_vehicle_label || ''}`.toLowerCase(),
       })),
-    [clients],
+    ],
+    [clients, pendingClientName, pendingClientPhone],
   );
 
   const handleClientSelect = useCallback((nextClientId) => {
     const option = clientOptions.find((item) => item.value === String(nextClientId));
     setClientId(String(nextClientId));
+    if (nextClientId) {
+      setPendingClientName('');
+      setPendingClientPhone('');
+    }
     if (option?.matchedVehicleId) {
       setVehicleId(String(option.matchedVehicleId));
     }
   }, [clientOptions]);
 
   const vehicleOptions = useMemo(
-    () =>
-      vehicles.map((v) => ({
+    () => [
+      ...(pendingVehicleMake || pendingVehicleModel ? [{
+        value: '',
+        label: [pendingVehicleMake, pendingVehicleModel].filter(Boolean).join(' '),
+        hint: 'Новый автомобиль будет создан при сохранении',
+        searchText: `${pendingVehicleMake} ${pendingVehicleModel}`.toLowerCase(),
+      }] : []),
+      ...vehicles.map((v) => ({
         value: String(v.id),
         label: vehicleLabel(v),
         searchText: vehicleSearchText(v),
       })),
-    [vehicles],
+    ],
+    [vehicles, pendingVehicleMake, pendingVehicleModel],
   );
 
   const selectedVehicle = useMemo(
@@ -1425,6 +1473,10 @@ export default function AutoserviceOrderFormPage() {
   const handleVehicleSelect = useCallback((nextVehicleId) => {
     const nextId = String(nextVehicleId);
     setVehicleId(nextId);
+    if (nextId) {
+      setPendingVehicleMake('');
+      setPendingVehicleModel('');
+    }
     const vehicle = vehicles.find((v) => String(v.id) === nextId);
     if (vehicle?.mileage_km != null && vehicle?.mileage_km !== '') {
       setMileageKm(String(vehicle.mileage_km));
@@ -1816,8 +1868,13 @@ export default function AutoserviceOrderFormPage() {
         : shopParts);
 
     return {
-      client_id: Number(clientId),
-      vehicle_id: Number(vehicleId),
+      client_id: clientId ? Number(clientId) : null,
+      vehicle_id: vehicleId ? Number(vehicleId) : null,
+      client_name: clientId ? null : pendingClientName.trim() || null,
+      client_phone: clientId ? null : pendingClientPhone.trim() || null,
+      vehicle_make: vehicleId ? null : pendingVehicleMake.trim() || null,
+      vehicle_model: vehicleId ? null : pendingVehicleModel.trim() || null,
+      inspection_booking_id: inspectionBookingId,
       scheduled_at: fromLocalInputValue(scheduledAt),
       scheduled_end_at: scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null,
       shipping_date: shippingDate || null,
@@ -1924,10 +1981,16 @@ export default function AutoserviceOrderFormPage() {
   };
 
   const validateCommonFields = () => {
-    if (!clientId || !vehicleId || (!ownMode && !scheduledAt)) {
+    const hasClient = Boolean(clientId || (pendingClientName.trim().length >= 2 && pendingClientPhone.trim()));
+    const hasVehicle = Boolean(vehicleId || (pendingVehicleMake.trim() && pendingVehicleModel.trim()));
+    if (!hasClient || !hasVehicle || (!ownMode && !scheduledAt)) {
       return ownMode
-        ? 'Выберите клиента и автомобиль'
-        : 'Выберите клиента, автомобиль и дату записи';
+        ? 'Выберите или заполните клиента и автомобиль'
+        : 'Выберите или заполните клиента, автомобиль и дату записи';
+    }
+    if (!clientId) {
+      const phoneError = validatePhoneOptional(pendingClientPhone);
+      if (phoneError) return phoneError;
     }
     const iso = fromLocalInputValue(scheduledAt);
     if (!ownMode && !iso) return 'Некорректная дата записи';
@@ -1948,7 +2011,11 @@ export default function AutoserviceOrderFormPage() {
   };
 
   const canAttemptAutoSave = () => (
-    Boolean(clientId && vehicleId && (ownMode || scheduledAt))
+    Boolean(
+      (clientId || (pendingClientName.trim() && pendingClientPhone.trim()))
+      && (vehicleId || (pendingVehicleMake.trim() && pendingVehicleModel.trim()))
+      && (ownMode || scheduledAt),
+    )
   );
 
   const validateForAutoSave = () => {
@@ -2317,10 +2384,10 @@ export default function AutoserviceOrderFormPage() {
                 value={vehicleId}
                 onChange={handleVehicleSelect}
                 options={vehicleOptions}
-                placeholder={clientId ? 'Поиск по марке, модели, VIN…' : 'Сначала выберите клиента'}
-                disabled={!clientId}
+                placeholder={clientId || pendingClientName ? 'Поиск по марке, модели, VIN…' : 'Сначала выберите клиента'}
+                disabled={!clientId && !pendingClientName}
                 loading={vehiclesLoading}
-                emptyMessage={vehiclesError || (clientId ? 'Нет автомобилей' : 'Сначала выберите клиента')}
+                emptyMessage={vehiclesError || (clientId || pendingClientName ? 'Нет автомобилей' : 'Сначала выберите клиента')}
                 noResultsMessage="Нет совпадений"
               />
               {vehiclesError ? (

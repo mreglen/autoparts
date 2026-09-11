@@ -40,6 +40,7 @@ class InspectionBookingClientCreate(BaseModel):
 
 
 class InspectionBookingStaffCreate(BaseModel):
+    client_id: Optional[int] = Field(None, ge=1)
     name: str = Field(min_length=2, max_length=120)
     phone: str = Field(min_length=5, max_length=40)
     preferred_date: date
@@ -60,6 +61,8 @@ class InspectionBookingPatch(BaseModel):
     preferred_time: Optional[time] = None
     vehicle_make: Optional[str] = Field(None, max_length=80)
     vehicle_model: Optional[str] = Field(None, max_length=120)
+    client_id: Optional[int] = Field(None, ge=1)
+    garage_vehicle_id: Optional[int] = Field(None, ge=1)
     work_zone_id: Optional[int] = Field(None, ge=1)
 
 

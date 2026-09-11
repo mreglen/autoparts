@@ -205,8 +205,13 @@ class RepairOrderClientShopPartView(BaseModel):
 
 
 class RepairOrderCreate(BaseModel):
-    client_id: int
-    vehicle_id: int
+    client_id: Optional[int] = Field(None, ge=1)
+    vehicle_id: Optional[int] = Field(None, ge=1)
+    client_name: Optional[str] = Field(None, min_length=2, max_length=120)
+    client_phone: Optional[str] = Field(None, min_length=5, max_length=40)
+    vehicle_make: Optional[str] = Field(None, min_length=1, max_length=80)
+    vehicle_model: Optional[str] = Field(None, min_length=1, max_length=80)
+    inspection_booking_id: Optional[int] = Field(None, ge=1)
     scheduled_at: Optional[datetime] = None
     scheduled_end_at: Optional[datetime] = None
     shipping_date: Optional[date] = None

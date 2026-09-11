@@ -17,6 +17,10 @@ export default function SearchablePillSelect({
   id,
   className = '',
   inputClassName = '',
+  allowCustomValue = false,
+  customValue = '',
+  onCustomValueChange,
+  maxLength,
 }) {
   const rootRef = useRef(null);
   const inputRef = useRef(null);
@@ -57,7 +61,9 @@ export default function SearchablePillSelect({
     return options.filter((option) => (option.searchText || option.label).toLowerCase().includes(q));
   }, [options, query]);
 
-  const displayValue = open ? query : selected?.label || '';
+  const displayValue = open
+    ? query
+    : selected?.inputLabel || selected?.label || (allowCustomValue ? customValue : '');
 
   const activeOptionId = open && filtered.length > 0
     ? `${listboxId}-opt-${String(filtered[0].value).replace(/[^a-zA-Z0-9_-]/g, '_')}`
@@ -70,7 +76,11 @@ export default function SearchablePillSelect({
       onAddClick?.();
       return;
     }
-    onChange(nextValue === '' ? '' : String(nextValue));
+    const normalizedValue = nextValue === '' ? '' : String(nextValue);
+    onChange(normalizedValue);
+    if (allowCustomValue && normalizedValue === '') {
+      onCustomValueChange?.(customValue);
+    }
     setOpen(false);
     setQuery('');
   };
@@ -91,16 +101,22 @@ export default function SearchablePillSelect({
         aria-activedescendant={activeOptionId}
         aria-autocomplete="list"
         disabled={disabled || loading}
+        maxLength={maxLength}
         placeholder={loading ? 'Загрузка…' : placeholder}
         value={displayValue}
         onChange={(event) => {
-          setQuery(event.target.value);
+          const nextQuery = event.target.value;
+          setQuery(nextQuery);
           setOpen(true);
+          if (allowCustomValue) {
+            onCustomValueChange?.(nextQuery);
+            if (selected) onChange('');
+          }
         }}
         onFocus={() => {
           setOpen(true);
-          if (!open && selected?.label) {
-            setQuery('');
+          if (!open) {
+            setQuery(allowCustomValue && !selected ? customValue : '');
           }
         }}
         onKeyDown={(event) => {
@@ -152,7 +168,10 @@ export default function SearchablePillSelect({
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => handleSelect(option.value)}
                   >
-                    <span className="min-w-0 whitespace-normal break-words">{option.label}</span>
+                    <span className="min-w-0">
+                      <span className="block whitespace-normal break-words">{option.label}</span>
+                      {option.hint ? <span className="mt-0.5 block text-xs text-ink-muted">{option.hint}</span> : null}
+                    </span>
                   </button>
                 </li>
               );

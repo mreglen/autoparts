@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import exists, or_
+from sqlalchemy import exists, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.auth import get_current_user
@@ -15,6 +15,7 @@ from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.organization_employee import OrganizationEmployee, repair_order_employee_assignees
 from app.models.autoservice_work import AutoserviceWork
 from app.models.garage_vehicle import GarageVehicle
+from app.models.inspection_booking import InspectionBooking
 from app.models.repair_order import (
     RepairOrder,
     RepairOrderClientPart,
@@ -69,6 +70,7 @@ from app.utils.autoservice_access import (
     require_orders_access,
     user_display_name,
 )
+from app.utils.phone import normalize_to_storage_format
 from app.utils.repair_order_number import allocate_repair_order_number
 from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
 from app.services.autoservice_payment_service import (
@@ -684,6 +686,106 @@ def _get_client_and_vehicle(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Автомобиль не найден у этого клиента",
         )
+    return client, vehicle
+
+
+def _resolve_create_client_and_vehicle(
+    db: Session,
+    org_id: str,
+    payload: RepairOrderCreate,
+    current_user: User,
+) -> tuple[AutoserviceClient, GarageVehicle]:
+    if payload.vehicle_id is not None:
+        vehicle = (
+            db.query(GarageVehicle)
+            .filter(
+                GarageVehicle.id == payload.vehicle_id,
+                GarageVehicle.organization_id == org_id,
+            )
+            .first()
+        )
+        if not vehicle:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Автомобиль не найден",
+            )
+        client_id = payload.client_id or vehicle.client_id
+        return _get_client_and_vehicle(db, org_id, client_id, vehicle.id)
+
+    if payload.client_id is not None:
+        client = (
+            db.query(AutoserviceClient)
+            .filter(
+                AutoserviceClient.id == payload.client_id,
+                AutoserviceClient.organization_id == org_id,
+                AutoserviceClient.status == "active",
+            )
+            .first()
+        )
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Клиент не найден",
+            )
+    else:
+        name = (payload.client_name or "").strip()
+        phone = normalize_to_storage_format(payload.client_phone)
+        if len(name) < 2 or not phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Укажите имя и телефон клиента",
+            )
+        client = (
+            db.query(AutoserviceClient)
+            .filter(
+                AutoserviceClient.organization_id == org_id,
+                AutoserviceClient.phone == phone,
+                AutoserviceClient.status == "active",
+            )
+            .first()
+        )
+        if not client:
+            client = AutoserviceClient(
+                organization_id=org_id,
+                name=name[:120],
+                phone=phone,
+                person_type="individual",
+                status="active",
+                source="staff",
+                consented_at=datetime.utcnow(),
+                created_by_user_id=current_user.id,
+            )
+            db.add(client)
+            db.flush()
+
+    make = (payload.vehicle_make or "").strip()
+    model = (payload.vehicle_model or "").strip()
+    if not make or not model:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите марку и модель автомобиля",
+        )
+    vehicle = (
+        db.query(GarageVehicle)
+        .filter(
+            GarageVehicle.client_id == client.id,
+            GarageVehicle.organization_id == org_id,
+            func.lower(GarageVehicle.make) == make.lower(),
+            func.lower(GarageVehicle.model) == model.lower(),
+        )
+        .order_by(GarageVehicle.id.desc())
+        .first()
+    )
+    if not vehicle:
+        vehicle = GarageVehicle(
+            client_id=client.id,
+            organization_id=org_id,
+            make=make[:80],
+            model=model[:80],
+            source="inspection",
+        )
+        db.add(vehicle)
+        db.flush()
     return client, vehicle
 
 
@@ -1416,7 +1518,27 @@ def create_repair_order(
     current_user: User = Depends(get_current_user),
 ):
     org_id, level = require_orders_access(db, current_user)
-    _get_client_and_vehicle(db, org_id, payload.client_id, payload.vehicle_id)
+    booking = None
+    if payload.inspection_booking_id is not None:
+        booking = (
+            db.query(InspectionBooking)
+            .filter(
+                InspectionBooking.id == payload.inspection_booking_id,
+                InspectionBooking.organization_id == org_id,
+            )
+            .first()
+        )
+        if not booking:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Запись на осмотр не найдена",
+            )
+    if (payload.client_id is None or payload.vehicle_id is None) and booking is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Выберите клиента и автомобиль",
+        )
+    client, vehicle = _resolve_create_client_and_vehicle(db, org_id, payload, current_user)
     is_own = level == "own"
     if is_own:
         scheduled_at = _normalize_dt(payload.scheduled_at) or datetime.utcnow()
@@ -1444,8 +1566,8 @@ def create_repair_order(
     row = RepairOrder(
         organization_id=org_id,
         order_number=order_number,
-        client_id=payload.client_id,
-        vehicle_id=payload.vehicle_id,
+        client_id=client.id,
+        vehicle_id=vehicle.id,
         client_comment=(payload.client_comment or "").strip() or None,
         staff_comment=(payload.staff_comment or "").strip() or None,
         work_zone_id=work_zone_id,
@@ -1471,6 +1593,9 @@ def create_repair_order(
         mileage_km=payload.mileage_km,
         user_id=current_user.id,
     )
+    if booking is not None:
+        booking.client_id = client.id
+        booking.garage_vehicle_id = vehicle.id
     db.commit()
     row = _get_org_order_or_404(db, org_id, row.id)
     return _to_staff_view(db, row)

@@ -529,6 +529,8 @@ export default function AutoserviceInspectionsPage() {
             state: {
               scheduledAtLocal: `${booking.preferred_date}T${booking.preferred_time?.slice(0, 5) || '10:00'}`,
               workZoneId: booking.work_zone_id,
+              clientId: booking.client_id,
+              vehicleId: booking.garage_vehicle_id,
               clientName: booking.name,
               clientPhone: booking.phone,
               vehicleMake: booking.vehicle_make || booking.vehicle?.make,

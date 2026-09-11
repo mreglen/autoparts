@@ -275,9 +275,24 @@ def create_staff_inspection_booking(
     phone = _normalize_phone_or_400(payload.phone)
     notes = (payload.notes or "").strip() or None
     garage_vehicle_id = payload.garage_vehicle_id
-    client_id = None
+    client_id = payload.client_id
     vehicle = None
     work_zone_id = None
+    if client_id is not None:
+        client = (
+            db.query(AutoserviceClient)
+            .filter(
+                AutoserviceClient.id == client_id,
+                AutoserviceClient.organization_id == org_id,
+                AutoserviceClient.status == "active",
+            )
+            .first()
+        )
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Клиент не найден",
+            )
     if garage_vehicle_id is not None:
         vehicle = (
             db.query(GarageVehicle)
@@ -291,6 +306,11 @@ def create_staff_inspection_booking(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Автомобиль не найден",
+            )
+        if client_id is not None and vehicle.client_id != client_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Автомобиль не принадлежит выбранному клиенту",
             )
         client_id = vehicle.client_id
     if payload.work_zone_id is not None:
@@ -389,6 +409,46 @@ def patch_inspection_booking(
         row.vehicle_make = (data["vehicle_make"] or "").strip() or None
     if "vehicle_model" in data:
         row.vehicle_model = (data["vehicle_model"] or "").strip() or None
+    if "client_id" in data or "garage_vehicle_id" in data:
+        client_id = data.get("client_id", row.client_id)
+        garage_vehicle_id = data.get("garage_vehicle_id", row.garage_vehicle_id)
+        if client_id is not None:
+            client = (
+                db.query(AutoserviceClient)
+                .filter(
+                    AutoserviceClient.id == client_id,
+                    AutoserviceClient.organization_id == org_id,
+                    AutoserviceClient.status == "active",
+                )
+                .first()
+            )
+            if not client:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Клиент не найден",
+                )
+        if garage_vehicle_id is not None:
+            vehicle = (
+                db.query(GarageVehicle)
+                .filter(
+                    GarageVehicle.id == garage_vehicle_id,
+                    GarageVehicle.organization_id == org_id,
+                )
+                .first()
+            )
+            if not vehicle:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Автомобиль не найден",
+                )
+            if client_id is not None and vehicle.client_id != client_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Автомобиль не принадлежит выбранному клиенту",
+                )
+            client_id = vehicle.client_id
+        row.client_id = client_id
+        row.garage_vehicle_id = garage_vehicle_id
     if "work_zone_id" in data:
         work_zone_id = data["work_zone_id"]
         if work_zone_id is not None:

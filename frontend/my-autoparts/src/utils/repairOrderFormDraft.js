@@ -10,6 +10,12 @@ export function repairOrderFormCacheKey(mode, orderId = null) {
 export function repairOrderFormSnapshotHasContent(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return false;
   if (snapshot.clientId || snapshot.vehicleId) return true;
+  if (
+    String(snapshot.pendingClientName || '').trim()
+    || String(snapshot.pendingClientPhone || '').trim()
+    || String(snapshot.pendingVehicleMake || '').trim()
+    || String(snapshot.pendingVehicleModel || '').trim()
+  ) return true;
   if (String(snapshot.comment || '').trim() || String(snapshot.staffComment || '').trim()) return true;
   if ((snapshot.works || []).length > 0) return true;
   if ((snapshot.clientParts || []).length > 0) return true;

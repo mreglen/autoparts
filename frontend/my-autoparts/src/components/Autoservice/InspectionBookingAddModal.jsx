@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../UI/Modal';
 import PhoneInput from '../UI/PhoneInput';
 import SearchablePillSelect from '../SearchablePillSelect/SearchablePillSelect';
@@ -33,14 +33,19 @@ export default function InspectionBookingAddModal({
   const [phone, setPhone] = useState('');
   const [preferredDate, setPreferredDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [preferredTime, setPreferredTime] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState(null);
+  const [clients, setClients] = useState([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState(null);
+  const [vehicles, setVehicles] = useState([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(false);
+  const [vehicleMode, setVehicleMode] = useState('manual');
   const [vehicleMake, setVehicleMake] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [manufacturers, setManufacturers] = useState([]);
   const [models, setModels] = useState([]);
   const [notes, setNotes] = useState('');
   const [selectedWorkZoneId, setSelectedWorkZoneId] = useState(null);
-  const makeListId = useId();
-  const modelListId = useId();
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -51,6 +56,8 @@ export default function InspectionBookingAddModal({
   const initialPhone = (isEdit ? initialBooking.phone : '') || '';
   const initialPreferred = (isEdit ? initialBooking.preferred_date : initialPreferredDate) || new Date().toISOString().slice(0, 10);
   const initialPreferredTime = (isEdit ? initialBooking.preferred_time : '')?.slice(0, 5) || '';
+  const initialClientId = (isEdit ? initialBooking.client_id : null) ?? null;
+  const initialVehicleId = (isEdit ? initialBooking.garage_vehicle_id : null) ?? null;
   const initialVehicleMake = (isEdit ? initialBooking.vehicle_make || initialBooking.vehicle?.make : '') || '';
   const initialVehicleModel = (isEdit ? initialBooking.vehicle_model || initialBooking.vehicle?.model : '') || '';
   const initialNotes = (isEdit ? initialBooking.notes : '') || '';
@@ -62,6 +69,9 @@ export default function InspectionBookingAddModal({
     setPhone(initialPhone);
     setPreferredDate(initialPreferred);
     setPreferredTime(initialPreferredTime);
+    setSelectedClientId(initialClientId);
+    setSelectedVehicleId(initialVehicleId);
+    setVehicleMode(initialClientId ? 'list' : 'manual');
     setVehicleMake(initialVehicleMake);
     setVehicleModel(initialVehicleModel);
     setNotes(initialNotes);
@@ -70,10 +80,66 @@ export default function InspectionBookingAddModal({
     setError(null);
     setSaving(false);
     setIsEditing(!isEdit);
-  }, [open, initialName, initialPhone, initialPreferred, initialPreferredTime, initialVehicleMake, initialVehicleModel, initialNotes, initialWorkZoneId, isEdit]);
+  }, [open, initialName, initialPhone, initialPreferred, initialPreferredTime, initialClientId, initialVehicleId, initialVehicleMake, initialVehicleModel, initialNotes, initialWorkZoneId, isEdit]);
 
   useEffect(() => {
-    if (!open || manufacturers.length > 0) return;
+    if (!open) return undefined;
+    let cancelled = false;
+    setClientsLoading(true);
+    apiRequest('/autoservice/clients')
+      .then((rows) => {
+        if (!cancelled) setClients(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setClients([]);
+      })
+      .finally(() => {
+        if (!cancelled) setClientsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !selectedClientId) {
+      setVehicles([]);
+      setVehiclesLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setVehiclesLoading(true);
+    apiRequest(`/autoservice/garage/vehicles?client_id=${encodeURIComponent(selectedClientId)}`)
+      .then((rows) => {
+        if (cancelled) return;
+        const nextVehicles = Array.isArray(rows) ? rows : [];
+        setVehicles(nextVehicles);
+        setVehicleMode(nextVehicles.length === 0 ? 'manual' : 'list');
+        setSelectedVehicleId((current) => {
+          if (current && nextVehicles.some((vehicle) => String(vehicle.id) === String(current))) return current;
+          return nextVehicles.length === 1 ? nextVehicles[0].id : null;
+        });
+        if (nextVehicles.length === 1) {
+          setVehicleMake(nextVehicles[0].make || '');
+          setVehicleModel(nextVehicles[0].model || '');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVehicles([]);
+          setVehicleMode('manual');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setVehiclesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedClientId]);
+
+  useEffect(() => {
+    if (!open || manufacturers.length > 0) return undefined;
     let cancelled = false;
     apiRequest('/vehicle-catalog/manufacturers?limit=200')
       .then((rows) => {
@@ -88,7 +154,7 @@ export default function InspectionBookingAddModal({
   }, [open, manufacturers.length]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     const normalizedMake = vehicleMake.trim().toLocaleLowerCase('ru-RU');
     const manufacturer = manufacturers.find((item) => (
       item.description?.trim().toLocaleLowerCase('ru-RU') === normalizedMake
@@ -96,7 +162,7 @@ export default function InspectionBookingAddModal({
     ));
     if (!manufacturer) {
       setModels([]);
-      return;
+      return undefined;
     }
     let cancelled = false;
     apiRequest(`/vehicle-catalog/manufacturers/${manufacturer.id}/models`)
@@ -110,6 +176,52 @@ export default function InspectionBookingAddModal({
       cancelled = true;
     };
   }, [open, vehicleMake, manufacturers]);
+
+  const clientOptions = useMemo(() => clients.map((client) => ({
+    value: client.id,
+    label: client.name,
+    inputLabel: client.name,
+    hint: client.phone || null,
+    searchText: `${client.name || ''} ${client.phone || ''}`,
+  })), [clients]);
+
+  const vehicleOptions = useMemo(() => vehicles.map((vehicle) => ({
+    value: vehicle.id,
+    label: [vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ') || 'Автомобиль',
+    hint: [vehicle.plate, vehicle.vin].filter(Boolean).join(' · ') || null,
+    searchText: [vehicle.make, vehicle.model, vehicle.year, vehicle.plate, vehicle.vin].filter(Boolean).join(' '),
+  })), [vehicles]);
+
+  const handleClientSelect = (clientId) => {
+    const client = clients.find((item) => String(item.id) === String(clientId));
+    setSelectedClientId(client?.id ?? null);
+    setSelectedVehicleId(null);
+    setVehicleMake('');
+    setVehicleModel('');
+    if (client) {
+      setName(client.name || '');
+      setPhone(formatPhoneFromRaw(client.phone));
+    }
+  };
+
+  const handleVehicleSelect = (vehicleId) => {
+    const vehicle = vehicles.find((item) => String(item.id) === String(vehicleId));
+    setSelectedVehicleId(vehicle?.id ?? null);
+    if (vehicle) {
+      setVehicleMake(vehicle.make || '');
+      setVehicleModel(vehicle.model || '');
+    }
+  };
+
+  const handleManualClientName = (value) => {
+    setName(value);
+    if (selectedClientId) {
+      setSelectedClientId(null);
+      setSelectedVehicleId(null);
+      setVehicles([]);
+      setVehicleMode('manual');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -135,6 +247,8 @@ export default function InspectionBookingAddModal({
       const body = {
         name: trimmedName,
         phone,
+        client_id: selectedClientId,
+        garage_vehicle_id: vehicleMode === 'list' ? selectedVehicleId : null,
         preferred_date: preferredDate,
         preferred_time: preferredTime || null,
         vehicle_make: vehicleMake.trim() || null,
@@ -190,6 +304,9 @@ export default function InspectionBookingAddModal({
             setPhone(initialPhone);
             setPreferredDate(initialPreferred);
             setPreferredTime(initialPreferredTime);
+            setSelectedClientId(initialClientId);
+            setSelectedVehicleId(initialVehicleId);
+            setVehicleMode(initialClientId ? 'list' : 'manual');
             setVehicleMake(initialVehicleMake);
             setVehicleModel(initialVehicleModel);
             setNotes(initialNotes);
@@ -226,6 +343,8 @@ export default function InspectionBookingAddModal({
               ...initialBooking,
               name,
               phone,
+              client_id: selectedClientId,
+              garage_vehicle_id: vehicleMode === 'list' ? selectedVehicleId : null,
               preferred_date: preferredDate,
               preferred_time: preferredTime || null,
               vehicle_make: vehicleMake || null,
@@ -275,13 +394,21 @@ export default function InspectionBookingAddModal({
       {isEditing ? (
         <form id="add-inspection-booking" onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-ink-soft">{isEdit ? 'Клиент' : 'Имя'}</label>
-            <input
-              className={inputClass}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+            <label className="block text-sm font-medium text-ink-soft">Клиент</label>
+            <SearchablePillSelect
+              className="mt-1"
+              inputClassName="sg-pill-input"
+              value={selectedClientId ?? ''}
+              onChange={handleClientSelect}
+              options={clientOptions}
+              placeholder="Выберите или введите клиента"
+              emptyOptionLabel="Ввести вручную"
               disabled={saving}
-              required
+              loading={clientsLoading}
+              ariaLabel="Клиент"
+              allowCustomValue
+              customValue={name}
+              onCustomValueChange={handleManualClientName}
               maxLength={120}
             />
           </div>
@@ -293,6 +420,12 @@ export default function InspectionBookingAddModal({
               onChange={(e) => {
                 setPhone(e.target.value);
                 setPhoneError('');
+                if (selectedClientId) {
+                  setSelectedClientId(null);
+                  setSelectedVehicleId(null);
+                  setVehicles([]);
+                  setVehicleMode('manual');
+                }
               }}
               placeholder="+7 (___) ___-__-__"
               disabled={saving}
@@ -300,45 +433,106 @@ export default function InspectionBookingAddModal({
             />
             {phoneError ? <p className="mt-1 text-sm text-danger-600">{phoneError}</p> : null}
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-ink-soft">Марка</label>
-              <input
-                type="text"
-                list={makeListId}
-                className={inputClass}
-                value={vehicleMake}
-                onChange={(e) => setVehicleMake(e.target.value)}
-                placeholder="Выберите или введите"
-                disabled={saving}
-                maxLength={80}
-                autoComplete="off"
-              />
-              <datalist id={makeListId}>
-                {manufacturers.map((item) => (
-                  <option key={item.id} value={item.description || item.matchcode || ''} />
-                ))}
-              </datalist>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <label className="block text-sm font-medium text-ink-soft">Автомобиль</label>
+              <button
+                type="button"
+                onClick={() => {
+                  if (vehicleMode === 'list') {
+                    setVehicleMode('manual');
+                    setSelectedVehicleId(null);
+                  } else if (selectedClientId && vehicles.length > 0) {
+                    setVehicleMode('list');
+                  }
+                }}
+                disabled={saving || (vehicleMode === 'manual' && (!selectedClientId || vehicles.length === 0))}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sg-sm text-brand-600 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:text-ink-faint"
+                aria-label={vehicleMode === 'list' ? 'Добавить автомобиль вручную' : 'Выбрать автомобиль из списка'}
+                title={vehicleMode === 'list' ? 'Добавить автомобиль вручную' : 'Выбрать автомобиль из списка'}
+              >
+                {vehicleMode === 'list' ? (
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m-7-7h14" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                )}
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-soft">Модель</label>
-              <input
-                type="text"
-                list={modelListId}
-                className={inputClass}
-                value={vehicleModel}
-                onChange={(e) => setVehicleModel(e.target.value)}
-                placeholder="Выберите или введите"
+            {vehicleMode === 'list' ? (
+              <SearchablePillSelect
+                className="mt-1"
+                inputClassName="sg-pill-input"
+                value={selectedVehicleId ?? ''}
+                onChange={handleVehicleSelect}
+                options={vehicleOptions}
+                placeholder="Поиск по марке, модели, VIN или номеру"
+                emptyOptionLabel="Не выбрано"
                 disabled={saving}
-                maxLength={120}
-                autoComplete="off"
+                loading={vehiclesLoading}
+                ariaLabel="Автомобиль клиента"
               />
-              <datalist id={modelListId}>
-                {models.map((item) => (
-                  <option key={item.id} value={item.description || ''} />
-                ))}
-              </datalist>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-ink-soft">Марка</label>
+                  <SearchablePillSelect
+                    className="mt-1"
+                    inputClassName="sg-pill-input"
+                    value=""
+                    onChange={(value) => {
+                      setVehicleMake(value);
+                      setVehicleModel('');
+                    }}
+                    options={manufacturers
+                      .filter((item) => item.description || item.matchcode)
+                      .map((item) => ({
+                        value: item.description || item.matchcode,
+                        label: item.description || item.matchcode,
+                        hint: item.matchcode && item.matchcode !== item.description ? item.matchcode : null,
+                      }))}
+                    placeholder="Выберите или введите"
+                    emptyOptionLabel="Оставить введённое"
+                    disabled={saving}
+                    ariaLabel="Марка автомобиля"
+                    allowCustomValue
+                    customValue={vehicleMake}
+                    onCustomValueChange={(value) => {
+                      setVehicleMake(value);
+                      setVehicleModel('');
+                    }}
+                    maxLength={80}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-ink-soft">Модель</label>
+                  <SearchablePillSelect
+                    className="mt-1"
+                    inputClassName="sg-pill-input"
+                    value=""
+                    onChange={setVehicleModel}
+                    options={models
+                      .filter((item) => item.description)
+                      .map((item) => ({
+                        value: item.description,
+                        label: item.description,
+                        hint: [item.from_year, item.to_year].filter(Boolean).join('–') || null,
+                      }))}
+                    placeholder="Выберите или введите"
+                    emptyOptionLabel="Оставить введённое"
+                    disabled={saving}
+                    ariaLabel="Модель автомобиля"
+                    allowCustomValue
+                    customValue={vehicleModel}
+                    onCustomValueChange={setVehicleModel}
+                    maxLength={80}
+                  />
+                </div>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>

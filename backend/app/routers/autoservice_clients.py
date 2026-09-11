@@ -27,6 +27,7 @@ from app.schemas.autoservice_client import (
 )
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_CLIENTS,
+    AUTOSERVICE_PERMISSION_INSPECTIONS,
     AUTOSERVICE_PERMISSION_ORDERS,
     AUTOSERVICE_PERMISSION_ORDERS_OWN,
     display_client_phone,
@@ -455,6 +456,7 @@ def list_autoservice_clients(
         AUTOSERVICE_PERMISSION_CLIENTS,
         AUTOSERVICE_PERMISSION_ORDERS,
         AUTOSERVICE_PERMISSION_ORDERS_OWN,
+        AUTOSERVICE_PERMISSION_INSPECTIONS,
     )
     query = db.query(AutoserviceClient).filter(AutoserviceClient.organization_id == org_id)
     query = _apply_client_search_filter(query, org_id, q)

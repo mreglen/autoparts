@@ -41,7 +41,7 @@ function plannerItemStyle(item) {
 }
 
 function plannerItemTimeLabel(item) {
-  if (item?.kind === 'inspection') return item.preferred_time?.slice(0, 5) || 'Осмотр';
+  if (item?.kind === 'inspection') return item.preferred_time?.slice(0, 5) || '—';
   return formatOrderClockRange(item);
 }
 
@@ -274,26 +274,29 @@ function MobileDayPlanner({
                           }`}>
                             {plannerItemTimeLabel(order)}
                           </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-sm font-medium text-ink">
-                                {order.vehicle && order.vehicle !== '—'
-                                  ? order.vehicle
-                                  : (order.kind === 'inspection' ? 'Осмотр' : 'Авто')}
+                          {order.kind === 'inspection' ? (
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-ink">
+                                {formatPersonNameWithInitials(order.client_name)}
                               </span>
-                              {order.kind === 'inspection' ? (
-                                <span className="inline-flex items-center rounded-full bg-success-50 px-2 py-0.5 text-[11px] font-medium text-success-700 ring-1 ring-inset ring-success-100">
-                                  Осмотр
+                              <span className="mt-0.5 block truncate text-sm text-ink-muted">
+                                {order.client_phone || '—'}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="min-w-0 flex-1">
+                              <span className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-sm font-medium text-ink">
+                                  {order.vehicle && order.vehicle !== '—' ? order.vehicle : 'Авто'}
                                 </span>
-                              ) : (
                                 <OrderStatusBadge status={order.status} />
-                              )}
+                              </span>
+                              <span className="mt-0.5 block truncate text-sm text-ink-muted">
+                                {formatPersonNameWithInitials(order.client_name)}
+                                {order.client_phone ? ` · ${order.client_phone}` : ''}
+                              </span>
                             </span>
-                            <span className="mt-0.5 block truncate text-sm text-ink-muted">
-                              {formatPersonNameWithInitials(order.client_name)}
-                              {order.client_phone ? ` · ${order.client_phone}` : ''}
-                            </span>
-                          </span>
+                          )}
                         </button>
                       </li>
                     ))}
@@ -616,8 +619,10 @@ export default function AutoservicePlannerPage() {
           setViewInspection(null);
           navigate('/autoservice/orders/new', {
             state: {
-              scheduledAtLocal: `${booking.preferred_date}T${booking.preferred_time || '10:00'}`,
+              scheduledAtLocal: `${booking.preferred_date}T${booking.preferred_time?.slice(0, 5) || '10:00'}`,
               workZoneId: booking.work_zone_id,
+              clientId: booking.client_id,
+              vehicleId: booking.garage_vehicle_id,
               clientName: booking.name,
               clientPhone: booking.phone,
               vehicleMake: booking.vehicle_make,
@@ -630,6 +635,8 @@ export default function AutoservicePlannerPage() {
           viewInspection
             ? {
                 id: viewInspection.id,
+                client_id: viewInspection.client_id,
+                garage_vehicle_id: viewInspection.garage_vehicle_id,
                 name: viewInspection.client_name,
                 phone: viewInspection.client_phone,
                 preferred_date: toDateInputValue(viewInspection.scheduled_at),
