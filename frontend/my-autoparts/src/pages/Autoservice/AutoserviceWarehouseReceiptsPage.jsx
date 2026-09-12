@@ -3,11 +3,12 @@ import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
-import { ConfirmDialog, Skeleton } from '../../components/UI';
+import { ConfirmDialog, Modal, Skeleton } from '../../components/UI';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 import AutoserviceReceiptDocumentModal from '../../components/Autoservice/AutoserviceReceiptDocumentModal';
+import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   autoserviceListErrorClass,
@@ -68,6 +69,9 @@ export default function AutoserviceWarehouseReceiptsPage() {
   const [selectedDocId, setSelectedDocId] = useState(null);
   const [deleteDoc, setDeleteDoc] = useState(null);
   const [deletingDocId, setDeletingDocId] = useState(null);
+  const [viewReceiptLine, setViewReceiptLine] = useState(null);
+  const [viewRepairOrder, setViewRepairOrder] = useState(null);
+  const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -121,6 +125,19 @@ export default function AutoserviceWarehouseReceiptsPage() {
     }
   }, [deleteDoc, loadRows, selectedDocId]);
 
+  const openRepairOrder = useCallback(async (orderId) => {
+    if (!orderId) return;
+    setViewRepairOrderLoading(true);
+    try {
+      const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
+      setViewRepairOrder(order);
+    } catch (err) {
+      setError(err?.message || 'Не удалось загрузить заказ-наряд');
+    } finally {
+      setViewRepairOrderLoading(false);
+    }
+  }, []);
+
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !userHasAutoserviceOrganization(user)) return null;
 
@@ -158,6 +175,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
               <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
               <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Кол-во</th>
+              <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Цена</th>
               <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
               <th className={`w-40 pl-3 text-center ${autoserviceListThClass}`}>Документ</th>
             </tr>
@@ -170,12 +188,13 @@ export default function AutoserviceWarehouseReceiptsPage() {
                   <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-40" /></td>
                   <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
+                  <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                   <td className={`w-40 pl-3 ${autoserviceListTdClass} truncate text-center`}><Skeleton className="mx-auto h-4 w-20" /></td>
                 </tr>
               ))
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-ink-muted">
+                <td colSpan={6} className="py-12 text-center text-ink-muted">
                   Позиций пока нет
                 </td>
               </tr>
@@ -193,15 +212,29 @@ export default function AutoserviceWarehouseReceiptsPage() {
                   <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>
                     {row.quantity} {row.unit === 'pcs' ? 'шт.' : row.unit}
                   </td>
+                  <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
+                    {formatAutoserviceWarehouseMoney(row.unit_price)}
+                  </td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                     {formatAutoserviceWarehouseMoney(row.line_total)}
                   </td>
                   <td className={`w-40 pl-3 ${autoserviceListTdClass} truncate text-center`}>
-                    {row.repair_order_number
-                      ? `Заказ-наряд ${row.repair_order_number}`
-                      : row.doc_number
-                        ? `№ ${row.doc_number}`
-                        : '—'}
+                    {row.repair_order_number ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewReceiptLine(row);
+                        }}
+                        className="inline-flex w-full cursor-pointer items-center justify-center py-2.5 text-sm font-medium text-ink transition hover:bg-surface-muted hover:underline"
+                      >
+                        Заказ-наряд {row.repair_order_number}
+                      </button>
+                    ) : row.doc_number ? (
+                      `№ ${row.doc_number}`
+                    ) : (
+                      '—'
+                    )}
                   </td>
                 </tr>
               ))
@@ -256,6 +289,81 @@ export default function AutoserviceWarehouseReceiptsPage() {
         confirmLabel="Удалить"
         danger
         loading={Boolean(deletingDocId)}
+      />
+
+      <Modal
+        open={Boolean(viewReceiptLine)}
+        onClose={() => setViewReceiptLine(null)}
+        title={viewReceiptLine ? `Поступление · ${viewReceiptLine.name || '—'}` : 'Поступление'}
+        size="sm"
+      >
+        {viewReceiptLine ? (
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <p>
+                <span className="text-ink-muted">Дата:</span>{' '}
+                <span className="text-ink">{formatDate(viewReceiptLine.doc_date)}</span>
+              </p>
+              <p>
+                <span className="text-ink-muted">Поставщик:</span>{' '}
+                <span className="text-ink">{viewReceiptLine.supplier_name || '—'}</span>
+              </p>
+              <p>
+                <span className="text-ink-muted">Кол-во:</span>{' '}
+                <span className="text-ink">{viewReceiptLine.quantity} {viewReceiptLine.unit === 'pcs' ? 'шт.' : viewReceiptLine.unit}</span>
+              </p>
+              <p>
+                <span className="text-ink-muted">Цена:</span>{' '}
+                <span className="text-ink">{formatAutoserviceWarehouseMoney(viewReceiptLine.unit_price)}</span>
+              </p>
+              <p>
+                <span className="text-ink-muted">Сумма:</span>{' '}
+                <span className="text-ink font-semibold tabular-nums">{formatAutoserviceWarehouseMoney(viewReceiptLine.line_total)}</span>
+              </p>
+            </div>
+            <p>
+              <span className="text-ink-muted">Бренд:</span>{' '}
+              <span className="text-ink">{viewReceiptLine.brand || '—'}</span>
+            </p>
+            <p>
+              <span className="text-ink-muted">Артикул:</span>{' '}
+              <span className="text-ink">{viewReceiptLine.article || '—'}</span>
+            </p>
+            <p>
+              <span className="text-ink-muted">Документ:</span>{' '}
+              {viewReceiptLine.repair_order_id ? (
+                <button
+                  type="button"
+                  onClick={() => openRepairOrder(viewReceiptLine.repair_order_id)}
+                  className="cursor-pointer font-medium text-brand-600 transition hover:underline"
+                >
+                  Заказ-наряд {viewReceiptLine.repair_order_number}
+                </button>
+              ) : viewReceiptLine.doc_number ? (
+                <span className="text-ink">№ {viewReceiptLine.doc_number}</span>
+              ) : (
+                '—'
+              )}
+            </p>
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setViewReceiptLine(null)}
+                className="inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted md:h-10"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <RepairOrderViewModal
+        order={viewRepairOrder}
+        loading={viewRepairOrderLoading}
+        enablePayment
+        onClose={() => setViewRepairOrder(null)}
+        onOrderChange={(updated) => setViewRepairOrder(updated)}
       />
     </div>
   );

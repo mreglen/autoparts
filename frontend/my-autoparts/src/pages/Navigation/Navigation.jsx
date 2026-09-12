@@ -177,7 +177,7 @@ export default function Navigation() {
             <Link
               to="/cart"
               aria-label="Корзина"
-              className="relative hidden items-center gap-2 rounded-sg border border-line bg-surface-muted px-3 py-2 text-sm transition hover:border-brand-200 hover:bg-brand-50/50 sm:flex"
+              className="relative hidden h-10 items-center gap-2 rounded-sg px-3 text-sm text-ink-muted transition hover:bg-surface-muted hover:text-brand-600 sm:flex"
             >
               <svg className="h-5 w-5 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -213,7 +213,7 @@ export default function Navigation() {
                   <Link
                     to={profilePath}
                     aria-label="Профиль"
-                    className="flex items-center gap-2 rounded-sg border border-line py-1 pl-1 pr-3 transition hover:border-brand-200 hover:bg-surface-subtle"
+                    className="flex items-center gap-2 rounded-sg py-1 pl-1 pr-3 text-ink-muted transition hover:bg-surface-subtle hover:text-brand-600"
                   >
                     <HeaderAvatar
                       initial={firstName}

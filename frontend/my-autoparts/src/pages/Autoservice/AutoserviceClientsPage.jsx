@@ -1414,7 +1414,7 @@ export default function AutoserviceClientsPage() {
           <thead>
             <tr className={autoserviceListTheadRowClass}>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Имя</th>
-              <th className={`w-44 ${autoserviceListThClass}`}>Телефон</th>
+              <th className={`w-36 ${autoserviceListThClass}`}>Телефон</th>
               <th className={`w-28 ${autoserviceListThClass}`}>Аккаунт</th>
             </tr>
           </thead>

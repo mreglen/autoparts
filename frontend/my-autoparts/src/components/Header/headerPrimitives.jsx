@@ -28,10 +28,10 @@ export function HeaderIconButton({
   className = '',
 }) {
   const classes = cx(
-    'relative flex h-10 w-10 shrink-0 items-center justify-center rounded-sg border transition active:scale-[0.97]',
+    'relative flex h-10 w-10 shrink-0 items-center justify-center rounded-sg transition active:scale-[0.97]',
     accent
-      ? 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100'
-      : 'border-line bg-surface-muted text-ink-muted hover:border-brand-200 hover:bg-brand-50/50 hover:text-brand-600',
+      ? 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+      : 'bg-surface-muted text-ink-muted hover:bg-brand-50/50 hover:text-brand-600',
     className,
   );
 

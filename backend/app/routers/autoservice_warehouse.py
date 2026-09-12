@@ -15,6 +15,7 @@ from app.models.autoservice_warehouse import (
     AutoserviceWarehouseReceipt,
     AutoserviceWarehouseReceiptDoc,
 )
+from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseExpenseCreate,
@@ -737,9 +738,34 @@ def list_autoservice_warehouse_expenses(
         .limit(500)
         .all()
     )
+
+    order_numbers = set()
+    for row in rows:
+        reason = (row.reason or "").strip()
+        if reason.startswith("Заказ-наряд №"):
+            order_numbers.add(reason.removeprefix("Заказ-наряд №").strip())
+
+    order_map: dict[str, int] = {}
+    if order_numbers:
+        for ro_id, ro_number in (
+            db.query(RepairOrder.id, RepairOrder.order_number)
+            .filter(
+                RepairOrder.organization_id == org_id,
+                RepairOrder.order_number.in_(list(order_numbers)),
+            )
+            .all()
+        ):
+            order_map[ro_number] = ro_id
+
     result = []
     for row in rows:
         item = row.item
+        reason = (row.reason or "").strip()
+        repair_order_id = None
+        repair_order_number = None
+        if reason.startswith("Заказ-наряд №"):
+            repair_order_number = reason.removeprefix("Заказ-наряд №").strip()
+            repair_order_id = order_map.get(repair_order_number)
         result.append(
             AutoserviceWarehouseExpenseView(
                 id=row.id,
@@ -750,6 +776,8 @@ def list_autoservice_warehouse_expenses(
                 quantity=int(row.quantity or 0),
                 unit_price=row.unit_price,
                 reason=row.reason,
+                repair_order_id=repair_order_id,
+                repair_order_number=repair_order_number,
                 created_at=row.created_at,
                 creator_name=_creator_name(row.creator),
             )

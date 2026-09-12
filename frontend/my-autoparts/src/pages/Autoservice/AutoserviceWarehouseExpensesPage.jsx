@@ -4,6 +4,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
 import { Modal, Skeleton } from '../../components/UI';
+import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
@@ -68,6 +69,8 @@ export default function AutoserviceWarehouseExpensesPage() {
   const [viewExpense, setViewExpense] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
+  const [viewRepairOrder, setViewRepairOrder] = useState(null);
+  const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -121,6 +124,19 @@ export default function AutoserviceWarehouseExpensesPage() {
     }
   }, [viewExpense, loadData]);
 
+  const openRepairOrder = useCallback(async (orderId) => {
+    if (!orderId) return;
+    setViewRepairOrderLoading(true);
+    try {
+      const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
+      setViewRepairOrder(order);
+    } catch (err) {
+      setError(err?.message || 'Не удалось загрузить заказ-наряд');
+    } finally {
+      setViewRepairOrderLoading(false);
+    }
+  }, []);
+
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !userHasAutoserviceOrganization(user)) return null;
 
@@ -159,6 +175,7 @@ export default function AutoserviceWarehouseExpensesPage() {
               <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
               <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Кол-во</th>
               <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Цена</th>
+              <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
               <th className={`w-40 pl-3 text-center ${autoserviceListThClass}`}>Документ</th>
             </tr>
           </thead>
@@ -170,12 +187,13 @@ export default function AutoserviceWarehouseExpensesPage() {
                   <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
                   <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
+                  <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                   <td className={`w-40 pl-3 ${autoserviceListTdClass} truncate text-center`}><Skeleton className="mx-auto h-4 w-20" /></td>
                 </tr>
               ))
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-ink-muted">
+                <td colSpan={6} className="py-12 text-center text-ink-muted">
                   Расходов пока нет
                 </td>
               </tr>
@@ -191,11 +209,27 @@ export default function AutoserviceWarehouseExpensesPage() {
                     <div className="w-0 min-w-full truncate font-semibold text-ink">{row.name || '—'}</div>
                   </td>
                   <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
-                  <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                  <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
                     {formatAutoserviceWarehouseMoney(row.unit_price)}
                   </td>
+                  <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                    {formatAutoserviceWarehouseMoney(Number(row.unit_price || 0) * Number(row.quantity || 0))}
+                  </td>
                   <td className={`w-40 pl-3 ${autoserviceListTdClass} truncate text-center`}>
-                    {row.reason || '—'}
+                    {row.repair_order_id ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openRepairOrder(row.repair_order_id);
+                        }}
+                        className="inline-flex w-full cursor-pointer items-center justify-center py-2.5 text-sm font-medium text-brand-600 transition hover:bg-surface-muted hover:underline"
+                      >
+                        Заказ-наряд {row.repair_order_number}
+                      </button>
+                    ) : (
+                      row.reason || '—'
+                    )}
                   </td>
                 </tr>
               ))
@@ -263,8 +297,18 @@ export default function AutoserviceWarehouseExpensesPage() {
               <span className="text-ink">{viewExpense.article || '—'}</span>
             </p>
             <p>
-              <span className="text-ink-muted">Причина:</span>{' '}
-              <span className="text-ink">{viewExpense.reason || '—'}</span>
+              <span className="text-ink-muted">Документ:</span>{' '}
+              {viewExpense.repair_order_id ? (
+                <button
+                  type="button"
+                  onClick={() => openRepairOrder(viewExpense.repair_order_id)}
+                  className="cursor-pointer font-medium text-brand-600 transition hover:underline"
+                >
+                  Заказ-наряд {viewExpense.repair_order_number}
+                </button>
+              ) : (
+                <span className="text-ink">{viewExpense.reason || '—'}</span>
+              )}
             </p>
             <p>
               <span className="text-ink-muted">Создал:</span>{' '}
@@ -323,6 +367,14 @@ export default function AutoserviceWarehouseExpensesPage() {
           </div>
         </div>
       </Modal>
+
+      <RepairOrderViewModal
+        order={viewRepairOrder}
+        loading={viewRepairOrderLoading}
+        enablePayment
+        onClose={() => setViewRepairOrder(null)}
+        onOrderChange={(updated) => setViewRepairOrder(updated)}
+      />
     </div>
   );
 }
