@@ -457,8 +457,8 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
           <LinesTable
             columns={
               showExecutors
-                ? ['№', 'Название', 'Кол-во', 'Цена', 'Сумма', 'Исполнитель']
-                : ['№', 'Название', 'Кол-во', 'Цена', 'Сумма']
+                ? ['№', 'Наименование', 'Кол-во', 'Цена', 'Сумма', 'Исполнитель']
+                : ['№', 'Наименование', 'Кол-во', 'Цена', 'Сумма']
             }
           >
             {works.map((w) => (
@@ -471,7 +471,7 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
                   {formatMoney(w.line_sum ?? lineSum(w.qty, w.unit_price))}
                 </td>
                 {showExecutors ? (
-                  <td className="py-1.5">
+                  <td className="py-1.5 pr-4">
                     {(w.executors || []).length
                       ? (w.executors || []).map((ex) => (
                           <span key={ex.employee_id} className="mr-2 inline-block">
@@ -491,7 +491,7 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
         {parts.length === 0 ? (
           <EmptyLine>Нет запчастей клиента</EmptyLine>
         ) : (
-          <LinesTable columns={['№', 'Название', 'Кол-во', 'Ед.']}>
+          <LinesTable columns={['№', 'Наименование', 'Кол-во', 'Ед.']}>
             {parts.map((p) => (
               <tr key={p.id || `${p.position}-${p.title}`}>
                 <td className="py-1.5 pr-3 tabular-nums text-ink-muted">{p.position}</td>

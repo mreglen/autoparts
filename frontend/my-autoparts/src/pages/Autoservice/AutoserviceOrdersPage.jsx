@@ -5,7 +5,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
+
 import RepairOrderViewModal, {
   RepairOrderStatusPicker,
   vehicleLabel,
@@ -23,6 +23,14 @@ import {
   repairOrderFormSnapshotHasContent,
 } from '../../utils/repairOrderFormDraft';
 import AutoserviceOrdersMobileView from './AutoserviceOrdersMobileView';
+import {
+  autoserviceListTableClass,
+  autoserviceListTheadRowClass,
+  autoserviceListThClass,
+  autoserviceListTbodyClass,
+  autoserviceListTrClickableClass,
+  autoserviceListTdClass,
+} from '../../utils/warehouseListUi';
 
 function formatDateTime(value) {
   return formatServerDateTime(value);
@@ -37,48 +45,6 @@ function orderMatchesList(order, { scope, historyStatus, includeReviewInActive }
   }
   if (status === 'pending' || status === 'in_progress' || status === 'done') return true;
   return Boolean(includeReviewInActive && status === 'review');
-}
-
-function OrderActionsMenu({
-  onView,
-  onEdit,
-  onDuplicate,
-  onDelete,
-  onApprove,
-  duplicating = false,
-  approveSaving = false,
-  showLabel = true,
-  isOpen,
-  onOpenChange,
-}) {
-  const itemClass = 'max-lg:min-h-11';
-  return (
-    <ActionsDropdown
-      isOpen={isOpen}
-      onOpenChange={onOpenChange}
-      menuClassName="w-52 z-50"
-      estimatedMenuHeight={onApprove ? 248 : 204}
-      showLabel={showLabel}
-      disabled={duplicating || approveSaving}
-      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60 max-lg:h-11 max-lg:w-11 max-lg:justify-center max-lg:px-0"
-    >
-      {onApprove ? (
-        <ActionsDropdownItem className={itemClass} onClick={onApprove} disabled={duplicating || approveSaving}>
-          {approveSaving ? 'Принятие…' : 'Принять в работу'}
-        </ActionsDropdownItem>
-      ) : null}
-      <ActionsDropdownItem className={itemClass} onClick={onView} disabled={duplicating}>Просмотр</ActionsDropdownItem>
-      <ActionsDropdownItem className={itemClass} onClick={onEdit} disabled={duplicating}>Изменить</ActionsDropdownItem>
-      {onDuplicate ? (
-        <ActionsDropdownItem className={itemClass} onClick={onDuplicate} disabled={duplicating}>
-          {duplicating ? 'Копирование…' : 'Скопировать и создать'}
-        </ActionsDropdownItem>
-      ) : null}
-      <ActionsDropdownItem className={itemClass} onClick={onDelete} disabled={duplicating} danger>
-        Удалить
-      </ActionsDropdownItem>
-    </ActionsDropdown>
-  );
 }
 
 export default function AutoserviceOrdersPage() {
@@ -493,33 +459,30 @@ export default function AutoserviceOrdersPage() {
           </p>
         ) : null}
 
-        <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
+        <table className={autoserviceListTableClass}>
           <thead>
-            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <th className="w-28 py-3 pr-3">Заказ</th>
-              <th className="py-3 pr-3">Автомобиль</th>
-              <th className="py-3 pr-3">Клиент</th>
-              <th className="w-32 py-3 pr-3">Статус</th>
-              <th className="w-28 py-3 text-right">Действия</th>
+            <tr className={autoserviceListTheadRowClass}>
+              <th className={`w-28 ${autoserviceListThClass}`}>Заказ</th>
+              <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
+              <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
+              <th className={`w-32 ${autoserviceListThClass}`}>Телефон</th>
+              <th className={`w-32 ${autoserviceListThClass}`}>Статус</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className={autoserviceListTbodyClass}>
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={`sk-${i}`}>
-                  <td className="py-3 pr-3"><Skeleton className="h-4 w-16" /></td>
-                  <td className="py-3 pr-3"><Skeleton className="h-4 w-36" /></td>
-                  <td className="py-3 pr-3">
-                    <Skeleton className="h-4 w-28" />
-                    <Skeleton className="mt-1 h-3 w-20" />
-                  </td>
-                  <td className="py-3 pr-3"><Skeleton className="h-6 w-20 rounded-full" /></td>
-                  <td className="py-3 text-right"><Skeleton className="ml-auto h-8 w-16 rounded-lg" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-28" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-6 w-20 rounded-full" /></td>
                 </tr>
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-gray-500">
+                <td colSpan={5} className="py-12 text-center text-ink-muted">
                   {emptyMessage}
                 </td>
               </tr>
@@ -527,7 +490,7 @@ export default function AutoserviceOrdersPage() {
               rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="group cursor-pointer transition-colors hover:bg-gray-50/70"
+                  className={autoserviceListTrClickableClass}
                   onClick={(e) => {
                     if (e.target.closest('.actions-dropdown') || e.target.closest('.status-picker')) {
                       return;
@@ -535,32 +498,23 @@ export default function AutoserviceOrdersPage() {
                     setViewOrder(row);
                   }}
                 >
-                  <td className="py-3 pr-3 align-middle">
-                    <span className="font-semibold tabular-nums text-gray-900">{repairOrderNumberLabel(row)}</span>
+                  <td className={autoserviceListTdClass}>
+                    <span className="font-medium tabular-nums text-ink-muted">{repairOrderNumberLabel(row)}</span>
                   </td>
-                  <td className="py-3 pr-3 align-middle font-medium text-gray-900">{vehicleLabel(row.vehicle)}</td>
-                  <td className="py-3 pr-3 align-middle">
-                    <div className="font-medium text-gray-900">{row.client?.name || '—'}</div>
-                    {row.client?.phone ? <div className="mt-0.5 text-xs text-gray-500">{row.client.phone}</div> : null}
+                  <td className={`${autoserviceListTdClass} font-semibold text-ink`}>{vehicleLabel(row.vehicle)}</td>
+                  <td className={autoserviceListTdClass}>
+                    <div className="font-semibold text-ink">{row.client?.name || '—'}</div>
                   </td>
-                  <td className="py-3 pr-3 align-middle">
+                  <td className={autoserviceListTdClass}>
+                    <div className="text-ink-muted">{row.client?.phone || '—'}</div>
+                  </td>
+                  <td className={`${autoserviceListTdClass} [&_span]:ring-0`}>
                     <RepairOrderStatusPicker
                       status={row.status}
                       options={statusActionsForRow(row)}
                       saving={statusSavingId === row.id}
                       disabled={statusSavingId === row.id}
                       onChange={(nextStatus) => handleStatus(row.id, nextStatus)}
-                    />
-                  </td>
-                  <td className="py-3 text-right align-middle">
-                    <OrderActionsMenu
-                      onView={() => setViewOrder(row)}
-                      onEdit={() => navigate(`/autoservice/orders/${row.id}/edit`)}
-                      onDuplicate={viewReview ? undefined : () => handleDuplicate(row)}
-                      onDelete={() => setDeleteConfirmOrder(row)}
-                      onApprove={viewReview ? () => handleApprove(row.id) : undefined}
-                      duplicating={duplicatingId === row.id}
-                      approveSaving={approvingId === row.id}
                     />
                   </td>
                 </tr>
