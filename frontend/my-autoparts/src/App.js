@@ -1,6 +1,6 @@
 // src/App.jsx
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
 import { clearAuthTokens } from './utils/apiClient';
@@ -29,6 +29,7 @@ import {
   getDefaultAutoserviceStaffPath,
 } from './utils/autoservicePermissions';
 import {
+  CABINET_MODE_AUTOSERVICE,
   getCabinetMode,
   getDefaultPathForCabinetMode,
 } from './utils/cabinetMode';
@@ -294,12 +295,25 @@ function AutoserviceClientRoute({ children }) {
   );
 }
 
+const AUTOSERVICE_STAFF_TABS = [
+  '/autoservice/clients',
+  '/autoservice/orders',
+  '/autoservice/finance',
+  '/autoservice/payroll',
+  '/autoservice/reports',
+  '/autoservice/inspections',
+  '/autoservice/warehouse',
+  '/autoservice/settings',
+];
+
 function AutoserviceStaffRoute({ section, settingsOnly = false }) {
   const showAutoservice = useShowAutoservice();
   const autoserviceOrganizationId = useAutoserviceOrganizationId();
   const user = useSelector((state) => state.auth.user);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const cabinetMode = getCabinetMode(user, { autoserviceOrganizationId });
+  const location = useLocation();
+  const navigate = useNavigate();
   const accessOptions = {
     showAutoservice,
     autoserviceOrganizationId,
@@ -307,6 +321,18 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
     organizationIsAutoservice: Boolean(user?.organization_is_autoservice),
     permissionCodes: permissionCodes || [],
   };
+
+  useEffect(() => {
+    if (cabinetMode !== CABINET_MODE_AUTOSERVICE) return;
+    if (!AUTOSERVICE_STAFF_TABS.includes(location.pathname)) return;
+    const [navEntry] = window.performance?.getEntriesByType('navigation') || [];
+    const isReload =
+      navEntry?.type === 'reload' ||
+      (window.performance?.navigation?.type === 1);
+    if (isReload) {
+      navigate('/autoservice/planner', { replace: true });
+    }
+  }, []);
 
   if (!showAutoservice && !user?.is_admin) {
     return <Navigate to="/" replace />;
