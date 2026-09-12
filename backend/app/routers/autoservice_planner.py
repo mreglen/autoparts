@@ -25,6 +25,7 @@ from app.utils.autoservice_access import (
     display_client_phone,
     require_autoservice_permission,
 )
+from app.utils.org_access import resolve_autoservice_organization_id
 
 router = APIRouter(tags=["Autoservice planner"])
 
@@ -227,7 +228,12 @@ def get_planner_today_shortcut(
     elif organization_id:
         org_id = organization_id
     else:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется авторизация или organization_id")
+        org_id = resolve_autoservice_organization_id(db)
+        if not org_id:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Организация автосервиса не настроена",
+            )
     target = target_date or date.today()
     range_start = datetime.combine(target, time.min)
     range_end = datetime.combine(target + timedelta(days=1), time.min)

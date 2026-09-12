@@ -379,7 +379,7 @@ def create_staff_inspection_booking_shortcut(
     elif organization_id:
         org_id = organization_id
     else:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется авторизация или organization_id")
+        org_id = _require_autoservice_org_id(db)
     view = _create_staff_inspection_booking(payload, db, current_user, org_id)
     time_label = view.preferred_time.strftime("%H:%M") if view.preferred_time else "—"
     vehicle_label = "—"
