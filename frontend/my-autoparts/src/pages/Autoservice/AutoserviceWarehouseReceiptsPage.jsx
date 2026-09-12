@@ -156,10 +156,10 @@ export default function AutoserviceWarehouseReceiptsPage() {
           <thead>
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
-              <th className={autoserviceListThClass}>Наименование</th>
+              <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
               <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
               <th className={`w-24 ${autoserviceListThRightClass}`}>Сумма</th>
-              <th className={`w-40 text-center ${autoserviceListThClass}`}>Документ</th>
+              <th className={`w-40 pl-3 text-center ${autoserviceListThClass}`}>Документ</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
@@ -167,10 +167,10 @@ export default function AutoserviceWarehouseReceiptsPage() {
               Array.from({ length: 6 }).map((_, index) => (
                 <tr key={`sk-${index}`}>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-40" /></td>
+                  <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-40" /></td>
                   <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
                   <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
-                  <td className={`w-40 ${autoserviceListTdClass}`}><Skeleton className="mx-auto h-4 w-20" /></td>
+                  <td className={`w-40 pl-3 ${autoserviceListTdClass} truncate text-center`}><Skeleton className="mx-auto h-4 w-20" /></td>
                 </tr>
               ))
             ) : filteredRows.length === 0 ? (
@@ -187,7 +187,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
                   onClick={() => setSelectedDocId(row.doc_id)}
                 >
                   <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.doc_date)}</td>
-                  <td className={autoserviceListTdClass}>
+                  <td className={`min-w-0 ${autoserviceListTdClass}`}>
                     <div className="w-full truncate font-medium text-ink">{row.name || '—'}</div>
                   </td>
                   <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>
@@ -196,7 +196,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
                   <td className={`w-24 ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                     {formatAutoserviceWarehouseMoney(row.line_total)}
                   </td>
-                  <td className={`w-40 ${autoserviceListTdClass} truncate text-center`}>
+                  <td className={`w-40 pl-3 ${autoserviceListTdClass} truncate text-center`}>
                     {row.repair_order_number
                       ? `Заказ-наряд ${row.repair_order_number}`
                       : row.doc_number

@@ -425,8 +425,8 @@ export default function AutoserviceWarehousePage() {
             <table className={autoserviceListTableClass}>
               <thead>
                 <tr className={autoserviceListTheadRowClass}>
-                  <th className={autoserviceListThClass}>Товар</th>
-                  <th className={autoserviceListThClass}>Поставщик</th>
+                  <th className={`min-w-0 ${autoserviceListThClass}`}>Товар</th>
+                  <th className={`min-w-0 ${autoserviceListThClass}`}>Поставщик</th>
                   <th className={`w-24 ${autoserviceListThClass}`}>Заказ</th>
                   <th className={`w-20 ${autoserviceListThRightClass}`}>Поступило</th>
                   <th className={`w-20 ${autoserviceListThRightClass}`}>Резерв</th>
@@ -438,9 +438,9 @@ export default function AutoserviceWarehousePage() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, index) => (
                     <tr key={`sk-lot-${index}`}>
-                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
-                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-28" /></td>
-                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-28" /></td>
+                      <td className={`w-24 ${autoserviceListTdClass} text-center`}><Skeleton className="mx-auto h-4 w-16" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
@@ -456,13 +456,15 @@ export default function AutoserviceWarehousePage() {
                 ) : (
                   filteredLots.map((lot) => (
                     <tr key={lot.receipt_id} className={autoserviceListTrClass}>
-                      <td className={autoserviceListTdClass}>
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
                         <p className="w-full truncate font-medium text-ink">{lot.name}</p>
                         <p className="mt-0.5 text-xs text-ink-muted">
                           {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
                         </p>
                       </td>
-                      <td className={autoserviceListTdClass}>{lot.supplier_name}</td>
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                        <div className="w-full truncate text-ink">{lot.supplier_name}</div>
+                      </td>
                       <td className={`w-24 ${autoserviceListTdClass} text-center`}>№ {lot.source_order_id}</td>
                       <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>{lot.quantity}</td>
                       <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>
@@ -525,7 +527,7 @@ export default function AutoserviceWarehousePage() {
             <table className={autoserviceListTableClass}>
               <thead>
                 <tr className={autoserviceListTheadRowClass}>
-                  <th className={autoserviceListThClass}>Наименование</th>
+                  <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
                   <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
                   <th className={`w-24 ${autoserviceListThRightClass}`}>
                     <span className="inline-flex items-center justify-end gap-1.5">
@@ -541,7 +543,7 @@ export default function AutoserviceWarehousePage() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, index) => (
                     <tr key={`sk-item-${index}`}>
-                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
                       <td className={`w-20 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
                       <td className={`w-24 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                     </tr>
@@ -564,7 +566,7 @@ export default function AutoserviceWarehousePage() {
                         className={autoserviceListTrClickableClass}
                         onClick={() => setDetailsItem(item)}
                       >
-                        <td className={autoserviceListTdClass}>
+                        <td className={`min-w-0 ${autoserviceListTdClass}`}>
                           <div className="w-full truncate font-medium text-ink">{item.name || '—'}</div>
                           {!item.name ? (
                             <div className="mt-0.5 text-xs text-ink-faint">№{item.id}</div>

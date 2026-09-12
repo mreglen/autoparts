@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_current_user_optional
 from app.db.database import get_db
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.garage_vehicle import GarageVehicle
@@ -218,10 +218,16 @@ def get_planner_week(
 @router.get("/autoservice/planner/shortcuts/today", response_class=PlainTextResponse)
 def get_planner_today_shortcut(
     target_date: date | None = Query(None, alias="date"),
+    organization_id: str | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
-    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
+    if current_user:
+        org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
+    elif organization_id:
+        org_id = organization_id
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется авторизация или organization_id")
     target = target_date or date.today()
     range_start = datetime.combine(target, time.min)
     range_end = datetime.combine(target + timedelta(days=1), time.min)

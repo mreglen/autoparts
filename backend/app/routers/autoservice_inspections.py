@@ -262,17 +262,12 @@ def list_inspection_bookings(
     return [_booking_to_view(row) for row in rows]
 
 
-@router.post(
-    "/autoservice/inspection-bookings",
-    response_model=InspectionBookingView,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_staff_inspection_booking(
+def _create_staff_inspection_booking(
     payload: InspectionBookingStaffCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session,
+    current_user: User | None,
+    org_id: str,
 ):
-    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
     phone = _normalize_phone_or_400(payload.phone)
     notes = (payload.notes or "").strip() or None
     garage_vehicle_id = payload.garage_vehicle_id
@@ -342,7 +337,7 @@ def create_staff_inspection_booking(
         vehicle_model=(payload.vehicle_model or "").strip() or None,
         status="new",
         source="staff",
-        created_by_user_id=current_user.id,
+        created_by_user_id=current_user.id if current_user else None,
         work_zone_id=work_zone_id,
         notes=notes,
     )
@@ -355,16 +350,37 @@ def create_staff_inspection_booking(
 
 
 @router.post(
+    "/autoservice/inspection-bookings",
+    response_model=InspectionBookingView,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_staff_inspection_booking(
+    payload: InspectionBookingStaffCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
+    return _create_staff_inspection_booking(payload, db, current_user, org_id)
+
+
+@router.post(
     "/autoservice/inspection-bookings/shortcut",
     response_class=PlainTextResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def create_staff_inspection_booking_shortcut(
     payload: InspectionBookingStaffCreate,
+    organization_id: str | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
-    view = create_staff_inspection_booking(payload, db, current_user)
+    if current_user:
+        org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
+    elif organization_id:
+        org_id = organization_id
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Требуется авторизация или organization_id")
+    view = _create_staff_inspection_booking(payload, db, current_user, org_id)
     time_label = view.preferred_time.strftime("%H:%M") if view.preferred_time else "—"
     vehicle_label = "—"
     if view.vehicle:
