@@ -71,7 +71,7 @@ function WarehouseItemMobileCard({
 }) {
   return (
     <button type="button" onClick={onOpen} className="w-full border-b border-line-soft py-2 text-left last:border-b-0">
-      <p className="font-medium text-ink">{item.name || '—'}</p>
+      <p className="truncate font-medium text-ink">{item.name || '—'}</p>
       <p className="mt-0.5 text-xs text-ink-muted">
         {[item.brand, item.article].filter(Boolean).join(' · ') || `№${item.id}`}
       </p>
@@ -89,7 +89,7 @@ function PurchaseLotMobileCard({ lot, onReturn }) {
     <div className="border-b border-line-soft py-2 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-ink">{lot.name}</p>
+          <p className="truncate font-medium text-ink">{lot.name}</p>
           <p className="mt-0.5 text-xs text-ink-muted">
             {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
           </p>
@@ -428,9 +428,9 @@ export default function AutoserviceWarehousePage() {
                   <th className={autoserviceListThClass}>Товар</th>
                   <th className={autoserviceListThClass}>Поставщик</th>
                   <th className={`w-24 ${autoserviceListThClass}`}>Заказ</th>
-                  <th className={autoserviceListThRightClass}>Поступило</th>
-                  <th className={autoserviceListThRightClass}>Резерв</th>
-                  <th className={autoserviceListThRightClass}>К возврату</th>
+                  <th className={`w-20 ${autoserviceListThRightClass}`}>Поступило</th>
+                  <th className={`w-20 ${autoserviceListThRightClass}`}>Резерв</th>
+                  <th className={`w-20 ${autoserviceListThRightClass}`}>К возврату</th>
                   <th className={autoserviceListThActionsClass}>Действие</th>
                 </tr>
               </thead>
@@ -457,18 +457,18 @@ export default function AutoserviceWarehousePage() {
                   filteredLots.map((lot) => (
                     <tr key={lot.receipt_id} className={autoserviceListTrClass}>
                       <td className={autoserviceListTdClass}>
-                        <p className="font-medium text-ink">{lot.name}</p>
+                        <p className="w-full truncate font-medium text-ink">{lot.name}</p>
                         <p className="mt-0.5 text-xs text-ink-muted">
                           {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
                         </p>
                       </td>
                       <td className={autoserviceListTdClass}>{lot.supplier_name}</td>
-                      <td className={autoserviceListTdClass}>№ {lot.source_order_id}</td>
-                      <td className={`${autoserviceListTdRightClass} tabular-nums`}>{lot.quantity}</td>
-                      <td className={`${autoserviceListTdRightClass} tabular-nums`}>
+                      <td className={`w-24 ${autoserviceListTdClass} text-center`}>№ {lot.source_order_id}</td>
+                      <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>{lot.quantity}</td>
+                      <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>
                         {lot.item_reserved_qty || 0}
                       </td>
-                      <td className={`${autoserviceListTdRightClass} tabular-nums`}>
+                      <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>
                         {lot.max_returnable_qty}
                       </td>
                       <td className={autoserviceListTdActionsClass}>
@@ -526,8 +526,8 @@ export default function AutoserviceWarehousePage() {
               <thead>
                 <tr className={autoserviceListTheadRowClass}>
                   <th className={autoserviceListThClass}>Наименование</th>
-                  <th className={autoserviceListThRightClass}>Кол-во</th>
-                  <th className={autoserviceListThRightClass}>
+                  <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
+                  <th className={`w-24 ${autoserviceListThRightClass}`}>
                     <span className="inline-flex items-center justify-end gap-1.5">
                       {clientMarkupEnabled ? (
                         <ClientMarkupPopover readOnly={!canEditMarkupSettings} />
@@ -542,8 +542,8 @@ export default function AutoserviceWarehousePage() {
                   Array.from({ length: 6 }).map((_, index) => (
                     <tr key={`sk-item-${index}`}>
                       <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
-                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-12" /></td>
-                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
+                      <td className={`w-20 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
+                      <td className={`w-24 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                     </tr>
                   ))
                 ) : filteredItems.length === 0 ? (
@@ -565,15 +565,15 @@ export default function AutoserviceWarehousePage() {
                         onClick={() => setDetailsItem(item)}
                       >
                         <td className={autoserviceListTdClass}>
-                          <div className="font-medium text-ink">{item.name || '—'}</div>
+                          <div className="w-full truncate font-medium text-ink">{item.name || '—'}</div>
                           {!item.name ? (
                             <div className="mt-0.5 text-xs text-ink-faint">№{item.id}</div>
                           ) : null}
                         </td>
-                        <td className={`${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
+                        <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
                           {formatAutoserviceWarehouseQty(item)}
                         </td>
-                        <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                        <td className={`w-24 ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                           {formatAutoserviceWarehouseMoney(displayPrice)}
                         </td>
                       </tr>

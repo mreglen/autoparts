@@ -34,10 +34,15 @@ function formatDate(value) {
 }
 
 function ReceiptMobileCard({ row, onOpen }) {
+  const docLabel = row.repair_order_number
+    ? `Заказ-наряд ${row.repair_order_number}`
+    : row.doc_number
+      ? `№ ${row.doc_number}`
+      : '—';
   return (
     <button type="button" onClick={onOpen} className="w-full border-b border-line-soft py-2 text-left last:border-b-0">
       <div className="flex items-start justify-between gap-2">
-        <span className="font-medium text-ink">{row.name || '—'}</span>
+        <span className="min-w-0 flex-1 truncate font-medium text-ink">{row.name || '—'}</span>
         <span className="shrink-0 tabular-nums font-semibold text-ink">
           {formatAutoserviceWarehouseMoney(row.line_total)}
         </span>
@@ -47,8 +52,8 @@ function ReceiptMobileCard({ row, onOpen }) {
         {' · '}
         {row.quantity} {row.unit === 'pcs' ? 'шт.' : row.unit}
       </p>
-      <p className="mt-0.5 text-xs text-ink-muted">
-        ЗН: {row.repair_order_number || '—'}
+      <p className="mt-0.5 text-xs text-ink-muted truncate">
+        {docLabel}
       </p>
     </button>
   );
@@ -152,9 +157,9 @@ export default function AutoserviceWarehouseReceiptsPage() {
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
               <th className={autoserviceListThClass}>Наименование</th>
-              <th className={`w-24 ${autoserviceListThRightClass}`}>Кол-во</th>
-              <th className={autoserviceListThRightClass}>Сумма</th>
-              <th className={`w-32 ${autoserviceListThClass}`}>Заказ-наряд</th>
+              <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
+              <th className={`w-24 ${autoserviceListThRightClass}`}>Сумма</th>
+              <th className={`w-40 text-center ${autoserviceListThClass}`}>Документ</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
@@ -163,9 +168,9 @@ export default function AutoserviceWarehouseReceiptsPage() {
                 <tr key={`sk-${index}`}>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-40" /></td>
+                  <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
                   <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
-                  <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-20" /></td>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                  <td className={`w-40 ${autoserviceListTdClass}`}><Skeleton className="mx-auto h-4 w-20" /></td>
                 </tr>
               ))
             ) : filteredRows.length === 0 ? (
@@ -183,16 +188,20 @@ export default function AutoserviceWarehouseReceiptsPage() {
                 >
                   <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.doc_date)}</td>
                   <td className={autoserviceListTdClass}>
-                    <div className="font-medium text-ink">{row.name || '—'}</div>
+                    <div className="w-full truncate font-medium text-ink">{row.name || '—'}</div>
                   </td>
-                  <td className={`${autoserviceListTdRightClass} tabular-nums`}>
+                  <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>
                     {row.quantity} {row.unit === 'pcs' ? 'шт.' : row.unit}
                   </td>
-                  <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                  <td className={`w-24 ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                     {formatAutoserviceWarehouseMoney(row.line_total)}
                   </td>
-                  <td className={`${autoserviceListTdClass} whitespace-nowrap`}>
-                    {row.repair_order_number || '—'}
+                  <td className={`w-40 ${autoserviceListTdClass} truncate text-center`}>
+                    {row.repair_order_number
+                      ? `Заказ-наряд ${row.repair_order_number}`
+                      : row.doc_number
+                        ? `№ ${row.doc_number}`
+                        : '—'}
                   </td>
                 </tr>
               ))

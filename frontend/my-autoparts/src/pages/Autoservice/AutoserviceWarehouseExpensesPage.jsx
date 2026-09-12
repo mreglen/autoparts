@@ -35,7 +35,7 @@ function ExpenseMobileCard({ row }) {
     <div className="border-b border-line-soft py-2 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-ink">{row.name || '—'}</p>
+          <p className="truncate font-medium text-ink">{row.name || '—'}</p>
           <p className="mt-0.5 text-xs text-ink-muted">
             {[row.brand, row.article].filter(Boolean).join(' · ') || '—'}
           </p>
@@ -134,9 +134,9 @@ export default function AutoserviceWarehouseExpensesPage() {
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
               <th className={autoserviceListThClass}>Наименование</th>
-              <th className={autoserviceListThRightClass}>Кол-во</th>
-              <th className={autoserviceListThRightClass}>Цена</th>
-              <th className={autoserviceListThClass}>Причина</th>
+              <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
+              <th className={`w-24 ${autoserviceListThRightClass}`}>Цена</th>
+              <th className={`w-40 text-center ${autoserviceListThClass}`}>Причина</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
@@ -145,9 +145,9 @@ export default function AutoserviceWarehouseExpensesPage() {
                 <tr key={`sk-${index}`}>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
-                  <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-12" /></td>
-                  <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-28" /></td>
+                  <td className={`w-20 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
+                  <td className={`w-24 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
+                  <td className={`w-40 ${autoserviceListTdClass}`}><Skeleton className="mx-auto h-4 w-20" /></td>
                 </tr>
               ))
             ) : filteredRows.length === 0 ? (
@@ -160,12 +160,16 @@ export default function AutoserviceWarehouseExpensesPage() {
               filteredRows.map((row) => (
                 <tr key={row.id} className={autoserviceListTrClass}>
                   <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.created_at)}</td>
-                  <td className={autoserviceListTdClass}>{row.name || '—'}</td>
-                  <td className={`${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
-                  <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                  <td className={autoserviceListTdClass}>
+                    <div className="w-full truncate font-medium text-ink">{row.name || '—'}</div>
+                  </td>
+                  <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
+                  <td className={`w-24 ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                     {formatAutoserviceWarehouseMoney(row.unit_price)}
                   </td>
-                  <td className={`${autoserviceListTdClass} text-ink-muted`}>{row.reason || '—'}</td>
+                  <td className={`w-40 ${autoserviceListTdClass} truncate text-center`}>
+                    {row.reason || '—'}
+                  </td>
                 </tr>
               ))
             )}
