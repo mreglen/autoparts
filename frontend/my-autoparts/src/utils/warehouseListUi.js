@@ -7,7 +7,7 @@ export const autoserviceListTableWrapClass = 'hidden md:block min-w-0';
 
 export const autoserviceListMobileWrapClass = 'md:hidden';
 
-export const autoserviceListTableClass = 'min-w-full table-fixed divide-y divide-line text-sm';
+export const autoserviceListTableClass = 'min-w-full table-fixed divide-y divide-line text-xs';
 
 export const autoserviceListTheadRowClass =
   'text-left text-xs font-semibold uppercase tracking-wide text-ink-muted';

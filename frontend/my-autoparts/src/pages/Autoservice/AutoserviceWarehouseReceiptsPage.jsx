@@ -186,11 +186,11 @@ export default function AutoserviceWarehouseReceiptsPage() {
                   className={autoserviceListTrClickableClass}
                   onClick={() => setSelectedDocId(row.doc_id)}
                 >
-                  <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.doc_date)}</td>
+                  <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{formatDate(row.doc_date)}</td>
                   <td className={`min-w-0 ${autoserviceListTdClass}`}>
-                    <div className="w-0 min-w-full truncate font-medium text-ink">{row.name || '—'}</div>
+                    <div className="w-0 min-w-full truncate font-semibold text-ink">{row.name || '—'}</div>
                   </td>
-                  <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
+                  <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>
                     {row.quantity} {row.unit === 'pcs' ? 'шт.' : row.unit}
                   </td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>

@@ -136,7 +136,7 @@ export default function AutoserviceWarehouseExpensesPage() {
               <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
               <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Кол-во</th>
               <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Цена</th>
-              <th className={`w-40 pl-3 text-center ${autoserviceListThClass}`}>Причина</th>
+              <th className={`w-40 pl-3 text-center ${autoserviceListThClass}`}>Документ</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
@@ -159,11 +159,11 @@ export default function AutoserviceWarehouseExpensesPage() {
             ) : (
               filteredRows.map((row) => (
                 <tr key={row.id} className={autoserviceListTrClass}>
-                  <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.created_at)}</td>
+                  <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{formatDate(row.created_at)}</td>
                   <td className={`min-w-0 ${autoserviceListTdClass}`}>
-                    <div className="w-0 min-w-full truncate font-medium text-ink">{row.name || '—'}</div>
+                    <div className="w-0 min-w-full truncate font-semibold text-ink">{row.name || '—'}</div>
                   </td>
-                  <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
+                  <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                     {formatAutoserviceWarehouseMoney(row.unit_price)}
                   </td>

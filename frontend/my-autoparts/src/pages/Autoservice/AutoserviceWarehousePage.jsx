@@ -457,7 +457,7 @@ export default function AutoserviceWarehousePage() {
                   filteredLots.map((lot) => (
                     <tr key={lot.receipt_id} className={autoserviceListTrClass}>
                       <td className={`min-w-0 ${autoserviceListTdClass}`}>
-                        <p className="w-0 min-w-full truncate font-medium text-ink">{lot.name}</p>
+                        <p className="w-0 min-w-full truncate font-semibold text-ink">{lot.name}</p>
                         <p className="mt-0.5 text-xs text-ink-muted">
                           {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
                         </p>
@@ -466,11 +466,11 @@ export default function AutoserviceWarehousePage() {
                         <div className="w-0 min-w-full truncate text-ink">{lot.supplier_name}</div>
                       </td>
                       <td className={`w-24 whitespace-nowrap ${autoserviceListTdClass} text-center`}>№ {lot.source_order_id}</td>
-                      <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>{lot.quantity}</td>
-                      <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
+                      <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>{lot.quantity}</td>
+                      <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>
                         {lot.item_reserved_qty || 0}
                       </td>
-                      <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
+                      <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>
                         {lot.max_returnable_qty}
                       </td>
                       <td className={autoserviceListTdActionsClass}>
@@ -527,8 +527,8 @@ export default function AutoserviceWarehousePage() {
             <table className={autoserviceListTableClass}>
               <thead>
                 <tr className={autoserviceListTheadRowClass}>
-                  <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
-                  <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Кол-во</th>
+                  <th className={`w-3/5 ${autoserviceListThClass}`}>Наименование</th>
+                  <th className={`w-20 whitespace-nowrap !pr-2 ${autoserviceListThRightClass}`}>Кол-во</th>
                   <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>
                     <span className="inline-flex items-center justify-end gap-1.5">
                       {clientMarkupEnabled ? (
@@ -544,7 +544,7 @@ export default function AutoserviceWarehousePage() {
                   Array.from({ length: 6 }).map((_, index) => (
                     <tr key={`sk-item-${index}`}>
                       <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
-                      <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
+                      <td className={`w-20 whitespace-nowrap !pr-2 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
                       <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                     </tr>
                   ))
@@ -567,12 +567,12 @@ export default function AutoserviceWarehousePage() {
                         onClick={() => setDetailsItem(item)}
                       >
                         <td className={`min-w-0 ${autoserviceListTdClass}`}>
-                          <div className="w-0 min-w-full truncate font-medium text-ink">{item.name || '—'}</div>
+                          <div className="w-0 min-w-full truncate font-semibold text-ink">{item.name || '—'}</div>
                           {!item.name ? (
                             <div className="mt-0.5 text-xs text-ink-faint">№{item.id}</div>
                           ) : null}
                         </td>
-                        <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
+                        <td className={`w-20 !pr-2 text-ink-muted ${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
                           {formatAutoserviceWarehouseQty(item)}
                         </td>
                         <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
