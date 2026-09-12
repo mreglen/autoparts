@@ -129,8 +129,22 @@
     <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicons/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/favicons/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/favicons/apple-touch-icon.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>Свой Гараж</title>
+    <script>
+      (function () {
+        var path = window.location.pathname || '';
+        var isPlanner = path === '/autoservice/planner' || path.indexOf('/autoservice/planner/') === 0;
+        var manifest = isPlanner ? '%PUBLIC_URL%/manifest-planner.json' : '%PUBLIC_URL%/manifest.json';
+        var title = isPlanner ? 'Планировщик — Свой Гараж' : 'Свой Гараж';
+        var link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifest;
+        document.head.appendChild(link);
+        var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (appleTitle) appleTitle.content = title;
+        if (isPlanner) document.title = title;
+      })();
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.

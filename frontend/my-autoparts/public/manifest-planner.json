@@ -1,0 +1,66 @@
+{
+  "id": "/autoservice/planner",
+  "lang": "ru",
+  "short_name": "Планировщик",
+  "name": "Планировщик — Свой Гараж",
+  "description": "Планировщик автосервиса",
+  "scope": "/",
+  "start_url": "/autoservice/planner",
+  "display": "standalone",
+  "theme_color": "#4f46e5",
+  "background_color": "#fefdfb",
+  "icons": [
+    {
+      "src": "favicons/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "120x120",
+      "purpose": "any"
+    },
+    {
+      "src": "favicons/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "favicons/favicon-16x16.png",
+      "type": "image/png",
+      "sizes": "16x16"
+    },
+    {
+      "src": "favicons/favicon-32x32.png",
+      "type": "image/png",
+      "sizes": "32x32"
+    },
+    {
+      "src": "favicons/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180"
+    },
+    {
+      "src": "favicons/android-chrome-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "favicons/android-chrome-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "favicons/android-chrome-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "На сегодня",
+      "short_name": "Сегодня",
+      "url": "/autoservice/planner",
+      "icons": [{ "src": "favicons/android-chrome-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}
