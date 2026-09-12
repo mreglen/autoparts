@@ -188,7 +188,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
                 >
                   <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.doc_date)}</td>
                   <td className={`min-w-0 ${autoserviceListTdClass}`}>
-                    <div className="w-full truncate font-medium text-ink">{row.name || '—'}</div>
+                    <div className="w-0 min-w-full truncate font-medium text-ink">{row.name || '—'}</div>
                   </td>
                   <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
                     {row.quantity} {row.unit === 'pcs' ? 'шт.' : row.unit}

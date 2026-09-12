@@ -161,7 +161,7 @@ export default function AutoserviceWarehouseExpensesPage() {
                 <tr key={row.id} className={autoserviceListTrClass}>
                   <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.created_at)}</td>
                   <td className={`min-w-0 ${autoserviceListTdClass}`}>
-                    <div className="w-full truncate font-medium text-ink">{row.name || '—'}</div>
+                    <div className="w-0 min-w-full truncate font-medium text-ink">{row.name || '—'}</div>
                   </td>
                   <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
