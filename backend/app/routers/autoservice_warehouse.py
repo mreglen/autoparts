@@ -27,6 +27,7 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseReceiptDocDetailView,
     AutoserviceWarehouseReceiptDocListView,
     AutoserviceWarehouseReceiptDocUpdate,
+    AutoserviceWarehouseReceiptLineListView,
     AutoserviceWarehouseReceiptLinePriceUpdate,
     AutoserviceWarehouseReceiptLineUpdate,
     AutoserviceWarehouseReceiptSuggestView,
@@ -144,6 +145,42 @@ def _receipt_line_view(
         created_at=_line_created_at(row.created_at),
         creator_name=_creator_name(row.creator),
         **pricing_fields,
+    )
+
+
+def _receipt_line_list_view(
+    db: Session,
+    row: AutoserviceWarehouseReceipt,
+) -> AutoserviceWarehouseReceiptLineListView:
+    doc = row.document
+    line = _receipt_line_view(db, row, doc)
+    return AutoserviceWarehouseReceiptLineListView(
+        id=line.id,
+        doc_id=doc.id if doc else 0,
+        doc_number=doc.number if doc else "",
+        doc_date=doc.doc_date if doc else row.created_at,
+        supplier_name=resolve_autoservice_supplier_display_name(
+            db,
+            supplier_name=doc.supplier_name if doc else "",
+            source_order_type=doc.source_order_type if doc else None,
+            source_order_id=doc.source_order_id if doc else None,
+        ) if doc else "Поставщик",
+        item_id=line.item_id,
+        brand=line.brand,
+        article=line.article,
+        name=line.name,
+        quantity=line.quantity,
+        unit=line.unit,
+        unit_price=line.unit_price,
+        line_total=line.line_total,
+        repair_order_id=doc.repair_order_id if doc else row.repair_order_id,
+        repair_order_number=(
+            doc.repair_order.order_number
+            if doc and doc.repair_order
+            else (row.repair_order.order_number if row.repair_order else None)
+        ),
+        created_at=line.created_at,
+        creator_name=line.creator_name,
     )
 
 
@@ -385,6 +422,36 @@ def list_autoservice_warehouse_receipts(
         .all()
     )
     return [_doc_list_view(db, row) for row in rows]
+
+
+@router.get(
+    "/autoservice/warehouse/receipts/lines",
+    response_model=list[AutoserviceWarehouseReceiptLineListView],
+)
+def list_autoservice_warehouse_receipt_lines(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows = (
+        db.query(AutoserviceWarehouseReceipt)
+        .options(
+            joinedload(AutoserviceWarehouseReceipt.item),
+            joinedload(AutoserviceWarehouseReceipt.creator),
+            joinedload(AutoserviceWarehouseReceipt.repair_order),
+            joinedload(AutoserviceWarehouseReceipt.document).joinedload(
+                AutoserviceWarehouseReceiptDoc.repair_order
+            ),
+            joinedload(AutoserviceWarehouseReceipt.document).joinedload(
+                AutoserviceWarehouseReceiptDoc.creator
+            ),
+        )
+        .filter(AutoserviceWarehouseReceipt.organization_id == org_id)
+        .order_by(AutoserviceWarehouseReceipt.created_at.desc(), AutoserviceWarehouseReceipt.id.desc())
+        .limit(500)
+        .all()
+    )
+    return [_receipt_line_list_view(db, row) for row in rows]
 
 
 @router.get(

@@ -28,41 +28,29 @@ import {
   autoserviceListTrClickableClass,
 } from '../../utils/warehouseListUi';
 
-const deleteButtonClass =
-  'text-sm font-medium text-danger-600 transition hover:text-danger-700 disabled:cursor-wait disabled:opacity-60';
-
 function formatDate(value) {
   if (!value) return '—';
   return new Date(value).toLocaleDateString('ru-RU');
 }
 
-function ReceiptMobileCard({ row, onOpen, onDelete, deleting }) {
+function ReceiptMobileCard({ row, onOpen }) {
   return (
-    <div className="border-b border-line-soft py-3 last:border-b-0">
-      <button type="button" onClick={onOpen} className="w-full text-left">
-        <div className="flex items-start justify-between gap-2">
-          <span className="font-semibold text-brand-700">{row.number}</span>
-          <span className="shrink-0 tabular-nums font-semibold text-ink">
-            {formatAutoserviceWarehouseMoney(row.total_amount)}
-          </span>
-        </div>
-        <p className="mt-1 text-sm text-ink-muted">
-          {formatDate(row.doc_date)}
-          {' · '}
-          {row.supplier_name}
-        </p>
-      </button>
-      <div className="mt-2">
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={deleting}
-          className={deleteButtonClass}
-        >
-          Удалить
-        </button>
+    <button type="button" onClick={onOpen} className="w-full border-b border-line-soft py-3 text-left last:border-b-0">
+      <div className="flex items-start justify-between gap-2">
+        <span className="font-medium text-ink">{row.name || '—'}</span>
+        <span className="shrink-0 tabular-nums font-semibold text-ink">
+          {formatAutoserviceWarehouseMoney(row.line_total)}
+        </span>
       </div>
-    </div>
+      <p className="mt-1 text-xs text-ink-muted">
+        {formatDate(row.doc_date)}
+        {' · '}
+        {row.quantity} {row.unit === 'pcs' ? 'шт.' : row.unit}
+      </p>
+      <p className="mt-0.5 text-xs text-ink-muted">
+        ЗН: {row.repair_order_number || '—'}
+      </p>
+    </button>
   );
 }
 
@@ -80,7 +68,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await apiRequest('/autoservice/warehouse/receipts');
+      const data = await apiRequest('/autoservice/warehouse/receipts/lines');
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить поступления');
@@ -108,7 +96,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter((row) => [row.number, row.supplier_name, row.repair_order_number, row.creator_name]
+    return rows.filter((row) => [row.doc_number, row.name, row.supplier_name, row.repair_order_number]
       .some((value) => String(value || '').toLowerCase().includes(q)));
   }, [rows, searchQuery]);
 
@@ -137,7 +125,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
         <div>
           <h1 className={autoserviceListHeaderTitleClass}>Поступления</h1>
           <p className={autoserviceListHeaderSubtitleClass}>
-            {loading ? 'Загрузка…' : `${filteredRows.length} документов`}
+            {loading ? 'Загрузка…' : `${filteredRows.length} позиций`}
           </p>
         </div>
       </div>
@@ -146,7 +134,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
         <AutoserviceLiveSearchField
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="Поиск по номеру или поставщику"
+          placeholder="Поиск по товару или заказ-наряду"
           ariaLabel="Поиск поступлений"
         />
         <AutoserviceListRefreshButton loading={loading} onClick={loadRows} />
@@ -162,28 +150,28 @@ export default function AutoserviceWarehouseReceiptsPage() {
         <table className={autoserviceListTableClass}>
           <thead>
             <tr className={autoserviceListTheadRowClass}>
-              <th className={`w-32 ${autoserviceListThClass}`}>Номер</th>
               <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
-              <th className={autoserviceListThClass}>Поставщик</th>
+              <th className={autoserviceListThClass}>Наименование</th>
+              <th className={`w-24 ${autoserviceListThRightClass}`}>Кол-во</th>
               <th className={autoserviceListThRightClass}>Сумма</th>
-              <th className={autoserviceListThActionsClass}>Действия</th>
+              <th className={`w-32 ${autoserviceListThClass}`}>Заказ-наряд</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
             {loading ? (
               Array.from({ length: 6 }).map((_, index) => (
                 <tr key={`sk-${index}`}>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-40" /></td>
+                  <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
                   <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-20" /></td>
-                  <td className={autoserviceListTdActionsClass}><Skeleton className="ml-auto h-4 w-16" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
                 </tr>
               ))
             ) : filteredRows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-12 text-center text-ink-muted">
-                  Поступлений пока нет
+                  Позиций пока нет
                 </td>
               </tr>
             ) : (
@@ -191,28 +179,20 @@ export default function AutoserviceWarehouseReceiptsPage() {
                 <tr
                   key={row.id}
                   className={autoserviceListTrClickableClass}
-                  onClick={() => setSelectedDocId(row.id)}
+                  onClick={() => setSelectedDocId(row.doc_id)}
                 >
-                  <td className={autoserviceListTdClass}>
-                    <span className="font-semibold text-brand-700">{row.number}</span>
-                  </td>
                   <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.doc_date)}</td>
-                  <td className={autoserviceListTdClass}>{row.supplier_name}</td>
-                  <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
-                    {formatAutoserviceWarehouseMoney(row.total_amount)}
+                  <td className={autoserviceListTdClass}>
+                    <div className="font-medium text-ink">{row.name || '—'}</div>
                   </td>
-                  <td className={autoserviceListTdActionsClass}>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setDeleteDoc(row);
-                      }}
-                      disabled={Boolean(deletingDocId)}
-                      className={deleteButtonClass}
-                    >
-                      Удалить
-                    </button>
+                  <td className={`${autoserviceListTdRightClass} tabular-nums`}>
+                    {row.quantity} {row.unit === 'pcs' ? 'шт.' : row.unit}
+                  </td>
+                  <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                    {formatAutoserviceWarehouseMoney(row.line_total)}
+                  </td>
+                  <td className={`${autoserviceListTdClass} whitespace-nowrap`}>
+                    {row.repair_order_number || '—'}
                   </td>
                 </tr>
               ))
@@ -232,15 +212,13 @@ export default function AutoserviceWarehouseReceiptsPage() {
             ))}
           </div>
         ) : filteredRows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-ink-muted">Поступлений пока нет</p>
+          <p className="py-10 text-center text-sm text-ink-muted">Позиций пока нет</p>
         ) : (
           filteredRows.map((row) => (
             <ReceiptMobileCard
               key={row.id}
               row={row}
-              onOpen={() => setSelectedDocId(row.id)}
-              onDelete={() => setDeleteDoc(row)}
-              deleting={Boolean(deletingDocId)}
+              onOpen={() => setSelectedDocId(row.doc_id)}
             />
           ))
         )}

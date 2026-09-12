@@ -133,8 +133,6 @@ export default function AutoserviceWarehouseExpensesPage() {
           <thead>
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
-              <th className={`w-24 ${autoserviceListThClass}`}>Бренд</th>
-              <th className={`w-28 ${autoserviceListThClass}`}>Артикул</th>
               <th className={autoserviceListThClass}>Наименование</th>
               <th className={autoserviceListThRightClass}>Кол-во</th>
               <th className={autoserviceListThRightClass}>Цена</th>
@@ -146,8 +144,6 @@ export default function AutoserviceWarehouseExpensesPage() {
               Array.from({ length: 6 }).map((_, index) => (
                 <tr key={`sk-${index}`}>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
                   <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-12" /></td>
                   <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
@@ -156,7 +152,7 @@ export default function AutoserviceWarehouseExpensesPage() {
               ))
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-ink-muted">
+                <td colSpan={5} className="py-12 text-center text-ink-muted">
                   Расходов пока нет
                 </td>
               </tr>
@@ -164,8 +160,6 @@ export default function AutoserviceWarehouseExpensesPage() {
               filteredRows.map((row) => (
                 <tr key={row.id} className={autoserviceListTrClass}>
                   <td className={`${autoserviceListTdClass} whitespace-nowrap`}>{formatDate(row.created_at)}</td>
-                  <td className={`${autoserviceListTdClass} font-medium`}>{row.brand || '—'}</td>
-                  <td className={`${autoserviceListTdClass} font-mono text-ink-muted`}>{row.article || '—'}</td>
                   <td className={autoserviceListTdClass}>{row.name || '—'}</td>
                   <td className={`${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
                   <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>

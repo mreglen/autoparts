@@ -60,6 +60,28 @@ class AutoserviceWarehouseReceiptView(BaseModel):
     automatic_client_unit_price: Optional[Decimal] = None
 
 
+class AutoserviceWarehouseReceiptLineListView(BaseModel):
+    id: int
+    doc_id: int
+    doc_number: str
+    doc_date: date
+    supplier_name: str
+    item_id: int
+    brand: str
+    article: str
+    name: str
+    quantity: int
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+    unit_price: Decimal
+    line_total: Decimal
+    repair_order_id: Optional[int] = None
+    repair_order_number: Optional[str] = None
+    created_at: date
+    creator_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class AutoserviceWarehouseReceiptLinePriceUpdate(BaseModel):
     unit_price: Optional[Decimal] = Field(default=None, ge=0)
     client_unit_price_override: Optional[Decimal] = Field(default=None, ge=0)
