@@ -12,11 +12,11 @@ export const autoserviceListTableClass = 'min-w-full table-fixed divide-y divide
 export const autoserviceListTheadRowClass =
   'text-left text-xs font-semibold uppercase tracking-wide text-ink-muted';
 
-export const autoserviceListThClass = 'py-3 pr-3';
+export const autoserviceListThClass = 'py-2 pr-3';
 
-export const autoserviceListThRightClass = 'py-3 pr-3 text-right';
+export const autoserviceListThRightClass = 'py-2 pr-3 text-right';
 
-export const autoserviceListThActionsClass = 'w-28 py-3 text-right';
+export const autoserviceListThActionsClass = 'w-28 py-2 text-right';
 
 export const autoserviceListTbodyClass = 'divide-y divide-line-soft';
 
@@ -25,11 +25,11 @@ export const autoserviceListTrClickableClass =
 
 export const autoserviceListTrClass = 'group transition-colors hover:bg-surface-muted/70';
 
-export const autoserviceListTdClass = 'py-3 pr-3 align-middle';
+export const autoserviceListTdClass = 'py-2 pr-3 align-middle';
 
-export const autoserviceListTdRightClass = 'py-3 pr-3 text-right align-middle';
+export const autoserviceListTdRightClass = 'py-2 pr-3 text-right align-middle';
 
-export const autoserviceListTdActionsClass = 'py-3 text-right align-middle';
+export const autoserviceListTdActionsClass = 'py-2 text-right align-middle';
 
 export const autoserviceListErrorClass =
   'mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700';

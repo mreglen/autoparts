@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
+
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
 import Modal from '../../components/UI/Modal';
@@ -29,7 +29,6 @@ import { formatShopPartUnit, formatShopPartQty } from '../../utils/repairOrderSh
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
-  autoserviceListActionsButtonClass,
   autoserviceListErrorClass,
   autoserviceListHeaderSubtitleClass,
   autoserviceListHeaderTitleClass,
@@ -65,71 +64,29 @@ function formatReservationQty(qty, unit = 'pcs') {
   return `${formatShopPartQty(qty, unit)} ${formatShopPartUnit(unit)}`;
 }
 
-function WarehouseItemActionsMenu({
-  canAct,
-  onEdit,
-  onAddToOrder,
-  onWriteOff,
-  showLabel = true,
-}) {
-  return (
-    <ActionsDropdown
-      menuClassName="w-56 z-50"
-      estimatedMenuHeight={160}
-      showLabel={showLabel}
-      buttonClassName={autoserviceListActionsButtonClass}
-    >
-      <ActionsDropdownItem onClick={onEdit}>Редактировать</ActionsDropdownItem>
-      <ActionsDropdownItem disabled={!canAct} onClick={onAddToOrder}>
-        Добавить в заказ-наряд
-      </ActionsDropdownItem>
-      <ActionsDropdownItem disabled={!canAct} onClick={onWriteOff}>
-        Списать
-      </ActionsDropdownItem>
-    </ActionsDropdown>
-  );
-}
-
 function WarehouseItemMobileCard({
   item,
   displayPrice,
-  canAct,
   onOpen,
-  onEdit,
-  onAddToOrder,
-  onWriteOff,
 }) {
   return (
-    <div className="border-b border-line-soft py-3 last:border-b-0">
-      <div className="flex items-start justify-between gap-2">
-        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
-          <p className="font-medium text-ink">{item.name || '—'}</p>
-          <p className="mt-0.5 text-xs text-ink-muted">
-            {[item.brand, item.article].filter(Boolean).join(' · ') || `№${item.id}`}
-          </p>
-          <p className="mt-1 text-sm text-ink-muted">
-            {formatAutoserviceWarehouseQty(item)}
-            {' · '}
-            {formatAutoserviceWarehouseMoney(displayPrice)}
-          </p>
-        </button>
-        <div className="shrink-0" onClick={(event) => event.stopPropagation()}>
-          <WarehouseItemActionsMenu
-            canAct={canAct}
-            showLabel={false}
-            onEdit={onEdit}
-            onAddToOrder={onAddToOrder}
-            onWriteOff={onWriteOff}
-          />
-        </div>
-      </div>
-    </div>
+    <button type="button" onClick={onOpen} className="w-full border-b border-line-soft py-2 text-left last:border-b-0">
+      <p className="font-medium text-ink">{item.name || '—'}</p>
+      <p className="mt-0.5 text-xs text-ink-muted">
+        {[item.brand, item.article].filter(Boolean).join(' · ') || `№${item.id}`}
+      </p>
+      <p className="mt-1 text-sm text-ink-muted">
+        {formatAutoserviceWarehouseQty(item)}
+        {' · '}
+        {formatAutoserviceWarehouseMoney(displayPrice)}
+      </p>
+    </button>
   );
 }
 
 function PurchaseLotMobileCard({ lot, onReturn }) {
   return (
-    <div className="border-b border-line-soft py-3 last:border-b-0">
+    <div className="border-b border-line-soft py-2 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-ink">{lot.name}</p>
@@ -541,9 +498,9 @@ export default function AutoserviceWarehousePage() {
             {loading ? (
               <div className="divide-y divide-line-soft">
                 {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={`msk-lot-${index}`} className="py-3">
+                  <div key={`msk-lot-${index}`} className="border-b border-line-soft py-2 last:border-b-0">
                     <Skeleton className="h-4 w-32" />
-                    <Skeleton className="mt-2 h-3 w-40" />
+                    <Skeleton className="mt-1 h-3 w-40" />
                   </div>
                 ))}
               </div>
@@ -578,7 +535,6 @@ export default function AutoserviceWarehousePage() {
                       <span>Цена</span>
                     </span>
                   </th>
-                  <th className={autoserviceListThActionsClass}>Действия</th>
                 </tr>
               </thead>
               <tbody className={autoserviceListTbodyClass}>
@@ -588,12 +544,11 @@ export default function AutoserviceWarehousePage() {
                       <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-12" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
-                      <td className={autoserviceListTdActionsClass}><Skeleton className="ml-auto h-8 w-20 rounded-sg-sm" /></td>
                     </tr>
                   ))
                 ) : filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center text-ink-muted">
+                    <td colSpan={3} className="py-12 text-center text-ink-muted">
                       На складе автосервиса пока нет позиций
                     </td>
                   </tr>
@@ -603,15 +558,11 @@ export default function AutoserviceWarehousePage() {
                       item.unit_price,
                       catalogMarkupPercent,
                     );
-                    const canAct = Number(item.available_qty) > 0;
                     return (
                       <tr
                         key={item.id}
                         className={autoserviceListTrClickableClass}
-                        onClick={(event) => {
-                          if (event.target.closest('.actions-dropdown')) return;
-                          setDetailsItem(item);
-                        }}
+                        onClick={() => setDetailsItem(item)}
                       >
                         <td className={autoserviceListTdClass}>
                           <div className="font-medium text-ink">{item.name || '—'}</div>
@@ -625,14 +576,6 @@ export default function AutoserviceWarehousePage() {
                         <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                           {formatAutoserviceWarehouseMoney(displayPrice)}
                         </td>
-                        <td className={autoserviceListTdActionsClass}>
-                          <WarehouseItemActionsMenu
-                            canAct={canAct}
-                            onEdit={() => openEditItem(item)}
-                            onAddToOrder={() => openAddToOrder(item)}
-                            onWriteOff={() => openWriteOff(item)}
-                          />
-                        </td>
                       </tr>
                     );
                   })
@@ -645,12 +588,9 @@ export default function AutoserviceWarehousePage() {
             {loading ? (
               <div className="divide-y divide-line-soft">
                 {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={`msk-item-${index}`} className="flex items-start justify-between gap-3 py-3">
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-24" />
-                    </div>
-                    <Skeleton className="h-8 w-8 rounded-sg-sm" />
+                  <div key={`msk-item-${index}`} className="border-b border-line-soft py-2 last:border-b-0">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="mt-1 h-3 w-24" />
                   </div>
                 ))}
               </div>
@@ -664,17 +604,12 @@ export default function AutoserviceWarehousePage() {
                   item.unit_price,
                   catalogMarkupPercent,
                 );
-                const canAct = Number(item.available_qty) > 0;
                 return (
                   <WarehouseItemMobileCard
                     key={item.id}
                     item={item}
                     displayPrice={displayPrice}
-                    canAct={canAct}
                     onOpen={() => setDetailsItem(item)}
-                    onEdit={() => openEditItem(item)}
-                    onAddToOrder={() => openAddToOrder(item)}
-                    onWriteOff={() => openWriteOff(item)}
                   />
                 );
               })

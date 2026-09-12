@@ -35,7 +35,7 @@ function formatDate(value) {
 
 function ReceiptMobileCard({ row, onOpen }) {
   return (
-    <button type="button" onClick={onOpen} className="w-full border-b border-line-soft py-3 text-left last:border-b-0">
+    <button type="button" onClick={onOpen} className="w-full border-b border-line-soft py-2 text-left last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <span className="font-medium text-ink">{row.name || '—'}</span>
         <span className="shrink-0 tabular-nums font-semibold text-ink">
@@ -205,9 +205,9 @@ export default function AutoserviceWarehouseReceiptsPage() {
         {loading ? (
           <div className="divide-y divide-line-soft">
             {Array.from({ length: 5 }).map((_, index) => (
-              <div key={`msk-${index}`} className="py-3">
+              <div key={`msk-${index}`} className="border-b border-line-soft py-2 last:border-b-0">
                 <Skeleton className="h-4 w-24" />
-                <Skeleton className="mt-2 h-4 w-40" />
+                <Skeleton className="mt-1 h-4 w-40" />
               </div>
             ))}
           </div>
