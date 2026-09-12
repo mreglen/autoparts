@@ -12,6 +12,7 @@ import { captureBoundaryError } from './utils/sentry';
 import AuthSessionRenew from './components/AuthSessionRenew/AuthSessionRenew';
 import RouteFallback from './components/RouteFallback';
 import RequireAuth from './components/auth/RequireAuth';
+import AuthLoadingScreen from './components/AuthLoadingScreen/AuthLoadingScreen';
 import CookieBanner from './components/Legal/CookieBanner';
 import PullToRefresh from './components/PullToRefresh/PullToRefresh';
 import MainLayout from './layouts/MainLayout';
@@ -311,9 +312,10 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
   const autoserviceOrganizationId = useAutoserviceOrganizationId();
   const user = useSelector((state) => state.auth.user);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const profileLoading = useSelector((state) => state.auth.profileLoading);
   const cabinetMode = getCabinetMode(user, { autoserviceOrganizationId });
 
-  if (permissionCodes === null) return null;
+  if (profileLoading) return <AuthLoadingScreen className="min-h-screen" />;
 
   const accessOptions = {
     showAutoservice,
