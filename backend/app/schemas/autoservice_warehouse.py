@@ -139,6 +139,7 @@ class AutoserviceWarehouseExpenseView(BaseModel):
     name: str
     quantity: int
     unit_price: Decimal
+    client_unit_price: Decimal
     reason: Optional[str] = None
     repair_order_id: Optional[int] = None
     repair_order_number: Optional[str] = None

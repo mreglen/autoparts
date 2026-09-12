@@ -52,7 +52,7 @@ function ExpenseMobileCard({ row, onClick }) {
         <div className="shrink-0 text-right">
           <p className="tabular-nums text-sm font-semibold text-ink">{row.quantity} шт.</p>
           <p className="mt-0.5 tabular-nums text-xs text-ink-muted">
-            {formatAutoserviceWarehouseMoney(row.unit_price)}
+            {formatAutoserviceWarehouseMoney(row.client_unit_price)}
           </p>
         </div>
       </div>
@@ -210,10 +210,10 @@ export default function AutoserviceWarehouseExpensesPage() {
                   </td>
                   <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
-                    {formatAutoserviceWarehouseMoney(row.unit_price)}
+                    {formatAutoserviceWarehouseMoney(row.client_unit_price)}
                   </td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
-                    {formatAutoserviceWarehouseMoney(Number(row.unit_price || 0) * Number(row.quantity || 0))}
+                    {formatAutoserviceWarehouseMoney(Number(row.client_unit_price || 0) * Number(row.quantity || 0))}
                   </td>
                   <td className={`w-40 pl-3 ${autoserviceListTdClass} truncate text-center`}>
                     {row.repair_order_id ? (
@@ -223,12 +223,12 @@ export default function AutoserviceWarehouseExpensesPage() {
                           e.stopPropagation();
                           openRepairOrder(row.repair_order_id);
                         }}
-                        className="inline-flex w-full cursor-pointer items-center justify-center py-2.5 text-sm font-medium text-brand-600 transition hover:bg-surface-muted hover:underline"
+                        className="inline-flex w-full cursor-pointer items-center justify-center py-2.5 text-xs font-medium text-brand-600 transition hover:bg-surface-muted hover:underline"
                       >
                         Заказ-наряд {row.repair_order_number}
                       </button>
                     ) : (
-                      row.reason || '—'
+                      <span className="text-xs">{row.reason || '—'}</span>
                     )}
                   </td>
                 </tr>
@@ -279,12 +279,12 @@ export default function AutoserviceWarehouseExpensesPage() {
               </p>
               <p>
                 <span className="text-ink-muted">Цена:</span>{' '}
-                <span className="text-ink">{formatAutoserviceWarehouseMoney(viewExpense.unit_price)}</span>
+                <span className="text-ink">{formatAutoserviceWarehouseMoney(viewExpense.client_unit_price)}</span>
               </p>
               <p>
                 <span className="text-ink-muted">Сумма:</span>{' '}
                 <span className="text-ink font-semibold tabular-nums">
-                  {formatAutoserviceWarehouseMoney(Number(viewExpense.unit_price ?? 0) * Number(viewExpense.quantity ?? 0))}
+                  {formatAutoserviceWarehouseMoney(Number(viewExpense.client_unit_price ?? 0) * Number(viewExpense.quantity ?? 0))}
                 </span>
               </p>
             </div>

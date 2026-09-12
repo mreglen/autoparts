@@ -312,8 +312,9 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
   const user = useSelector((state) => state.auth.user);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const cabinetMode = getCabinetMode(user, { autoserviceOrganizationId });
-  const location = useLocation();
-  const navigate = useNavigate();
+
+  if (permissionCodes === null) return null;
+
   const accessOptions = {
     showAutoservice,
     autoserviceOrganizationId,
@@ -321,18 +322,6 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
     organizationIsAutoservice: Boolean(user?.organization_is_autoservice),
     permissionCodes: permissionCodes || [],
   };
-
-  useEffect(() => {
-    if (cabinetMode !== CABINET_MODE_AUTOSERVICE) return;
-    if (!AUTOSERVICE_STAFF_TABS.includes(location.pathname)) return;
-    const [navEntry] = window.performance?.getEntriesByType('navigation') || [];
-    const isReload =
-      navEntry?.type === 'reload' ||
-      (window.performance?.navigation?.type === 1);
-    if (isReload) {
-      navigate('/autoservice/planner', { replace: true });
-    }
-  }, []);
 
   if (!showAutoservice && !user?.is_admin) {
     return <Navigate to="/" replace />;

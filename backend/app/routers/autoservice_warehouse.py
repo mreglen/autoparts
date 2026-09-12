@@ -775,6 +775,7 @@ def list_autoservice_warehouse_expenses(
                 name=item.name if item else "",
                 quantity=int(row.quantity or 0),
                 unit_price=row.unit_price,
+                client_unit_price=row.client_unit_price,
                 reason=row.reason,
                 repair_order_id=repair_order_id,
                 repair_order_number=repair_order_number,

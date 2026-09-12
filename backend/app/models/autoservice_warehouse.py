@@ -155,6 +155,7 @@ class AutoserviceWarehouseExpense(Base):
     )
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Numeric(12, 2), nullable=False, default=0)
+    client_unit_price = Column(Numeric(12, 2), nullable=False, default=0)
     reason = Column(String(255), nullable=True)
     return_request_id = Column(
         Integer,

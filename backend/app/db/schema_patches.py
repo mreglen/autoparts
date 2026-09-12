@@ -5653,6 +5653,7 @@ def ensure_autoservice_warehouse_tables() -> None:
             item_id INTEGER NOT NULL REFERENCES autoservice_warehouse_items(id) ON DELETE CASCADE,
             quantity INTEGER NOT NULL,
             unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            client_unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
             reason VARCHAR(255),
             created_by INTEGER NOT NULL REFERENCES users(id),
             created_at DATE NOT NULL DEFAULT CURRENT_DATE
@@ -5695,6 +5696,7 @@ def ensure_autoservice_warehouse_tables() -> None:
             item_id INTEGER NOT NULL REFERENCES autoservice_warehouse_items(id) ON DELETE CASCADE,
             quantity INTEGER NOT NULL,
             unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            client_unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
             reason VARCHAR(255),
             created_by INTEGER NOT NULL REFERENCES users(id),
             created_at DATE NOT NULL DEFAULT CURRENT_DATE
@@ -5925,6 +5927,24 @@ def ensure_autoservice_warehouse_return_tables() -> None:
                     )
                 )
     logger.info("Ensured autoservice warehouse return tables")
+
+
+def ensure_autoservice_warehouse_expenses_client_unit_price() -> None:
+    """Add client_unit_price column to autoservice warehouse expenses."""
+    inspector = inspect(engine)
+    if "autoservice_warehouse_expenses" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("autoservice_warehouse_expenses")}
+    if "client_unit_price" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE autoservice_warehouse_expenses "
+                "ADD COLUMN client_unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0"
+            )
+        )
+    logger.info("Applied autoservice_warehouse_expenses.client_unit_price patch")
 
 
 def ensure_autoservice_warehouse_item_internal_key() -> None:
