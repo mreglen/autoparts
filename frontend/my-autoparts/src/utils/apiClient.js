@@ -16,9 +16,17 @@ const normalizeBaseUrl = (url) => {
     return String(url).trim().replace(/\/+$/, '');
 };
 
+const isLoopbackUrl = (url) => {
+    if (!url) return false;
+    return /(?:127\.0\.0\.1|localhost)(?::\d+)?/.test(String(url));
+};
+
 /** Fallback when CRA build missed REACT_APP_* (avoids `/undefined/...` → nginx 405). */
 const resolveApiBase = () => {
-    const fromEnv = normalizeBaseUrl(process.env.REACT_APP_API_BASE_URL);
+    let fromEnv = normalizeBaseUrl(process.env.REACT_APP_API_BASE_URL);
+    if (process.env.NODE_ENV === 'production' && isLoopbackUrl(fromEnv)) {
+        fromEnv = '';
+    }
     if (fromEnv) return fromEnv;
     if (typeof window !== 'undefined' && window.location?.origin) {
         return `${window.location.origin}/server/api`;
@@ -27,7 +35,10 @@ const resolveApiBase = () => {
 };
 
 const resolveBackendBase = () => {
-    const fromEnv = normalizeBaseUrl(process.env.REACT_APP_BACKEND_BASE_URL);
+    let fromEnv = normalizeBaseUrl(process.env.REACT_APP_BACKEND_BASE_URL);
+    if (process.env.NODE_ENV === 'production' && isLoopbackUrl(fromEnv)) {
+        fromEnv = '';
+    }
     if (fromEnv) return fromEnv;
     if (typeof window !== 'undefined' && window.location?.origin) {
         return `${window.location.origin}/server`;
