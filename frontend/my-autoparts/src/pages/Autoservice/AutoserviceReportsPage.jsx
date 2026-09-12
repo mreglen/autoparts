@@ -12,7 +12,6 @@ import { formatServerDateTime } from '../../utils/serverDate';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import {
-  DataTable,
   EmptyState,
   PageHeader,
   Skeleton,
@@ -24,6 +23,16 @@ import {
   warehousePillControlClass,
   warehousePrimaryButtonClass,
   warehouseToolbarClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTableClass,
+  autoserviceListTheadRowClass,
+  autoserviceListThClass,
+  autoserviceListThRightClass,
+  autoserviceListTbodyClass,
+  autoserviceListTrClass,
+  autoserviceListTrClickableClass,
+  autoserviceListTdClass,
+  autoserviceListTdRightClass,
 } from '../../utils/warehouseListUi';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import RepairOrderViewModal, {
@@ -688,7 +697,7 @@ export default function AutoserviceReportsPage() {
       <PageHeader
         className="mb-0"
         title="Отчёты"
-        subtitle="Экономика, платежи, зарплаты и остатки склада"
+        subtitle=""
         action={
           tab === 'payments' ? (
             <div className="text-right">
@@ -768,7 +777,7 @@ export default function AutoserviceReportsPage() {
           <MobileCollapsibleFilters title="Период">
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block min-w-0">
-                <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
+                <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
                 <input
                   type="date"
                   value={dateFrom}
@@ -782,7 +791,7 @@ export default function AutoserviceReportsPage() {
                 />
               </label>
               <label className="block min-w-0">
-                <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
+                <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
                 <input
                   type="date"
                   value={dateTo}
@@ -856,41 +865,66 @@ export default function AutoserviceReportsPage() {
                   ))
                 )}
               </div>
-              <div className="hidden md:block">
-                <DataTable
-                  columns={[
-                    { key: 'sequential_number', label: '№' },
-                    {
-                      key: 'repair_order_number',
-                      label: 'Заказ-наряд',
-                      render: (row) => (
-                        <RepairOrderLink
-                          orderId={row.repair_order_id}
-                          orderNumber={row.repair_order_number}
-                          onOpen={openOrderView}
-                        />
-                      ),
-                    },
-                    {
-                      key: 'client_name',
-                      label: 'Клиент',
-                      render: (row) => row.client_name || '—',
-                    },
-                    { key: 'method', label: 'Способ', render: (row) => METHOD_LABELS[row.method] || row.method || '' },
-                    { key: 'amount', label: 'Сумма', render: (row) => formatFinanceCurrency(row.amount) },
-                    { key: 'created_at', label: 'Дата', render: (row) => row.created_at ? formatServerDateTime(row.created_at) : '' },
-                  ]}
-                  rows={paymentItems}
-                  footer={{
-                    sequential_number: 'Итого',
-                    repair_order_number: `${payments.count ?? 0} платежей`,
-                    client_name: '',
-                    method: '',
-                    amount: payments.total_amount,
-                    created_at: '',
-                  }}
-                  empty={<EmptyState illustration="empty" title="Нет платежей" description="За выбранный период оплат по заказ-нарядам нет." />}
-                />
+              <div className={`hidden md:block ${paymentItems.length ? '' : 'min-h-[16rem]'}`}>
+                {paymentItems.length ? (
+                  <div className={autoserviceListTableWrapClass}>
+                    <table className={autoserviceListTableClass}>
+                      <thead>
+                        <tr className={autoserviceListTheadRowClass}>
+                          <th className={`w-16 ${autoserviceListThClass}`}>№</th>
+                          <th className={`w-28 ${autoserviceListThClass}`}>Заказ-наряд</th>
+                          <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
+                          <th className={`w-32 ${autoserviceListThClass}`}>Способ</th>
+                          <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
+                          <th className={`w-36 whitespace-nowrap ${autoserviceListThRightClass}`}>Дата</th>
+                        </tr>
+                      </thead>
+                      <tbody className={autoserviceListTbodyClass}>
+                        {paymentItems.map((row) => (
+                          <tr
+                            key={`${row.sequential_number}-${row.created_at}`}
+                            className={autoserviceListTrClass}
+                          >
+                            <td className={autoserviceListTdClass}>{row.sequential_number}</td>
+                            <td className={autoserviceListTdClass}>
+                              <RepairOrderLink
+                                orderId={row.repair_order_id}
+                                orderNumber={row.repair_order_number}
+                                onOpen={openOrderView}
+                              />
+                            </td>
+                            <td className={autoserviceListTdClass}>{row.client_name || '—'}</td>
+                            <td className={autoserviceListTdClass}>{METHOD_LABELS[row.method] || row.method || '—'}</td>
+                            <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                              {formatFinanceCurrency(row.amount)}
+                            </td>
+                            <td className={`w-36 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>
+                              {row.created_at ? formatServerDateTime(row.created_at) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="border-t border-line">
+                        <tr className={autoserviceListTrClass}>
+                          <td className={autoserviceListTdClass} colSpan={4}>
+                            <span className="font-semibold text-ink">Итого</span>
+                            <span className="ml-1 text-ink-muted">{payments.count ?? 0} платежей</span>
+                          </td>
+                          <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                            {formatFinanceCurrency(payments.total_amount)}
+                          </td>
+                          <td className={`w-36 whitespace-nowrap ${autoserviceListTdRightClass}`} />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  <EmptyState
+                    illustration="empty"
+                    title="Нет платежей"
+                    description="За выбранный период оплат по заказ-нарядам нет."
+                  />
+                )}
               </div>
             </>
           )}
@@ -993,24 +1027,24 @@ export default function AutoserviceReportsPage() {
                 {!payrollRows.length ? (
                   <EmptyState illustration="empty" title="Нет данных" description="За этот месяц начислений по заказ-нарядам нет." />
                 ) : (
-                  <div className="overflow-x-auto rounded-sg-lg border border-line bg-surface">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="bg-surface-muted text-xs uppercase tracking-wide text-ink-muted">
-                        <tr>
-                          <th className="w-10 px-4 py-3 font-semibold" aria-hidden="true" />
-                          <th className="px-4 py-3 font-semibold">Сотрудник</th>
-                          <th className="px-4 py-3 font-semibold">Заказ-наряды</th>
-                          <th className="px-4 py-3 font-semibold">Итого</th>
+                  <div className={autoserviceListTableWrapClass}>
+                    <table className={autoserviceListTableClass}>
+                      <thead>
+                        <tr className={autoserviceListTheadRowClass}>
+                          <th className={`w-10 ${autoserviceListThClass}`} aria-hidden="true" />
+                          <th className={`min-w-0 ${autoserviceListThClass}`}>Сотрудник</th>
+                          <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Заказ-наряды</th>
+                          <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Итого</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-line">
+                      <tbody className={autoserviceListTbodyClass}>
                         {payrollRows.map((row) => {
                           const isExpanded = expandedEmployeeId === row.employee_id;
                           const orders = row.orders || [];
                           return (
                             <Fragment key={row.employee_id}>
                               <tr
-                                className="cursor-pointer hover:bg-surface-muted/60"
+                                className={autoserviceListTrClickableClass}
                                 onClick={() => toggleEmployeeExpand(row.employee_id)}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter' || e.key === ' ') {
@@ -1023,12 +1057,14 @@ export default function AutoserviceReportsPage() {
                                 aria-expanded={isExpanded}
                                 aria-label={`${row.name}, ${formatFinanceCurrency(row.total)}`}
                               >
-                                <td className="px-4 py-3">
+                                <td className={autoserviceListTdClass}>
                                   <ExpandChevron expanded={isExpanded} />
                                 </td>
-                                <td className="px-4 py-3 font-medium text-ink-soft">{row.name}</td>
-                                <td className="px-4 py-3 text-ink-soft">{row.completed_orders}</td>
-                                <td className="px-4 py-3 tabular-nums text-ink-soft">{formatFinanceCurrency(row.total)}</td>
+                                <td className={autoserviceListTdClass}>
+                                  <div className="font-semibold text-ink">{row.name}</div>
+                                </td>
+                                <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>{row.completed_orders}</td>
+                                <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatFinanceCurrency(row.total)}</td>
                               </tr>
                               {isExpanded ? (
                                 <tr>
@@ -1036,26 +1072,28 @@ export default function AutoserviceReportsPage() {
                                     {!orders.length ? (
                                       <p className="text-sm text-ink-muted">Нет начислений по заказ-нарядам</p>
                                     ) : (
-                                      <table className="min-w-full text-left text-sm">
+                                      <table className={autoserviceListTableClass}>
                                         <thead>
-                                          <tr className="text-xs uppercase tracking-wide text-ink-muted">
-                                            <th className="pb-2 pr-4 font-semibold">Номер заказ-наряда</th>
-                                            <th className="pb-2 pr-4 font-semibold">Автомобиль</th>
-                                            <th className="pb-2 font-semibold">Сумма</th>
+                                          <tr className={autoserviceListTheadRowClass}>
+                                            <th className={`min-w-0 ${autoserviceListThClass}`}>Номер заказ-наряда</th>
+                                            <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
+                                            <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
                                           </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-line/60">
+                                        <tbody className={autoserviceListTbodyClass}>
                                           {orders.map((order) => (
-                                            <tr key={order.order_id} className="hover:bg-surface-muted/60">
-                                              <td className="py-2 pr-4">
+                                            <tr key={order.order_id} className={autoserviceListTrClass}>
+                                              <td className={autoserviceListTdClass}>
                                                 <RepairOrderLink
                                                   orderId={order.order_id}
                                                   orderNumber={order.order_number}
                                                   onOpen={openOrderView}
                                                 />
                                               </td>
-                                              <td className="py-2 pr-4 text-ink-soft">{vehicleLabel(order.vehicle)}</td>
-                                              <td className="py-2 tabular-nums text-ink-soft">
+                                              <td className={autoserviceListTdClass}>
+                                                <div className="w-0 min-w-full truncate text-ink-muted">{vehicleLabel(order.vehicle)}</div>
+                                              </td>
+                                              <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                                                 {formatFinanceCurrency(order.amount)}
                                               </td>
                                             </tr>
@@ -1070,12 +1108,14 @@ export default function AutoserviceReportsPage() {
                           );
                         })}
                       </tbody>
-                      <tfoot className="border-t border-line bg-surface-muted/60">
-                        <tr>
-                          <td className="px-4 py-3" />
-                          <td className="px-4 py-3 font-semibold text-ink">Итого</td>
-                          <td className="px-4 py-3 font-semibold text-ink">{payrollOrderCount}</td>
-                          <td className="px-4 py-3 font-semibold tabular-nums text-ink">
+                      <tfoot className="border-t border-line">
+                        <tr className={autoserviceListTrClass}>
+                          <td className={autoserviceListTdClass} />
+                          <td className={autoserviceListTdClass}>
+                            <span className="font-semibold text-ink">Итого</span>
+                          </td>
+                          <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>{payrollOrderCount}</td>
+                          <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                             {formatFinanceCurrency(payroll.total)}
                           </td>
                         </tr>
@@ -1093,7 +1133,7 @@ export default function AutoserviceReportsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="block min-w-0">
-                  <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
+                  <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
                   <input
                     type="date"
                     value={dateFrom}
@@ -1107,7 +1147,7 @@ export default function AutoserviceReportsPage() {
                   />
                 </label>
                 <label className="block min-w-0">
-                  <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
+                  <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
                   <input
                     type="date"
                     value={dateTo}
@@ -1250,10 +1290,14 @@ export default function AutoserviceReportsPage() {
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-sm text-ink">{row.client_name || '—'}</p>
-                        <p className="text-sm text-ink-muted">{vehicleLabel(row.vehicle)}</p>
-                        <p className="text-xs text-ink-faint">
-                          {row.scheduled_at ? formatServerDateTime(row.scheduled_at) : '—'}
+                        <p className="truncate text-sm">
+                          <span className="text-ink">{row.client_name || '—'}</span>
+                          <span className="mx-1 text-ink-muted">·</span>
+                          <span className="text-ink-muted">{vehicleLabel(row.vehicle)}</span>
+                          <span className="mx-1 text-ink-muted">·</span>
+                          <span className="text-ink-faint">
+                            {row.scheduled_at ? formatServerDateTime(row.scheduled_at) : '—'}
+                          </span>
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
@@ -1385,42 +1429,42 @@ export default function AutoserviceReportsPage() {
                 })}
               </div>
 
-              <div className="hidden md:block overflow-x-auto rounded-sg-lg border border-line bg-surface">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-surface-muted text-xs uppercase tracking-wide text-ink-muted">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold">Наименование</th>
-                      <th className="px-4 py-3 font-semibold">Ед.</th>
-                      <th className="px-4 py-3 font-semibold">Остаток на конец</th>
+              <div className={autoserviceListTableWrapClass}>
+                <table className={autoserviceListTableClass}>
+                  <thead>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
+                      <th className={`w-20 ${autoserviceListThClass}`}>Ед.</th>
+                      <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Остаток на конец</th>
                       {warehouseStock.is_current_month ? (
                         <>
-                          <th className="px-4 py-3 font-semibold">Резерв</th>
-                          <th className="px-4 py-3 font-semibold">Доступно</th>
+                          <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Резерв</th>
+                          <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Доступно</th>
                         </>
                       ) : null}
-                      <th className="px-4 py-3 font-semibold">Цена</th>
-                      <th className="px-4 py-3 font-semibold">Сумма</th>
+                      <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Цена</th>
+                      <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line">
+                  <tbody className={autoserviceListTbodyClass}>
                     {warehouseStockItems.map((row) => {
                       const { primary, secondary } = warehouseStockNameParts(row);
                       return (
-                        <tr key={row.id} className="align-top hover:bg-surface-muted/60">
-                          <td className="px-4 py-3">
-                            <p className="font-medium text-ink">{primary}</p>
-                            {secondary ? <p className="mt-0.5 text-xs text-ink-muted">{secondary}</p> : null}
+                        <tr key={row.id} className={autoserviceListTrClass}>
+                          <td className={autoserviceListTdClass}>
+                            <div className="w-0 min-w-full truncate font-semibold text-ink">{primary}</div>
+                            {secondary ? <p className="mt-0.5 truncate text-xs text-ink-muted">{secondary}</p> : null}
                           </td>
-                          <td className="px-4 py-3 tabular-nums">{formatShopPartUnit(row.unit)}</td>
-                          <td className="px-4 py-3 tabular-nums">{row.closing_qty}</td>
+                          <td className={autoserviceListTdClass}>{formatShopPartUnit(row.unit)}</td>
+                          <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>{row.closing_qty}</td>
                           {warehouseStock.is_current_month ? (
                             <>
-                              <td className="px-4 py-3 tabular-nums">{row.reserved_qty ?? '—'}</td>
-                              <td className="px-4 py-3 tabular-nums">{row.available_qty ?? '—'}</td>
+                              <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>{row.reserved_qty ?? '—'}</td>
+                              <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>{row.available_qty ?? '—'}</td>
                             </>
                           ) : null}
-                          <td className="px-4 py-3 tabular-nums">{formatAutoserviceWarehouseMoney(row.unit_price)}</td>
-                          <td className="px-4 py-3 tabular-nums font-medium">{formatAutoserviceWarehouseMoney(row.stock_amount)}</td>
+                          <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>{formatAutoserviceWarehouseMoney(row.unit_price)}</td>
+                          <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatAutoserviceWarehouseMoney(row.stock_amount)}</td>
                         </tr>
                       );
                     })}
@@ -1442,7 +1486,7 @@ export default function AutoserviceReportsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="block min-w-0">
-                  <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
+                  <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
                   <input
                     type="date"
                     value={dateFrom}
@@ -1456,7 +1500,7 @@ export default function AutoserviceReportsPage() {
                   />
                 </label>
                 <label className="block min-w-0">
-                  <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
+                  <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
                   <input
                     type="date"
                     value={dateTo}

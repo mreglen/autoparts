@@ -7,6 +7,15 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
 import { Skeleton, UnderlineTabs, NumericInput } from '../../components/UI';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+import {
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTheadRowClass,
+  autoserviceListThClass,
+  autoserviceListTbodyClass,
+  autoserviceListTrClickableClass,
+  autoserviceListTdClass,
+} from '../../utils/warehouseListUi';
 import RepairOrderViewModal, {
   OrderStatusBadge,
   vehicleLabel,
@@ -576,7 +585,7 @@ function ClientProfileModal({
     { id: 'profile', label: 'Профиль' },
     { id: 'vehicles', label: 'Автомобили', count: loading ? undefined : vehicles.length },
     { id: 'orders', label: 'Заказ-наряды', count: ordersLoading ? undefined : orders.length },
-    { id: 'bookings', label: 'Заявки', count: bookingsLoading ? undefined : bookings.length },
+    { id: 'bookings', label: 'Записи', count: bookingsLoading ? undefined : bookings.length },
   ];
   const filteredOrders = vehicleOrderFilterId ? orders.filter((row) => row.vehicle_id === vehicleOrderFilterId) : orders;
   const filteredVehicle = vehicleOrderFilterId
@@ -1400,16 +1409,16 @@ export default function AutoserviceClientsPage() {
         </p>
       ) : null}
 
-      <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-full table-fixed divide-y divide-line text-sm">
+      <div className={autoserviceListTableWrapClass}>
+        <table className={autoserviceListTableClass}>
           <thead>
-            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">
-              <th className="py-3 pr-3">Имя</th>
-              <th className="w-44 py-3 pr-3">Телефон</th>
-              <th className="w-28 py-3">Аккаунт</th>
+            <tr className={autoserviceListTheadRowClass}>
+              <th className={`min-w-0 ${autoserviceListThClass}`}>Имя</th>
+              <th className={`w-44 ${autoserviceListThClass}`}>Телефон</th>
+              <th className={`w-28 ${autoserviceListThClass}`}>Аккаунт</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line-soft">
+          <tbody className={autoserviceListTbodyClass}>
             {loading ? (
               <tr>
                 <td colSpan={3} className="py-12 text-center text-ink-muted">
@@ -1428,21 +1437,21 @@ export default function AutoserviceClientsPage() {
                 return (
                   <tr
                     key={row.id}
-                    className="cursor-pointer transition-colors hover:bg-surface-muted/70"
+                    className={autoserviceListTrClickableClass}
                     onClick={() => openClientVehicles(row)}
                   >
-                    <td className="py-3 pr-3 align-middle">
-                      <p className="font-medium text-ink">{row.name}</p>
+                    <td className={autoserviceListTdClass}>
+                      <p className="font-semibold text-ink">{row.name}</p>
                       {hint ? (
                         <p className="mt-0.5 truncate text-xs text-brand-600" title={hint}>
                           Найдено по: {hint}
                         </p>
                       ) : null}
                     </td>
-                    <td className="whitespace-nowrap py-3 pr-3 align-middle tabular-nums text-ink-soft">
+                    <td className={`${autoserviceListTdClass} whitespace-nowrap tabular-nums text-ink-muted`}>
                       {row.phone || '—'}
                     </td>
-                    <td className="py-3 align-middle">
+                    <td className={autoserviceListTdClass}>
                       <AccountBadge userId={row.user_id} />
                     </td>
                   </tr>

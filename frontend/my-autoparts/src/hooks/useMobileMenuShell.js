@@ -312,7 +312,7 @@ export function getPageTitle(pathname) {
         '/autoservice/clients': 'Клиенты автосервиса',
         '/autoservice/orders': 'Заказ-наряды',
         '/autoservice/orders/new': 'Новый заказ-наряд',
-        '/autoservice/inspections': 'Заявки',
+        '/autoservice/inspections': 'Записи',
         '/autoservice/finance': 'Финансы',
         '/autoservice/payroll': 'Зарплата',
         '/autoservice/reports': 'Отчёты',

@@ -15,10 +15,7 @@ import {
 } from '../../utils/repairOrderShopPartUtils';
 import { splitVatInclusive } from '../../utils/updDocument';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
-import {
-  AUTOSERVICE_PAYMENT_METHOD_LABELS,
-  paymentReceiptPrintUrl,
-} from '../../utils/autoservicePaymentReceipt';
+import { AUTOSERVICE_PAYMENT_METHOD_LABELS } from '../../utils/autoservicePaymentReceipt';
 
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
@@ -131,7 +128,7 @@ function PaymentWizard({
                 onClick={onPrintReceipt}
                 className="inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
               >
-                Печать чека
+                История
               </button>
             ) : null}
             {fullyPaid ? (
@@ -471,7 +468,7 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
                   {formatMoney(w.line_sum ?? lineSum(w.qty, w.unit_price))}
                 </td>
                 {showExecutors ? (
-                  <td className="py-1.5 pr-4">
+                  <td className="py-1.5 pr-5">
                     {(w.executors || []).length
                       ? (w.executors || []).map((ex) => (
                           <span key={ex.employee_id} className="mr-2 inline-block">
@@ -584,7 +581,9 @@ export default function RepairOrderViewModal({
   const [orderPayments, setOrderPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsError, setPaymentsError] = useState('');
-  const [selectedPaymentIds, setSelectedPaymentIds] = useState([]);
+  const [selectedPaymentId, setSelectedPaymentId] = useState(null);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [cancelSaving, setCancelSaving] = useState(false);
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -601,7 +600,9 @@ export default function RepairOrderViewModal({
     setReceiptPickerOpen(false);
     setOrderPayments([]);
     setPaymentsError('');
-    setSelectedPaymentIds([]);
+    setSelectedPaymentId(null);
+    setCancelConfirmOpen(false);
+    setCancelSaving(false);
     setStatusPickerOpen(false);
   }, [order?.id]);
 
@@ -638,19 +639,40 @@ export default function RepairOrderViewModal({
     }
   }, [order?.id]);
 
-  const openReceiptPicker = useCallback(async () => {
+  const openPaymentHistory = useCallback(async () => {
     setReceiptPickerOpen(true);
-    const items = await loadOrderPayments();
-    setSelectedPaymentIds(items.map((row) => row.id));
+    setSelectedPaymentId(null);
+    await loadOrderPayments();
   }, [loadOrderPayments]);
 
-  const handlePrintSelectedReceipts = useCallback(() => {
-    if (!order?.id || selectedPaymentIds.length === 0) return;
-    const url = paymentReceiptPrintUrl(order.id, selectedPaymentIds);
-    if (!url) return;
-    window.open(url, '_blank', 'noopener,noreferrer');
-    setReceiptPickerOpen(false);
-  }, [order?.id, selectedPaymentIds]);
+  const reloadOrder = useCallback(async () => {
+    if (!order?.id) return null;
+    try {
+      const updated = await apiRequest(`/autoservice/repair-orders/${order.id}`);
+      onOrderChange?.(updated);
+      return updated;
+    } catch (e) {
+      return null;
+    }
+  }, [order?.id, onOrderChange]);
+
+  const handleCancelPayment = useCallback(async () => {
+    if (!selectedPaymentId) return;
+    setCancelSaving(true);
+    setPaymentsError('');
+    try {
+      await apiRequest(`/autoservice/finance/receipts/${selectedPaymentId}`, { method: 'DELETE' });
+      setCancelConfirmOpen(false);
+      setReceiptPickerOpen(false);
+      setSelectedPaymentId(null);
+      await loadOrderPayments();
+      await reloadOrder();
+    } catch (e) {
+      setPaymentsError(e?.message || 'Не удалось отменить операцию');
+    } finally {
+      setCancelSaving(false);
+    }
+  }, [selectedPaymentId, loadOrderPayments, reloadOrder]);
 
   const paymentsByDate = useMemo(() => {
     const groups = new Map();
@@ -876,11 +898,11 @@ export default function RepairOrderViewModal({
                 {hasPayments && !payOpen ? (
                   <button
                     type="button"
-                    onClick={openReceiptPicker}
+                    onClick={openPaymentHistory}
                     disabled={paymentsLoading}
                     className={secondaryBtnClass}
                   >
-                    Печать чека
+                    История
                   </button>
                 ) : null}
               </div>
@@ -963,7 +985,7 @@ export default function RepairOrderViewModal({
           onSubmit={handleSubmitPayment}
           onPayMore={handlePayMore}
           onBackToDetails={resetPaymentWizard}
-          onPrintReceipt={openReceiptPicker}
+          onPrintReceipt={openPaymentHistory}
         />
       ) : (
         <div className="space-y-5">
@@ -1050,14 +1072,11 @@ export default function RepairOrderViewModal({
     <Modal
       open={receiptPickerOpen && Boolean(order?.id)}
       onClose={() => setReceiptPickerOpen(false)}
-      title="Печать чека"
+      title="История"
       size="sm"
       wrapperClassName="z-[120]"
     >
       <div className="space-y-4">
-        <p className="text-sm text-ink-muted">
-          Выберите операции оплаты по заказ-наряду. В документ попадут только отмеченные строки.
-        </p>
         {paymentsLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full rounded-sg-sm" />
@@ -1076,24 +1095,19 @@ export default function RepairOrderViewModal({
                 </h3>
                 <div className="space-y-2">
                   {rows.map((payment) => {
-                    const checked = selectedPaymentIds.includes(payment.id);
+                    const selected = selectedPaymentId === payment.id;
                     return (
-                      <label
+                      <button
                         key={payment.id}
-                        className="flex cursor-pointer items-start gap-3 rounded-sg-sm border border-line px-3 py-2.5 hover:bg-surface-muted"
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setSelectedPaymentId(selected ? null : payment.id)}
+                        className={`flex w-full items-start gap-3 rounded-sg-sm border px-3 py-2.5 text-left transition hover:bg-surface-muted ${
+                          selected
+                            ? 'border-brand-500 ring-1 ring-brand-500'
+                            : 'border-line'
+                        }`}
                       >
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 h-4 w-4 rounded border-line-strong text-brand-600 focus:ring-brand-500"
-                          checked={checked}
-                          onChange={() => {
-                            setSelectedPaymentIds((prev) => (
-                              checked
-                                ? prev.filter((id) => id !== payment.id)
-                                : [...prev, payment.id]
-                            ));
-                          }}
-                        />
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-medium text-ink">
                             {AUTOSERVICE_PAYMENT_METHOD_LABELS[payment.method] || payment.method}
@@ -1107,7 +1121,7 @@ export default function RepairOrderViewModal({
                               : ''}
                           </span>
                         </span>
-                      </label>
+                      </button>
                     );
                   })}
                 </div>
@@ -1118,18 +1132,48 @@ export default function RepairOrderViewModal({
         <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            onClick={() => setReceiptPickerOpen(false)}
+            onClick={() => (selectedPaymentId ? setCancelConfirmOpen(true) : setReceiptPickerOpen(false))}
+            disabled={paymentsLoading || cancelSaving}
             className={secondaryBtnClass}
           >
-            Отмена
+            {selectedPaymentId ? 'Отменить операцию' : 'Закрыть'}
           </button>
           <button
             type="button"
-            onClick={handlePrintSelectedReceipts}
-            disabled={paymentsLoading || selectedPaymentIds.length === 0}
+            onClick={() => setReceiptPickerOpen(false)}
+            disabled={paymentsLoading || cancelSaving}
             className={primaryBtnClass}
           >
-            Печать
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </Modal>
+    <Modal
+      open={cancelConfirmOpen}
+      onClose={() => setCancelConfirmOpen(false)}
+      title="Подтверждение"
+      size="sm"
+      wrapperClassName="z-[130]"
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-ink">Точно хотите отменить?</p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setCancelConfirmOpen(false)}
+            disabled={cancelSaving}
+            className={secondaryBtnClass}
+          >
+            Нет, оставить
+          </button>
+          <button
+            type="button"
+            onClick={handleCancelPayment}
+            disabled={cancelSaving}
+            className={primaryBtnClass}
+          >
+            {cancelSaving ? 'Отмена…' : 'Да, отменить'}
           </button>
         </div>
       </div>

@@ -874,6 +874,29 @@ def create_autoservice_expense(
     return expense
 
 
+def delete_autoservice_expense(
+    db: Session,
+    *,
+    org_id: str,
+    expense_id: int,
+) -> None:
+    expense = (
+        db.query(AutoserviceWarehouseExpense)
+        .filter(
+            AutoserviceWarehouseExpense.id == expense_id,
+            AutoserviceWarehouseExpense.organization_id == org_id,
+        )
+        .first()
+    )
+    if not expense:
+        raise HTTPException(status_code=404, detail="Списание не найдено")
+    item = expense.item
+    if item:
+        item.quantity = int(item.quantity or 0) + int(expense.quantity or 0)
+    db.delete(expense)
+    db.flush()
+
+
 def recalculate_autoservice_item_quantities(db: Session, *, org_id: str | None = None) -> int:
     """Set item.quantity = sum(receipts) - sum(expenses); keep reserved_qty unchanged."""
     query = db.query(AutoserviceWarehouseItem)

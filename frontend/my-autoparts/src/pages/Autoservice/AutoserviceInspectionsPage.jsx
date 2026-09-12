@@ -1,29 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import Modal from '../../components/UI/Modal';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
 import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
-import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
-
-const STATUS_LABELS = {
-  new: 'В ожидании',
-  processed: 'Обработано',
-  cancelled: 'Отменена',
-};
-
-const STATUS_STYLES = {
-  new: 'bg-warning-50 text-warning-700 ring-warning-100',
-  processed: 'bg-success-50 text-success-700 ring-success-100',
-  cancelled: 'bg-surface-subtle text-ink-muted ring-line',
-};
+import {
+  autoserviceListTableClass,
+  autoserviceListTheadRowClass,
+  autoserviceListThClass,
+  autoserviceListTbodyClass,
+  autoserviceListTrClickableClass,
+  autoserviceListTdClass,
+} from '../../utils/warehouseListUi';
 
 const SOURCE_LABELS = {
   site: 'Сайт',
@@ -36,12 +30,6 @@ function formatPreferredDateTime(row) {
   return row?.preferred_time ? `${date}, ${row.preferred_time.slice(0, 5)}` : date;
 }
 
-const STATUS_OPTIONS = [
-  { value: 'new', label: 'В ожидании' },
-  { value: 'processed', label: 'Обработано' },
-  { value: 'cancelled', label: 'Отменена' },
-];
-
 function formatVehicleBrief(vehicle) {
   if (!vehicle) return '—';
   const parts = [vehicle.make, vehicle.model].filter(Boolean);
@@ -52,155 +40,49 @@ function formatVehicleBrief(vehicle) {
   return label || '—';
 }
 
-function StatusBadge({ status, className = '' }) {
+function BookingMobileCard({ row, onView }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
-        STATUS_STYLES[status] || STATUS_STYLES.new
-      } ${className}`}
-    >
-      {STATUS_LABELS[status] || status}
-    </span>
-  );
-}
-
-function StatusPicker({ status, disabled, saving, onChange, isOpen, onOpenChange }) {
-  const [internalOpen, setInternalOpen] = useState(false);
-  const rootRef = useRef(null);
-  const available = STATUS_OPTIONS.filter((option) => option.value !== status);
-  const isControlled = isOpen !== undefined;
-  const open = isControlled ? isOpen : internalOpen;
-
-  const setOpen = useCallback((next) => {
-    if (!isControlled) setInternalOpen(next);
-    onOpenChange?.(next);
-  }, [isControlled, onOpenChange]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDocClick = (event) => {
-      if (rootRef.current && !rootRef.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open, setOpen]);
-
-  if (available.length === 0) {
-    return <StatusBadge status={status} />;
-  }
-
-  return (
-    <div ref={rootRef} className="status-picker relative inline-block">
-      <button
-        type="button"
-        disabled={disabled || saving}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(!open);
-        }}
-        className="rounded-full transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 disabled:cursor-wait disabled:opacity-60"
-        title="Сменить статус"
-      >
-        <StatusBadge status={status} className={saving ? 'opacity-70' : ''} />
+    <div className="border-b border-line-soft py-3 last:border-b-0">
+      <button type="button" onClick={onView} className="w-full text-left">
+        <div className="text-sm font-semibold text-ink">{row.name}</div>
+        <p className="mt-1 text-sm text-ink-muted">{row.phone || '—'}</p>
+        <p className="mt-0.5 text-xs text-ink-muted">
+          Дата: {formatPreferredDateTime(row)}
+          {row.vehicle ? ` · ${formatVehicleBrief(row.vehicle)}` : ''}
+        </p>
+        <p className="mt-0.5 text-xs text-ink-muted">
+          {SOURCE_LABELS[row.source] || row.source || '—'} · {formatServerDateTime(row.created_at)}
+        </p>
       </button>
-      {open ? (
-        <div className={buildActionsDropdownMenuClassName(false, 'w-44 z-50')}>
-          {available.map((option) => (
-            <ActionsDropdownItem
-              key={option.value}
-              onClick={() => {
-                setOpen(false);
-                onChange(option.value);
-              }}
-            >
-              {option.label}
-            </ActionsDropdownItem>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
 
-function BookingMobileCard({ row, updatingId, onStatusChange, onView, openMenuKey, onOpenMenu }) {
-  const statusOpen = openMenuKey === `status:${row.id}`;
-  const actionsOpen = openMenuKey === `actions:${row.id}`;
-  return (
-    <div className={`border-b border-line-soft py-3 last:border-b-0 ${statusOpen || actionsOpen ? 'relative z-30' : ''}`}>
-      <div className="flex items-start justify-between gap-2">
-        <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-ink">{row.name}</span>
-            <StatusPicker
-              status={row.status}
-              saving={updatingId === row.id}
-              disabled={updatingId === row.id}
-              isOpen={statusOpen}
-              onOpenChange={(next) => onOpenMenu(next ? `status:${row.id}` : null)}
-              onChange={(nextStatus) => onStatusChange(row.id, nextStatus)}
-            />
-          </div>
-          <p className="mt-1 text-sm text-ink-muted">{row.phone || '—'}</p>
-          <p className="mt-0.5 text-xs text-ink-muted">
-            Дата: {formatPreferredDateTime(row)}
-            {row.vehicle ? ` · ${formatVehicleBrief(row.vehicle)}` : ''}
-          </p>
-          <p className="mt-0.5 text-xs text-ink-muted">
-            {SOURCE_LABELS[row.source] || row.source || '—'} · {formatServerDateTime(row.created_at)}
-          </p>
-        </button>
-        <div className="shrink-0">
-          <ActionsDropdown
-            isOpen={actionsOpen}
-            onOpenChange={(next) => onOpenMenu(next ? `actions:${row.id}` : null)}
-            menuClassName="w-40 z-50"
-            estimatedMenuHeight={80}
-            showLabel={false}
-            buttonClassName="inline-flex min-h-11 min-w-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface text-ink-soft transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
-          >
-            <ActionsDropdownItem onClick={onView}>Подробнее</ActionsDropdownItem>
-          </ActionsDropdown>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BookingViewModal({ booking, onClose, updatingId, onStatusChange, onCreateOrder }) {
+function BookingViewModal({ booking, onClose, onCreateOrder }) {
   if (!booking) return null;
 
   return (
     <Modal
       open={Boolean(booking)}
       onClose={onClose}
-      title={`Заявка · ${booking.name || 'Без имени'}`}
+      title={`Запись · ${booking.name || 'Без имени'}`}
       size="md"
       footer={
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <StatusPicker
-            status={booking.status}
-            saving={updatingId === booking.id}
-            disabled={updatingId === booking.id}
-            onChange={(nextStatus) => onStatusChange(booking.id, nextStatus)}
-          />
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => onCreateOrder(booking)}
-              className="rounded-sg-sm min-h-11 border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-            >
-              Создать заказ-наряд
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-sg-sm min-h-11 border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
-            >
-              Закрыть
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onCreateOrder(booking)}
+            className="rounded-sg-sm min-h-11 border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+          >
+            Создать заказ-наряд
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-sg-sm min-h-11 border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
+          >
+            Закрыть
+          </button>
         </div>
       }
     >
@@ -250,9 +132,6 @@ export default function AutoserviceInspectionsPage() {
   const qApplied = useDebouncedValue(q);
   const [addOpen, setAddOpen] = useState(false);
   const [viewBooking, setViewBooking] = useState(null);
-  const [updatingId, setUpdatingId] = useState(null);
-  const [openMenuKey, setOpenMenuKey] = useState(null);
-  const menuOpen = Boolean(openMenuKey);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -262,7 +141,7 @@ export default function AutoserviceInspectionsPage() {
       const data = await apiRequest(`/autoservice/inspection-bookings${qs}`);
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err?.message || 'Не удалось загрузить заявки');
+      setError(err?.message || 'Не удалось загрузить записи');
       setRows([]);
     } finally {
       setLoading(false);
@@ -305,23 +184,6 @@ export default function AutoserviceInspectionsPage() {
     });
   }, [rows, qApplied]);
 
-  const handleStatusChange = async (id, nextStatus) => {
-    setUpdatingId(id);
-    setError(null);
-    try {
-      const updated = await apiRequest(`/autoservice/inspection-bookings/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      setRows((prev) => prev.map((row) => (row.id === id ? updated : row)));
-      setViewBooking((prev) => (prev?.id === id ? updated : prev));
-    } catch (err) {
-      setError(err?.message || 'Не удалось обновить статус');
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !user) return null;
 
@@ -329,13 +191,13 @@ export default function AutoserviceInspectionsPage() {
     <div className="w-full min-w-0">
       <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-ink sm:text-2xl">Заявки</h1>
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">Записи</h1>
           <p className="mt-0.5 text-sm text-ink-muted">
             {loading
               ? 'Загрузка…'
               : qApplied.trim()
                 ? `${filteredRows.length} из ${rows.length}`
-                : `${rows.length} заявок`}
+                : `${rows.length} записей`}
           </p>
         </div>
         <button
@@ -349,7 +211,7 @@ export default function AutoserviceInspectionsPage() {
 
       <UnderlineTabs
         className="mb-4"
-        ariaLabel="Фильтр заявок по статусу"
+        ariaLabel="Фильтр записей по статусу"
         gapClassName="gap-4"
         tabs={[
           { id: 'all', label: 'Все' },
@@ -360,7 +222,6 @@ export default function AutoserviceInspectionsPage() {
         value={statusFilter}
         onChange={(id) => {
           setStatusFilter(id);
-          setOpenMenuKey(null);
           setViewBooking(null);
         }}
       />
@@ -370,7 +231,7 @@ export default function AutoserviceInspectionsPage() {
           value={q}
           onChange={setQ}
           placeholder="Имя, телефон, авто или комментарий"
-          ariaLabel="Поиск заявок"
+          ariaLabel="Поиск записей"
         />
         <button
           type="button"
@@ -396,114 +257,71 @@ export default function AutoserviceInspectionsPage() {
         </p>
       ) : null}
 
-      <div className={`hidden w-full md:block ${menuOpen ? 'overflow-visible' : 'overflow-x-auto'}`}>
-        <table className="min-w-full table-fixed divide-y divide-line text-sm">
+      <div className="hidden w-full md:block overflow-x-auto">
+        <table className={autoserviceListTableClass}>
           <thead>
-            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">
-              <th className="w-40 py-3 pr-3">Создана</th>
-              <th className="py-3 pr-3">Клиент</th>
-              <th className="w-36 py-3 pr-3">Дата</th>
-              <th className="hidden py-3 pr-3 lg:table-cell">Автомобиль</th>
-              <th className="hidden w-28 py-3 pr-3 xl:table-cell">Источник</th>
-              <th className="w-36 py-3 pr-3">Статус</th>
-              <th className="w-28 py-3 text-right">Действия</th>
+            <tr className={autoserviceListTheadRowClass}>
+              <th className={`w-36 ${autoserviceListThClass}`}>Дата</th>
+              <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
+              <th className={`w-32 ${autoserviceListThClass}`}>Телефон</th>
+              <th className={`w-44 ${autoserviceListThClass} hidden lg:table-cell`}>Автомобиль</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-line-soft">
+          <tbody className={autoserviceListTbodyClass}>
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-ink-muted">
+                <td colSpan={4} className="py-12 text-center text-ink-muted">
                   Загрузка…
                 </td>
               </tr>
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-ink-muted">
-                  {rows.length === 0 ? 'Заявок пока нет' : 'Ничего не найдено'}
+                <td colSpan={4} className="py-12 text-center text-ink-muted">
+                  {rows.length === 0 ? 'Записей пока нет' : 'Ничего не найдено'}
                 </td>
               </tr>
             ) : (
-              filteredRows.map((row) => {
-                const statusOpen = openMenuKey === `status:${row.id}`;
-                const actionsOpen = openMenuKey === `actions:${row.id}`;
-                const rowMenuOpen = statusOpen || actionsOpen;
-                return (
-                  <tr
-                    key={row.id}
-                    className={`cursor-pointer transition-colors hover:bg-surface-muted/70 ${rowMenuOpen ? 'relative z-30' : ''}`}
-                    onDoubleClick={(e) => {
-                      if (e.target.closest('.status-picker') || e.target.closest('.actions-dropdown')) {
-                        return;
-                      }
-                      setViewBooking(row);
-                    }}
+              filteredRows.map((row) => (
+                <tr
+                  key={row.id}
+                  className={autoserviceListTrClickableClass}
+                  onDoubleClick={() => setViewBooking(row)}
+                >
+                  <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
+                    {formatPreferredDateTime(row)}
+                  </td>
+                  <td className={autoserviceListTdClass}>
+                    <div className="font-semibold text-ink">{row.name}</div>
+                  </td>
+                  <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
+                    {row.phone || '—'}
+                  </td>
+                  <td
+                    className={`${autoserviceListTdClass} hidden truncate text-ink-muted lg:table-cell`}
+                    title={formatVehicleBrief(row.vehicle)}
                   >
-                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-ink-muted">
-                      {formatServerDateTime(row.created_at)}
-                    </td>
-                    <td className="py-3 pr-3 align-middle">
-                      <div className="font-medium text-ink">{row.name}</div>
-                      {row.phone ? <div className="mt-0.5 text-xs text-ink-muted">{row.phone}</div> : null}
-                    </td>
-                    <td className="whitespace-nowrap py-3 pr-3 align-middle text-ink-soft">
-                      {formatPreferredDateTime(row)}
-                    </td>
-                    <td
-                      className="hidden max-w-[12rem] truncate py-3 pr-3 align-middle text-ink-soft lg:table-cell"
-                      title={formatVehicleBrief(row.vehicle)}
-                    >
-                      {formatVehicleBrief(row.vehicle)}
-                    </td>
-                    <td className="hidden py-3 pr-3 align-middle text-ink-muted xl:table-cell">
-                      {SOURCE_LABELS[row.source] || row.source || '—'}
-                    </td>
-                    <td className={`py-3 pr-3 align-middle ${statusOpen ? 'relative z-30' : ''}`}>
-                      <StatusPicker
-                        status={row.status}
-                        saving={updatingId === row.id}
-                        disabled={updatingId === row.id}
-                        isOpen={statusOpen}
-                        onOpenChange={(next) => setOpenMenuKey(next ? `status:${row.id}` : null)}
-                        onChange={(nextStatus) => handleStatusChange(row.id, nextStatus)}
-                      />
-                    </td>
-                    <td className={`py-3 text-right align-middle ${actionsOpen ? 'relative z-30' : ''}`}>
-                      <ActionsDropdown
-                        isOpen={actionsOpen}
-                        onOpenChange={(next) => setOpenMenuKey(next ? `actions:${row.id}` : null)}
-                        menuClassName="w-40 z-50"
-                        estimatedMenuHeight={80}
-                        showLabel
-                        buttonClassName="inline-flex min-h-11 items-center gap-1.5 rounded-sg-sm border border-line-strong bg-surface px-2.5 text-sm font-medium text-ink-soft transition hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 md:min-h-9"
-                      >
-                        <ActionsDropdownItem onClick={() => setViewBooking(row)}>Подробнее</ActionsDropdownItem>
-                      </ActionsDropdown>
-                    </td>
-                  </tr>
-                );
-              })
+                    {formatVehicleBrief(row.vehicle)}
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      <div className={`md:hidden ${menuOpen ? 'overflow-visible' : ''}`}>
+      <div className="md:hidden">
         {loading ? (
           <p className="py-10 text-center text-sm text-ink-muted">Загрузка…</p>
         ) : filteredRows.length === 0 ? (
           <p className="py-10 text-center text-sm text-ink-muted">
-            {rows.length === 0 ? 'Заявок пока нет' : 'Ничего не найдено'}
+            {rows.length === 0 ? 'Записей пока нет' : 'Ничего не найдено'}
           </p>
         ) : (
           filteredRows.map((row) => (
             <BookingMobileCard
               key={row.id}
               row={row}
-              updatingId={updatingId}
-              onStatusChange={handleStatusChange}
               onView={() => setViewBooking(row)}
-              openMenuKey={openMenuKey}
-              onOpenMenu={setOpenMenuKey}
             />
           ))
         )}
@@ -512,7 +330,7 @@ export default function AutoserviceInspectionsPage() {
       <InspectionBookingAddModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        title="Добавить заявку"
+        title="Добавить запись"
         onCreated={(row) => {
           setRows((prev) => [row, ...prev.filter((r) => r.id !== row.id)]);
         }}
@@ -521,8 +339,6 @@ export default function AutoserviceInspectionsPage() {
       <BookingViewModal
         booking={viewBooking}
         onClose={() => setViewBooking(null)}
-        updatingId={updatingId}
-        onStatusChange={handleStatusChange}
         onCreateOrder={(booking) => {
           setViewBooking(null);
           navigate('/autoservice/orders/new', {

@@ -41,6 +41,7 @@ from app.schemas.autoservice_warehouse import (
 from app.services.autoservice_warehouse_service import (
     autoservice_item_available_qty,
     create_autoservice_expense,
+    delete_autoservice_expense,
     delete_receipt_document,
     import_purchase_groups_to_warehouse,
     list_autoservice_warehouse_item_reservations,
@@ -754,6 +755,20 @@ def list_autoservice_warehouse_expenses(
             )
         )
     return result
+
+
+@router.delete(
+    "/autoservice/warehouse/expenses/{expense_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_autoservice_warehouse_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    delete_autoservice_expense(db, org_id=org_id, expense_id=expense_id)
+    db.commit()
 
 
 @router.post(

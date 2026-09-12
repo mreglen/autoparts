@@ -161,13 +161,13 @@ function Cell({ children, className = '', align = 'left', ...props }) {
 
 function SignLine({ label, nameControl }) {
   return (
-    <table className="repair-order-sign-table border-collapse">
+    <table className="repair-order-sign-table w-full table-fixed border-collapse">
       <tbody>
         <tr>
-          <td className="whitespace-nowrap pr-1.5 align-bottom">{label}</td>
-          <td className="w-28 min-w-[6.5rem] border-b border-black align-bottom">&nbsp;</td>
-          <td className="px-0.5 align-bottom">/</td>
-          <td className="whitespace-nowrap pl-0.5 align-bottom">{nameControl}</td>
+          <td className="w-[15%] whitespace-nowrap pr-1.5 align-bottom">{label}</td>
+          <td className="w-[20%] border-b border-black align-bottom">&nbsp;</td>
+          <td className="w-[5%] px-0.5 align-bottom text-center">/</td>
+          <td className="w-[60%] overflow-hidden whitespace-nowrap pl-0.5 align-bottom">{nameControl}</td>
         </tr>
       </tbody>
     </table>
@@ -718,13 +718,13 @@ export default function RepairOrderPrintPage() {
         ) : null}
 
         <footer className="mt-3 text-[11px] leading-snug">
-          <table className="w-full border-collapse">
+          <table className="w-full table-fixed border-collapse">
             <tbody>
               <tr>
-                <td className="w-[22%] whitespace-nowrap align-bottom pr-2">
-                  Дата {editControl('signDate', 'upd-edit-inline min-w-[7rem]')}
+                <td className="w-[18%] whitespace-nowrap align-bottom pr-2">
+                  Дата {editControl('signDate', 'upd-edit-inline min-w-[6rem]')}
                 </td>
-                <td className="align-bottom pb-1.5">
+                <td className="w-[82%] align-bottom pb-1.5">
                   <SignLine
                     label="Подпись заказчика"
                     nameControl={editControl('clientSignName', 'upd-edit-inline', {
@@ -735,7 +735,7 @@ export default function RepairOrderPrintPage() {
               </tr>
               <tr>
                 <td />
-                <td className="align-bottom">
+                <td className="w-[82%] align-bottom">
                   <SignLine
                     label="Подпись исполнителя"
                     nameControl={editControl('contractorSignName', 'upd-edit-inline', {

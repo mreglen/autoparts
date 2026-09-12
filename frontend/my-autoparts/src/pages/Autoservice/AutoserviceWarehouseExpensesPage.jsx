@@ -3,7 +3,7 @@ import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
-import { Skeleton } from '../../components/UI';
+import { Modal, Skeleton } from '../../components/UI';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
@@ -23,6 +23,7 @@ import {
   autoserviceListThRightClass,
   autoserviceListTheadRowClass,
   autoserviceListTrClass,
+  autoserviceListTrClickableClass,
 } from '../../utils/warehouseListUi';
 
 function formatDate(value) {
@@ -30,9 +31,12 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('ru-RU');
 }
 
-function ExpenseMobileCard({ row }) {
+function ExpenseMobileCard({ row, onClick }) {
   return (
-    <div className="border-b border-line-soft py-2 last:border-b-0">
+    <div
+      className="cursor-pointer border-b border-line-soft py-2 last:border-b-0 transition hover:bg-surface-muted/70"
+      onClick={() => onClick?.(row)}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-ink">{row.name || '—'}</p>
@@ -61,6 +65,9 @@ export default function AutoserviceWarehouseExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewExpense, setViewExpense] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -97,6 +104,22 @@ export default function AutoserviceWarehouseExpensesPage() {
     return rows.filter((row) => [row.brand, row.article, row.name, row.reason, row.creator_name]
       .some((value) => String(value || '').toLowerCase().includes(q)));
   }, [rows, searchQuery]);
+
+  const handleDelete = useCallback(async () => {
+    if (!viewExpense) return;
+    setDeleteSaving(true);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/warehouse/expenses/${viewExpense.id}`, { method: 'DELETE' });
+      setDeleteConfirmOpen(false);
+      setViewExpense(null);
+      await loadData();
+    } catch (err) {
+      setError(err?.message || 'Не удалось удалить списание');
+    } finally {
+      setDeleteSaving(false);
+    }
+  }, [viewExpense, loadData]);
 
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !userHasAutoserviceOrganization(user)) return null;
@@ -158,7 +181,11 @@ export default function AutoserviceWarehouseExpensesPage() {
               </tr>
             ) : (
               filteredRows.map((row) => (
-                <tr key={row.id} className={autoserviceListTrClass}>
+                <tr
+                  key={row.id}
+                  className={autoserviceListTrClickableClass}
+                  onClick={() => setViewExpense(row)}
+                >
                   <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{formatDate(row.created_at)}</td>
                   <td className={`min-w-0 ${autoserviceListTdClass}`}>
                     <div className="w-0 min-w-full truncate font-semibold text-ink">{row.name || '—'}</div>
@@ -190,9 +217,112 @@ export default function AutoserviceWarehouseExpensesPage() {
         ) : filteredRows.length === 0 ? (
           <p className="py-10 text-center text-sm text-ink-muted">Расходов пока нет</p>
         ) : (
-          filteredRows.map((row) => <ExpenseMobileCard key={row.id} row={row} />)
+          filteredRows.map((row) => <ExpenseMobileCard key={row.id} row={row} onClick={setViewExpense} />)
         )}
       </div>
+
+      <Modal
+        open={Boolean(viewExpense)}
+        onClose={() => {
+          if (!deleteSaving) {
+            setViewExpense(null);
+            setDeleteConfirmOpen(false);
+          }
+        }}
+        title={viewExpense ? `Списание · ${viewExpense.name || '—'}` : 'Списание'}
+        size="sm"
+      >
+        {viewExpense ? (
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <p>
+                <span className="text-ink-muted">Дата:</span>{' '}
+                <span className="text-ink">{formatDate(viewExpense.created_at)}</span>
+              </p>
+              <p>
+                <span className="text-ink-muted">Кол-во:</span>{' '}
+                <span className="text-ink">{viewExpense.quantity} шт.</span>
+              </p>
+              <p>
+                <span className="text-ink-muted">Цена:</span>{' '}
+                <span className="text-ink">{formatAutoserviceWarehouseMoney(viewExpense.unit_price)}</span>
+              </p>
+              <p>
+                <span className="text-ink-muted">Сумма:</span>{' '}
+                <span className="text-ink font-semibold tabular-nums">
+                  {formatAutoserviceWarehouseMoney(Number(viewExpense.unit_price ?? 0) * Number(viewExpense.quantity ?? 0))}
+                </span>
+              </p>
+            </div>
+            <p>
+              <span className="text-ink-muted">Бренд:</span>{' '}
+              <span className="text-ink">{viewExpense.brand || '—'}</span>
+            </p>
+            <p>
+              <span className="text-ink-muted">Артикул:</span>{' '}
+              <span className="text-ink">{viewExpense.article || '—'}</span>
+            </p>
+            <p>
+              <span className="text-ink-muted">Причина:</span>{' '}
+              <span className="text-ink">{viewExpense.reason || '—'}</span>
+            </p>
+            <p>
+              <span className="text-ink-muted">Создал:</span>{' '}
+              <span className="text-ink">{viewExpense.creator_name || '—'}</span>
+            </p>
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setViewExpense(null)}
+                disabled={deleteSaving}
+                className="inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60 md:h-10"
+              >
+                Закрыть
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={deleteSaving}
+                className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-danger-600 px-4 text-sm font-semibold text-white transition hover:bg-danger-700 disabled:opacity-60 md:h-10"
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={deleteConfirmOpen}
+        onClose={() => {
+          if (!deleteSaving) setDeleteConfirmOpen(false);
+        }}
+        title="Подтверждение"
+        size="sm"
+        wrapperClassName="z-[130]"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-ink">Точно удалить списание?</p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={deleteSaving}
+              className="inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60 md:h-10"
+            >
+              Нет, оставить
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleteSaving}
+              className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-danger-600 px-4 text-sm font-semibold text-white transition hover:bg-danger-700 disabled:opacity-60 md:h-10"
+            >
+              {deleteSaving ? 'Удаление…' : 'Да, удалить'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
