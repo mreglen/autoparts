@@ -113,7 +113,9 @@ def _receipt_line_view(
 ) -> AutoserviceWarehouseReceiptView:
     item = row.item
     qty = int(row.quantity or 0)
-    unit_price = _money(row.unit_price)
+    row_price = _money(row.unit_price)
+    item_price = _money(item.unit_price) if item else _money(0)
+    unit_price = row_price if row_price > 0 else item_price
     pricing = (
         receipt_line_pricing_context(db, doc=doc, receipt=row)
         if doc is not None

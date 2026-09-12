@@ -224,9 +224,9 @@ export default function AutoserviceWarehouseReceiptsPage() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setViewReceiptLine(row);
+                          openRepairOrder(row.repair_order_id);
                         }}
-                        className="inline-flex w-full cursor-pointer items-center justify-center py-2.5 text-xs font-medium text-brand-600 transition hover:bg-surface-muted hover:underline"
+                        className="cursor-pointer text-xs font-medium text-brand-600 hover:underline bg-transparent border-0 p-0"
                       >
                         Заказ-наряд {row.repair_order_number}
                       </button>
