@@ -15,7 +15,7 @@ from app.models.autoservice_warehouse import (
     AutoserviceWarehouseReceipt,
     AutoserviceWarehouseReceiptDoc,
 )
-from app.models.repair_order import RepairOrder
+from app.models.repair_order import RepairOrder, RepairOrderShopPart
 from app.models.user import User
 from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseExpenseCreate,
@@ -52,6 +52,7 @@ from app.services.autoservice_warehouse_service import (
     update_manual_receipt_line_prices,
     update_receipt_doc_date,
     update_receipt_line_details,
+    _effective_client_price,
 )
 from app.utils.autoservice_access import AUTOSERVICE_PERMISSION_WAREHOUSE, require_autoservice_permission
 from app.utils.autoservice_warehouse_supplier import resolve_autoservice_supplier_display_name
@@ -757,6 +758,19 @@ def list_autoservice_warehouse_expenses(
         ):
             order_map[ro_number] = ro_id
 
+    part_prices: dict[tuple[int, int], Decimal] = {}
+    if order_map:
+        for part in (
+            db.query(RepairOrderShopPart)
+            .filter(
+                RepairOrderShopPart.repair_order_id.in_(list(order_map.values())),
+                RepairOrderShopPart.source == "autoservice_stock",
+                RepairOrderShopPart.autoservice_stock_item_id.isnot(None),
+            )
+            .all()
+        ):
+            part_prices[(part.repair_order_id, part.autoservice_stock_item_id)] = _effective_client_price(part)
+
     result = []
     for row in rows:
         item = row.item
@@ -775,7 +789,7 @@ def list_autoservice_warehouse_expenses(
                 name=item.name if item else "",
                 quantity=int(row.quantity or 0),
                 unit_price=row.unit_price,
-                client_unit_price=row.client_unit_price,
+                client_unit_price=(part_prices[(repair_order_id, row.item_id)] if repair_order_id and (repair_order_id, row.item_id) in part_prices and (row.client_unit_price is None or row.client_unit_price == 0) else row.client_unit_price),
                 reason=row.reason,
                 repair_order_id=repair_order_id,
                 repair_order_number=repair_order_number,
