@@ -134,8 +134,8 @@ export default function AutoserviceWarehouseExpensesPage() {
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
-              <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
-              <th className={`w-24 ${autoserviceListThRightClass}`}>Цена</th>
+              <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Кол-во</th>
+              <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Цена</th>
               <th className={`w-40 pl-3 text-center ${autoserviceListThClass}`}>Причина</th>
             </tr>
           </thead>
@@ -145,8 +145,8 @@ export default function AutoserviceWarehouseExpensesPage() {
                 <tr key={`sk-${index}`}>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
                   <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
-                  <td className={`w-20 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
-                  <td className={`w-24 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
+                  <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
+                  <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                   <td className={`w-40 pl-3 ${autoserviceListTdClass} truncate text-center`}><Skeleton className="mx-auto h-4 w-20" /></td>
                 </tr>
               ))
@@ -163,8 +163,8 @@ export default function AutoserviceWarehouseExpensesPage() {
                   <td className={`min-w-0 ${autoserviceListTdClass}`}>
                     <div className="w-full truncate font-medium text-ink">{row.name || '—'}</div>
                   </td>
-                  <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
-                  <td className={`w-24 ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                  <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
+                  <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                     {formatAutoserviceWarehouseMoney(row.unit_price)}
                   </td>
                   <td className={`w-40 pl-3 ${autoserviceListTdClass} truncate text-center`}>

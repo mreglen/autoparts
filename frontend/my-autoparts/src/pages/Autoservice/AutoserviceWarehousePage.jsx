@@ -427,10 +427,10 @@ export default function AutoserviceWarehousePage() {
                 <tr className={autoserviceListTheadRowClass}>
                   <th className={`min-w-0 ${autoserviceListThClass}`}>Товар</th>
                   <th className={`min-w-0 ${autoserviceListThClass}`}>Поставщик</th>
-                  <th className={`w-24 ${autoserviceListThClass}`}>Заказ</th>
-                  <th className={`w-20 ${autoserviceListThRightClass}`}>Поступило</th>
-                  <th className={`w-20 ${autoserviceListThRightClass}`}>Резерв</th>
-                  <th className={`w-20 ${autoserviceListThRightClass}`}>К возврату</th>
+                  <th className={`w-24 whitespace-nowrap ${autoserviceListThClass}`}>Заказ</th>
+                  <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Поступило</th>
+                  <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Резерв</th>
+                  <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>К возврату</th>
                   <th className={autoserviceListThActionsClass}>Действие</th>
                 </tr>
               </thead>
@@ -465,12 +465,12 @@ export default function AutoserviceWarehousePage() {
                       <td className={`min-w-0 ${autoserviceListTdClass}`}>
                         <div className="w-full truncate text-ink">{lot.supplier_name}</div>
                       </td>
-                      <td className={`w-24 ${autoserviceListTdClass} text-center`}>№ {lot.source_order_id}</td>
-                      <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>{lot.quantity}</td>
-                      <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>
+                      <td className={`w-24 whitespace-nowrap ${autoserviceListTdClass} text-center`}>№ {lot.source_order_id}</td>
+                      <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>{lot.quantity}</td>
+                      <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
                         {lot.item_reserved_qty || 0}
                       </td>
-                      <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums`}>
+                      <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
                         {lot.max_returnable_qty}
                       </td>
                       <td className={autoserviceListTdActionsClass}>
@@ -528,8 +528,8 @@ export default function AutoserviceWarehousePage() {
               <thead>
                 <tr className={autoserviceListTheadRowClass}>
                   <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
-                  <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
-                  <th className={`w-24 ${autoserviceListThRightClass}`}>
+                  <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Кол-во</th>
+                  <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>
                     <span className="inline-flex items-center justify-end gap-1.5">
                       {clientMarkupEnabled ? (
                         <ClientMarkupPopover readOnly={!canEditMarkupSettings} />
@@ -544,8 +544,8 @@ export default function AutoserviceWarehousePage() {
                   Array.from({ length: 6 }).map((_, index) => (
                     <tr key={`sk-item-${index}`}>
                       <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
-                      <td className={`w-20 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
-                      <td className={`w-24 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
+                      <td className={`w-20 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
+                      <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                     </tr>
                   ))
                 ) : filteredItems.length === 0 ? (
@@ -575,7 +575,7 @@ export default function AutoserviceWarehousePage() {
                         <td className={`w-20 ${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
                           {formatAutoserviceWarehouseQty(item)}
                         </td>
-                        <td className={`w-24 ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                        <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                           {formatAutoserviceWarehouseMoney(displayPrice)}
                         </td>
                       </tr>
