@@ -537,6 +537,7 @@ export default function AutoserviceWarehousePage() {
                       <span>Цена</span>
                     </span>
                   </th>
+                  <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
                 </tr>
               </thead>
               <tbody className={autoserviceListTbodyClass}>
@@ -546,11 +547,12 @@ export default function AutoserviceWarehousePage() {
                       <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
                       <td className={`w-20 whitespace-nowrap !pr-2 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
                       <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
+                      <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                     </tr>
                   ))
                 ) : filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="py-12 text-center text-ink-muted">
+                    <td colSpan={4} className="py-12 text-center text-ink-muted">
                       На складе автосервиса пока нет позиций
                     </td>
                   </tr>
@@ -575,8 +577,11 @@ export default function AutoserviceWarehousePage() {
                         <td className={`w-20 !pr-2 text-ink-muted ${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
                           {formatAutoserviceWarehouseQty(item)}
                         </td>
-                        <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                        <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
                           {formatAutoserviceWarehouseMoney(displayPrice)}
+                        </td>
+                        <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                          {formatAutoserviceWarehouseMoney(displayPrice * Number(item.quantity || 0))}
                         </td>
                       </tr>
                     );
