@@ -226,7 +226,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
                           e.stopPropagation();
                           setViewReceiptLine(row);
                         }}
-                        className="inline-flex w-full cursor-pointer items-center justify-center py-2.5 text-sm font-medium text-ink transition hover:bg-surface-muted hover:underline"
+                        className="inline-flex w-full cursor-pointer items-center justify-center py-2.5 text-sm font-medium text-brand-600 transition hover:bg-surface-muted hover:underline"
                       >
                         Заказ-наряд {row.repair_order_number}
                       </button>
