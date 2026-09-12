@@ -568,8 +568,6 @@ export default function AutoserviceWarehousePage() {
             <table className={autoserviceListTableClass}>
               <thead>
                 <tr className={autoserviceListTheadRowClass}>
-                  <th className={`w-24 ${autoserviceListThClass}`}>Бренд</th>
-                  <th className={`w-28 ${autoserviceListThClass}`}>Артикул</th>
                   <th className={autoserviceListThClass}>Наименование</th>
                   <th className={autoserviceListThRightClass}>Кол-во</th>
                   <th className={autoserviceListThRightClass}>
@@ -587,8 +585,6 @@ export default function AutoserviceWarehousePage() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, index) => (
                     <tr key={`sk-item-${index}`}>
-                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
-                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
                       <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-12" /></td>
                       <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-16" /></td>
@@ -597,7 +593,7 @@ export default function AutoserviceWarehousePage() {
                   ))
                 ) : filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-ink-muted">
+                    <td colSpan={4} className="py-12 text-center text-ink-muted">
                       На складе автосервиса пока нет позиций
                     </td>
                   </tr>
@@ -617,11 +613,9 @@ export default function AutoserviceWarehousePage() {
                           setDetailsItem(item);
                         }}
                       >
-                        <td className={`${autoserviceListTdClass} font-medium`}>{item.brand || '—'}</td>
-                        <td className={`${autoserviceListTdClass} font-mono text-ink-muted`}>{item.article || '—'}</td>
                         <td className={autoserviceListTdClass}>
                           <div className="font-medium text-ink">{item.name || '—'}</div>
-                          {!item.brand && !item.article ? (
+                          {!item.name ? (
                             <div className="mt-0.5 text-xs text-ink-faint">№{item.id}</div>
                           ) : null}
                         </td>
