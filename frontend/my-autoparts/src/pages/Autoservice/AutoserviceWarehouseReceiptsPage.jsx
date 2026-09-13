@@ -8,6 +8,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 import AutoserviceReceiptDocumentModal from '../../components/Autoservice/AutoserviceReceiptDocumentModal';
+import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
@@ -70,6 +71,8 @@ export default function AutoserviceWarehouseReceiptsPage() {
   const [deleteDoc, setDeleteDoc] = useState(null);
   const [deletingDocId, setDeletingDocId] = useState(null);
   const [viewReceiptLine, setViewReceiptLine] = useState(null);
+  const [editReceiptLine, setEditReceiptLine] = useState(null);
+  const [editReceiptSaving, setEditReceiptSaving] = useState(false);
   const [viewRepairOrder, setViewRepairOrder] = useState(null);
   const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
 
@@ -138,6 +141,25 @@ export default function AutoserviceWarehouseReceiptsPage() {
     }
   }, []);
 
+  const handleReceiptEdit = useCallback(async (values) => {
+    if (!editReceiptLine) return;
+    setEditReceiptSaving(true);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/warehouse/receipts/${editReceiptLine.doc_id}/lines/${editReceiptLine.id}`, {
+        method: 'PATCH',
+        body: values,
+      });
+      setEditReceiptLine(null);
+      await loadRows();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить изменения');
+      throw err;
+    } finally {
+      setEditReceiptSaving(false);
+    }
+  }, [editReceiptLine, loadRows]);
+
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !userHasAutoserviceOrganization(user)) return null;
 
@@ -203,7 +225,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
                 <tr
                   key={row.id}
                   className={autoserviceListTrClickableClass}
-                  onClick={() => setSelectedDocId(row.doc_id)}
+                  onClick={() => setViewReceiptLine(row)}
                 >
                   <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{formatDate(row.doc_date)}</td>
                   <td className={`min-w-0 ${autoserviceListTdClass}`}>
@@ -231,7 +253,16 @@ export default function AutoserviceWarehouseReceiptsPage() {
                         Заказ-наряд {row.repair_order_number}
                       </button>
                     ) : row.doc_number ? (
-                      <span className="text-xs">№ {row.doc_number}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDocId(row.doc_id);
+                        }}
+                        className="cursor-pointer text-xs font-medium text-brand-600 hover:underline bg-transparent border-0 p-0"
+                      >
+                        № {row.doc_number}
+                      </button>
                     ) : (
                       '—'
                     )}
@@ -260,7 +291,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
             <ReceiptMobileCard
               key={row.id}
               row={row}
-              onOpen={() => setSelectedDocId(row.doc_id)}
+              onOpen={() => setViewReceiptLine(row)}
             />
           ))
         )}
@@ -353,10 +384,37 @@ export default function AutoserviceWarehouseReceiptsPage() {
               >
                 Закрыть
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const row = viewReceiptLine;
+                  if (row) {
+                    setViewReceiptLine(null);
+                    setEditReceiptLine(row);
+                  }
+                }}
+                className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 md:h-10"
+              >
+                Редактировать
+              </button>
             </div>
           </div>
         ) : null}
       </Modal>
+
+      <AutoserviceWarehouseAddModal
+        open={Boolean(editReceiptLine)}
+        onClose={() => setEditReceiptLine(null)}
+        onSubmit={handleReceiptEdit}
+        submitting={editReceiptSaving}
+        title="Редактировать позицию"
+        submitLabel="Сохранить"
+        mode="edit"
+        showRosskoLookup={false}
+        showBrandAndArticle
+        showUnitSelector
+        initialValues={editReceiptLine}
+      />
 
       <RepairOrderViewModal
         order={viewRepairOrder}
