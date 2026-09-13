@@ -6,7 +6,6 @@ import AutoserviceLiveSearchField from '../../components/Autoservice/Autoservice
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import Modal from '../../components/UI/Modal';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
-import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
@@ -127,7 +126,6 @@ export default function AutoserviceInspectionsPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('all');
   const [q, setQ] = useState('');
   const qApplied = useDebouncedValue(q);
   const [addOpen, setAddOpen] = useState(false);
@@ -137,8 +135,7 @@ export default function AutoserviceInspectionsPage() {
     setLoading(true);
     setError(null);
     try {
-      const qs = statusFilter !== 'all' ? `?status=${encodeURIComponent(statusFilter)}` : '';
-      const data = await apiRequest(`/autoservice/inspection-bookings${qs}`);
+      const data = await apiRequest('/autoservice/inspection-bookings');
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить записи');
@@ -146,7 +143,7 @@ export default function AutoserviceInspectionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, []);
 
   useEffect(() => {
     if (isReady && isAuthenticated) {
@@ -208,23 +205,6 @@ export default function AutoserviceInspectionsPage() {
           Добавить
         </button>
       </div>
-
-      <UnderlineTabs
-        className="mb-4"
-        ariaLabel="Фильтр записей по статусу"
-        gapClassName="gap-4"
-        tabs={[
-          { id: 'all', label: 'Все' },
-          { id: 'new', label: 'В ожидании' },
-          { id: 'processed', label: 'Обработано' },
-          { id: 'cancelled', label: 'Отменена' },
-        ]}
-        value={statusFilter}
-        onChange={(id) => {
-          setStatusFilter(id);
-          setViewBooking(null);
-        }}
-      />
 
       <div className="mb-4 flex items-center gap-2">
         <AutoserviceLiveSearchField
