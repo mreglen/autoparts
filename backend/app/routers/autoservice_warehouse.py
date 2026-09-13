@@ -24,6 +24,8 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseItemView,
     AutoserviceWarehouseItemReservationView,
     AutoserviceWarehouseItemMovementView,
+    AutoserviceWarehouseItemMovementReceiptView,
+    AutoserviceWarehouseItemMovementExpenseView,
     AutoserviceWarehouseItemUpdate,
     AutoserviceWarehouseManualReceiptIn,
     AutoserviceWarehouseReceiptDocDetailView,
@@ -414,7 +416,6 @@ def get_autoservice_warehouse_item_movements(
     )
     expenses = (
         db.query(AutoserviceWarehouseExpense)
-        .options(joinedload(AutoserviceWarehouseExpense.repair_order))
         .filter(
             AutoserviceWarehouseExpense.item_id == item_id,
             AutoserviceWarehouseExpense.organization_id == org_id,
@@ -468,8 +469,8 @@ def get_autoservice_warehouse_item_movements(
                 unit_price=_money(e.unit_price),
                 client_unit_price=_money(e.client_unit_price),
                 reason=e.reason,
-                repair_order_id=e.repair_order_id,
-                repair_order_number=getattr(e.repair_order, "order_number", None),
+                repair_order_id=None,
+                repair_order_number=None,
             )
             for e in expenses
         ],
