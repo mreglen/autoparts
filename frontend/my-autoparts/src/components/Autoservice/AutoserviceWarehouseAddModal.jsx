@@ -238,7 +238,7 @@ export default function AutoserviceWarehouseAddModal({
                 value={form.brand}
                 onValueChange={(value) => patch('brand', value)}
                 onPick={applyReceiptSuggestion}
-                placeholder="Bosch"
+                placeholder="Бренд"
                 inputClassName={fieldClass}
               />
             </label>
@@ -249,7 +249,7 @@ export default function AutoserviceWarehouseAddModal({
                 value={form.article}
                 onValueChange={(value) => patch('article', value)}
                 onPick={applyReceiptSuggestion}
-                placeholder="0986424794"
+                placeholder="Артикул"
                 inputClassName={fieldClass}
               />
             </label>
