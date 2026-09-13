@@ -89,21 +89,11 @@ function PurchaseLotMobileCard({ lot, onOpen }) {
   const lotTotal = Number(lot.unit_price || 0) * Number(lot.quantity || 0);
   return (
     <button type="button" onClick={onOpen} className="w-full border-b border-line-soft py-2 text-left last:border-b-0">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-ink">{lot.name || '—'}</p>
-          <p className="mt-0.5 text-xs text-ink-muted">
-            {[lot.brand, lot.article].filter(Boolean).join(' · ') || `№${lot.receipt_id}`}
-          </p>
-          <p className="mt-1 text-sm text-ink-muted">
-            {lot.quantity} шт. · {formatAutoserviceWarehouseMoney(lot.unit_price)} ·{' '}
-            {formatAutoserviceWarehouseMoney(lotTotal)}
-          </p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="font-semibold tabular-nums text-ink">{formatAutoserviceWarehouseMoney(lotTotal)}</p>
-        </div>
-      </div>
+      <p className="truncate font-medium text-ink">{lot.name || '—'}</p>
+      <p className="mt-1 text-sm text-ink-muted">
+        {lot.quantity} шт. · {formatAutoserviceWarehouseMoney(lot.unit_price)} ·{' '}
+        {formatAutoserviceWarehouseMoney(lotTotal)}
+      </p>
     </button>
   );
 }
@@ -241,6 +231,19 @@ export default function AutoserviceWarehousePage() {
       lot.source_order_id,
     ].some((value) => String(value || '').toLowerCase().includes(query)));
   }, [purchaseLots, searchQuery]);
+
+  const detailsItemReturnableLot = useMemo(
+    () =>
+      detailsItem
+        ? purchaseLots.find(
+            (lot) =>
+              lot.item_id === detailsItem.id &&
+              lot.max_returnable_qty > 0 &&
+              !lot.active_return,
+          )
+        : null,
+    [detailsItem, purchaseLots],
+  );
 
   const openWriteOff = (item) => {
     if (!item || Number(item.available_qty) < 1) {
@@ -472,11 +475,6 @@ export default function AutoserviceWarehousePage() {
                       >
                         <td className={`min-w-0 ${autoserviceListTdClass}`}>
                           <div className="w-0 min-w-full truncate font-semibold text-ink">{lot.name || '—'}</div>
-                          {lot.brand || lot.article ? (
-                            <div className="mt-0.5 w-0 min-w-full truncate text-xs text-ink-faint">
-                              {[lot.brand, lot.article].filter(Boolean).join(' · ')}
-                            </div>
-                          ) : null}
                         </td>
                         <td className={`w-20 !pr-2 text-ink-muted ${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
                           {lot.quantity} шт.
@@ -794,6 +792,17 @@ export default function AutoserviceWarehousePage() {
               <Button variant="secondary" onClick={() => openAddToOrder(detailsItem)}>
                 Добавить в заказ-наряд
               </Button>
+              {detailsItemReturnableLot ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setDetailsItem(null);
+                    setReturnLot(detailsItemReturnableLot);
+                  }}
+                >
+                  Вернуть
+                </Button>
+              ) : null}
               <Button onClick={() => openWriteOff(detailsItem)}>
                 Списать
               </Button>
