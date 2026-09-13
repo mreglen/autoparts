@@ -182,7 +182,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
     try {
       await apiRequest(`/autoservice/warehouse/receipts/${editReceiptLine.doc_id}/lines/${editReceiptLine.id}`, {
         method: 'PATCH',
-        body: values,
+        body: JSON.stringify(values),
       });
       setEditReceiptLine(null);
       await loadRows();
@@ -193,6 +193,13 @@ export default function AutoserviceWarehouseReceiptsPage() {
       setEditReceiptSaving(false);
     }
   }, [editReceiptLine, loadRows]);
+
+  const closeReceiptEdit = useCallback(() => {
+    if (editReceiptSaving) return;
+    const row = editReceiptLine;
+    setEditReceiptLine(null);
+    if (row) setViewReceiptLine(row);
+  }, [editReceiptLine, editReceiptSaving]);
 
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !userHasAutoserviceOrganization(user)) return null;
@@ -444,7 +451,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
 
       <AutoserviceWarehouseAddModal
         open={Boolean(editReceiptLine)}
-        onClose={() => setEditReceiptLine(null)}
+        onClose={closeReceiptEdit}
         onSubmit={handleReceiptEdit}
         submitting={editReceiptSaving}
         title="Редактировать позицию"
