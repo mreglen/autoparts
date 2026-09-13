@@ -450,7 +450,12 @@ def get_autoservice_warehouse_item_movements(
                 unit_price=_money(r.unit_price),
                 repair_order_id=r.repair_order_id,
                 repair_order_number=getattr(r.repair_order, "order_number", None),
-                supplier_name=resolve_autoservice_supplier_display_name(r.document) if r.document else None,
+                supplier_name=resolve_autoservice_supplier_display_name(
+                    db,
+                    supplier_name=r.document.supplier_name if r.document else "",
+                    source_order_type=getattr(r.document, "source_order_type", None),
+                    source_order_id=getattr(r.document, "source_order_id", None),
+                ) if r.document else None,
             )
             for r in receipts
         ],
