@@ -2993,6 +2993,8 @@ export default function AutoserviceOrderFormPage() {
         onSubmit={handleManualShopPartAdd}
         title="Добавить запчасть вручную"
         submitLabel="Добавить в заказ-наряд"
+        showRosskoLookup={false}
+        showBrandAndArticle={false}
         showUnitSelector
         preserveDraftOnClose
         initialValues={shopPartManualDraft}
@@ -3004,6 +3006,8 @@ export default function AutoserviceOrderFormPage() {
         onClose={() => setShopPartEditIndex(null)}
         onSubmit={handleManualShopPartEdit}
         submitting={shopPartEditSubmitting}
+        showRosskoLookup={false}
+        showBrandAndArticle={false}
         mode="edit"
         initialValues={
           shopPartEditIndex == null

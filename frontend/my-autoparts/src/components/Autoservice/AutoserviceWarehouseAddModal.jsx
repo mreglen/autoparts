@@ -28,6 +28,7 @@ export default function AutoserviceWarehouseAddModal({
   title = 'Добавить запчасть вручную',
   submitLabel = 'Добавить',
   showRosskoLookup = true,
+  showBrandAndArticle = true,
   showUnitSelector = true,
   initialValues = null,
   preserveDraftOnClose = false,
@@ -79,8 +80,7 @@ export default function AutoserviceWarehouseAddModal({
   const applyReceiptSuggestion = (row) => {
     setForm((prev) => ({
       ...prev,
-      brand: row.brand ?? prev.brand,
-      article: row.article ?? prev.article,
+      ...(showBrandAndArticle ? { brand: row.brand ?? prev.brand, article: row.article ?? prev.article } : {}),
       name: row.name ?? prev.name,
       unit_price: row.unit_price != null && row.unit_price !== ''
         ? String(row.unit_price)
@@ -229,30 +229,32 @@ export default function AutoserviceWarehouseAddModal({
           />
         </label>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className={labelClass}>Бренд</span>
-            <AutoserviceReceiptSuggestField
-              field="brand"
-              value={form.brand}
-              onValueChange={(value) => patch('brand', value)}
-              onPick={applyReceiptSuggestion}
-              placeholder="Bosch"
-              inputClassName={fieldClass}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>Артикул</span>
-            <AutoserviceReceiptSuggestField
-              field="article"
-              value={form.article}
-              onValueChange={(value) => patch('article', value)}
-              onPick={applyReceiptSuggestion}
-              placeholder="0986424794"
-              inputClassName={fieldClass}
-            />
-          </label>
-        </div>
+        {showBrandAndArticle ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className={labelClass}>Бренд</span>
+              <AutoserviceReceiptSuggestField
+                field="brand"
+                value={form.brand}
+                onValueChange={(value) => patch('brand', value)}
+                onPick={applyReceiptSuggestion}
+                placeholder="Bosch"
+                inputClassName={fieldClass}
+              />
+            </label>
+            <label className="block">
+              <span className={labelClass}>Артикул</span>
+              <AutoserviceReceiptSuggestField
+                field="article"
+                value={form.article}
+                onValueChange={(value) => patch('article', value)}
+                onPick={applyReceiptSuggestion}
+                placeholder="0986424794"
+                inputClassName={fieldClass}
+              />
+            </label>
+          </div>
+        ) : null}
 
         {showRosskoLookup ? (
           <div className="space-y-2">
