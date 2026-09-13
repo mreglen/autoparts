@@ -5,14 +5,11 @@ import MediaModal from '../../components/MediaModal/MediaModal';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import StockInEmptyState from '../../components/StockIn/StockInEmptyState';
 import SellerStockMovementModal from '../../components/SellerWarehouse/SellerStockMovementModal';
-import PillDropdown from '../../components/PillDropdown/PillDropdown';
 import {
-  mapIdOptionsForPillDropdown,
   warehousePageClass,
   warehousePillControlClass,
   warehousePrimaryButtonClass,
   warehouseSecondaryButtonClass,
-  warehouseToolbarClass,
   autoserviceListTableClass,
   autoserviceListTableWrapClass,
   autoserviceListTheadRowClass,
@@ -32,8 +29,6 @@ import {
   formatStockInMoney,
   getStockInLineTotal,
   matchesStockInSearch,
-  sortStockInDocs,
-  STOCK_IN_SORT_OPTIONS,
 } from '../../utils/stockInUi';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
@@ -47,8 +42,6 @@ const StockInList = () => {
   const [authChecked, setAuthChecked] = useState(false);
   const [viewStockIn, setViewStockIn] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState('date_desc');
-  const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
 
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
@@ -94,14 +87,9 @@ const StockInList = () => {
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
   }, [loadStockIns]);
 
-  const sortedStockIns = useMemo(
-    () => sortStockInDocs(stockIns, sortOrder),
-    [stockIns, sortOrder]
-  );
-
   const displayStockIns = useMemo(
-    () => sortedStockIns.filter((doc) => matchesStockInSearch(doc, searchQuery)),
-    [sortedStockIns, searchQuery]
+    () => stockIns.filter((doc) => matchesStockInSearch(doc, searchQuery)),
+    [stockIns, searchQuery]
   );
 
   const stats = useMemo(() => {
@@ -113,6 +101,8 @@ const StockInList = () => {
     });
     return { count: displayStockIns.length, totalQty, totalValue };
   }, [displayStockIns]);
+
+  const totalInList = stockIns.length;
 
   const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
     const formattedMedia = mediaItems.map((item) => {
@@ -130,16 +120,6 @@ const StockInList = () => {
     setMediaModalOpen(true);
   };
 
-  const sortFilterOptions = useMemo(
-    () => mapIdOptionsForPillDropdown(STOCK_IN_SORT_OPTIONS),
-    [],
-  );
-
-  const setFilterDropdownOpen = (key) => (open) => {
-    setOpenFilterDropdown(open ? key : null);
-  };
-
-  const totalInList = sortedStockIns.length;
   const hasSearch = Boolean(searchQuery.trim());
 
   if (!authChecked) {
@@ -153,8 +133,7 @@ const StockInList = () => {
     <div className={warehousePageClass}>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Документы поступления</h1>
-          <p className="mt-1 text-sm text-gray-500">История оприходования запчастей на склад</p>
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Поступления</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {!loading && !error && totalInList > 0 && (
@@ -227,20 +206,8 @@ const StockInList = () => {
           ) : null}
         </div>
 
-        <div className={warehouseToolbarClass}>
-          <PillDropdown
-            ariaLabel="Сортировка"
-            placeholder="Сначала новые"
-            value={sortOrder}
-            options={sortFilterOptions}
-            isOpen={openFilterDropdown === 'sort'}
-            onOpenChange={setFilterDropdownOpen('sort')}
-            onChange={setSortOrder}
-            fullWidth={false}
-            triggerClassName="h-9 rounded-xl bg-white px-3 ring-1 ring-gray-200 hover:bg-gray-50"
-            menuClassName="min-w-[14rem]"
-          />
-          {hasSearch && (
+        {hasSearch && (
+          <div className="mt-3 flex items-center gap-2">
             <button
               type="button"
               onClick={() => setSearchQuery('')}
@@ -249,8 +216,8 @@ const StockInList = () => {
               <span aria-hidden>×</span>
               Сбросить поиск
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {loading && (
@@ -288,30 +255,43 @@ const StockInList = () => {
                       <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
                       <th className={`w-24 ${autoserviceListThRightClass}`}>Цена</th>
                       <th className={`w-24 ${autoserviceListThRightClass}`}>Сумма</th>
-                      <th className={`w-40 ${autoserviceListThClass}`}>Хранение</th>
                     </tr>
                   </thead>
                   <tbody className={autoserviceListTbodyClass}>
-                    {displayStockIns.map((doc) => (
-                      <tr key={doc.id} className={autoserviceListTrClickableClass} onClick={() => setViewStockIn(doc)}>
-                        <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{new Date(doc.created_at).toLocaleDateString('ru-RU')}</td>
-                        <td className={`min-w-0 ${autoserviceListTdClass}`}><div className="w-0 min-w-full truncate font-semibold text-ink">{doc.product?.name || '—'}</div></td>
-                        <td className={`${autoserviceListTdRightClass} tabular-nums`}>{doc.quantity} шт.</td>
-                        <td className={`${autoserviceListTdRightClass} tabular-nums`}>{formatStockInMoney(doc.sale_price)}</td>
-                        <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatStockInMoney(getStockInLineTotal(doc))}</td>
-                        <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>{doc.storage_location?.address || '—'}</td>
-                      </tr>
-                    ))}
+                    {displayStockIns.map((doc) => {
+                      const product = doc.product || {};
+                      const title = [product.brand, product.article, product.name].filter(Boolean).join(' · ') || '—';
+                      return (
+                        <tr key={doc.id} className={autoserviceListTrClickableClass} onClick={() => setViewStockIn(doc)}>
+                          <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{new Date(doc.created_at).toLocaleDateString('ru-RU')}</td>
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                            <div className="w-0 min-w-full truncate text-ink" title={title}>
+                              {title}
+                            </div>
+                          </td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums`}>{doc.quantity} шт.</td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums`}>{formatStockInMoney(doc.sale_price)}</td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatStockInMoney(getStockInLineTotal(doc))}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
               <div className={autoserviceListMobileWrapClass}>
-                {displayStockIns.map((doc) => (
-                  <button key={doc.id} type="button" onClick={() => setViewStockIn(doc)} className="w-full border-b border-line-soft py-2 text-left last:border-0">
-                    <div className="flex justify-between gap-2"><span className="truncate font-medium text-ink">{doc.product?.name || '—'}</span><span className="shrink-0 font-semibold tabular-nums">{formatStockInMoney(getStockInLineTotal(doc))}</span></div>
-                    <p className="mt-1 text-xs text-ink-muted">{new Date(doc.created_at).toLocaleDateString('ru-RU')} · {doc.quantity} шт. · {doc.storage_location?.address || '—'}</p>
-                  </button>
-                ))}
+                {displayStockIns.map((doc) => {
+                  const product = doc.product || {};
+                  const title = [product.brand, product.article, product.name].filter(Boolean).join(' · ') || '—';
+                  return (
+                    <button key={doc.id} type="button" onClick={() => setViewStockIn(doc)} className="w-full border-b border-line-soft py-2 text-left last:border-0">
+                      <div className="flex justify-between gap-2">
+                        <span className="truncate font-medium text-ink" title={title}>{title}</span>
+                        <span className="shrink-0 font-semibold tabular-nums">{formatStockInMoney(getStockInLineTotal(doc))}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-ink-muted">{new Date(doc.created_at).toLocaleDateString('ru-RU')} · {doc.quantity} шт.</p>
+                    </button>
+                  );
+                })}
               </div>
             </>
           ) : (
