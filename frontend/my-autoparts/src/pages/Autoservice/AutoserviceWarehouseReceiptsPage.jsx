@@ -9,6 +9,7 @@ import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMod
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 import AutoserviceReceiptDocumentModal from '../../components/Autoservice/AutoserviceReceiptDocumentModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
+import AutoserviceWarehouseItemMovements from '../../components/Autoservice/AutoserviceWarehouseItemMovements';
 import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
@@ -71,6 +72,9 @@ export default function AutoserviceWarehouseReceiptsPage() {
   const [deleteDoc, setDeleteDoc] = useState(null);
   const [deletingDocId, setDeletingDocId] = useState(null);
   const [viewReceiptLine, setViewReceiptLine] = useState(null);
+  const [viewReceiptMovements, setViewReceiptMovements] = useState(null);
+  const [viewReceiptMovementsLoading, setViewReceiptMovementsLoading] = useState(false);
+  const [viewReceiptMovementsError, setViewReceiptMovementsError] = useState('');
   const [editReceiptLine, setEditReceiptLine] = useState(null);
   const [editReceiptSaving, setEditReceiptSaving] = useState(false);
   const [viewRepairOrder, setViewRepairOrder] = useState(null);
@@ -104,6 +108,36 @@ export default function AutoserviceWarehouseReceiptsPage() {
     window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
   }, [loadRows]);
+
+  useEffect(() => {
+    if (!viewReceiptLine?.item_id) {
+      setViewReceiptMovements(null);
+      setViewReceiptMovementsLoading(false);
+      setViewReceiptMovementsError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setViewReceiptMovementsLoading(true);
+    setViewReceiptMovementsError('');
+    apiRequest(`/autoservice/warehouse/items/${viewReceiptLine.item_id}/movements`)
+      .then((data) => {
+        if (cancelled) return;
+        setViewReceiptMovements(data || null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setViewReceiptMovements(null);
+        setViewReceiptMovementsError(err?.message || 'Не удалось загрузить движения');
+      })
+      .finally(() => {
+        if (!cancelled) setViewReceiptMovementsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewReceiptLine?.item_id]);
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -376,6 +410,12 @@ export default function AutoserviceWarehouseReceiptsPage() {
                 '—'
               )}
             </p>
+            <AutoserviceWarehouseItemMovements
+              movements={viewReceiptMovements}
+              loading={viewReceiptMovementsLoading}
+              error={viewReceiptMovementsError}
+              showReceipts={false}
+            />
             <div className="flex flex-wrap justify-end gap-2 pt-2">
               <button
                 type="button"

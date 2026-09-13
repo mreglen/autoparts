@@ -12,6 +12,7 @@ import Button from '../../components/UI/Button';
 import { NumericInput, Skeleton, UnderlineTabs } from '../../components/UI';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
+import AutoserviceWarehouseItemMovements from '../../components/Autoservice/AutoserviceWarehouseItemMovements';
 import AutoserviceWarehouseReturnModal from '../../components/Autoservice/AutoserviceWarehouseReturnModal';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import useNewPartsMarkupPercent from '../../hooks/useNewPartsMarkupPercent';
@@ -134,6 +135,9 @@ export default function AutoserviceWarehousePage() {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [detailsItem, setDetailsItem] = useState(null);
+  const [detailsMovements, setDetailsMovements] = useState(null);
+  const [detailsMovementsLoading, setDetailsMovementsLoading] = useState(false);
+  const [detailsMovementsError, setDetailsMovementsError] = useState('');
   const [writeOffItem, setWriteOffItem] = useState(null);
   const [writeOffQty, setWriteOffQty] = useState('1');
   const [writeOffReason, setWriteOffReason] = useState('');
@@ -187,6 +191,9 @@ export default function AutoserviceWarehousePage() {
       setReservations([]);
       setReservationsLoading(false);
       setReservationsError('');
+      setDetailsMovements(null);
+      setDetailsMovementsLoading(false);
+      setDetailsMovementsError('');
       return undefined;
     }
 
@@ -205,6 +212,22 @@ export default function AutoserviceWarehousePage() {
       })
       .finally(() => {
         if (!cancelled) setReservationsLoading(false);
+      });
+
+    setDetailsMovementsLoading(true);
+    setDetailsMovementsError('');
+    apiRequest(`/autoservice/warehouse/items/${detailsItem.id}/movements`)
+      .then((data) => {
+        if (cancelled) return;
+        setDetailsMovements(data || null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setDetailsMovements(null);
+        setDetailsMovementsError(err?.message || 'Не удалось загрузить движения');
+      })
+      .finally(() => {
+        if (!cancelled) setDetailsMovementsLoading(false);
       });
 
     return () => {
@@ -665,6 +688,13 @@ export default function AutoserviceWarehousePage() {
                 </dd>
               </div>
             </dl>
+
+            <AutoserviceWarehouseItemMovements
+              movements={detailsMovements}
+              loading={detailsMovementsLoading}
+              error={detailsMovementsError}
+              showStock={false}
+            />
 
             {Number(detailsItem.reserved_qty) > 0 ? (
               <div>

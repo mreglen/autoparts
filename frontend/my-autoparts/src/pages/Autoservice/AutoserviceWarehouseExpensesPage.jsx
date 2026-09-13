@@ -4,6 +4,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
 import { Modal, Skeleton } from '../../components/UI';
+import AutoserviceWarehouseItemMovements from '../../components/Autoservice/AutoserviceWarehouseItemMovements';
 import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
@@ -67,6 +68,9 @@ export default function AutoserviceWarehouseExpensesPage() {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewExpense, setViewExpense] = useState(null);
+  const [viewExpenseMovements, setViewExpenseMovements] = useState(null);
+  const [viewExpenseMovementsLoading, setViewExpenseMovementsLoading] = useState(false);
+  const [viewExpenseMovementsError, setViewExpenseMovementsError] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [viewRepairOrder, setViewRepairOrder] = useState(null);
@@ -100,6 +104,36 @@ export default function AutoserviceWarehouseExpensesPage() {
     window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
   }, [loadData]);
+
+  useEffect(() => {
+    if (!viewExpense?.item_id) {
+      setViewExpenseMovements(null);
+      setViewExpenseMovementsLoading(false);
+      setViewExpenseMovementsError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setViewExpenseMovementsLoading(true);
+    setViewExpenseMovementsError('');
+    apiRequest(`/autoservice/warehouse/items/${viewExpense.item_id}/movements`)
+      .then((data) => {
+        if (cancelled) return;
+        setViewExpenseMovements(data || null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setViewExpenseMovements(null);
+        setViewExpenseMovementsError(err?.message || 'Не удалось загрузить движения');
+      })
+      .finally(() => {
+        if (!cancelled) setViewExpenseMovementsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewExpense?.item_id]);
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -314,6 +348,12 @@ export default function AutoserviceWarehouseExpensesPage() {
               <span className="text-ink-muted">Создал:</span>{' '}
               <span className="text-ink">{viewExpense.creator_name || '—'}</span>
             </p>
+            <AutoserviceWarehouseItemMovements
+              movements={viewExpenseMovements}
+              loading={viewExpenseMovementsLoading}
+              error={viewExpenseMovementsError}
+              showExpenses={false}
+            />
             <div className="flex flex-wrap justify-end gap-2 pt-2">
               <button
                 type="button"

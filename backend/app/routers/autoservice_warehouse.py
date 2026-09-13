@@ -23,6 +23,7 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseImportResult,
     AutoserviceWarehouseItemView,
     AutoserviceWarehouseItemReservationView,
+    AutoserviceWarehouseItemMovementView,
     AutoserviceWarehouseItemUpdate,
     AutoserviceWarehouseManualReceiptIn,
     AutoserviceWarehouseReceiptDocDetailView,
@@ -375,6 +376,99 @@ def get_autoservice_warehouse_item_reservations(
         item_id=item_id,
     )
     return [AutoserviceWarehouseItemReservationView.model_validate(row) for row in rows]
+
+
+@router.get(
+    "/autoservice/warehouse/items/{item_id}/movements",
+    response_model=AutoserviceWarehouseItemMovementView,
+)
+def get_autoservice_warehouse_item_movements(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    item = (
+        db.query(AutoserviceWarehouseItem)
+        .filter(
+            AutoserviceWarehouseItem.id == item_id,
+            AutoserviceWarehouseItem.organization_id == org_id,
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Позиция не найдена")
+
+    receipts = (
+        db.query(AutoserviceWarehouseReceipt)
+        .options(
+            joinedload(AutoserviceWarehouseReceipt.document),
+            joinedload(AutoserviceWarehouseReceipt.repair_order),
+        )
+        .filter(
+            AutoserviceWarehouseReceipt.item_id == item_id,
+            AutoserviceWarehouseReceipt.organization_id == org_id,
+        )
+        .order_by(AutoserviceWarehouseReceipt.created_at.desc())
+        .all()
+    )
+    expenses = (
+        db.query(AutoserviceWarehouseExpense)
+        .options(joinedload(AutoserviceWarehouseExpense.repair_order))
+        .filter(
+            AutoserviceWarehouseExpense.item_id == item_id,
+            AutoserviceWarehouseExpense.organization_id == org_id,
+        )
+        .order_by(AutoserviceWarehouseExpense.created_at.desc())
+        .all()
+    )
+
+    def _item_unit():
+        unit = getattr(item, "unit", None)
+        if unit in ("pcs", "l", "kg"):
+            return unit
+        return "pcs"
+
+    return AutoserviceWarehouseItemMovementView(
+        item_id=item.id,
+        brand=item.brand or "",
+        article=item.article or "",
+        name=item.name,
+        quantity=int(item.quantity or 0),
+        reserved_qty=int(item.reserved_qty or 0),
+        available_qty=autoservice_item_available_qty(item),
+        unit=_item_unit(),
+        unit_price=_money(item.unit_price),
+        receipts=[
+            AutoserviceWarehouseItemMovementReceiptView(
+                id=r.id,
+                doc_id=r.document_id,
+                doc_number=getattr(r.document, "number", None) if r.document else None,
+                doc_date=r.document.doc_date if r.document else r.created_at,
+                quantity=int(r.quantity or 0),
+                unit=_item_unit(),
+                unit_price=_money(r.unit_price),
+                repair_order_id=r.repair_order_id,
+                repair_order_number=getattr(r.repair_order, "order_number", None),
+                supplier_name=resolve_autoservice_supplier_display_name(r.document) if r.document else None,
+            )
+            for r in receipts
+        ],
+        expenses=[
+            AutoserviceWarehouseItemMovementExpenseView(
+                id=e.id,
+                created_at=e.created_at,
+                quantity=int(e.quantity or 0),
+                unit=_item_unit(),
+                unit_price=_money(e.unit_price),
+                client_unit_price=_money(e.client_unit_price),
+                reason=e.reason,
+                repair_order_id=e.repair_order_id,
+                repair_order_number=getattr(e.repair_order, "order_number", None),
+            )
+            for e in expenses
+        ],
+    )
 
 
 @router.patch(

@@ -98,6 +98,49 @@ class AutoserviceWarehouseReceiptLineUpdate(BaseModel):
     unit_price: Decimal = Field(ge=0)
 
 
+class AutoserviceWarehouseItemMovementReceiptView(BaseModel):
+    id: int
+    doc_id: int
+    doc_number: Optional[str] = None
+    doc_date: date
+    quantity: int
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+    unit_price: Decimal
+    repair_order_id: Optional[int] = None
+    repair_order_number: Optional[str] = None
+    supplier_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AutoserviceWarehouseItemMovementExpenseView(BaseModel):
+    id: int
+    created_at: date
+    quantity: int
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+    unit_price: Decimal
+    client_unit_price: Decimal
+    reason: Optional[str] = None
+    repair_order_id: Optional[int] = None
+    repair_order_number: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AutoserviceWarehouseItemMovementView(BaseModel):
+    item_id: int
+    brand: str
+    article: str
+    name: str
+    quantity: int
+    reserved_qty: int
+    available_qty: int
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+    unit_price: Decimal
+    receipts: list[AutoserviceWarehouseItemMovementReceiptView]
+    expenses: list[AutoserviceWarehouseItemMovementExpenseView]
+
+
 class AutoserviceWarehouseReceiptDocListView(BaseModel):
     id: int
     number: str
