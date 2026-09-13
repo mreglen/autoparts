@@ -1413,7 +1413,7 @@ export default function AutoserviceClientsPage() {
         <table className={autoserviceListTableClass}>
           <thead>
             <tr className={autoserviceListTheadRowClass}>
-              <th className={`min-w-0 ${autoserviceListThClass}`}>Имя</th>
+              <th className={`w-56 ${autoserviceListThClass}`}>Имя</th>
               <th className={`w-36 ${autoserviceListThClass}`}>Телефон</th>
               <th className={`w-28 ${autoserviceListThClass}`}>Аккаунт</th>
             </tr>
@@ -1441,7 +1441,7 @@ export default function AutoserviceClientsPage() {
                     onClick={() => openClientVehicles(row)}
                   >
                     <td className={autoserviceListTdClass}>
-                      <p className="font-semibold text-ink">{row.name}</p>
+                      <p className="truncate font-semibold text-ink">{row.name}</p>
                       {hint ? (
                         <p className="mt-0.5 truncate text-xs text-brand-600" title={hint}>
                           Найдено по: {hint}
