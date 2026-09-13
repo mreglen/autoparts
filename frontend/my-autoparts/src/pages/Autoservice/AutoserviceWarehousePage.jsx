@@ -85,36 +85,26 @@ function WarehouseItemMobileCard({
   );
 }
 
-function PurchaseLotMobileCard({ lot, onReturn }) {
+function PurchaseLotMobileCard({ lot, onOpen }) {
+  const lotTotal = Number(lot.unit_price || 0) * Number(lot.quantity || 0);
   return (
-    <div className="border-b border-line-soft py-2 last:border-b-0">
+    <button type="button" onClick={onOpen} className="w-full border-b border-line-soft py-2 text-left last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-ink">{lot.name}</p>
+          <p className="truncate font-medium text-ink">{lot.name || '—'}</p>
           <p className="mt-0.5 text-xs text-ink-muted">
-            {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
+            {[lot.brand, lot.article].filter(Boolean).join(' · ') || `№${lot.receipt_id}`}
           </p>
           <p className="mt-1 text-sm text-ink-muted">
-            {lot.supplier_name}
-            {lot.source_order_id ? ` · Заказ №${lot.source_order_id}` : ''}
-          </p>
-          <p className="mt-1 text-xs text-ink-muted">
-            Поступило {lot.quantity} · Доступно к возврату {lot.max_returnable_qty}
+            {lot.quantity} шт. · {formatAutoserviceWarehouseMoney(lot.unit_price)} ·{' '}
+            {formatAutoserviceWarehouseMoney(lotTotal)}
           </p>
         </div>
-        <div className="shrink-0">
-          {lot.active_return ? (
-            <span className="text-xs font-medium text-brand-700">
-              №{lot.active_return.id}
-            </span>
-          ) : (
-            <Button type="button" variant="secondary" size="sm" onClick={onReturn}>
-              Вернуть
-            </Button>
-          )}
+        <div className="shrink-0 text-right">
+          <p className="font-semibold tabular-nums text-ink">{formatAutoserviceWarehouseMoney(lotTotal)}</p>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -148,6 +138,7 @@ export default function AutoserviceWarehousePage() {
   const [submitting, setSubmitting] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [detailsLot, setDetailsLot] = useState(null);
   const [returnLot, setReturnLot] = useState(null);
   const [reservations, setReservations] = useState([]);
   const [reservationsLoading, setReservationsLoading] = useState(false);
@@ -448,13 +439,10 @@ export default function AutoserviceWarehousePage() {
             <table className={autoserviceListTableClass}>
               <thead>
                 <tr className={autoserviceListTheadRowClass}>
-                  <th className={`min-w-0 ${autoserviceListThClass}`}>Товар</th>
-                  <th className={`min-w-0 ${autoserviceListThClass}`}>Поставщик</th>
-                  <th className={`w-24 whitespace-nowrap ${autoserviceListThClass}`}>Заказ</th>
-                  <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Поступило</th>
-                  <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>Резерв</th>
-                  <th className={`w-20 whitespace-nowrap ${autoserviceListThRightClass}`}>К возврату</th>
-                  <th className={autoserviceListThActionsClass}>Действие</th>
+                  <th className={`w-3/5 ${autoserviceListThClass}`}>Наименование</th>
+                  <th className={`w-20 whitespace-nowrap !pr-2 ${autoserviceListThRightClass}`}>Кол-во</th>
+                  <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Цена</th>
+                  <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
                 </tr>
               </thead>
               <tbody className={autoserviceListTbodyClass}>
@@ -462,58 +450,46 @@ export default function AutoserviceWarehousePage() {
                   Array.from({ length: 6 }).map((_, index) => (
                     <tr key={`sk-lot-${index}`}>
                       <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
-                      <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-28" /></td>
-                      <td className={`w-24 ${autoserviceListTdClass} text-center`}><Skeleton className="mx-auto h-4 w-16" /></td>
-                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
-                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
-                      <td className={autoserviceListTdRightClass}><Skeleton className="ml-auto h-4 w-10" /></td>
-                      <td className={autoserviceListTdActionsClass}><Skeleton className="ml-auto h-8 w-16 rounded-sg-sm" /></td>
+                      <td className={`w-20 whitespace-nowrap !pr-2 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
+                      <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
+                      <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                     </tr>
                   ))
                 ) : filteredLots.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-ink-muted">
+                    <td colSpan={4} className="py-12 text-center text-ink-muted">
                       На складе нет партий из оформленных заказов
                     </td>
                   </tr>
                 ) : (
-                  filteredLots.map((lot) => (
-                    <tr key={lot.receipt_id} className={autoserviceListTrClass}>
-                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
-                        <p className="w-0 min-w-full truncate font-semibold text-ink">{lot.name}</p>
-                        <p className="mt-0.5 text-xs text-ink-muted">
-                          {[lot.brand, lot.article].filter(Boolean).join(' · ') || '—'}
-                        </p>
-                      </td>
-                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
-                        <div className="w-0 min-w-full truncate text-ink">{lot.supplier_name}</div>
-                      </td>
-                      <td className={`w-24 whitespace-nowrap ${autoserviceListTdClass} text-center`}>№ {lot.source_order_id}</td>
-                      <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>{lot.quantity}</td>
-                      <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>
-                        {lot.item_reserved_qty || 0}
-                      </td>
-                      <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>
-                        {lot.max_returnable_qty}
-                      </td>
-                      <td className={autoserviceListTdActionsClass}>
-                        {lot.active_return ? (
-                          <span className="text-xs font-medium text-brand-700">
-                            Заявка №{lot.active_return.id} · {lot.active_return.status_code}
-                          </span>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setReturnLot(lot)}
-                          >
-                            Вернуть
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                  filteredLots.map((lot) => {
+                    const lotTotal = Number(lot.unit_price || 0) * Number(lot.quantity || 0);
+                    return (
+                      <tr
+                        key={lot.receipt_id}
+                        className={autoserviceListTrClickableClass}
+                        onClick={() => setDetailsLot(lot)}
+                      >
+                        <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                          <div className="w-0 min-w-full truncate font-semibold text-ink">{lot.name || '—'}</div>
+                          {lot.brand || lot.article ? (
+                            <div className="mt-0.5 w-0 min-w-full truncate text-xs text-ink-faint">
+                              {[lot.brand, lot.article].filter(Boolean).join(' · ')}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className={`w-20 !pr-2 text-ink-muted ${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
+                          {lot.quantity} шт.
+                        </td>
+                        <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
+                          {formatAutoserviceWarehouseMoney(lot.unit_price)}
+                        </td>
+                        <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                          {formatAutoserviceWarehouseMoney(lotTotal)}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -538,7 +514,7 @@ export default function AutoserviceWarehousePage() {
                 <PurchaseLotMobileCard
                   key={lot.receipt_id}
                   lot={lot}
-                  onReturn={() => setReturnLot(lot)}
+                  onOpen={() => setDetailsLot(lot)}
                 />
               ))
             )}
@@ -647,6 +623,80 @@ export default function AutoserviceWarehousePage() {
           </div>
         </>
       )}
+
+      <Modal
+        open={Boolean(detailsLot)}
+        onClose={() => setDetailsLot(null)}
+        title={detailsLot ? detailsLot.name || 'Партия из закупки' : 'Партия из закупки'}
+      >
+        {detailsLot ? (
+          <div className="space-y-4 text-sm">
+            <dl className="grid grid-cols-2 gap-3">
+              <div>
+                <dt className="text-ink-muted">Бренд</dt>
+                <dd className="font-medium text-ink">{detailsLot.brand || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-muted">Артикул</dt>
+                <dd className="font-mono text-ink">{detailsLot.article || '—'}</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-ink-muted">Наименование</dt>
+                <dd className="font-medium text-ink">{detailsLot.name || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-muted">Поставщик</dt>
+                <dd className="text-ink">{detailsLot.supplier_name || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-muted">Заказ</dt>
+                <dd className="text-ink">{detailsLot.source_order_id ? `№ ${detailsLot.source_order_id}` : '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-muted">Поступило</dt>
+                <dd className="tabular-nums text-ink">{detailsLot.quantity} шт.</dd>
+              </div>
+              <div>
+                <dt className="text-ink-muted">К возврату</dt>
+                <dd className="tabular-nums text-ink">{detailsLot.max_returnable_qty} шт.</dd>
+              </div>
+              <div>
+                <dt className="text-ink-muted">Цена</dt>
+                <dd className="tabular-nums text-ink">{formatAutoserviceWarehouseMoney(detailsLot.unit_price)}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-muted">Сумма</dt>
+                <dd className="tabular-nums font-semibold text-ink">
+                  {formatAutoserviceWarehouseMoney(Number(detailsLot.unit_price || 0) * Number(detailsLot.quantity || 0))}
+                </dd>
+              </div>
+            </dl>
+
+            {detailsLot.active_return ? (
+              <p className="rounded-sg bg-brand-50 px-3 py-2 text-xs text-brand-700">
+                Заявка на возврат №{detailsLot.active_return.id} · {detailsLot.active_return.status_code}
+              </p>
+            ) : null}
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={() => setDetailsLot(null)}>
+                Закрыть
+              </Button>
+              {detailsLot.max_returnable_qty > 0 && !detailsLot.active_return ? (
+                <Button
+                  onClick={() => {
+                    const lot = detailsLot;
+                    setDetailsLot(null);
+                    setReturnLot(lot);
+                  }}
+                >
+                  Вернуть
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <AutoserviceWarehouseReturnModal
         receiptId={returnLot?.receipt_id || null}
