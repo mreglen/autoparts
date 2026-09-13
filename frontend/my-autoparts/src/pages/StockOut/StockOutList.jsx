@@ -10,15 +10,11 @@ import StockOutEmptyState from '../../components/StockOut/StockOutEmptyState';
 import SellerStockMovementModal from '../../components/SellerWarehouse/SellerStockMovementModal';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import ReturnModal from './ReturnModal';
-import PillDropdown from '../../components/PillDropdown/PillDropdown';
 import {
-  mapIdOptionsForPillDropdown,
   warehousePageClass,
-  warehousePillButtonClass,
   warehousePillControlClass,
   warehousePrimaryButtonClass,
   warehouseSecondaryButtonClass,
-  warehouseToolbarClass,
   autoserviceListTableClass,
   autoserviceListTableWrapClass,
   autoserviceListTheadRowClass,
@@ -35,12 +31,7 @@ import { normalizeImageUrl } from '../../utils/apiClient';
 import {
   formatStockOutMoney,
   getStockOutLineTotal,
-  isStockOutSale,
   matchesStockOutSearch,
-  matchesStockOutTypeFilter,
-  sortStockOutItems,
-  STOCK_OUT_SORT_OPTIONS,
-  STOCK_OUT_TYPE_FILTERS,
 } from '../../utils/stockOutUi';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
@@ -54,14 +45,9 @@ export const StockOutList = () => {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [viewStockOut, setViewStockOut] = useState(null);
-  const [selectedItems, setSelectedItems] = useState([]);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [itemsToReturn, setItemsToReturn] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [sortOrder, setSortOrder] = useState('date_desc');
-  const [filtersOpen, setFiltersOpen] = useState(true);
-  const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
 
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
@@ -108,30 +94,12 @@ export const StockOutList = () => {
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
   }, [loadStockOuts]);
 
-  const sortedStockOuts = useMemo(
-    () => sortStockOutItems(stockOuts, sortOrder),
-    [stockOuts, sortOrder]
-  );
-
   const displayStockOuts = useMemo(
-    () =>
-      sortedStockOuts.filter(
-        (item) => matchesStockOutTypeFilter(item, typeFilter) && matchesStockOutSearch(item, searchQuery)
-      ),
-    [sortedStockOuts, typeFilter, searchQuery]
+    () => stockOuts.filter((item) => matchesStockOutSearch(item, searchQuery)),
+    [stockOuts, searchQuery]
   );
 
-  const stats = useMemo(() => {
-    let salesCount = 0;
-    let writeoffCount = 0;
-    let totalValue = 0;
-    displayStockOuts.forEach((item) => {
-      if (isStockOutSale(item)) salesCount += 1;
-      else writeoffCount += 1;
-      totalValue += getStockOutLineTotal(item);
-    });
-    return { count: displayStockOuts.length, salesCount, writeoffCount, totalValue };
-  }, [displayStockOuts]);
+  const totalInList = stockOuts.length;
 
   const getStorageAddress = useCallback(
     (locationId) => {
@@ -142,30 +110,8 @@ export const StockOutList = () => {
     [storageLocations]
   );
 
-  const handleSelectItem = (itemId) => {
-    setSelectedItems((prev) =>
-      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]
-    );
-  };
-
-  const handleSelectAllDisplayed = () => {
-    const ids = displayStockOuts.map((item) => item.id);
-    const allSelected = ids.length > 0 && ids.every((id) => selectedItems.includes(id));
-    if (allSelected) {
-      setSelectedItems((prev) => prev.filter((id) => !ids.includes(id)));
-    } else {
-      setSelectedItems((prev) => [...new Set([...prev, ...ids])]);
-    }
-  };
-
   const handleReturnItem = (item) => {
     setItemsToReturn([item]);
-    setReturnModalOpen(true);
-  };
-
-  const handleReturnSelected = () => {
-    const selected = stockOuts.filter((item) => selectedItems.includes(item.id));
-    setItemsToReturn(selected);
     setReturnModalOpen(true);
   };
 
@@ -177,14 +123,12 @@ export const StockOutList = () => {
       dispatch(fetchStockIns());
       setReturnModalOpen(false);
       setItemsToReturn([]);
-      setSelectedItems([]);
     } catch (err) {
       console.error('Ошибка при возврате:', err);
     }
   };
 
   const handleRemoveItemFromReturn = (itemId) => {
-    setSelectedItems((prev) => prev.filter((id) => id !== itemId));
     setItemsToReturn((prev) => prev.filter((item) => item.id !== itemId));
   };
 
@@ -206,24 +150,8 @@ export const StockOutList = () => {
     setMediaModalOpen(true);
   };
 
-  const typeFilterOptions = useMemo(
-    () => mapIdOptionsForPillDropdown(STOCK_OUT_TYPE_FILTERS),
-    [],
-  );
-  const sortFilterOptions = useMemo(
-    () => mapIdOptionsForPillDropdown(STOCK_OUT_SORT_OPTIONS),
-    [],
-  );
 
-  const setFilterDropdownOpen = (key) => (open) => {
-    setOpenFilterDropdown(open ? key : null);
-  };
-
-  const totalInList = sortedStockOuts.length;
-  const hasActiveFilters = Boolean(searchQuery.trim()) || typeFilter !== 'all';
-  const displayedIds = displayStockOuts.map((i) => i.id);
-  const allDisplayedSelected =
-    displayedIds.length > 0 && displayedIds.every((id) => selectedItems.includes(id));
+  const hasSearch = Boolean(searchQuery.trim());
 
   if (!authChecked) {
     return <AuthLoadingScreen />;
@@ -237,44 +165,15 @@ export const StockOutList = () => {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 sm:text-[1.75rem]">Расходы</h1>
-          <p className="mt-1 text-sm text-gray-500">Списания и продажи запчастей со склада</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {!loading && !error && totalInList > 0 && (
-            <>
-              <div className="grid w-full grid-cols-3 gap-2 rounded-xl bg-gray-50 px-3 py-2.5 ring-1 ring-gray-200/80 sm:hidden">
-                <div className="text-center">
-                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.count}</div>
-                  <div className="text-[11px] text-gray-500">Записей</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.salesCount}</div>
-                  <div className="text-[11px] text-gray-500">Продажи</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
-                    {formatStockOutMoney(stats.totalValue)}
-                  </div>
-                  <div className="text-[11px] text-gray-500">На сумму</div>
-                </div>
-              </div>
-              <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
+            <div className="mr-1 hidden items-center gap-4 text-right sm:flex">
               <div>
-                <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.count}</div>
+                <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{totalInList}</div>
                 <div className="text-[11px] text-gray-500">Записей</div>
               </div>
-              <div>
-                <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">{stats.salesCount}</div>
-                <div className="text-[11px] text-gray-500">Продажи</div>
-              </div>
-              <div>
-                <div className="text-base font-bold tabular-nums text-gray-900 leading-tight">
-                  {formatStockOutMoney(stats.totalValue)}
-                </div>
-                <div className="text-[11px] text-gray-500">На сумму</div>
-              </div>
             </div>
-            </>
           )}
           {canScanQr ? (
             <Link to="/warehouse/scan" className={warehouseSecondaryButtonClass}>
@@ -288,128 +187,40 @@ export const StockOutList = () => {
       </div>
 
       <div className="mb-4 space-y-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative min-w-0 flex-1 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Бренд, артикул, причина, ответственный…"
-              className={`${warehousePillControlClass} pr-10`}
-            />
-            {searchQuery ? (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
-                aria-label="Очистить поиск"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setFiltersOpen((v) => {
-                if (v) setOpenFilterDropdown(null);
-                return !v;
-              });
-            }}
-            className={`${warehousePillButtonClass} ${filtersOpen ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
-            aria-expanded={filtersOpen}
-          >
-            Фильтры
-            <svg
-              className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        </div>
-
-        {filtersOpen && (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:max-w-xl">
-            <PillDropdown
-              ariaLabel="Тип операции"
-              placeholder="Все операции"
-              value={typeFilter}
-              options={typeFilterOptions}
-              isOpen={openFilterDropdown === 'type'}
-              onOpenChange={setFilterDropdownOpen('type')}
-              onChange={setTypeFilter}
-            />
-          </div>
-        )}
-
-        <div className={`${warehouseToolbarClass} max-[400px]:flex-col max-[400px]:items-stretch`}>
-          {displayStockOuts.length > 0 && (
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-gray-700 ring-1 ring-gray-200">
-              <input
-                type="checkbox"
-                checked={allDisplayedSelected}
-                onChange={handleSelectAllDisplayed}
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              <span>Выбрать все</span>
-              {selectedItems.length > 0 && (
-                <span className="text-gray-400 tabular-nums">({selectedItems.length})</span>
-              )}
-            </label>
-          )}
-
-          <PillDropdown
-            ariaLabel="Сортировка"
-            placeholder="Сначала новые"
-            value={sortOrder}
-            options={sortFilterOptions}
-            isOpen={openFilterDropdown === 'sort'}
-            onOpenChange={setFilterDropdownOpen('sort')}
-            onChange={setSortOrder}
-            fullWidth={false}
-            triggerClassName="h-9 rounded-xl bg-white px-3 ring-1 ring-gray-200 hover:bg-gray-50"
-            menuClassName="min-w-[14rem]"
+        <div className="relative min-w-0 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Бренд, артикул, причина, ответственный…"
+            className={`${warehousePillControlClass} pr-10`}
           />
-
-          {selectedItems.length > 0 && (
-            <>
-              <button
-                type="button"
-                onClick={handleReturnSelected}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-700 sm:ml-auto sm:w-auto"
-              >
-                Вернуть на склад
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedItems([])}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
-              >
-                Снять выделение
-              </button>
-            </>
-          )}
-
-          {hasActiveFilters && (
+          {searchQuery ? (
             <button
               type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setTypeFilter('all');
-              }}
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
+              aria-label="Очистить поиск"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
+
+        {hasSearch && (
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:underline"
             >
               <span aria-hidden>×</span>
-              Сбросить фильтры
+              Сбросить поиск
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {loading && (
@@ -435,7 +246,6 @@ export const StockOutList = () => {
           {totalInList > 0 && displayStockOuts.length !== totalInList && (
             <p className="mb-3 text-sm text-gray-500">
               Показано {displayStockOuts.length} из {totalInList} записей
-              {hasActiveFilters ? ' (с учётом фильтров)' : ''}
             </p>
           )}
 
@@ -445,41 +255,52 @@ export const StockOutList = () => {
                 <table className={autoserviceListTableClass}>
                   <thead>
                     <tr className={autoserviceListTheadRowClass}>
-                      <th className="w-8 py-2 pr-2" />
                       <th className={`w-24 ${autoserviceListThClass}`}>Дата</th>
                       <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
                       <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
                       <th className={`w-24 ${autoserviceListThRightClass}`}>Цена</th>
                       <th className={`w-24 ${autoserviceListThRightClass}`}>Сумма</th>
-                      <th className={`w-40 ${autoserviceListThClass}`}>Хранение</th>
                     </tr>
                   </thead>
                   <tbody className={autoserviceListTbodyClass}>
-                    {displayStockOuts.map((item) => (
-                      <tr key={item.id} className={autoserviceListTrClickableClass} onClick={() => setViewStockOut(item)}>
-                        <td className="w-8 py-2 pr-2"><input type="checkbox" checked={selectedItems.includes(item.id)} onClick={(e) => e.stopPropagation()} onChange={() => handleSelectItem(item.id)} className="h-4 w-4 rounded border-line-strong text-brand-600" /></td>
-                        <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{new Date(item.movement_date).toLocaleDateString('ru-RU')}</td>
-                        <td className={`min-w-0 ${autoserviceListTdClass}`}><div className="w-0 min-w-full truncate font-semibold text-ink">{item.product?.name || '—'}</div><div className="truncate text-ink-muted">{[item.product?.brand, item.product?.article].filter(Boolean).join(' · ') || '—'}</div></td>
-                        <td className={`${autoserviceListTdRightClass} tabular-nums`}>{item.quantity} шт.</td>
-                        <td className={`${autoserviceListTdRightClass} tabular-nums`}>{formatStockOutMoney(item.sale_price)}</td>
-                        <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatStockOutMoney(getStockOutLineTotal(item))}</td>
-                        <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>{getStorageAddress(item.storage_location_id)}</td>
-                      </tr>
-                    ))}
+                    {displayStockOuts.map((item) => {
+                      const product = item.product || {};
+                      const title = [product.brand, product.article, product.name].filter(Boolean).join(' · ') || '—';
+                      return (
+                        <tr key={item.id} className={autoserviceListTrClickableClass} onClick={() => setViewStockOut(item)}>
+                          <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{new Date(item.movement_date).toLocaleDateString('ru-RU')}</td>
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                            <div className="w-0 min-w-full truncate text-ink" title={title}>
+                              {title}
+                            </div>
+                          </td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums`}>{item.quantity} шт.</td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums`}>{formatStockOutMoney(item.sale_price)}</td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatStockOutMoney(getStockOutLineTotal(item))}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
               <div className={autoserviceListMobileWrapClass}>
-                {displayStockOuts.map((item) => (
-                  <button key={item.id} type="button" onClick={() => setViewStockOut(item)} className="w-full border-b border-line-soft py-2 text-left last:border-0">
-                    <div className="flex justify-between gap-2"><span className="truncate font-medium text-ink">{item.product?.name || '—'}</span><span className="shrink-0 font-semibold tabular-nums">{formatStockOutMoney(getStockOutLineTotal(item))}</span></div>
-                    <p className="mt-1 text-xs text-ink-muted">{new Date(item.movement_date).toLocaleDateString('ru-RU')} · {item.quantity} шт. · {getStorageAddress(item.storage_location_id)}</p>
-                  </button>
-                ))}
+                {displayStockOuts.map((item) => {
+                  const product = item.product || {};
+                  const title = [product.brand, product.article, product.name].filter(Boolean).join(' · ') || '—';
+                  return (
+                    <button key={item.id} type="button" onClick={() => setViewStockOut(item)} className="w-full border-b border-line-soft py-2 text-left last:border-0">
+                      <div className="flex justify-between gap-2">
+                        <span className="truncate font-medium text-ink" title={title}>{title}</span>
+                        <span className="shrink-0 font-semibold tabular-nums">{formatStockOutMoney(getStockOutLineTotal(item))}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-ink-muted">{new Date(item.movement_date).toLocaleDateString('ru-RU')} · {item.quantity} шт.</p>
+                    </button>
+                  );
+                })}
               </div>
             </>
           ) : (
-            <StockOutEmptyState hasSearch={hasActiveFilters || totalInList > 0} />
+            <StockOutEmptyState hasSearch={hasSearch || totalInList > 0} />
           )}
         </>
       )}
