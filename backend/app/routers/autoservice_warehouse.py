@@ -765,13 +765,13 @@ def list_autoservice_warehouse_expenses(
         for part in (
             db.query(RepairOrderShopPart)
             .filter(
-                RepairOrderShopPart.repair_order_id.in_(list(order_map.values())),
+                RepairOrderShopPart.order_id.in_(list(order_map.values())),
                 RepairOrderShopPart.source == "autoservice_stock",
                 RepairOrderShopPart.autoservice_stock_item_id.isnot(None),
             )
             .all()
         ):
-            part_prices[(part.repair_order_id, part.autoservice_stock_item_id)] = _effective_client_price(part)
+            part_prices[(part.order_id, part.autoservice_stock_item_id)] = _effective_client_price(part)
 
     result = []
     for row in rows:
