@@ -6,8 +6,8 @@ import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchMyProducts } from '../../redux/slices/ProductSlice';
 import { fetchStockIns } from '../../redux/slices/StockInSlice';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import StockOutCard from '../../components/StockOut/StockOutCard';
 import StockOutEmptyState from '../../components/StockOut/StockOutEmptyState';
+import SellerStockMovementModal from '../../components/SellerWarehouse/SellerStockMovementModal';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import ReturnModal from './ReturnModal';
 import PillDropdown from '../../components/PillDropdown/PillDropdown';
@@ -19,6 +19,16 @@ import {
   warehousePrimaryButtonClass,
   warehouseSecondaryButtonClass,
   warehouseToolbarClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTheadRowClass,
+  autoserviceListThClass,
+  autoserviceListThRightClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListTdRightClass,
+  autoserviceListTrClickableClass,
+  autoserviceListMobileWrapClass,
 } from '../../utils/warehouseListUi';
 import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { normalizeImageUrl } from '../../utils/apiClient';
@@ -38,11 +48,12 @@ export const StockOutList = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { items: stockOuts, loading, error } = useSelector((state) => state.stockOut);
+  const { items: stockIns } = useSelector((state) => state.stockIn);
   const { storageLocations } = useSelector((state) => state.organization);
   const { user, permissionCodes } = useSelector((state) => state.auth);
 
   const [authChecked, setAuthChecked] = useState(false);
-  const [expandedDocId, setExpandedDocId] = useState(null);
+  const [viewStockOut, setViewStockOut] = useState(null);
   const [selectedItems, setSelectedItems] = useState([]);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [itemsToReturn, setItemsToReturn] = useState([]);
@@ -82,6 +93,7 @@ export const StockOutList = () => {
   useEffect(() => {
     if (authChecked && hasPermission && (user?.is_seller || user?.is_employee) && user.organization_id) {
       loadStockOuts();
+      dispatch(fetchStockIns());
       dispatch(fetchStorageLocations(user.organization_id));
     }
   }, [dispatch, user, authChecked, hasPermission, loadStockOuts]);
@@ -174,10 +186,6 @@ export const StockOutList = () => {
   const handleRemoveItemFromReturn = (itemId) => {
     setSelectedItems((prev) => prev.filter((id) => id !== itemId));
     setItemsToReturn((prev) => prev.filter((item) => item.id !== itemId));
-  };
-
-  const toggleExpand = (id) => {
-    setExpandedDocId((prev) => (prev === id ? null : id));
   };
 
   const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
@@ -432,26 +440,62 @@ export const StockOutList = () => {
           )}
 
           {displayStockOuts.length > 0 ? (
-            <div className="space-y-4">
-              {displayStockOuts.map((item) => (
-                <StockOutCard
-                  key={item.id}
-                  item={item}
-                  storageLabel={getStorageAddress(item.storage_location_id)}
-                  isExpanded={expandedDocId === item.id}
-                  isSelected={selectedItems.includes(item.id)}
-                  onToggle={toggleExpand}
-                  onSelect={() => handleSelectItem(item.id)}
-                  onReturn={handleReturnItem}
-                  onImageClick={handleOpenMediaModal}
-                />
-              ))}
-            </div>
+            <>
+              <div className={autoserviceListTableWrapClass}>
+                <table className={autoserviceListTableClass}>
+                  <thead>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className="w-8 py-2 pr-2" />
+                      <th className={`w-24 ${autoserviceListThClass}`}>Дата</th>
+                      <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
+                      <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
+                      <th className={`w-24 ${autoserviceListThRightClass}`}>Цена</th>
+                      <th className={`w-24 ${autoserviceListThRightClass}`}>Сумма</th>
+                      <th className={`w-40 ${autoserviceListThClass}`}>Хранение</th>
+                    </tr>
+                  </thead>
+                  <tbody className={autoserviceListTbodyClass}>
+                    {displayStockOuts.map((item) => (
+                      <tr key={item.id} className={autoserviceListTrClickableClass} onClick={() => setViewStockOut(item)}>
+                        <td className="w-8 py-2 pr-2"><input type="checkbox" checked={selectedItems.includes(item.id)} onClick={(e) => e.stopPropagation()} onChange={() => handleSelectItem(item.id)} className="h-4 w-4 rounded border-line-strong text-brand-600" /></td>
+                        <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{new Date(item.movement_date).toLocaleDateString('ru-RU')}</td>
+                        <td className={`min-w-0 ${autoserviceListTdClass}`}><div className="w-0 min-w-full truncate font-semibold text-ink">{item.product?.name || '—'}</div><div className="truncate text-ink-muted">{[item.product?.brand, item.product?.article].filter(Boolean).join(' · ') || '—'}</div></td>
+                        <td className={`${autoserviceListTdRightClass} tabular-nums`}>{item.quantity} шт.</td>
+                        <td className={`${autoserviceListTdRightClass} tabular-nums`}>{formatStockOutMoney(item.sale_price)}</td>
+                        <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatStockOutMoney(getStockOutLineTotal(item))}</td>
+                        <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>{getStorageAddress(item.storage_location_id)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className={autoserviceListMobileWrapClass}>
+                {displayStockOuts.map((item) => (
+                  <button key={item.id} type="button" onClick={() => setViewStockOut(item)} className="w-full border-b border-line-soft py-2 text-left last:border-0">
+                    <div className="flex justify-between gap-2"><span className="truncate font-medium text-ink">{item.product?.name || '—'}</span><span className="shrink-0 font-semibold tabular-nums">{formatStockOutMoney(getStockOutLineTotal(item))}</span></div>
+                    <p className="mt-1 text-xs text-ink-muted">{new Date(item.movement_date).toLocaleDateString('ru-RU')} · {item.quantity} шт. · {getStorageAddress(item.storage_location_id)}</p>
+                  </button>
+                ))}
+              </div>
+            </>
           ) : (
             <StockOutEmptyState hasSearch={hasActiveFilters || totalInList > 0} />
           )}
         </>
       )}
+
+      <SellerStockMovementModal
+        row={viewStockOut}
+        type="out"
+        stockIns={stockIns}
+        stockOuts={stockOuts}
+        onClose={() => setViewStockOut(null)}
+        onImageClick={handleOpenMediaModal}
+        onReturn={(item) => {
+          setViewStockOut(null);
+          handleReturnItem(item);
+        }}
+      />
 
       <ReturnModal
         isOpen={returnModalOpen}

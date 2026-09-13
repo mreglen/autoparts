@@ -3,8 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import StockInCard from '../../components/StockIn/StockInCard';
 import StockInEmptyState from '../../components/StockIn/StockInEmptyState';
+import SellerStockMovementModal from '../../components/SellerWarehouse/SellerStockMovementModal';
 import PillDropdown from '../../components/PillDropdown/PillDropdown';
 import {
   mapIdOptionsForPillDropdown,
@@ -13,10 +13,21 @@ import {
   warehousePrimaryButtonClass,
   warehouseSecondaryButtonClass,
   warehouseToolbarClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTheadRowClass,
+  autoserviceListThClass,
+  autoserviceListThRightClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListTdRightClass,
+  autoserviceListTrClickableClass,
+  autoserviceListMobileWrapClass,
 } from '../../utils/warehouseListUi';
 import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import { fetchStockIns } from '../../redux/slices/StockInSlice';
+import { fetchStockOuts } from '../../redux/slices/StockOutSlice';
 import {
   formatStockInMoney,
   getStockInLineTotal,
@@ -31,9 +42,10 @@ const StockInList = () => {
   const dispatch = useDispatch();
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const { items: stockIns, loading, error } = useSelector((state) => state.stockIn);
+  const { items: stockOuts } = useSelector((state) => state.stockOut);
 
   const [authChecked, setAuthChecked] = useState(false);
-  const [expandedDocId, setExpandedDocId] = useState(null);
+  const [viewStockIn, setViewStockIn] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('date_desc');
   const [openFilterDropdown, setOpenFilterDropdown] = useState(null);
@@ -51,6 +63,7 @@ const StockInList = () => {
   useEffect(() => {
     if (authChecked && hasPermission) {
       dispatch(fetchStockIns());
+      dispatch(fetchStockOuts());
     }
   }, [dispatch, authChecked, hasPermission]);
 
@@ -100,10 +113,6 @@ const StockInList = () => {
     });
     return { count: displayStockIns.length, totalQty, totalValue };
   }, [displayStockIns]);
-
-  const toggleExpand = (id) => {
-    setExpandedDocId((prev) => (prev === id ? null : id));
-  };
 
   const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
     const formattedMedia = mediaItems.map((item) => {
@@ -269,22 +278,56 @@ const StockInList = () => {
           )}
 
           {displayStockIns.length > 0 ? (
-            <div className="space-y-4">
-              {displayStockIns.map((doc) => (
-                <StockInCard
-                  key={doc.id}
-                  doc={doc}
-                  isExpanded={expandedDocId === doc.id}
-                  onToggle={toggleExpand}
-                  onImageClick={handleOpenMediaModal}
-                />
-              ))}
-            </div>
+            <>
+              <div className={autoserviceListTableWrapClass}>
+                <table className={autoserviceListTableClass}>
+                  <thead>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className={`w-24 ${autoserviceListThClass}`}>Дата</th>
+                      <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
+                      <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
+                      <th className={`w-24 ${autoserviceListThRightClass}`}>Цена</th>
+                      <th className={`w-24 ${autoserviceListThRightClass}`}>Сумма</th>
+                      <th className={`w-40 ${autoserviceListThClass}`}>Хранение</th>
+                    </tr>
+                  </thead>
+                  <tbody className={autoserviceListTbodyClass}>
+                    {displayStockIns.map((doc) => (
+                      <tr key={doc.id} className={autoserviceListTrClickableClass} onClick={() => setViewStockIn(doc)}>
+                        <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{new Date(doc.created_at).toLocaleDateString('ru-RU')}</td>
+                        <td className={`min-w-0 ${autoserviceListTdClass}`}><div className="w-0 min-w-full truncate font-semibold text-ink">{doc.product?.name || '—'}</div></td>
+                        <td className={`${autoserviceListTdRightClass} tabular-nums`}>{doc.quantity} шт.</td>
+                        <td className={`${autoserviceListTdRightClass} tabular-nums`}>{formatStockInMoney(doc.sale_price)}</td>
+                        <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatStockInMoney(getStockInLineTotal(doc))}</td>
+                        <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>{doc.storage_location?.address || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className={autoserviceListMobileWrapClass}>
+                {displayStockIns.map((doc) => (
+                  <button key={doc.id} type="button" onClick={() => setViewStockIn(doc)} className="w-full border-b border-line-soft py-2 text-left last:border-0">
+                    <div className="flex justify-between gap-2"><span className="truncate font-medium text-ink">{doc.product?.name || '—'}</span><span className="shrink-0 font-semibold tabular-nums">{formatStockInMoney(getStockInLineTotal(doc))}</span></div>
+                    <p className="mt-1 text-xs text-ink-muted">{new Date(doc.created_at).toLocaleDateString('ru-RU')} · {doc.quantity} шт. · {doc.storage_location?.address || '—'}</p>
+                  </button>
+                ))}
+              </div>
+            </>
           ) : (
             <StockInEmptyState hasSearch={hasSearch} />
           )}
         </>
       )}
+
+      <SellerStockMovementModal
+        row={viewStockIn}
+        type="in"
+        stockIns={stockIns}
+        stockOuts={stockOuts}
+        onClose={() => setViewStockIn(null)}
+        onImageClick={handleOpenMediaModal}
+      />
 
       <MediaModal
         isOpen={mediaModalOpen}

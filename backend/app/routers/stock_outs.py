@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from datetime import date
 from app.core.auth import get_current_user
 from app.models.product import Product
@@ -135,7 +135,10 @@ def get_stocks_outs(
     stock_outs = (
         db.query(StockOutModel)
         .options(
-            joinedload(StockOutModel.product),
+            joinedload(StockOutModel.product).options(
+                selectinload(Product.photos),
+                selectinload(Product.videos),
+            ),
             joinedload(StockOutModel.storage_location),
             joinedload(StockOutModel.user)
         )

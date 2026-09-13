@@ -30,6 +30,8 @@ def get_stock_ins(
                     selectinload(VehicleModel.vin_row),
                     selectinload(VehicleModel.mileage_row),
                 ),
+                selectinload(ProductModel.photos),
+                selectinload(ProductModel.videos),
             ),
             joinedload(StockInModel.storage_location),
             joinedload(StockInModel.creator),
