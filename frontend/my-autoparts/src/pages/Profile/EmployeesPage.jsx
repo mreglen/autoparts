@@ -8,7 +8,6 @@ import {
   createEmployeeAccount,
 } from '../../redux/slices/OrganizationSlice';
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import {
   Button,
   ConfirmDialog,
@@ -24,7 +23,18 @@ import {
   Textarea,
 } from '../../components/UI';
 import { SettingsToggle } from '../Settings/settingsUi';
-import { warehousePageClass } from '../../utils/warehouseListUi';
+import {
+  autoserviceListMobileWrapClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListThClass,
+  autoserviceListTheadRowClass,
+  autoserviceListTrClickableClass,
+  warehousePageClass,
+  warehousePillControlClass,
+} from '../../utils/warehouseListUi';
 import {
   buildPayload,
   emptyForm,
@@ -77,81 +87,23 @@ function EmployeeAccountBadge({ employee }) {
   );
 }
 
-function EmployeeActionsMenu({
-  employee,
-  fullName,
-  creatingAccountId,
-  onEdit,
-  onPermissions,
-  onCreateAccount,
-  onDelete,
-  showLabel = true,
-}) {
-  const canCreateAccount = employee.email && !employee.user_id && employee.account_status !== 'linked';
-  const accountLoading = creatingAccountId === employee.id;
-
-  return (
-    <ActionsDropdown
-      menuClassName="w-56 z-50"
-      estimatedMenuHeight={canCreateAccount ? 180 : 140}
-      showLabel={showLabel}
-      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-    >
-      <ActionsDropdownItem onClick={onEdit}>Редактировать</ActionsDropdownItem>
-      <ActionsDropdownItem onClick={onPermissions}>Назначить права</ActionsDropdownItem>
-      {canCreateAccount ? (
-        <ActionsDropdownItem disabled={accountLoading} onClick={onCreateAccount}>
-          {accountLoading ? 'Создание…' : 'Создать аккаунт'}
-        </ActionsDropdownItem>
-      ) : null}
-      <ActionsDropdownItem danger onClick={onDelete}>Удалить</ActionsDropdownItem>
-    </ActionsDropdown>
-  );
-}
-
-function EmployeeMobileCard({
-  employee,
-  creatingAccountId,
-  onEdit,
-  onPermissions,
-  onCreateAccount,
-  onDelete,
-}) {
+function EmployeeMobileCard({ employee, onOpen }) {
   const fullName = getEmployeeFullName(employee);
 
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
-      <div className="flex items-start justify-between gap-2">
-        <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">{fullName || '—'}</span>
-            <EmployeeAccountBadge employee={employee} />
-          </div>
-          {employee.position ? (
-            <p className="mt-1 truncate text-sm text-gray-500">{employee.position}</p>
-          ) : null}
-          <p className="mt-0.5 truncate text-sm text-gray-500">{employee.phone || '—'}</p>
-          {employee.email ? (
-            <p className="mt-0.5 truncate text-xs text-gray-500">{employee.email}</p>
-          ) : null}
-          {employee.is_service_executor ? (
-            <p className="mt-1 text-xs text-gray-500">{formatPayroll(employee)}</p>
-          ) : null}
-        </button>
-        <div className="shrink-0">
-          <EmployeeActionsMenu
-            employee={employee}
-            fullName={fullName}
-            creatingAccountId={creatingAccountId}
-            onEdit={onEdit}
-            onPermissions={onPermissions}
-            onCreateAccount={onCreateAccount}
-            onDelete={onDelete}
-            showLabel={false}
-          />
-        </div>
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full border-b border-line-soft py-2 text-left last:border-b-0"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-xs font-semibold text-ink">{fullName || '—'}</span>
+        <EmployeeAccountBadge employee={employee} />
       </div>
-    </div>
+      <p className="mt-1 truncate text-xs text-ink-muted">
+        {[employee.position, employee.phone].filter(Boolean).join(' · ') || '—'}
+      </p>
+    </button>
   );
 }
 
@@ -253,6 +205,7 @@ export default function EmployeesPage() {
   const [editingId, setEditingId] = useState(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [detailsEmployee, setDetailsEmployee] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
@@ -404,13 +357,21 @@ export default function EmployeesPage() {
   const getEmployeeActions = (employee) => {
     const fullName = getEmployeeFullName(employee);
     return {
-      onEdit: () => startEditing(employee),
+      onEdit: () => {
+        setDetailsEmployee(null);
+        startEditing(employee);
+      },
       onPermissions: () => {
+        setDetailsEmployee(null);
         setSelectedEmployee(employee);
         setShowPermissionModal(true);
       },
-      onCreateAccount: () => handleCreateAccount(employee),
+      onCreateAccount: async () => {
+        await handleCreateAccount(employee);
+        setDetailsEmployee(null);
+      },
       onDelete: () => {
+        setDetailsEmployee(null);
         setEmployeeToDelete({ id: employee.id, name: fullName });
         setShowDeleteModal(true);
       },
@@ -440,7 +401,7 @@ export default function EmployeesPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Поиск по имени, email, телефону или должности"
-          className="h-10 w-full rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-brand-500/20"
+          className={warehousePillControlClass}
         />
       ) : null}
 
@@ -454,57 +415,36 @@ export default function EmployeesPage() {
         <EmptyState illustration="search" title="Никого не нашли" description="Попробуйте изменить запрос поиска." />
       ) : (
         <>
-          <div className="hidden md:block min-w-0">
-            <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
+          <div className={autoserviceListTableWrapClass}>
+            <table className={autoserviceListTableClass}>
               <thead>
-                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <th className="py-3 pr-3">Сотрудник</th>
-                  <th className="py-3 pr-3">Контакты</th>
-                  <th className="w-40 py-3 pr-3">Оплата</th>
-                  <th className="w-44 py-3 pr-3">Аккаунт</th>
-                  <th className="w-28 py-3 text-right">Действия</th>
+                <tr className={autoserviceListTheadRowClass}>
+                  <th className={autoserviceListThClass}>Сотрудник</th>
+                  <th className={`w-52 ${autoserviceListThClass}`}>Контакты</th>
+                  <th className={`w-40 ${autoserviceListThClass}`}>Оплата</th>
+                  <th className={`w-40 ${autoserviceListThClass}`}>Аккаунт</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className={autoserviceListTbodyClass}>
                 {filteredEmployees.map((employee) => {
                   const fullName = getEmployeeFullName(employee);
-                  const actions = getEmployeeActions(employee);
                   return (
                     <tr
                       key={employee.id}
-                      className="group cursor-pointer transition-colors hover:bg-gray-50/70"
-                      onClick={(e) => {
-                        if (e.target.closest('.actions-dropdown')) return;
-                        startEditing(employee);
-                      }}
+                      className={autoserviceListTrClickableClass}
+                      onClick={() => setDetailsEmployee(employee)}
                     >
-                      <td className="py-3 pr-3 align-middle">
-                        <div className="font-medium text-gray-900">{fullName || '—'}</div>
-                        {employee.position ? (
-                          <div className="mt-0.5 text-xs text-gray-500">{employee.position}</div>
-                        ) : null}
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                        <div className="w-0 min-w-full truncate font-semibold text-ink">{fullName || '—'}</div>
                       </td>
-                      <td className="py-3 pr-3 align-middle">
-                        {employee.phone ? (
-                          <div className="font-medium text-gray-900">{employee.phone}</div>
-                        ) : (
-                          <div className="text-gray-500">—</div>
-                        )}
-                        {employee.email ? (
-                          <div className="mt-0.5 text-xs text-gray-500">{employee.email}</div>
-                        ) : null}
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                        <div className="w-0 min-w-full truncate text-ink-muted">
+                          {[employee.phone, employee.email].filter(Boolean).join(' · ') || '—'}
+                        </div>
                       </td>
-                      <td className="py-3 pr-3 align-middle text-gray-600">{formatPayroll(employee)}</td>
-                      <td className="py-3 pr-3 align-middle">
+                      <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>{formatPayroll(employee)}</td>
+                      <td className={autoserviceListTdClass}>
                         <EmployeeAccountBadge employee={employee} />
-                      </td>
-                      <td className="py-3 text-right align-middle">
-                        <EmployeeActionsMenu
-                          employee={employee}
-                          fullName={fullName}
-                          creatingAccountId={creatingAccountId}
-                          {...actions}
-                        />
                       </td>
                     </tr>
                   );
@@ -512,21 +452,84 @@ export default function EmployeesPage() {
               </tbody>
             </table>
           </div>
-          <div className="md:hidden">
-            {filteredEmployees.map((employee) => {
-              const actions = getEmployeeActions(employee);
-              return (
-                <EmployeeMobileCard
-                  key={employee.id}
-                  employee={employee}
-                  creatingAccountId={creatingAccountId}
-                  {...actions}
-                />
-              );
-            })}
+          <div className={autoserviceListMobileWrapClass}>
+            {filteredEmployees.map((employee) => (
+              <EmployeeMobileCard
+                key={employee.id}
+                employee={employee}
+                onOpen={() => setDetailsEmployee(employee)}
+              />
+            ))}
           </div>
         </>
       )}
+
+      <Modal
+        open={Boolean(detailsEmployee)}
+        onClose={() => setDetailsEmployee(null)}
+        title={detailsEmployee ? getEmployeeFullName(detailsEmployee) || 'Сотрудник' : 'Сотрудник'}
+        size="md"
+      >
+        {detailsEmployee ? (() => {
+          const actions = getEmployeeActions(detailsEmployee);
+          const canCreateAccount = detailsEmployee.email
+            && !detailsEmployee.user_id
+            && detailsEmployee.account_status !== 'linked';
+          return (
+            <div className="space-y-5">
+              <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-ink-muted">Должность</dt>
+                  <dd className="mt-0.5 font-medium text-ink">{detailsEmployee.position || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Телефон</dt>
+                  <dd className="mt-0.5 font-medium text-ink">{detailsEmployee.phone || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Email</dt>
+                  <dd className="mt-0.5 font-medium text-ink">{detailsEmployee.email || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Аккаунт</dt>
+                  <dd className="mt-1"><EmployeeAccountBadge employee={detailsEmployee} /></dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Оплата</dt>
+                  <dd className="mt-0.5 font-medium text-ink">{formatPayroll(detailsEmployee)}</dd>
+                </div>
+                {detailsEmployee.comment ? (
+                  <div className="sm:col-span-2">
+                    <dt className="text-ink-muted">Комментарий</dt>
+                    <dd className="mt-0.5 whitespace-pre-wrap text-ink">{detailsEmployee.comment}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" variant="danger" onClick={actions.onDelete}>
+                  Удалить
+                </Button>
+                <Button type="button" variant="secondary" onClick={actions.onPermissions}>
+                  Назначить права
+                </Button>
+                {canCreateAccount ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={actions.onCreateAccount}
+                    loading={creatingAccountId === detailsEmployee.id}
+                  >
+                    Создать аккаунт
+                  </Button>
+                ) : null}
+                <Button type="button" onClick={actions.onEdit}>
+                  Редактировать
+                </Button>
+              </div>
+            </div>
+          );
+        })() : null}
+      </Modal>
 
       <PermissionAssignmentModal
         show={showPermissionModal}
