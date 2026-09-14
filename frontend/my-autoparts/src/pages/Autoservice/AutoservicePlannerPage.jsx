@@ -570,6 +570,11 @@ export default function AutoservicePlannerPage() {
       <RepairOrderViewModal
         order={viewOrder}
         loading={viewOrderLoading}
+        enablePayment
+        onOrderChange={(updated) => {
+          setViewOrder(updated);
+          load();
+        }}
         onClose={() => {
           setViewOrder(null);
           setViewOrderLoading(false);
