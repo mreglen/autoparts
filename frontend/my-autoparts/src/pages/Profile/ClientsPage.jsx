@@ -15,13 +15,24 @@ import {
 } from '../../redux/slices/ClientSlice';
 import ClientOrdersModal from './ClientOrdersModal';
 import MediaModal from '../../components/MediaModal/MediaModal';
+import Modal, { ConfirmDialog } from '../../components/UI/Modal';
 import { apiAxios, normalizeImageUrl } from '../../utils/apiClient';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import {
+    autoserviceListMobileWrapClass,
+    autoserviceListTableClass,
+    autoserviceListTableWrapClass,
+    autoserviceListTbodyClass,
+    autoserviceListTdClass,
+    autoserviceListTdRightClass,
+    autoserviceListThClass,
+    autoserviceListThRightClass,
+    autoserviceListTheadRowClass,
+    autoserviceListTrClickableClass,
     warehouseEmptyShellClass,
-    warehouseListShellClass,
     warehousePageClass,
     warehousePillControlClass,
+    warehousePrimaryButtonClass,
+    warehouseSecondaryButtonClass,
 } from '../../utils/warehouseListUi';
 
 function clientFullName(client) {
@@ -53,7 +64,8 @@ export default function ClientsPage() {
     const user = useSelector((state) => state.auth.user);
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [openActionsId, setOpenActionsId] = useState(null);
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [deleteConfirmClient, setDeleteConfirmClient] = useState(null);
     const [ordersClient, setOrdersClient] = useState(null);
     const [selectedPart, setSelectedPart] = useState(null);
     const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -70,18 +82,6 @@ export default function ClientsPage() {
         if (error) dispatch(clearError());
     }, [error, dispatch]);
 
-    useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (!e.target.closest('.actions-dropdown')) {
-                setOpenActionsId(null);
-            }
-        };
-        if (openActionsId) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [openActionsId]);
-
     const filteredClients = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
         if (!q) return clients;
@@ -97,13 +97,8 @@ export default function ClientsPage() {
 
     const clientRowKey = (client) => client.id ?? `${client.email}-${client.phone}`;
 
-    const lastClientRowKey = useMemo(() => {
-        if (filteredClients.length === 0) return null;
-        return clientRowKey(filteredClients[filteredClients.length - 1]);
-    }, [filteredClients]);
-
     const handleOpenOrders = (client) => {
-        setOpenActionsId(null);
+        setSelectedClient(null);
         setOrdersClient(client);
         dispatch(fetchClientBuyerOrders({
             clientId: client.id ?? undefined,
@@ -120,13 +115,16 @@ export default function ClientsPage() {
 
     const handleDelete = (client) => {
         if (!client.id) return;
-        setOpenActionsId(null);
-        if (window.confirm('Удалить карточку клиента из справочника? Заказы сохранятся.')) {
-            dispatch(deleteClient(client.id)).then((result) => {
-                if (deleteClient.fulfilled.match(result)) {
-                    dispatch(fetchClients());
-                }
-            });
+        setDeleteConfirmClient(client);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteConfirmClient?.id) return;
+        const result = await dispatch(deleteClient(deleteConfirmClient.id));
+        if (deleteClient.fulfilled.match(result)) {
+            setDeleteConfirmClient(null);
+            setSelectedClient(null);
+            dispatch(fetchClients());
         }
     };
 
@@ -214,103 +212,130 @@ export default function ClientsPage() {
                 </div>
             ) : (
                 <>
-                    <div
-                        className={`hidden md:block w-full ${warehouseListShellClass} ${
-                            openActionsId ? 'overflow-visible' : 'overflow-x-auto overflow-hidden'
-                        }`}
-                    >
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Клиент</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Контакты</th>
-                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Заказов</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Действия</th>
+                    <div className={autoserviceListTableWrapClass}>
+                        <table className={autoserviceListTableClass}>
+                            <thead>
+                                <tr className={autoserviceListTheadRowClass}>
+                                    <th className={`w-2/5 ${autoserviceListThClass}`}>Клиент</th>
+                                    <th className={`w-1/4 ${autoserviceListThClass}`}>Email</th>
+                                    <th className={`w-1/4 ${autoserviceListThClass}`}>Телефон</th>
+                                    <th className={`w-20 ${autoserviceListThRightClass}`}>Заказов</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredClients.map((client) => {
-                                    const rowKey = clientRowKey(client);
-                                    const isMenuOpen = openActionsId === rowKey;
-                                    return (
-                                        <tr
-                                            key={rowKey}
-                                            onDoubleClick={() => handleOpenOrders(client)}
-                                            className={`cursor-pointer hover:bg-gray-50/50 ${isMenuOpen ? 'relative z-30' : ''}`}
-                                        >
-                                            <td className="px-4 py-4">
-                                                <div className="text-sm font-semibold text-gray-900">
-                                                    {clientFullName(client) || '—'}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-4 text-sm text-gray-600">
-                                                <div>{client.email}</div>
-                                                <div className="text-gray-500">{client.phone}</div>
-                                            </td>
-                                            <td className="px-4 py-4 text-center text-sm font-medium text-gray-900">
-                                                {client.orders_count ?? 0}
-                                            </td>
-                                            <td
-                                                className={`px-4 py-4 text-right ${isMenuOpen ? 'relative z-30' : ''}`}
-                                                onDoubleClick={(e) => e.stopPropagation()}
-                                            >
-                                                <ActionsDropdown
-                                                    isOpen={isMenuOpen}
-                                                    onOpenChange={(next) => setOpenActionsId(next ? rowKey : null)}
-                                                    menuClassName="w-56 z-50"
-                                                    estimatedMenuHeight={client.id ? 120 : 56}
-                                                    preferOpenUp={rowKey === lastClientRowKey}
-                                                >
-                                                    <ActionsDropdownItem onClick={() => handleOpenOrders(client)}>
-                                                        Просмотреть заказы
-                                                    </ActionsDropdownItem>
-                                                    {client.id && (
-                                                        <ActionsDropdownItem
-                                                            danger
-                                                            disabled={deleting}
-                                                            onClick={() => handleDelete(client)}
-                                                        >
-                                                            Удалить из справочника
-                                                        </ActionsDropdownItem>
-                                                    )}
-                                                </ActionsDropdown>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                            <tbody className={autoserviceListTbodyClass}>
+                                {filteredClients.map((client) => (
+                                    <tr
+                                        key={clientRowKey(client)}
+                                        onClick={() => setSelectedClient(client)}
+                                        className={autoserviceListTrClickableClass}
+                                    >
+                                        <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                                            <div className="w-0 min-w-full truncate font-semibold text-ink">
+                                                {clientFullName(client) || '—'}
+                                            </div>
+                                        </td>
+                                        <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                                            <div className="w-0 min-w-full truncate text-ink-muted">{client.email || '—'}</div>
+                                        </td>
+                                        <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
+                                            {client.phone || '—'}
+                                        </td>
+                                        <td className={`${autoserviceListTdRightClass} tabular-nums font-semibold text-ink`}>
+                                            {client.orders_count ?? 0}
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>
 
-                    <div className="md:hidden space-y-3">
+                    <div className={autoserviceListMobileWrapClass}>
                         {filteredClients.map((client) => (
-                            <div
+                            <button
                                 key={clientRowKey(client)}
-                                onDoubleClick={() => handleOpenOrders(client)}
-                                className="cursor-pointer bg-white rounded-lg border border-gray-200 p-4 shadow-sm active:bg-gray-50"
+                                type="button"
+                                onClick={() => setSelectedClient(client)}
+                                className="w-full border-b border-line-soft py-2 text-left last:border-0"
                             >
-                                <div className="flex justify-between gap-3">
-                                    <div className="min-w-0 flex-1">
-                                        <h3 className="font-semibold text-gray-900">{clientFullName(client) || '—'}</h3>
-                                        <p className="text-sm text-gray-500 mt-1">{client.email}</p>
-                                        <p className="text-sm text-gray-500">{client.phone}</p>
-                                        <p className="text-sm mt-2 text-gray-700">
-                                            Заказов: <span className="font-medium">{client.orders_count ?? 0}</span>
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleOpenOrders(client)}
-                                        className="flex-shrink-0 px-3 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50"
-                                    >
-                                        Заказы
-                                    </button>
+                                <div className="flex justify-between gap-2">
+                                    <span className="truncate font-medium text-ink">{clientFullName(client) || '—'}</span>
+                                    <span className="shrink-0 tabular-nums text-ink-muted">{client.orders_count ?? 0}</span>
                                 </div>
-                            </div>
+                                <p className="mt-1 truncate text-xs text-ink-muted">
+                                    {[client.phone, client.email].filter(Boolean).join(' · ') || '—'}
+                                </p>
+                            </button>
                         ))}
                     </div>
                 </>
             )}
+
+            <Modal
+                open={Boolean(selectedClient)}
+                onClose={() => setSelectedClient(null)}
+                title={selectedClient ? clientFullName(selectedClient) || 'Клиент' : 'Клиент'}
+                size="md"
+            >
+                {selectedClient ? (
+                    <div className="space-y-5">
+                        <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                            <div>
+                                <dt className="text-ink-muted">Email</dt>
+                                <dd className="mt-0.5 font-medium text-ink">{selectedClient.email || '—'}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-ink-muted">Телефон</dt>
+                                <dd className="mt-0.5 font-medium text-ink">{selectedClient.phone || '—'}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-ink-muted">Количество заказов</dt>
+                                <dd className="mt-0.5 font-semibold tabular-nums text-ink">
+                                    {selectedClient.orders_count ?? 0}
+                                </dd>
+                            </div>
+                        </dl>
+                        <div className="flex flex-wrap justify-end gap-2">
+                            {selectedClient.id ? (
+                                <button
+                                    type="button"
+                                    onClick={() => handleDelete(selectedClient)}
+                                    disabled={deleting}
+                                    className="inline-flex min-h-11 items-center justify-center rounded-sg-sm bg-danger-600 px-4 text-sm font-semibold text-white transition hover:bg-danger-700 disabled:opacity-60"
+                                >
+                                    Удалить из справочника
+                                </button>
+                            ) : null}
+                            <button
+                                type="button"
+                                onClick={() => setSelectedClient(null)}
+                                className={warehouseSecondaryButtonClass}
+                            >
+                                Закрыть
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleOpenOrders(selectedClient)}
+                                className={warehousePrimaryButtonClass}
+                            >
+                                Просмотреть заказы
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
+            </Modal>
+
+            <ConfirmDialog
+                open={Boolean(deleteConfirmClient)}
+                onClose={() => {
+                    if (!deleting) setDeleteConfirmClient(null);
+                }}
+                onConfirm={handleDeleteConfirm}
+                title="Удалить клиента?"
+                message="Карточка клиента будет удалена из справочника. Оформленные заказы сохранятся."
+                confirmLabel="Удалить"
+                danger
+                loading={deleting}
+            />
 
             <ClientOrdersModal
                 isOpen={Boolean(ordersClient)}
