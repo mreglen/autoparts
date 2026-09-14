@@ -217,7 +217,7 @@ export const addNewPartsToCart = createAsyncThunk(
                 payload.supplier_unit_price = truncateRubles(cartItem.supplier_unit_price);
             }
             const response = await apiAxios.post('/cart/new-parts', payload);
-            dispatch(fetchCart());
+            await dispatch(fetchCart());
             return response.data;
         } catch (error) {
             return rejectWithValue(
@@ -397,7 +397,7 @@ export const addUsedPartsToCart = createAsyncThunk(
     async (cartItem, { rejectWithValue, dispatch }) => {
         try {
             const response = await apiAxios.post('/cart/used-parts', cartItem);
-            dispatch(fetchCart());
+            await dispatch(fetchCart());
             return response.data;
         } catch (error) {
             return rejectWithValue(
