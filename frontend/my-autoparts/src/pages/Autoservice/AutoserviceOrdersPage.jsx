@@ -72,6 +72,7 @@ export default function AutoserviceOrdersPage() {
   const [duplicatingId, setDuplicatingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
   const [deleteConfirmOrder, setDeleteConfirmOrder] = useState(null);
+  const [closeConfirmOrder, setCloseConfirmOrder] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const prevScopeKeyRef = useRef(null);
 
@@ -163,7 +164,7 @@ export default function AutoserviceOrdersPage() {
     [scope, historyStatus, canReview, viewOrder?.id],
   );
 
-  const handleStatus = async (id, nextStatus) => {
+  const updateOrderStatus = async (id, nextStatus) => {
     setStatusSavingId(id);
     setError('');
     try {
@@ -172,11 +173,20 @@ export default function AutoserviceOrdersPage() {
         body: JSON.stringify({ status: nextStatus }),
       });
       applyOrderToList(updated);
+      setCloseConfirmOrder(null);
     } catch (e) {
       setError(e?.message || 'Не удалось сменить статус');
     } finally {
       setStatusSavingId(null);
     }
+  };
+
+  const handleStatus = async (id, nextStatus) => {
+    if (nextStatus === 'completed') {
+      setCloseConfirmOrder(rows.find((row) => row.id === id) || viewOrder || { id });
+      return;
+    }
+    await updateOrderStatus(id, nextStatus);
   };
 
   const handleApprove = async (id) => {
@@ -214,21 +224,7 @@ export default function AutoserviceOrdersPage() {
     [viewHistory, viewReview],
   );
 
-  const statusActionsForRow = useCallback(
-    (row) => {
-      const unpaid = row?.is_paid === false || Number(row?.remaining_amount ?? 0) > 0.005;
-      return statusActions.map((option) =>
-        option.value === 'completed' && unpaid
-          ? {
-              ...option,
-              disabled: true,
-              disabledTitle: 'Сначала оплатите заказ-наряд полностью',
-            }
-          : option,
-      );
-    },
-    [statusActions],
-  );
+  const statusActionsForRow = useCallback(() => statusActions, [statusActions]);
 
   const handleDuplicate = async (row) => {
     setDuplicatingId(row.id);
@@ -533,6 +529,22 @@ export default function AutoserviceOrdersPage() {
           setViewOrder(null);
           navigate(`/autoservice/orders/${order.id}/edit`);
         }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(closeConfirmOrder)}
+        onClose={() => {
+          if (!statusSavingId) setCloseConfirmOrder(null);
+        }}
+        onConfirm={() => updateOrderStatus(closeConfirmOrder.id, 'completed')}
+        title="Закрыть заказ-наряд?"
+        message={
+          closeConfirmOrder
+            ? `Вы точно хотите закрыть ${repairOrderNumberLabel(closeConfirmOrder)}?${Number(closeConfirmOrder.remaining_amount || 0) > 0.005 ? ` Заказ оплачен не полностью. Осталось ${Number(closeConfirmOrder.remaining_amount).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽.` : ''}`
+            : ''
+        }
+        confirmLabel="Да, закрыть"
+        loading={Boolean(statusSavingId)}
       />
 
       <ConfirmDialog

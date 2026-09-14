@@ -76,7 +76,6 @@ from app.services.autoservice_payroll import accrue_order_payroll, clear_order_a
 from app.services.autoservice_payment_service import (
     batch_paid_amounts,
     create_repair_order_payment,
-    ensure_order_fully_paid,
     list_repair_order_payments,
     order_payment_summary,
 )
@@ -1879,8 +1878,6 @@ def patch_repair_order_status(
             detail="Недопустимый статус",
         )
     prev_status = row.status
-    if payload.status == "completed" and prev_status != "completed":
-        ensure_order_fully_paid(db, row, _order_grand_total(row))
     if payload.status == "cancelled" and prev_status not in ("cancelled", "completed"):
         release_order_reservations(db, row)
     if prev_status != payload.status:

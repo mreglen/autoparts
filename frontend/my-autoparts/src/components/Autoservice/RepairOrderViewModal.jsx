@@ -71,11 +71,8 @@ const PAYMENT_METHODS = [
 
 function paymentSummary(order, grandTotal) {
   const paid = Number(order?.paid_amount ?? 0);
-  const remaining =
-    order?.remaining_amount != null
-      ? Number(order.remaining_amount)
-      : Math.max(0, grandTotal - paid);
-  const isPaid = order?.is_paid === true || remaining <= 0.005;
+  const remaining = Math.max(0, grandTotal - paid);
+  const isPaid = remaining <= 0.005;
   return { paid, remaining, isPaid };
 }
 
@@ -266,15 +263,8 @@ export function OrderStatusBadge({ status, className = '' }) {
   );
 }
 
-export function buildRepairOrderStatusOptions({
-  status,
-  payment = null,
-  enablePayment = false,
-} = {}) {
+export function buildRepairOrderStatusOptions({ status } = {}) {
   const normalized = normalizeRepairOrderStatus(status);
-  const unpaid = enablePayment && payment
-    ? !payment.isPaid && payment.remaining > 0.005
-    : false;
 
   if (status === 'review') {
     return [{ value: 'cancelled', label: 'Отклонить' }];
@@ -295,18 +285,6 @@ export function buildRepairOrderStatusOptions({
     { value: 'completed', label: 'Закрыт' },
     { value: 'cancelled', label: 'Отменить' },
   ];
-
-  if (enablePayment && unpaid) {
-    return options.map((option) => (
-      option.value === 'completed'
-        ? {
-            ...option,
-            disabled: true,
-            disabledTitle: 'Сначала оплатите заказ-наряд полностью',
-          }
-        : option
-    ));
-  }
 
   return options;
 }
@@ -542,17 +520,22 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
 function orderTotals(order) {
   const works = order.works || [];
   const shop = order.shop_parts || [];
-  const worksTotal = order.works_total ?? works.reduce((s, w) => s + lineSum(w.qty, w.unit_price), 0);
-  const shopTotal =
-    order.shop_parts_total ??
-    shop.reduce(
-      (s, p) => s + (
-        Number(p.line_sum) || shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p))
-      ),
-      0,
-    );
-  const grand = order.grand_total ?? worksTotal + shopTotal;
-  return { worksTotal, shopTotal, grand };
+  const worksTotal = works.reduce(
+    (sum, work) => sum + lineSum(work.qty, work.unit_price),
+    0,
+  );
+  const shopTotal = shop.reduce(
+    (sum, part) => sum + (
+      Number(part.line_sum) || shopLineSum(
+        part.qty,
+        part.unit_price,
+        part.markup_percent,
+        shopPartPricingOptions(part),
+      )
+    ),
+    0,
+  );
+  return { worksTotal, shopTotal, grand: worksTotal + shopTotal };
 }
 
 export default function RepairOrderViewModal({
@@ -576,6 +559,7 @@ export default function RepairOrderViewModal({
   const [statusError, setStatusError] = useState('');
   const [completeSaving, setCompleteSaving] = useState(false);
   const [completeError, setCompleteError] = useState('');
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
   const [printPickerOpen, setPrintPickerOpen] = useState(false);
   const [receiptPickerOpen, setReceiptPickerOpen] = useState(false);
   const [orderPayments, setOrderPayments] = useState([]);
@@ -596,6 +580,7 @@ export default function RepairOrderViewModal({
     setLastPaidAmount(0);
     setStatusError('');
     setCompleteError('');
+    setCompleteConfirmOpen(false);
     setPrintPickerOpen(false);
     setReceiptPickerOpen(false);
     setOrderPayments([]);
@@ -735,6 +720,7 @@ export default function RepairOrderViewModal({
         method: 'PATCH',
         body: JSON.stringify({ status: 'completed' }),
       });
+      setCompleteConfirmOpen(false);
       onOrderChange?.(updated);
     } catch (e) {
       const message = e?.message || 'Не удалось закрыть заказ-наряд';
@@ -748,11 +734,12 @@ export default function RepairOrderViewModal({
 
   const handleStatusChange = useCallback(async (nextStatus) => {
     if (nextStatus === 'completed') {
-      await handleCompleteOrder();
+      setStatusPickerOpen(false);
+      setCompleteConfirmOpen(true);
       return;
     }
     await handleAdvanceStatus(nextStatus);
-  }, [handleAdvanceStatus, handleCompleteOrder]);
+  }, [handleAdvanceStatus]);
 
   const handleSubmitPayment = useCallback(async () => {
     if (!order?.id || !payMethod) return;
@@ -892,7 +879,7 @@ export default function RepairOrderViewModal({
                     disabled={paySaving || statusSaving || completeSaving}
                     className={primaryBtnClass}
                   >
-                    Оплатить
+                    Оплата
                   </button>
                 ) : null}
                 {hasPayments && !payOpen ? (
@@ -1028,6 +1015,40 @@ export default function RepairOrderViewModal({
           <OrderLinesExpand row={order} showExecutors={showExecutors} />
         </div>
       )}
+    </Modal>
+    <Modal
+      open={completeConfirmOpen && Boolean(order?.id)}
+      onClose={() => {
+        if (!completeSaving) setCompleteConfirmOpen(false);
+      }}
+      title="Закрыть заказ-наряд?"
+    >
+      <div className="space-y-5">
+        <p className="text-sm text-ink-soft">
+          Вы точно хотите закрыть {repairOrderNumberLabel(order)}?
+          {payment?.remaining > 0.005
+            ? ` Заказ оплачен не полностью. Осталось ${formatMoney(payment.remaining)} ₽.`
+            : ''}
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setCompleteConfirmOpen(false)}
+            disabled={completeSaving}
+            className={secondaryBtnClass}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={handleCompleteOrder}
+            disabled={completeSaving}
+            className={primaryBtnClass}
+          >
+            {completeSaving ? 'Закрытие…' : 'Да, закрыть'}
+          </button>
+        </div>
+      </div>
     </Modal>
     <Modal
       open={printPickerOpen && Boolean(order?.id)}
