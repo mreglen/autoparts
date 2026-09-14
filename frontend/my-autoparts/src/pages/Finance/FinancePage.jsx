@@ -14,6 +14,15 @@ import {
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import { Skeleton } from '../../components/UI';
 import {
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListTdRightClass,
+  autoserviceListThClass,
+  autoserviceListThRightClass,
+  autoserviceListTheadRowClass,
+  autoserviceListTrClass,
   warehouseEmptyShellClass,
   warehousePageClass,
   warehousePillControlClass,
@@ -113,17 +122,11 @@ function FinanceField({ label, children }) {
 }
 
 function FinanceMobileCard({ children }) {
-  return (
-    <div className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-gray-200/80">{children}</div>
-  );
+  return <div className="space-y-1.5 border-b border-line-soft py-2 last:border-0">{children}</div>;
 }
 
 function FinanceTableShell({ children }) {
-  return (
-    <div className="hidden overflow-x-auto rounded-2xl bg-white ring-1 ring-gray-200/80 md:block">
-      {children}
-    </div>
-  );
+  return <div className={autoserviceListTableWrapClass}>{children}</div>;
 }
 
 function FinanceEmptyState({ children }) {
@@ -457,7 +460,7 @@ export default function FinancePage() {
 
           {activeTab === 'sales' ? (
             <div className="space-y-3">
-              <div className="md:hidden space-y-3">
+              <div className="md:hidden">
                 {!sales.rows?.length ? (
                   <FinanceEmptyState>Нет продаж за период</FinanceEmptyState>
                 ) : (
@@ -479,18 +482,18 @@ export default function FinancePage() {
                 )}
               </div>
               <FinanceTableShell>
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Дата</th>
-                      <th className="px-4 py-3 font-medium">Товар</th>
-                      <th className="px-4 py-3 font-medium">Канал</th>
-                      <th className="px-4 py-3 font-medium">Оплата</th>
-                      <th className="px-4 py-3 text-right font-medium">Кол-во</th>
-                      <th className="px-4 py-3 text-right font-medium">Сумма</th>
+                <table className={autoserviceListTableClass}>
+                  <thead>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className={`w-24 ${autoserviceListThClass}`}>Дата</th>
+                      <th className={autoserviceListThClass}>Товар</th>
+                      <th className={`w-28 ${autoserviceListThClass}`}>Канал</th>
+                      <th className={`w-28 ${autoserviceListThClass}`}>Оплата</th>
+                      <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
+                      <th className={`w-28 ${autoserviceListThRightClass}`}>Сумма</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className={autoserviceListTbodyClass}>
                     {sales.rows?.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
@@ -499,20 +502,17 @@ export default function FinancePage() {
                       </tr>
                     ) : (
                       sales.rows.map((row) => (
-                        <tr key={row.id} className="hover:bg-gray-50/80">
-                          <td className="whitespace-nowrap px-4 py-3">
+                        <tr key={row.id} className={autoserviceListTrClass}>
+                          <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
                             {formatFinanceDate(row.movement_date)}
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-gray-900">{row.name || '—'}</div>
-                            <div className="text-xs text-gray-500">
-                              {[row.article, row.internal_code].filter(Boolean).join(' · ')}
-                            </div>
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                            <div className="w-0 min-w-full truncate font-medium text-ink">{row.name || '—'}</div>
                           </td>
-                          <td className="px-4 py-3">{row.channel_label}</td>
-                          <td className="px-4 py-3">{row.payment_method || '—'}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{row.quantity}</td>
-                          <td className="px-4 py-3 text-right font-medium tabular-nums">
+                          <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>{row.channel_label}</td>
+                          <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>{row.payment_method || '—'}</td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums`}>{row.quantity}</td>
+                          <td className={`${autoserviceListTdRightClass} font-semibold tabular-nums`}>
                             {formatFinanceCurrency(row.line_total)}
                           </td>
                         </tr>
@@ -526,7 +526,7 @@ export default function FinancePage() {
 
           {activeTab === 'writeoffs' ? (
             <>
-              <div className="mb-3 space-y-3 md:hidden">
+              <div className="mb-3 md:hidden">
                 {!writeoffs.rows?.length ? (
                   <FinanceEmptyState>Нет списаний за период</FinanceEmptyState>
                 ) : (
@@ -541,16 +541,16 @@ export default function FinancePage() {
                 )}
               </div>
               <FinanceTableShell>
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Дата</th>
-                      <th className="px-4 py-3 font-medium">Товар</th>
-                      <th className="px-4 py-3 text-right font-medium">Кол-во</th>
-                      <th className="px-4 py-3 font-medium">Причина</th>
+                <table className={autoserviceListTableClass}>
+                  <thead>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className={`w-24 ${autoserviceListThClass}`}>Дата</th>
+                      <th className={autoserviceListThClass}>Товар</th>
+                      <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
+                      <th className={`w-2/5 ${autoserviceListThClass}`}>Причина</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className={autoserviceListTbodyClass}>
                     {!writeoffs.rows?.length ? (
                       <tr>
                         <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
@@ -559,11 +559,11 @@ export default function FinancePage() {
                       </tr>
                     ) : (
                       writeoffs.rows.map((row) => (
-                        <tr key={row.id} className="hover:bg-gray-50/80">
-                          <td className="px-4 py-3">{formatFinanceDate(row.movement_date)}</td>
-                          <td className="px-4 py-3">{row.name || row.article || '—'}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{row.quantity}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.reason || '—'}</td>
+                        <tr key={row.id} className={autoserviceListTrClass}>
+                          <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{formatFinanceDate(row.movement_date)}</td>
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}><div className="w-0 min-w-full truncate font-medium text-ink">{row.name || row.article || '—'}</div></td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums`}>{row.quantity}</td>
+                          <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>{row.reason || '—'}</td>
                         </tr>
                       ))
                     )}
@@ -575,7 +575,7 @@ export default function FinancePage() {
 
           {activeTab === 'stock_ins' ? (
             <>
-              <div className="mb-3 space-y-3 md:hidden">
+              <div className="mb-3 md:hidden">
                 {!stockIns.rows?.length ? (
                   <FinanceEmptyState>Нет поступлений за период</FinanceEmptyState>
                 ) : (
@@ -590,16 +590,16 @@ export default function FinancePage() {
                 )}
               </div>
               <FinanceTableShell>
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Дата</th>
-                      <th className="px-4 py-3 font-medium">Товар</th>
-                      <th className="px-4 py-3 text-right font-medium">Кол-во</th>
-                      <th className="px-4 py-3 text-right font-medium">Сумма</th>
+                <table className={autoserviceListTableClass}>
+                  <thead>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className={`w-24 ${autoserviceListThClass}`}>Дата</th>
+                      <th className={autoserviceListThClass}>Товар</th>
+                      <th className={`w-20 ${autoserviceListThRightClass}`}>Кол-во</th>
+                      <th className={`w-28 ${autoserviceListThRightClass}`}>Сумма</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className={autoserviceListTbodyClass}>
                     {!stockIns.rows?.length ? (
                       <tr>
                         <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
@@ -608,11 +608,11 @@ export default function FinancePage() {
                       </tr>
                     ) : (
                       stockIns.rows.map((row) => (
-                        <tr key={row.id} className="hover:bg-gray-50/80">
-                          <td className="px-4 py-3">{formatFinanceDate(row.created_at)}</td>
-                          <td className="px-4 py-3">{row.name || row.article || '—'}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{row.quantity}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">
+                        <tr key={row.id} className={autoserviceListTrClass}>
+                          <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>{formatFinanceDate(row.created_at)}</td>
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}><div className="w-0 min-w-full truncate font-medium text-ink">{row.name || row.article || '—'}</div></td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums`}>{row.quantity}</td>
+                          <td className={`${autoserviceListTdRightClass} font-semibold tabular-nums`}>
                             {formatFinanceCurrency(row.line_total)}
                           </td>
                         </tr>
@@ -626,7 +626,7 @@ export default function FinancePage() {
 
           {activeTab === 'inventory' ? (
             <div className="space-y-3">
-              <div className="space-y-3 md:hidden">
+              <div className="md:hidden">
                 {!inventory.rows?.length ? (
                   <FinanceEmptyState>Нет остатков на выбранную дату</FinanceEmptyState>
                 ) : (
@@ -641,16 +641,16 @@ export default function FinancePage() {
                 )}
               </div>
               <FinanceTableShell>
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Товар</th>
-                      <th className="px-4 py-3 text-right font-medium">Остаток</th>
-                      <th className="px-4 py-3 text-right font-medium">Цена</th>
-                      <th className="px-4 py-3 text-right font-medium">Оценка</th>
+                <table className={autoserviceListTableClass}>
+                  <thead>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className={autoserviceListThClass}>Товар</th>
+                      <th className={`w-24 ${autoserviceListThRightClass}`}>Остаток</th>
+                      <th className={`w-28 ${autoserviceListThRightClass}`}>Цена</th>
+                      <th className={`w-28 ${autoserviceListThRightClass}`}>Оценка</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className={autoserviceListTbodyClass}>
                     {!inventory.rows?.length ? (
                       <tr>
                         <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
@@ -659,13 +659,13 @@ export default function FinancePage() {
                       </tr>
                     ) : (
                       inventory.rows.map((row, idx) => (
-                        <tr key={`${row.product_id}-${idx}`} className="hover:bg-gray-50/80">
-                          <td className="px-4 py-3">{row.name || row.article || '—'}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{row.quantity}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">
+                        <tr key={`${row.product_id}-${idx}`} className={autoserviceListTrClass}>
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}><div className="w-0 min-w-full truncate font-medium text-ink">{row.name || row.article || '—'}</div></td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums`}>{row.quantity}</td>
+                          <td className={`${autoserviceListTdRightClass} tabular-nums`}>
                             {formatFinanceCurrency(row.unit_price)}
                           </td>
-                          <td className="px-4 py-3 text-right tabular-nums">
+                          <td className={`${autoserviceListTdRightClass} font-semibold tabular-nums`}>
                             {formatFinanceCurrency(row.line_total)}
                           </td>
                         </tr>
