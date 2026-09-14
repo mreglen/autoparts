@@ -1595,6 +1595,7 @@ def create_repair_order(
     if booking is not None:
         booking.client_id = client.id
         booking.garage_vehicle_id = vehicle.id
+        booking.status = "processed"
     db.commit()
     row = _get_org_order_or_404(db, org_id, row.id)
     return _to_staff_view(db, row)

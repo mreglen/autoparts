@@ -153,7 +153,7 @@ def get_planner_week(
             InspectionBooking.organization_id == org_id,
             InspectionBooking.preferred_date >= day_dates[0],
             InspectionBooking.preferred_date <= week_end,
-            InspectionBooking.status != "cancelled",
+            InspectionBooking.status == "new",
         )
         .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
         .all()
@@ -274,7 +274,7 @@ def get_planner_today_shortcut(
         .filter(
             InspectionBooking.organization_id == org_id,
             InspectionBooking.preferred_date == target,
-            InspectionBooking.status != "cancelled",
+            InspectionBooking.status == "new",
         )
         .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
         .all()
