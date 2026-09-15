@@ -56,7 +56,7 @@ export default function WmsStoragesPage() {
   const completedSessions = sessions.filter((s) => s.status === 'completed');
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-0">
+    <div className="max-w-5xl mx-auto">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <Link to="/settings/storage-addresses" className="text-sm text-indigo-600 hover:underline mb-2 inline-block">

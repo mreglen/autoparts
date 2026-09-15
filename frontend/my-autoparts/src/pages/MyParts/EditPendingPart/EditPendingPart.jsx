@@ -135,7 +135,7 @@ const EditPendingPart = () => {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-10 text-center">
+    <div className="mx-auto max-w-lg px-0 py-10 text-center sm:px-4">
       <h1 className="text-xl font-semibold text-gray-900">Запчасть не найдена</h1>
       <p className="mt-2 text-sm text-gray-600">{error}</p>
       <Link to="/my-parts" className="mt-6 inline-block text-indigo-600 hover:underline">

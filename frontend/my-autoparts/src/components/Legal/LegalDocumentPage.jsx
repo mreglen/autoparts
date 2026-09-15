@@ -6,7 +6,7 @@ export default function LegalDocumentPage({ title, description, path, paragraphs
   const seo = buildLegalPageSeo({ title, description, path });
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="max-w-3xl mx-auto px-0 py-8 sm:px-4">
       <PageSeoHelmet seo={seo} />
 
       <header className="mb-8">

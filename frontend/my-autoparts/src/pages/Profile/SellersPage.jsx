@@ -100,7 +100,7 @@ export default function SellersPage() {
         `${seller.last_name} ${seller.first_name}${seller.patronymic ? ` ${seller.patronymic}` : ''}`;
 
     return (
-        <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+        <div className="mt-4 sm:mt-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
                 <h1 className="text-2xl font-bold text-gray-800">Продавцы</h1>
                 <div className="text-left sm:text-right text-sm text-gray-500">

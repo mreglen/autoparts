@@ -71,7 +71,7 @@ export default function ReviewsPage() {
       <div className="relative w-full pb-16 md:pb-20">
         <PageAmbientBackground />
 
-        <div className="relative mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <div className="relative mx-auto max-w-6xl px-3 py-6 sm:px-6 sm:py-8 lg:px-8">
           <Card padding="lg" className="overflow-hidden">
             <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
               <div>

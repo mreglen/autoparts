@@ -98,7 +98,7 @@ export default function PendingSellersPage() {
 
     return (
         <div className="max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
-            <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+            <div className="mt-4 sm:mt-5">
                 <div className="mb-6 sm:mb-8">
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Регистрация продавцов</h1>
                     <p className="mt-2 text-gray-600">Модерация заявок на регистрацию продавцов</p>

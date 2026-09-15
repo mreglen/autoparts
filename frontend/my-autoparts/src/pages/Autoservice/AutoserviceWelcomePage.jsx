@@ -62,7 +62,7 @@ export default function AutoserviceWelcomePage() {
   if (!isReady) return <AuthLoadingScreen />;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6">
+    <div className="mx-auto max-w-2xl px-0 py-6 sm:px-4">
       <PageHeader title={serviceName} />
 
       <Card className="mt-2" padding="md">

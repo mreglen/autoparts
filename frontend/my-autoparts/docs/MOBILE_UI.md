@@ -26,7 +26,7 @@ Constants: [`src/constants/mobileTokens.js`](../src/constants/mobileTokens.js), 
 
 - Minimum interactive height **44px** (`min-h-11` / `h-11`) for primary controls on mobile.
 - Page body on mobile: prefer `text-base`; section titles: `text-lg font-semibold`.
-- Horizontal padding on mobile pages: `max-md:px-3`; vertical rhythm: `max-md:py-4` where appropriate.
+- Horizontal padding on mobile pages: `max-lg:px-3`, задаётся только layout'ом (`getCabinetMainClasses` / `getPublicMainClasses` в `layoutProfiles.js`). Страницы не добавляют свой `px-*` на корневом контейнере — двойной отступ запрещён. Осознанные исключения `px-0`: чаты (full-bleed) и полноэкранные страницы, где контент сам даёт `px-3` внутри.
 
 ## Headers
 

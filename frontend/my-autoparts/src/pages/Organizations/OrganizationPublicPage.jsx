@@ -123,7 +123,7 @@ export default function OrganizationPublicPage() {
         <PageSeoHelmet seo={seo} />
         <div className="relative w-full pb-12">
           <PageAmbientBackground />
-          <div className="relative mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <div className="relative mx-auto max-w-6xl px-3 py-6 sm:px-6 sm:py-8 lg:px-8">
             <DetailSkeleton />
           </div>
         </div>
@@ -139,7 +139,7 @@ export default function OrganizationPublicPage() {
           <meta name="robots" content="noindex, nofollow" />
         </Helmet>
         <PageAmbientBackground />
-        <div className="relative mx-auto max-w-3xl space-y-4 px-4 py-10 sm:px-6">
+        <div className="relative mx-auto max-w-3xl space-y-4 px-3 py-10 sm:px-6">
           <EmptyState
             illustration="error"
             title="Организация не найдена"

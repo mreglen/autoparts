@@ -221,7 +221,7 @@ export default function CartMobileView({
   }
 
   return (
-    <div className="space-y-3 lg:hidden px-3">
+    <div className="space-y-3 lg:hidden">
       {filled.map((section) => (
         <CartMobileBlock
           key={section.key}

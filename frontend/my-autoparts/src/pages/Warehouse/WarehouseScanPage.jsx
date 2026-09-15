@@ -132,7 +132,7 @@ export default function WarehouseScanPage() {
 
   if (!canScan) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-10 text-center">
+      <div className="mx-auto max-w-lg px-0 py-10 text-center sm:px-4">
         <h1 className="text-xl font-semibold text-gray-900">Нет доступа</h1>
         <p className="mt-2 text-gray-600">Сканирование QR доступно сотрудникам склада.</p>
         <Link to="/my-parts" className="mt-6 inline-block text-indigo-600 hover:underline">К моим запчастям</Link>
@@ -141,7 +141,7 @@ export default function WarehouseScanPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6 max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
+    <div className="mx-auto max-w-lg px-0 py-6 max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)] sm:px-4">
       <h1 className="text-2xl font-bold text-gray-900">Сканировать QR</h1>
       <p className="mt-1 text-sm text-gray-600">Наведите камеру на QR-код с этикетки запчасти</p>
 

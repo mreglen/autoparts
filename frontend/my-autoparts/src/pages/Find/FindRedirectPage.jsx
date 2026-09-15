@@ -43,7 +43,7 @@ export default function FindRedirectPage() {
   return (
     <>
       <PageSeoHelmet seo={seo} />
-      <div className="mx-auto max-w-7xl px-4 py-16 text-center text-gray-600">
+      <div className="mx-auto max-w-7xl px-0 py-16 text-center text-gray-600 sm:px-4">
         Ищем запчасть…
       </div>
     </>

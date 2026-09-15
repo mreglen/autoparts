@@ -307,7 +307,7 @@ export default function PurchasesReturnsPage() {
 
   return (
     <div
-      className="mt-4 sm:mt-5 px-4 sm:px-0 space-y-6 max-lg:pb-[var(--sg-mobile-bottom-nav-total)]"
+      className="mt-4 sm:mt-5 space-y-6 max-lg:pb-[var(--sg-mobile-bottom-nav-total)]"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

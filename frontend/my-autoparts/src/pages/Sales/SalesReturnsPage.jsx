@@ -409,7 +409,7 @@ export default function SalesReturnsPage() {
   if (!hasPermission) return null;
 
   return (
-    <div className="mt-4 space-y-8 px-4 pb-[var(--sg-mobile-bottom-nav-total,4rem)] sm:mt-5 sm:px-0 sm:pb-10">
+    <div className="mt-4 space-y-8 pb-[var(--sg-mobile-bottom-nav-total,4rem)] sm:mt-5 sm:pb-10">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Возвраты</h1>
         <p className="mt-1 text-sm text-gray-600">Заявки покупателей и возвраты Avito</p>

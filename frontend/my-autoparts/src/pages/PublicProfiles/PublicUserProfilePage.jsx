@@ -13,7 +13,7 @@ import BuyerProfileBlock from '../../components/PublicProfile/BuyerProfileBlock'
 
 function ProfileSkeleton() {
   return (
-    <div className="mx-auto max-w-4xl animate-pulse px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-4xl animate-pulse px-0 py-10 sm:px-6">
       <div className="h-56 rounded-sg-lg bg-surface-subtle" />
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="h-28 rounded-sg bg-surface-muted" />
@@ -189,7 +189,7 @@ export default function PublicUserProfilePage() {
 
   if (error || !profile) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-20 text-center">
+      <div className="mx-auto max-w-lg px-0 py-20 text-center sm:px-4">
         <Helmet>
           <title>Профиль не найден — Свой Гараж</title>
           <meta name="robots" content="noindex, nofollow" />
@@ -212,7 +212,7 @@ export default function PublicUserProfilePage() {
   return (
     <div className="relative min-h-[70vh] pb-16">
       <PageAmbientBackground />
-      <div className="relative mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-10">
+      <div className="relative mx-auto max-w-4xl px-0 py-8 sm:px-6 lg:py-10">
         <Helmet>
           <title>{seo.title}</title>
           <meta name="description" content={seo.description} />

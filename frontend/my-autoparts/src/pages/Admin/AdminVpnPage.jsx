@@ -522,7 +522,7 @@ export default function AdminVpnPage() {
   if (!isReady) return <AuthLoadingScreen />;
 
   return (
-    <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+    <div className="mt-4 sm:mt-5">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">VPN</h1>
