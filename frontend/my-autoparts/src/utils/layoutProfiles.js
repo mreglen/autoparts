@@ -70,7 +70,7 @@ export function getPublicMainClasses({
   if (path === '/cart' || path.startsWith('/cart/')) {
     return 'max-w-sg-content max-lg:px-3 max-lg:py-3 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
   }
-  return 'max-w-sg-content max-lg:px-4 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
+  return 'max-w-sg-content max-lg:px-3 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
 }
 
 export function getCabinetLayoutProfile(pathname = '', chatIdParam = null) {
@@ -85,35 +85,9 @@ export function getCabinetLayoutProfile(pathname = '', chatIdParam = null) {
   };
 }
 
-/** Mobile list — tighter horizontal padding than default cabinet pages. */
-export function isAutoserviceOrdersListRoute(pathname = '') {
-  const path = String(pathname || '').split('?')[0];
-  return path === '/autoservice/orders';
-}
-
-/** Create + edit forms for repair orders (not print). */
-export function isAutoserviceOrdersFormRoute(pathname = '') {
-  const path = String(pathname || '').split('?')[0];
-  if (path === '/autoservice/orders/new') {
-    return true;
-  }
-  return /^\/autoservice\/orders\/\d+\/edit$/.test(path);
-}
-
-/** @deprecated Use isAutoserviceOrdersListRoute or isAutoserviceOrdersFormRoute */
-export function isAutoserviceOrdersShellRoute(pathname = '') {
-  return isAutoserviceOrdersListRoute(pathname) || isAutoserviceOrdersFormRoute(pathname);
-}
-
-export function getCabinetMainClasses({ isChatsPage, pathname = '' } = {}) {
+export function getCabinetMainClasses({ isChatsPage } = {}) {
   if (isChatsPage) {
     return 'mx-auto max-w-full max-lg:flex max-lg:min-h-0 max-lg:flex-1 max-lg:flex-col max-lg:overflow-hidden max-lg:px-0 max-lg:py-0 px-4 py-6 sm:px-6 sm:py-8 lg:flex lg:max-h-[calc(100dvh-var(--sg-desktop-header-h))] lg:min-h-0 lg:flex-col lg:overflow-hidden lg:px-8 lg:py-4 lg:max-w-sg-content';
-  }
-  if (isAutoserviceOrdersListRoute(pathname)) {
-    return 'mx-auto max-w-sg-content max-lg:px-0 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
-  }
-  if (isAutoserviceOrdersFormRoute(pathname)) {
-    return 'mx-auto max-w-sg-content max-lg:px-1.5 max-lg:pt-3 max-lg:pb-4 px-4 sm:px-6 lg:px-8 pt-4 pb-6 sm:pt-5 sm:pb-8';
   }
   return 'mx-auto max-w-sg-content max-lg:px-3 max-lg:py-4 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
 }

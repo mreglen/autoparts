@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 
 export default function NotFoundPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center px-4 max-lg:px-0 sm:px-6 lg:px-8">
       <Helmet>
         <title>404 — страница не найдена | Свой Гараж</title>
         <meta name="robots" content="noindex, nofollow" />

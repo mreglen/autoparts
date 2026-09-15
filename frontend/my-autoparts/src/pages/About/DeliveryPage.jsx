@@ -132,7 +132,7 @@ export default function DeliveryPage() {
       <PageSeoHelmet seo={seo} />
       <PageAmbientBackground />
 
-      <div className="relative mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="relative mx-auto max-w-6xl space-y-5 px-4 py-6 max-lg:px-0 sm:px-6 sm:py-8 lg:px-8">
         <Card padding="lg">
           <p className="text-sm font-semibold text-brand-700">Интернет-магазин</p>
           <PageHeader

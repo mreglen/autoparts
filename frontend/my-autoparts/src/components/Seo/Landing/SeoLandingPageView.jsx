@@ -15,7 +15,7 @@ import SeoLandingSimilarCategories from './SeoLandingSimilarCategories';
 
 function LoadingState() {
   return (
-    <div className="relative min-h-[50vh] px-4 py-16">
+    <div className="relative min-h-[50vh] px-3 py-16">
       <PageAmbientBackground />
       <p className="text-center text-sm text-gray-500">Загрузка каталога…</p>
     </div>
@@ -24,7 +24,7 @@ function LoadingState() {
 
 function NotFoundState({ error, backLink, backLabel }) {
   return (
-    <div className="relative min-h-[50vh] px-4 py-16">
+    <div className="relative min-h-[50vh] px-3 py-16">
       <PageAmbientBackground />
       <div className="mx-auto max-w-lg rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <h1 className="text-xl font-semibold text-gray-900">Страница не найдена</h1>

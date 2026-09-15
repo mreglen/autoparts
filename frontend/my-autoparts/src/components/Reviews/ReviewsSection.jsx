@@ -36,7 +36,7 @@ export default function ReviewsSection() {
   if (loading) {
     return (
       <section className="border-y border-line bg-surface py-14 md:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 max-lg:px-3 sm:px-6 lg:px-8">
           <div className="h-40 animate-pulse rounded-sg-lg bg-surface-muted" />
         </div>
       </section>
@@ -47,7 +47,7 @@ export default function ReviewsSection() {
 
   return (
     <section className="border-y border-line bg-surface py-14 md:py-20">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 max-lg:px-3 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <p className="text-sm font-semibold text-brand-700">Отзывы клиентов</p>

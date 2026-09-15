@@ -266,7 +266,7 @@ const SellerPartCardPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
       <PageSeoHelmet seo={seo} />
-      <div className="mx-auto max-w-3xl space-y-4 px-4 py-4">
+      <div className="mx-auto max-w-3xl space-y-4 px-4 py-4 max-lg:px-0">
         <button
           type="button"
           onClick={() => navigate(-1)}

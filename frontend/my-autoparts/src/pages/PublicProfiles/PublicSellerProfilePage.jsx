@@ -54,7 +54,7 @@ export default function PublicSellerProfilePage() {
 
   if (loading) {
     return (
-      <div className="relative mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <div className="relative mx-auto max-w-3xl px-4 py-8 max-lg:px-0 sm:px-6">
         <ProfileSkeleton />
       </div>
     );
@@ -62,7 +62,7 @@ export default function PublicSellerProfilePage() {
 
   if (error || !profile) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+      <div className="mx-auto max-w-lg px-4 py-16 text-center max-lg:px-0">
         <Helmet>
           <title>Профиль не найден — Свой Гараж</title>
           <meta name="robots" content="noindex, nofollow" />
@@ -79,7 +79,7 @@ export default function PublicSellerProfilePage() {
   return (
     <div className="relative min-h-[60vh]">
       <PageAmbientBackground />
-      <div className="relative mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <div className="relative mx-auto max-w-3xl px-4 py-8 max-lg:px-0 sm:px-6">
         <Helmet>
           <title>{seo.title}</title>
           <meta name="description" content={seo.description} />

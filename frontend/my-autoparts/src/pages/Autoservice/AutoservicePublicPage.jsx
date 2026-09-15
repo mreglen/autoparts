@@ -202,7 +202,7 @@ export default function AutoservicePublicPage() {
         <div className="pointer-events-none absolute -right-16 top-8 h-80 w-80 rounded-full bg-gradient-to-br from-blue-400/30 to-indigo-500/20 blur-3xl sm:h-[28rem] sm:w-[28rem]" />
         <div className="pointer-events-none absolute -left-10 bottom-0 h-64 w-64 rounded-full bg-gradient-to-tr from-sky-400/20 to-transparent blur-3xl" />
 
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="relative mx-auto max-w-7xl px-4 max-lg:px-0 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-12 lg:gap-12 xl:gap-14">
             <div className="space-y-8 lg:col-span-6 lg:pt-2">
               <div className="space-y-5">
@@ -431,7 +431,7 @@ export default function AutoservicePublicPage() {
 
       {/* Services */}
       <section className="relative border-t border-indigo-100/60 bg-white/55 py-14 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 max-lg:px-0 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">Что мы предлагаем</h2>
             <p className="mt-2 text-base text-gray-600">
@@ -459,7 +459,7 @@ export default function AutoservicePublicPage() {
 
       {/* How it works */}
       <section className="relative py-14 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 max-lg:px-0 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">Как записаться</h2>
             <p className="mt-2 text-base text-gray-600">Три шага от заявки до визита.</p>
@@ -481,7 +481,7 @@ export default function AutoservicePublicPage() {
 
       {/* Client CTA */}
       <section className="relative pb-14 sm:pb-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 max-lg:px-0 sm:px-6 lg:px-8">
           <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 px-6 py-10 shadow-xl shadow-indigo-900/25 sm:px-10 sm:py-12">
             <div className="grid gap-8 lg:grid-cols-12 lg:items-center">
               <div className="lg:col-span-7">
@@ -561,7 +561,7 @@ export default function AutoservicePublicPage() {
 
       {/* Contact strip / visiting card footer */}
       <section className="border-t border-indigo-100/70 bg-white/80 py-10">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 max-lg:px-0 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Контакты</p>
             <p className="mt-1 text-xl font-bold text-gray-900">{AUTOSERVICE_PUBLIC_NAME}</p>

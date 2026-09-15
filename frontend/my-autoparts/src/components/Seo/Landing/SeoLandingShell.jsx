@@ -5,7 +5,7 @@ export default function SeoLandingShell({ children }) {
   return (
     <div className="relative pb-16">
       <PageAmbientBackground />
-      <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">{children}</div>
+      <div className="mx-auto max-w-7xl px-4 pt-6 max-lg:px-3 sm:px-6 lg:px-8">{children}</div>
     </div>
   );
 }

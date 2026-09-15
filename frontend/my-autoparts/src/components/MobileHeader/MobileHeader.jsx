@@ -78,7 +78,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
         className={`lg:hidden fixed inset-x-0 top-0 border-b border-line bg-surface pt-safe-top ${hidden ? 'hidden' : ''}`}
         style={{ zIndex: Z_MOBILE_HEADER }}
       >
-        <div className="flex h-[3.75rem] items-center gap-2.5 px-4 sm:px-6">
+        <div className="flex h-[3.75rem] items-center gap-2.5 px-3">
           {showBack ? (
             <HeaderIconButton onClick={handleBack} label="Назад">
               <BackIcon />

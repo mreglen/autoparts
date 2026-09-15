@@ -851,7 +851,7 @@ const PartDetail = () => {
 
     if (!soldOutLabel && soldOutResolveState === 'loading') {
       return (
-        <div className="px-4 py-10 md:px-0">
+        <div className="px-3 py-10 md:px-0">
           <SkeletonCard lines={4} className="shadow-none" />
         </div>
       );
@@ -859,7 +859,7 @@ const PartDetail = () => {
 
     if (soldOutLabel) {
       return (
-        <div className="px-4 py-6 md:px-0">
+        <div className="px-3 py-6 md:px-0">
           <Helmet>
             <title>{soldOutLabel} — продано | Свой Гараж</title>
             <meta name="robots" content="noindex, follow" />
@@ -895,7 +895,7 @@ const PartDetail = () => {
     }
 
     return (
-      <div className="px-4 py-10 md:px-0">
+      <div className="px-3 py-10 md:px-0">
         <Helmet>
           <title>Запчасть не найдена | Свой Гараж</title>
           <meta name="robots" content="noindex, nofollow" />
@@ -914,7 +914,7 @@ const PartDetail = () => {
 
   if (!showProduct) {
     return (
-      <div className="px-4 py-10 md:px-0">
+      <div className="px-3 py-10 md:px-0">
         {apiSeo ? <PartProductSeoHelmet seo={apiSeo} structuredDataBlocks={null} product={null} /> : null}
         <SkeletonCard lines={5} className="shadow-none" />
       </div>
@@ -1266,7 +1266,7 @@ const PartDetail = () => {
         </div>
       </div>
 
-      <div className="px-4 pb-8 pt-3 md:px-0">
+      <div className="px-3 pb-8 pt-3 md:px-0">
         <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
         <div className="mt-2 hidden flex-wrap items-center gap-2 md:flex">
           <Button variant="ghost" size="sm" onClick={handleBackToList} className="-ml-2">

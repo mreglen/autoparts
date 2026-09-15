@@ -26,7 +26,7 @@ Constants: [`src/constants/mobileTokens.js`](../src/constants/mobileTokens.js), 
 
 - Minimum interactive height **44px** (`min-h-11` / `h-11`) for primary controls on mobile.
 - Page body on mobile: prefer `text-base`; section titles: `text-lg font-semibold`.
-- Horizontal padding on mobile pages: `max-md:px-3`; vertical rhythm: `max-md:py-4` where appropriate.
+- Horizontal page gutter on mobile: **12px** (`px-3`) across the whole mobile shell (`max-lg:`). Set in `layoutProfiles.js`; full-bleed (`max-lg:px-0`) routes set it on their inner page-level container (`max-lg:px-3`). Vertical rhythm: `max-lg:py-4` where appropriate.
 
 ## Headers
 

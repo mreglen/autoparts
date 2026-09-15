@@ -47,7 +47,7 @@ export default function NewPartOpenPage() {
   }, [brand, article, backTo, navigate, location.state]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
+    <div className="mx-auto max-w-4xl px-3 py-10">
       <div className="rounded-2xl border border-gray-200 bg-white px-6 py-8 text-center shadow-sm">
         {error ? (
           <p className="text-red-600">{error}</p>

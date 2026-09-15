@@ -16,7 +16,7 @@ export default function CookiePolicyPage() {
           { to: '/about', label: 'О компании' },
         ]}
       />
-      <div className="max-w-3xl mx-auto px-4">
+      <div className="max-w-3xl mx-auto px-4 max-lg:px-0">
         <YandexWebmasterCounter />
       </div>
     </>

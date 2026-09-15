@@ -132,7 +132,7 @@ function Main() {
       <HomeAmbientBackground />
 
       {/* Hero — визитка */}
-      <section className="relative px-4 pb-10 pt-6 sm:px-6 sm:pb-14 sm:pt-10 lg:px-8 lg:pt-14">
+      <section className="relative px-4 pb-10 pt-6 max-lg:px-3 sm:px-6 sm:pb-14 sm:pt-10 lg:px-8 lg:pt-14">
         <div className="relative mx-auto max-w-sg-content">
           <div className={`relative overflow-hidden p-6 sm:p-10 lg:p-12 ${softCardClass}`}>
             <div
@@ -243,7 +243,7 @@ function Main() {
       </section>
 
       {/* Как это работает */}
-      <section className="relative px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+      <section className="relative px-4 py-10 max-lg:px-3 sm:px-6 sm:py-14 lg:px-8">
         <div className="mx-auto max-w-sg-content">
           <div className="mb-8 text-center sm:mb-10">
             <p className="text-sm font-semibold text-brand-600">Просто и понятно</p>
@@ -276,7 +276,7 @@ function Main() {
       </div>
 
       {/* Покупателям и продавцам */}
-      <section className="relative px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+      <section className="relative px-4 py-10 max-lg:px-3 sm:px-6 sm:py-14 lg:px-8">
         <div className="mx-auto grid max-w-sg-content gap-5 lg:grid-cols-2">
           <div className={`flex flex-col p-6 sm:p-8 ${softCardClass}`}>
             <span className="inline-flex w-fit rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
@@ -306,7 +306,7 @@ function Main() {
       </section>
 
       {/* Регистрация продавца */}
-      <section className="relative px-4 pb-10 sm:px-6 sm:pb-14 lg:px-8">
+      <section className="relative px-4 pb-10 max-lg:px-3 sm:px-6 sm:pb-14 lg:px-8">
         <div className={`mx-auto max-w-sg-content p-6 sm:p-8 lg:p-10 ${softCardClass}`}>
           <div className="grid items-start gap-10 lg:grid-cols-12 lg:gap-12">
             <div className="lg:col-span-5">
@@ -344,7 +344,7 @@ function Main() {
       ) : null}
 
       {/* CTA */}
-      <section className="relative px-4 pb-12 pt-4 sm:px-6 sm:pb-16 lg:px-8">
+      <section className="relative px-4 pb-12 pt-4 max-lg:px-3 sm:px-6 sm:pb-16 lg:px-8">
         <div className="mx-auto max-w-sg-content overflow-hidden rounded-[2rem] bg-gradient-to-br from-brand-600 via-brand-600 to-brand-800 p-8 text-center shadow-[0_16px_48px_rgba(79,70,229,0.25)] sm:p-12">
           <div
             className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl"
