@@ -105,7 +105,7 @@ export default function LabelQrResolvePage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-10 text-center max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
+      <div className="mx-auto max-w-lg px-0 py-10 text-center max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)] sm:px-4">
         <h1 className="text-xl font-semibold text-gray-900">Запчасть не найдена</h1>
         <p className="mt-2 text-sm text-gray-600">{error}</p>
         <div className="mt-6 flex flex-col items-center gap-3">
@@ -124,7 +124,7 @@ export default function LabelQrResolvePage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-10 text-center text-sm text-gray-600">
+    <div className="mx-auto max-w-lg px-0 py-10 text-center text-sm text-gray-600 sm:px-4">
       Открываем карточку…
     </div>
   );

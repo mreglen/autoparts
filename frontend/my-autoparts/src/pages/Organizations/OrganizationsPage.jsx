@@ -149,7 +149,7 @@ export default function OrganizationsPage() {
 
       <PageAmbientBackground />
 
-      <div className="relative mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="relative mx-auto max-w-6xl px-3 py-6 sm:px-6 sm:py-8 lg:px-8">
         <Card padding="lg">
           <p className="text-sm font-semibold text-brand-700">Партнёры платформы</p>
           <PageHeader

@@ -100,7 +100,7 @@ export default function NewPartsPaymentPage() {
 
     if (!sessionId) {
         return (
-            <div className="mx-auto max-w-lg px-4 py-16 text-center">
+            <div className="mx-auto max-w-lg px-0 py-16 text-center sm:px-4">
                 <p className="text-gray-600">Сессия оплаты не найдена</p>
                 <Link to="/cart" className="mt-4 inline-block text-brand-600 hover:underline">
                     В корзину
@@ -213,7 +213,7 @@ export default function NewPartsPaymentPage() {
 
     if (session?.status === 'expired') {
         return (
-            <div className="mx-auto max-w-lg px-4 py-16 text-center">
+            <div className="mx-auto max-w-lg px-0 py-16 text-center sm:px-4">
                 <h1 className="text-lg font-semibold text-gray-900">Время оплаты истекло</h1>
                 <p className="mt-2 text-sm text-gray-600">Вернитесь в корзину и начните оформление заново.</p>
                 <Link
@@ -237,7 +237,7 @@ export default function NewPartsPaymentPage() {
 
     if (loading && !session) {
         return (
-            <div className={`mx-auto max-w-5xl px-4 py-6 md:py-10 ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
+            <div className={`mx-auto max-w-5xl px-0 py-6 sm:px-4 md:py-10 ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
                 <div className="mb-6 h-6 w-48 animate-pulse rounded bg-surface-muted" />
                 <div className="grid gap-6 lg:grid-cols-2">
                     <div className="h-80 animate-pulse rounded-2xl bg-surface-muted" />
@@ -248,7 +248,7 @@ export default function NewPartsPaymentPage() {
     }
 
     return (
-        <div className={`mx-auto max-w-5xl px-4 py-6 md:py-10 ${showStickyPay ? MOBILE_PRODUCT_STICKY_SCROLL_PAD : ''}`}>
+        <div className={`mx-auto max-w-5xl px-0 py-6 sm:px-4 md:py-10 ${showStickyPay ? MOBILE_PRODUCT_STICKY_SCROLL_PAD : ''}`}>
             <div className="mb-6">
                 <Link to="/cart/new/checkout" className="text-sm text-brand-600 hover:underline">
                     ← Назад к оформлению

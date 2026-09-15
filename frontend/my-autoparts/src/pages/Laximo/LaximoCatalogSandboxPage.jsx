@@ -333,7 +333,7 @@ export default function LaximoCatalogSandboxPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-10">
+      <div className="mx-auto max-w-xl px-0 py-10 sm:px-4">
         <h1 className="text-2xl font-bold text-gray-900">Каталог по VIN</h1>
         <p className="mt-3 text-sm text-gray-600">Войдите, чтобы открыть каталог узлов.</p>
         <Link to="/auth" className="mt-4 inline-block text-sm font-medium text-indigo-600 hover:underline">
@@ -344,7 +344,7 @@ export default function LaximoCatalogSandboxPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto max-w-4xl px-0 py-8 sm:px-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Каталог по VIN</h1>

@@ -557,7 +557,7 @@ export default function NewPartsOrderRegistration() {
 
   if (placedOrder) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-16">
+      <div className="mx-auto max-w-lg px-0 py-16 sm:px-4">
         <div className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center">
           <h1 className="text-xl font-bold text-gray-900">Заказ оформлен</h1>
           <p className="mt-2 text-sm text-gray-700">{placedOrder.message}</p>
@@ -585,7 +585,7 @@ export default function NewPartsOrderRegistration() {
   }
 
   return (
-    <div className={`mx-auto w-full max-w-2xl px-4 py-6 sm:py-8 md:pb-8 ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
+    <div className={`mx-auto w-full max-w-2xl px-0 py-6 sm:py-8 sm:px-4 md:pb-8 ${MOBILE_PRODUCT_STICKY_SCROLL_PAD}`}>
       <Link
         to="/cart"
         className="mb-3 inline-flex items-center gap-1 text-sm text-ink-muted transition hover:text-brand-600"

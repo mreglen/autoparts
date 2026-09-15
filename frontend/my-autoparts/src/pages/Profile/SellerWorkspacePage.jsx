@@ -221,7 +221,7 @@ export default function SellerWorkspacePage() {
     const stats = workspace?.stats;
 
     return (
-        <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+        <div className="mt-4 sm:mt-5">
             <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <button
