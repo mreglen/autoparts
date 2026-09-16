@@ -505,11 +505,6 @@ export default function ProfileMenuTabs({
                 activeTab === item.id ? itemActive : itemInactive
             } ${activeTab === item.id ? 'font-medium' : 'font-normal text-gray-700'}`}
         >
-            {!isDrawer ? null : (
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-700">
-                    {getMenuIcon(item.id)}
-                </div>
-            )}
             <span
                 className={`min-w-0 flex-1 ${
                     isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
@@ -570,11 +565,6 @@ export default function ProfileMenuTabs({
                                                     activeTab === subTab.id ? itemActive : itemInactive
                                                 } ${activeTab === subTab.id ? 'font-medium' : 'font-normal text-gray-700'}`}
                                             >
-                                                {!isDrawer ? null : (
-                                                    <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-700">
-                                                        {getMenuIcon(subTab.id)}
-                                                    </div>
-                                                )}
                                                 <span
                                                     className={`min-w-0 flex-1 ${
                                                         isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
@@ -590,20 +580,13 @@ export default function ProfileMenuTabs({
                                                 onClick={() => toggleSubmenu(subTab.id)}
                                                 className={`${submenuItemBase} ${nestedHighlight ? itemActive : itemInactive}`}
                                             >
-                                                {!isDrawer ? (
-                                                    <span className="min-w-0 flex-1 whitespace-normal leading-snug">
-                                                        {subTab.label}
-                                                    </span>
-                                                ) : (
-                                                    <>
-                                                        <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-700">
-                                                            {getMenuIcon(subTab.id)}
-                                                        </div>
-                                                        <span className="min-w-0 flex-1 break-words whitespace-normal">
-                                                            {subTab.label}
-                                                        </span>
-                                                    </>
-                                                )}
+                                                <span
+                                                    className={`min-w-0 flex-1 ${
+                                                        isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
+                                                    }`}
+                                                >
+                                                    {subTab.label}
+                                                </span>
                                                 <MenuBadge count={badgeCounts[subTab.id]} className="mr-1" />
                                                 <MenuChevron expanded={nestedExpanded} />
                                             </button>
