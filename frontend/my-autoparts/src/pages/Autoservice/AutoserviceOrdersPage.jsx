@@ -14,7 +14,7 @@ import { Skeleton, UnderlineTabs } from '../../components/UI';
 import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { buildRepairOrderDuplicatePayload } from '../../utils/repairOrderDuplicate';
-import { formatServerDateTime } from '../../utils/serverDate';
+import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
@@ -34,6 +34,12 @@ import {
 
 function formatDateTime(value) {
   return formatServerDateTime(value);
+}
+
+function formatMoney(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return '0,00';
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function orderMatchesList(order, { scope, historyStatus, includeReviewInActive }) {
@@ -459,9 +465,10 @@ export default function AutoserviceOrdersPage() {
           <thead>
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-28 ${autoserviceListThClass}`}>Заказ</th>
+              <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
-              <th className={`w-32 ${autoserviceListThClass}`}>Телефон</th>
+              <th className={`w-32 ${autoserviceListThClass}`}>Сумма</th>
               <th className={`w-32 ${autoserviceListThClass}`}>Статус</th>
             </tr>
           </thead>
@@ -470,6 +477,7 @@ export default function AutoserviceOrdersPage() {
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={`sk-${i}`}>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
+                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-28" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
@@ -478,7 +486,7 @@ export default function AutoserviceOrdersPage() {
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-ink-muted">
+                <td colSpan={6} className="py-12 text-center text-ink-muted">
                   {emptyMessage}
                 </td>
               </tr>
@@ -497,12 +505,15 @@ export default function AutoserviceOrdersPage() {
                   <td className={autoserviceListTdClass}>
                     <span className="font-medium tabular-nums text-ink-muted">{repairOrderNumberLabel(row)}</span>
                   </td>
+                  <td className={autoserviceListTdClass}>
+                    <span className="tabular-nums text-ink-muted">{formatServerDate(row.scheduled_at)}</span>
+                  </td>
                   <td className={`${autoserviceListTdClass} font-semibold text-ink`}>{vehicleLabel(row.vehicle)}</td>
                   <td className={autoserviceListTdClass}>
                     <div className="font-semibold text-ink">{row.client?.name || '—'}</div>
                   </td>
                   <td className={autoserviceListTdClass}>
-                    <div className="text-ink-muted">{row.client?.phone || '—'}</div>
+                    <div className="tabular-nums font-semibold text-ink">{formatMoney(row.grand_total)} ₽</div>
                   </td>
                   <td className={`${autoserviceListTdClass} [&_span]:ring-0`}>
                     <RepairOrderStatusPicker

@@ -101,6 +101,7 @@ function PlannerDayCell({ orders, onItemClick, isToday, onContextMenu }) {
         const styleClass = plannerItemStyle(order);
         const clientName = order.client_name || '—';
         const clientLabel = formatPersonNameWithInitials(clientName);
+        const vehicleLabel = [order.vehicle_make, order.vehicle_model].filter(Boolean).join(' ');
         return (
           <button
             key={plannerItemKey(order)}
@@ -111,6 +112,9 @@ function PlannerDayCell({ orders, onItemClick, isToday, onContextMenu }) {
           >
             <span className="block tabular-nums">{plannerItemTimeLabel(order)}</span>
             <span className="mt-0.5 block truncate font-normal">{clientLabel}</span>
+            {vehicleLabel ? (
+              <span className="mt-0.5 block font-normal">{vehicleLabel}</span>
+            ) : null}
           </button>
         );
       })}
