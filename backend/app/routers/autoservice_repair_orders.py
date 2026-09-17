@@ -168,7 +168,9 @@ def _user_brief(user: User) -> RepairOrderUserBrief:
     return RepairOrderUserBrief(id=user.id, name=user_display_name(user))
 
 
-def _vehicle_brief(vehicle: GarageVehicle) -> RepairOrderVehicleBrief:
+def _vehicle_brief(vehicle: GarageVehicle | None) -> RepairOrderVehicleBrief | None:
+    if vehicle is None:
+        return None
     return RepairOrderVehicleBrief(
         id=vehicle.id,
         make=vehicle.make,
@@ -693,7 +695,7 @@ def _resolve_create_client_and_vehicle(
     org_id: str,
     payload: RepairOrderCreate,
     current_user: User,
-) -> tuple[AutoserviceClient, GarageVehicle]:
+) -> tuple[AutoserviceClient, GarageVehicle | None]:
     if payload.vehicle_id is not None:
         vehicle = (
             db.query(GarageVehicle)
@@ -760,10 +762,7 @@ def _resolve_create_client_and_vehicle(
     make = (payload.vehicle_make or "").strip()
     model = (payload.vehicle_model or "").strip()
     if not make or not model:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Укажите марку и модель автомобиля",
-        )
+        return client, None
     vehicle = (
         db.query(GarageVehicle)
         .filter(
@@ -1532,10 +1531,11 @@ def create_repair_order(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Запись на осмотр не найдена",
             )
-    if (payload.client_id is None or payload.vehicle_id is None) and booking is None:
+    has_client_ref = payload.client_id is not None or bool((payload.client_name or "").strip())
+    if not has_client_ref and booking is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Выберите клиента и автомобиль",
+            detail="Выберите клиента",
         )
     client, vehicle = _resolve_create_client_and_vehicle(db, org_id, payload, current_user)
     is_own = level == "own"
@@ -1566,7 +1566,7 @@ def create_repair_order(
         organization_id=org_id,
         order_number=order_number,
         client_id=client.id,
-        vehicle_id=vehicle.id,
+        vehicle_id=vehicle.id if vehicle else None,
         client_comment=(payload.client_comment or "").strip() or None,
         staff_comment=(payload.staff_comment or "").strip() or None,
         work_zone_id=work_zone_id,
@@ -1594,7 +1594,8 @@ def create_repair_order(
     )
     if booking is not None:
         booking.client_id = client.id
-        booking.garage_vehicle_id = vehicle.id
+        if vehicle is not None:
+            booking.garage_vehicle_id = vehicle.id
         booking.status = "processed"
     db.commit()
     row = _get_org_order_or_404(db, org_id, row.id)
@@ -1620,10 +1621,28 @@ def update_repair_order(
             detail="После одобрения заявку меняет приёмщик",
         )
 
-    client_id = payload.client_id if payload.client_id is not None else row.client_id
-    vehicle_id = payload.vehicle_id if payload.vehicle_id is not None else row.vehicle_id
-    if payload.client_id is not None or payload.vehicle_id is not None:
-        _get_client_and_vehicle(db, org_id, client_id, vehicle_id)
+    client_set = payload.client_id is not None
+    vehicle_set = "vehicle_id" in payload.model_fields_set
+    if client_set or vehicle_set:
+        client_id = payload.client_id if client_set else row.client_id
+        vehicle_id = payload.vehicle_id if vehicle_set else row.vehicle_id
+        if vehicle_id is not None:
+            _get_client_and_vehicle(db, org_id, client_id, vehicle_id)
+        elif client_set:
+            client = (
+                db.query(AutoserviceClient)
+                .filter(
+                    AutoserviceClient.id == client_id,
+                    AutoserviceClient.organization_id == org_id,
+                    AutoserviceClient.status == "active",
+                )
+                .first()
+            )
+            if not client:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Клиент не найден",
+                )
         row.client_id = client_id
         row.vehicle_id = vehicle_id
 

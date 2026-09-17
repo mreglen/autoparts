@@ -260,7 +260,7 @@ class RepairOrderStaffView(BaseModel):
     organization_id: str
     order_number: Optional[str] = None
     client_id: int
-    vehicle_id: int
+    vehicle_id: Optional[int] = None
     client_comment: Optional[str] = None
     staff_comment: Optional[str] = None
     work_zone_id: Optional[int] = None
@@ -275,7 +275,7 @@ class RepairOrderStaffView(BaseModel):
     created_at: datetime
     updated_at: datetime
     client: RepairOrderClientBrief
-    vehicle: RepairOrderVehicleBrief
+    vehicle: Optional[RepairOrderVehicleBrief] = None
     accepted_by: RepairOrderUserBrief
     created_by: Optional[RepairOrderUserBrief] = None
     assignees: list[RepairOrderUserBrief] = Field(default_factory=list)
@@ -293,7 +293,7 @@ class RepairOrderStaffView(BaseModel):
 class RepairOrderClientView(BaseModel):
     id: int
     order_number: Optional[str] = None
-    vehicle_id: int
+    vehicle_id: Optional[int] = None
     client_comment: Optional[str] = None
     work_zone_id: Optional[int] = None
     work_zone: Optional[RepairOrderWorkZoneBrief] = None
@@ -301,7 +301,7 @@ class RepairOrderClientView(BaseModel):
     scheduled_end_at: Optional[datetime] = None
     status: str
     created_at: datetime
-    vehicle: RepairOrderVehicleBrief
+    vehicle: Optional[RepairOrderVehicleBrief] = None
     works: list[RepairOrderClientWorkView] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartView] = Field(default_factory=list)
     shop_parts: list[RepairOrderClientShopPartView] = Field(default_factory=list)

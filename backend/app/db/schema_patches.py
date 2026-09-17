@@ -4405,7 +4405,7 @@ def ensure_repair_orders_tables() -> None:
             organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
             order_number VARCHAR(32) NOT NULL,
             client_id INTEGER NOT NULL REFERENCES autoservice_clients(id),
-            vehicle_id INTEGER NOT NULL REFERENCES garage_vehicles(id),
+            vehicle_id INTEGER REFERENCES garage_vehicles(id),
             client_comment TEXT,
             scheduled_at TIMESTAMPTZ NOT NULL,
             accepted_by_user_id INTEGER NOT NULL REFERENCES users(id),
@@ -4429,7 +4429,7 @@ def ensure_repair_orders_tables() -> None:
             organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
             order_number VARCHAR(32) NOT NULL,
             client_id INTEGER NOT NULL REFERENCES autoservice_clients(id),
-            vehicle_id INTEGER NOT NULL REFERENCES garage_vehicles(id),
+            vehicle_id INTEGER REFERENCES garage_vehicles(id),
             client_comment TEXT,
             scheduled_at DATETIME NOT NULL,
             accepted_by_user_id INTEGER NOT NULL REFERENCES users(id),
@@ -5246,6 +5246,22 @@ def ensure_inspection_bookings_phone_nullable() -> None:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE inspection_bookings ALTER COLUMN phone DROP NOT NULL"))
     logger.info("Applied inspection_bookings phone nullable patch")
+
+
+def ensure_repair_orders_vehicle_nullable() -> None:
+    """Allow repair orders to exist without a linked garage vehicle."""
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+    columns = {col["name"]: col for col in inspector.get_columns("repair_orders")}
+    vehicle_col = columns.get("vehicle_id")
+    if vehicle_col is None or vehicle_col.get("nullable"):
+        return
+    if engine.dialect.name != "postgresql":
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE repair_orders ALTER COLUMN vehicle_id DROP NOT NULL"))
+    logger.info("Applied repair_orders vehicle_id nullable patch")
 
 
 WORK_ZONES_MIGRATION_MARKER = "autoservice_work_zones_v1"

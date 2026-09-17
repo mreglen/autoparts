@@ -34,6 +34,7 @@ from app.db.schema_patches import (
     ensure_inspection_bookings_preferred_time_column,
     ensure_inspection_bookings_vehicle_columns,
     ensure_inspection_bookings_phone_nullable,
+    ensure_repair_orders_vehicle_nullable,
     ensure_autoservice_clients_table,
     ensure_autoservice_clients_requisites_columns,
     ensure_autoservice_tariff_applications_table,
@@ -299,6 +300,7 @@ try:
     ensure_repair_order_status_timestamps()
     ensure_repair_orders_shipping_date()
     ensure_repair_orders_mileage_km()
+    ensure_repair_orders_vehicle_nullable()
     ensure_garage_vehicle_mileage_history()
     ensure_repair_orders_review_flow()
     ensure_organization_employees_tables()

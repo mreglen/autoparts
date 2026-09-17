@@ -2009,11 +2009,10 @@ export default function AutoserviceOrderFormPage() {
 
   const validateCommonFields = () => {
     const hasClient = Boolean(clientId || (pendingClientName.trim().length >= 2 && pendingClientPhone.trim()));
-    const hasVehicle = Boolean(vehicleId || (pendingVehicleMake.trim() && pendingVehicleModel.trim()));
-    if (!hasClient || !hasVehicle || (!ownMode && !scheduledAt)) {
+    if (!hasClient || (!ownMode && !scheduledAt)) {
       return ownMode
-        ? 'Выберите или заполните клиента и автомобиль'
-        : 'Выберите или заполните клиента, автомобиль и дату записи';
+        ? 'Выберите или заполните клиента'
+        : 'Выберите или заполните клиента и дату записи';
     }
     if (!clientId) {
       const phoneError = validatePhoneOptional(pendingClientPhone);
@@ -2040,7 +2039,6 @@ export default function AutoserviceOrderFormPage() {
   const canAttemptAutoSave = () => (
     Boolean(
       (clientId || (pendingClientName.trim() && pendingClientPhone.trim()))
-      && (vehicleId || (pendingVehicleMake.trim() && pendingVehicleModel.trim()))
       && (ownMode || scheduledAt),
     )
   );
@@ -2400,7 +2398,7 @@ export default function AutoserviceOrderFormPage() {
                   <button
                     type="button"
                     onClick={() => setAddVehicleOpen(true)}
-                    disabled={!clientId}
+                    disabled={!clientId && !pendingClientName.trim()}
                     className={`${linkActionClass} disabled:cursor-not-allowed disabled:text-ink-faint max-lg:inline-flex max-lg:min-h-11 max-lg:items-center`}
                   >
                     Добавить
@@ -2896,11 +2894,16 @@ export default function AutoserviceOrderFormPage() {
         />
       ) : null}
 
-      {addVehicleOpen && clientId && !ownMode ? (
+      {addVehicleOpen && (clientId || pendingClientName.trim()) && !ownMode ? (
         <GarageQuickAddModal
-          clientId={clientId}
+          clientId={clientId || null}
           onClose={() => setAddVehicleOpen(false)}
           onCreated={handleVehicleCreated}
+          onPending={({ make, model }) => {
+            setVehicleId('');
+            setPendingVehicleMake(make);
+            setPendingVehicleModel(model);
+          }}
         />
       ) : null}
 

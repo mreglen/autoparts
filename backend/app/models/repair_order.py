@@ -64,7 +64,7 @@ class RepairOrder(Base):
     vehicle_id = Column(
         Integer,
         ForeignKey("garage_vehicles.id"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     client_comment = Column(Text, nullable=True)

@@ -192,7 +192,7 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
   );
 }
 
-export default function GarageQuickAddModal({ onClose, onCreated, clientId = null }) {
+export default function GarageQuickAddModal({ onClose, onCreated, clientId = null, onPending = null }) {
   const [step, setStep] = useState('lookup');
   const [lookupInput, setLookupInput] = useState('');
   const [lookupDecoding, setLookupDecoding] = useState(false);
@@ -397,6 +397,14 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
   };
 
   const handleCreateVehicle = async (body) => {
+    if (!clientId && onPending) {
+      onPending({
+        make: (body.make || '').trim(),
+        model: (body.model || '').trim(),
+      });
+      onClose?.();
+      return;
+    }
     setSaving(true);
     try {
       const payload = mapCandidateToGarageCreatePayload(
