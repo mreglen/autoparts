@@ -20,6 +20,7 @@ export default function SearchablePillSelect({
   allowCustomValue = false,
   customValue = '',
   onCustomValueChange,
+  onQueryChange,
   maxLength,
 }) {
   const rootRef = useRef(null);
@@ -108,6 +109,7 @@ export default function SearchablePillSelect({
           const nextQuery = event.target.value;
           setQuery(nextQuery);
           setOpen(true);
+          onQueryChange?.(nextQuery);
           if (allowCustomValue) {
             onCustomValueChange?.(nextQuery);
             if (selected) onChange('');
@@ -172,6 +174,11 @@ export default function SearchablePillSelect({
                       <span className="block whitespace-normal break-words">{option.label}</span>
                       {option.hint ? <span className="mt-0.5 block text-xs text-ink-muted">{option.hint}</span> : null}
                     </span>
+                    {option.trailing ? (
+                      <span className="ml-auto shrink-0 self-center pl-3 text-xs text-ink-muted">
+                        {option.trailing}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );

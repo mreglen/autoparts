@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import Modal from '../UI/Modal';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Modal, { ConfirmDialog } from '../UI/Modal';
 import PhoneInput from '../UI/PhoneInput';
 import SearchablePillSelect from '../SearchablePillSelect/SearchablePillSelect';
 import { apiRequest } from '../../utils/apiClient';
+import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import {
   formatPhoneFromRaw,
   validatePhoneOptional,
@@ -22,6 +23,7 @@ export default function InspectionBookingAddModal({
   onClose,
   onCreated,
   onSaved,
+  onDeleted,
   onCreateOrder,
   initialPreferredDate = null,
   workZoneId = null,
@@ -36,6 +38,8 @@ export default function InspectionBookingAddModal({
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [clients, setClients] = useState([]);
   const [clientsLoading, setClientsLoading] = useState(false);
+  const [clientQuery, setClientQuery] = useState('');
+  const clientQueryDebounced = useDebouncedValue(clientQuery);
   const [selectedVehicleId, setSelectedVehicleId] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
@@ -49,6 +53,8 @@ export default function InspectionBookingAddModal({
   const [phoneError, setPhoneError] = useState('');
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const editStartedAtRef = useRef(0);
   const isEdit = Boolean(initialBooking?.id);
@@ -79,27 +85,35 @@ export default function InspectionBookingAddModal({
     setPhoneError('');
     setError(null);
     setSaving(false);
+    setDeleting(false);
+    setDeleteConfirmOpen(false);
     setIsEditing(!isEdit);
   }, [open, initialName, initialPhone, initialPreferred, initialPreferredTime, initialClientId, initialVehicleId, initialVehicleMake, initialVehicleModel, initialNotes, initialWorkZoneId, isEdit]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    let cancelled = false;
+  const clientSearchRef = useRef(0);
+  const loadClients = useCallback(async (q = '') => {
+    const requestId = ++clientSearchRef.current;
     setClientsLoading(true);
-    apiRequest('/autoservice/clients')
-      .then((rows) => {
-        if (!cancelled) setClients(Array.isArray(rows) ? rows : []);
-      })
-      .catch(() => {
-        if (!cancelled) setClients([]);
-      })
-      .finally(() => {
-        if (!cancelled) setClientsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
+    try {
+      const query = q.trim();
+      const rows = await apiRequest(
+        query ? `/autoservice/clients?q=${encodeURIComponent(query)}` : '/autoservice/clients',
+      );
+      if (requestId === clientSearchRef.current) {
+        setClients(Array.isArray(rows) ? rows : []);
+      }
+    } catch {
+      if (requestId === clientSearchRef.current) setClients([]);
+    } finally {
+      if (requestId === clientSearchRef.current) setClientsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!clientQueryDebounced.trim()) setClientQuery('');
+    loadClients(clientQueryDebounced);
+  }, [open, clientQueryDebounced, loadClients]);
 
   useEffect(() => {
     if (!open || !selectedClientId) {
@@ -182,7 +196,8 @@ export default function InspectionBookingAddModal({
     label: client.name,
     inputLabel: client.name,
     hint: client.phone || null,
-    searchText: `${client.name || ''} ${client.phone || ''}`,
+    trailing: client.matched_vehicle_label || null,
+    searchText: `${client.name || ''} ${client.phone || ''} ${client.matched_vehicle_label || ''}`,
   })), [clients]);
 
   const vehicleOptions = useMemo(() => vehicles.map((vehicle) => ({
@@ -278,6 +293,22 @@ export default function InspectionBookingAddModal({
     }
   };
 
+  const handleDelete = async () => {
+    if (!initialBooking?.id) return;
+    setDeleting(true);
+    try {
+      await apiRequest(`/autoservice/inspection-bookings/${initialBooking.id}`, { method: 'DELETE' });
+      setDeleteConfirmOpen(false);
+      onDeleted?.(initialBooking);
+      onClose?.();
+    } catch (err) {
+      setError(err?.message || 'Не удалось удалить заявку');
+      setDeleteConfirmOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   function formatDateView(value) {
     if (!value) return '—';
     const date = new Date(`${value}T00:00:00`);
@@ -334,6 +365,19 @@ export default function InspectionBookingAddModal({
     </div>
   ) : (
     <div className="flex flex-wrap justify-end gap-2">
+      {isEdit ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDeleteConfirmOpen(true);
+          }}
+          disabled={deleting}
+          className="mr-auto rounded-sg-sm min-h-11 border border-danger-200 bg-surface px-4 py-2 text-sm font-medium text-danger-600 transition hover:bg-danger-50 disabled:opacity-60"
+        >
+          Удалить
+        </button>
+      ) : null}
       {isEdit && onCreateOrder ? (
         <button
           type="button"
@@ -409,6 +453,7 @@ export default function InspectionBookingAddModal({
               allowCustomValue
               customValue={name}
               onCustomValueChange={handleManualClientName}
+              onQueryChange={setClientQuery}
               maxLength={120}
             />
           </div>
@@ -614,6 +659,17 @@ export default function InspectionBookingAddModal({
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleDelete}
+        title="Удалить запись?"
+        message={`Запись «${name || 'Без имени'}» на ${formatDateTimeView(preferredDate, preferredTime)} будет удалена. Действие нельзя отменить.`}
+        confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        danger
+        loading={deleting}
+      />
     </Modal>
   );
 }

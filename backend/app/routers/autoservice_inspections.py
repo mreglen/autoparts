@@ -522,3 +522,30 @@ def patch_inspection_booking(
     db.commit()
     db.refresh(row)
     return _booking_to_view(row)
+
+
+@router.delete(
+    "/autoservice/inspection-bookings/{booking_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_inspection_booking(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
+    row = (
+        db.query(InspectionBooking)
+        .filter(
+            InspectionBooking.id == booking_id,
+            InspectionBooking.organization_id == org_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Заявка не найдена",
+        )
+    db.delete(row)
+    db.commit()

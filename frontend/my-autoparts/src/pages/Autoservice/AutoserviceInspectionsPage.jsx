@@ -4,7 +4,6 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import Modal from '../../components/UI/Modal';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
@@ -57,69 +56,6 @@ function BookingMobileCard({ row, onView }) {
   );
 }
 
-function BookingViewModal({ booking, onClose, onCreateOrder }) {
-  if (!booking) return null;
-
-  return (
-    <Modal
-      open={Boolean(booking)}
-      onClose={onClose}
-      title={`Запись · ${booking.name || 'Без имени'}`}
-      size="md"
-      footer={
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => onCreateOrder(booking)}
-            className="rounded-sg-sm min-h-11 border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-          >
-            Создать заказ-наряд
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-sg-sm min-h-11 border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
-          >
-            Закрыть
-          </button>
-        </div>
-      }
-    >
-      <div className="space-y-3 text-sm text-ink-soft">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <p>
-            <span className="font-medium text-ink">Телефон:</span> {booking.phone || '—'}
-          </p>
-          <p>
-            <span className="font-medium text-ink">Желаемая дата и время:</span>{' '}
-            {formatPreferredDateTime(booking)}
-          </p>
-          <p>
-            <span className="font-medium text-ink">Создана:</span>{' '}
-            {formatServerDateTime(booking.created_at) || '—'}
-          </p>
-          <p>
-            <span className="font-medium text-ink">Источник:</span>{' '}
-            {SOURCE_LABELS[booking.source] || booking.source || '—'}
-          </p>
-          <p className="sm:col-span-2">
-            <span className="font-medium text-ink">Автомобиль:</span>{' '}
-            {booking.vehicle
-              ? formatVehicleBrief(booking.vehicle)
-              : [booking.vehicle_make, booking.vehicle_model].filter(Boolean).join(' ') || '—'}
-          </p>
-        </div>
-        <div className="rounded-sg border border-line-soft bg-surface-muted/80 px-3 py-3">
-          <p>
-            <span className="font-medium text-ink">Комментарий:</span>{' '}
-            <span className="whitespace-pre-wrap text-ink-soft">{booking.notes?.trim() || '—'}</span>
-          </p>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 export default function AutoserviceInspectionsPage() {
   const { isReady, user, isAuthenticated } = useAuthReady();
   const navigate = useNavigate();
@@ -130,6 +66,7 @@ export default function AutoserviceInspectionsPage() {
   const qApplied = useDebouncedValue(q);
   const [addOpen, setAddOpen] = useState(false);
   const [viewBooking, setViewBooking] = useState(null);
+  const [zones, setZones] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -144,6 +81,13 @@ export default function AutoserviceInspectionsPage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated) return;
+    apiRequest('/autoservice/work-zones')
+      .then((data) => setZones(Array.isArray(data) ? data : []))
+      .catch(() => setZones([]));
+  }, [isReady, isAuthenticated]);
 
   useEffect(() => {
     if (isReady && isAuthenticated) {
@@ -316,9 +260,19 @@ export default function AutoserviceInspectionsPage() {
         }}
       />
 
-      <BookingViewModal
-        booking={viewBooking}
+      <InspectionBookingAddModal
+        open={Boolean(viewBooking)}
         onClose={() => setViewBooking(null)}
+        zones={zones}
+        initialBooking={viewBooking}
+        onSaved={() => {
+          setViewBooking(null);
+          load();
+        }}
+        onDeleted={() => {
+          setViewBooking(null);
+          load();
+        }}
         onCreateOrder={(booking) => {
           setViewBooking(null);
           navigate('/autoservice/orders/new', {

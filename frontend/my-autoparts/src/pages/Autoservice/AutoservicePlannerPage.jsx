@@ -113,11 +113,13 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
         <div className="absolute inset-0 grid grid-cols-7">
           {(zone.days || []).map((dayCell) => {
             const iso = String(dayCell.date).slice(0, 10);
+            const weekday = new Date(`${iso}T00:00:00`).getDay();
+            const isWeekend = weekday === 0 || weekday === 6;
             return (
               <div
                 key={iso}
                 className={`border-r border-line-soft transition-colors hover:bg-surface-subtle/45 ${
-                  iso === todayIso ? 'bg-brand-50/30' : 'bg-surface'
+                  iso === todayIso ? 'bg-brand-50/30' : isWeekend ? 'bg-danger-50/40' : 'bg-surface'
                 }`}
                 onContextMenu={handleCellContextMenu(iso)}
               />
@@ -125,7 +127,7 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
           })}
         </div>
         {entries.length > 0 ? (
-          <div className="relative grid grid-cols-7 gap-y-1 py-1.5 sm:py-2">
+          <div className="relative grid grid-cols-[repeat(14,minmax(0,1fr))] py-px sm:py-0.5">
             {entries.map((entry) => {
               const { item } = entry;
               const styleClass = plannerItemStyle(item);
@@ -133,19 +135,25 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
               const clientLabel = formatPersonNameWithInitials(clientName);
               const vehicleLabel = item.vehicle_make || '';
               const nameWithVehicle = [clientLabel, vehicleLabel].filter(Boolean).join(' ');
+              const titleVehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ');
+              const itemTitle = [
+                item.kind === 'inspection' ? 'Осмотр' : `№ ${item.order_number}`,
+                clientName,
+                titleVehicle,
+              ].filter(Boolean).join(' · ');
               return (
                 <button
                   key={plannerItemKey(item)}
                   type="button"
                   onClick={() => onItemClick(item)}
-                  className={`m-1 min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:m-2 sm:text-xs ${styleClass} ${
+                  className={`mx-0.5 my-px min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:mx-1 sm:my-0.5 sm:text-xs ${styleClass} ${
                     entry.continuesPastWeek ? 'rounded-r-none' : ''
                   }`}
                   style={{
-                    gridColumn: `${entry.startIdx + 1} / ${entry.endIdx + 2}`,
+                    gridColumn: `${entry.subStart + 1} / ${entry.subEnd + 2}`,
                     gridRow: entry.lane + 1,
                   }}
-                  title={`${item.kind === 'inspection' ? 'Осмотр' : `№ ${item.order_number}`} · ${clientName}`}
+                  title={itemTitle}
                 >
                   <span className="block truncate tabular-nums">{plannerBarTimeLabel(entry, dayIsos)}</span>
                   <span className="mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
@@ -494,7 +502,7 @@ export default function AutoservicePlannerPage() {
     : null;
 
   return (
-    <div className="w-full min-w-0">
+    <div className="min-w-0 md:-mx-4 lg:-mx-6">
       <div className="mb-3 flex flex-col gap-3 md:mb-5 md:flex-row md:items-center md:justify-between">
         <h1 className="max-md:hidden text-xl font-bold text-ink sm:text-2xl">Планировщик</h1>
 
@@ -539,10 +547,10 @@ export default function AutoservicePlannerPage() {
       />
 
       <div className="hidden overflow-x-auto md:block">
-        <div className="min-w-[36rem] overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
+        <div className="min-w-[52rem] overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
           <div
             className="grid w-full"
-            style={{ gridTemplateColumns: 'minmax(5rem, 7.3rem) repeat(7, minmax(4.5rem, 1fr))' }}
+            style={{ gridTemplateColumns: 'minmax(5rem, 7.3rem) repeat(7, minmax(6.5rem, 1fr))' }}
           >
             <div className="sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
               Зона
@@ -550,18 +558,23 @@ export default function AutoservicePlannerPage() {
             {dayHeaders.map((day, index) => {
               const iso = String(day.date).slice(0, 10);
               const isToday = iso === toIsoDate(today);
+              const isWeekend = index >= 5;
               return (
                 <div
                   key={iso}
                   className={`border-b border-r border-line px-2 py-2 text-center ${
-                    isToday ? 'bg-brand-50 text-brand-800' : 'bg-surface-muted text-ink-muted'
+                    isToday
+                      ? 'bg-brand-50 text-brand-800'
+                      : isWeekend
+                        ? 'bg-danger-50/60 text-ink-muted'
+                        : 'bg-surface-muted text-ink-muted'
                   }`}
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-wide sm:text-xs">
-                    {WEEKDAYS[index]}
-                  </div>
-                  <div className={`mt-0.5 text-sm font-medium ${isToday ? 'text-brand-900' : 'text-ink'}`}>
-                    {formatDayHeader(iso)}
+                  <div className="text-xs font-semibold uppercase tracking-wide sm:text-sm">
+                    <span>{WEEKDAYS[index]}</span>{' '}
+                    <span className={`normal-case tracking-normal ${isToday ? 'text-brand-900' : 'text-ink'}`}>
+                      {formatDayHeader(iso)}
+                    </span>
                   </div>
                 </div>
               );
@@ -679,6 +692,10 @@ export default function AutoservicePlannerPage() {
             : null
         }
         onSaved={() => {
+          setViewInspection(null);
+          load();
+        }}
+        onDeleted={() => {
           setViewInspection(null);
           load();
         }}

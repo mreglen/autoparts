@@ -63,24 +63,64 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
     }
     placed.push({ item, startIdx, endIdx, continuesPastWeek });
   }
+  const subCount = dayIsos.length * 2;
+  const dayCounts = new Array(dayIsos.length).fill(0);
+  for (const entry of placed) {
+    for (let d = entry.startIdx; d <= entry.endIdx; d += 1) {
+      dayCounts[d] += 1;
+    }
+  }
   placed.sort((a, b) => {
     if (a.startIdx !== b.startIdx) return a.startIdx - b.startIdx;
+    const aSpan = a.endIdx - a.startIdx;
+    const bSpan = b.endIdx - b.startIdx;
+    if (aSpan !== bSpan) return bSpan - aSpan;
     const aTime = new Date(a.item.scheduled_at).getTime();
     const bTime = new Date(b.item.scheduled_at).getTime();
     if (aTime !== bTime) return aTime - bTime;
     return (a.item.id || 0) - (b.item.id || 0);
   });
   const lanes = [];
-  for (const entry of placed) {
-    let laneIdx = lanes.findIndex(
-      (lane) => lane.every((other) => entry.startIdx > other.endIdx),
-    );
-    if (laneIdx < 0) {
-      laneIdx = lanes.length;
-      lanes.push([]);
+  const isFree = (lane, subStart, subEnd) => {
+    for (let s = subStart; s <= subEnd; s += 1) {
+      if (lane[s]) return false;
     }
-    lanes[laneIdx].push(entry);
-    entry.lane = laneIdx;
+    return true;
+  };
+  const occupy = (lane, subStart, subEnd) => {
+    for (let s = subStart; s <= subEnd; s += 1) lane[s] = true;
+  };
+  for (const entry of placed) {
+    const singleDay = entry.startIdx === entry.endIdx;
+    const crowded = singleDay && entry.item.kind !== 'inspection' && dayCounts[entry.startIdx] > 1;
+    const ranges = crowded
+      ? [
+        [entry.startIdx * 2, entry.startIdx * 2],
+        [entry.startIdx * 2 + 1, entry.startIdx * 2 + 1],
+      ]
+      : [[entry.startIdx * 2, entry.endIdx * 2 + 1]];
+    let placedEntry = false;
+    for (let laneIdx = 0; laneIdx < lanes.length && !placedEntry; laneIdx += 1) {
+      for (const [subStart, subEnd] of ranges) {
+        if (isFree(lanes[laneIdx], subStart, subEnd)) {
+          occupy(lanes[laneIdx], subStart, subEnd);
+          entry.subStart = subStart;
+          entry.subEnd = subEnd;
+          entry.lane = laneIdx;
+          placedEntry = true;
+          break;
+        }
+      }
+    }
+    if (!placedEntry) {
+      const lane = new Array(subCount).fill(false);
+      const [subStart, subEnd] = ranges[0];
+      occupy(lane, subStart, subEnd);
+      entry.subStart = subStart;
+      entry.subEnd = subEnd;
+      entry.lane = lanes.length;
+      lanes.push(lane);
+    }
   }
   return placed;
 }
