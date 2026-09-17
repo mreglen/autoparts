@@ -33,6 +33,7 @@ from app.db.schema_patches import (
     ensure_inspection_bookings_work_zone_column,
     ensure_inspection_bookings_preferred_time_column,
     ensure_inspection_bookings_vehicle_columns,
+    ensure_inspection_bookings_phone_nullable,
     ensure_autoservice_clients_table,
     ensure_autoservice_clients_requisites_columns,
     ensure_autoservice_tariff_applications_table,
@@ -262,6 +263,7 @@ try:
     ensure_inspection_bookings_work_zone_column()
     ensure_inspection_bookings_preferred_time_column()
     ensure_inspection_bookings_vehicle_columns()
+    ensure_inspection_bookings_phone_nullable()
     ensure_autoservice_clients_table()
     ensure_autoservice_clients_requisites_columns()
     ensure_autoservice_tariff_applications_table()

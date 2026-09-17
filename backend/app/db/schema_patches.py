@@ -3996,7 +3996,7 @@ def ensure_inspection_bookings_table() -> None:
             id SERIAL PRIMARY KEY,
             organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
             name VARCHAR(120) NOT NULL,
-            phone VARCHAR(32) NOT NULL,
+            phone VARCHAR(32),
             preferred_date DATE NOT NULL,
             preferred_time TIME,
             vehicle_make VARCHAR(80),
@@ -4014,7 +4014,7 @@ def ensure_inspection_bookings_table() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
             name VARCHAR(120) NOT NULL,
-            phone VARCHAR(32) NOT NULL,
+            phone VARCHAR(32),
             preferred_date DATE NOT NULL,
             preferred_time TIME,
             vehicle_make VARCHAR(80),
@@ -5230,6 +5230,22 @@ def ensure_inspection_bookings_vehicle_columns() -> None:
         for statement in statements:
             conn.execute(text(statement))
     logger.info("Applied inspection_bookings vehicle columns patch: %s", statements)
+
+
+def ensure_inspection_bookings_phone_nullable() -> None:
+    """Allow inspection bookings to be created without a phone number."""
+    inspector = inspect(engine)
+    if "inspection_bookings" not in inspector.get_table_names():
+        return
+    columns = {col["name"]: col for col in inspector.get_columns("inspection_bookings")}
+    phone_col = columns.get("phone")
+    if phone_col is None or phone_col.get("nullable"):
+        return
+    if engine.dialect.name != "postgresql":
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE inspection_bookings ALTER COLUMN phone DROP NOT NULL"))
+    logger.info("Applied inspection_bookings phone nullable patch")
 
 
 WORK_ZONES_MIGRATION_MARKER = "autoservice_work_zones_v1"

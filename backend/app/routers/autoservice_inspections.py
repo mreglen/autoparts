@@ -268,7 +268,8 @@ def _create_staff_inspection_booking(
     current_user: User | None,
     org_id: str,
 ):
-    phone = _normalize_phone_or_400(payload.phone)
+    raw_phone = (payload.phone or "").strip()
+    phone = _normalize_phone_or_400(raw_phone) if raw_phone else None
     notes = (payload.notes or "").strip() or None
     garage_vehicle_id = payload.garage_vehicle_id
     client_id = payload.client_id
@@ -392,7 +393,7 @@ def create_staff_inspection_booking_shortcut(
             "✅ Запись на осмотр создана",
             f"№{view.id}",
             f"Клиент: {view.name}",
-            f"Телефон: {view.phone}",
+            f"Телефон: {view.phone or '—'}",
             f"Дата: {view.preferred_date.strftime('%d.%m.%Y')}",
             f"Время: {time_label}",
             f"Авто: {vehicle_label}",
@@ -446,8 +447,9 @@ def patch_inspection_booking(
                 detail="Имя должно содержать минимум 2 символа",
             )
         row.name = name[:120]
-    if "phone" in data and data["phone"] is not None:
-        row.phone = _normalize_phone_or_400(data["phone"])
+    if "phone" in data:
+        raw_phone = (data["phone"] or "").strip()
+        row.phone = _normalize_phone_or_400(raw_phone) if raw_phone else None
     if "preferred_date" in data and data["preferred_date"] is not None:
         row.preferred_date = data["preferred_date"]
     if "preferred_time" in data:

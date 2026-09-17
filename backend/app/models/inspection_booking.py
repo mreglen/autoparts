@@ -23,7 +23,7 @@ class InspectionBooking(Base):
     )
     legacy_repair_booking_id = Column(Integer, nullable=True, unique=True, index=True)
     name = Column(String(120), nullable=False)
-    phone = Column(String(32), nullable=False)
+    phone = Column(String(32), nullable=True)
     preferred_date = Column(Date, nullable=False)
     preferred_time = Column(Time, nullable=True)
     vehicle_make = Column(String(80), nullable=True)

@@ -59,6 +59,8 @@ def _planner_order(row: RepairOrder) -> PlannerRepairOrder:
         status=row.status,
         scheduled_at=row.scheduled_at,
         scheduled_end_at=row.scheduled_end_at,
+        vehicle_make=row.vehicle.make if row.vehicle else None,
+        vehicle_model=row.vehicle.model if row.vehicle else None,
         work_zone_id=row.work_zone_id,
         work_zone_name=row.work_zone.name if row.work_zone else None,
     )

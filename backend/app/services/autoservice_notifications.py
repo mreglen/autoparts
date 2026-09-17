@@ -251,7 +251,7 @@ def notify_new_inspection_booking(db: Session, booking: InspectionBooking) -> No
     title = f"Новая запись на осмотр №{booking.id}"
     vehicle_label = _vehicle_label(booking.vehicle) if booking.vehicle else None
     body_parts = [
-        f"Клиент: {booking.name}, {booking.phone}",
+        f"Клиент: {booking.name}, {booking.phone or '—'}",
         f"Желаемая дата: {_format_preferred_date(booking.preferred_date)}",
         f"Источник: {source_label}",
     ]

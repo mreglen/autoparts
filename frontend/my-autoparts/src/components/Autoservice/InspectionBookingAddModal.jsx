@@ -5,7 +5,7 @@ import SearchablePillSelect from '../SearchablePillSelect/SearchablePillSelect';
 import { apiRequest } from '../../utils/apiClient';
 import {
   formatPhoneFromRaw,
-  validatePhone,
+  validatePhoneOptional,
 } from '../../utils/contactValidation';
 
 const inputClass = 'sg-pill-input mt-1';
@@ -233,7 +233,7 @@ export default function InspectionBookingAddModal({
       setError(isEdit ? 'Укажите клиента' : 'Укажите имя');
       return;
     }
-    const phoneErr = validatePhone(phone);
+    const phoneErr = validatePhoneOptional(phone);
     if (phoneErr) {
       setPhoneError(phoneErr);
       return;
@@ -246,7 +246,7 @@ export default function InspectionBookingAddModal({
     try {
       const body = {
         name: trimmedName,
-        phone,
+        phone: phone || null,
         client_id: selectedClientId,
         garage_vehicle_id: vehicleMode === 'list' ? selectedVehicleId : null,
         preferred_date: preferredDate,
@@ -429,7 +429,6 @@ export default function InspectionBookingAddModal({
               }}
               placeholder="+7 (___) ___-__-__"
               disabled={saving}
-              required
             />
             {phoneError ? <p className="mt-1 text-sm text-danger-600">{phoneError}</p> : null}
           </div>
