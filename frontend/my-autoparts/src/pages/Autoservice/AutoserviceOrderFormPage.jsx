@@ -1123,6 +1123,7 @@ export default function AutoserviceOrderFormPage() {
 
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
+  const [clientChoiceOpen, setClientChoiceOpen] = useState(false);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
   const [addEmployeeTarget, setAddEmployeeTarget] = useState(null);
   const [error, setError] = useState('');
@@ -1137,6 +1138,7 @@ export default function AutoserviceOrderFormPage() {
     model: location.state?.vehicleModel || '',
   });
   const createInitRef = useRef(false);
+  const clientChoiceShownRef = useRef(false);
   const autoSaveTimerRef = useRef(null);
   const autoSaveResumeTimerRef = useRef(null);
   const clientSearchRequestRef = useRef(0);
@@ -1394,6 +1396,15 @@ export default function AutoserviceOrderFormPage() {
     }
     plannerPrefillRef.current = null;
   }, [isCreate, formInitialized, metaLoading, clients]);
+
+  useEffect(() => {
+    if (!isCreate || !formInitialized || metaLoading) return;
+    if (clientChoiceShownRef.current) return;
+    if (inspectionBookingId && !clientId && pendingClientName.trim().length >= 2) {
+      clientChoiceShownRef.current = true;
+      setClientChoiceOpen(true);
+    }
+  }, [isCreate, formInitialized, metaLoading, inspectionBookingId, clientId, pendingClientName]);
 
   useEffect(() => {
     if (!clientId) {
@@ -2008,7 +2019,7 @@ export default function AutoserviceOrderFormPage() {
   };
 
   const validateCommonFields = () => {
-    const hasClient = Boolean(clientId || (pendingClientName.trim().length >= 2 && pendingClientPhone.trim()));
+    const hasClient = Boolean(clientId || pendingClientName.trim().length >= 2);
     if (!hasClient || (!ownMode && !scheduledAt)) {
       return ownMode
         ? 'Выберите или заполните клиента'
@@ -2038,7 +2049,7 @@ export default function AutoserviceOrderFormPage() {
 
   const canAttemptAutoSave = () => (
     Boolean(
-      (clientId || (pendingClientName.trim() && pendingClientPhone.trim()))
+      (clientId || pendingClientName.trim().length >= 2)
       && (ownMode || scheduledAt),
     )
   );
@@ -2894,6 +2905,36 @@ export default function AutoserviceOrderFormPage() {
           onClose={() => setAddClientOpen(false)}
           onCreated={handleClientCreated}
         />
+      ) : null}
+
+      {clientChoiceOpen && !clientId && !ownMode ? (
+        <Modal
+          open
+          title="Клиент не найден"
+          onClose={() => setClientChoiceOpen(false)}
+        >
+          <p className="text-sm text-ink-soft">
+            По записи на осмотр клиент «{pendingClientName.trim()}» ещё не добавлен в базу.
+            Выберите существующего клиента в поле «Клиент» или создайте нового —
+            телефон указывать не обязательно.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setClientChoiceOpen(false)}
+              className={btnSecondaryClass}
+            >
+              Выбрать существующего
+            </button>
+            <button
+              type="button"
+              onClick={() => setClientChoiceOpen(false)}
+              className={btnPrimaryClass}
+            >
+              Создать нового
+            </button>
+          </div>
+        </Modal>
       ) : null}
 
       {addVehicleOpen && (clientId || pendingClientName.trim()) && !ownMode ? (

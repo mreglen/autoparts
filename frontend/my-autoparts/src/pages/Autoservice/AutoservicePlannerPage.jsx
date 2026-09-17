@@ -47,6 +47,12 @@ function plannerItemTimeLabel(item) {
   return formatOrderClockRange(item);
 }
 
+function plannerItemStartTimeLabel(item) {
+  if (item?.kind === 'inspection') return item.preferred_time?.slice(0, 5) || '—';
+  const start = parseServerDate(item?.scheduled_at);
+  return start ? start.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
+}
+
 function plannerItemKey(item) {
   return `${item.kind || 'order'}-${item.id}`;
 }
@@ -119,19 +125,20 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
           })}
         </div>
         {entries.length > 0 ? (
-          <div className="relative grid grid-cols-7 gap-y-1 p-1.5 sm:p-2">
+          <div className="relative grid grid-cols-7 gap-y-1 py-1.5 sm:py-2">
             {entries.map((entry) => {
               const { item } = entry;
               const styleClass = plannerItemStyle(item);
               const clientName = item.client_name || '—';
               const clientLabel = formatPersonNameWithInitials(clientName);
               const vehicleLabel = item.vehicle_make || '';
+              const nameWithVehicle = [clientLabel, vehicleLabel].filter(Boolean).join(' ');
               return (
                 <button
                   key={plannerItemKey(item)}
                   type="button"
                   onClick={() => onItemClick(item)}
-                  className={`min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:text-xs ${styleClass} ${
+                  className={`m-1 min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:m-2 sm:text-xs ${styleClass} ${
                     entry.continuesPastWeek ? 'rounded-r-none' : ''
                   }`}
                   style={{
@@ -141,10 +148,7 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                   title={`${item.kind === 'inspection' ? 'Осмотр' : `№ ${item.order_number}`} · ${clientName}`}
                 >
                   <span className="block truncate tabular-nums">{plannerBarTimeLabel(entry, dayIsos)}</span>
-                  <span className="mt-0.5 block truncate font-normal">{clientLabel}</span>
-                  {vehicleLabel ? (
-                    <span className="mt-0.5 block truncate font-normal">{vehicleLabel}</span>
-                  ) : null}
+                  <span className="mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
                 </button>
               );
             })}
@@ -309,7 +313,7 @@ function MobileDayPlanner({
                           <span className={`w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums ${
                             order.kind === 'inspection' ? 'text-success-700' : 'text-brand-700'
                           }`}>
-                            {plannerItemTimeLabel(order)}
+                            {plannerItemStartTimeLabel(order)}
                           </span>
                           {order.kind === 'inspection' ? (
                             <span className="min-w-0 flex-1">

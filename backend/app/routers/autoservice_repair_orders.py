@@ -65,6 +65,7 @@ from app.schemas.repair_order import (
 from app.schemas.autoservice_finance import AutoservicePaymentIn, RepairOrderPaymentsListResponse
 from app.utils.autoservice_access import (
     display_client_phone,
+    missing_phone_placeholder,
     related_autoservice_client_ids,
     require_my_active_autoservice_client,
     require_orders_access,
@@ -730,26 +731,28 @@ def _resolve_create_client_and_vehicle(
             )
     else:
         name = (payload.client_name or "").strip()
-        phone = normalize_to_storage_format(payload.client_phone)
-        if len(name) < 2 or not phone:
+        if len(name) < 2:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Укажите имя и телефон клиента",
+                detail="Укажите имя клиента",
             )
-        client = (
-            db.query(AutoserviceClient)
-            .filter(
-                AutoserviceClient.organization_id == org_id,
-                AutoserviceClient.phone == phone,
-                AutoserviceClient.status == "active",
+        phone = normalize_to_storage_format(payload.client_phone)
+        client = None
+        if phone:
+            client = (
+                db.query(AutoserviceClient)
+                .filter(
+                    AutoserviceClient.organization_id == org_id,
+                    AutoserviceClient.phone == phone,
+                    AutoserviceClient.status == "active",
+                )
+                .first()
             )
-            .first()
-        )
         if not client:
             client = AutoserviceClient(
                 organization_id=org_id,
                 name=name[:120],
-                phone=phone,
+                phone=phone or missing_phone_placeholder(),
                 person_type="individual",
                 status="active",
                 source="staff",
