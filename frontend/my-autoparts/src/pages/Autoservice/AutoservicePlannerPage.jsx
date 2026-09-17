@@ -101,7 +101,7 @@ function PlannerDayCell({ orders, onItemClick, isToday, onContextMenu }) {
         const styleClass = plannerItemStyle(order);
         const clientName = order.client_name || '—';
         const clientLabel = formatPersonNameWithInitials(clientName);
-        const vehicleLabel = [order.vehicle_make, order.vehicle_model].filter(Boolean).join(' ');
+        const vehicleLabel = [order.vehicle_make].filter(Boolean).join(' ');
         return (
           <button
             key={plannerItemKey(order)}
@@ -635,7 +635,6 @@ export default function AutoservicePlannerPage() {
               clientName: booking.name,
               clientPhone: booking.phone,
               vehicleMake: booking.vehicle_make,
-              vehicleModel: booking.vehicle_model,
               inspectionBookingId: booking.id,
             },
           });
@@ -651,7 +650,6 @@ export default function AutoservicePlannerPage() {
                 preferred_date: toDateInputValue(viewInspection.scheduled_at),
                 preferred_time: viewInspection.preferred_time,
                 vehicle_make: viewInspection.vehicle_make,
-                vehicle_model: viewInspection.vehicle_model,
                 notes: viewInspection.notes,
                 vehicle: viewInspection.vehicle,
                 work_zone_id: viewInspection.work_zone_id,
