@@ -104,6 +104,16 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
     onCellContextMenu?.({ x: event.clientX, y: event.clientY, dayIso, zoneId: zone.id ?? null });
   };
 
+  const handleCellClick = (dayIso) => (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    onCellContextMenu?.({
+      x: rect.left,
+      y: rect.bottom + 4,
+      dayIso,
+      zoneId: zone.id ?? null,
+    });
+  };
+
   return (
     <div className="contents">
       <div className="sticky left-0 z-10 border-b border-r border-line bg-surface px-3 py-2.5 text-sm font-medium leading-snug text-ink">
@@ -122,12 +132,13 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                   iso === todayIso ? 'bg-brand-50/30' : isWeekend ? 'bg-danger-50/40' : 'bg-surface'
                 }`}
                 onContextMenu={handleCellContextMenu(iso)}
+                onClick={handleCellClick(iso)}
               />
             );
           })}
         </div>
         {entries.length > 0 ? (
-          <div className="relative grid grid-cols-[repeat(14,minmax(0,1fr))] py-px sm:py-0.5">
+          <div className="pointer-events-none relative grid grid-cols-[repeat(14,minmax(0,1fr))] py-px sm:py-0.5">
             {entries.map((entry) => {
               const { item } = entry;
               const styleClass = plannerItemStyle(item);
@@ -146,7 +157,7 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                   key={plannerItemKey(item)}
                   type="button"
                   onClick={() => onItemClick(item)}
-                  className={`mx-0.5 my-px min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:mx-1 sm:my-0.5 sm:text-xs ${styleClass} ${
+                  className={`pointer-events-auto mx-0.5 my-px min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:mx-1 sm:my-0.5 sm:text-xs ${styleClass} ${
                     entry.continuesPastWeek ? 'rounded-r-none' : ''
                   }`}
                   style={{
@@ -640,7 +651,7 @@ export default function AutoservicePlannerPage() {
       <PlannerCellContextMenu
         position={contextMenu ? { x: contextMenu.x, y: contextMenu.y } : null}
         onClose={() => setContextMenu(null)}
-        onCreateInspection={() => beginCreateInspection(contextMenuContext)}
+        onCreateOrder={() => beginCreateOrder(contextMenuContext)}
       />
 
       <InspectionBookingAddModal

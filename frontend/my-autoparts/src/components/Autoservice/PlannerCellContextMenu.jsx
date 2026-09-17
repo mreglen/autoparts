@@ -6,12 +6,10 @@ function MenuButton({ children, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full min-h-11 items-center gap-2 rounded-sg-sm px-3 py-2 text-left text-sm font-medium text-ink transition hover:bg-surface-muted"
+      className="flex w-full items-center gap-1.5 rounded-sg-sm px-2.5 py-1.5 text-left text-xs font-medium text-ink transition hover:bg-surface-muted"
     >
-      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-brand-100 text-xs font-bold text-brand-700">
-        +
-      </span>
-      <span>{children}</span>
+      <span className="text-base font-semibold leading-none text-ink-soft">+</span>
+      {children}
     </button>
   );
 }
@@ -19,7 +17,7 @@ function MenuButton({ children, onClick }) {
 export default function PlannerCellContextMenu({
   position,
   onClose,
-  onCreateInspection,
+  onCreateOrder,
 }) {
   const menuRef = useRef(null);
 
@@ -49,8 +47,8 @@ export default function PlannerCellContextMenu({
 
   if (!position) return null;
 
-  const menuWidth = 220;
-  const menuHeight = 48;
+  const menuWidth = 150;
+  const menuHeight = 32;
   const padding = 8;
   const left = Math.min(position.x, window.innerWidth - menuWidth - padding);
   const top = Math.min(position.y, window.innerHeight - menuHeight - padding);
@@ -58,17 +56,17 @@ export default function PlannerCellContextMenu({
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[120] min-w-[13.5rem] rounded-sg border border-line bg-surface p-1.5 shadow-sg-lg ring-1 ring-ink/5"
+      className="fixed z-[120] w-max rounded-md border border-line bg-surface p-1 shadow-sg-lg"
       style={{ left, top }}
       role="menu"
     >
       <MenuButton
         onClick={() => {
-          onCreateInspection?.();
+          onCreateOrder?.();
           onClose?.();
         }}
       >
-        Запись на осмотр
+        Запись на ремонт
       </MenuButton>
     </div>,
     document.body,

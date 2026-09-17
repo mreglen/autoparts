@@ -66,9 +66,8 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
   const subCount = dayIsos.length * 2;
   const dayCounts = new Array(dayIsos.length).fill(0);
   for (const entry of placed) {
-    for (let d = entry.startIdx; d <= entry.endIdx; d += 1) {
-      dayCounts[d] += 1;
-    }
+    if (entry.item.kind === 'inspection' || entry.startIdx !== entry.endIdx) continue;
+    dayCounts[entry.startIdx] += 1;
   }
   placed.sort((a, b) => {
     if (a.startIdx !== b.startIdx) return a.startIdx - b.startIdx;
