@@ -157,7 +157,7 @@ function fromLocalInputValue(local) {
   if (!local) return null;
   const d = new Date(local);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
+  return local.length === 16 ? `${local}:00` : local;
 }
 
 function toDateInputValue(iso) {
