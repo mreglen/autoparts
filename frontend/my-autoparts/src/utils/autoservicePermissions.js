@@ -70,6 +70,11 @@ export const AUTOSERVICE_MENU_ITEMS = [
 /** Work pages for shop employees (folded into client Autoservice menu). */
 export const AUTOSERVICE_SHOP_EMPLOYEE_WORK_ITEMS = [
   {
+    id: 'autoservice-planner',
+    label: 'Планировщик',
+    permission: AUTOSERVICE_PERMISSION.planner,
+  },
+  {
     id: 'autoservice-orders',
     label: 'Заказ-наряды',
     permission: AUTOSERVICE_PERMISSION.orders,
@@ -134,9 +139,9 @@ export function canAccessAutoserviceSection(user, permissionCodes, section) {
   if (section === 'payroll' && hasAutoserviceBypass(user)) {
     return false;
   }
-  // Shop employees: only orders (+ form/print) and payroll for now.
+  // Shop employees: planner (if granted), orders (+ form/print) and payroll.
   if (isAutoserviceShopEmployee(user)) {
-    const allowed = new Set(['orders', 'order-form', 'order-print', 'payroll']);
+    const allowed = new Set(['planner', 'orders', 'order-form', 'order-print', 'payroll']);
     if (!allowed.has(section)) return false;
   }
   const code = AUTOSERVICE_SECTION_PERMISSION[section];
