@@ -93,7 +93,8 @@ export default function InspectionBookingAddModal({
   const clientSearchRef = useRef(0);
   const loadClients = useCallback(async (q = '') => {
     const requestId = ++clientSearchRef.current;
-    setClientsLoading(true);
+    const isInitial = !q.trim();
+    if (isInitial) setClientsLoading(true);
     try {
       const query = q.trim();
       const rows = await apiRequest(
@@ -105,7 +106,7 @@ export default function InspectionBookingAddModal({
     } catch {
       if (requestId === clientSearchRef.current) setClients([]);
     } finally {
-      if (requestId === clientSearchRef.current) setClientsLoading(false);
+      if (isInitial && requestId === clientSearchRef.current) setClientsLoading(false);
     }
   }, []);
 
