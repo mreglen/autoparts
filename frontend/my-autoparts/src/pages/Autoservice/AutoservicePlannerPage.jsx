@@ -8,10 +8,12 @@ import PlannerCellContextMenu from '../../components/Autoservice/PlannerCellCont
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
-import { toDateInputValue } from '../../utils/serverDate';
+import { parseServerDate, toDateInputValue } from '../../utils/serverDate';
 import {
   addDays,
+  assignPlannerLanes,
   getWeekStart,
+  plannerItemEndDate,
   sortDayOrders,
   toIsoDate,
 } from '../../utils/autoservicePlannerLayout';
@@ -72,52 +74,83 @@ function formatLongDay(isoDate) {
   });
 }
 
-function PlannerDayCell({ orders, onItemClick, isToday, onContextMenu }) {
-  const items = useMemo(() => sortDayOrders(orders), [orders]);
-  const cellClass = `min-h-[3rem] border-b border-r border-line-soft transition-colors hover:bg-surface-subtle/45 ${
-    isToday ? 'bg-brand-50/30' : 'bg-surface'
-  }`;
+function plannerBarTimeLabel(entry, dayIsos) {
+  const { item, startIdx, endIdx } = entry;
+  if (item.kind === 'inspection') return plannerItemTimeLabel(item);
+  if (endIdx <= startIdx) return plannerItemTimeLabel(item);
+  const startDate = parseServerDate(item.scheduled_at);
+  if (!startDate) return '—';
+  const startClock = startDate.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const end = plannerItemEndDate(item);
+  if (!end) return startClock;
+  const endClock = end.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return `${startClock} → ${formatDayHeader(dayIsos[endIdx])} ${endClock}`;
+}
 
-  const handleContextMenu = (event) => {
+function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContextMenu }) {
+  const entries = useMemo(
+    () => assignPlannerLanes((zone.days || []).flatMap((day) => day.orders || []), dayIsos),
+    [zone.days, dayIsos],
+  );
+
+  const handleCellContextMenu = (dayIso) => (event) => {
     event.preventDefault();
-    onContextMenu?.({ x: event.clientX, y: event.clientY });
+    onCellContextMenu?.({ x: event.clientX, y: event.clientY, dayIso, zoneId: zone.id ?? null });
   };
 
-  if (items.length === 0) {
-    return (
-      <div
-        className={cellClass}
-        onContextMenu={handleContextMenu}
-      />
-    );
-  }
-
   return (
-    <div
-      className={`flex ${cellClass} flex-col gap-1 p-1.5 sm:p-2`}
-      onContextMenu={handleContextMenu}
-    >
-      {items.map((order) => {
-        const styleClass = plannerItemStyle(order);
-        const clientName = order.client_name || '—';
-        const clientLabel = formatPersonNameWithInitials(clientName);
-        const vehicleLabel = [order.vehicle_make].filter(Boolean).join(' ');
-        return (
-          <button
-            key={plannerItemKey(order)}
-            type="button"
-            onClick={() => onItemClick(order)}
-            className={`w-full rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:text-xs ${styleClass}`}
-            title={`${order.kind === 'inspection' ? 'Осмотр' : `№ ${order.order_number}`} · ${clientName}`}
-          >
-            <span className="block tabular-nums">{plannerItemTimeLabel(order)}</span>
-            <span className="mt-0.5 block truncate font-normal">{clientLabel}</span>
-            {vehicleLabel ? (
-              <span className="mt-0.5 block font-normal">{vehicleLabel}</span>
-            ) : null}
-          </button>
-        );
-      })}
+    <div className="contents">
+      <div className="sticky left-0 z-10 border-b border-r border-line bg-surface px-3 py-2.5 text-sm font-medium leading-snug text-ink">
+        {zone.name}
+      </div>
+      <div className="relative col-span-7 min-h-[3rem] border-b border-line-soft">
+        <div className="absolute inset-0 grid grid-cols-7">
+          {(zone.days || []).map((dayCell) => {
+            const iso = String(dayCell.date).slice(0, 10);
+            return (
+              <div
+                key={iso}
+                className={`border-r border-line-soft transition-colors hover:bg-surface-subtle/45 ${
+                  iso === todayIso ? 'bg-brand-50/30' : 'bg-surface'
+                }`}
+                onContextMenu={handleCellContextMenu(iso)}
+              />
+            );
+          })}
+        </div>
+        {entries.length > 0 ? (
+          <div className="relative grid grid-cols-7 gap-y-1 p-1.5 sm:p-2">
+            {entries.map((entry) => {
+              const { item } = entry;
+              const styleClass = plannerItemStyle(item);
+              const clientName = item.client_name || '—';
+              const clientLabel = formatPersonNameWithInitials(clientName);
+              const vehicleLabel = item.vehicle_make || '';
+              return (
+                <button
+                  key={plannerItemKey(item)}
+                  type="button"
+                  onClick={() => onItemClick(item)}
+                  className={`min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:text-xs ${styleClass} ${
+                    entry.continuesPastWeek ? 'rounded-r-none' : ''
+                  }`}
+                  style={{
+                    gridColumn: `${entry.startIdx + 1} / ${entry.endIdx + 2}`,
+                    gridRow: entry.lane + 1,
+                  }}
+                  title={`${item.kind === 'inspection' ? 'Осмотр' : `№ ${item.order_number}`} · ${clientName}`}
+                >
+                  <span className="block truncate tabular-nums">{plannerBarTimeLabel(entry, dayIsos)}</span>
+                  <span className="mt-0.5 block truncate font-normal">{clientLabel}</span>
+                  {vehicleLabel ? (
+                    <span className="mt-0.5 block truncate font-normal">{vehicleLabel}</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -505,7 +538,7 @@ export default function AutoservicePlannerPage() {
         <div className="min-w-[36rem] overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
           <div
             className="grid w-full"
-            style={{ gridTemplateColumns: 'minmax(7.5rem, 11rem) repeat(7, minmax(4.5rem, 1fr))' }}
+            style={{ gridTemplateColumns: 'minmax(5rem, 7.3rem) repeat(7, minmax(4.5rem, 1fr))' }}
           >
             <div className="sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
               Зона
@@ -536,29 +569,14 @@ export default function AutoservicePlannerPage() {
               </div>
             ) : (
               zones.map((zone) => (
-                <div key={zone.id ?? 'unassigned'} className="contents">
-                  <div className="sticky left-0 z-10 border-b border-r border-line bg-surface px-3 py-2.5 text-sm font-medium leading-snug text-ink">
-                    {zone.name}
-                  </div>
-                  {(zone.days || []).map((dayCell) => {
-                    const iso = String(dayCell.date).slice(0, 10);
-                    const isToday = iso === toIsoDate(today);
-                    return (
-                      <PlannerDayCell
-                        key={`${zone.id ?? 'unassigned'}-${dayCell.date}`}
-                        orders={dayCell.orders || []}
-                        onItemClick={handlePlannerItemClick}
-                        isToday={isToday}
-                        onContextMenu={({ x, y }) => handleCellContextMenu({
-                          x,
-                          y,
-                          dayIso: iso,
-                          zoneId: zone.id ?? null,
-                        })}
-                      />
-                    );
-                  })}
-                </div>
+                <PlannerZoneWeekRow
+                  key={zone.id ?? 'unassigned'}
+                  zone={zone}
+                  dayIsos={dayHeaders.map((day) => String(day.date).slice(0, 10))}
+                  todayIso={toIsoDate(today)}
+                  onItemClick={handlePlannerItemClick}
+                  onCellContextMenu={handleCellContextMenu}
+                />
               ))
             )}
           </div>
