@@ -2841,20 +2841,21 @@ export default function AutoserviceOrderFormPage() {
         className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--sg-mobile-sticky-bottom-offset)+0.75rem)] lg:bottom-0"
         style={{ zIndex: Z_MOBILE_STICKY_FOOTER }}
       >
-        <div className="pointer-events-auto min-w-0 bg-surface px-2.5 py-3 sm:p-5">
-          <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3">
-            <div className="min-w-0 lg:flex-1">
-              <p className="text-sm font-semibold text-ink">
-                {ownMode ? 'Заказ-наряд' : `Итого: ${formatMoney(grandTotal)} ₽`}
-              </p>
-              {ownMode ? null : (
-                <p className="text-[11px] leading-snug text-ink-muted sm:text-xs">
-                  работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)} · НДС{' '}
-                  {formatMoney(grandVat)}
+        <div className="pointer-events-auto min-w-0 bg-surface">
+          <div className="mx-auto w-full min-w-0 max-w-sg-content px-2.5 py-3 sm:px-5 sm:py-4 lg:px-8">
+            <div className="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3 lg:pl-[19rem]">
+              <div className="min-w-0 lg:flex-1">
+                <p className="text-sm font-semibold text-ink">
+                  {ownMode ? 'Заказ-наряд' : `Итого: ${formatMoney(grandTotal)} ₽`}
                 </p>
-              )}
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+                {ownMode ? null : (
+                  <p className="text-[11px] leading-snug text-ink-muted sm:text-xs">
+                    работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)} · НДС{' '}
+                    {formatMoney(grandVat)}
+                  </p>
+                )}
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
               {autoSaveStatus === 'saving' || saving ? (
                 <p className="text-xs text-ink-muted sm:mr-auto" role="status">
                   Сохранение…
@@ -2881,6 +2882,7 @@ export default function AutoserviceOrderFormPage() {
               >
                 Закрыть
               </button>
+              </div>
             </div>
           </div>
         </div>
