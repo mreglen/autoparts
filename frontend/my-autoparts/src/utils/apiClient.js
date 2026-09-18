@@ -4,6 +4,7 @@ import {
     getRetryDelayMs,
     isApiOutage,
     isRetryableStatus,
+    MAX_RETRYABLE_ATTEMPTS,
     registerApiFailure,
     registerApiSuccess,
 } from './apiOutageGuard';
@@ -351,8 +352,12 @@ const clearRequestTimeout = (timeoutId) => {
 };
 
 export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
-    if (isApiOutage() && retryCount === 0) {
-        throw new Error(getOutageMessage());
+    if (isApiOutage()) {
+        if (retryCount >= MAX_RETRYABLE_ATTEMPTS) {
+            throw new Error(getOutageMessage());
+        }
+        await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(retryCount)));
+        return apiRequest(endpoint, options, retryCount + 1);
     }
 
     const { timeoutMs, ...requestOptions } = options;
@@ -397,7 +402,7 @@ export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
     }
 
     if (!response.ok) {
-        if (retryCount < 1 && isRetryableStatus(response.status)) {
+        if (retryCount < MAX_RETRYABLE_ATTEMPTS && isRetryableStatus(response.status)) {
             registerApiFailure(response.status);
             await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(retryCount)));
             return apiRequest(endpoint, options, retryCount + 1);
@@ -493,7 +498,7 @@ export const apiRequestFormData = async (endpoint, formData, options = {}, retry
     }
 
     if (!response.ok) {
-        if (retryCount < 1 && isRetryableStatus(response.status)) {
+        if (retryCount < MAX_RETRYABLE_ATTEMPTS && isRetryableStatus(response.status)) {
             registerApiFailure(response.status);
             await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(retryCount)));
             return apiRequestFormData(endpoint, formData, options, retryCount + 1);
@@ -520,8 +525,15 @@ export const apiAxios = axios.create({
 });
 
 
-apiAxios.interceptors.request.use((config) => {
+apiAxios.interceptors.request.use(async (config) => {
     assertOnlineForMutation(config.method);
+    if (isApiOutage()) {
+        if ((config.__retryCount || 0) >= MAX_RETRYABLE_ATTEMPTS) {
+            return Promise.reject(new Error(getOutageMessage()));
+        }
+        await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(config.__retryCount || 0)));
+        config.__retryCount = (config.__retryCount || 0) + 1;
+    }
     const token = getAuthToken();
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -555,6 +567,13 @@ apiAxios.interceptors.response.use(
             }
         }
 
+        if (config && (config.__retryCount || 0) < MAX_RETRYABLE_ATTEMPTS && isRetryableStatus(status)) {
+            config.__retryCount = (config.__retryCount || 0) + 1;
+            registerApiFailure(status);
+            await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(config.__retryCount)));
+            return apiAxios(config);
+        }
+
         if (isRetryableStatus(status)) {
             registerApiFailure(status);
         }
@@ -579,9 +598,13 @@ const applyGuestCartTokenFromResponse = (response) => {
     }
 };
 
-apiAxiosUnauth.interceptors.request.use((config) => {
-    if (isApiOutage() && !config.__outageRetry) {
-        return Promise.reject(new Error(getOutageMessage()));
+apiAxiosUnauth.interceptors.request.use(async (config) => {
+    if (isApiOutage()) {
+        if ((config.__retryCount || 0) >= MAX_RETRYABLE_ATTEMPTS) {
+            return Promise.reject(new Error(getOutageMessage()));
+        }
+        await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(config.__retryCount || 0)));
+        config.__retryCount = (config.__retryCount || 0) + 1;
     }
     const guestToken = getGuestCartToken();
     if (guestToken) {
@@ -601,12 +624,11 @@ apiAxiosUnauth.interceptors.response.use(
         const status = error.response?.status;
         const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
 
-        if (config && !config.__retryCount && (isRetryableStatus(status) || isTimeout)) {
-            config.__retryCount = 1;
-            config.__outageRetry = true;
+        if (config && (config.__retryCount || 0) < MAX_RETRYABLE_ATTEMPTS && (isRetryableStatus(status) || isTimeout)) {
+            config.__retryCount = (config.__retryCount || 0) + 1;
             if (status) registerApiFailure(status);
             else if (isTimeout) registerApiFailure(504);
-            await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(0)));
+            await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(config.__retryCount)));
             return apiAxiosUnauth(config);
         }
 

@@ -209,7 +209,7 @@ export default function AutoserviceInspectionsPage() {
                 <tr
                   key={row.id}
                   className={autoserviceListTrClickableClass}
-                  onDoubleClick={() => setViewBooking(row)}
+                  onClick={() => setViewBooking(row)}
                 >
                   <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
                     {formatPreferredDateTime(row)}

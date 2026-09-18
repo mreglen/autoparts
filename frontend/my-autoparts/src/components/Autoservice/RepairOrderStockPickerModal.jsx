@@ -76,7 +76,7 @@ export default function RepairOrderStockPickerModal({
   };
 
   return (
-    <Modal open={open} title={title} onClose={onClose}>
+    <Modal open={open} title={title} onClose={onClose} draggable>
       <div className="space-y-4">
         <input
           type="search"

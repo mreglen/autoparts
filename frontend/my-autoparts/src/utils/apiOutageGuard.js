@@ -1,6 +1,8 @@
 const RETRYABLE_STATUSES = new Set([502, 503, 504]);
 const BASE_BACKOFF_MS = 5000;
 const MAX_BACKOFF_MS = 30000;
+export const MAX_RETRYABLE_ATTEMPTS = 12;
+const MAX_RETRY_DELAY_MS = 4000;
 
 let outageUntil = 0;
 let consecutiveFailures = 0;
@@ -34,8 +36,8 @@ export function getOutageRemainingMs() {
 
 export function getRetryDelayMs(retryCount = 0) {
   const outageDelay = getOutageRemainingMs();
-  if (outageDelay > 0) return outageDelay;
-  return 800 * (retryCount + 1);
+  const delay = outageDelay > 0 ? outageDelay : 800 * (retryCount + 1);
+  return Math.min(MAX_RETRY_DELAY_MS, delay);
 }
 
 export function getOutageMessage() {

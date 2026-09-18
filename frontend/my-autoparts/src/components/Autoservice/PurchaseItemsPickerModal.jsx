@@ -124,6 +124,7 @@ export default function PurchaseItemsPickerModal({
       onClose={onClose}
       size="lg"
       title="Выбрать из оформленных заказов"
+      draggable
       footer={(
         <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
           <Button variant="secondary" onClick={onClose} className="max-md:min-h-11">

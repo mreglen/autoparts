@@ -513,7 +513,7 @@ export default function AutoservicePlannerPage() {
     : null;
 
   return (
-    <div className="min-w-0 lg:-mx-6">
+    <div className="min-w-0 lg:-mr-6">
       <div className="mb-3 flex flex-col gap-3 md:mb-5 md:flex-row md:items-center md:justify-between">
         <h1 className="max-md:hidden text-xl font-bold text-ink sm:text-2xl">Планировщик</h1>
 

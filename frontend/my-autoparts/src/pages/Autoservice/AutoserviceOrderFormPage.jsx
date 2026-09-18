@@ -86,10 +86,10 @@ function SectionAddLink({ onClick, label = '+ Добавить' }) {
 }
 
 const btnPrimaryClass =
-  'inline-flex min-h-11 items-center justify-center rounded-full bg-brand-600 px-5 text-sm font-semibold text-white shadow-sg-sm transition hover:bg-brand-700 disabled:opacity-60';
+  'inline-flex min-h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:min-h-10';
 
 const btnSecondaryClass =
-  'inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-surface px-5 text-sm font-medium text-ink-soft transition hover:bg-surface-subtle';
+  'inline-flex min-h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60 sm:min-h-10';
 
 const orderFormPageClass =
   'w-full min-w-0 pt-0 pb-28 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset)+8.5rem)] lg:pb-24';
@@ -110,7 +110,7 @@ const lineDeleteBtnCompactClass =
 function FieldLabel({ children, optional = false, action }) {
   return (
     <div className="flex items-end justify-between gap-2">
-      <span className="block min-w-0 text-sg-caption font-medium text-ink-muted">
+      <span className="block min-w-0 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
         {children}
         {optional ? <span className="font-normal text-ink-faint"> (необязательно)</span> : null}
       </span>
@@ -377,6 +377,9 @@ const clientPartControlInputClass = `${compactControlInputClass} w-12 px-1.5 tex
 
 const clientPartControlSelectClass = `${compactControlSelectClass} w-[3.75rem] px-1.5`;
 
+const workExecutorBtnClass =
+  'inline-flex h-9 min-w-0 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm text-ink transition hover:bg-surface-muted max-lg:flex-1 lg:h-8 lg:w-44';
+
 function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
   return {
     id: p.id,
@@ -409,12 +412,12 @@ function vehicleSearchText(v) {
   return [v.make, v.model, v.year, v.plate, v.vin].filter(Boolean).join(' ').toLowerCase();
 }
 
-function SectionCard({ title, children, action, compact = false }) {
+function SectionCard({ title, children, action }) {
   return (
-    <section className={`min-w-0 rounded-sg-lg border border-line bg-surface ${compact ? 'px-2.5 py-2.5 sm:p-4' : 'px-2.5 py-3 sm:p-5'}`}>
+    <section className="min-w-0 border-t border-line-soft pt-4">
       {title ? (
-        <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-line-soft ${compact ? 'mb-2.5 pb-2' : 'mb-4 pb-3'}`}>
-          <h2 className={`min-w-0 font-semibold text-ink ${compact ? 'text-sm lg:text-base' : 'text-lg lg:text-sg-subtitle'}`}>{title}</h2>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="min-w-0 text-xs font-semibold uppercase tracking-wide text-ink-muted">{title}</h2>
           {action}
         </div>
       ) : null}
@@ -597,7 +600,7 @@ export function AddClientModal({ onClose, onCreated, initialName = '' }) {
   };
 
   return (
-    <Modal open title="Добавить клиента" onClose={onClose} initialFocusRef={nameInputRef}>
+    <Modal open title="Добавить клиента" onClose={onClose} initialFocusRef={nameInputRef} draggable>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sg-caption font-medium text-ink-muted">ФИО</label>
@@ -682,7 +685,7 @@ function AddEmployeeModal({ onClose, onCreated }) {
   };
 
   return (
-    <Modal open title="Добавить сотрудника" onClose={onClose}>
+    <Modal open title="Добавить сотрудника" onClose={onClose} draggable>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sg-caption font-medium text-ink-muted">Имя</label>
@@ -828,7 +831,7 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
   };
 
   return (
-    <Modal open title="Добавить автомобиль" onClose={onClose}>
+    <Modal open title="Добавить автомобиль" onClose={onClose} draggable>
       <form onSubmit={handleSubmit} className="space-y-4">
         {notice ? (
           <SoftServiceNotice
@@ -1126,6 +1129,7 @@ export default function AutoserviceOrderFormPage() {
   const [clientChoiceOpen, setClientChoiceOpen] = useState(false);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
   const [addEmployeeTarget, setAddEmployeeTarget] = useState(null);
+  const [workExecutorEditIndex, setWorkExecutorEditIndex] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState('idle');
@@ -2368,15 +2372,14 @@ export default function AutoserviceOrderFormPage() {
         </p>
       ) : null}
 
-      <form id="repair-order-form" onSubmit={handleSubmit} className="min-w-0 space-y-3">
+      <form id="repair-order-form" onSubmit={handleSubmit} className="min-w-0 space-y-5">
         {error ? (
           <p className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
             {error}
           </p>
         ) : null}
 
-        <SectionCard title="Клиент и заказ-наряд" compact>
-          <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="min-w-0">
               <FieldLabel
                 action={ownMode ? null : (
@@ -2521,14 +2524,29 @@ export default function AutoserviceOrderFormPage() {
               />
             </div>
           </div>
-        </SectionCard>
 
-        <SectionCard title="Работы" compact>
+        <SectionCard
+          title="Работы"
+          action={(
+            <p className="text-xs tabular-nums text-ink-muted">{formatMoney(worksTotal)} ₽</p>
+          )}
+        >
           {works.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет работ</p>
           ) : (
             <div className="space-y-1">
-              {works.map((w, index) => (
+              {works.map((w, index) => {
+                const executors = ownMode ? [] : (w.executors || []);
+                const firstExec = executors[0];
+                const firstEmp = firstExec
+                  ? serviceEmployees.find((e) => String(e.id) === String(firstExec.employee_id))
+                  : null;
+                const executorLabel = !executors.length
+                  ? 'Сотрудник'
+                  : executors.length > 1
+                    ? `${firstEmp?.name || 'Сотрудник'} +${executors.length - 1}`
+                    : firstEmp?.name || 'Сотрудник';
+                return (
                 <div key={index} className="min-w-0">
                   <div className={lineItemRowClass}>
                     <div className={lineItemIdentityClass}>
@@ -2568,69 +2586,37 @@ export default function AutoserviceOrderFormPage() {
                       value={w.unit_price ?? ''}
                       onChange={(e) => updateWork(index, { unit_price: e.target.value })}
                     />
+                    <button
+                      type="button"
+                      className={workExecutorBtnClass}
+                      onClick={() => setWorkExecutorEditIndex(index)}
+                      title="Сотрудник и процент оплаты"
+                    >
+                      <span className={`min-w-0 truncate ${executors.length ? '' : 'text-ink-faint'}`}>
+                        {executorLabel}
+                      </span>
+                      {executors.length === 1 && firstExec?.percent !== '' && firstExec?.percent != null ? (
+                        <span className="shrink-0 text-xs tabular-nums text-ink-muted">{firstExec.percent}%</span>
+                      ) : null}
+                    </button>
                     <span className="ml-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[4.75rem]">
                       {formatMoney(lineSum(w.qty, w.unit_price))} ₽
                     </span>
-                    <button
-                      type="button"
-                      className="shrink-0 whitespace-nowrap py-0.5 text-xs font-medium text-brand-600 hover:text-brand-700"
-                      onClick={() => addWorkExecutor(index)}
-                    >
-                      + сотрудник
-                    </button>
                     </>
                     )}
                     </div>
                   </div>
-                  {(ownMode ? [] : (w.executors || [])).length > 0 ? (
-                    <div className="mt-1 min-w-0 space-y-1 pl-[1.125rem]">
-                      {(w.executors || []).map((ex, execIndex) => (
-                        <div key={execIndex} className="flex min-w-0 flex-wrap items-center gap-1">
-                          <SearchableSelect
-                            className="min-w-0 flex-1"
-                            inputClassName="sg-pill-input sg-pill-input-sm w-full min-w-0 flex-1 lg:h-8"
-                            value={ex.employee_id}
-                            onChange={(next) => updateWorkExecutor(index, execIndex, { employee_id: next })}
-                            options={employeeOptions}
-                            placeholder="Сотрудник"
-                            emptyMessage="Нет сотрудников"
-                            noResultsMessage="Не найдено"
-                            addOptionLabel="Добавить сотрудника"
-                            onAddClick={() => openAddEmployeeModal(index, execIndex)}
-                          />
-                          <NumericInput
-                            mode="numeric"
-                            className={`w-12 ${compactControlInputClass} px-1.5 text-center`}
-                            value={ex.percent}
-                            onChange={(e) => updateWorkExecutor(index, execIndex, { percent: e.target.value })}
-                          />
-                          <span className="text-xs text-ink-muted">%</span>
-                          <span className="text-xs font-medium tabular-nums text-ink">
-                            {formatMoney(workPayAmount(w.qty, w.unit_price, ex.percent))} ₽
-                          </span>
-                          <button
-                            type="button"
-                            className={lineDeleteBtnCompactClass}
-                            aria-label="Удалить сотрудника"
-                            onClick={() => removeWorkExecutor(index, execIndex)}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-line-soft pt-2">
-            <p className="text-sm font-medium text-ink">Итого: {formatMoney(worksTotal)} ₽</p>
+          <div className="mt-2 flex justify-end border-t border-line-soft pt-2">
             <SectionAddLink onClick={() => setWorks((prev) => [...prev, emptyWork()])} />
           </div>
         </SectionCard>
 
-        <SectionCard title="Запчасти клиента" compact>
+        <SectionCard title="Запчасти клиента">
           {clientParts.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет запчастей клиента</p>
           ) : (
@@ -2692,9 +2678,9 @@ export default function AutoserviceOrderFormPage() {
         {!ownMode ? (
         <SectionCard
           title="Запчасти исполнителя"
-          compact
           action={(
             <div className="flex flex-wrap items-center justify-end gap-2">
+              <p className="text-xs tabular-nums text-ink-muted">{formatRubles(shopPartsTotal)} ₽</p>
               {clientMarkupEnabled ? (
                 <div className="flex items-center gap-1.5 text-sm text-ink-muted">
                   <span>Наценка</span>
@@ -2838,11 +2824,6 @@ export default function AutoserviceOrderFormPage() {
               })}
             </div>
           )}
-          <div className="mt-2 flex items-center justify-between gap-2 border-t border-line-soft pt-2">
-            <p className="text-sm font-medium text-ink">
-              Итого: {formatRubles(shopPartsTotal)} ₽
-            </p>
-          </div>
         </SectionCard>
         ) : null}
 
@@ -2912,6 +2893,7 @@ export default function AutoserviceOrderFormPage() {
           open
           title="Клиент не найден"
           onClose={() => setClientChoiceOpen(false)}
+          draggable
         >
           <p className="text-sm text-ink-soft">
             По записи на осмотр клиент «{pendingClientName.trim()}» ещё не добавлен в базу.
@@ -2964,6 +2946,7 @@ export default function AutoserviceOrderFormPage() {
         open={shopPartAddMenuOpen}
         title="Добавить запчасть исполнителя"
         onClose={() => setShopPartAddMenuOpen(false)}
+        draggable
       >
           <div className="flex flex-col gap-2">
             <button
@@ -3007,6 +2990,77 @@ export default function AutoserviceOrderFormPage() {
               Добавить вручную
             </button>
           </div>
+      </Modal>
+
+      <Modal
+        open={workExecutorEditIndex != null}
+        onClose={() => setWorkExecutorEditIndex(null)}
+        title="Сотрудник по работе"
+        size="sm"
+        draggable
+        footer={(
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className={btnPrimaryClass}
+              onClick={() => setWorkExecutorEditIndex(null)}
+            >
+              Готово
+            </button>
+          </div>
+        )}
+      >
+        {workExecutorEditIndex != null && works[workExecutorEditIndex] ? (
+          <div className="space-y-3">
+            {(works[workExecutorEditIndex].executors || []).length === 0 ? (
+              <p className="text-sm text-ink-muted">Сотрудник не назначен</p>
+            ) : (
+              (works[workExecutorEditIndex].executors || []).map((ex, execIndex) => (
+                <div key={execIndex} className="flex min-w-0 items-center gap-2">
+                  <SearchableSelect
+                    className="min-w-0 flex-1"
+                    inputClassName="sg-pill-input sg-pill-input-sm w-full min-w-0 flex-1"
+                    value={ex.employee_id}
+                    onChange={(next) => updateWorkExecutor(workExecutorEditIndex, execIndex, { employee_id: next })}
+                    options={employeeOptions}
+                    placeholder="Сотрудник"
+                    emptyMessage="Нет сотрудников"
+                    noResultsMessage="Не найдено"
+                    addOptionLabel="Добавить сотрудника"
+                    onAddClick={() => openAddEmployeeModal(workExecutorEditIndex, execIndex)}
+                  />
+                  <NumericInput
+                    mode="numeric"
+                    className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center`}
+                    value={ex.percent}
+                    aria-label="Процент оплаты"
+                    onChange={(e) => updateWorkExecutor(workExecutorEditIndex, execIndex, { percent: e.target.value })}
+                  />
+                  <span className="shrink-0 text-xs text-ink-muted">%</span>
+                  <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
+                    {formatMoney(workPayAmount(
+                      works[workExecutorEditIndex].qty,
+                      works[workExecutorEditIndex].unit_price,
+                      ex.percent,
+                    ))} ₽
+                  </span>
+                  <button
+                    type="button"
+                    className={lineDeleteBtnCompactClass}
+                    aria-label="Удалить сотрудника"
+                    onClick={() => removeWorkExecutor(workExecutorEditIndex, execIndex)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))
+            )}
+            <SectionAddLink
+              onClick={() => addWorkExecutor(workExecutorEditIndex)}
+              label="+ Сотрудник"
+            />
+          </div>
+        ) : null}
       </Modal>
 
       <PurchaseItemsPickerModal
