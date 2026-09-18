@@ -39,6 +39,16 @@ export function plannerItemEndDate(item, now = new Date()) {
   return null;
 }
 
+export function plannerItemCoversDay(item, isoDate, now = new Date()) {
+  const start = item?.scheduled_at ? new Date(item.scheduled_at) : null;
+  if (!start) return false;
+  const startIso = toIsoDate(start);
+  if (isoDate < startIso) return false;
+  const end = plannerItemEndDate(item, now);
+  if (!end) return isoDate === startIso;
+  return isoDate <= toIsoDate(end);
+}
+
 export function assignPlannerLanes(items, dayIsos, now = new Date()) {
   const weekEnd = dayIsos.length
     ? new Date(`${dayIsos[dayIsos.length - 1]}T23:59:59.999`)

@@ -13,6 +13,7 @@ import {
   addDays,
   assignPlannerLanes,
   getWeekStart,
+  plannerItemCoversDay,
   plannerItemEndDate,
   sortDayOrders,
   toIsoDate,
@@ -51,6 +52,14 @@ function plannerItemStartTimeLabel(item) {
   if (item?.kind === 'inspection') return item.preferred_time?.slice(0, 5) || '—';
   const start = parseServerDate(item?.scheduled_at);
   return start ? start.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
+}
+
+function plannerItemMobileTimeLabel(item, dayIso) {
+  const start = parseServerDate(item?.scheduled_at);
+  if (!start || item?.kind === 'inspection' || toIsoDate(start) === dayIso) {
+    return plannerItemStartTimeLabel(item);
+  }
+  return `с ${formatDayHeader(toIsoDate(start))}`;
 }
 
 function plannerItemKey(item) {
@@ -245,10 +254,6 @@ function MobileDayPlanner({
   onAddInZone,
   loading,
 }) {
-  const selectedIndex = dayHeaders.findIndex(
-    (day) => String(day.date).slice(0, 10) === selectedDayIso,
-  );
-
   return (
     <div className="md:hidden">
       <div className="grid grid-cols-7 gap-1">
@@ -291,8 +296,11 @@ function MobileDayPlanner({
       ) : (
         <div className="mt-3 space-y-3">
           {zones.map((zone) => {
-            const dayCell = (zone.days || [])[selectedIndex] || {};
-            const orders = sortDayOrders(dayCell.orders || []);
+            const orders = sortDayOrders(
+              (zone.days || [])
+                .flatMap((day) => day.orders || [])
+                .filter((order) => plannerItemCoversDay(order, selectedDayIso)),
+            );
             return (
               <section
                 key={zone.id ?? 'unassigned'}
@@ -332,7 +340,7 @@ function MobileDayPlanner({
                           <span className={`w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums ${
                             order.kind === 'inspection' ? 'text-success-700' : 'text-brand-700'
                           }`}>
-                            {plannerItemStartTimeLabel(order)}
+                            {plannerItemMobileTimeLabel(order, selectedDayIso)}
                           </span>
                           {order.kind === 'inspection' ? (
                             <span className="min-w-0 flex-1">

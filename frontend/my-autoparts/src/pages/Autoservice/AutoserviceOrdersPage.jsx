@@ -44,6 +44,7 @@ function formatMoney(value) {
 
 function orderMatchesList(order, { scope, historyStatus, includeReviewInActive }) {
   const status = order?.status;
+  if (scope === 'all') return true;
   if (scope === 'review') return status === 'review';
   if (scope === 'history') {
     if (historyStatus) return status === historyStatus;
@@ -63,6 +64,7 @@ export default function AutoserviceOrdersPage() {
   const viewHistory = viewParam === 'history';
   const viewReview = viewParam === 'review';
   const viewDrafts = viewParam === 'drafts';
+  const viewAll = viewParam === 'all';
   const createDraft = readRepairOrderFormDraft('create');
   const hasCreateDraft = repairOrderFormSnapshotHasContent(createDraft?.form);
 
@@ -82,7 +84,7 @@ export default function AutoserviceOrdersPage() {
   const [deletingId, setDeletingId] = useState(null);
   const prevScopeKeyRef = useRef(null);
 
-  const scope = viewReview ? 'review' : viewHistory ? 'history' : 'active';
+  const scope = viewReview ? 'review' : viewHistory ? 'history' : viewAll ? 'all' : 'active';
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (viewDrafts) {
@@ -147,6 +149,7 @@ export default function AutoserviceOrdersPage() {
     if (id === 'history') setSearchParams({ view: 'history' });
     else if (id === 'review') setSearchParams({ view: 'review' });
     else if (id === 'drafts') setSearchParams({ view: 'drafts' });
+    else if (id === 'all') setSearchParams({ view: 'all' });
     else setSearchParams({});
     setViewOrder(null);
   };
@@ -292,12 +295,16 @@ export default function AutoserviceOrdersPage() {
       ? 'На проверке'
       : viewDrafts
         ? 'Черновики'
-        : 'Заказ-наряды';
+        : viewAll
+          ? 'Все заказ-наряды'
+          : 'Заказ-наряды';
   const pageSubtitle = loading
     ? 'Загрузка…'
     : viewDrafts
       ? `${hasCreateDraft ? 1 : 0} черновиков`
-      : viewHistory
+      : viewAll
+        ? `${rows.length} всего`
+        : viewHistory
       ? canReview
         ? `${rows.length} завершённых и отменённых`
         : `${rows.length} ваших завершённых и отменённых`
@@ -308,16 +315,27 @@ export default function AutoserviceOrdersPage() {
           : `${rows.length} ваших активных`;
   const orderTabs = [
     { id: 'active', label: 'Активные' },
+    { id: 'all', label: 'Все' },
     { id: 'drafts', label: 'Черновики', count: hasCreateDraft ? 1 : undefined },
     ...(canReview ? [{ id: 'review', label: 'На проверке', shortLabel: 'Проверка', count: reviewCount }] : []),
     { id: 'history', label: 'История' },
   ];
-  const tabValue = viewReview ? 'review' : viewHistory ? 'history' : viewDrafts ? 'drafts' : 'active';
+  const tabValue = viewReview
+    ? 'review'
+    : viewHistory
+      ? 'history'
+      : viewDrafts
+        ? 'drafts'
+        : viewAll
+          ? 'all'
+          : 'active';
   const emptyMessage = viewHistory
     ? 'В истории пока нет заказ-нарядов'
     : viewReview
       ? 'Заявок на проверке нет'
-      : 'Активных заказ-нарядов нет';
+      : viewAll
+        ? 'Заказ-нарядов нет'
+        : 'Активных заказ-нарядов нет';
 
   if (viewDrafts) {
     return (
