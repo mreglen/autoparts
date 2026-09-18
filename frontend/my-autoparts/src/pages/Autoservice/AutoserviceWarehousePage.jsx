@@ -626,6 +626,7 @@ export default function AutoserviceWarehousePage() {
         open={Boolean(detailsLot)}
         onClose={() => setDetailsLot(null)}
         title={detailsLot ? detailsLot.name || 'Партия из закупки' : 'Партия из закупки'}
+        draggable
       >
         {detailsLot ? (
           <div className="space-y-4 text-sm">
@@ -707,6 +708,7 @@ export default function AutoserviceWarehousePage() {
         open={Boolean(detailsItem)}
         onClose={() => setDetailsItem(null)}
         title={detailsItem ? autoserviceWarehouseItemLabel(detailsItem) : 'Позиция склада'}
+        draggable
       >
         {detailsItem ? (
           <div className="space-y-4">
@@ -815,6 +817,7 @@ export default function AutoserviceWarehousePage() {
         open={Boolean(writeOffItem)}
         onClose={() => setWriteOffItem(null)}
         title="Списать со склада автосервиса"
+        draggable
       >
         {writeOffItem ? (
           <div className="space-y-4">
@@ -863,6 +866,7 @@ export default function AutoserviceWarehousePage() {
         open={Boolean(orderQtyItem)}
         onClose={() => setOrderQtyItem(null)}
         title="Добавить в заказ-наряд"
+        draggable
       >
         {orderQtyItem ? (
           <div className="space-y-4">

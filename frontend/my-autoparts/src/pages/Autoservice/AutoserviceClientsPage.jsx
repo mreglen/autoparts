@@ -351,6 +351,7 @@ function ClientBookingViewModal({ booking, onClose }) {
       title={`Заявка · ${formatServerDate(booking.preferred_date) || booking.name || ''}`}
       size="md"
       wrapperClassName="z-[120]"
+      draggable
       footer={
         <div className="flex justify-end">
           <button
@@ -608,6 +609,7 @@ function ClientProfileModal({
       onClose={handleClose}
       title={client ? client.name : 'Клиент'}
       size="lg"
+      draggable
       footer={
         <div className="flex flex-wrap justify-end gap-2">
           {canCreateAccount && (section === 'profile' || editing) ? (
@@ -889,6 +891,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
       onClose={onClose}
       title="Изменить автомобиль"
       size="md"
+      draggable
       footer={
         <div className="flex justify-end gap-2">
           <button
@@ -1061,6 +1064,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
       onClose={onClose}
       title="Добавить автомобиль"
       size="md"
+      draggable
       footer={
         <div className="flex justify-end gap-2">
           <button
@@ -1218,6 +1222,7 @@ function AddClientModal({ open, onClose, onCreated }) {
       onClose={onClose}
       title="Добавить клиента"
       size="sm"
+      draggable
       footer={
         <div className="flex justify-end gap-2">
           <button

@@ -159,6 +159,7 @@ export default function RepairOrderPickerModal({
       onClose={onClose}
       size="lg"
       title={modalTitle}
+      draggable
       footer={(
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>

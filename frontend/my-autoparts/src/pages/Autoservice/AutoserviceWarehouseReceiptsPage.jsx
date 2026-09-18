@@ -368,6 +368,7 @@ export default function AutoserviceWarehouseReceiptsPage() {
         onClose={() => setViewReceiptLine(null)}
         title={viewReceiptLine ? `Поступление · ${viewReceiptLine.name || '—'}` : 'Поступление'}
         size="sm"
+        draggable
       >
         {viewReceiptLine ? (
           <div className="space-y-3 text-sm">

@@ -779,6 +779,11 @@ export default function RepairOrderViewModal({
 
   if (!order && !loading) return null;
 
+  const handleClose = () => {
+    setPrintPickerOpen(false);
+    onClose?.();
+  };
+
   const clientLine = [order?.client?.name, order?.client?.phone].filter(Boolean).join(' · ') || '—';
   const hasClientComment = Boolean(order?.client_comment?.trim());
   const hasStaffComment = Boolean(order?.staff_comment?.trim());
@@ -791,13 +796,23 @@ export default function RepairOrderViewModal({
     <>
     <Modal
       open={!!order || loading}
-      onClose={() => {
-        setPrintPickerOpen(false);
-        onClose?.();
-      }}
+      onClose={handleClose}
       closeVariant="back"
       size="lg"
       className="max-lg:!rounded-none"
+      draggable
+      headerActions={
+        <button
+          type="button"
+          onClick={handleClose}
+          className="flex max-md:min-h-11 max-md:min-w-11 items-center justify-center rounded-sg p-1.5 text-ink-faint hover:bg-surface-subtle hover:text-ink"
+          aria-label="Закрыть"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      }
       title={
         order ? (
           <div className="space-y-1 pr-2">

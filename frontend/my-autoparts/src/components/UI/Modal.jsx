@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Z_CONTEXT_MENU, Z_MODAL } from '../../constants/mobileTokens';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
@@ -23,12 +23,16 @@ export default function Modal({
   closeOnBackdrop = true,
   initialFocusRef,
   returnFocusRef,
+  draggable = false,
 }) {
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
   const backButtonRef = useRef(null);
   const titleId = useId();
   const hasStringTitle = typeof title === 'string' && title.length > 0;
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragStateRef = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -45,6 +49,41 @@ export default function Modal({
     returnFocusRef,
     onEscape: onClose,
   });
+
+  useEffect(() => {
+    if (!open) {
+      setDragOffset({ x: 0, y: 0 });
+      setDragging(false);
+      dragStateRef.current = null;
+    }
+  }, [open]);
+
+  const handleHeaderPointerDown = useCallback((event) => {
+    if (!draggable) return;
+    if (event.button !== 0) return;
+    if (window.matchMedia('(max-width: 639.98px)').matches) return;
+    if (event.target.closest('button, a, input, select, textarea, [data-no-drag]')) return;
+    dragStateRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      baseX: dragOffset.x,
+      baseY: dragOffset.y,
+    };
+    setDragging(true);
+    const onMove = (e) => {
+      const s = dragStateRef.current;
+      if (!s) return;
+      setDragOffset({ x: s.baseX + e.clientX - s.startX, y: s.baseY + e.clientY - s.startY });
+    };
+    const onUp = () => {
+      dragStateRef.current = null;
+      setDragging(false);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, [draggable, dragOffset.x, dragOffset.y]);
 
   if (!open) return null;
 
@@ -83,9 +122,21 @@ export default function Modal({
           width,
           className,
         )}
+        style={
+          dragOffset.x || dragOffset.y
+            ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }
+            : undefined
+        }
       >
         {(title || onClose) && (
-          <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-3 sm:gap-3 sm:px-5 sm:py-4">
+          <div
+            onPointerDown={draggable ? handleHeaderPointerDown : undefined}
+            className={cx(
+              'flex shrink-0 items-center gap-2 border-b border-line px-4 py-3 sm:gap-3 sm:px-5 sm:py-4',
+              draggable && (dragging ? 'sm:cursor-grabbing' : 'sm:cursor-grab'),
+              draggable && 'sm:select-none',
+            )}
+          >
             {onClose && closeVariant === 'back' ? (
               <button
                 ref={backButtonRef}

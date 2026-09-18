@@ -98,7 +98,7 @@ export default function AutoserviceWarehouseReturnModal({
   };
 
   return (
-    <Modal open={Boolean(receiptId)} onClose={onClose} title={title} size="md">
+    <Modal open={Boolean(receiptId)} onClose={onClose} title={title} size="md" draggable>
       {loading ? (
         <p className="py-8 text-center text-sm text-ink-muted">Загрузка…</p>
       ) : blockedByRepairOrder ? (

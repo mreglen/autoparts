@@ -435,6 +435,7 @@ export default function InspectionBookingAddModal({
       title={modalTitle}
       size="sm"
       footer={footer}
+      draggable
     >
       {isEditing ? (
         <form id="add-inspection-booking" onSubmit={handleSubmit} className="space-y-4">

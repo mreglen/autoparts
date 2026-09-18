@@ -341,6 +341,7 @@ export default function AutoserviceReceiptDocumentModal({
       title={doc?.number ? `Поступление ${doc.number}` : 'Поступление'}
       size="xl"
       closeVariant="back"
+      draggable
       headerActions={(
         <div className="flex items-center gap-2">
           {onDeleteRequest && doc ? (

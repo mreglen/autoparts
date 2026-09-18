@@ -299,6 +299,7 @@ export default function AutoserviceWarehouseExpensesPage() {
         }}
         title={viewExpense ? `Списание · ${viewExpense.name || '—'}` : 'Списание'}
         size="sm"
+        draggable
       >
         {viewExpense ? (
           <div className="space-y-3 text-sm">

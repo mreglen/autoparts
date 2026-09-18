@@ -213,6 +213,7 @@ export default function AutoserviceWarehouseAddModal({
       title={modalTitle}
       size="sm"
       closeOnBackdrop={false}
+      draggable
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
