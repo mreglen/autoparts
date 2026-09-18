@@ -7,6 +7,7 @@ import MobileFormField from '../../components/MobileFormField/MobileFormField';
 import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
 import { UnderlineTabs } from '../../components/UI';
+import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import {
   fetchAutoserviceClientMe,
@@ -77,39 +78,34 @@ function StatusBadge({ status }) {
   );
 }
 
-function BookingRow({ row }) {
-  const createdLabel = formatCreatedAt(row.created_at);
-  const vehicleLabel = formatGarageVehicleLabel(row.vehicle);
+function bookingVehicleLabel(row) {
+  const fromVehicle = formatGarageVehicleLabel(row.vehicle);
+  if (fromVehicle) return fromVehicle;
+  return [row.vehicle_make, row.vehicle_model].filter(Boolean).join(' ') || '';
+}
+
+function BookingRow({ row, onOpen }) {
+  const vehicleLabel = bookingVehicleLabel(row);
   const note = row.notes || row.comment;
 
   return (
-    <article className="border-b border-line-soft py-4 last:border-b-0">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold tabular-nums text-ink">
-              {formatDate(row.preferred_date)}
-            </p>
-            <StatusBadge status={row.status} />
-          </div>
-          {vehicleLabel ? (
-            <p className="mt-1 truncate text-sm font-medium text-ink">{vehicleLabel}</p>
-          ) : (
-            <p className="mt-1 text-sm text-ink-muted">Без автомобиля</p>
-          )}
-          {note ? (
-            <p className="mt-1 whitespace-pre-wrap text-sm text-ink-muted line-clamp-3">{note}</p>
-          ) : (
-            <p className="mt-1 text-sm text-ink-faint">Комментарий не указан</p>
-          )}
-          <p className="mt-1 text-xs text-ink-muted">
-            {[createdLabel ? `Создана ${createdLabel}` : null, row.name, row.phone]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-        </div>
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full border-b border-line-soft py-2 text-left last:border-b-0"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-medium tabular-nums text-ink">
+          {formatDate(row.preferred_date)}
+          {row.preferred_time ? ` · ${String(row.preferred_time).slice(0, 5)}` : ''}
+        </p>
+        <StatusBadge status={row.status} />
       </div>
-    </article>
+      <p className="mt-0.5 truncate text-ink-soft">{vehicleLabel || 'Без автомобиля'}</p>
+      <p className="mt-0.5 truncate text-xs text-ink-muted">
+        {note || 'Комментарий не указан'}
+      </p>
+    </button>
   );
 }
 
@@ -156,6 +152,7 @@ export default function AutoserviceRepairBookingPage() {
   const [rows, setRows] = useState([]);
   const [rowsLoading, setRowsLoading] = useState(false);
   const [rowsError, setRowsError] = useState('');
+  const [viewBooking, setViewBooking] = useState(null);
 
   useEffect(() => {
     if (isReady && isAuthenticated) {
@@ -379,7 +376,7 @@ export default function AutoserviceRepairBookingPage() {
       ) : (
         <div>
           {rows.map((row) => (
-            <BookingRow key={row.id} row={row} />
+            <BookingRow key={row.id} row={row} onOpen={() => setViewBooking(row)} />
           ))}
         </div>
       )}
@@ -461,6 +458,65 @@ export default function AutoserviceRepairBookingPage() {
       {addVehicleOpen ? (
         <GarageQuickAddModal onClose={() => setAddVehicleOpen(false)} onCreated={handleVehicleCreated} />
       ) : null}
+
+      <Modal
+        open={Boolean(viewBooking)}
+        onClose={() => setViewBooking(null)}
+        title={
+          viewBooking
+            ? `Заявка · ${formatDate(viewBooking.preferred_date)}${viewBooking.preferred_time ? `, ${String(viewBooking.preferred_time).slice(0, 5)}` : ''}`
+            : 'Заявка'
+        }
+        size="sm"
+        draggable
+        footer={
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setViewBooking(null)} className={btnGhost}>
+              Закрыть
+            </button>
+          </div>
+        }
+      >
+        {viewBooking ? (
+          <div className="space-y-4 text-sm">
+            <div>
+              <StatusBadge status={viewBooking.status} />
+            </div>
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Желаемая дата</dt>
+                <dd className="mt-1 font-medium text-ink">
+                  {formatDate(viewBooking.preferred_date)}
+                  {viewBooking.preferred_time ? `, ${String(viewBooking.preferred_time).slice(0, 5)}` : ''}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Автомобиль</dt>
+                <dd className="mt-1 font-medium text-ink">
+                  {bookingVehicleLabel(viewBooking) || 'Без автомобиля'}
+                </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Имя</dt>
+                <dd className="mt-1 font-medium text-ink">{viewBooking.name || '—'}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Телефон</dt>
+                <dd className="mt-1 font-medium text-ink">{viewBooking.phone || '—'}</dd>
+              </div>
+            </dl>
+            <div>
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Комментарий</dt>
+              <dd className="mt-1 whitespace-pre-wrap text-ink-soft">
+                {(viewBooking.notes || viewBooking.comment || '').trim() || '—'}
+              </dd>
+            </div>
+            {formatCreatedAt(viewBooking.created_at) ? (
+              <p className="text-xs text-ink-muted">Создана {formatCreatedAt(viewBooking.created_at)}</p>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

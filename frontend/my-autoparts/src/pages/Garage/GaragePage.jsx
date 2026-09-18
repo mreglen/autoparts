@@ -4,12 +4,21 @@ import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
 import NumericInput from '../../components/UI/NumericInput';
 import { apiRequest } from '../../utils/apiClient';
 import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+import {
+  autoserviceListMobileWrapClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListThClass,
+  autoserviceListTheadRowClass,
+  autoserviceListTrClickableClass,
+} from '../../utils/warehouseListUi';
 import {
   candidateLabel,
   mapCandidateToGarageCreatePayload,
@@ -183,33 +192,21 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
   );
 }
 
-function VehicleMobileCard({ vehicle, deletingId, onEdit, onDelete }) {
+function VehicleMobileCard({ vehicle, onOpen }) {
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-gray-900">{vehicleTitle(vehicle)}</p>
-          <p className="mt-1 text-sm text-gray-600">
-            {vehicle.vin ? `VIN: ${vehicle.vin}` : 'VIN не указан'}
-            {vehicle.plate ? ` · ${vehicle.plate}` : ''}
-          </p>
-          {vehicle.color ? <p className="mt-0.5 text-xs text-gray-500">{vehicle.color}</p> : null}
-          {vehicle.notes ? <p className="mt-1 text-xs text-gray-500 line-clamp-2">{vehicle.notes}</p> : null}
-        </div>
-        <ActionsDropdown
-          menuClassName="w-40 z-50"
-          estimatedMenuHeight={100}
-          showLabel={false}
-          buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50"
-          disabled={deletingId === vehicle.id}
-        >
-          <ActionsDropdownItem onClick={onEdit}>Изменить</ActionsDropdownItem>
-          <ActionsDropdownItem danger onClick={onDelete}>
-            {deletingId === vehicle.id ? 'Удаление…' : 'Удалить'}
-          </ActionsDropdownItem>
-        </ActionsDropdown>
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full border-b border-line-soft py-2 text-left last:border-b-0"
+    >
+      <p className="truncate font-medium text-ink">{vehicleTitle(vehicle)}</p>
+      <p className="mt-0.5 text-xs text-ink-muted">
+        {vehicle.vin ? `VIN: ${vehicle.vin}` : 'VIN не указан'}
+        {vehicle.plate ? ` · ${vehicle.plate}` : ''}
+      </p>
+      {vehicle.color ? <p className="mt-0.5 text-xs text-ink-muted">{vehicle.color}</p> : null}
+      {vehicle.notes ? <p className="mt-1 text-xs text-ink-faint line-clamp-2">{vehicle.notes}</p> : null}
+    </button>
   );
 }
 
@@ -243,10 +240,11 @@ export default function GaragePage() {
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [addNotice, setAddNotice] = useState(null);
 
-  const [editVehicle, setEditVehicle] = useState(null);
+  const [viewVehicle, setViewVehicle] = useState(null);
+  const [viewEditing, setViewEditing] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const loadVehicles = useCallback(async () => {
     setVehiclesLoading(true);
@@ -520,28 +518,45 @@ export default function GaragePage() {
     }
   };
 
+  const openVehicle = useCallback((vehicle) => {
+    setViewVehicle(vehicle);
+    setViewEditing(false);
+    setDeleteConfirmOpen(false);
+  }, []);
+
+  const closeVehicle = useCallback(() => {
+    if (deletingId) return;
+    setViewVehicle(null);
+    setViewEditing(false);
+    setDeleteConfirmOpen(false);
+  }, [deletingId]);
+
   const handleUpdateVehicle = async (body) => {
-    if (!editVehicle) return;
+    if (!viewVehicle) return;
     setEditSaving(true);
     try {
-      const row = await apiRequest(`/autoservice/garage/vehicles/${editVehicle.id}`, {
+      const row = await apiRequest(`/autoservice/garage/vehicles/${viewVehicle.id}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
       });
       setVehicles((prev) => prev.map((v) => (v.id === row.id ? row : v)));
-      setEditVehicle(null);
+      setViewVehicle(row);
+      setViewEditing(false);
     } finally {
       setEditSaving(false);
     }
   };
 
-  const handleDeleteVehicle = async (id) => {
-    setDeletingId(id);
+  const handleDeleteVehicle = async () => {
+    if (!viewVehicle) return;
+    setDeletingId(viewVehicle.id);
     setPageError(null);
     try {
-      await apiRequest(`/autoservice/garage/vehicles/${id}`, { method: 'DELETE' });
-      setVehicles((prev) => prev.filter((v) => v.id !== id));
-      setDeleteConfirmId(null);
+      await apiRequest(`/autoservice/garage/vehicles/${viewVehicle.id}`, { method: 'DELETE' });
+      setVehicles((prev) => prev.filter((v) => v.id !== viewVehicle.id));
+      setDeleteConfirmOpen(false);
+      setViewVehicle(null);
+      setViewEditing(false);
     } catch (err) {
       setPageError(err?.message || 'Не удалось удалить');
     } finally {
@@ -642,74 +657,67 @@ export default function GaragePage() {
         </p>
       ) : null}
 
-      <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
-          <thead>
-            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <th className="py-3 pr-3">Автомобиль</th>
-              <th className="w-48 py-3 pr-3">VIN</th>
-              <th className="w-36 py-3 pr-3">Госномер</th>
-              <th className="hidden w-28 py-3 pr-3 lg:table-cell">Цвет</th>
-              <th className="w-28 py-3 text-right">Действия</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {vehiclesLoading ? (
-              <tr>
-                <td colSpan={5} className="py-12 text-center text-gray-500">
-                  Загрузка…
-                </td>
+      <div className={autoserviceListTableWrapClass}>
+        <div className="overflow-x-auto">
+          <table className={autoserviceListTableClass}>
+            <thead>
+              <tr className={autoserviceListTheadRowClass}>
+                <th className={autoserviceListThClass}>Автомобиль</th>
+                <th className={`w-48 ${autoserviceListThClass}`}>VIN</th>
+                <th className={`w-36 ${autoserviceListThClass}`}>Госномер</th>
+                <th className={`hidden w-28 lg:table-cell ${autoserviceListThClass}`}>Цвет</th>
               </tr>
-            ) : filteredVehicles.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-12 text-center text-gray-500">
-                  {vehicles.length === 0
-                    ? 'Пока нет автомобилей. Добавьте первый по VIN, госномеру или Frame.'
-                    : 'Ничего не найдено'}
-                </td>
-              </tr>
-            ) : (
-              filteredVehicles.map((v) => (
-                <tr key={v.id} className="transition-colors hover:bg-gray-50/70">
-                  <td className="py-3 pr-3 align-middle">
-                    <div className="font-medium text-gray-900">{vehicleTitle(v)}</div>
-                    {v.notes ? (
-                      <div className="mt-0.5 truncate text-xs text-gray-500" title={v.notes}>
-                        {v.notes}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="truncate py-3 pr-3 align-middle font-mono text-xs text-gray-700" title={v.vin || ''}>
-                    {v.vin || '—'}
-                  </td>
-                  <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">{v.plate || '—'}</td>
-                  <td className="hidden py-3 pr-3 align-middle text-gray-600 lg:table-cell">{v.color || '—'}</td>
-                  <td className="py-3 text-right align-middle">
-                    <ActionsDropdown
-                      menuClassName="w-40 z-50"
-                      estimatedMenuHeight={100}
-                      showLabel
-                      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-                      disabled={deletingId === v.id}
-                    >
-                      <ActionsDropdownItem onClick={() => setEditVehicle(v)}>Изменить</ActionsDropdownItem>
-                      <ActionsDropdownItem danger onClick={() => setDeleteConfirmId(v.id)}>
-                        {deletingId === v.id ? 'Удаление…' : 'Удалить'}
-                      </ActionsDropdownItem>
-                    </ActionsDropdown>
+            </thead>
+            <tbody className={autoserviceListTbodyClass}>
+              {vehiclesLoading ? (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center text-ink-muted">
+                    Загрузка…
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : filteredVehicles.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center text-ink-muted">
+                    {vehicles.length === 0
+                      ? 'Пока нет автомобилей. Добавьте первый по VIN, госномеру или Frame.'
+                      : 'Ничего не найдено'}
+                  </td>
+                </tr>
+              ) : (
+                filteredVehicles.map((v) => (
+                  <tr
+                    key={v.id}
+                    className={autoserviceListTrClickableClass}
+                    onClick={() => openVehicle(v)}
+                  >
+                    <td className={autoserviceListTdClass}>
+                      <div className="truncate font-medium text-ink" title={vehicleTitle(v)}>
+                        {vehicleTitle(v)}
+                      </div>
+                      {v.notes ? (
+                        <div className="mt-0.5 truncate text-ink-faint" title={v.notes}>
+                          {v.notes}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className={`truncate font-mono text-ink-soft ${autoserviceListTdClass}`} title={v.vin || ''}>
+                      {v.vin || '—'}
+                    </td>
+                    <td className={`whitespace-nowrap text-ink-soft ${autoserviceListTdClass}`}>{v.plate || '—'}</td>
+                    <td className={`hidden text-ink-muted lg:table-cell ${autoserviceListTdClass}`}>{v.color || '—'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="md:hidden">
+      <div className={autoserviceListMobileWrapClass}>
         {vehiclesLoading ? (
-          <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
+          <p className="py-10 text-center text-sm text-ink-muted">Загрузка…</p>
         ) : filteredVehicles.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">
+          <p className="py-10 text-center text-sm text-ink-muted">
             {vehicles.length === 0
               ? 'Пока нет автомобилей. Добавьте первый по VIN, госномеру или Frame.'
               : 'Ничего не найдено'}
@@ -719,9 +727,7 @@ export default function GaragePage() {
             <VehicleMobileCard
               key={v.id}
               vehicle={v}
-              deletingId={deletingId}
-              onEdit={() => setEditVehicle(v)}
-              onDelete={() => setDeleteConfirmId(v.id)}
+              onOpen={() => openVehicle(v)}
             />
           ))
         )}
@@ -732,6 +738,7 @@ export default function GaragePage() {
         onClose={() => setAddOpen(false)}
         title="Добавление авто в гараж"
         size="sm"
+        draggable
         footer={
           <div className="flex flex-wrap items-center justify-between gap-2">
             <button
@@ -791,6 +798,7 @@ export default function GaragePage() {
         onClose={() => setAddOpen(false)}
         title="Выберите автомобиль"
         size="sm"
+        draggable
         footer={
           <div className="flex justify-start">
             <button
@@ -830,6 +838,7 @@ export default function GaragePage() {
         onClose={() => setAddOpen(false)}
         title="Данные автомобиля"
         size="md"
+        draggable
       >
         <VehicleForm
           initial={addForm}
@@ -851,34 +860,91 @@ export default function GaragePage() {
         />
       </Modal>
 
-      <Modal open={Boolean(editVehicle)} onClose={() => setEditVehicle(null)} title="Изменить автомобиль" size="md">
-        {editVehicle ? (
+      <Modal
+        open={Boolean(viewVehicle)}
+        onClose={closeVehicle}
+        title={
+          viewEditing
+            ? 'Изменить автомобиль'
+            : (viewVehicle ? vehicleTitle(viewVehicle) : '') || 'Автомобиль'
+        }
+        size="md"
+        draggable
+        footer={
+          viewVehicle && !viewEditing ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={Boolean(deletingId)}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-white px-4 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+              >
+                Удалить
+              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={closeVehicle} className={btnGhost}>
+                  Закрыть
+                </button>
+                <button type="button" onClick={() => setViewEditing(true)} className={btnPrimary}>
+                  Редактировать
+                </button>
+              </div>
+            </div>
+          ) : null
+        }
+      >
+        {viewVehicle && !viewEditing ? (
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div className="min-w-0">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">VIN</dt>
+              <dd className="mt-1 font-mono text-sm text-gray-900">{viewVehicle.vin || '—'}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Госномер</dt>
+              <dd className="mt-1 text-sm font-medium text-gray-900">{viewVehicle.plate || '—'}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Год</dt>
+              <dd className="mt-1 text-sm font-medium text-gray-900">{viewVehicle.year || '—'}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Цвет</dt>
+              <dd className="mt-1 text-sm font-medium text-gray-900">{viewVehicle.color || '—'}</dd>
+            </div>
+            <div className="min-w-0 sm:col-span-2">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Заметка</dt>
+              <dd className="mt-1 whitespace-pre-wrap text-sm font-medium text-gray-900">
+                {viewVehicle.notes?.trim() || '—'}
+              </dd>
+            </div>
+          </dl>
+        ) : viewVehicle ? (
           <VehicleForm
             initial={{
-              vin: editVehicle.vin || '',
-              make: editVehicle.make || '',
-              model: editVehicle.model || '',
-              year: editVehicle.year ? String(editVehicle.year) : '',
-              color: editVehicle.color || '',
-              plate: editVehicle.plate || '',
-              notes: editVehicle.notes || '',
+              vin: viewVehicle.vin || '',
+              make: viewVehicle.make || '',
+              model: viewVehicle.model || '',
+              year: viewVehicle.year ? String(viewVehicle.year) : '',
+              color: viewVehicle.color || '',
+              plate: viewVehicle.plate || '',
+              notes: viewVehicle.notes || '',
             }}
             saving={editSaving}
             submitLabel="Сохранить"
-            onCancel={() => setEditVehicle(null)}
+            onCancel={() => setViewEditing(false)}
             onSubmit={handleUpdateVehicle}
           />
         ) : null}
       </Modal>
 
       <ConfirmDialog
-        open={deleteConfirmId != null}
+        open={deleteConfirmOpen && Boolean(viewVehicle)}
         onClose={() => {
-          if (!deletingId) setDeleteConfirmId(null);
+          if (!deletingId) setDeleteConfirmOpen(false);
         }}
-        onConfirm={() => handleDeleteVehicle(deleteConfirmId)}
+        onConfirm={handleDeleteVehicle}
         title="Удалить автомобиль?"
-        message="Автомобиль будет удалён из гаража."
+        message={viewVehicle ? `${vehicleTitle(viewVehicle)} будет удалён из гаража.` : 'Автомобиль будет удалён из гаража.'}
         confirmLabel="Удалить"
         cancelLabel="Отмена"
         danger

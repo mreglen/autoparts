@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import RepairOrderViewModal, {
   OrderStatusBadge,
   vehicleLabel,
@@ -12,6 +11,16 @@ import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDateTime } from '../../utils/serverDate';
 import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
+import {
+  autoserviceListMobileWrapClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListThClass,
+  autoserviceListTheadRowClass,
+  autoserviceListTrClickableClass,
+} from '../../utils/warehouseListUi';
 
 const pillControlClass =
   'h-10 w-full rounded-full border border-transparent bg-gray-100 px-4 text-sm text-gray-900 shadow-none transition hover:bg-gray-50 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-0';
@@ -27,28 +36,20 @@ function formatMoney(value) {
 
 function RepairMobileCard({ row, onView }) {
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
-      <div className="flex items-start justify-between gap-2">
-        <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">№ {row.order_number}</span>
-            <OrderStatusBadge status={row.status} />
-          </div>
-          <p className="mt-1 truncate text-sm font-medium text-gray-800">{vehicleLabel(row.vehicle)}</p>
-          <p className="mt-0.5 text-xs text-gray-500">
-            {formatServerDateTime(row.scheduled_at)} · {formatMoney(row.grand_total)} ₽
-          </p>
-        </button>
-        <ActionsDropdown
-          menuClassName="w-40 z-50"
-          estimatedMenuHeight={80}
-          showLabel={false}
-          buttonClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50"
-        >
-          <ActionsDropdownItem onClick={onView}>Подробнее</ActionsDropdownItem>
-        </ActionsDropdown>
+    <button
+      type="button"
+      onClick={onView}
+      className="w-full border-b border-line-soft py-2 text-left last:border-b-0"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium text-ink">№ {row.order_number}</span>
+        <OrderStatusBadge status={row.status} />
       </div>
-    </div>
+      <p className="mt-0.5 truncate text-ink-soft">{vehicleLabel(row.vehicle)}</p>
+      <p className="mt-0.5 text-xs text-ink-muted">
+        {formatServerDateTime(row.scheduled_at)} · {formatMoney(row.grand_total)} ₽
+      </p>
+    </button>
   );
 }
 
@@ -228,74 +229,62 @@ export default function GarageRepairHistoryPage() {
         </p>
       ) : null}
 
-      <div className="hidden overflow-x-auto md:block">
-        <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm">
-          <thead>
-            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-              <th className="w-28 py-3 pr-3">Заказ</th>
-              <th className="py-3 pr-3">Автомобиль</th>
-              <th className="w-40 py-3 pr-3">Дата</th>
-              <th className="w-28 py-3 pr-3">Сумма</th>
-              <th className="w-32 py-3 pr-3">Статус</th>
-              <th className="w-28 py-3 text-right">Действия</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="py-12 text-center text-gray-500">
-                  Загрузка…
-                </td>
+      <div className={autoserviceListTableWrapClass}>
+        <div className="overflow-x-auto">
+          <table className={autoserviceListTableClass}>
+            <thead>
+              <tr className={autoserviceListTheadRowClass}>
+                <th className={`w-28 ${autoserviceListThClass}`}>Заказ</th>
+                <th className={autoserviceListThClass}>Автомобиль</th>
+                <th className={`w-40 ${autoserviceListThClass}`}>Дата</th>
+                <th className={`w-28 ${autoserviceListThClass}`}>Сумма</th>
+                <th className={`w-32 ${autoserviceListThClass}`}>Статус</th>
               </tr>
-            ) : filteredRows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="py-12 text-center text-gray-500">
-                  {rows.length === 0 ? 'Ремонтов пока нет' : 'Ничего не найдено'}
-                </td>
-              </tr>
-            ) : (
-              filteredRows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="cursor-pointer transition-colors hover:bg-gray-50/70"
-                  onDoubleClick={(e) => {
-                    if (e.target.closest('.actions-dropdown')) return;
-                    openDetails(row);
-                  }}
-                >
-                  <td className="py-3 pr-3 align-middle">
-                    <span className="font-semibold tabular-nums text-gray-900">№ {row.order_number}</span>
-                  </td>
-                  <td className="py-3 pr-3 align-middle font-medium text-gray-900">
-                    {vehicleLabel(row.vehicle)}
-                  </td>
-                  <td className="whitespace-nowrap py-3 pr-3 align-middle text-gray-700">
-                    {formatServerDateTime(row.scheduled_at)}
-                  </td>
-                  <td className="whitespace-nowrap py-3 pr-3 align-middle tabular-nums text-gray-700">
-                    {formatMoney(row.grand_total)} ₽
-                  </td>
-                  <td className="py-3 pr-3 align-middle">
-                    <OrderStatusBadge status={row.status} />
-                  </td>
-                  <td className="py-3 text-right align-middle">
-                    <ActionsDropdown
-                      menuClassName="w-40 z-50"
-                      estimatedMenuHeight={80}
-                      showLabel
-                      buttonClassName="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-                    >
-                      <ActionsDropdownItem onClick={() => openDetails(row)}>Подробнее</ActionsDropdownItem>
-                    </ActionsDropdown>
+            </thead>
+            <tbody className={autoserviceListTbodyClass}>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-ink-muted">
+                    Загрузка…
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : filteredRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-ink-muted">
+                    {rows.length === 0 ? 'Ремонтов пока нет' : 'Ничего не найдено'}
+                  </td>
+                </tr>
+              ) : (
+                filteredRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className={autoserviceListTrClickableClass}
+                    onClick={() => openDetails(row)}
+                  >
+                    <td className={autoserviceListTdClass}>
+                      <span className="font-semibold tabular-nums text-ink">№ {row.order_number}</span>
+                    </td>
+                    <td className={`truncate font-medium text-ink ${autoserviceListTdClass}`}>
+                      {vehicleLabel(row.vehicle)}
+                    </td>
+                    <td className={`whitespace-nowrap text-ink-soft ${autoserviceListTdClass}`}>
+                      {formatServerDateTime(row.scheduled_at)}
+                    </td>
+                    <td className={`whitespace-nowrap tabular-nums text-ink-soft ${autoserviceListTdClass}`}>
+                      {formatMoney(row.grand_total)} ₽
+                    </td>
+                    <td className={autoserviceListTdClass}>
+                      <OrderStatusBadge status={row.status} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="md:hidden">
+      <div className={autoserviceListMobileWrapClass}>
         {loading ? (
           <p className="py-10 text-center text-sm text-gray-500">Загрузка…</p>
         ) : filteredRows.length === 0 ? (
