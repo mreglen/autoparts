@@ -561,7 +561,9 @@ const ChatsHubPage = () => {
       />
 
       {incomingChatAlert ? (
-        <div className="mx-3 mt-2 flex items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900 shadow-sm">
+        <div className={`mx-3 mt-2 flex items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900 shadow-sm ${
+          activeChatId ? 'max-lg:fixed max-lg:inset-x-0 max-lg:top-2 max-lg:z-40' : ''
+        }`}>
           <button
             type="button"
             onClick={handleOpenIncomingChat}
@@ -727,7 +729,9 @@ const ChatsHubPage = () => {
           <div
             className={`${
               activeChatId ? 'flex' : 'hidden lg:flex'
-            } min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] max-lg:h-full md:h-full md:max-h-full`}
+            } min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] max-lg:h-full md:h-full md:max-h-full ${
+              activeChatId ? 'max-lg:fixed max-lg:inset-0 max-lg:z-30' : ''
+            }`}
           >
             {activeChatId ? (
               isAvitoActive ? (

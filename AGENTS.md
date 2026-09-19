@@ -250,6 +250,12 @@ systemctl restart kroan.service
 
 Использовать `Ctrl+F5`, чтобы сбросить кэш браузера.
 
+### 8.5 Мобильная раскладка: `min-h-dvh` + `flex-1`
+
+- На мобильном скролл живёт в `#root` (`html.mobile-shell`: `body` fixed, `#root { height:100%; overflow-y:auto }`).
+- `MobileShellFrame` использует `min-h-dvh` (не `h-dvh`) — высота shell **неопределённая**, поэтому `flex-1` (`flex-basis:0%`) у детей резолвится в `content`, и колонка растёт по контенту вместо ограничения вьюпортом.
+- Поэтому «прибитые» экраны (активный чат в `ChatsHubPage`) делаются через `max-lg:fixed max-lg:inset-0` на панели — не через `h-full`/`flex-1`-цепочку.
+
 ## 9. Безопасность и процесс
 
 - **Никогда** не запускать production `update` без явного запроса пользователя.
