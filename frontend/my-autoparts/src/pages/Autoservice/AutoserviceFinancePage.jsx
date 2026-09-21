@@ -19,6 +19,15 @@ import {
   FINANCE_METHOD_LABELS,
 } from '../../utils/financeReceiptSearch';
 import {
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListTdRightClass,
+  autoserviceListThClass,
+  autoserviceListThRightClass,
+  autoserviceListTheadRowClass,
+  autoserviceListTrClass,
   warehouseEmptyShellClass,
   warehousePageClass,
   warehousePillControlClass,
@@ -105,11 +114,11 @@ function FinanceReceiptRows({
 
   return (
     <>
-      <div className="space-y-3 md:hidden">
+      <div className="md:hidden">
         {entries.map(({ row, hint }) => (
           <div
             key={row.id}
-            className="space-y-2 rounded-sg-lg bg-surface p-4 ring-1 ring-line/80"
+            className="space-y-1.5 border-b border-line-soft py-3 last:border-0"
           >
             <FinanceField label="Клиент">{financeReceiptClientLabel(row)}</FinanceField>
             {showMethod ? (
@@ -149,41 +158,41 @@ function FinanceReceiptRows({
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto rounded-sg-lg bg-surface ring-1 ring-line/80 md:block">
-        <table className="min-w-full text-sm">
-          <thead className="bg-surface-muted text-left text-xs uppercase tracking-wide text-ink-muted">
-            <tr>
-              {showMethod ? null : <th className="px-4 py-3 font-medium">№</th>}
-              {showMethod ? null : <th className="px-4 py-3 font-medium">Заказ-наряд</th>}
-              <th className="px-4 py-3 font-medium">Клиент</th>
-              {showMethod ? <th className="px-4 py-3 font-medium">Способ</th> : null}
-              <th className="px-4 py-3 text-right font-medium">Сумма</th>
-              <th className="px-4 py-3 font-medium">Дата</th>
-              {showMatchHint ? <th className="px-4 py-3 font-medium">Найдено</th> : null}
-              {showMethod ? null : <th className="px-4 py-3 text-right font-medium">Действия</th>}
+      <div className={autoserviceListTableWrapClass}>
+        <table className={autoserviceListTableClass}>
+          <thead>
+            <tr className={autoserviceListTheadRowClass}>
+              {showMethod ? null : <th className={`w-16 ${autoserviceListThClass}`}>№</th>}
+              {showMethod ? null : <th className={`w-28 ${autoserviceListThClass}`}>Заказ-наряд</th>}
+              <th className={autoserviceListThClass}>Клиент</th>
+              {showMethod ? <th className={`w-32 ${autoserviceListThClass}`}>Способ</th> : null}
+              <th className={`w-32 ${autoserviceListThRightClass}`}>Сумма</th>
+              <th className={`w-40 ${autoserviceListThClass}`}>Дата</th>
+              {showMatchHint ? <th className={autoserviceListThClass}>Найдено</th> : null}
+              {showMethod ? null : <th className={`w-24 ${autoserviceListThRightClass}`}>Действия</th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-line-soft">
+          <tbody className={autoserviceListTbodyClass}>
             {entries.map(({ row, hint }) => (
-              <tr key={row.id} className="hover:bg-surface-muted/80">
+              <tr key={row.id} className={autoserviceListTrClass}>
                 {showMethod ? null : (
-                  <td className="px-4 py-3 tabular-nums font-medium text-ink">
+                  <td className={`${autoserviceListTdClass} tabular-nums font-medium text-ink`}>
                     {row.sequential_number}
                   </td>
                 )}
                 {showMethod ? null : (
-                  <td className="px-4 py-3 tabular-nums">№ {row.repair_order_number}</td>
+                  <td className={`${autoserviceListTdClass} tabular-nums`}>№ {row.repair_order_number}</td>
                 )}
-                <td className="px-4 py-3">
+                <td className={autoserviceListTdClass}>
                   {financeReceiptClientLabel(row)}
                 </td>
                 {showMethod ? (
-                  <td className="px-4 py-3">{FINANCE_METHOD_LABELS[row.method] || row.method}</td>
+                  <td className={autoserviceListTdClass}>{FINANCE_METHOD_LABELS[row.method] || row.method}</td>
                 ) : null}
-                <td className="px-4 py-3 text-right font-medium tabular-nums">
+                <td className={`${autoserviceListTdRightClass} font-medium tabular-nums`}>
                   {formatFinanceCurrency(row.amount)}
                 </td>
-                <td className="px-4 py-3">
+                <td className={autoserviceListTdClass}>
                   {showMethod ? (
                     formatServerDateTime(row.created_at)
                   ) : (
@@ -196,10 +205,10 @@ function FinanceReceiptRows({
                   )}
                 </td>
                 {showMatchHint ? (
-                  <td className="px-4 py-3 text-ink-muted">{hint || '—'}</td>
+                  <td className={`${autoserviceListTdClass} text-ink-muted`}>{hint || '—'}</td>
                 ) : null}
                 {showMethod ? null : (
-                  <td className="px-4 py-3 text-right">
+                  <td className={autoserviceListTdRightClass}>
                     <button
                       type="button"
                       onClick={() => onDeletePayment(row)}
@@ -366,7 +375,7 @@ export default function AutoserviceFinancePage() {
         </div>
       </div>
 
-      <MobileCollapsibleFilters title="Период">
+      <MobileCollapsibleFilters title="Период и параметры">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block min-w-0">
             <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
@@ -463,17 +472,15 @@ export default function AutoserviceFinancePage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80 sm:p-5"
+                className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80"
               >
-                <Skeleton className="h-3 w-16 sm:h-4 sm:w-24" />
-                <div className="mt-3 space-y-2">
-                  <Skeleton className="h-6 w-20 sm:h-8 sm:w-28" />
-                  <Skeleton className="h-3 w-14 sm:w-20" />
-                </div>
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="mt-3 h-6 w-28" />
+                <Skeleton className="mt-2 h-3 w-20" />
               </div>
             ))}
           </div>
@@ -524,23 +531,21 @@ export default function AutoserviceFinancePage() {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {methodStats.map((block) => (
             <button
               key={block.id}
               type="button"
               onClick={() => setSelectedMethod(block.id)}
-              className="rounded-sg-lg bg-surface p-4 text-left ring-1 ring-line/80 transition hover:bg-surface-muted hover:ring-line-strong sm:p-5"
+              className="rounded-sg-lg bg-surface p-4 text-left ring-1 ring-line/80 transition hover:bg-surface-muted hover:ring-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
-              <p className="text-[11px] font-medium leading-tight text-ink-muted sm:text-sm">{block.label}</p>
-              <div className="mt-3">
-                <p className="text-base font-bold tabular-nums leading-tight text-ink sm:text-2xl">
-                  {formatFinanceCurrency(block.amount)}
-                </p>
-                <p className="mt-1 text-[11px] text-ink-muted sm:text-xs">
-                  {block.count} {receiptsWord(block.count)}
-                </p>
-              </div>
+              <p className="text-xs font-medium text-ink-muted">{block.label}</p>
+              <p className="mt-2 text-lg font-bold tabular-nums text-ink sm:text-xl">
+                {formatFinanceCurrency(block.amount)}
+              </p>
+              <p className="mt-1 text-xs text-ink-muted">
+                {block.count} {receiptsWord(block.count)}
+              </p>
             </button>
           ))}
         </div>
