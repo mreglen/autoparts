@@ -35,6 +35,9 @@ export function plannerItemEndDate(item, now = new Date()) {
   if (item.status === 'in_progress') {
     return end && end > now ? end : now;
   }
+  if (item.status === 'pending' && start && start <= now) {
+    return end && end > now ? end : now;
+  }
   if (end && (!start || end > start)) return end;
   return null;
 }

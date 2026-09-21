@@ -140,12 +140,10 @@ def get_planner_week(
             RepairOrder.scheduled_at < range_end,
             (
                 (RepairOrder.scheduled_end_at > range_start)
+                | (RepairOrder.status.in_(("pending", "in_progress")))
                 | (
                     RepairOrder.scheduled_end_at.is_(None)
-                    & (
-                        (RepairOrder.scheduled_at >= range_start)
-                        | (RepairOrder.status == "in_progress")
-                    )
+                    & (RepairOrder.scheduled_at >= range_start)
                 )
             ),
             RepairOrder.status.notin_(("cancelled", "review")),
@@ -272,12 +270,10 @@ def get_planner_today_shortcut(
             RepairOrder.scheduled_at < range_end,
             (
                 (RepairOrder.scheduled_end_at > range_start)
+                | (RepairOrder.status.in_(("pending", "in_progress")))
                 | (
                     RepairOrder.scheduled_end_at.is_(None)
-                    & (
-                        (RepairOrder.scheduled_at >= range_start)
-                        | (RepairOrder.status == "in_progress")
-                    )
+                    & (RepairOrder.scheduled_at >= range_start)
                 )
             ),
             RepairOrder.status.notin_(("cancelled", "review")),

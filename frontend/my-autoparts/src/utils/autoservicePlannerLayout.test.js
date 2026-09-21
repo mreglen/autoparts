@@ -39,7 +39,7 @@ describe('autoservicePlannerLayout', () => {
     expect(entries[0].continuesFromPrevWeek).toBe(true);
   });
 
-  it('drops stale orders started before the week without an end date', () => {
+  it('carries unfinished orders started before the week to the current day', () => {
     const dayIsos = [
       '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
       '2026-09-25', '2026-09-26', '2026-09-27',
@@ -52,6 +52,27 @@ describe('autoservicePlannerLayout', () => {
         scheduled_end_at: null,
       },
     ], dayIsos, new Date('2026-09-26T12:00:00'));
-    expect(entries).toHaveLength(0);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].startIdx).toBe(0);
+    expect(entries[0].endIdx).toBe(5);
+    expect(entries[0].continuesFromPrevWeek).toBe(true);
+  });
+
+  it('keeps pending orders scheduled later this week on their own day', () => {
+    const dayIsos = [
+      '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+    ];
+    const entries = assignPlannerLanes([
+      {
+        id: 1,
+        status: 'pending',
+        scheduled_at: '2026-09-24T11:00:00',
+        scheduled_end_at: null,
+      },
+    ], dayIsos, new Date('2026-09-21T09:00:00'));
+    expect(entries).toHaveLength(1);
+    expect(entries[0].startIdx).toBe(3);
+    expect(entries[0].endIdx).toBe(3);
   });
 });
