@@ -57,11 +57,16 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
   for (const item of items || []) {
     const start = item.scheduled_at ? new Date(item.scheduled_at) : null;
     if (!start) continue;
-    const startIdx = dayIsos.indexOf(toIsoDate(start));
-    if (startIdx < 0) continue;
+    const end = plannerItemEndDate(item, now);
+    let startIdx = dayIsos.indexOf(toIsoDate(start));
+    let continuesFromPrevWeek = false;
+    if (startIdx < 0) {
+      if (!end || toIsoDate(end) < dayIsos[0]) continue;
+      startIdx = 0;
+      continuesFromPrevWeek = true;
+    }
     let endIdx = startIdx;
     let continuesPastWeek = false;
-    const end = plannerItemEndDate(item, now);
     if (end) {
       const idx = dayIsos.indexOf(toIsoDate(end));
       if (idx >= 0) {
@@ -71,7 +76,7 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
         continuesPastWeek = true;
       }
     }
-    placed.push({ item, startIdx, endIdx, continuesPastWeek });
+    placed.push({ item, startIdx, endIdx, continuesPastWeek, continuesFromPrevWeek });
   }
   const subCount = dayIsos.length * 2;
   const dayCounts = new Array(dayIsos.length).fill(0);

@@ -137,8 +137,17 @@ def get_planner_week(
         )
         .filter(
             RepairOrder.organization_id == org_id,
-            RepairOrder.scheduled_at >= range_start,
             RepairOrder.scheduled_at < range_end,
+            (
+                (RepairOrder.scheduled_end_at > range_start)
+                | (
+                    RepairOrder.scheduled_end_at.is_(None)
+                    & (
+                        (RepairOrder.scheduled_at >= range_start)
+                        | (RepairOrder.status == "in_progress")
+                    )
+                )
+            ),
             RepairOrder.status.notin_(("cancelled", "review")),
         )
         .order_by(RepairOrder.scheduled_at.asc(), RepairOrder.id.asc())
@@ -168,9 +177,10 @@ def get_planner_week(
 
     active_zone_ids = {zone.id for zone in zones}
     for row in orders:
+        item_day = row.scheduled_at.date()
         _place_item(
             _planner_order(row),
-            row.scheduled_at.date(),
+            item_day if item_day >= day_dates[0] else day_dates[0],
             zone_day_map=zone_day_map,
             unassigned_days=unassigned_days,
             active_zone_ids=active_zone_ids,
@@ -259,8 +269,17 @@ def get_planner_today_shortcut(
         )
         .filter(
             RepairOrder.organization_id == org_id,
-            RepairOrder.scheduled_at >= range_start,
             RepairOrder.scheduled_at < range_end,
+            (
+                (RepairOrder.scheduled_end_at > range_start)
+                | (
+                    RepairOrder.scheduled_end_at.is_(None)
+                    & (
+                        (RepairOrder.scheduled_at >= range_start)
+                        | (RepairOrder.status == "in_progress")
+                    )
+                )
+            ),
             RepairOrder.status.notin_(("cancelled", "review")),
         )
         .order_by(RepairOrder.scheduled_at.asc(), RepairOrder.id.asc())

@@ -1,4 +1,5 @@
 import {
+  assignPlannerLanes,
   getWeekStart,
   sortDayOrders,
   toIsoDate,
@@ -17,5 +18,40 @@ describe('autoservicePlannerLayout', () => {
       { id: 1, scheduled_at: '2026-08-11T10:00:00' },
     ]);
     expect(sorted.map((order) => order.id)).toEqual([1, 2]);
+  });
+
+  it('keeps orders started before the week and ending inside it', () => {
+    const dayIsos = [
+      '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+    ];
+    const entries = assignPlannerLanes([
+      {
+        id: 1,
+        status: 'done',
+        scheduled_at: '2026-09-18T11:00:00',
+        scheduled_end_at: '2026-09-23T18:00:00',
+      },
+    ], dayIsos, new Date('2026-09-26T12:00:00'));
+    expect(entries).toHaveLength(1);
+    expect(entries[0].startIdx).toBe(0);
+    expect(entries[0].endIdx).toBe(2);
+    expect(entries[0].continuesFromPrevWeek).toBe(true);
+  });
+
+  it('drops stale orders started before the week without an end date', () => {
+    const dayIsos = [
+      '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+    ];
+    const entries = assignPlannerLanes([
+      {
+        id: 1,
+        status: 'pending',
+        scheduled_at: '2026-09-18T11:00:00',
+        scheduled_end_at: null,
+      },
+    ], dayIsos, new Date('2026-09-26T12:00:00'));
+    expect(entries).toHaveLength(0);
   });
 });

@@ -100,6 +100,9 @@ function plannerBarTimeLabel(entry, dayIsos) {
   const end = plannerItemEndDate(item);
   if (!end) return startClock;
   const endClock = end.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  if (entry.continuesFromPrevWeek) {
+    return `${formatDayHeader(toIsoDate(startDate))} → ${formatDayHeader(dayIsos[endIdx])} ${endClock}`;
+  }
   return `${startClock} → ${formatDayHeader(dayIsos[endIdx])} ${endClock}`;
 }
 
@@ -169,7 +172,7 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                   onClick={() => onItemClick(item)}
                   className={`pointer-events-auto mx-0.5 my-px min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:mx-1 sm:my-0.5 sm:text-xs ${styleClass} ${
                     entry.continuesPastWeek ? 'rounded-r-none' : ''
-                  }`}
+                  } ${entry.continuesFromPrevWeek ? 'rounded-l-none' : ''}`}
                   style={{
                     gridColumn: `${entry.subStart + 1} / ${entry.subEnd + 2}`,
                     gridRow: entry.lane + 1,
@@ -455,12 +458,11 @@ export default function AutoservicePlannerPage() {
   };
 
   const shiftWeek = (delta) => {
-    setWeekStart((prev) => addDays(prev, delta * 7));
-    setSelectedDayIso((prev) => {
-      const [y, m, d] = String(prev).split('-').map(Number);
-      if (!y || !m || !d) return prev;
-      return toIsoDate(addDays(new Date(y, m - 1, d), delta * 7));
-    });
+    const nextWeekStart = addDays(weekStart, delta * 7);
+    setWeekStart(nextWeekStart);
+    const startIso = toIsoDate(nextWeekStart);
+    const endIso = toIsoDate(addDays(nextWeekStart, 6));
+    setSelectedDayIso(todayIso >= startIso && todayIso <= endIso ? todayIso : startIso);
   };
 
   const jumpToDate = (isoDate) => {
