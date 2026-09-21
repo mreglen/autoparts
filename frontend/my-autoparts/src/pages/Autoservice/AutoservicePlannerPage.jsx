@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import RepairOrderViewModal, { OrderStatusBadge } from '../../components/Autoservice/RepairOrderViewModal';
+import RepairOrderViewModal, { OrderStatusBadge, normalizeRepairOrderStatus } from '../../components/Autoservice/RepairOrderViewModal';
 import PlannerCreateChoiceModal from '../../components/Autoservice/PlannerCreateChoiceModal';
 import PlannerCellContextMenu from '../../components/Autoservice/PlannerCellContextMenu';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
@@ -40,7 +40,8 @@ function plannerItemStyle(item) {
   if (item?.kind === 'inspection') {
     return INSPECTION_STATUS_STYLES[item.status] || INSPECTION_STATUS_STYLES.new;
   }
-  return ORDER_STATUS_STYLES[item?.status] || ORDER_STATUS_STYLES.pending;
+  const status = normalizeRepairOrderStatus(item?.status);
+  return ORDER_STATUS_STYLES[status] || ORDER_STATUS_STYLES.pending;
 }
 
 function plannerItemTimeLabel(item) {
@@ -329,37 +330,35 @@ function MobileDayPlanner({
                   ) : null}
                 </div>
                 {orders.length > 0 ? (
-                  <ul className="mt-2 divide-y divide-line-soft">
+                  <ul className="mt-2 space-y-1.5">
                     {orders.map((order) => (
                       <li key={plannerItemKey(order)}>
                         <button
                           type="button"
                           onClick={() => onItemClick(order)}
-                          className="flex w-full min-h-11 items-start gap-3 py-2.5 text-left"
+                          className={`flex w-full min-h-11 items-start gap-3 rounded-sg px-3 py-2.5 text-left transition ${plannerItemStyle(order)}`}
                         >
-                          <span className={`w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums ${
-                            order.kind === 'inspection' ? 'text-success-700' : 'text-brand-700'
-                          }`}>
+                          <span className="w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums">
                             {plannerItemMobileTimeLabel(order, selectedDayIso)}
                           </span>
                           {order.kind === 'inspection' ? (
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium text-ink">
+                              <span className="block truncate text-sm font-medium">
                                 {formatPersonNameWithInitials(order.client_name)}
                               </span>
-                              <span className="mt-0.5 block truncate text-sm text-ink-muted">
+                              <span className="mt-0.5 block truncate text-sm opacity-80">
                                 {order.client_phone || '—'}
                               </span>
                             </span>
                           ) : (
                             <span className="min-w-0 flex-1">
                               <span className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-sm font-medium text-ink">
+                                <span className="text-sm font-medium">
                                   {order.vehicle && order.vehicle !== '—' ? order.vehicle : 'Авто'}
                                 </span>
                                 <OrderStatusBadge status={order.status} />
                               </span>
-                              <span className="mt-0.5 block truncate text-sm text-ink-muted">
+                              <span className="mt-0.5 block truncate text-sm opacity-80">
                                 {formatPersonNameWithInitials(order.client_name)}
                                 {order.client_phone ? ` · ${order.client_phone}` : ''}
                               </span>

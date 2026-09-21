@@ -114,38 +114,89 @@ function isGarageGroupSource(source) {
   return source === 'organization' || source === 'sellers';
 }
 
-function SourceBadge({ source, className = '' }) {
-  const isAvito = source === 'avito';
-  const isOrganization = source === 'organization';
-  const isSellers = source === 'sellers';
-  const label = isAvito
-    ? 'Авито'
-    : isSellers
-      ? 'Продавцы'
-      : isOrganization
-        ? 'Организация'
-        : 'Гараж';
-  const badgeClass = isAvito
-    ? 'bg-[#fff3e0] text-[#e65100]'
-    : isSellers
-      ? 'bg-amber-50 text-amber-800'
-      : isOrganization
-        ? 'bg-emerald-50 text-emerald-700'
-        : 'bg-brand-50 text-brand-700';
+function ChatPanelMenu({ items }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const visibleItems = (items || []).filter(Boolean);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handlePointerDown = (event) => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  if (visibleItems.length === 0) return null;
+
+  const itemClass = (danger) =>
+    `flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
+      danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'
+    }`;
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${className} ${badgeClass}`}
-    >
-      {!isOrganization && (
-        <img
-          src={isAvito ? '/logos/avito.png' : '/logos/svoygarage.png'}
-          alt=""
-          className="h-3 w-3 object-contain"
-        />
-      )}
-      {label}
-    </span>
+    <div ref={rootRef} className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="-mr-1 rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+        aria-label="Действия чата"
+      >
+        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <circle cx="12" cy="5" r="1.75" />
+          <circle cx="12" cy="12" r="1.75" />
+          <circle cx="12" cy="19" r="1.75" />
+        </svg>
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+          {visibleItems.map((item, index) => {
+            if (item.href) {
+              return (
+                <a
+                  key={index}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={itemClass(item.danger)}
+                  onClick={() => setOpen(false)}
+                >
+                  {item.label}
+                </a>
+              );
+            }
+            if (item.to) {
+              return (
+                <Link
+                  key={index}
+                  to={item.to}
+                  className={itemClass(item.danger)}
+                  onClick={() => setOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              );
+            }
+            return (
+              <button
+                key={index}
+                type="button"
+                className={itemClass(item.danger)}
+                onClick={() => {
+                  setOpen(false);
+                  item.onClick?.();
+                }}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -211,7 +262,7 @@ function ChatEmptyState({ icon, title, subtitle, action }) {
   );
 }
 
-function ChatPanelHeader({ onBack, avatar, title, subtitle, subtitleAction, badge, trailing, pinned = false }) {
+function ChatPanelHeader({ onBack, avatar, title, subtitle, trailing, pinned = false }) {
   return (
     <div
       className={`flex-shrink-0 border-b border-gray-200/80 bg-white px-3 py-3 sm:px-4 lg:bg-white/95 lg:backdrop-blur-sm ${
@@ -233,23 +284,8 @@ function ChatPanelHeader({ onBack, avatar, title, subtitle, subtitleAction, badg
         </button>
         {avatar}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate font-semibold text-gray-900">{title}</h3>
-            {badge}
-          </div>
-          {subtitle ? (
-            subtitleAction ? (
-              <button
-                type="button"
-                onClick={subtitleAction}
-                className="truncate text-left text-xs text-brand-600 hover:text-brand-800 hover:underline"
-              >
-                {subtitle}
-              </button>
-            ) : (
-              <p className="truncate text-xs text-gray-500">{subtitle}</p>
-            )
-          ) : null}
+          <h3 className="truncate font-semibold text-gray-900">{title}</h3>
+          {subtitle ? <p className="truncate text-xs text-gray-500">{subtitle}</p> : null}
         </div>
         {trailing}
       </div>
@@ -1173,14 +1209,8 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
         ? (chat?.buyer_name || 'Покупатель')
         : (chat?.seller_name || chat?.seller_organization || 'Продавец'));
 
-  const panelSubtitle = isGroupChat
-    ? (chat?.participants_count ? `${chat.participants_count} участников` : null)
-    : (chat?.product_name ? `${chat.product_name}${chat.product_article ? ` · ${chat.product_article}` : ''}` : null);
-
   const typingUserId = chatId ? typingByChatId[parseInt(chatId, 10)] : null;
-  const panelSubtitleDisplay = typingUserId && typingUserId !== user?.id
-    ? 'печатает…'
-    : panelSubtitle;
+  const typingLabel = typingUserId && typingUserId !== user?.id ? 'печатает…' : null;
 
   const counterpartyAvatar = !isGroupChat
     ? (user?.id === chat?.seller_id ? chat?.buyer_avatar_url : chat?.seller_avatar_url)
@@ -1208,44 +1238,20 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
     }
   };
 
-  const headerTrailing = (
-    <div className="flex flex-shrink-0 items-center gap-2">
-      {isGroupChat ? (
-        <button
-          type="button"
-          onClick={() => setShowParticipants(true)}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
-        >
-          Участники
-        </button>
-      ) : counterpartyProfilePath ? (
-        <Link
-          to={counterpartyProfilePath}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
-        >
-          Профиль
-        </Link>
-      ) : null}
-      {!isGroupChat && chat?.product_id ? (
-        <button
-          type="button"
-          onClick={openProduct}
-          className="hidden rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:inline-flex"
-        >
-          К товару
-        </button>
-      ) : null}
-      {chat?.can_delete ? (
-        <button
-          type="button"
-          onClick={handleDeleteChat}
-          className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-        >
-          Удалить
-        </button>
-      ) : null}
-    </div>
-  );
+  const headerMenuItems = [
+    isGroupChat
+      ? { label: 'Участники', onClick: () => setShowParticipants(true) }
+      : null,
+    !isGroupChat && counterpartyProfilePath
+      ? { label: 'Профиль', to: counterpartyProfilePath }
+      : null,
+    !isGroupChat && chat?.product_id
+      ? { label: 'К товару', onClick: openProduct }
+      : null,
+    chat?.can_delete
+      ? { label: 'Удалить чат', onClick: handleDeleteChat, danger: true }
+      : null,
+  ];
 
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] md:h-full">
@@ -1292,14 +1298,8 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
           )
         }
         title={title}
-        subtitle={panelSubtitleDisplay}
-        subtitleAction={
-          isGroupChat && chat?.participants_count
-            ? () => setShowParticipants(true)
-            : undefined
-        }
-        badge={<SourceBadge source={isGroupChat ? getGarageChatListSource(chat) : 'garage'} />}
-        trailing={headerTrailing}
+        subtitle={typingLabel}
+        trailing={<ChatPanelMenu items={headerMenuItems} />}
       />
 
       <ChatParticipantsPanel
@@ -1700,19 +1700,14 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
           )
         }
         title={title}
-        subtitle={displayChat?.context_title ? [displayChat.context_title, displayChat.context_price].filter(Boolean).join(' · ') : null}
-        badge={<SourceBadge source="avito" />}
         trailing={
-          displayChat?.context_url ? (
-            <a
-              href={displayChat.context_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:inline-flex"
-            >
-              На Авито
-            </a>
-          ) : null
+          <ChatPanelMenu
+            items={[
+              displayChat?.context_url
+                ? { label: 'На Авито', href: displayChat.context_url }
+                : null,
+            ]}
+          />
         }
       />
 
