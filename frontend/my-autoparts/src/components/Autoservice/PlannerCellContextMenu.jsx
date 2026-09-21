@@ -17,7 +17,7 @@ function MenuButton({ children, onClick }) {
 export default function PlannerCellContextMenu({
   position,
   onClose,
-  onCreateOrder,
+  onCreateInspection,
 }) {
   const menuRef = useRef(null);
 
@@ -62,11 +62,11 @@ export default function PlannerCellContextMenu({
     >
       <MenuButton
         onClick={() => {
-          onCreateOrder?.();
+          onCreateInspection?.();
           onClose?.();
         }}
       >
-        Запись на ремонт
+        Запись на осмотр
       </MenuButton>
     </div>,
     document.body,

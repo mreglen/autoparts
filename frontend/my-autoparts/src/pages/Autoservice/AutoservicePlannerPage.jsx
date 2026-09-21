@@ -660,7 +660,7 @@ export default function AutoservicePlannerPage() {
       <PlannerCellContextMenu
         position={contextMenu ? { x: contextMenu.x, y: contextMenu.y } : null}
         onClose={() => setContextMenu(null)}
-        onCreateOrder={() => beginCreateOrder(contextMenuContext)}
+        onCreateInspection={() => beginCreateInspection(contextMenuContext)}
       />
 
       <InspectionBookingAddModal
