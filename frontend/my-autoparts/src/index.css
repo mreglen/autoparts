@@ -176,6 +176,24 @@ code {
     }
   }
 
+  @keyframes slideInUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideOutDown {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(105%);
+    }
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -200,6 +218,14 @@ code {
 
   .animate-slide-out-right {
     animation: slideOutRight 0.2s ease-in forwards;
+  }
+
+  .animate-slide-in-up {
+    animation: slideInUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .animate-slide-out-down {
+    animation: slideOutDown 0.24s ease-in forwards;
   }
 
   .animate-fade-in {

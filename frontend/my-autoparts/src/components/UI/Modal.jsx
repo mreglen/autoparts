@@ -33,6 +33,19 @@ export default function Modal({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragStateRef = useRef(null);
+  const [sheetY, setSheetY] = useState(0);
+  const [sheetDragging, setSheetDragging] = useState(false);
+  const [sheetClosing, setSheetClosing] = useState(false);
+  const [sheetReturning, setSheetReturning] = useState(false);
+  const sheetDragRef = useRef(null);
+  const sheetHeightRef = useRef(0);
+  const sheetCloseTimerRef = useRef(null);
+
+  const isSheetViewport = useCallback(
+    () => typeof window !== 'undefined'
+      && window.matchMedia('(max-width: 639.98px)').matches,
+    [],
+  );
 
   useEffect(() => {
     if (!open) return undefined;
@@ -55,8 +68,21 @@ export default function Modal({
       setDragOffset({ x: 0, y: 0 });
       setDragging(false);
       dragStateRef.current = null;
+      setSheetY(0);
+      setSheetDragging(false);
+      setSheetClosing(false);
+      setSheetReturning(false);
+      sheetDragRef.current = null;
+      if (sheetCloseTimerRef.current) {
+        window.clearTimeout(sheetCloseTimerRef.current);
+        sheetCloseTimerRef.current = null;
+      }
     }
   }, [open]);
+
+  useEffect(() => () => {
+    if (sheetCloseTimerRef.current) window.clearTimeout(sheetCloseTimerRef.current);
+  }, []);
 
   const handleHeaderPointerDown = useCallback((event) => {
     if (!draggable) return;
@@ -85,10 +111,82 @@ export default function Modal({
     window.addEventListener('pointerup', onUp);
   }, [draggable, dragOffset.x, dragOffset.y]);
 
+  const handleSheetPointerDown = useCallback((event) => {
+    if (!onClose || !isSheetViewport()) return;
+    if (event.button !== 0) return;
+    if (event.target.closest('button, a, input, select, textarea, [data-no-drag]')) return;
+    sheetDragRef.current = {
+      startY: event.clientY,
+      lastY: event.clientY,
+      lastT: performance.now(),
+      velocity: 0,
+    };
+    sheetHeightRef.current = dialogRef.current?.offsetHeight || 0;
+    setSheetDragging(true);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }, [onClose, isSheetViewport]);
+
+  const handleSheetPointerMove = useCallback((event) => {
+    const s = sheetDragRef.current;
+    if (!s) return;
+    const now = performance.now();
+    const dt = now - s.lastT;
+    if (dt > 0) {
+      s.velocity = (event.clientY - s.lastY) / dt;
+    }
+    s.lastY = event.clientY;
+    s.lastT = now;
+    setSheetY(Math.max(0, event.clientY - s.startY));
+  }, []);
+
+  const handleSheetPointerEnd = useCallback((event) => {
+    const s = sheetDragRef.current;
+    if (!s) return;
+    sheetDragRef.current = null;
+    setSheetDragging(false);
+    const dy = Math.max(0, event.clientY - s.startY);
+    const height = sheetHeightRef.current || window.innerHeight;
+    const fastSwipe = s.velocity > 0.4 && dy > 24;
+    if (dy > height * 0.35 || fastSwipe) {
+      setSheetClosing(true);
+      sheetCloseTimerRef.current = window.setTimeout(() => onClose?.(), 240);
+    } else {
+      setSheetReturning(true);
+      setSheetY(0);
+      window.setTimeout(() => setSheetReturning(false), 300);
+    }
+  }, [onClose]);
+
+  const handleHeaderPointerDownCombined = useCallback((event) => {
+    if (draggable) handleHeaderPointerDown(event);
+    handleSheetPointerDown(event);
+  }, [draggable, handleHeaderPointerDown, handleSheetPointerDown]);
+
   if (!open) return null;
 
   const width =
     size === 'sm' ? 'max-w-md' : size === 'lg' ? 'max-w-3xl' : size === 'xl' ? 'max-w-5xl' : 'max-w-xl';
+
+  const sheetProgress = sheetHeightRef.current
+    ? Math.min(1, sheetY / sheetHeightRef.current)
+    : 0;
+  const dialogTransform = sheetClosing
+    ? 'translateY(105%)'
+    : sheetY > 0
+      ? `translateY(${sheetY}px)`
+      : dragOffset.x || dragOffset.y
+        ? `translate(${dragOffset.x}px, ${dragOffset.y}px)`
+        : undefined;
+  const dialogTransition = sheetDragging
+    ? 'none'
+    : sheetClosing || sheetReturning
+      ? 'transform 0.26s cubic-bezier(0.32, 0.72, 0, 1)'
+      : undefined;
+  const backdropOpacity = sheetClosing
+    ? 0
+    : sheetY > 0
+      ? Math.max(0, 1 - sheetProgress)
+      : undefined;
 
   return createPortal(
     <div
@@ -106,6 +204,11 @@ export default function Modal({
           // Leave MobileBottomNav undimmed on mobile/tablet shell (< lg)
           'bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-0',
         )}
+        style={
+          backdropOpacity !== undefined
+            ? { opacity: backdropOpacity, transition: sheetDragging ? 'none' : 'opacity 0.24s ease-out' }
+            : undefined
+        }
         aria-label={closeOnBackdrop ? 'Закрыть' : undefined}
         aria-hidden={!closeOnBackdrop}
         tabIndex={-1}
@@ -118,21 +221,24 @@ export default function Modal({
         aria-labelledby={hasStringTitle ? titleId : undefined}
         aria-label={!hasStringTitle && typeof title === 'string' ? title : undefined}
         className={cx(
-          'pointer-events-auto relative z-10 flex w-full max-h-full flex-col overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:max-h-[85vh] sm:rounded-sg-lg',
+          'pointer-events-auto relative z-10 flex w-full max-h-full flex-col overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:max-h-[85vh] sm:rounded-sg-lg max-sm:animate-slide-in-up',
           width,
           className,
         )}
         style={
-          dragOffset.x || dragOffset.y
-            ? { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }
+          dialogTransform !== undefined || dialogTransition !== undefined
+            ? { transform: dialogTransform, transition: dialogTransition }
             : undefined
         }
       >
         {(title || onClose) && (
           <div
-            onPointerDown={draggable ? handleHeaderPointerDown : undefined}
+            onPointerDown={handleHeaderPointerDownCombined}
+            onPointerMove={handleSheetPointerMove}
+            onPointerUp={handleSheetPointerEnd}
+            onPointerCancel={handleSheetPointerEnd}
             className={cx(
-              'flex shrink-0 items-center gap-2 border-b border-line px-4 py-3 sm:gap-3 sm:px-5 sm:py-4',
+              'flex shrink-0 touch-none items-center gap-2 border-b border-line px-4 py-3 sm:gap-3 sm:px-5 sm:py-4',
               draggable && (dragging ? 'sm:cursor-grabbing' : 'sm:cursor-grab'),
               draggable && 'sm:select-none',
             )}

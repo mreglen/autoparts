@@ -435,7 +435,6 @@ export default function InspectionBookingAddModal({
       title={modalTitle}
       size="sm"
       footer={footer}
-      className="animate-slide-in-right"
       draggable
     >
       {isEditing ? (
