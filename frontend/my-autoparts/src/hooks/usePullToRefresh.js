@@ -57,6 +57,7 @@ export default function usePullToRefresh({ enabled = true, onRefresh } = {}) {
     const onTouchStart = (event) => {
       if (refreshingRef.current) return;
       if (event.touches.length !== 1) return;
+      if (event.target?.closest?.('[role="dialog"], [data-ptr-ignore]')) return;
       if (!isTouchAtScrollTop(event.target)) return;
 
       trackingRef.current = true;

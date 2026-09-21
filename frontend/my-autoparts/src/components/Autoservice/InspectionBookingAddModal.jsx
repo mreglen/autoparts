@@ -326,7 +326,7 @@ export default function InspectionBookingAddModal({
     : title;
 
   const footer = isEditing ? (
-    <div className="flex justify-end gap-2">
+    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
       <button
         type="button"
         onClick={(e) => {
@@ -350,7 +350,7 @@ export default function InspectionBookingAddModal({
             onClose?.();
           }
         }}
-        className="rounded-sg-sm min-h-11 border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
+        className="min-h-12 w-full rounded-sg-sm border border-line-strong bg-surface px-4 py-2.5 text-sm font-medium text-ink-soft transition hover:bg-surface-muted sm:min-h-11 sm:w-auto"
         disabled={saving}
       >
         {isEdit ? 'Отмена' : 'Закрыть'}
@@ -359,26 +359,25 @@ export default function InspectionBookingAddModal({
         type="submit"
         form="add-inspection-booking"
         disabled={saving}
-        className="rounded-sg-sm min-h-11 bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+        className="min-h-12 w-full rounded-sg-sm bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:min-h-11 sm:w-auto"
       >
         {saving ? 'Сохранение…' : 'Сохранить'}
       </button>
     </div>
   ) : (
-    <div className="flex flex-wrap justify-end gap-2">
-      {isEdit ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setDeleteConfirmOpen(true);
-          }}
-          disabled={deleting}
-          className="mr-auto rounded-sg-sm min-h-11 border border-danger-200 bg-surface px-4 py-2 text-sm font-medium text-danger-600 transition hover:bg-danger-50 disabled:opacity-60"
-        >
-          Удалить
-        </button>
-      ) : null}
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          editStartedAtRef.current = Date.now();
+          setIsEditing(true);
+        }}
+        className="min-h-12 w-full rounded-sg-sm bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 sm:order-4 sm:min-h-11 sm:w-auto"
+      >
+        Редактировать
+      </button>
       {isEdit && onCreateOrder ? (
         <button
           type="button"
@@ -398,7 +397,7 @@ export default function InspectionBookingAddModal({
               notes,
             });
           }}
-          className="rounded-sg-sm min-h-11 border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+          className="min-h-12 w-full rounded-sg-sm border border-brand-300 bg-brand-50 px-4 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 sm:order-3 sm:min-h-11 sm:w-auto"
         >
           Создать заказ-наряд
         </button>
@@ -409,22 +408,23 @@ export default function InspectionBookingAddModal({
           e.stopPropagation();
           onClose?.();
         }}
-        className="rounded-sg-sm min-h-11 border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
+        className="min-h-12 w-full rounded-sg-sm border border-line-strong bg-surface px-4 py-2.5 text-sm font-medium text-ink-soft transition hover:bg-surface-muted sm:order-2 sm:min-h-11 sm:w-auto"
       >
         Закрыть
       </button>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          editStartedAtRef.current = Date.now();
-          setIsEditing(true);
-        }}
-        className="rounded-sg-sm min-h-11 bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-      >
-        Редактировать
-      </button>
+      {isEdit ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDeleteConfirmOpen(true);
+          }}
+          disabled={deleting}
+          className="min-h-12 w-full rounded-sg-sm border border-danger-200 bg-surface px-4 py-2.5 text-sm font-medium text-danger-600 transition hover:bg-danger-50 disabled:opacity-60 sm:order-1 sm:mr-auto sm:min-h-11 sm:w-auto"
+        >
+          Удалить
+        </button>
+      ) : null}
     </div>
   );
 
