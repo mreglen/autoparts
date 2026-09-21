@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { requestPasswordReset, confirmPasswordReset } from '../../../redux/slices/AuthSlice';
+import { requestPasswordReset, confirmPasswordReset, clearError } from '../../../redux/slices/AuthSlice';
+import Toast from '../../../components/UI/Toast';
 
 export default function PasswordReset() {
     const dispatch = useDispatch();
@@ -76,6 +77,11 @@ export default function PasswordReset() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+            <Toast
+                message={error}
+                variant="error"
+                onClose={() => dispatch(clearError())}
+            />
             <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
                 <div className="p-8">
                     <div className="space-y-6">
@@ -91,9 +97,9 @@ export default function PasswordReset() {
                             </p>
                         </div>
 
-                        {(error || success) && (
-                            <div className={`p-3 rounded-lg text-sm border ${error ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                                {error || success}
+                        {success && (
+                            <div className="p-3 rounded-lg text-sm border bg-green-50 text-green-700 border-green-200">
+                                {success}
                             </div>
                         )}
 

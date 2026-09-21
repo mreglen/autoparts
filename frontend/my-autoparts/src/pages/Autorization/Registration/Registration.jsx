@@ -22,7 +22,6 @@ export default function Registration() {
         code,
         emailVerification,
         loading,
-        error,
     } = useSelector((state) => state.auth);
     const dispatch = useDispatch();
 
@@ -337,10 +336,6 @@ export default function Registration() {
                     ))}
                 </div>
 
-                {emailVerification.status === 'error' && (
-                    <p className="text-red-600 text-sm text-center">{error || 'Неверный код'}</p>
-                )}
-
                 <div className="space-y-3">
                     <div className="flex justify-between items-center">
                         <button
@@ -466,12 +461,6 @@ export default function Registration() {
                 <h2 className="text-2xl font-bold text-gray-900">Регистрация</h2>
                 <p className="text-gray-500 text-sm mt-1">Создайте аккаунт покупателя</p>
             </div>
-
-            {error && (
-                <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-200">
-                    {error}
-                </div>
-            )}
 
             <div>
                 <div className="flex justify-between mb-6">

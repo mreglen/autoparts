@@ -21,7 +21,7 @@ export default function Login() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const location = useLocation();
-    const { loading, error } = useSelector((state) => state.auth);
+    const { loading } = useSelector((state) => state.auth);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -42,12 +42,6 @@ export default function Login() {
                 <h2 className="text-2xl font-bold text-gray-900">Вход</h2>
                 <p className="text-gray-500 text-sm mt-1">Введите email или телефон и пароль</p>
             </div>
-
-            {error && (
-                <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-200" role="alert">
-                    {error}
-                </div>
-            )}
 
             <MobileFormField label="Email или телефон" htmlFor="auth-login" required>
                 <input

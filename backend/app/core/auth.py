@@ -248,10 +248,21 @@ def cleanup_old_user_sessions(db: Session, user_id: int, ip_address: str, max_se
 
 def cleanup_expired_sessions(db: Session, hours_threshold: int = 24):
     from datetime import datetime, timedelta
-    
-    threshold_time = datetime.utcnow() - timedelta(hours=hours_threshold)
+
+    now = datetime.utcnow()
+    threshold_time = now - timedelta(hours=hours_threshold)
     expired_sessions = db.query(UserSession)\
-        .filter(UserSession.last_activity < threshold_time)\
+        .filter(
+            (UserSession.refresh_expires_at < now)
+            | (
+                (UserSession.refresh_expires_at.is_(None))
+                & (UserSession.last_activity < threshold_time)
+            )
+            | (
+                (UserSession.is_active == False)
+                & (UserSession.last_activity < threshold_time)
+            )
+        )\
         .all()
 
     for session in expired_sessions:

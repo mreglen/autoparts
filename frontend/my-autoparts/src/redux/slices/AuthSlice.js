@@ -237,6 +237,12 @@ const authSlice = createSlice({
         error: null,
     },
     reducers: {
+        clearError: (state) => {
+            state.error = null;
+        },
+        setError: (state, action) => {
+            state.error = action.payload || null;
+        },
         resetEmailVerificationError: (state) => {
             state.error = null;
             state.emailVerification.status = 'sent';
@@ -467,6 +473,8 @@ export const {
     resetRegistration,
     resetEmailVerificationError,
     setAddressError,
+    clearError,
+    setError,
 } = authSlice.actions;
 
 export default authSlice.reducer;

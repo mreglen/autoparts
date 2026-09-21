@@ -1,9 +1,10 @@
 // Authorization.jsx
 import { useEffect, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { resetRegistration } from '../../redux/slices/AuthSlice';
+import { resetRegistration, clearError } from '../../redux/slices/AuthSlice';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import Toast from '../../components/UI/Toast';
 import Login from './Login/Login';
 import Registration from './Registration/Registration';
 
@@ -20,6 +21,7 @@ export default function Authorization() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, isReady, token } = useAuthReady();
+  const authError = useSelector((state) => state.auth.error);
 
   useEffect(() => {
     if (!isReady || !token || !isAuthenticated) return;
@@ -33,6 +35,11 @@ export default function Authorization() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <Toast
+        message={authError}
+        variant="error"
+        onClose={() => dispatch(clearError())}
+      />
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/80">
         {/* Return to Home Button */}
         <div className="border-b border-gray-100 bg-gray-50 p-4">

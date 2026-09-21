@@ -221,6 +221,13 @@ sudo update
 - Почти все сущности привязаны к `organization_id`.
 - Запросы к заказ-нарядам, складам, клиентам и т.д. всегда должны включать фильтр по `organization_id`.
 
+### 7.5 Сессии и токены
+
+- Access JWT живёт `ACCESS_TOKEN_EXPIRE_MINUTES` (30 мин), фронт молча обновляет его через `POST /auth/refresh` при 401 (`apiClient.js`).
+- `REFRESH_TOKEN_EXPIRE_DAYS` (default 365) — при каждом refresh продлевается sliding-окно, активный пользователь не разлогинивается.
+- Планировщик в `main.py` раз в час вызывает `cleanup_expired_sessions` — удаляет только мёртвые сессии (истёк `refresh_expires_at`, `is_active=False` >24ч, легаси без refresh >24ч). Не возвращать очистку по `last_activity` — это разлогинивает пользователей через сутки неактивности.
+- `cleanup_old_user_sessions` — максимум 5 сессий на пользователя с одного IP (на логине).
+
 ## 8. Типичные ошибки
 
 ### 8.1 Заказ-наряды
