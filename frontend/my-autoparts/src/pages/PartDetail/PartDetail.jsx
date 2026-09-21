@@ -851,7 +851,7 @@ const PartDetail = () => {
 
     if (!soldOutLabel && soldOutResolveState === 'loading') {
       return (
-        <div className="px-3 py-10 md:px-0">
+        <div className="px-3 py-10 md:px-0 max-lg:animate-slide-in-right">
           <SkeletonCard lines={4} className="shadow-none" />
         </div>
       );
@@ -895,7 +895,7 @@ const PartDetail = () => {
     }
 
     return (
-      <div className="px-3 py-10 md:px-0">
+      <div className="px-3 py-10 md:px-0 max-lg:animate-slide-in-right">
         <Helmet>
           <title>Запчасть не найдена | Свой Гараж</title>
           <meta name="robots" content="noindex, nofollow" />
@@ -914,7 +914,7 @@ const PartDetail = () => {
 
   if (!showProduct) {
     return (
-      <div className="px-3 py-10 md:px-0">
+      <div className="px-3 py-10 md:px-0 max-lg:animate-slide-in-right">
         {apiSeo ? <PartProductSeoHelmet seo={apiSeo} structuredDataBlocks={null} product={null} /> : null}
         <SkeletonCard lines={5} className="shadow-none" />
       </div>
@@ -1153,7 +1153,7 @@ const PartDetail = () => {
   );
 
   return (
-    <div className={showMobileStickyCta ? MOBILE_PRODUCT_STICKY_SCROLL_PAD : undefined}>
+    <div className={showMobileStickyCta ? `${MOBILE_PRODUCT_STICKY_SCROLL_PAD} max-lg:animate-slide-in-right` : 'max-lg:animate-slide-in-right'}>
       <PartProductSeoHelmet seo={seo} structuredDataBlocks={structuredDataBlocks} product={currentProduct} />
 
       <div className="relative bg-surface-subtle md:hidden">

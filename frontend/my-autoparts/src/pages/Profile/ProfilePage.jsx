@@ -19,16 +19,8 @@ import UserAvatar from '../../components/UserAvatar/UserAvatar';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import ChangePasswordModal from './ChangePasswordModal';
 import OrganizationCard from './OrganizationCard';
-import ProfileEngagementPreview from './ProfileEngagementPreview';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { ChevronRight, profilePageShell } from './profileUi';
-
-function getRoleLabel(user) {
-  if (user?.is_admin) return 'Администратор';
-  if (user?.is_seller) return 'Продавец';
-  if (user?.is_employee) return 'Сотрудник';
-  return 'Покупатель';
-}
 
 const ICON_SIZE = 'h-5 w-5';
 
@@ -88,20 +80,19 @@ const IconEye = () => (
 function ProfilePageSkeleton() {
   return (
     <div className={`${profilePageShell} animate-pulse`}>
-      <div className="flex items-center gap-4 rounded-sg-lg bg-surface-muted p-5">
+      <div className="flex items-center gap-4 rounded-sg-lg bg-surface-muted p-4">
         <div className="h-16 w-16 rounded-full bg-surface-subtle" />
         <div className="min-w-0 flex-1 space-y-2">
-          <div className="h-5 w-40 rounded bg-surface-subtle" />
-          <div className="h-4 w-24 rounded bg-surface-subtle" />
+          <div className="h-5 w-32 rounded bg-surface-subtle" />
+          <div className="h-3 w-24 rounded bg-surface-subtle" />
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="h-24 rounded-sg-lg bg-surface-muted" />
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+          <div key={i} className="h-20 rounded-sg-lg bg-surface-muted" />
         ))}
       </div>
-      <div className="h-48 rounded-sg-lg bg-surface-muted" />
-      <div className="h-32 rounded-sg-lg bg-surface-muted" />
+      <div className="h-24 rounded-sg-lg bg-surface-muted" />
     </div>
   );
 }
@@ -117,15 +108,13 @@ function Section({ title, children }) {
   );
 }
 
-function DashboardCard({ to, onClick, title, subtitle, icon, className = '' }) {
-  const base = `flex min-h-[5.5rem] items-center justify-between rounded-sg-lg border border-line bg-surface p-4 shadow-sg-sm transition hover:border-brand-200 hover:shadow-sg ${className}`;
+function DashboardCard({ to, onClick, title, icon }) {
+  const base =
+    'flex min-h-[4.25rem] items-center justify-between rounded-sg-lg border border-line bg-surface p-3.5 shadow-sg-sm transition hover:border-brand-200 hover:shadow-sg';
   const content = (
     <>
-      <div className="min-w-0">
-        <p className="text-base font-semibold text-ink">{title}</p>
-        {subtitle ? <p className="mt-0.5 truncate text-sm text-ink-muted">{subtitle}</p> : null}
-      </div>
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+      <span className="text-base font-medium text-ink">{title}</span>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
         {icon}
       </span>
     </>
@@ -144,7 +133,7 @@ function DashboardCard({ to, onClick, title, subtitle, icon, className = '' }) {
   );
 }
 
-function MenuRow({ to, onClick, icon, label, hint, destructive }) {
+function MenuRow({ to, onClick, icon, label, destructive }) {
   const className = `flex w-full items-center gap-3 px-5 py-3.5 text-left transition hover:bg-surface-muted/60 ${
     destructive ? 'text-danger-600' : 'text-ink'
   }`;
@@ -159,10 +148,7 @@ function MenuRow({ to, onClick, icon, label, hint, destructive }) {
           {icon}
         </span>
       ) : null}
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium leading-snug">{label}</span>
-        {hint ? <span className="mt-0.5 block truncate text-xs text-ink-muted">{hint}</span> : null}
-      </span>
+      <span className="min-w-0 flex-1 text-sm font-medium">{label}</span>
       <ChevronRight className="h-5 w-5 shrink-0 text-ink-faint" />
     </>
   );
@@ -236,9 +222,9 @@ export default function ProfilePage() {
   if (isReady && !user) {
     return (
       <div className={profilePageShell}>
-        <Section title="Профиль">
+        <Section>
           <div className="px-5 py-10 text-center">
-            <p className="text-sm text-ink-muted">Войдите в аккаунт, чтобы управлять профилем</p>
+            <p className="text-sm text-ink-muted">Войдите в аккаунт</p>
             <Link
               to="/auth"
               className="mt-5 inline-flex min-h-10 items-center justify-center rounded-sg bg-brand-600 px-6 text-sm font-semibold text-white transition hover:bg-brand-700"
@@ -336,7 +322,7 @@ export default function ProfilePage() {
   return (
     <div className={profilePageShell}>
       {isEditing ? (
-        <Section title="Личные данные">
+        <Section>
           <div className="p-5">
             {saveError ? (
               <div className="mb-4 rounded-sg border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700">
@@ -393,35 +379,29 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink-soft">Фамилия</label>
-                <input
-                  name="last_name"
-                  value={formData.last_name}
-                  onChange={handleChange}
-                  className="sg-pill-input"
-                  autoComplete="family-name"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink-soft">Имя</label>
-                <input
-                  name="first_name"
-                  value={formData.first_name}
-                  onChange={handleChange}
-                  className="sg-pill-input"
-                  autoComplete="given-name"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink-soft">Отчество</label>
-                <input
-                  name="patronymic"
-                  value={formData.patronymic}
-                  onChange={handleChange}
-                  className="sg-pill-input"
-                />
-              </div>
+              <input
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleChange}
+                className="sg-pill-input"
+                placeholder="Фамилия"
+                autoComplete="family-name"
+              />
+              <input
+                name="first_name"
+                value={formData.first_name}
+                onChange={handleChange}
+                className="sg-pill-input"
+                placeholder="Имя"
+                autoComplete="given-name"
+              />
+              <input
+                name="patronymic"
+                value={formData.patronymic}
+                onChange={handleChange}
+                className="sg-pill-input"
+                placeholder="Отчество"
+              />
             </div>
 
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -445,7 +425,7 @@ export default function ProfilePage() {
           </div>
         </Section>
       ) : (
-        <section className="flex items-center gap-4 rounded-sg-lg border border-line bg-surface p-4 shadow-sg-sm sm:p-5">
+        <section className="flex items-center gap-4 rounded-sg-lg border border-line bg-surface p-4 shadow-sg-sm">
           <UserAvatar
             avatarUrl={user.avatar_url}
             firstName={user.first_name}
@@ -454,34 +434,17 @@ export default function ProfilePage() {
             className="!h-16 !w-16 !rounded-full !text-xl"
           />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-bold text-ink sm:text-2xl">{displayName}</h1>
+            <h1 className="truncate text-xl font-bold text-ink">{displayName}</h1>
             <p className="mt-0.5 truncate text-sm text-ink-muted">{profileSubtitle}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700">
-                {getRoleLabel(user)}
-              </span>
-              {user.id != null ? (
-                <span className="font-mono text-xs text-ink-faint" title="Идентификатор пользователя">
-                  ID {user.id}
-                </span>
-              ) : null}
-            </div>
           </div>
           <button
             type="button"
             onClick={handleEdit}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-faint transition hover:bg-surface-muted hover:text-brand-600"
-            aria-label="Редактировать профиль"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-faint transition hover:bg-surface-muted hover:text-brand-600"
+            aria-label="Редактировать"
             title="Редактировать"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              aria-hidden
-            >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -492,69 +455,23 @@ export default function ProfilePage() {
         </section>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <DashboardCard
-          to="/purchases/orders"
-          title="Мои заказы"
-          subtitle="Активные и завершённые покупки"
-          icon={<IconBag />}
-        />
-        <DashboardCard
-          to="/profile/favorites"
-          title="Избранное"
-          subtitle="Сохранённые товары"
-          icon={<IconHeart />}
-        />
-        <DashboardCard
-          to="/profile/views"
-          title="Просмотры"
-          subtitle="Недавно просмотренные"
-          icon={<IconEye />}
-        />
-        <DashboardCard
-          to="/profile/notifications"
-          title="Уведомления"
-          subtitle="Настройки push и email"
-          icon={<IconBell />}
-        />
-        {canOpenGarage ? (
-          <DashboardCard
-            to="/garage"
-            title="Мои авто"
-            subtitle="Гараж и история ремонтов"
-            icon={<IconCar />}
-          />
-        ) : null}
-        {showMyParts ? (
-          <DashboardCard
-            to="/my-parts"
-            title="Мои запчасти"
-            subtitle="Управление объявлениями"
-            icon={<IconParts />}
-          />
-        ) : null}
+      <div className="grid grid-cols-2 gap-3">
+        <DashboardCard to="/purchases/orders" title="Заказы" icon={<IconBag />} />
+        <DashboardCard to="/profile/favorites" title="Избранное" icon={<IconHeart />} />
+        <DashboardCard to="/profile/views" title="Просмотры" icon={<IconEye />} />
+        <DashboardCard to="/profile/notifications" title="Уведомления" icon={<IconBell />} />
+        <DashboardCard to="/profile/subscriptions" title="Подписки" icon={<IconParts />} />
+        <DashboardCard to="/profile/notification-center" title="Push" icon={<IconBell />} />
+        {canOpenGarage ? <DashboardCard to="/garage" title="Авто" icon={<IconCar />} /> : null}
+        {showMyParts ? <DashboardCard to="/my-parts" title="Запчасти" icon={<IconParts />} /> : null}
       </div>
-
-      <ProfileEngagementPreview />
 
       {showOrganization ? <OrganizationCard orgId={user.organization_id} /> : null}
 
-      <Section title="Аккаунт">
+      <Section>
         <div className="divide-y divide-line">
           <MenuRow
-            to="/profile/subscriptions"
-            label="Подписки на поиск"
-            icon={<IconParts />}
-            hint="Управление подписками на новые запчасти"
-          />
-          <MenuRow
-            to="/profile/notification-center"
-            label="История уведомлений"
-            icon={<IconBell />}
-            hint="Push-уведомления"
-          />
-          <MenuRow
-            label="Сменить пароль"
+            label="Пароль"
             onClick={() => setShowPasswordModal(true)}
             icon={<IconLock />}
           />

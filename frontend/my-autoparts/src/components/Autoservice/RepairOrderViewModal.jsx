@@ -799,7 +799,7 @@ export default function RepairOrderViewModal({
       onClose={handleClose}
       closeVariant="back"
       size="lg"
-      className="max-lg:!rounded-none"
+      className="max-lg:!rounded-none animate-slide-in-right"
       draggable
       headerActions={
         <button
