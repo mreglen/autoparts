@@ -11,7 +11,7 @@ const PERMISSION_GROUP_DEFS = [
     title: 'Склад',
     description: 'Запчасти, автомобили, движение товара',
     match: (code) =>
-      ['my-parts', 'vehicles', 'stock-in', 'stock-out'].includes(code) ||
+      ['my-parts', 'vehicles', 'stock-in', 'stock-out', 'qr-card'].includes(code) ||
       code.startsWith('inventory.'),
   },
   {

@@ -39,7 +39,7 @@ describe('autoservicePlannerLayout', () => {
     expect(entries[0].continuesFromPrevWeek).toBe(true);
   });
 
-  it('carries unfinished orders started before the week to the current day', () => {
+  it('drops stale pending orders started before the week without an end date', () => {
     const dayIsos = [
       '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
       '2026-09-25', '2026-09-26', '2026-09-27',
@@ -50,6 +50,22 @@ describe('autoservicePlannerLayout', () => {
         status: 'pending',
         scheduled_at: '2026-09-18T11:00:00',
         scheduled_end_at: null,
+      },
+    ], dayIsos, new Date('2026-09-26T12:00:00'));
+    expect(entries).toHaveLength(0);
+  });
+
+  it('carries in-progress orders started before the week to the current day', () => {
+    const dayIsos = [
+      '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+    ];
+    const entries = assignPlannerLanes([
+      {
+        id: 1,
+        status: 'in_progress',
+        scheduled_at: '2026-09-18T11:00:00',
+        scheduled_end_at: '2026-09-19T18:00:00',
       },
     ], dayIsos, new Date('2026-09-26T12:00:00'));
     expect(entries).toHaveLength(1);

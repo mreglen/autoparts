@@ -457,7 +457,7 @@ function AutoParts() {
   }
 
   return (
-    <div className="mt-0 sm:mt-5 px-0 w-full">
+    <div className={`mt-0 px-0 w-full ${activeTab === 'my' ? 'sm:mt-3' : 'sm:mt-5'}`}>
       <PageSeoHelmet seo={seo} />
       {searchParams.get('vin_unavailable') === '1' ? (
         <div className="mb-4 max-lg:px-3">
@@ -488,14 +488,14 @@ function AutoParts() {
         )}
 
         {/* Переключатель вкладок */}
-        <div className="mb-3 sm:mb-6 max-lg:px-3 max-lg:py-1">
+        <div className={`max-lg:px-3 max-lg:py-1 ${activeTab === 'my' ? 'mb-2 sm:mb-3' : 'mb-3 sm:mb-6'}`}>
         <div className="flex items-center gap-2">
-        <div className="flex min-w-0 flex-1 snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {showNewAutoparts && (
             <button
               type="button"
               onClick={() => setActiveTab('rossko')}
-              className={`min-h-11 shrink-0 snap-start touch-manipulation rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'rossko'
+              className={`min-h-10 shrink-0 snap-start touch-manipulation rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:rounded-lg sm:px-4 sm:py-2 ${activeTab === 'rossko'
                   ? 'bg-indigo-500 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
@@ -506,7 +506,7 @@ function AutoParts() {
           <button
             type="button"
             onClick={() => setActiveTab('my')}
-            className={`min-h-11 shrink-0 snap-start touch-manipulation rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'my'
+            className={`min-h-10 shrink-0 snap-start touch-manipulation rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:rounded-lg sm:px-4 sm:py-2 ${activeTab === 'my'
                 ? 'bg-indigo-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
@@ -532,7 +532,7 @@ function AutoParts() {
               </button>
 
               {showSortDropdown && (
-                <div className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg" role="menu" aria-label="Сортировка">
+                <div className="absolute left-0 z-50 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg" role="menu" aria-label="Сортировка">
                   <button
                     type="button"
                     onClick={() => applyNewPartsSort('price_asc')}
@@ -612,7 +612,7 @@ function AutoParts() {
                 </button>
 
                 {showSortDropdown && (
-                  <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg" role="menu" aria-label="Сортировка">
+                  <div className="absolute left-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg" role="menu" aria-label="Сортировка">
                   <button
                     type="button"
                     onClick={() => applyUsedSort('price_asc')}

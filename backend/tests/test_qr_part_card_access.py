@@ -201,6 +201,7 @@ class OrgProductAccessTests(unittest.TestCase):
     def _seed(self):
         stock_in = Permission(id=1, code="stock-in", name="Поступление")
         stock_out = Permission(id=2, code="stock-out", name="Расход")
+        qr_card = Permission(id=3, code="qr-card", name="QR-карточка запчасти")
         self.seller = UserModel(
             id=1,
             public_code="S10000001",
@@ -219,6 +220,13 @@ class OrgProductAccessTests(unittest.TestCase):
             id=3,
             public_code="E10000003",
             email="emp2@test.ru",
+            is_employee=True,
+            organization_id="ORG1",
+        )
+        self.employee_stock_only = UserModel(
+            id=5,
+            public_code="E10000005",
+            email="emp3@test.ru",
             is_employee=True,
             organization_id="ORG1",
         )
@@ -245,21 +253,28 @@ class OrgProductAccessTests(unittest.TestCase):
             [
                 stock_in,
                 stock_out,
+                qr_card,
                 self.seller,
                 self.employee_ok,
                 self.employee_denied,
+                self.employee_stock_only,
                 self.other_seller,
                 self.product,
             ]
         )
         self.db.add(UserPermission(user_id=2, permission_id=1))
+        self.db.add(UserPermission(user_id=2, permission_id=3))
+        self.db.add(UserPermission(user_id=5, permission_id=1))
         self.db.commit()
 
     def test_seller_can_access_qr_card(self):
         self.assertTrue(user_can_access_qr_part_card(self.db, self.seller))
 
-    def test_employee_with_stock_in_can_access_qr_card(self):
+    def test_employee_with_qr_card_can_access_qr_card(self):
         self.assertTrue(user_can_access_qr_part_card(self.db, self.employee_ok))
+
+    def test_employee_with_only_stock_in_denied_qr_card(self):
+        self.assertFalse(user_can_access_qr_part_card(self.db, self.employee_stock_only))
 
     def test_employee_without_permission_denied(self):
         self.assertFalse(user_can_access_qr_part_card(self.db, self.employee_denied))

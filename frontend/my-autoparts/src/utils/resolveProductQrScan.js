@@ -1,6 +1,9 @@
 import { apiAxios, apiAxiosUnauth } from './apiClient';
 import { buildPartDetailPath } from './partRoutes';
-import { userHasWarehouseQrAccess } from '../hooks/useWarehousePermissions';
+import {
+  userHasSellerPartCardAccess,
+  userHasWarehouseQrAccess,
+} from '../hooks/useWarehousePermissions';
 
 /**
  * Сканирование QR с /seller/part-card/{id} (URL в уже напечатанных этикетках не меняем):
@@ -12,7 +15,7 @@ export async function fetchSellerQrPartCard(productId, user, permissionCodes = [
   if (!Number.isFinite(numericId) || numericId <= 0) {
     return { ok: false, reason: 'invalid' };
   }
-  if (!userHasWarehouseQrAccess(user, permissionCodes)) {
+  if (!userHasSellerPartCardAccess(user, permissionCodes)) {
     return { ok: false, reason: 'no_access' };
   }
 
@@ -70,7 +73,7 @@ export async function fetchModerationQrPath(productId) {
 }
 
 export async function resolveProductQrScan(productId, user, permissionCodes = []) {
-  const hasWarehouseAccess = Boolean(user && userHasWarehouseQrAccess(user, permissionCodes));
+  const hasWarehouseAccess = Boolean(user && userHasSellerPartCardAccess(user, permissionCodes));
 
   if (hasWarehouseAccess) {
     const sellerResult = await fetchSellerQrPartCard(productId, user, permissionCodes);
@@ -105,7 +108,7 @@ function isSameOrganization(user, organizationId) {
 
 /**
  * Open product from label QR by role:
- * — warehouse access + same org → /seller/part-card/{id}
+ * — qr-card access + same org → /seller/part-card/{id}
  * — otherwise → public /part/...
  */
 export async function resolveLabelProductOpen(productId, user, permissionCodes = [], productOrgId = null) {
@@ -115,7 +118,7 @@ export async function resolveLabelProductOpen(productId, user, permissionCodes =
   }
 
   const sameOrg = isSameOrganization(user, productOrgId);
-  const hasWarehouseAccess = Boolean(user && userHasWarehouseQrAccess(user, permissionCodes));
+  const hasWarehouseAccess = Boolean(user && userHasSellerPartCardAccess(user, permissionCodes));
 
   if (hasWarehouseAccess && (sameOrg || user?.is_admin)) {
     const sellerResult = await fetchSellerQrPartCard(numericId, user, permissionCodes);

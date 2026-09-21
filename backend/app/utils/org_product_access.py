@@ -8,13 +8,7 @@ from app.models.product import Product as ProductModel
 from app.models.user import User
 from app.models.user_permission import UserPermission
 
-WAREHOUSE_QR_PERMISSIONS: tuple[str, ...] = (
-    "my-parts",
-    "stock-in",
-    "stock-out",
-    "warehouse-sales",
-)
-
+QR_PART_CARD_PERMISSION = "qr-card"
 STOCK_IN_PERMISSION = "stock-in"
 PRINT_PERMISSION = "settings.printers"
 
@@ -47,10 +41,10 @@ def user_has_any_permission(db: Session, user: User, codes: tuple[str, ...]) -> 
 def user_can_access_qr_part_card(db: Session, user: User | None) -> bool:
     if not user or not user.organization_id:
         return False
-    if user.is_admin or user.is_seller:
+    if user.is_admin or user.is_seller or user.is_director:
         return True
     if user.is_employee:
-        return user_has_any_permission(db, user, WAREHOUSE_QR_PERMISSIONS)
+        return _user_has_permission_code(db, user, QR_PART_CARD_PERMISSION)
     return False
 
 

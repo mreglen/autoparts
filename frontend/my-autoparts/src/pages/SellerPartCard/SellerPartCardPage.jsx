@@ -16,7 +16,7 @@ import { resolveProductQrScan, fetchSellerQrPartCard } from '../../utils/resolve
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useWarehousePermissions, usePermissionCodes } from '../../hooks/useWarehousePermissions';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import { Z_MOBILE_STICKY_FOOTER, MOBILE_STICKY_BOTTOM_OFFSET } from '../../constants/mobileTokens';
+import { Z_MOBILE_STICKY_FOOTER } from '../../constants/mobileTokens';
 import SellerPartCardSituation from './SellerPartCardSituation';
 
 function ActionButton({ children, onClick, to, variant = 'default', disabled = false }) {
@@ -264,7 +264,7 @@ const SellerPartCardPage = () => {
   const hasStock = qty > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-28">
+    <div className="min-h-screen bg-gray-50 pb-28 max-lg:pb-[calc(var(--sg-mobile-sticky-bottom-offset,4rem)+5.5rem)]">
       <PageSeoHelmet seo={seo} />
       <div className="mx-auto max-w-3xl space-y-4 px-4 py-4 max-lg:px-0">
         <button
@@ -364,10 +364,9 @@ const SellerPartCardPage = () => {
 
       {perms.isStaff && (
         <div
-          className="fixed inset-x-0 border-t border-gray-200 bg-white/95 px-3 py-3 backdrop-blur"
+          className="fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white/95 px-3 py-3 backdrop-blur max-lg:bottom-[var(--sg-mobile-sticky-bottom-offset,4rem)]"
           style={{
             zIndex: Z_MOBILE_STICKY_FOOTER,
-            bottom: MOBILE_STICKY_BOTTOM_OFFSET,
             paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
           }}
         >

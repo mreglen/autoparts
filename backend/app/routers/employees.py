@@ -25,6 +25,7 @@ from app.utils.org_access import (
     SETTINGS_INTEGRATION_AVITO_PERMISSION_CODE,
     org_has_admin_director,
 )
+from app.utils.org_product_access import QR_PART_CARD_PERMISSION
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
@@ -77,6 +78,7 @@ def _ensure_default_permissions(db: Session) -> None:
         {"code": "autoservice.inspections", "name": "Записи автосервиса"},
         {"code": "autoservice.settings", "name": "Настройки автосервиса"},
         {"code": "autoservice.markup", "name": "Настройки наценки"},
+        {"code": QR_PART_CARD_PERMISSION, "name": "QR-карточка запчасти"},
     ]
     for perm in defaults:
         existing = db.query(Permission).filter(Permission.code == perm["code"]).first()
