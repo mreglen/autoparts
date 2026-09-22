@@ -4,7 +4,7 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
@@ -64,6 +64,7 @@ def accrue_order_payroll(db: Session, order: RepairOrder) -> None:
                     employee_id=row.employee_id,
                     order_id=order.id,
                     work_id=work.id,
+                    work_title=work.title,
                     accrual_type="work_percent",
                     amount=amount,
                 )
@@ -186,7 +187,30 @@ def _executor_percent(work: RepairOrderWork | None, employee_id: int) -> Decimal
     return None
 
 
-def _accrual_work_row(accrual: AutoservicePayrollAccrual, works_by_id: dict[int, RepairOrderWork]) -> dict:
+def _match_accrual_to_order_work(
+    accrual: AutoservicePayrollAccrual,
+    amount: Decimal,
+    works: list[RepairOrderWork],
+) -> RepairOrderWork | None:
+    matches: list[RepairOrderWork] = []
+    for work in works:
+        line_total = _line_sum(work.qty, _money(work.unit_price))
+        for row in work.executors or []:
+            if row.employee_id != accrual.employee_id:
+                continue
+            if _money(line_total * _money(row.percent) / Decimal("100")) == amount:
+                matches.append(work)
+                break
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
+def _accrual_work_row(
+    accrual: AutoservicePayrollAccrual,
+    works_by_id: dict[int, RepairOrderWork],
+    order_works: list[RepairOrderWork],
+) -> dict:
     amount = _money(accrual.amount)
     if accrual.accrual_type == "daily_rate":
         return {
@@ -203,9 +227,11 @@ def _accrual_work_row(accrual: AutoservicePayrollAccrual, works_by_id: dict[int,
 
     work = works_by_id.get(accrual.work_id) if accrual.work_id else None
     if work is None:
+        work = _match_accrual_to_order_work(accrual, amount, order_works)
+    if work is None:
         return {
             "work_id": accrual.work_id,
-            "title": "Работа",
+            "title": getattr(accrual, "work_title", None) or "Работа",
             "qty": None,
             "unit_price": None,
             "line_total": None,
@@ -295,13 +321,17 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
         bucket["order_works"].setdefault(accrual.order_id, []).append(accrual)
 
     works_by_id: dict[int, RepairOrderWork] = {}
-    if all_work_ids:
+    order_works_by_order_id: dict[int, list[RepairOrderWork]] = {}
+    if all_order_ids:
         works = (
             db.query(RepairOrderWork)
-            .filter(RepairOrderWork.id.in_(all_work_ids))
+            .options(selectinload(RepairOrderWork.executors))
+            .filter(RepairOrderWork.order_id.in_(all_order_ids))
             .all()
         )
         works_by_id = {work.id: work for work in works}
+        for work in works:
+            order_works_by_order_id.setdefault(work.order_id, []).append(work)
 
     orders_by_id: dict[int, RepairOrder] = {}
     vehicles_by_id: dict[int, GarageVehicle] = {}
@@ -338,7 +368,10 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
             vehicle = vehicles_by_id.get(order.vehicle_id) if order and order.vehicle_id else None
             work_accruals = bucket["order_works"].get(order_id, [])
             works = _sort_work_rows(
-                [_accrual_work_row(accrual, works_by_id) for accrual in work_accruals]
+                [
+                    _accrual_work_row(accrual, works_by_id, order_works_by_order_id.get(order_id, []))
+                    for accrual in work_accruals
+                ]
             )
             order_rows.append(
                 {

@@ -41,6 +41,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
             q = MagicMock()
             q.filter.return_value = q
             q.order_by.return_value = q
+            q.options.return_value = q
             if model is AutoserviceServiceEmployee:
                 q.all.return_value = employees
                 q.first.return_value = employees[0] if employees else None
@@ -108,6 +109,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         works = [
             SimpleNamespace(
                 id=501,
+                order_id=10,
                 title="Замена масла",
                 qty=1,
                 unit_price=Decimal("1000.00"),
@@ -119,6 +121,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
             ),
             SimpleNamespace(
                 id=502,
+                order_id=11,
                 title="Диагностика",
                 qty=1,
                 unit_price=Decimal("500.00"),
@@ -196,6 +199,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         works = [
             SimpleNamespace(
                 id=501,
+                order_id=10,
                 title="Ремонт",
                 qty=1,
                 unit_price=Decimal("1500.00"),
@@ -246,6 +250,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         works = [
             SimpleNamespace(
                 id=501,
+                order_id=10,
                 title="Диагностика",
                 qty=1,
                 unit_price=Decimal("1500.00"),

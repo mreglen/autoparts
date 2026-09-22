@@ -4962,6 +4962,7 @@ def ensure_autoservice_works_and_employees_tables() -> None:
             employee_id INTEGER NOT NULL REFERENCES autoservice_service_employees(id) ON DELETE CASCADE,
             order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
             work_id INTEGER REFERENCES repair_order_works(id) ON DELETE SET NULL,
+            work_title VARCHAR(255),
             accrual_type VARCHAR(32) NOT NULL,
             amount {numeric} NOT NULL DEFAULT 0,
             accrued_at {ts_type} NOT NULL DEFAULT {"NOW()" if is_pg else "CURRENT_TIMESTAMP"}
@@ -4970,6 +4971,15 @@ def ensure_autoservice_works_and_employees_tables() -> None:
         with engine.begin() as conn:
             conn.execute(text(ddl))
         logger.info("Applied autoservice_payroll_accruals table patch")
+
+    if "autoservice_payroll_accruals" in tables:
+        accrual_columns = {col["name"] for col in inspector.get_columns("autoservice_payroll_accruals")}
+        if "work_title" not in accrual_columns:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE autoservice_payroll_accruals ADD COLUMN work_title VARCHAR(255)")
+                )
+            logger.info("Applied autoservice_payroll_accruals work_title patch")
 
     if "repair_orders" in tables:
         with engine.begin() as conn:

@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { apiRequest } from '../../utils/apiClient';
 import { formatFinanceCurrency } from '../Finance/financeDisplay';
 import { Skeleton } from '../../components/UI';
 import Modal from '../../components/UI/Modal';
-import { vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
+import RepairOrderViewModal, { vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
 import {
   autoserviceListErrorClass,
   autoserviceListHeaderSubtitleClass,
@@ -104,6 +103,8 @@ export default function AutoserviceMyPayrollPage() {
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
   const [viewOrder, setViewOrder] = useState(null);
+  const [fullOrder, setFullOrder] = useState(null);
+  const [fullOrderLoading, setFullOrderLoading] = useState(false);
   const monthInputRef = useRef(null);
 
   const openMonthPicker = useCallback((event) => {
@@ -146,6 +147,20 @@ export default function AutoserviceMyPayrollPage() {
   const orders = data?.orders || [];
   const showDaily = Number(data?.from_daily || 0) > 0;
   const showFixed = Number(data?.from_fixed || 0) > 0;
+
+  const openRepairOrder = useCallback(async (orderId) => {
+    if (!orderId) return;
+    setFullOrderLoading(true);
+    try {
+      const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
+      setViewOrder(null);
+      setFullOrder(order);
+    } catch (e) {
+      setError(e?.message || 'Не удалось загрузить заказ-наряд');
+    } finally {
+      setFullOrderLoading(false);
+    }
+  }, []);
 
   return (
     <div className={`${warehousePageClass} min-w-0 space-y-4`}>
@@ -266,12 +281,14 @@ export default function AutoserviceMyPayrollPage() {
               Закрыть
             </button>
             {viewOrder?.order_id ? (
-              <Link
-                to={`/autoservice/orders/${viewOrder.order_id}/edit`}
+              <button
+                type="button"
+                onClick={() => openRepairOrder(viewOrder.order_id)}
+                disabled={fullOrderLoading}
                 className={autoserviceListPrimaryButtonClass}
               >
-                Открыть заказ-наряд
-              </Link>
+                {fullOrderLoading ? 'Открытие…' : 'Открыть заказ-наряд'}
+              </button>
             ) : null}
           </div>
         }
@@ -310,6 +327,13 @@ export default function AutoserviceMyPayrollPage() {
           </div>
         ) : null}
       </Modal>
+
+      <RepairOrderViewModal
+        order={fullOrder}
+        loading={fullOrderLoading && !fullOrder}
+        onClose={() => setFullOrder(null)}
+        onOrderChange={setFullOrder}
+      />
     </div>
   );
 }

@@ -40,6 +40,7 @@ class AutoservicePayrollAccrual(Base):
         nullable=True,
         index=True,
     )
+    work_title = Column(String(255), nullable=True)
     accrual_type = Column(String(32), nullable=False)
     amount = Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     accrued_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
