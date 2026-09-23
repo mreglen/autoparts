@@ -514,6 +514,7 @@ export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
         order={viewRepairOrder}
         loading={viewRepairOrderLoading}
         enablePayment
+        wrapperZIndex="var(--sg-z-modal-elevated-shell)"
         onClose={() => setViewRepairOrder(null)}
         onOrderChange={(updated) => setViewRepairOrder(updated)}
       />

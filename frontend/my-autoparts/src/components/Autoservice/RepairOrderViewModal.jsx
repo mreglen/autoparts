@@ -548,6 +548,7 @@ export default function RepairOrderViewModal({
   onOrderChange,
   showExecutors = true,
   enablePayment = false,
+  wrapperZIndex = null,
 }) {
   const [payOpen, setPayOpen] = useState(false);
   const [payMethod, setPayMethod] = useState(null);
@@ -801,6 +802,7 @@ export default function RepairOrderViewModal({
       onClose={handleClose}
       size="lg"
       className="max-lg:!rounded-none"
+      wrapperZIndex={wrapperZIndex}
       draggable
       title={
         order ? (

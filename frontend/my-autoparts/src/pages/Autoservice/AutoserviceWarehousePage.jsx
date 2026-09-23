@@ -657,8 +657,8 @@ export default function AutoserviceWarehousePage() {
             />
 
             {Number(detailsItem.reserved_qty) > 0 ? (
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-ink">Резерв в заказ-нарядах</h3>
+              <div className="text-sm">
+                <h3 className="mb-2 font-semibold text-ink">Резерв в заказ-нарядах</h3>
                 {reservationsLoading ? (
                   <p className="text-sm text-ink-muted">Загрузка…</p>
                 ) : reservationsError ? (
@@ -727,6 +727,7 @@ export default function AutoserviceWarehousePage() {
         order={viewRepairOrder}
         loading={viewRepairOrderLoading}
         enablePayment
+        wrapperZIndex="var(--sg-z-modal-elevated-shell)"
         onClose={() => setViewRepairOrder(null)}
         onEdit={(o) => {
           if (!o?.id) return;

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { getFocusableElements } from '../utils/focusTrapUtils';
 
+const activeTrapStack = [];
+
 /**
  * Traps keyboard focus inside a dialog/drawer panel and restores focus on deactivate.
  *
@@ -41,7 +43,11 @@ export function useFocusTrap(containerRef, {
       focusable[0]?.focus();
     }, 0);
 
+    const stackEntry = {};
+    activeTrapStack.push(stackEntry);
+
     const onKeyDown = (event) => {
+      if (activeTrapStack[activeTrapStack.length - 1] !== stackEntry) return;
       if (event.key === 'Escape') {
         onEscapeRef.current?.();
         return;
@@ -75,6 +81,8 @@ export function useFocusTrap(containerRef, {
     return () => {
       window.clearTimeout(focusTimer);
       window.removeEventListener('keydown', onKeyDown);
+      const stackIndex = activeTrapStack.indexOf(stackEntry);
+      if (stackIndex >= 0) activeTrapStack.splice(stackIndex, 1);
 
       if (!restoreFocus) return;
 
