@@ -23,6 +23,15 @@ function formatPrice(amount) {
   return `${Number(amount || 0).toLocaleString('ru-RU')} ₽`;
 }
 
+function formatOrderDate(value) {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleDateString('ru-RU');
+  } catch {
+    return '';
+  }
+}
+
 export default function PurchaseItemsPickerModal({
   open,
   onClose,
@@ -152,7 +161,7 @@ export default function PurchaseItemsPickerModal({
         ) : unifiedOrders.length === 0 ? (
           <p className="py-6 text-center text-sm text-ink-muted">Оформленных заказов пока нет</p>
         ) : (
-          <ul className="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
+          <ul className="space-y-2">
             {unifiedOrders.map((entry) => {
               const orderType = entry.source;
               const order = entry.order;
@@ -173,10 +182,18 @@ export default function PurchaseItemsPickerModal({
                   >
                     <span className="min-w-0 text-sm text-ink">
                       <span className="font-medium">
-                        {orderType === 'new' ? 'NEW' : 'Б/У'} · №{order.id} · {items.length} поз.
+                        №{order.id}
+                        <span className="font-normal text-ink-faint"> · {orderType === 'new' ? 'Новый' : 'Б/У'}</span>
                       </span>
                       {sellerName ? (
                         <span className="text-ink-muted"> · {sellerName}</span>
+                      ) : null}
+                      <span>
+                        {formatOrderDate(order.created_at) ? ` · ${formatOrderDate(order.created_at)}` : ''}
+                      </span>
+                      <span className="text-ink-muted"> · {items.length} поз.</span>
+                      {order.total_amount != null ? (
+                        <span className="font-medium"> · {formatPrice(order.total_amount)}</span>
                       ) : null}
                     </span>
                     <span className="shrink-0 text-xs text-brand-600">
