@@ -463,6 +463,35 @@ def get_autoservice_warehouse_item_movements(
             return unit
         return "pcs"
 
+    order_numbers = set()
+    for e in expenses:
+        reason = (e.reason or "").strip()
+        if not e.repair_order_id and reason.startswith("Заказ-наряд №"):
+            order_numbers.add(reason.removeprefix("Заказ-наряд №").strip())
+
+    order_map: dict[str, int] = {}
+    if order_numbers:
+        for ro_id, ro_number in (
+            db.query(RepairOrder.id, RepairOrder.order_number)
+            .filter(
+                RepairOrder.organization_id == org_id,
+                RepairOrder.order_number.in_(list(order_numbers)),
+            )
+            .all()
+        ):
+            order_map[ro_number] = ro_id
+
+    def _expense_order(e) -> tuple[int | None, str | None]:
+        if e.repair_order_id:
+            return e.repair_order_id, (
+                e.repair_order.order_number if e.repair_order else None
+            )
+        reason = (e.reason or "").strip()
+        if reason.startswith("Заказ-наряд №"):
+            number = reason.removeprefix("Заказ-наряд №").strip()
+            return order_map.get(number), number
+        return None, None
+
     unit = _item_unit()
     events = []
     for r in receipts:
@@ -497,6 +526,7 @@ def get_autoservice_warehouse_item_movements(
         )
     for e in expenses:
         is_return = e.return_request_id is not None
+        expense_order_id, expense_order_number = _expense_order(e)
         events.append(
             AutoserviceWarehouseItemMovementEventView(
                 kind="return" if is_return else "expense",
@@ -506,10 +536,8 @@ def get_autoservice_warehouse_item_movements(
                 title="Возврат поставщику" if is_return else "Списание",
                 detail=e.reason,
                 unit_price=_money(e.client_unit_price),
-                repair_order_id=e.repair_order_id,
-                repair_order_number=(
-                    e.repair_order.order_number if e.repair_order else None
-                ),
+                repair_order_id=expense_order_id,
+                repair_order_number=expense_order_number,
             )
         )
     for rr in pending_returns:
@@ -572,10 +600,8 @@ def get_autoservice_warehouse_item_movements(
                 unit_price=_money(e.unit_price),
                 client_unit_price=_money(e.client_unit_price),
                 reason=e.reason,
-                repair_order_id=e.repair_order_id,
-                repair_order_number=(
-                    e.repair_order.order_number if e.repair_order else None
-                ),
+                repair_order_id=_expense_order(e)[0],
+                repair_order_number=_expense_order(e)[1],
             )
             for e in expenses
         ],

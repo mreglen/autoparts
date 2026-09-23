@@ -57,6 +57,7 @@ const pillButtonClass =
 
 const REPAIR_ORDER_STATUS_LABELS = {
   review: 'На проверке',
+  pending: 'Ожидание',
   accepted: 'Принят',
   open: 'Открыт',
   in_progress: 'В работе',
