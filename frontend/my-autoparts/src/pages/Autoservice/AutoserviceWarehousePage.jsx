@@ -666,30 +666,30 @@ export default function AutoserviceWarehousePage() {
                 ) : reservations.length === 0 ? (
                   <p className="text-sm text-ink-muted">Нет активных резервов в заказ-нарядах</p>
                 ) : (
-                  <ul className="divide-y divide-line-soft rounded-sg border border-line">
+                  <ul className="divide-y divide-line-soft rounded-sg border border-line-soft">
                     {reservations.map((row) => (
-                      <li
-                        key={row.repair_order_id}
-                        className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
-                      >
-                        <div className="min-w-0">
+                      <li key={row.repair_order_id} className="px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-ink">Резерв</span>
+                          <span className="shrink-0 tabular-nums font-medium text-warning-700">
+                            {formatReservationQty(row.qty, row.unit || detailsItem.unit || 'pcs')}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-ink-soft">
                           <button
                             type="button"
                             className="font-medium text-brand-700 hover:text-brand-900"
                             onClick={() => openRepairOrder(row.repair_order_id)}
                           >
-                            {repairOrderNumberLabel({
+                            Заказ-наряд {repairOrderNumberLabel({
                               id: row.repair_order_id,
                               order_number: row.repair_order_number,
                             })}
                           </button>
-                          <p className="mt-0.5 text-xs text-ink-muted">
+                          <span className="text-xs text-ink-muted">
                             {REPAIR_ORDER_STATUS_LABELS[row.order_status] || row.order_status}
-                          </p>
+                          </span>
                         </div>
-                        <span className="shrink-0 tabular-nums font-medium text-ink">
-                          {formatReservationQty(row.qty, row.unit || detailsItem.unit || 'pcs')}
-                        </span>
                       </li>
                     ))}
                   </ul>

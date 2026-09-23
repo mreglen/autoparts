@@ -96,7 +96,12 @@ export default function AutoserviceWarehouseItemMovements({
           <p className="text-ink-muted">Движений пока нет</p>
         ) : (
           <ul className="divide-y divide-line-soft rounded-sg border border-line-soft">
-            {events.map((ev, i) => (
+            {events.map((ev, i) => {
+              const detail = ev.repair_order_id
+                && String(ev.detail || '').startsWith('Заказ-наряд')
+                ? ''
+                : ev.detail;
+              return (
               <li key={`${ev.kind}-${i}`} className="px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-ink-muted">{formatMovementDate(ev.date)}</span>
@@ -116,7 +121,7 @@ export default function AutoserviceWarehouseItemMovements({
                       Заказ-наряд {ev.repair_order_number || `№${ev.repair_order_id}`}
                     </button>
                   ) : null}
-                  {ev.detail ? <span className="truncate">{ev.detail}</span> : null}
+                  {detail ? <span className="truncate">{detail}</span> : null}
                   {ev.unit_price != null ? (
                     <span>{formatAutoserviceWarehouseMoney(ev.unit_price)}</span>
                   ) : null}
@@ -127,7 +132,8 @@ export default function AutoserviceWarehouseItemMovements({
                   </p>
                 ) : null}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>
