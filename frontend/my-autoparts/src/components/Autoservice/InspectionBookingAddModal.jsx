@@ -365,19 +365,7 @@ export default function InspectionBookingAddModal({
       </button>
     </div>
   ) : (
-    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          editStartedAtRef.current = Date.now();
-          setIsEditing(true);
-        }}
-        className="min-h-12 w-full rounded-sg-sm bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 sm:order-4 sm:min-h-11 sm:w-auto"
-      >
-        Редактировать
-      </button>
+    <div className="flex items-center justify-end gap-2">
       {isEdit && onCreateOrder ? (
         <button
           type="button"
@@ -397,7 +385,7 @@ export default function InspectionBookingAddModal({
               notes,
             });
           }}
-          className="min-h-12 w-full rounded-sg-sm border border-brand-300 bg-brand-50 px-4 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 sm:order-3 sm:min-h-11 sm:w-auto"
+          className="min-h-11 rounded-sg-sm border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
         >
           Создать заказ-наряд
         </button>
@@ -405,12 +393,18 @@ export default function InspectionBookingAddModal({
       <button
         type="button"
         onClick={(e) => {
+          e.preventDefault();
           e.stopPropagation();
-          onClose?.();
+          editStartedAtRef.current = Date.now();
+          setIsEditing(true);
         }}
-        className="min-h-12 w-full rounded-sg-sm border border-line-strong bg-surface px-4 py-2.5 text-sm font-medium text-ink-soft transition hover:bg-surface-muted sm:order-2 sm:min-h-11 sm:w-auto"
+        aria-label="Редактировать запись"
+        title="Редактировать запись"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm border border-brand-300 text-brand-600 transition hover:bg-brand-50"
       >
-        Закрыть
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+        </svg>
       </button>
       {isEdit ? (
         <button
@@ -420,9 +414,13 @@ export default function InspectionBookingAddModal({
             setDeleteConfirmOpen(true);
           }}
           disabled={deleting}
-          className="min-h-12 w-full rounded-sg-sm border border-danger-200 bg-surface px-4 py-2.5 text-sm font-medium text-danger-600 transition hover:bg-danger-50 disabled:opacity-60 sm:order-1 sm:mr-auto sm:min-h-11 sm:w-auto"
+          aria-label="Удалить запись"
+          title="Удалить запись"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm border border-brand-300 text-danger-600 transition hover:bg-danger-50 disabled:opacity-60"
         >
-          Удалить
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 7l-.9 12.1A2 2 0 0116.1 21H7.9a2 2 0 01-2-1.9L5 7m5 4v6m4-6v6M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M4 7h16" />
+          </svg>
         </button>
       ) : null}
     </div>

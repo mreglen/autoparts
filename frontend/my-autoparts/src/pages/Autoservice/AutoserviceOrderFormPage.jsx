@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
@@ -445,19 +446,48 @@ export function SearchableSelect({
   onInputChange,
 }) {
   const rootRef = useRef(null);
+  const listRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [listPos, setListPos] = useState(null);
+
+  const updateListPos = useCallback(() => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const below = window.innerHeight - rect.bottom;
+    const openUp = below < 208 && rect.top > below;
+    setListPos({
+      left: rect.left,
+      width: rect.width,
+      top: openUp ? undefined : rect.bottom + 4,
+      bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
+      maxHeight: Math.max(96, Math.min(192, (openUp ? rect.top - 12 : below - 12))),
+    });
+  }, []);
 
   useEffect(() => {
     const onDocClick = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setOpen(false);
-        setQuery('');
-      }
+      if (rootRef.current?.contains(e.target) || listRef.current?.contains(e.target)) return;
+      setOpen(false);
+      setQuery('');
     };
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setListPos(null);
+      return undefined;
+    }
+    updateListPos();
+    window.addEventListener('scroll', updateListPos, true);
+    window.addEventListener('resize', updateListPos);
+    return () => {
+      window.removeEventListener('scroll', updateListPos, true);
+      window.removeEventListener('resize', updateListPos);
+    };
+  }, [open, updateListPos]);
 
   const selected = options.find((o) => String(o.value) === String(value));
 
@@ -500,10 +530,12 @@ export function SearchableSelect({
         }}
         autoComplete="off"
       />
-      {open && !disabled && !loading ? (
+      {open && !disabled && !loading && listPos ? createPortal(
         <ul
+          ref={listRef}
           aria-busy={searching}
-          className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-sg-lg border border-line bg-surface py-1 shadow-sg-md"
+          className="fixed z-[140] overflow-y-auto rounded-sg-lg border border-line bg-surface py-1 shadow-sg-md"
+          style={listPos}
         >
           {searching ? (
             <li className="px-4 py-2 text-xs text-ink-muted">Поиск клиентов…</li>
@@ -554,7 +586,8 @@ export function SearchableSelect({
               </button>
             </li>
           ) : null}
-        </ul>
+        </ul>,
+        document.body,
       ) : null}
     </div>
   );
