@@ -2295,19 +2295,22 @@ export default function AutoserviceOrderFormPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
     const snapshot = captureFormSnapshot();
     const validationError = validateForAutoSave();
     if (!canAttemptAutoSave() || validationError) {
       writeRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null, snapshot);
-      setError('');
-      setAutoSaveStatus('saved');
+      navigate('/autoservice/orders');
       return;
     }
 
     setSaving(true);
     setAutoSaveStatus('saving');
     setError('');
-    const err = await persistRepairOrder();
+    const err = await persistRepairOrder({ afterCreate: 'close' });
     setSaving(false);
     if (err) {
       setAutoSaveStatus('error');
@@ -2315,7 +2318,8 @@ export default function AutoserviceOrderFormPage() {
       return;
     }
     lastSavedSnapshotRef.current = JSON.stringify(snapshot);
-    setAutoSaveStatus('saved');
+    clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null);
+    navigate('/autoservice/orders');
   };
 
   if (!isReady) return <AuthLoadingScreen />;
@@ -2864,7 +2868,7 @@ export default function AutoserviceOrderFormPage() {
                 disabled={saving}
                 className={`${btnPrimaryClass} max-lg:w-full max-lg:px-3`}
               >
-                {saving ? 'Сохранение…' : 'Сохранить'}
+                {saving ? 'Сохранение…' : 'Сохранить и закрыть'}
               </button>
               <button
                 type="button"

@@ -19,8 +19,8 @@ import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
-  readRepairOrderFormDraft,
-  repairOrderFormSnapshotHasContent,
+  clearRepairOrderFormDraft,
+  listRepairOrderFormDrafts,
 } from '../../utils/repairOrderFormDraft';
 import AutoserviceOrdersMobileView from './AutoserviceOrdersMobileView';
 import {
@@ -65,8 +65,7 @@ export default function AutoserviceOrdersPage() {
   const viewReview = viewParam === 'review';
   const viewDrafts = viewParam === 'drafts';
   const viewAll = viewParam === 'all';
-  const createDraft = readRepairOrderFormDraft('create');
-  const hasCreateDraft = repairOrderFormSnapshotHasContent(createDraft?.form);
+  const [drafts, setDrafts] = useState(() => listRepairOrderFormDrafts());
 
   const [rows, setRows] = useState([]);
   const [reviewCount, setReviewCount] = useState(0);
@@ -80,6 +79,7 @@ export default function AutoserviceOrdersPage() {
   const [duplicatingId, setDuplicatingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
   const [deleteConfirmOrder, setDeleteConfirmOrder] = useState(null);
+  const [deleteConfirmDraft, setDeleteConfirmDraft] = useState(null);
   const [closeConfirmOrder, setCloseConfirmOrder] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const prevScopeKeyRef = useRef(null);
@@ -132,12 +132,17 @@ export default function AutoserviceOrdersPage() {
     const onPullRefresh = (event) => {
       const path = event.detail?.pathname || '';
       if (path === '/autoservice/orders' || path.startsWith('/autoservice/orders?')) {
+        setDrafts(listRepairOrderFormDrafts());
         load({ silent: true });
       }
     };
     window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
   }, [load]);
+
+  useEffect(() => {
+    if (viewDrafts) setDrafts(listRepairOrderFormDrafts());
+  }, [viewDrafts]);
 
   useEffect(() => {
     if (isReady && viewReview && !canReview) {
@@ -152,6 +157,7 @@ export default function AutoserviceOrdersPage() {
     else if (id === 'all') setSearchParams({ view: 'all' });
     else setSearchParams({});
     setViewOrder(null);
+    setDrafts(listRepairOrderFormDrafts());
   };
 
   const applyOrderToList = useCallback(
@@ -259,6 +265,24 @@ export default function AutoserviceOrdersPage() {
     }
   };
 
+  const openDraft = useCallback(
+    (draft) => {
+      if (draft.mode === 'edit' && draft.orderId) {
+        navigate(`/autoservice/orders/${draft.orderId}/edit`);
+      } else {
+        navigate('/autoservice/orders/new');
+      }
+    },
+    [navigate],
+  );
+
+  const handleDeleteDraftConfirm = useCallback(() => {
+    if (!deleteConfirmDraft) return;
+    clearRepairOrderFormDraft(deleteConfirmDraft.mode, deleteConfirmDraft.orderId);
+    setDeleteConfirmDraft(null);
+    setDrafts(listRepairOrderFormDrafts());
+  }, [deleteConfirmDraft]);
+
   const handleDeleteConfirm = async () => {
     if (!deleteConfirmOrder) return;
     setDeletingId(deleteConfirmOrder.id);
@@ -286,6 +310,28 @@ export default function AutoserviceOrdersPage() {
     [applyOrderToList],
   );
 
+  const filteredDrafts = useMemo(() => {
+    if (!viewDrafts) return drafts;
+    const term = qApplied.trim().toLowerCase();
+    if (!term) return drafts;
+    return drafts.filter((draft) => {
+      const title = draft.mode === 'create'
+        ? 'новый заказ-наряд'
+        : `заказ-наряд #${draft.orderId}`;
+      const text = [
+        title,
+        draft.form?.pendingClientName,
+        draft.form?.pendingClientPhone,
+        draft.form?.pendingVehicleMake,
+        draft.form?.pendingVehicleModel,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return text.includes(term);
+    });
+  }, [drafts, qApplied, viewDrafts]);
+
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !user) return null;
 
@@ -301,7 +347,7 @@ export default function AutoserviceOrdersPage() {
   const pageSubtitle = loading
     ? 'Загрузка…'
     : viewDrafts
-      ? `${hasCreateDraft ? 1 : 0} черновиков`
+      ? `${drafts.length} черновиков`
       : viewAll
         ? `${rows.length} всего`
         : viewHistory
@@ -316,7 +362,7 @@ export default function AutoserviceOrdersPage() {
   const orderTabs = [
     { id: 'active', label: 'Активные' },
     { id: 'all', label: 'Все' },
-    { id: 'drafts', label: 'Черновики', count: hasCreateDraft ? 1 : undefined },
+    { id: 'drafts', label: 'Черновики', count: drafts.length || undefined },
     ...(canReview ? [{ id: 'review', label: 'На проверке', shortLabel: 'Проверка', count: reviewCount }] : []),
     { id: 'history', label: 'История' },
   ];
@@ -329,59 +375,15 @@ export default function AutoserviceOrdersPage() {
         : viewAll
           ? 'all'
           : 'active';
-  const emptyMessage = viewHistory
+  const emptyMessage = viewDrafts
+    ? 'Черновиков пока нет'
+    : viewHistory
     ? 'В истории пока нет заказ-нарядов'
     : viewReview
       ? 'Заявок на проверке нет'
       : viewAll
         ? 'Заказ-нарядов нет'
         : 'Активных заказ-нарядов нет';
-
-  if (viewDrafts) {
-    return (
-      <div className="w-full min-w-0">
-        <button
-          type="button"
-          onClick={() => navigate('/autoservice/orders/new')}
-          className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 lg:hidden"
-        >
-          Новый заказ-наряд
-        </button>
-        <div className="mb-4 max-lg:hidden">
-          <h1 className="text-xl font-bold text-ink sm:text-2xl">{pageTitle}</h1>
-          <p className="mt-0.5 text-sm text-ink-muted">{pageSubtitle}</p>
-        </div>
-        <UnderlineTabs
-          className="mb-4 max-lg:mt-4"
-          ariaLabel="Разделы заказ-нарядов"
-          gapClassName="gap-4"
-          tabClassName="pb-3 pt-1 text-sm font-medium sm:text-[15px]"
-          tabs={orderTabs}
-          value={tabValue}
-          onChange={setListView}
-        />
-        {hasCreateDraft ? (
-          <button
-            type="button"
-            onClick={() => navigate('/autoservice/orders/new')}
-            className="flex w-full min-h-11 items-center justify-between gap-3 rounded-sg border border-line bg-surface p-4 text-left transition hover:bg-surface-muted"
-          >
-            <span>
-              <span className="block text-sm font-semibold text-ink">Новый заказ-наряд</span>
-              <span className="mt-1 block text-xs text-ink-muted">
-                Сохранён {new Date(createDraft.savedAt).toLocaleString('ru-RU')}
-              </span>
-            </span>
-            <span className="text-sm font-medium text-brand-600">Продолжить</span>
-          </button>
-        ) : (
-          <div className="rounded-sg border border-line bg-surface p-6 text-center text-sm text-ink-muted">
-            Черновиков пока нет
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="w-full min-w-0">
@@ -412,6 +414,9 @@ export default function AutoserviceOrdersPage() {
           duplicatingId={duplicatingId}
           approvingId={approvingId}
           formatDateTime={formatDateTime}
+          drafts={viewDrafts ? filteredDrafts : undefined}
+          onDraftOpen={openDraft}
+          onDraftDelete={setDeleteConfirmDraft}
         />
       </div>
 
@@ -507,6 +512,67 @@ export default function AutoserviceOrdersPage() {
                   <td className={autoserviceListTdClass}><Skeleton className="h-6 w-20 rounded-full" /></td>
                 </tr>
               ))
+            ) : viewDrafts ? (
+              filteredDrafts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-ink-muted">
+                    {emptyMessage}
+                  </td>
+                </tr>
+              ) : (
+                filteredDrafts.map((draft) => (
+                  <tr
+                    key={draft.key}
+                    className={autoserviceListTrClickableClass}
+                    onClick={() => openDraft(draft)}
+                  >
+                    <td className={autoserviceListTdClass}>
+                      <span className="font-medium text-ink-muted">
+                        {draft.mode === 'create' ? 'Новый' : `#${draft.orderId}`}
+                      </span>
+                    </td>
+                    <td className={autoserviceListTdClass}>
+                      <span className="tabular-nums text-ink-muted">
+                        {draft.savedAt ? new Date(draft.savedAt).toLocaleString('ru-RU') : '—'}
+                      </span>
+                    </td>
+                    <td className={`${autoserviceListTdClass} font-semibold text-ink`}>
+                      {[draft.form?.pendingVehicleMake, draft.form?.pendingVehicleModel]
+                        .filter(Boolean)
+                        .join(' ') || '—'}
+                    </td>
+                    <td className={autoserviceListTdClass}>
+                      <div className="font-semibold text-ink">
+                        {draft.form?.pendingClientName || '—'}
+                      </div>
+                    </td>
+                    <td className={autoserviceListTdClass}>
+                      <span className="text-ink-muted">—</span>
+                    </td>
+                    <td className={autoserviceListTdClass}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                          Черновик
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmDraft(draft);
+                          }}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                          title="Удалить черновик"
+                          aria-label="Удалить черновик"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3m-9 0h10" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )
             ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-ink-muted">
@@ -596,6 +662,20 @@ export default function AutoserviceOrdersPage() {
         confirmLabel="Удалить"
         danger
         loading={Boolean(deletingId)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteConfirmDraft)}
+        onClose={() => setDeleteConfirmDraft(null)}
+        onConfirm={handleDeleteDraftConfirm}
+        title="Удалить черновик?"
+        message={
+          deleteConfirmDraft
+            ? `${deleteConfirmDraft.mode === 'create' ? 'Новый заказ-наряд' : `Заказ-наряд #${deleteConfirmDraft.orderId}`} — несохранённые данные будут удалены безвозвратно.`
+            : ''
+        }
+        confirmLabel="Удалить"
+        danger
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
+import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import { Modal, Skeleton } from '../../components/UI';
 import AutoserviceWarehouseItemMovements from '../../components/Autoservice/AutoserviceWarehouseItemMovements';
 import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
@@ -24,9 +25,12 @@ import {
   autoserviceListThClass,
   autoserviceListThRightClass,
   autoserviceListTheadRowClass,
-  autoserviceListTrClass,
   autoserviceListTrClickableClass,
+  warehousePillControlClass,
 } from '../../utils/warehouseListUi';
+
+const pillButtonClass =
+  'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
 
 function formatDate(value) {
   if (!value) return '—';
@@ -61,12 +65,18 @@ function ExpenseMobileCard({ row, onClick }) {
   );
 }
 
-export default function AutoserviceWarehouseExpensesPage() {
+export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [supplierCustom, setSupplierCustom] = useState('');
+  const [supplierDocs, setSupplierDocs] = useState([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewExpense, setViewExpense] = useState(null);
   const [viewExpenseMovements, setViewExpenseMovements] = useState(null);
   const [viewExpenseMovementsLoading, setViewExpenseMovementsLoading] = useState(false);
@@ -76,16 +86,30 @@ export default function AutoserviceWarehouseExpensesPage() {
   const [viewRepairOrder, setViewRepairOrder] = useState(null);
   const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
 
+  const supplierTerm = (supplierFilter || supplierCustom).trim();
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const expenses = await apiRequest('/autoservice/warehouse/expenses');
+      const params = new URLSearchParams();
+      if (supplierTerm) params.set('supplier', supplierTerm);
+      const suffix = params.toString() ? `?${params.toString()}` : '';
+      const expenses = await apiRequest(`/autoservice/warehouse/expenses${suffix}`);
       setRows(Array.isArray(expenses) ? expenses : []);
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить расходы');
     } finally {
       setLoading(false);
+    }
+  }, [supplierTerm]);
+
+  const loadSupplierDocs = useCallback(async () => {
+    try {
+      const docs = await apiRequest('/autoservice/warehouse/receipts');
+      setSupplierDocs(Array.isArray(docs) ? docs : []);
+    } catch {
+      setSupplierDocs([]);
     }
   }, []);
 
@@ -93,17 +117,21 @@ export default function AutoserviceWarehouseExpensesPage() {
     if (!isReady || !isAuthenticated) return;
     if (!userHasAutoserviceOrganization(user)) return;
     loadData();
-  }, [isReady, isAuthenticated, user, loadData]);
+    loadSupplierDocs();
+  }, [isReady, isAuthenticated, user, loadData, loadSupplierDocs]);
 
   useEffect(() => {
+    const refreshPath = embedded
+      ? '/autoservice/warehouse'
+      : '/autoservice/warehouse/expenses';
     const onPullRefresh = (event) => {
-      if (event.detail?.pathname === '/autoservice/warehouse/expenses') {
+      if (event.detail?.pathname === refreshPath) {
         loadData();
       }
     };
     window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
-  }, [loadData]);
+  }, [loadData, embedded]);
 
   useEffect(() => {
     if (!viewExpense?.item_id) {
@@ -135,12 +163,28 @@ export default function AutoserviceWarehouseExpensesPage() {
     };
   }, [viewExpense?.item_id]);
 
+  const supplierOptions = useMemo(() => {
+    const names = new Map();
+    supplierDocs.forEach((doc) => {
+      const name = String(doc.supplier_name || '').trim();
+      if (name) names.set(name.toLowerCase(), name);
+    });
+    return [...names.values()]
+      .sort((a, b) => a.localeCompare(b, 'ru'))
+      .map((name) => ({ value: name, label: name }));
+  }, [supplierDocs]);
+
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) => [row.brand, row.article, row.name, row.reason, row.creator_name]
-      .some((value) => String(value || '').toLowerCase().includes(q)));
-  }, [rows, searchQuery]);
+    return rows.filter((row) => {
+      const day = String(row.created_at || '').slice(0, 10);
+      if (dateFrom && day < dateFrom) return false;
+      if (dateTo && day > dateTo) return false;
+      if (!q) return true;
+      return [row.brand, row.article, row.name, row.reason, row.creator_name]
+        .some((value) => String(value || '').toLowerCase().includes(q));
+    });
+  }, [rows, searchQuery, dateFrom, dateTo]);
 
   const handleDelete = useCallback(async () => {
     if (!viewExpense) return;
@@ -176,14 +220,16 @@ export default function AutoserviceWarehouseExpensesPage() {
 
   return (
     <div className={autoserviceListPageClass}>
-      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className={autoserviceListHeaderTitleClass}>Расходы</h1>
-          <p className={autoserviceListHeaderSubtitleClass}>
-            {loading ? 'Загрузка…' : `${filteredRows.length} списаний`}
-          </p>
+      {embedded ? null : (
+        <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className={autoserviceListHeaderTitleClass}>Расходы</h1>
+            <p className={autoserviceListHeaderSubtitleClass}>
+              {loading ? 'Загрузка…' : `${filteredRows.length} списаний`}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <AutoserviceLiveSearchField
@@ -192,8 +238,63 @@ export default function AutoserviceWarehouseExpensesPage() {
           placeholder="Поиск по товару или причине"
           ariaLabel="Поиск расходов"
         />
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((v) => !v)}
+          className={`${pillButtonClass} shrink-0 ${filtersOpen ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
+          aria-expanded={filtersOpen}
+        >
+          Фильтры
+          <svg
+            className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
         <AutoserviceListRefreshButton loading={loading} onClick={loadData} />
       </div>
+
+      {filtersOpen ? (
+        <div className="mb-4 grid grid-cols-2 gap-3">
+          <label className="block min-w-0">
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
+            <input
+              type="date"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={warehousePillControlClass}
+            />
+          </label>
+          <label className="block min-w-0">
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              className={warehousePillControlClass}
+            />
+          </label>
+          <label className="col-span-2 block min-w-0">
+            <span className="mb-1.5 block text-xs font-medium text-ink-muted">Поставщик</span>
+            <SearchablePillSelect
+              value={supplierFilter}
+              onChange={setSupplierFilter}
+              options={supplierOptions}
+              placeholder="Все поставщики"
+              emptyOptionLabel="Все поставщики"
+              ariaLabel="Фильтр по поставщику"
+              allowCustomValue
+              customValue={supplierCustom}
+              onCustomValueChange={setSupplierCustom}
+            />
+          </label>
+        </div>
+      ) : null}
 
       {error ? (
         <p className={autoserviceListErrorClass} role="alert">

@@ -336,6 +336,7 @@ def update_own_autoservice_warehouse_return(
 )
 def list_autoservice_warehouse_items(
     q: str = Query("", max_length=120),
+    supplier: str = Query("", max_length=255),
     available_only: bool = Query(False),
     exclude_zero_qty: bool = Query(False),
     db: Session = Depends(get_db),
@@ -345,6 +346,24 @@ def list_autoservice_warehouse_items(
     query = db.query(AutoserviceWarehouseItem).filter(
         AutoserviceWarehouseItem.organization_id == org_id,
     )
+    supplier_term = (supplier or "").strip()
+    if supplier_term:
+        like = f"%{supplier_term}%"
+        supplier_item_ids = (
+            db.query(AutoserviceWarehouseReceipt.item_id)
+            .join(
+                AutoserviceWarehouseReceiptDoc,
+                AutoserviceWarehouseReceipt.document_id
+                == AutoserviceWarehouseReceiptDoc.id,
+            )
+            .filter(
+                AutoserviceWarehouseReceipt.organization_id == org_id,
+                AutoserviceWarehouseReceiptDoc.supplier_name.ilike(like),
+            )
+        )
+        query = query.filter(
+            AutoserviceWarehouseItem.id.in_(supplier_item_ids.scalar_subquery())
+        )
     term = (q or "").strip()
     if term:
         like = f"%{term}%"
@@ -910,17 +929,39 @@ def update_autoservice_warehouse_receipt_line_price(
     response_model=list[AutoserviceWarehouseExpenseView],
 )
 def list_autoservice_warehouse_expenses(
+    supplier: str = Query("", max_length=255),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    query = db.query(AutoserviceWarehouseExpense).filter(
+        AutoserviceWarehouseExpense.organization_id == org_id,
+    )
+    supplier_term = (supplier or "").strip()
+    if supplier_term:
+        like = f"%{supplier_term}%"
+        supplier_item_ids = (
+            db.query(AutoserviceWarehouseReceipt.item_id)
+            .join(
+                AutoserviceWarehouseReceiptDoc,
+                AutoserviceWarehouseReceipt.document_id
+                == AutoserviceWarehouseReceiptDoc.id,
+            )
+            .filter(
+                AutoserviceWarehouseReceipt.organization_id == org_id,
+                AutoserviceWarehouseReceiptDoc.supplier_name.ilike(like),
+            )
+        )
+        query = query.filter(
+            AutoserviceWarehouseExpense.item_id.in_(supplier_item_ids.scalar_subquery())
+        )
     rows = (
-        db.query(AutoserviceWarehouseExpense)
+        query
         .options(
             joinedload(AutoserviceWarehouseExpense.item),
             joinedload(AutoserviceWarehouseExpense.creator),
+            joinedload(AutoserviceWarehouseExpense.repair_order),
         )
-        .filter(AutoserviceWarehouseExpense.organization_id == org_id)
         .order_by(
             AutoserviceWarehouseExpense.created_at.desc(),
             AutoserviceWarehouseExpense.id.desc(),
@@ -964,9 +1005,11 @@ def list_autoservice_warehouse_expenses(
     for row in rows:
         item = row.item
         reason = (row.reason or "").strip()
-        repair_order_id = None
-        repair_order_number = None
-        if reason.startswith("Заказ-наряд №"):
+        repair_order_id = row.repair_order_id
+        repair_order_number = (
+            row.repair_order.order_number if row.repair_order else None
+        )
+        if not repair_order_id and reason.startswith("Заказ-наряд №"):
             repair_order_number = reason.removeprefix("Заказ-наряд №").strip()
             repair_order_id = order_map.get(repair_order_number)
         result.append(

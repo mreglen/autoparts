@@ -8,6 +8,7 @@ import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import {
   normalizeImageUrl,
   apiAxiosUnauth,
+  apiRequest,
   pickFullImageUrl,
   pickListImageUrlNormalized,
 } from '../../utils/apiClient';
@@ -127,6 +128,7 @@ const PartDetail = () => {
   
   const { currentProduct, error } = useSelector((state) => state.products);
   const { user } = useSelector((state) => state.auth);
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const cart = useSelector(selectCart);
   const purchaseMode = useSelector((state) => state.publicInfo.usedPartsPurchaseMode);
   const { formatPrice: formatProductPriceDisplay } = useProductPriceFormat();
@@ -149,6 +151,7 @@ const PartDetail = () => {
   const [soldOutAlternatesLoading, setSoldOutAlternatesLoading] = useState(false);
   const [soldOutResolved, setSoldOutResolved] = useState(null);
   const [soldOutResolveState, setSoldOutResolveState] = useState('idle');
+  const [orgStockPlacement, setOrgStockPlacement] = useState(null);
   const fetchedProductIdRef = useRef(null);
   const searchedBrandArticleRef = useRef(null);
   const trackedPartViewRef = useRef(null);
@@ -473,6 +476,36 @@ const PartDetail = () => {
     recordedEngagementViewRef.current = currentProduct.id;
     dispatch(recordProductView(currentProduct.id));
   }, [showProduct, currentProduct?.id, user, location.pathname, dispatch]);
+
+  const displayProductId = displayProduct?.id;
+  const displayProductOrgId = displayProduct?.organization_id || displayProduct?.organization?.id;
+
+  // Org member viewing own product → warehouse placement (storage location + cells)
+  useEffect(() => {
+    setOrgStockPlacement(null);
+    if (!user || !displayProductId) return undefined;
+    if (!user.organization_id || String(user.organization_id) !== String(displayProductOrgId)) {
+      return undefined;
+    }
+    const canSee =
+      user.is_admin ||
+      user.is_seller ||
+      user.is_director ||
+      (user.is_employee && (permissionCodes || []).includes('qr-card'));
+    if (!canSee) return undefined;
+
+    let cancelled = false;
+    apiRequest(`/products/qr-card/${displayProductId}`)
+      .then((data) => {
+        if (!cancelled) setOrgStockPlacement(data || null);
+      })
+      .catch(() => {
+        if (!cancelled) setOrgStockPlacement(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, displayProductId, displayProductOrgId, permissionCodes]);
 
   // Preload first photo thumb for faster LCP on /part/
   useEffect(() => {
@@ -1309,6 +1342,27 @@ const PartDetail = () => {
             <div className="mt-4 md:hidden">{renderMediaThumbnails()}</div>
             <div className="mt-4 lg:hidden">{renderPurchaseSidebar()}</div>
             <PartDetailSpecsBlock product={currentProduct} variant="inline" />
+            {orgStockPlacement && (orgStockPlacement.storage_location_name || (orgStockPlacement.product_storage_cells || []).length) ? (
+              <section className="mt-4 rounded-sg border border-line bg-surface-muted px-3 py-2.5">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                  Размещение на складе
+                </h2>
+                <div className="mt-1.5 space-y-1 text-sm text-ink">
+                  {orgStockPlacement.storage_location_name ? (
+                    <p>
+                      <span className="text-ink-muted">Склад:</span>{' '}
+                      <span className="font-medium">{orgStockPlacement.storage_location_name}</span>
+                    </p>
+                  ) : null}
+                  {(orgStockPlacement.product_storage_cells || []).map((cell) => (
+                    <p key={cell.id || cell.storage_cell_id}>
+                      <span className="text-ink-muted">{cell.storage_cell_name || 'Ячейка'}:</span>{' '}
+                      <span className="font-medium">{cell.value}</span>
+                    </p>
+                  ))}
+                </div>
+              </section>
+            ) : null}
             {currentProduct.description ? <div className="mt-5">{renderSellerDescription()}</div> : null}
             <div className="mt-5 lg:hidden">{renderOrganizationSidebar()}</div>
           </div>

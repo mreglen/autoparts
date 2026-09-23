@@ -49,6 +49,58 @@ function OrderActionsMenu({
   );
 }
 
+function DraftMobileRow({ draft, onOpen, onDelete }) {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const title = draft.mode === 'create'
+    ? 'Новый заказ-наряд'
+    : `Заказ-наряд #${draft.orderId}`;
+  const client = draft.form?.pendingClientName?.trim();
+  const vehicle = [draft.form?.pendingVehicleMake, draft.form?.pendingVehicleModel]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const savedAt = draft.savedAt
+    ? new Date(draft.savedAt).toLocaleString('ru-RU')
+    : '';
+
+  return (
+    <div className={`py-3 ${actionsOpen ? 'relative z-30' : ''}`}>
+      <div className="flex items-start gap-2">
+        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="shrink-0 text-base font-semibold text-gray-900">{title}</span>
+            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              Черновик
+            </span>
+          </div>
+          {vehicle ? (
+            <p className="mt-1.5 line-clamp-2 text-sm font-medium text-gray-800">{vehicle}</p>
+          ) : null}
+          {client ? <p className="mt-0.5 truncate text-sm text-gray-800">{client}</p> : null}
+          <p className="mt-1 text-xs text-gray-500">Сохранён {savedAt}</p>
+        </button>
+        <div className="shrink-0">
+          <ActionsDropdown
+            isOpen={actionsOpen}
+            onOpenChange={setActionsOpen}
+            menuClassName="w-52 z-50"
+            estimatedMenuHeight={120}
+            showLabel={false}
+            buttonClassName="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+          >
+            <ActionsDropdownItem className="min-h-11" onClick={onOpen}>
+              Продолжить
+            </ActionsDropdownItem>
+            <ActionsDropdownItem className="min-h-11" onClick={onDelete} danger>
+              Удалить
+            </ActionsDropdownItem>
+          </ActionsDropdown>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OrderMobileRow({
   row,
   statusActions,
@@ -144,7 +196,11 @@ export default function AutoserviceOrdersMobileView({
   duplicatingId,
   approvingId,
   formatDateTime,
+  drafts,
+  onDraftOpen,
+  onDraftDelete,
 }) {
+  const isDrafts = Array.isArray(drafts);
   return (
     <div className="w-full min-w-0">
       <button
@@ -219,6 +275,21 @@ export default function AutoserviceOrdersMobileView({
               </div>
             ))}
           </div>
+        ) : isDrafts ? (
+          drafts.length === 0 ? (
+            <p className="py-10 text-center text-sm text-gray-500">{emptyMessage}</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {drafts.map((draft) => (
+                <DraftMobileRow
+                  key={draft.key}
+                  draft={draft}
+                  onOpen={() => onDraftOpen?.(draft)}
+                  onDelete={() => onDraftDelete?.(draft)}
+                />
+              ))}
+            </div>
+          )
         ) : rows.length === 0 ? (
           <p className="py-10 text-center text-sm text-gray-500">{emptyMessage}</p>
         ) : (

@@ -199,7 +199,7 @@ def is_missing_phone_placeholder(phone: str | None) -> bool:
 
 
 def missing_phone_placeholder() -> str:
-    return f"{MISSING_PHONE_PREFIX}{uuid.uuid4().hex}__"
+    return f"{MISSING_PHONE_PREFIX}{uuid.uuid4().hex[:19]}__"
 
 
 def normalize_phone_or_400(phone: str) -> str:

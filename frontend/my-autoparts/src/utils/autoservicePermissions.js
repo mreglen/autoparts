@@ -45,15 +45,7 @@ export const AUTOSERVICE_MENU_ITEMS = [
     permission: AUTOSERVICE_PERMISSION.orders,
     anyOf: AUTOSERVICE_ORDERS_SECTION_CODES,
   },
-  {
-    id: 'autoservice-warehouse-group',
-    permission: AUTOSERVICE_PERMISSION.warehouse,
-    submenu: [
-      { id: 'autoservice-warehouse', permission: AUTOSERVICE_PERMISSION.warehouse },
-      { id: 'autoservice-warehouse-receipts', permission: AUTOSERVICE_PERMISSION.warehouse },
-      { id: 'autoservice-warehouse-expenses', permission: AUTOSERVICE_PERMISSION.warehouse },
-    ],
-  },
+  { id: 'autoservice-warehouse', permission: AUTOSERVICE_PERMISSION.warehouse },
   { id: 'autoservice-finance', permission: AUTOSERVICE_PERMISSION.finance },
   { id: 'autoservice-reports', permission: AUTOSERVICE_PERMISSION.reports },
   {

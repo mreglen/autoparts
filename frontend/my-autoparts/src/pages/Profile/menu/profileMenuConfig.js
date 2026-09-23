@@ -160,26 +160,10 @@ const buildAutoserviceStaffTab = (user, options, hasPermission) => {
             : can(item.permission);
         if (!allowed) return;
 
-        if (item.submenu?.length) {
-            submenu.push({
-                id: item.id,
-                label: 'Склад',
-                submenu: item.submenu.map((child) => ({
-                    id: child.id,
-                    label:
-                        child.id === 'autoservice-warehouse'
-                            ? 'Склад автосервиса'
-                            : child.id === 'autoservice-warehouse-receipts'
-                              ? 'Поступления'
-                              : 'Расходы',
-                })),
-            });
-            return;
-        }
-
         const labels = {
             'autoservice-planner': 'Планировщик',
             'autoservice-orders': 'Заказ-наряды',
+            'autoservice-warehouse': 'Склад',
             'autoservice-finance': 'Финансы',
             'autoservice-reports': 'Отчёты',
             'autoservice-payroll': 'Зарплата',
@@ -381,8 +365,6 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/autoservice/planner')) return 'autoservice-planner';
     if (path.startsWith('/autoservice/clients')) return 'autoservice-clients';
     if (path.startsWith('/autoservice/orders')) return 'autoservice-orders';
-    if (path.startsWith('/autoservice/warehouse/receipts')) return 'autoservice-warehouse-receipts';
-    if (path.startsWith('/autoservice/warehouse/expenses')) return 'autoservice-warehouse-expenses';
     if (path.startsWith('/autoservice/warehouse')) return 'autoservice-warehouse';
     if (path.startsWith('/autoservice/finance')) return 'autoservice-finance';
     if (path.startsWith('/autoservice/reports')) return 'autoservice-reports';

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -11,9 +11,13 @@ import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
 import { NumericInput, Skeleton, UnderlineTabs } from '../../components/UI';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
+import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import AutoserviceWarehouseItemMovements from '../../components/Autoservice/AutoserviceWarehouseItemMovements';
 import AutoserviceWarehouseReturnModal from '../../components/Autoservice/AutoserviceWarehouseReturnModal';
+import AutoserviceWarehouseReceiptsPage from './AutoserviceWarehouseReceiptsPage';
+import AutoserviceWarehouseExpensesPage from './AutoserviceWarehouseExpensesPage';
+import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import useNewPartsMarkupPercent from '../../hooks/useNewPartsMarkupPercent';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
@@ -39,17 +43,17 @@ import {
   autoserviceListTableClass,
   autoserviceListTableWrapClass,
   autoserviceListTbodyClass,
-  autoserviceListTdActionsClass,
   autoserviceListTdClass,
   autoserviceListTdRightClass,
-  autoserviceListThActionsClass,
   autoserviceListThClass,
   autoserviceListThRightClass,
   autoserviceListTheadRowClass,
-  autoserviceListTrClass,
   autoserviceListTrClickableClass,
   warehouseSecondaryButtonClass,
 } from '../../utils/warehouseListUi';
+
+const pillButtonClass =
+  'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
 
 const REPAIR_ORDER_STATUS_LABELS = {
   review: 'На проверке',
@@ -85,20 +89,8 @@ function WarehouseItemMobileCard({
   );
 }
 
-function PurchaseLotMobileCard({ lot, onOpen }) {
-  const lotTotal = Number(lot.unit_price || 0) * Number(lot.quantity || 0);
-  return (
-    <button type="button" onClick={onOpen} className="w-full border-b border-line-soft py-2 text-left last:border-b-0">
-      <p className="truncate font-medium text-ink">{lot.name || '—'}</p>
-      <p className="mt-1 text-sm text-ink-muted">
-        {lot.quantity} шт. · {formatAutoserviceWarehouseMoney(lot.unit_price)} ·{' '}
-        {formatAutoserviceWarehouseMoney(lotTotal)}
-      </p>
-    </button>
-  );
-}
-
 export default function AutoserviceWarehousePage() {
+  const navigate = useNavigate();
   const { isReady, isAuthenticated, user } = useAuthReady();
   const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
   const clientMarkupEnabled = canUseClientMarkup(user);
@@ -110,7 +102,11 @@ export default function AutoserviceWarehousePage() {
   const clientMarkupPercent = clientMarkupEnabled ? storedClientMarkupPercent : 0;
   const [items, setItems] = useState([]);
   const [purchaseLots, setPurchaseLots] = useState([]);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('stock');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [supplierCustom, setSupplierCustom] = useState('');
+  const [supplierDocs, setSupplierDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -128,18 +124,23 @@ export default function AutoserviceWarehousePage() {
   const [submitting, setSubmitting] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const [detailsLot, setDetailsLot] = useState(null);
   const [returnLot, setReturnLot] = useState(null);
   const [reservations, setReservations] = useState([]);
   const [reservationsLoading, setReservationsLoading] = useState(false);
   const [reservationsError, setReservationsError] = useState('');
+  const [viewRepairOrder, setViewRepairOrder] = useState(null);
+  const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
+
+  const supplierTerm = (supplierFilter || supplierCustom).trim();
 
   const loadItems = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
+      const params = new URLSearchParams({ exclude_zero_qty: 'true' });
+      if (supplierTerm) params.set('supplier', supplierTerm);
       const [data, lots] = await Promise.all([
-        apiRequest('/autoservice/warehouse/items?exclude_zero_qty=true'),
+        apiRequest(`/autoservice/warehouse/items?${params.toString()}`),
         apiRequest('/autoservice/warehouse/purchase-lots'),
       ]);
       setItems(Array.isArray(data) ? data : []);
@@ -149,13 +150,23 @@ export default function AutoserviceWarehousePage() {
     } finally {
       setLoading(false);
     }
+  }, [supplierTerm]);
+
+  const loadSupplierDocs = useCallback(async () => {
+    try {
+      const docs = await apiRequest('/autoservice/warehouse/receipts');
+      setSupplierDocs(Array.isArray(docs) ? docs : []);
+    } catch {
+      setSupplierDocs([]);
+    }
   }, []);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
     if (!userHasAutoserviceOrganization(user)) return;
     loadItems();
-  }, [isReady, isAuthenticated, user, loadItems]);
+    loadSupplierDocs();
+  }, [isReady, isAuthenticated, user, loadItems, loadSupplierDocs]);
 
   useEffect(() => {
     const onPullRefresh = (event) => {
@@ -216,21 +227,34 @@ export default function AutoserviceWarehousePage() {
     };
   }, [detailsItem?.id]);
 
+  const openRepairOrder = useCallback(async (orderId) => {
+    if (!orderId) return;
+    setViewRepairOrderLoading(true);
+    try {
+      const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
+      setViewRepairOrder(order);
+    } catch (err) {
+      setError(err?.message || 'Не удалось загрузить заказ-наряд');
+    } finally {
+      setViewRepairOrderLoading(false);
+    }
+  }, []);
+
   const filteredItems = useMemo(
     () => items.filter((item) => matchesAutoserviceWarehouseSearch(item, searchQuery)),
     [items, searchQuery],
   );
-  const filteredLots = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return purchaseLots;
-    return purchaseLots.filter((lot) => [
-      lot.brand,
-      lot.article,
-      lot.name,
-      lot.supplier_name,
-      lot.source_order_id,
-    ].some((value) => String(value || '').toLowerCase().includes(query)));
-  }, [purchaseLots, searchQuery]);
+
+  const supplierOptions = useMemo(() => {
+    const names = new Map();
+    supplierDocs.forEach((doc) => {
+      const name = String(doc.supplier_name || '').trim();
+      if (name) names.set(name.toLowerCase(), name);
+    });
+    return [...names.values()]
+      .sort((a, b) => a.localeCompare(b, 'ru'))
+      .map((name) => ({ value: name, label: name }));
+  }, [supplierDocs]);
 
   const detailsItemReturnableLot = useMemo(
     () =>
@@ -368,10 +392,11 @@ export default function AutoserviceWarehousePage() {
     await loadItems();
   };
 
-  const listCount = activeTab === 'purchases' ? filteredLots.length : filteredItems.length;
-  const listCountLabel = activeTab === 'purchases'
-    ? `${listCount} партий`
-    : `${listCount} позиций`;
+  const listCountLabel = activeTab === 'stock'
+    ? `${filteredItems.length} позиций`
+    : activeTab === 'receipts'
+      ? 'История поступлений'
+      : 'История списаний';
 
   if (!isReady) {
     return <AuthLoadingScreen />;
@@ -409,115 +434,73 @@ export default function AutoserviceWarehousePage() {
         ariaLabel="Разделы склада автосервиса"
         gapClassName="gap-4"
         tabs={[
-          { id: 'all', label: 'Все товары' },
-          { id: 'purchases', label: 'Из покупок' },
+          { id: 'stock', label: 'Остатки' },
+          { id: 'receipts', label: 'Поступления' },
+          { id: 'expenses', label: 'Расходы' },
         ]}
         value={activeTab}
         onChange={setActiveTab}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <AutoserviceLiveSearchField
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder={
-            activeTab === 'purchases'
-              ? 'Поиск по товару, поставщику или заказу'
-              : 'Поиск по бренду, артикулу, названию'
-          }
-          ariaLabel="Поиск по складу автосервиса"
-        />
-        <AutoserviceListRefreshButton loading={loading} onClick={loadItems} />
-      </div>
+      {activeTab === 'stock' ? (
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <AutoserviceLiveSearchField
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Поиск по бренду, артикулу, названию"
+              ariaLabel="Поиск по складу автосервиса"
+            />
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((v) => !v)}
+              className={`${pillButtonClass} shrink-0 ${filtersOpen ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
+              aria-expanded={filtersOpen}
+            >
+              Фильтры
+              <svg
+                className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <AutoserviceListRefreshButton loading={loading} onClick={loadItems} />
+          </div>
 
-      {error ? (
-        <p className={autoserviceListErrorClass} role="alert">
-          {error}
-        </p>
+          {filtersOpen ? (
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block min-w-0">
+                <span className="mb-1.5 block text-xs font-medium text-ink-muted">Поставщик</span>
+                <SearchablePillSelect
+                  value={supplierFilter}
+                  onChange={setSupplierFilter}
+                  options={supplierOptions}
+                  placeholder="Все поставщики"
+                  emptyOptionLabel="Все поставщики"
+                  ariaLabel="Фильтр по поставщику"
+                  allowCustomValue
+                  customValue={supplierCustom}
+                  onCustomValueChange={setSupplierCustom}
+                />
+              </label>
+            </div>
+          ) : null}
+
+          {error ? (
+            <p className={autoserviceListErrorClass} role="alert">
+              {error}
+            </p>
+          ) : null}
+        </>
       ) : null}
 
-      {activeTab === 'purchases' ? (
-        <>
-          <div className={autoserviceListTableWrapClass}>
-            <table className={autoserviceListTableClass}>
-              <thead>
-                <tr className={autoserviceListTheadRowClass}>
-                  <th className={`w-3/5 ${autoserviceListThClass}`}>Наименование</th>
-                  <th className={`w-20 whitespace-nowrap !pr-2 ${autoserviceListThRightClass}`}>Кол-во</th>
-                  <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Цена</th>
-                  <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
-                </tr>
-              </thead>
-              <tbody className={autoserviceListTbodyClass}>
-                {loading ? (
-                  Array.from({ length: 6 }).map((_, index) => (
-                    <tr key={`sk-lot-${index}`}>
-                      <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
-                      <td className={`w-20 whitespace-nowrap !pr-2 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-10" /></td>
-                      <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
-                      <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
-                    </tr>
-                  ))
-                ) : filteredLots.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-12 text-center text-ink-muted">
-                      На складе нет партий из оформленных заказов
-                    </td>
-                  </tr>
-                ) : (
-                  filteredLots.map((lot) => {
-                    const lotTotal = Number(lot.unit_price || 0) * Number(lot.quantity || 0);
-                    return (
-                      <tr
-                        key={lot.receipt_id}
-                        className={autoserviceListTrClickableClass}
-                        onClick={() => setDetailsLot(lot)}
-                      >
-                        <td className={`min-w-0 ${autoserviceListTdClass}`}>
-                          <div className="w-0 min-w-full truncate font-semibold text-ink">{lot.name || '—'}</div>
-                        </td>
-                        <td className={`w-20 !pr-2 text-ink-muted ${autoserviceListTdRightClass} tabular-nums whitespace-nowrap`}>
-                          {lot.quantity} шт.
-                        </td>
-                        <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
-                          {formatAutoserviceWarehouseMoney(lot.unit_price)}
-                        </td>
-                        <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
-                          {formatAutoserviceWarehouseMoney(lotTotal)}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className={autoserviceListMobileWrapClass}>
-            {loading ? (
-              <div className="divide-y divide-line-soft">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={`msk-lot-${index}`} className="border-b border-line-soft py-2 last:border-b-0">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="mt-1 h-3 w-40" />
-                  </div>
-                ))}
-              </div>
-            ) : filteredLots.length === 0 ? (
-              <p className="py-10 text-center text-sm text-ink-muted">
-                На складе нет партий из оформленных заказов
-              </p>
-            ) : (
-              filteredLots.map((lot) => (
-                <PurchaseLotMobileCard
-                  key={lot.receipt_id}
-                  lot={lot}
-                  onOpen={() => setDetailsLot(lot)}
-                />
-              ))
-            )}
-          </div>
-        </>
+      {activeTab === 'receipts' ? (
+        <AutoserviceWarehouseReceiptsPage embedded />
+      ) : activeTab === 'expenses' ? (
+        <AutoserviceWarehouseExpensesPage embedded />
       ) : (
         <>
           <div className={autoserviceListTableWrapClass}>
@@ -622,81 +605,6 @@ export default function AutoserviceWarehousePage() {
         </>
       )}
 
-      <Modal
-        open={Boolean(detailsLot)}
-        onClose={() => setDetailsLot(null)}
-        title={detailsLot ? detailsLot.name || 'Партия из закупки' : 'Партия из закупки'}
-        draggable
-      >
-        {detailsLot ? (
-          <div className="space-y-4 text-sm">
-            <dl className="grid grid-cols-2 gap-3">
-              <div>
-                <dt className="text-ink-muted">Бренд</dt>
-                <dd className="font-medium text-ink">{detailsLot.brand || '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted">Артикул</dt>
-                <dd className="font-mono text-ink">{detailsLot.article || '—'}</dd>
-              </div>
-              <div className="col-span-2">
-                <dt className="text-ink-muted">Наименование</dt>
-                <dd className="font-medium text-ink">{detailsLot.name || '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted">Поставщик</dt>
-                <dd className="text-ink">{detailsLot.supplier_name || '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted">Заказ</dt>
-                <dd className="text-ink">{detailsLot.source_order_id ? `№ ${detailsLot.source_order_id}` : '—'}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted">Поступило</dt>
-                <dd className="tabular-nums text-ink">{detailsLot.quantity} шт.</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted">К возврату</dt>
-                <dd className="tabular-nums text-ink">{detailsLot.max_returnable_qty} шт.</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted">Цена</dt>
-                <dd className="tabular-nums text-ink">{formatAutoserviceWarehouseMoney(detailsLot.unit_price)}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted">Сумма</dt>
-                <dd className="tabular-nums font-semibold text-ink">
-                  {formatAutoserviceWarehouseMoney(Number(detailsLot.unit_price || 0) * Number(detailsLot.quantity || 0))}
-                </dd>
-              </div>
-            </dl>
-
-            {detailsLot.active_return ? (
-              <p className="rounded-sg bg-brand-50 px-3 py-2 text-xs text-brand-700">
-                Заявка на возврат №{detailsLot.active_return.id} · {detailsLot.active_return.status_code}
-              </p>
-            ) : null}
-
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="secondary" onClick={() => setDetailsLot(null)}>
-                Закрыть
-              </Button>
-              {detailsLot.max_returnable_qty > 0 && !detailsLot.active_return ? (
-                <Button
-                  onClick={() => {
-                    const lot = detailsLot;
-                    setDetailsLot(null);
-                    setReturnLot(lot);
-                  }}
-                >
-                  Вернуть
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-      </Modal>
-
       <AutoserviceWarehouseReturnModal
         receiptId={returnLot?.receipt_id || null}
         initialLot={returnLot}
@@ -744,7 +652,7 @@ export default function AutoserviceWarehousePage() {
               loading={detailsMovementsLoading}
               error={detailsMovementsError}
               showStock={false}
-              onNavigate={() => setDetailsItem(null)}
+              onOpenOrder={openRepairOrder}
             />
 
             {Number(detailsItem.reserved_qty) > 0 ? (
@@ -764,16 +672,16 @@ export default function AutoserviceWarehousePage() {
                         className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
                       >
                         <div className="min-w-0">
-                          <Link
-                            to={`/autoservice/orders/${row.repair_order_id}/edit`}
+                          <button
+                            type="button"
                             className="font-medium text-brand-700 hover:text-brand-900"
-                            onClick={() => setDetailsItem(null)}
+                            onClick={() => openRepairOrder(row.repair_order_id)}
                           >
                             {repairOrderNumberLabel({
                               id: row.repair_order_id,
                               order_number: row.repair_order_number,
                             })}
-                          </Link>
+                          </button>
                           <p className="mt-0.5 text-xs text-ink-muted">
                             {REPAIR_ORDER_STATUS_LABELS[row.order_status] || row.order_status}
                           </p>
@@ -813,6 +721,18 @@ export default function AutoserviceWarehousePage() {
           </div>
         ) : null}
       </Modal>
+
+      <RepairOrderViewModal
+        order={viewRepairOrder}
+        loading={viewRepairOrderLoading}
+        enablePayment
+        onClose={() => setViewRepairOrder(null)}
+        onEdit={(o) => {
+          if (!o?.id) return;
+          navigate(`/autoservice/orders/${o.id}/edit`);
+        }}
+        onOrderChange={(updated) => setViewRepairOrder(updated)}
+      />
 
       <Modal
         open={Boolean(writeOffItem)}

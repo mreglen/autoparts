@@ -1,5 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 
 function formatMovementDate(value) {
@@ -62,7 +61,7 @@ export default function AutoserviceWarehouseItemMovements({
   loading,
   error,
   showStock = true,
-  onNavigate,
+  onOpenOrder,
 }) {
   if (loading) {
     return <p className="text-sm text-ink-muted">Загрузка движений…</p>;
@@ -109,13 +108,13 @@ export default function AutoserviceWarehouseItemMovements({
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-ink-soft">
                   <span className="font-medium text-ink">{ev.title}</span>
                   {ev.repair_order_id ? (
-                    <Link
-                      to={`/autoservice/orders/${ev.repair_order_id}/edit`}
+                    <button
+                      type="button"
                       className="font-medium text-brand-700 hover:text-brand-900"
-                      onClick={onNavigate}
+                      onClick={() => onOpenOrder?.(ev.repair_order_id)}
                     >
                       Заказ-наряд {ev.repair_order_number || `№${ev.repair_order_id}`}
-                    </Link>
+                    </button>
                   ) : null}
                   {ev.detail ? <span className="truncate">{ev.detail}</span> : null}
                   {ev.unit_price != null ? (
