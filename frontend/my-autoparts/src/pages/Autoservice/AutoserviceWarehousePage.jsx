@@ -410,7 +410,7 @@ export default function AutoserviceWarehousePage() {
         gapClassName="gap-4"
         tabs={[
           { id: 'all', label: 'Все товары' },
-          { id: 'purchases', label: 'Из закупок' },
+          { id: 'purchases', label: 'Из покупок' },
         ]}
         value={activeTab}
         onChange={setActiveTab}

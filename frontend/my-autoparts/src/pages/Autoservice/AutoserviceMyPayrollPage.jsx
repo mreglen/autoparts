@@ -153,7 +153,6 @@ export default function AutoserviceMyPayrollPage() {
     setFullOrderLoading(true);
     try {
       const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
-      setViewOrder(null);
       setFullOrder(order);
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить заказ-наряд');

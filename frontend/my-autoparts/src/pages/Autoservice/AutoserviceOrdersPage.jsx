@@ -14,7 +14,7 @@ import { Skeleton, UnderlineTabs } from '../../components/UI';
 import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { buildRepairOrderDuplicatePayload } from '../../utils/repairOrderDuplicate';
-import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
+import { formatServerDate, formatWallClockDateTime } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
@@ -33,7 +33,7 @@ import {
 } from '../../utils/warehouseListUi';
 
 function formatDateTime(value) {
-  return formatServerDateTime(value);
+  return formatWallClockDateTime(value);
 }
 
 function formatMoney(value) {
@@ -340,12 +340,19 @@ export default function AutoserviceOrdersPage() {
   if (viewDrafts) {
     return (
       <div className="w-full min-w-0">
-        <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => navigate('/autoservice/orders/new')}
+          className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 lg:hidden"
+        >
+          Новый заказ-наряд
+        </button>
+        <div className="mb-4 max-lg:hidden">
           <h1 className="text-xl font-bold text-ink sm:text-2xl">{pageTitle}</h1>
           <p className="mt-0.5 text-sm text-ink-muted">{pageSubtitle}</p>
         </div>
         <UnderlineTabs
-          className="mb-4"
+          className="mb-4 max-lg:mt-4"
           ariaLabel="Разделы заказ-нарядов"
           gapClassName="gap-4"
           tabClassName="pb-3 pt-1 text-sm font-medium sm:text-[15px]"
@@ -380,8 +387,6 @@ export default function AutoserviceOrdersPage() {
     <div className="w-full min-w-0">
       <div className="lg:hidden">
         <AutoserviceOrdersMobileView
-          pageSubtitle={pageSubtitle}
-          showCreateButton={!viewHistory && !viewReview}
           onCreate={() => navigate('/autoservice/orders/new')}
           orderTabs={orderTabs}
           tabValue={tabValue}

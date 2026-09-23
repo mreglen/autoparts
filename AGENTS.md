@@ -190,6 +190,8 @@ sudo update
 - React 19, Redux Toolkit, React Router 7, Tailwind.
 - Компактные таблицы: 12px, узкие строки, `text-ellipsis` для длинных имён.
 - Действия строки по возможности переносить в модальное окно.
+- **Эталон десктопных таблиц — `/autoservice/warehouse`:** все таблицы в ПК-версии должны выглядеть одинаково — узкие строки (`py-2`), `text-xs`, `table-fixed`, uppercase-заголовки `text-xs`, без кнопок действий в строках (строка кликабельная, действия — в модалке). Столбцы могут отличаться, стиль — нет.
+- Не писать табличные классы вручную — использовать общие `autoserviceList*Class` из `frontend/my-autoparts/src/utils/warehouseListUi.js` (`autoserviceListTableClass`, `autoserviceListTheadRowClass`, `autoserviceListThClass`, `autoserviceListTbodyClass`, `autoserviceListTrClass`/`autoserviceListTrClickableClass`, `autoserviceListTdClass` и т.д.).
 - Не коммитить source maps и build-артефакты (они в `.gitignore`).
 
 ## 7. Критичная бизнес-логика
@@ -262,6 +264,7 @@ systemctl restart kroan.service
 - На мобильном скролл живёт в `#root` (`html.mobile-shell`: `body` fixed, `#root { height:100%; overflow-y:auto }`).
 - `MobileShellFrame` использует `min-h-dvh` (не `h-dvh`) — высота shell **неопределённая**, поэтому `flex-1` (`flex-basis:0%`) у детей резолвится в `content`, и колонка растёт по контенту вместо ограничения вьюпортом.
 - Поэтому «прибитые» экраны (активный чат в `ChatsHubPage`) делаются через `max-lg:fixed max-lg:inset-0` на панели — не через `h-full`/`flex-1`-цепочку.
+- Shell на мобильном — `flex-col` контейнер: у прямых детей с `mx-auto` и `width:auto` авто-маргины отключают `stretch`, элемент сжимается до `fit-content` и центрируется. Поэтому `<main>` обязан иметь `w-full` (иначе страницы с узким контентом — настройки, записи — получают широкие боковые отступы).
 
 ## 9. Безопасность и процесс
 

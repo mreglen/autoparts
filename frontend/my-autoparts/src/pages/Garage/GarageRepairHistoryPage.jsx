@@ -9,7 +9,7 @@ import RepairOrderViewModal, {
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { UnderlineTabs } from '../../components/UI';
 import { apiRequest } from '../../utils/apiClient';
-import { formatServerDateTime } from '../../utils/serverDate';
+import { formatWallClockDateTime } from '../../utils/serverDate';
 import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
 import {
   autoserviceListMobileWrapClass,
@@ -47,7 +47,7 @@ function RepairMobileCard({ row, onView }) {
       </div>
       <p className="mt-0.5 truncate text-ink-soft">{vehicleLabel(row.vehicle)}</p>
       <p className="mt-0.5 text-xs text-ink-muted">
-        {formatServerDateTime(row.scheduled_at)} · {formatMoney(row.grand_total)} ₽
+        {formatWallClockDateTime(row.scheduled_at)} · {formatMoney(row.grand_total)} ₽
       </p>
     </button>
   );
@@ -268,7 +268,7 @@ export default function GarageRepairHistoryPage() {
                       {vehicleLabel(row.vehicle)}
                     </td>
                     <td className={`whitespace-nowrap text-ink-soft ${autoserviceListTdClass}`}>
-                      {formatServerDateTime(row.scheduled_at)}
+                      {formatWallClockDateTime(row.scheduled_at)}
                     </td>
                     <td className={`whitespace-nowrap tabular-nums text-ink-soft ${autoserviceListTdClass}`}>
                       {formatMoney(row.grand_total)} ₽

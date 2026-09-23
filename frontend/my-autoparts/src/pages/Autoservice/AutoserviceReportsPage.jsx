@@ -8,7 +8,7 @@ import {
   getFinanceTodayDate,
   getMonthRangeDefaults,
 } from '../Finance/financeDisplay';
-import { formatServerDateTime } from '../../utils/serverDate';
+import { formatServerDateTime, formatWallClockDateTime } from '../../utils/serverDate';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import {
@@ -19,7 +19,6 @@ import {
 } from '../../components/UI';
 import {
   warehouseEmptyShellClass,
-  warehousePageClass,
   warehousePillControlClass,
   warehousePrimaryButtonClass,
   warehouseToolbarClass,
@@ -693,7 +692,7 @@ export default function AutoserviceReportsPage() {
   const payrollOrderCount = payrollRows.reduce((sum, row) => sum + Number(row.completed_orders || 0), 0);
 
   return (
-    <div className={`${warehousePageClass} min-w-0 space-y-6`}>
+    <div className="mt-2 min-w-0 space-y-6 sm:mt-5">
       <PageHeader
         className="mb-0"
         title="Отчёты"
@@ -721,7 +720,6 @@ export default function AutoserviceReportsPage() {
                   <p className="text-2xl font-bold tabular-nums leading-none text-ink">
                     {formatFinanceCurrency(payroll.total)}
                   </p>
-                  <p className="mt-1.5 text-xs text-ink-muted sm:text-sm">к выплате за месяц</p>
                 </>
               )}
             </div>
@@ -734,7 +732,6 @@ export default function AutoserviceReportsPage() {
                   <p className="text-2xl font-bold tabular-nums leading-none text-ink">
                     {formatFinanceCurrency(economicsSummary.net_profit)}
                   </p>
-                  <p className="mt-1.5 text-xs text-ink-muted sm:text-sm">чистая прибыль за период</p>
                 </>
               )}
             </div>
@@ -762,7 +759,6 @@ export default function AutoserviceReportsPage() {
                   <p className="text-2xl font-bold tabular-nums leading-none text-ink">
                     {formatFinanceCurrency(rosskoSalesSummary.organization_income)}
                   </p>
-                  <p className="mt-1.5 text-xs text-ink-muted sm:text-sm">доход организации за период</p>
                 </>
               )}
             </div>
@@ -1296,7 +1292,7 @@ export default function AutoserviceReportsPage() {
                           <span className="text-ink-muted">{vehicleLabel(row.vehicle)}</span>
                           <span className="mx-1 text-ink-muted">·</span>
                           <span className="text-ink-faint">
-                            {row.scheduled_at ? formatServerDateTime(row.scheduled_at) : '—'}
+                            {row.scheduled_at ? formatWallClockDateTime(row.scheduled_at) : '—'}
                           </span>
                         </p>
                       </div>

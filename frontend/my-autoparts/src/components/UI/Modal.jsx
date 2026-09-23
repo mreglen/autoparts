@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Z_CONTEXT_MENU, Z_MODAL } from '../../constants/mobileTokens';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import Button from './Button';
 
@@ -19,7 +18,7 @@ export default function Modal({
   className = '',
   closeVariant = 'close',
   wrapperClassName = '',
-  wrapperZIndex = Z_MODAL,
+  wrapperZIndex = null,
   closeOnBackdrop = true,
   initialFocusRef,
   returnFocusRef,
@@ -195,7 +194,7 @@ export default function Modal({
         'pointer-events-none fixed inset-0 flex items-end justify-center p-0 max-lg:pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] sm:items-center sm:p-4 lg:pb-0',
         wrapperClassName,
       )}
-      style={{ zIndex: wrapperZIndex }}
+      style={{ zIndex: wrapperZIndex ?? 'var(--sg-z-modal-shell)' }}
     >
       <button
         type="button"
@@ -313,7 +312,7 @@ export function ConfirmDialog({
       onClose={onClose}
       title={title}
       size="sm"
-      wrapperZIndex={Z_CONTEXT_MENU}
+      wrapperZIndex="var(--sg-z-modal-elevated-shell)"
       returnFocusRef={returnFocusRef}
       footer={(
         <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">

@@ -8,7 +8,7 @@ import PlannerCellContextMenu from '../../components/Autoservice/PlannerCellCont
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
-import { parseServerDate, toDateInputValue } from '../../utils/serverDate';
+import { parseWallClockDate, toDateInputValue } from '../../utils/serverDate';
 import {
   addDays,
   assignPlannerLanes,
@@ -51,12 +51,12 @@ function plannerItemTimeLabel(item) {
 
 function plannerItemStartTimeLabel(item) {
   if (item?.kind === 'inspection') return item.preferred_time?.slice(0, 5) || '—';
-  const start = parseServerDate(item?.scheduled_at);
+  const start = parseWallClockDate(item?.scheduled_at);
   return start ? start.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
 }
 
 function plannerItemMobileTimeLabel(item, dayIso) {
-  const start = parseServerDate(item?.scheduled_at);
+  const start = parseWallClockDate(item?.scheduled_at);
   if (!start || item?.kind === 'inspection' || toIsoDate(start) === dayIso) {
     return plannerItemStartTimeLabel(item);
   }
@@ -94,7 +94,7 @@ function plannerBarTimeLabel(entry, dayIsos) {
   const { item, startIdx, endIdx } = entry;
   if (item.kind === 'inspection') return plannerItemTimeLabel(item);
   if (endIdx <= startIdx) return plannerItemTimeLabel(item);
-  const startDate = parseServerDate(item.scheduled_at);
+  const startDate = parseWallClockDate(item.scheduled_at);
   if (!startDate) return '—';
   const startClock = startDate.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   const end = plannerItemEndDate(item);
@@ -325,10 +325,13 @@ function MobileDayPlanner({
                     <button
                       type="button"
                       onClick={() => onAddInZone({ dayIso: selectedDayIso, zoneId: zone.id ?? null })}
-                      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-sg border border-brand-200 bg-brand-50 text-lg font-semibold text-brand-700 transition hover:bg-brand-100"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1 rounded-full border border-brand-200/80 bg-brand-50/60 text-xs font-semibold text-brand-700 transition hover:border-brand-300 hover:bg-brand-100 active:bg-brand-100 lg:w-auto lg:pl-2.5 lg:pr-3"
                       aria-label={`Добавить в ${zone.name}`}
                     >
-                      +
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" />
+                      </svg>
+                      <span className="hidden lg:inline">Запись</span>
                     </button>
                   ) : null}
                 </div>
@@ -355,11 +358,11 @@ function MobileDayPlanner({
                             </span>
                           ) : (
                             <span className="min-w-0 flex-1">
-                              <span className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-sm font-medium">
+                              <span className="flex items-center gap-1.5">
+                                <span className="min-w-0 flex-1 truncate text-sm font-medium">
                                   {order.vehicle && order.vehicle !== '—' ? order.vehicle : 'Авто'}
                                 </span>
-                                <OrderStatusBadge status={order.status} />
+                                <OrderStatusBadge status={order.status} className="shrink-0" />
                               </span>
                               <span className="mt-0.5 block truncate text-sm opacity-80">
                                 {formatPersonNameWithInitials(order.client_name)}

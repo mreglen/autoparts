@@ -24,7 +24,7 @@ import { apiRequest } from '../../utils/apiClient';
 import AutoserviceClientRequisitesFields from '../../components/Autoservice/AutoserviceClientRequisitesFields';
 import { validatePhoneOptional, validateEmail } from '../../utils/contactValidation';
 import PhoneInput from '../../components/UI/PhoneInput';
-import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
+import { formatServerDate, formatServerDateTime, formatWallClockDateTime } from '../../utils/serverDate';
 import { normalizeVinForLookupOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import {
   clientRequisitesChanged,
@@ -180,7 +180,7 @@ function VehicleList({
               <ul className="space-y-1">
                 {ordersByVehicle[v.id].map((order) => (
                   <li key={order.id} className="text-xs text-ink-soft">
-                    №{order.order_number || order.id} · {formatServerDateTime(order.scheduled_at || order.created_at) || '—'}
+                    №{order.order_number || order.id} · {order.scheduled_at ? formatWallClockDateTime(order.scheduled_at) : formatServerDateTime(order.created_at)}
                   </li>
                 ))}
               </ul>
@@ -296,7 +296,7 @@ function ClientOrderRow({ row, onOpen }) {
             Заказ-наряд №{row.order_number || row.id}
           </p>
           <p className="mt-0.5 text-xs text-ink-muted">
-            {formatServerDateTime(row.scheduled_at || row.created_at) || '—'}
+            {row.scheduled_at ? formatWallClockDateTime(row.scheduled_at) : formatServerDateTime(row.created_at)}
             {row.vehicle ? ` · ${vehicleLabel(row.vehicle)}` : ''}
           </p>
         </div>

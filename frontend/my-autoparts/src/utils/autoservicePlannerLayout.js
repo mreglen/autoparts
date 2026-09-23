@@ -1,3 +1,5 @@
+import { parseWallClockDate } from './serverDate';
+
 export function getWeekStart(date) {
   const value = new Date(date);
   const weekday = (value.getDay() + 6) % 7;
@@ -21,8 +23,8 @@ export function addDays(date, days) {
 
 export function sortDayOrders(orders) {
   return [...(orders || [])].sort((a, b) => {
-    const aTime = new Date(a.scheduled_at).getTime();
-    const bTime = new Date(b.scheduled_at).getTime();
+    const aTime = parseWallClockDate(a.scheduled_at)?.getTime() ?? 0;
+    const bTime = parseWallClockDate(b.scheduled_at)?.getTime() ?? 0;
     if (aTime !== bTime) return aTime - bTime;
     return (a.id || 0) - (b.id || 0);
   });
@@ -30,8 +32,8 @@ export function sortDayOrders(orders) {
 
 export function plannerItemEndDate(item, now = new Date()) {
   if (!item || item.kind === 'inspection') return null;
-  const start = item.scheduled_at ? new Date(item.scheduled_at) : null;
-  const end = item.scheduled_end_at ? new Date(item.scheduled_end_at) : null;
+  const start = parseWallClockDate(item.scheduled_at);
+  const end = parseWallClockDate(item.scheduled_end_at);
   if (item.status === 'in_progress') {
     return end && end > now ? end : now;
   }
@@ -40,7 +42,7 @@ export function plannerItemEndDate(item, now = new Date()) {
 }
 
 export function plannerItemCoversDay(item, isoDate, now = new Date()) {
-  const start = item?.scheduled_at ? new Date(item.scheduled_at) : null;
+  const start = parseWallClockDate(item?.scheduled_at);
   if (!start) return false;
   const startIso = toIsoDate(start);
   if (isoDate < startIso) return false;
@@ -55,7 +57,7 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
     : null;
   const placed = [];
   for (const item of items || []) {
-    const start = item.scheduled_at ? new Date(item.scheduled_at) : null;
+    const start = parseWallClockDate(item.scheduled_at);
     if (!start) continue;
     const end = plannerItemEndDate(item, now);
     let startIdx = dayIsos.indexOf(toIsoDate(start));
@@ -84,8 +86,8 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
     const aSpan = a.endIdx - a.startIdx;
     const bSpan = b.endIdx - b.startIdx;
     if (aSpan !== bSpan) return bSpan - aSpan;
-    const aTime = new Date(a.item.scheduled_at).getTime();
-    const bTime = new Date(b.item.scheduled_at).getTime();
+    const aTime = parseWallClockDate(a.item.scheduled_at)?.getTime() ?? 0;
+    const bTime = parseWallClockDate(b.item.scheduled_at)?.getTime() ?? 0;
     if (aTime !== bTime) return aTime - bTime;
     return (a.item.id || 0) - (b.item.id || 0);
   });

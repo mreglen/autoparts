@@ -26,6 +26,7 @@ import {
   markAvitoChatRead,
 } from '../../redux/slices/AvitoChatSlice';
 import { resolveActiveChatParams, buildChatsQueryUrl } from '../../utils/resolveActiveChatParams';
+import { canGoBackInHistory } from '../../hooks/useHistoryBack';
 import { getUnifiedChatUnreadCount } from '../../utils/chatUnread';
 import useVisualViewportInset from '../../hooks/useVisualViewportInset';
 import { useChatMediaBlobUrl } from '../../utils/chatMediaAuth';
@@ -518,6 +519,7 @@ const ChatsHubPage = () => {
 
   const handleSelectChat = useCallback((chat) => {
     const source = chat._source;
+    if (String(chat.id) === String(activeChatId) && source === activeChatSource) return;
     const next = new URLSearchParams(searchParams);
     next.set('source', source);
     next.set('chatId', String(chat.id));
@@ -525,13 +527,15 @@ const ChatsHubPage = () => {
     if (source === 'avito') {
       next.set('avitoChatId', String(chat.id));
       dispatch(setSelectedAvitoChatId(chat.id));
+      dispatch(setCurrentChat(null));
     } else {
       next.delete('avitoChatId');
+      dispatch(setSelectedAvitoChatId(null));
       dispatch(setCurrentChat(chat));
     }
     
     setSearchParams(next);
-  }, [dispatch, searchParams, setSearchParams]);
+  }, [dispatch, searchParams, setSearchParams, activeChatId, activeChatSource]);
 
   const handleOpenIncomingChat = useCallback(() => {
     if (!incomingChatAlert?.chatId) return;
@@ -548,14 +552,18 @@ const ChatsHubPage = () => {
   }, [incomingChatAlert, garageChats, handleSelectChat, searchParams, setSearchParams, dispatch]);
 
   const handleBackToList = useCallback(() => {
+    dispatch(setCurrentChat(null));
+    dispatch(setSelectedAvitoChatId(null));
+    if (canGoBackInHistory()) {
+      navigate(-1);
+      return;
+    }
     const next = new URLSearchParams(searchParams);
     next.delete('source');
     next.delete('chatId');
     next.delete('avitoChatId');
-    setSearchParams(next);
-    dispatch(setCurrentChat(null));
-    dispatch(setSelectedAvitoChatId(null));
-  }, [dispatch, searchParams, setSearchParams]);
+    setSearchParams(next, { replace: true });
+  }, [dispatch, navigate, searchParams, setSearchParams]);
 
   // Определяем активный чат
   const isAvitoActive = activeChatSource === 'avito';
@@ -741,8 +749,8 @@ const ChatsHubPage = () => {
                     const source = chat._source;
                     const isAvito = source === 'avito';
                     const isSelected = isAvito
-                      ? String(chat.id) === String(selectedAvitoChatId)
-                      : String(chat.id) === String(activeChatId);
+                      ? isAvitoActive && String(chat.id) === String(selectedAvitoChatId)
+                      : !isAvitoActive && String(chat.id) === String(activeChatId);
 
                     return (
                       <UnifiedChatListRow
@@ -1019,6 +1027,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
   const prevMessagesCountRef = useRef(0);
+  const lastScrolledChatRef = useRef(null);
   
   // Media Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -1042,11 +1051,23 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
 
   // Автоскролл к последнему сообщению
   useEffect(() => {
-    if (messages.length > prevMessagesCountRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: messages.length === prevMessagesCountRef.current + 1 ? 'smooth' : 'auto' });
+    const lastMessage = messages[messages.length - 1];
+    const belongsToChat = lastMessage?.chat_id == null || String(lastMessage.chat_id) === String(chatId);
+    const isNewChat = lastScrolledChatRef.current !== String(chatId);
+    if (isNewChat && (messages.length === 0 || !belongsToChat)) return;
+
+    const container = messagesScrollRef.current;
+    const behavior = !isNewChat && messages.length === prevMessagesCountRef.current + 1 ? 'smooth' : 'auto';
+    if (isNewChat || messages.length > prevMessagesCountRef.current) {
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior });
+      }
+      lastScrolledChatRef.current = String(chatId);
     }
     prevMessagesCountRef.current = messages.length;
-  }, [messages]);
+  }, [messages, chatId]);
 
   // Polling если WS не подключен
   useEffect(() => {
@@ -1553,6 +1574,9 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
   const { messages, chatDetail, chatDetailLoading, sending } = useSelector((state) => state.avitoChats);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
+  const messagesScrollRef = useRef(null);
+  const lastScrolledChatRef = useRef(null);
+  const prevMessagesCountRef = useRef(0);
   
   // Media Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -1568,8 +1592,21 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
   }, [dispatch, chatId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    const isNewChat = lastScrolledChatRef.current !== String(chatId);
+    if (isNewChat && messages.length === 0) return;
+
+    if (isNewChat || messages.length > prevMessagesCountRef.current) {
+      const container = messagesScrollRef.current;
+      const behavior = isNewChat ? 'auto' : 'smooth';
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior });
+      }
+      lastScrolledChatRef.current = String(chatId);
+    }
+    prevMessagesCountRef.current = messages.length;
+  }, [messages, chatId]);
 
   const handleSendMessage = async (e) => {
     e?.preventDefault();
@@ -1716,7 +1753,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
           Обновление…
         </p>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 sm:px-4">
+      <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 sm:px-4">
         {messages.length === 0 ? (
           <div className="flex h-full min-h-[200px] items-center justify-center">
             <ChatEmptyState

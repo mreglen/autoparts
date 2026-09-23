@@ -81,7 +81,7 @@ export default function MainLayout() {
                 onCabinetModeChange: setCabinetMode,
             }}
         >
-            <main className={`mx-auto ${mainClassName}`}>
+            <main className={`mx-auto w-full ${mainClassName}`}>
                 {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage && !isNewPartDetailPage && !isChatsPage && !isVinCatalogPage ? (
                     <div className={isFullBleedAmbientPage ? 'mx-auto max-w-sg-content px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8' : undefined}>
                         <Breadcrumbs items={breadcrumbItems} includeJsonLd={!isPartPage} />

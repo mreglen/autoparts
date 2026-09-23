@@ -33,15 +33,26 @@ export function toDateInputValue(value) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-export function formatServerDateTime(value, options = {}) {
-  const d = parseServerDate(value);
+export function parseWallClockDate(value) {
+  if (value == null || value === '') return null;
+  if (value instanceof Date) return value;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const naive = raw.replace(' ', 'T').replace(/([zZ]|[+-]\d{2}:?\d{2})$/, '');
+  const d = new Date(naive.length === 10 ? `${naive}T00:00:00` : naive);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatDateTimeValue(d, fallback, options) {
   if (!d) {
-    if (!value) return '—';
-    const parts = String(value).slice(0, 10).split('-');
+    if (!fallback) return '—';
+    const parts = String(fallback).slice(0, 10).split('-');
     if (parts.length === 3 && parts[0].length === 4) {
       return `${parts[2]}.${parts[1]}.${parts[0]}`;
     }
-    return String(value);
+    return String(fallback);
   }
 
   return d.toLocaleString('ru-RU', {
@@ -52,6 +63,14 @@ export function formatServerDateTime(value, options = {}) {
     minute: '2-digit',
     ...options,
   });
+}
+
+export function formatServerDateTime(value, options = {}) {
+  return formatDateTimeValue(parseServerDate(value), value, options);
+}
+
+export function formatWallClockDateTime(value, options = {}) {
+  return formatDateTimeValue(parseWallClockDate(value), value, options);
 }
 
 export function formatServerDate(value) {

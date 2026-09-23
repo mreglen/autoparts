@@ -18,6 +18,15 @@
   --sg-z-mobile-drawer: 60;
   --sg-z-modal: 110;
   --sg-z-context-menu: 120;
+  --sg-z-modal-shell: var(--sg-z-modal);
+  --sg-z-modal-elevated-shell: var(--sg-z-context-menu);
+}
+
+@media (max-width: 1023.98px) {
+  :root {
+    --sg-z-modal-shell: calc(var(--sg-z-mobile-bottom-nav) - 1);
+    --sg-z-modal-elevated-shell: calc(var(--sg-z-mobile-bottom-nav) - 1);
+  }
 }
 
 html.sg-yandex-badge-on {

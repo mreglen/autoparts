@@ -5,7 +5,7 @@ import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import { Input } from '../UI/Field';
 import { apiRequest } from '../../utils/apiClient';
-import { formatServerDateTime } from '../../utils/serverDate';
+import { formatWallClockDateTime } from '../../utils/serverDate';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import { vehicleLabel } from './RepairOrderViewModal';
 import {
@@ -17,7 +17,7 @@ import {
 } from '../../utils/repairOrderPurchaseDraft';
 
 function formatDate(value) {
-  return formatServerDateTime(value) || '—';
+  return formatWallClockDateTime(value) || '—';
 }
 
 export default function RepairOrderPickerModal({

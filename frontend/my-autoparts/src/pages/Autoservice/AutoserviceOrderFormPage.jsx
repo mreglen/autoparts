@@ -9,7 +9,7 @@ import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
 import { apiRequest } from '../../utils/apiClient';
 import { validatePhoneOptional } from '../../utils/contactValidation';
 import PhoneInput from '../../components/UI/PhoneInput';
-import { parseServerDate } from '../../utils/serverDate';
+import { parseWallClockDate } from '../../utils/serverDate';
 import {
   candidateLabel,
   mapCandidateToGarageCreatePayload,
@@ -147,7 +147,7 @@ function vehicleLabel(v) {
 
 function toLocalInputValue(iso) {
   if (!iso) return '';
-  const d = parseServerDate(iso);
+  const d = parseWallClockDate(iso);
   if (!d || Number.isNaN(d.getTime())) return '';
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -162,7 +162,7 @@ function fromLocalInputValue(local) {
 
 function toDateInputValue(iso) {
   if (!iso) return '';
-  const d = parseServerDate(iso);
+  const d = parseWallClockDate(iso);
   if (!d || Number.isNaN(d.getTime())) return '';
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -986,7 +986,7 @@ function mapOrderToFormState(order) {
     vehicleId: order?.vehicle_id ? String(order.vehicle_id) : '',
     scheduledAt: order?.scheduled_at
       ? toLocalInputValue(order.scheduled_at)
-      : toLocalInputValue(new Date().toISOString()),
+      : toLocalInputValue(new Date()),
     comment: order?.client_comment || '',
     staffComment: order?.staff_comment || '',
     workZoneId: order?.work_zone_id != null ? String(order.work_zone_id) : '',
@@ -1095,7 +1095,7 @@ export default function AutoserviceOrderFormPage() {
   const [pendingVehicleMake, setPendingVehicleMake] = useState('');
   const [pendingVehicleModel, setPendingVehicleModel] = useState('');
   const [inspectionBookingId, setInspectionBookingId] = useState(null);
-  const [scheduledAt, setScheduledAt] = useState(() => toLocalInputValue(new Date().toISOString()));
+  const [scheduledAt, setScheduledAt] = useState(() => toLocalInputValue(new Date()));
   const [comment, setComment] = useState('');
   const [staffComment, setStaffComment] = useState('');
   const [scheduledEndAt, setScheduledEndAt] = useState('');

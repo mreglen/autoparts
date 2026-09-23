@@ -119,8 +119,6 @@ function OrderMobileRow({
  * Mobile shell for /autoservice/orders — horizontal padding from cabinet layout (same as clients).
  */
 export default function AutoserviceOrdersMobileView({
-  pageSubtitle,
-  showCreateButton,
   onCreate,
   orderTabs,
   tabValue,
@@ -149,17 +147,13 @@ export default function AutoserviceOrdersMobileView({
 }) {
   return (
     <div className="w-full min-w-0">
-      <p className="text-sm text-gray-500">{pageSubtitle}</p>
-
-      {showCreateButton ? (
-        <button
-          type="button"
-          onClick={onCreate}
-          className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
-        >
-          Новый заказ-наряд
-        </button>
-      ) : null}
+      <button
+        type="button"
+        onClick={onCreate}
+        className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+      >
+        Новый заказ-наряд
+      </button>
 
       <UnderlineTabs
         className="mt-4"

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../UI/Modal';
 import { ActionsDropdownItem } from '../ActionsDropdown/ActionsDropdown';
-import { formatServerDateTime, formatServerDate } from '../../utils/serverDate';
+import { formatServerDateTime, formatServerDate, formatWallClockDateTime } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
 import { NumericInput, Skeleton } from '../UI';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
@@ -50,7 +50,7 @@ const STATUS_STYLES = {
 };
 
 function formatDateTime(value) {
-  return formatServerDateTime(value);
+  return formatWallClockDateTime(value);
 }
 
 function formatMoney(value) {

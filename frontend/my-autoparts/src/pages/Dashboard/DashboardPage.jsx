@@ -39,7 +39,7 @@ function getFirstName(user) {
   return raw.split(/\s+/)[0];
 }
 
-function MetricCard({ label, value, hint, href, accent = 'brand' }) {
+function MetricCard({ label, value, hint, href, accent = 'brand', className = '' }) {
   const accents = {
     brand: {
       card: 'border-brand-100 bg-brand-50/50',
@@ -59,21 +59,21 @@ function MetricCard({ label, value, hint, href, accent = 'brand' }) {
   const content = (
     <>
       <p className="text-sm font-medium text-ink-muted">{label}</p>
-      <p className={`mt-3 text-2xl font-bold tabular-nums tracking-tight sm:text-[1.75rem] ${tone.value}`}>
+      <p className={`mt-2 text-xl font-bold tabular-nums tracking-tight sm:mt-3 sm:text-2xl lg:text-[1.75rem] ${tone.value}`}>
         {value}
       </p>
-      {hint ? <p className="mt-2 text-sm text-ink-faint">{hint}</p> : null}
+      {hint ? <p className="mt-1.5 text-xs text-ink-faint sm:mt-2 sm:text-sm">{hint}</p> : null}
     </>
   );
 
   if (href) {
     return (
-      <Card as={Link} to={href} hover padding="md" className={`block ${tone.card}`}>
+      <Card as={Link} to={href} hover padding="none" className={`block p-4 sm:p-5 lg:p-6 ${tone.card} ${className}`}>
         {content}
       </Card>
     );
   }
-  return <Card padding="md" className={tone.card}>{content}</Card>;
+  return <Card padding="none" className={`p-4 sm:p-5 lg:p-6 ${tone.card} ${className}`}>{content}</Card>;
 }
 
 const TASK_TONE = {
@@ -118,7 +118,7 @@ const ACTION_TONES = {
 
 function QuickAction({ label, description, href, icon, tone = 'brand' }) {
   return (
-    <Card as={Link} to={href} hover padding="sm" className="flex items-center gap-3">
+    <Card as={Link} to={href} hover padding="sm" className="flex items-center gap-3 max-lg:flex-col max-lg:items-start max-lg:gap-2.5">
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ACTION_TONES[tone] || ACTION_TONES.brand}`}>
         {icon}
       </span>
@@ -347,12 +347,12 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className={`${warehousePageClass} w-full min-w-0 space-y-8 pb-12`}>
+      <div className={`${warehousePageClass} w-full min-w-0 space-y-6 pb-12 lg:space-y-8`}>
         <div className="space-y-2">
           <Skeleton className="h-8 w-56 sm:h-9" />
           <Skeleton className="h-4 w-64" />
         </div>
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-sg-lg border border-line bg-surface p-5 shadow-sg">
               <Skeleton className="h-4 w-28" />
@@ -363,7 +363,7 @@ export default function DashboardPage() {
         </section>
         <section className="space-y-3">
           <Skeleton className="h-6 w-40" />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="flex items-center gap-3 rounded-sg-lg border border-line bg-surface p-4 shadow-sg">
                 <Skeleton className="h-10 w-10 rounded-xl" />
@@ -412,7 +412,7 @@ export default function DashboardPage() {
   const recentSales = sales?.recentSales?.slice(0, 4) || [];
 
   return (
-    <div className={`${warehousePageClass} w-full min-w-0 space-y-8 pb-12`}>
+    <div className={`${warehousePageClass} w-full min-w-0 space-y-6 pb-12 lg:space-y-8`}>
       {showOnboarding && (
         <SellerOnboardingPanel onboarding={onboarding} loading={onboardingLoading} />
       )}
@@ -423,7 +423,7 @@ export default function DashboardPage() {
         subtitle="Краткий обзор магазина на сегодня"
       />
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
         {canViewFinance && sales ? (
           <>
             <MetricCard
@@ -445,6 +445,7 @@ export default function DashboardPage() {
               value={tasks.length}
               hint={tasks.length === 0 ? 'Всё в порядке' : `${urgentTasks.length} срочных`}
               accent={tasks.length === 0 ? 'success' : 'warning'}
+              className="max-lg:col-span-2"
             />
           </>
         ) : (
@@ -479,7 +480,7 @@ export default function DashboardPage() {
       {quickActions.length > 0 && (
         <section className="space-y-3">
           <SectionHeader title="Быстрые действия" />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {quickActions.map((action) => (
               <QuickAction key={action.href} {...action} />
             ))}
