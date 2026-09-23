@@ -62,6 +62,7 @@ from app.db.schema_patches import (
     ensure_autoservice_warehouse_receipt_docs_backfill,
     ensure_autoservice_warehouse_return_tables,
     ensure_autoservice_warehouse_expenses_client_unit_price,
+    ensure_autoservice_warehouse_expenses_repair_order_id,
     ensure_autoservice_warehouse_item_internal_key,
     ensure_autoservice_document_buyers_table,
     ensure_product_reserved_qty_column,
@@ -292,6 +293,7 @@ try:
     ensure_autoservice_warehouse_receipt_docs_backfill()
     ensure_autoservice_warehouse_return_tables()
     ensure_autoservice_warehouse_expenses_client_unit_price()
+    ensure_autoservice_warehouse_expenses_repair_order_id()
     ensure_autoservice_warehouse_item_internal_key()
     ensure_autoservice_document_buyers_table()
     ensure_product_reserved_qty_column()

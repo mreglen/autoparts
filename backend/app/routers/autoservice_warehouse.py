@@ -14,6 +14,7 @@ from app.models.autoservice_warehouse import (
     AutoserviceWarehouseItem,
     AutoserviceWarehouseReceipt,
     AutoserviceWarehouseReceiptDoc,
+    AutoserviceWarehouseReturnRequest,
 )
 from app.models.repair_order import RepairOrder, RepairOrderShopPart
 from app.models.user import User
@@ -26,6 +27,7 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseItemMovementView,
     AutoserviceWarehouseItemMovementReceiptView,
     AutoserviceWarehouseItemMovementExpenseView,
+    AutoserviceWarehouseItemMovementEventView,
     AutoserviceWarehouseItemUpdate,
     AutoserviceWarehouseManualReceiptIn,
     AutoserviceWarehouseReceiptDocDetailView,
@@ -416,11 +418,23 @@ def get_autoservice_warehouse_item_movements(
     )
     expenses = (
         db.query(AutoserviceWarehouseExpense)
+        .options(joinedload(AutoserviceWarehouseExpense.repair_order))
         .filter(
             AutoserviceWarehouseExpense.item_id == item_id,
             AutoserviceWarehouseExpense.organization_id == org_id,
         )
         .order_by(AutoserviceWarehouseExpense.created_at.desc())
+        .all()
+    )
+    pending_returns = (
+        db.query(AutoserviceWarehouseReturnRequest)
+        .filter(
+            AutoserviceWarehouseReturnRequest.item_id == item_id,
+            AutoserviceWarehouseReturnRequest.organization_id == org_id,
+            AutoserviceWarehouseReturnRequest.status_code.in_(
+                ("requested", "reviewing", "approved")
+            ),
+        )
         .all()
     )
 
@@ -429,6 +443,76 @@ def get_autoservice_warehouse_item_movements(
         if unit in ("pcs", "l", "kg"):
             return unit
         return "pcs"
+
+    unit = _item_unit()
+    events = []
+    for r in receipts:
+        doc = r.document
+        events.append(
+            AutoserviceWarehouseItemMovementEventView(
+                kind="receipt",
+                date=doc.doc_date if doc else r.created_at,
+                quantity=int(r.quantity or 0),
+                unit=unit,
+                title="Приход",
+                detail=(
+                    resolve_autoservice_supplier_display_name(
+                        db,
+                        supplier_name=doc.supplier_name,
+                        source_order_type=getattr(doc, "source_order_type", None),
+                        source_order_id=getattr(doc, "source_order_id", None),
+                    )
+                    if doc
+                    else None
+                ),
+                unit_price=_money(r.unit_price),
+                repair_order_id=(
+                    doc.repair_order_id if doc and doc.repair_order_id else r.repair_order_id
+                ),
+                repair_order_number=(
+                    doc.repair_order.order_number
+                    if doc and doc.repair_order
+                    else (r.repair_order.order_number if r.repair_order else None)
+                ),
+            )
+        )
+    for e in expenses:
+        is_return = e.return_request_id is not None
+        events.append(
+            AutoserviceWarehouseItemMovementEventView(
+                kind="return" if is_return else "expense",
+                date=e.created_at,
+                quantity=-int(e.quantity or 0),
+                unit=unit,
+                title="Возврат поставщику" if is_return else "Списание",
+                detail=e.reason,
+                unit_price=_money(e.client_unit_price),
+                repair_order_id=e.repair_order_id,
+                repair_order_number=(
+                    e.repair_order.order_number if e.repair_order else None
+                ),
+            )
+        )
+    for rr in pending_returns:
+        events.append(
+            AutoserviceWarehouseItemMovementEventView(
+                kind="return_pending",
+                date=rr.created_at.date() if rr.created_at else None,
+                quantity=-int(rr.quantity or 0),
+                unit=unit,
+                title="Возврат поставщику — заявка",
+                detail=RETURN_REASON_LABELS.get(rr.reason, rr.reason),
+            )
+        )
+    events.sort(key=lambda ev: (ev.date or date.min), reverse=True)
+
+    running = int(item.quantity or 0)
+    for ev in events:
+        if ev.kind == "return_pending":
+            ev.balance_after = running
+            continue
+        ev.balance_after = running
+        running -= ev.quantity
 
     return AutoserviceWarehouseItemMovementView(
         item_id=item.id,
@@ -469,11 +553,14 @@ def get_autoservice_warehouse_item_movements(
                 unit_price=_money(e.unit_price),
                 client_unit_price=_money(e.client_unit_price),
                 reason=e.reason,
-                repair_order_id=None,
-                repair_order_number=None,
+                repair_order_id=e.repair_order_id,
+                repair_order_number=(
+                    e.repair_order.order_number if e.repair_order else None
+                ),
             )
             for e in expenses
         ],
+        events=events,
     )
 
 

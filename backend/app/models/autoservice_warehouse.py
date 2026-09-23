@@ -163,11 +163,18 @@ class AutoserviceWarehouseExpense(Base):
         nullable=True,
         index=True,
     )
+    repair_order_id = Column(
+        Integer,
+        ForeignKey("repair_orders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(Date, server_default=func.current_date(), nullable=False)
 
     organization = relationship("Organization")
     item = relationship("AutoserviceWarehouseItem", back_populates="expenses")
+    repair_order = relationship("RepairOrder")
     creator = relationship("User", foreign_keys=[created_by])
 
 

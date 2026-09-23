@@ -5989,6 +5989,31 @@ def ensure_autoservice_warehouse_expenses_client_unit_price() -> None:
     logger.info("Applied autoservice_warehouse_expenses.client_unit_price patch")
 
 
+def ensure_autoservice_warehouse_expenses_repair_order_id() -> None:
+    """Add repair_order_id column to autoservice warehouse expenses."""
+    inspector = inspect(engine)
+    if "autoservice_warehouse_expenses" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("autoservice_warehouse_expenses")}
+    if "repair_order_id" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE autoservice_warehouse_expenses "
+                "ADD COLUMN repair_order_id INTEGER "
+                "REFERENCES repair_orders(id) ON DELETE SET NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_autoservice_wh_expenses_order "
+                "ON autoservice_warehouse_expenses (repair_order_id)"
+            )
+        )
+    logger.info("Applied autoservice_warehouse_expenses.repair_order_id patch")
+
+
 def ensure_autoservice_warehouse_item_internal_key() -> None:
     """Add internal_key and allow multiple items without brand and article."""
     inspector = inspect(engine)

@@ -127,6 +127,19 @@ class AutoserviceWarehouseItemMovementExpenseView(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AutoserviceWarehouseItemMovementEventView(BaseModel):
+    kind: Literal["receipt", "expense", "return", "return_pending"]
+    date: date
+    quantity: int
+    unit: Literal["pcs", "l", "kg"] = "pcs"
+    title: str
+    detail: Optional[str] = None
+    unit_price: Optional[Decimal] = None
+    repair_order_id: Optional[int] = None
+    repair_order_number: Optional[str] = None
+    balance_after: Optional[int] = None
+
+
 class AutoserviceWarehouseItemMovementView(BaseModel):
     item_id: int
     brand: str
@@ -139,6 +152,7 @@ class AutoserviceWarehouseItemMovementView(BaseModel):
     unit_price: Decimal
     receipts: list[AutoserviceWarehouseItemMovementReceiptView]
     expenses: list[AutoserviceWarehouseItemMovementExpenseView]
+    events: list[AutoserviceWarehouseItemMovementEventView] = []
 
 
 class AutoserviceWarehouseReceiptDocListView(BaseModel):

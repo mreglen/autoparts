@@ -744,6 +744,7 @@ export default function AutoserviceWarehousePage() {
               loading={detailsMovementsLoading}
               error={detailsMovementsError}
               showStock={false}
+              onNavigate={() => setDetailsItem(null)}
             />
 
             {Number(detailsItem.reserved_qty) > 0 ? (

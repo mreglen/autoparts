@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
 
 function formatMovementDate(value) {
@@ -15,13 +16,53 @@ function formatMovementUnit(qty, unit) {
   return `${qty} ${unit}`;
 }
 
+function buildFallbackEvents(movements) {
+  const events = [];
+  for (const r of movements?.receipts || []) {
+    events.push({
+      kind: 'receipt',
+      date: r.doc_date,
+      quantity: r.quantity,
+      unit: r.unit,
+      title: 'Приход',
+      detail: r.supplier_name || (r.doc_number ? `№ ${r.doc_number}` : null),
+      unit_price: r.unit_price,
+      repair_order_id: r.repair_order_id,
+      repair_order_number: r.repair_order_number,
+      balance_after: null,
+    });
+  }
+  for (const e of movements?.expenses || []) {
+    events.push({
+      kind: 'expense',
+      date: e.created_at,
+      quantity: -e.quantity,
+      unit: e.unit,
+      title: 'Списание',
+      detail: e.reason,
+      unit_price: e.client_unit_price,
+      repair_order_id: e.repair_order_id,
+      repair_order_number: e.repair_order_number,
+      balance_after: null,
+    });
+  }
+  events.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  return events;
+}
+
+const KIND_QTY_CLASS = {
+  receipt: 'text-success-700',
+  expense: 'text-danger-600',
+  return: 'text-warning-700',
+  return_pending: 'text-ink-muted',
+};
+
 export default function AutoserviceWarehouseItemMovements({
   movements,
   loading,
   error,
-  showReceipts = true,
-  showExpenses = true,
   showStock = true,
+  onNavigate,
 }) {
   if (loading) {
     return <p className="text-sm text-ink-muted">Загрузка движений…</p>;
@@ -30,6 +71,10 @@ export default function AutoserviceWarehouseItemMovements({
     return <p className="text-sm text-danger-600" role="alert">{error}</p>;
   }
   if (!movements) return null;
+
+  const events = movements.events?.length
+    ? movements.events
+    : buildFallbackEvents(movements);
 
   return (
     <div className="space-y-4 text-sm">
@@ -46,57 +91,47 @@ export default function AutoserviceWarehouseItemMovements({
         </div>
       ) : null}
 
-      {showReceipts && movements.receipts?.length > 0 ? (
-        <div>
-          <h4 className="mb-2 font-semibold text-ink">Поступления</h4>
+      <div>
+        <h4 className="mb-2 font-semibold text-ink">Движения</h4>
+        {events.length === 0 ? (
+          <p className="text-ink-muted">Движений пока нет</p>
+        ) : (
           <ul className="divide-y divide-line-soft rounded-sg border border-line-soft">
-            {movements.receipts.map((r) => (
-              <li key={r.id} className="px-3 py-2">
+            {events.map((ev, i) => (
+              <li key={`${ev.kind}-${i}`} className="px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-ink-muted">{formatMovementDate(r.doc_date)}</span>
-                  <span className="shrink-0 tabular-nums font-medium text-ink">
-                    {formatMovementUnit(r.quantity, r.unit)}
+                  <span className="text-ink-muted">{formatMovementDate(ev.date)}</span>
+                  <span className={`shrink-0 tabular-nums font-medium ${KIND_QTY_CLASS[ev.kind] || 'text-ink'}`}>
+                    {ev.quantity > 0 ? '+' : ''}
+                    {formatMovementUnit(ev.quantity, ev.unit)}
                   </span>
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-ink-soft">
-                  <span>Закуп: {formatAutoserviceWarehouseMoney(r.unit_price)}</span>
-                  {r.repair_order_number ? (
-                    <span>Заказ-наряд {r.repair_order_number}</span>
-                  ) : r.doc_number ? (
-                    <span>№ {r.doc_number}</span>
+                  <span className="font-medium text-ink">{ev.title}</span>
+                  {ev.repair_order_id ? (
+                    <Link
+                      to={`/autoservice/orders/${ev.repair_order_id}/edit`}
+                      className="font-medium text-brand-700 hover:text-brand-900"
+                      onClick={onNavigate}
+                    >
+                      Заказ-наряд {ev.repair_order_number || `№${ev.repair_order_id}`}
+                    </Link>
                   ) : null}
-                  {r.supplier_name ? <span>{r.supplier_name}</span> : null}
+                  {ev.detail ? <span className="truncate">{ev.detail}</span> : null}
+                  {ev.unit_price != null ? (
+                    <span>{formatAutoserviceWarehouseMoney(ev.unit_price)}</span>
+                  ) : null}
                 </div>
+                {ev.balance_after != null ? (
+                  <p className="mt-0.5 text-xs text-ink-faint">
+                    Осталось: {formatMovementUnit(ev.balance_after, ev.unit)}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
-        </div>
-      ) : null}
-
-      {showExpenses && movements.expenses?.length > 0 ? (
-        <div>
-          <h4 className="mb-2 font-semibold text-ink">Списания</h4>
-          <ul className="divide-y divide-line-soft rounded-sg border border-line-soft">
-            {movements.expenses.map((e) => (
-              <li key={e.id} className="px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-ink-muted">{formatMovementDate(e.created_at)}</span>
-                  <span className="shrink-0 tabular-nums font-medium text-ink">
-                    {formatMovementUnit(e.quantity, e.unit)}
-                  </span>
-                </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-ink-soft">
-                  <span>Цена: {formatAutoserviceWarehouseMoney(e.client_unit_price)}</span>
-                  {e.repair_order_number ? (
-                    <span>Заказ-наряд {e.repair_order_number}</span>
-                  ) : null}
-                  {e.reason ? <span className="truncate">{e.reason}</span> : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+        )}
+      </div>
     </div>
   );
 }

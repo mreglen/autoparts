@@ -771,6 +771,7 @@ def consume_reserved_autoservice_stock(
     quantity: int,
     reason: str | None = None,
     client_unit_price: Decimal | None = None,
+    repair_order_id: int | None = None,
 ) -> AutoserviceWarehouseExpense | None:
     """Write off reserved qty into expenses (used when a repair order is completed)."""
     qty = int(quantity or 0)
@@ -791,6 +792,7 @@ def consume_reserved_autoservice_stock(
         unit_price=_money(item.unit_price),
         client_unit_price=_money(client_unit_price) if client_unit_price is not None else _money(item.unit_price),
         reason=(reason or "").strip()[:255] or None,
+        repair_order_id=repair_order_id,
         created_by=user_id,
     )
     db.add(expense)
@@ -830,6 +832,7 @@ def fulfill_autoservice_stock_on_order_complete(
             quantity=max(1, int(Decimal(str(part.qty or 1)).quantize(Decimal("1")))),
             reason=order_label,
             client_unit_price=_effective_client_price(part),
+            repair_order_id=order.id,
         )
         if expense:
             created += 1
