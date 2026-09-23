@@ -362,7 +362,7 @@ function MobileDayPlanner({
                                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                                   {order.vehicle && order.vehicle !== '—' ? order.vehicle : 'Авто'}
                                 </span>
-                                <OrderStatusBadge status={order.status} className="shrink-0" />
+                                <OrderStatusBadge status={order.status} className="shrink-0" noRing />
                               </span>
                               <span className="mt-0.5 block truncate text-sm opacity-80">
                                 {formatPersonNameWithInitials(order.client_name)}

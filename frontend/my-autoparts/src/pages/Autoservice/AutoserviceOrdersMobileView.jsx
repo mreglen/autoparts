@@ -150,7 +150,7 @@ export default function AutoserviceOrdersMobileView({
       <button
         type="button"
         onClick={onCreate}
-        className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+        className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
       >
         Новый заказ-наряд
       </button>

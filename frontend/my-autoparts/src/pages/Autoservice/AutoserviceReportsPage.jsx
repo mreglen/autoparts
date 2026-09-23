@@ -692,7 +692,7 @@ export default function AutoserviceReportsPage() {
   const payrollOrderCount = payrollRows.reduce((sum, row) => sum + Number(row.completed_orders || 0), 0);
 
   return (
-    <div className="mt-2 min-w-0 space-y-6 sm:mt-5">
+    <div className="min-w-0 space-y-6 lg:mt-5">
       <PageHeader
         className="mb-0"
         title="Отчёты"
@@ -766,7 +766,7 @@ export default function AutoserviceReportsPage() {
         }
       />
 
-      <UnderlineTabs ariaLabel="Вкладки отчётов" tabs={tabs} value={tab} onChange={setTab} />
+      <UnderlineTabs ariaLabel="Вкладки отчётов" gapClassName="gap-5 sm:gap-6" tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === 'payments' ? (
         <>

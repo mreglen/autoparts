@@ -39,7 +39,13 @@ autoparts/
 │   ├── package.json
 │   └── .env.example
 ├── scripts/
-│   └── deploy/update.sh     # единый production deploy
+│   ├── deploy/update.sh     # единый production deploy
+│   └── devin-guard.ps1      # PreToolUse-хук: блокирует деструктивные команды
+├── .devin/
+│   ├── config.json          # permissions (allow/ask/deny)
+│   ├── hooks.v1.json        # lifecycle-хуки
+│   ├── mcp_config.local.json # MCP-серверы (gitignored, ключи)
+│   └── skills/              # /deploy, /verify, /review, /new-endpoint, /new-autoservice-page
 └── docs/ops/                # systemd units, nginx, pgbouncer, backup
 ```
 

@@ -1,0 +1,14 @@
+{
+  "PreToolUse": [
+    {
+      "matcher": "exec",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/devin-guard.ps1",
+          "timeout": 10
+        }
+      ]
+    }
+  ]
+}

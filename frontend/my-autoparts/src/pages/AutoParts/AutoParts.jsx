@@ -106,6 +106,7 @@ function AutoParts() {
   const [newPartsSort, setNewPartsSort] = useState(() => getNewUiSort(searchParams));
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const sortMenuRef = useRef(null);
+  const sortMenuRefDesktop = useRef(null);
 
   const updateCatalogUrl = useCallback((updates) => {
     const params = new URLSearchParams(searchParams);
@@ -241,6 +242,7 @@ function AutoParts() {
 
     const handlePointerDown = (event) => {
       if (sortMenuRef.current?.contains(event.target)) return;
+      if (sortMenuRefDesktop.current?.contains(event.target)) return;
       setShowSortDropdown(false);
     };
 
@@ -456,6 +458,100 @@ function AutoParts() {
     );
   }
 
+  const renderSortControl = (menuRef) => {
+    const isUsed = activeTab === 'my';
+    const options = isUsed
+      ? [
+          ['price_asc', 'Дешевле'],
+          ['price_desc', 'Дороже'],
+          ['date', 'По дате'],
+        ]
+      : [
+          ['price_asc', 'Дешевле'],
+          ['price_desc', 'Дороже'],
+          ['delivery_asc', 'Быстрее по поставке'],
+          ['brand', 'По бренду'],
+        ];
+    const current = isUsed ? usedPartsSort : newPartsSort;
+    const apply = isUsed ? applyUsedSort : applyNewPartsSort;
+    return (
+      <div ref={menuRef} className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setShowSortDropdown((prev) => !prev)}
+          className="flex h-9 w-9 touch-manipulation items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 active:bg-gray-300"
+          title="Сортировка"
+          aria-label="Сортировка"
+          aria-expanded={showSortDropdown}
+          aria-haspopup="menu"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+          </svg>
+        </button>
+
+        {showSortDropdown && (
+          <div className="absolute left-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg" role="menu" aria-label="Сортировка">
+            {options.map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => apply(value)}
+                className={`min-h-11 w-full touch-manipulation px-4 py-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-100 ${current === value ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>{label}</span>
+                  {current === value && (
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const tabPills = (
+    <div className="flex min-w-0 snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {showNewAutoparts && (
+        <button
+          type="button"
+          onClick={() => setActiveTab('rossko')}
+          className={`min-h-9 shrink-0 snap-start touch-manipulation rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:rounded-lg ${activeTab === 'rossko'
+              ? 'bg-indigo-500 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+        >
+          Новые
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => setActiveTab('my')}
+        className={`min-h-9 shrink-0 snap-start touch-manipulation rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:rounded-lg ${activeTab === 'my'
+            ? 'bg-indigo-500 text-white'
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+      >
+        Б/У
+      </button>
+    </div>
+  );
+
+  const usedToolbar = (menuRef) => (
+    <div className="flex flex-wrap items-center gap-2">
+      {tabPills}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {renderSortControl(menuRef)}
+        <CatalogViewModeToggle value={usedPartsView} onChange={setUsedPartsView} />
+      </div>
+    </div>
+  );
+
   return (
     <div className={`mt-0 px-0 w-full ${activeTab === 'my' ? 'sm:mt-3' : 'sm:mt-5'}`}>
       <PageSeoHelmet seo={seo} />
@@ -488,186 +584,16 @@ function AutoParts() {
         )}
 
         {/* Переключатель вкладок */}
-        <div className={`max-lg:px-3 max-lg:py-1 ${activeTab === 'my' ? 'mb-2 sm:mb-3' : 'mb-3 sm:mb-6'}`}>
-        <div className="flex items-center gap-2">
-        <div className="flex min-w-0 snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {showNewAutoparts && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('rossko')}
-              className={`min-h-10 shrink-0 snap-start touch-manipulation rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:rounded-lg sm:px-4 sm:py-2 ${activeTab === 'rossko'
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              Новые
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setActiveTab('my')}
-            className={`min-h-10 shrink-0 snap-start touch-manipulation rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors sm:rounded-lg sm:px-4 sm:py-2 ${activeTab === 'my'
-                ? 'bg-indigo-500 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-          >
-            Б/У
-          </button>
-        </div>
-
-          {activeTab === 'rossko' && showNewAutoparts && (
-            <div ref={sortMenuRef} className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowSortDropdown((prev) => !prev)}
-                className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 active:bg-gray-300 sm:px-4 sm:py-2"
-                title="Сортировка"
-                aria-label="Сортировка"
-                aria-expanded={showSortDropdown}
-                aria-haspopup="menu"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                </svg>
-              </button>
-
-              {showSortDropdown && (
-                <div className="absolute left-0 z-50 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg" role="menu" aria-label="Сортировка">
-                  <button
-                    type="button"
-                    onClick={() => applyNewPartsSort('price_asc')}
-                    className={`min-h-11 w-full touch-manipulation px-4 py-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-100 ${newPartsSort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>Дешевле</span>
-                      {newPartsSort === 'price_asc' && (
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyNewPartsSort('price_desc')}
-                    className={`min-h-11 w-full touch-manipulation px-4 py-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-100 ${newPartsSort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>Дороже</span>
-                      {newPartsSort === 'price_desc' && (
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyNewPartsSort('delivery_asc')}
-                    className={`min-h-11 w-full touch-manipulation px-4 py-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-100 ${newPartsSort === 'delivery_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>Быстрее по поставке</span>
-                      {newPartsSort === 'delivery_asc' && (
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyNewPartsSort('brand')}
-                    className={`min-h-11 w-full touch-manipulation px-4 py-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-100 ${newPartsSort === 'brand' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>По бренду</span>
-                      {newPartsSort === 'brand' && (
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                </div>
-              )}
+        <div className={`max-lg:px-3 max-lg:py-1 ${activeTab === 'my' ? 'mb-2 sm:mb-3 lg:hidden' : 'mb-3 sm:mb-6'}`}>
+          {activeTab === 'my' ? (
+            usedToolbar(sortMenuRef)
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              {tabPills}
+              {showNewAutoparts && renderSortControl(sortMenuRef)}
             </div>
           )}
-
-          {activeTab === 'my' && (
-            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-              <div ref={sortMenuRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowSortDropdown((prev) => !prev)}
-                  className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 active:bg-gray-300 sm:px-4 sm:py-2"
-                  title="Сортировка"
-                  aria-label="Сортировка"
-                  aria-expanded={showSortDropdown}
-                  aria-haspopup="menu"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                  </svg>
-                </button>
-
-                {showSortDropdown && (
-                  <div className="absolute left-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg" role="menu" aria-label="Сортировка">
-                  <button
-                    type="button"
-                    onClick={() => applyUsedSort('price_asc')}
-                    className={`min-h-11 w-full touch-manipulation text-left px-4 py-2 hover:bg-gray-100 active:bg-gray-100 transition-colors ${usedPartsSort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>Дешевле</span>
-                      {usedPartsSort === 'price_asc' && (
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyUsedSort('price_desc')}
-                    className={`min-h-11 w-full touch-manipulation text-left px-4 py-2 hover:bg-gray-100 active:bg-gray-100 transition-colors ${usedPartsSort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>Дороже</span>
-                      {usedPartsSort === 'price_desc' && (
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyUsedSort('date')}
-                    className={`min-h-11 w-full touch-manipulation text-left px-4 py-2 hover:bg-gray-100 active:bg-gray-100 transition-colors ${usedPartsSort === 'date' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>По дате</span>
-                      {usedPartsSort === 'date' && (
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
-            
-            <CatalogViewModeToggle
-              value={usedPartsView}
-              onChange={setUsedPartsView}
-              className="min-h-11"
-            />
-          </div>
-          )}
         </div>
-      </div>
       </div>
 
       {catalogError && activeTab === 'my' && !catalogLoading ? (
@@ -690,6 +616,7 @@ function AutoParts() {
           viewMode={usedPartsView}
           sortBy={usedPartsSort}
           updateCatalogUrl={updateCatalogUrl}
+          sidebarTop={usedToolbar(sortMenuRefDesktop)}
         />
       ) : !effectiveQuery ? (
         <NewPartsLanding onSearch={handleNewPartsSearch} />

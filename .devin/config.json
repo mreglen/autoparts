@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "allow": [
+      "read",
+      "grep",
+      "glob",
+      "Exec(git status)",
+      "Exec(git diff)",
+      "Exec(git log)",
+      "Exec(git show)",
+      "Exec(git add)",
+      "Exec(git branch)",
+      "Exec(git rev-parse)",
+      "Exec(npm run)",
+      "Exec(npm test)",
+      "Exec(npx eslint)",
+      "Exec(npx prettier)",
+      "Exec(python -m unittest)",
+      "Exec(pip list)",
+      "Exec(Get-ChildItem)",
+      "Exec(Get-Content)",
+      "Exec(Select-String)",
+      "Exec(Test-Path)",
+      "Fetch(domain:svoygarage.ru)",
+      "mcp__postgres__*"
+    ],
+    "ask": [
+      "Exec(git commit)",
+      "Exec(git push)",
+      "Exec(git stash)",
+      "Exec(git rebase)",
+      "Exec(git merge)",
+      "Exec(git tag)",
+      "Exec(npm install)",
+      "Exec(npm ci)",
+      "Exec(pip install)",
+      "Exec(npx playwright)"
+    ],
+    "deny": [
+      "Write(.env*)",
+      "Write(**/.env*)",
+      "Exec(sudo)",
+      "Exec(rm)",
+      "Exec(git push --force)",
+      "Exec(git push -f)",
+      "Exec(git reset --hard)",
+      "Exec(git clean)",
+      "Exec(git checkout --)",
+      "Exec(git restore)"
+    ]
+  }
+}

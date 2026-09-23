@@ -28,3 +28,6 @@ test-results/
 
 # OS
 .DS_Store
+
+# Devin CLI local config (personal keys, MCP creds)
+.devin/*.local.json

@@ -201,7 +201,7 @@ export default function AutoserviceRepairBookingPage() {
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
       setRows([]);
-      setRowsError(err?.message || 'Не удалось загрузить заявки');
+      setRowsError(err?.message || 'Не удалось загрузить записи');
     } finally {
       setRowsLoading(false);
     }
@@ -253,7 +253,7 @@ export default function AutoserviceRepairBookingPage() {
       setComment('');
       setTab('list');
     } catch (err) {
-      setError(err?.message || 'Не удалось отправить заявку');
+      setError(err?.message || 'Не удалось отправить запись');
     } finally {
       setSaving(false);
     }
@@ -344,7 +344,7 @@ export default function AutoserviceRepairBookingPage() {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <button type="submit" disabled={saving} className={`${btnPrimary} w-full sm:w-auto`}>
-          {saving ? 'Отправка…' : 'Отправить заявку'}
+          {saving ? 'Отправка…' : 'Отправить запись'}
         </button>
         <Link to="/garage/repairs" className={`${btnGhost} w-full sm:w-auto`}>
           История ремонтов
@@ -365,12 +365,12 @@ export default function AutoserviceRepairBookingPage() {
         <BookingsSkeleton />
       ) : rows.length === 0 ? (
         <div className="py-12 text-center">
-          <h3 className="text-base font-semibold text-ink">Заявок пока нет</h3>
+          <h3 className="text-base font-semibold text-ink">Записей пока нет</h3>
           <p className="mx-auto mt-2 max-w-sm text-sm text-ink-muted">
-            Заполните форму — заявка появится здесь, и мы свяжемся с вами для подтверждения
+            Заполните форму — запись появится здесь, и мы свяжемся с вами для подтверждения
           </p>
           <button type="button" onClick={() => setTab('form')} className={`${btnPrimary} mt-5`}>
-            Создать заявку
+            Создать запись
           </button>
         </div>
       ) : (
@@ -392,8 +392,8 @@ export default function AutoserviceRepairBookingPage() {
             {rowsLoading
               ? 'Загрузка…'
               : activeCount > 0
-                ? `${rows.length} заявок · ${activeCount} в ожидании`
-                : `${rows.length} заявок`}
+                ? `${rows.length} записей · ${activeCount} в ожидании`
+                : `${rows.length} записей`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -429,8 +429,8 @@ export default function AutoserviceRepairBookingPage() {
         ariaLabel="Разделы записи на ремонт"
         gapClassName="gap-4"
         tabs={[
-          { id: 'form', label: 'Новая заявка' },
-          { id: 'list', label: 'Мои заявки' },
+          { id: 'form', label: 'Новая запись' },
+          { id: 'list', label: 'Мои запись' },
         ]}
         value={tab}
         onChange={setTab}
@@ -439,14 +439,14 @@ export default function AutoserviceRepairBookingPage() {
       <div className="lg:grid lg:grid-cols-5 lg:items-start lg:gap-10">
         <section className={`lg:col-span-2 ${tab === 'form' ? 'block' : 'hidden lg:block'}`}>
           <h2 className="mb-4 hidden text-sm font-semibold uppercase tracking-wide text-ink-muted lg:block">
-            Новая заявка
+            Новая запись
           </h2>
           {formBlock}
         </section>
 
         <section className={`mt-2 lg:col-span-3 lg:mt-0 ${tab === 'list' ? 'block' : 'hidden lg:block'}`}>
           <div className="mb-3 hidden items-baseline justify-between gap-3 lg:flex">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Мои заявки</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Мои записи</h2>
             {!rowsLoading && rows.length > 0 ? (
               <p className="text-sm text-ink-muted">{rows.length}</p>
             ) : null}
@@ -464,8 +464,8 @@ export default function AutoserviceRepairBookingPage() {
         onClose={() => setViewBooking(null)}
         title={
           viewBooking
-            ? `Заявка · ${formatDate(viewBooking.preferred_date)}${viewBooking.preferred_time ? `, ${String(viewBooking.preferred_time).slice(0, 5)}` : ''}`
-            : 'Заявка'
+            ? `запись · ${formatDate(viewBooking.preferred_date)}${viewBooking.preferred_time ? `, ${String(viewBooking.preferred_time).slice(0, 5)}` : ''}`
+            : 'запись'
         }
         size="sm"
         draggable

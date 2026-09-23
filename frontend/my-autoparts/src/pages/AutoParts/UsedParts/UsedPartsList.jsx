@@ -270,7 +270,7 @@ const MediaDisplay = React.memo(function MediaDisplay({ part, listPriority = fal
   );
 });
 
-const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl }) => {
+const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl, sidebarTop = null }) => {
   const dispatch = useDispatch();
   const location = useLocation();
   const navigate = useNavigate();
@@ -806,7 +806,10 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
         </div>
       </div>
       <div className="flex flex-col gap-4 px-3 sm:gap-6 sm:px-0 lg:flex-row lg:items-start">
-        <UsedPartsFiltersAside updateCatalogUrl={updateCatalogUrl} />
+        <div className="hidden shrink-0 lg:flex lg:w-64 lg:flex-col lg:gap-3">
+          {sidebarTop}
+          <UsedPartsFiltersAside updateCatalogUrl={updateCatalogUrl} />
+        </div>
         <div className="relative min-w-0 flex-1">
       {status === 'loading' && (
         viewMode === 'list'

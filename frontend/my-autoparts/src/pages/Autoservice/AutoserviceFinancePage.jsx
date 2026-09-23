@@ -347,7 +347,7 @@ export default function AutoserviceFinancePage() {
   }, [searchApplied, searchResults, selectedMethod, items]);
 
   return (
-    <div className="mt-2 min-w-0 space-y-4 sm:mt-5">
+    <div className="min-w-0 space-y-4 lg:mt-5">
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <h1 className="text-2xl font-bold text-ink max-lg:hidden sm:text-[1.75rem]">Финансы</h1>
         <div className="grid grid-cols-2 gap-4 sm:flex sm:shrink-0 sm:gap-8">

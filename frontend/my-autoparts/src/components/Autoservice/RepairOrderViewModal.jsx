@@ -250,13 +250,15 @@ export function vehicleLabel(v) {
   return base;
 }
 
-export function OrderStatusBadge({ status, className = '' }) {
+export function OrderStatusBadge({ status, className = '', noRing = false }) {
   const normalized = normalizeRepairOrderStatus(status);
+  const tone = STATUS_STYLES[normalized] || STATUS_STYLES[status] || STATUS_STYLES.open;
+  const toneClass = noRing ? tone.replace(/\s*ring-\S+/g, '') : tone;
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
-        STATUS_STYLES[normalized] || STATUS_STYLES[status] || STATUS_STYLES.open
-      } ${className}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+        noRing ? '' : 'ring-1 ring-inset'
+      } ${toneClass} ${className}`}
     >
       {REPAIR_ORDER_STATUS_LABELS[normalized] || REPAIR_ORDER_STATUS_LABELS[status] || status}
     </span>

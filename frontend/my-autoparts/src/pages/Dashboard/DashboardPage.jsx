@@ -7,7 +7,6 @@ import { apiAxios } from '../../utils/apiClient';
 import {
   Badge,
   Button,
-  Card,
   EmptyState,
   PageHeader,
   SectionHeader,
@@ -23,58 +22,12 @@ import {
   setDashboardTasksSectionHidden,
 } from './dashboardUtils';
 import SellerOnboardingPanel from './SellerOnboardingPanel';
+import { getGreeting, getFirstName, MetricCard, QuickAction } from './dashboardUi';
+import AutoserviceDashboardPage from '../Autoservice/AutoserviceDashboardPage';
 import { warehousePageClass } from '../../utils/warehouseListUi';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Доброе утро';
-  if (hour < 18) return 'Добрый день';
-  return 'Добрый вечер';
-}
-
-function getFirstName(user) {
-  const raw = (user?.name || user?.username || '').trim();
-  if (!raw) return null;
-  return raw.split(/\s+/)[0];
-}
-
-function MetricCard({ label, value, hint, href, accent = 'brand', className = '' }) {
-  const accents = {
-    brand: {
-      card: 'border-brand-100 bg-brand-50/50',
-      value: 'text-brand-800',
-    },
-    success: {
-      card: 'border-success-100 bg-success-50/50',
-      value: 'text-success-700',
-    },
-    warning: {
-      card: 'border-warning-100 bg-warning-50/50',
-      value: 'text-warning-700',
-    },
-  };
-  const tone = accents[accent] || accents.brand;
-
-  const content = (
-    <>
-      <p className="text-sm font-medium text-ink-muted">{label}</p>
-      <p className={`mt-2 text-xl font-bold tabular-nums tracking-tight sm:mt-3 sm:text-2xl lg:text-[1.75rem] ${tone.value}`}>
-        {value}
-      </p>
-      {hint ? <p className="mt-1.5 text-xs text-ink-faint sm:mt-2 sm:text-sm">{hint}</p> : null}
-    </>
-  );
-
-  if (href) {
-    return (
-      <Card as={Link} to={href} hover padding="none" className={`block p-4 sm:p-5 lg:p-6 ${tone.card} ${className}`}>
-        {content}
-      </Card>
-    );
-  }
-  return <Card padding="none" className={`p-4 sm:p-5 lg:p-6 ${tone.card} ${className}`}>{content}</Card>;
-}
+import { CABINET_MODE_AUTOSERVICE, getCabinetMode } from '../../utils/cabinetMode';
+import { useAutoserviceOrganizationId } from '../../utils/autoservicePublic';
 
 const TASK_TONE = {
   high: 'danger',
@@ -109,27 +62,6 @@ function TaskRow({ task, onNavigate }) {
   );
 }
 
-const ACTION_TONES = {
-  brand: 'bg-brand-50 text-brand-600',
-  sky: 'bg-sky-50 text-sky-600',
-  success: 'bg-success-50 text-success-600',
-  accent: 'bg-accent-50 text-accent-600',
-};
-
-function QuickAction({ label, description, href, icon, tone = 'brand' }) {
-  return (
-    <Card as={Link} to={href} hover padding="sm" className="flex items-center gap-3 max-lg:flex-col max-lg:items-start max-lg:gap-2.5">
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ACTION_TONES[tone] || ACTION_TONES.brand}`}>
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold text-ink">{label}</span>
-        <span className="mt-0.5 block text-xs text-ink-muted">{description}</span>
-      </span>
-    </Card>
-  );
-}
-
 const ICONS = {
   orders: (
     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -157,6 +89,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { isReady, user } = useAuthReady();
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const autoserviceOrganizationId = useAutoserviceOrganizationId();
+  const isAutoserviceMode = getCabinetMode(user, { autoserviceOrganizationId }) === CABINET_MODE_AUTOSERVICE;
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -266,8 +200,8 @@ export default function DashboardPage() {
   }, [user, showOnboarding, canViewFinance]);
 
   useEffect(() => {
-    if (isReady && canAccess) loadDashboard();
-  }, [isReady, canAccess, loadDashboard]);
+    if (isReady && canAccess && !isAutoserviceMode) loadDashboard();
+  }, [isReady, canAccess, isAutoserviceMode, loadDashboard]);
 
   useEffect(() => {
     const onPullRefresh = (event) => {
@@ -344,6 +278,10 @@ export default function DashboardPage() {
 
   if (!isReady) return <AuthLoadingScreen />;
   if (!canAccess) return null;
+
+  if (isAutoserviceMode) {
+    return <AutoserviceDashboardPage />;
+  }
 
   if (loading) {
     return (

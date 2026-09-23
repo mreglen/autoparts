@@ -14,26 +14,33 @@ import { canViewInventory } from '../../utils/inventoryAccess';
 import { useShowWarehouseInventory } from '../../utils/siteReviewsPublic';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import PageIntro from '../../components/PageIntro/PageIntro';
 import {
-  Badge,
   Button,
-  Card,
   ConfirmDialog,
   EmptyState,
   FieldLabel,
   Input,
+  Modal,
   Select,
   Skeleton,
   Textarea,
 } from '../../components/UI';
 import {
-  warehousePageClass,
-  warehousePrimaryButtonClass,
+  autoserviceListErrorClass,
+  autoserviceListHeaderSubtitleClass,
+  autoserviceListHeaderTitleClass,
+  autoserviceListMobileWrapClass,
+  autoserviceListPageClass,
+  autoserviceListPrimaryButtonClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListTheadRowClass,
+  autoserviceListThClass,
+  autoserviceListTrClickableClass,
+  warehousePillButtonClass,
 } from '../../utils/warehouseListUi';
-
-const iconBtnClass =
-  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-50';
 
 function cellsCountLabel(count) {
   const n = Number(count) || 0;
@@ -90,8 +97,9 @@ export default function StorageAddressesPage() {
   );
   const { storageLocations } = useSelector((state) => state.organization);
 
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [editingCell, setEditingCell] = useState(null);
+  const [detailsCell, setDetailsCell] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -123,14 +131,20 @@ export default function StorageAddressesPage() {
     [locationsWithCells, user?.organization_id],
   );
 
-  const totalCells = useMemo(
-    () =>
-      sellerLocationsWithCells.reduce(
-        (sum, location) => sum + (location.cells?.length || 0),
-        0,
-      ),
-    [sellerLocationsWithCells],
-  );
+  const flatCells = useMemo(() => {
+    const rows = [];
+    for (const location of sellerLocationsWithCells) {
+      for (const cell of location.cells || []) {
+        rows.push({
+          ...cell,
+          locationAddress: location.address || `Склад #${location.id}`,
+        });
+      }
+    }
+    return rows;
+  }, [sellerLocationsWithCells]);
+
+  const totalCells = flatCells.length;
 
   useEffect(() => {
     if (!isReady || !hasPermission || !user?.organization_id) return;
@@ -154,16 +168,16 @@ export default function StorageAddressesPage() {
 
   const resetForm = () => {
     setEditingCell(null);
-    setShowAddForm(false);
+    setFormOpen(false);
     setFormData(emptyForm);
     setFormError('');
   };
 
-  const openCreateForm = () => {
+  const openCreateForm = (locationId = '') => {
     setEditingCell(null);
-    setFormData(emptyForm);
+    setFormData({ ...emptyForm, storage_location_id: locationId ? String(locationId) : '' });
     setFormError('');
-    setShowAddForm(true);
+    setFormOpen(true);
   };
 
   const handleInputChange = (e) => {
@@ -217,6 +231,7 @@ export default function StorageAddressesPage() {
   };
 
   const handleEdit = (cell) => {
+    setDetailsCell(null);
     setEditingCell(cell);
     setFormData({
       name: cell.name || '',
@@ -226,13 +241,7 @@ export default function StorageAddressesPage() {
         : '',
     });
     setFormError('');
-    setShowAddForm(true);
-    setTimeout(() => {
-      document.getElementById('storage-cell-form')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-      });
-    }, 50);
+    setFormOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
@@ -245,6 +254,7 @@ export default function StorageAddressesPage() {
         message: `Адрес «${cellToDelete.name}» удалён`,
       });
       setCellToDelete(null);
+      if (detailsCell?.id === cellToDelete.id) setDetailsCell(null);
       if (editingCell?.id === cellToDelete.id) resetForm();
     } catch (err) {
       const message =
@@ -270,155 +280,39 @@ export default function StorageAddressesPage() {
   }
 
   return (
-    <div className={`${warehousePageClass} min-w-0 space-y-4`}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <PageIntro
-          title="Адресное хранение"
-          description={
-            !loading && !error && totalCells > 0
-              ? cellsCountLabel(totalCells)
-              : 'Ячейки и адреса внутри складов организации'
-          }
-          className="mb-0"
-        />
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+    <div className={autoserviceListPageClass}>
+      <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className={`${autoserviceListHeaderTitleClass} max-lg:hidden`}>
+            Адресное хранение
+          </h1>
+          <p className={autoserviceListHeaderSubtitleClass}>
+            {loading ? 'Загрузка…' : cellsCountLabel(totalCells)}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {canOpenInventory ? (
-            <Link
-              to="/warehouse/inventory"
-              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
+            <Link to="/warehouse/inventory" className={warehousePillButtonClass}>
               Инвентаризация
             </Link>
           ) : null}
           <button
             type="button"
-            onClick={() => (showAddForm && !editingCell ? resetForm() : openCreateForm())}
-            className={`${warehousePrimaryButtonClass} w-full sm:w-auto`}
-            disabled={!sellerLocations.length && !showAddForm}
+            onClick={() => openCreateForm()}
+            className={autoserviceListPrimaryButtonClass}
+            disabled={!sellerLocations.length}
           >
-            {showAddForm && !editingCell ? 'Отмена' : 'Добавить адрес'}
+            Добавить адрес
           </button>
         </div>
       </div>
 
       <InlineNotice notice={notice} onClose={() => setNotice(null)} />
 
-      {showAddForm ? (
-        <Card id="storage-cell-form">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-ink">
-                {editingCell ? 'Редактировать адрес' : 'Новый адрес'}
-              </h2>
-              <p className="mt-0.5 text-sm text-ink-muted">
-                {editingCell
-                  ? 'Измените название или описание ячейки'
-                  : 'Выберите склад и укажите название ячейки'}
-              </p>
-            </div>
-            {editingCell ? (
-              <Badge tone="neutral">ID {editingCell.id}</Badge>
-            ) : null}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {editingCell ? (
-              <div>
-                <FieldLabel htmlFor="cell-name" required>
-                  Название ячейки
-                </FieldLabel>
-                <Input
-                  id="cell-name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="Например: A1, Стеллаж 1, Полка 2"
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <FieldLabel htmlFor="cell-warehouse" required>
-                    Склад
-                  </FieldLabel>
-                  <Select
-                    id="cell-warehouse"
-                    name="storage_location_id"
-                    value={formData.storage_location_id}
-                    onChange={handleInputChange}
-                    required
-                  >
-                    <option value="">Выберите склад</option>
-                    {sellerLocations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.address}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <FieldLabel htmlFor="cell-name" required>
-                    Название ячейки
-                  </FieldLabel>
-                  <Input
-                    id="cell-name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                    placeholder="Например: A1, Стеллаж 1, Полка 2"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <FieldLabel htmlFor="cell-description">Описание</FieldLabel>
-              <Textarea
-                id="cell-description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={3}
-                placeholder="Описание ячейки (необязательно)"
-              />
-            </div>
-
-            {formError ? (
-              <p className="text-sm text-danger-600">{formError}</p>
-            ) : null}
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button type="submit" loading={saving} disabled={saving}>
-                {editingCell ? 'Сохранить' : 'Создать адрес'}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={resetForm}
-                disabled={saving}
-              >
-                Отмена
-              </Button>
-            </div>
-          </form>
-        </Card>
-      ) : null}
-
-      {loading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-28 w-full rounded-sg-lg" />
-          <Skeleton className="h-40 w-full rounded-sg-lg" />
-        </div>
-      ) : null}
-
       {!loading && error ? (
-        <EmptyState
-          illustration="error"
-          title="Не удалось загрузить адреса"
-          description={typeof error === 'string' ? error : 'Попробуйте обновить страницу'}
-        />
+        <p className={autoserviceListErrorClass} role="alert">
+          {typeof error === 'string' ? error : 'Не удалось загрузить адреса'}
+        </p>
       ) : null}
 
       {!loading && !error && sellerLocationsWithCells.length === 0 ? (
@@ -439,110 +333,224 @@ export default function StorageAddressesPage() {
         />
       ) : null}
 
-      {!loading && !error
-        ? sellerLocationsWithCells.map((location) => (
-            <Card key={location.id} padding="none" className="overflow-hidden">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-subtle/60 px-5 py-4 sm:px-6">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                    Склад
-                  </p>
-                  <h3 className="mt-0.5 text-base font-semibold text-ink">
-                    {location.address || `Склад #${location.id}`}
-                  </h3>
-                </div>
-                <Badge tone="brand">{cellsCountLabel(location.cells?.length || 0)}</Badge>
-              </div>
-
-              <div className="p-5 sm:p-6">
-                {!location.cells?.length ? (
-                  <div className="rounded-sg border border-dashed border-line bg-surface-subtle/40 px-4 py-8 text-center">
-                    <p className="text-sm font-medium text-ink">Нет адресов</p>
-                    <p className="mt-1 text-sm text-ink-muted">
-                      В этом складе ещё нет ячеек.
-                    </p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="mt-4"
-                      onClick={() => {
-                        openCreateForm();
-                        setFormData((prev) => ({
-                          ...prev,
-                          storage_location_id: String(location.id),
-                        }));
-                      }}
-                    >
-                      Добавить адрес
-                    </Button>
-                  </div>
+      {!error && sellerLocationsWithCells.length > 0 ? (
+        <>
+          <div className={autoserviceListTableWrapClass}>
+            <table className={autoserviceListTableClass}>
+              <thead>
+                <tr className={autoserviceListTheadRowClass}>
+                  <th className={`w-2/5 ${autoserviceListThClass}`}>Адрес</th>
+                  <th className={`w-2/5 ${autoserviceListThClass}`}>Склад</th>
+                  <th className={autoserviceListThClass}>Описание</th>
+                </tr>
+              </thead>
+              <tbody className={autoserviceListTbodyClass}>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <tr key={`sk-cell-${index}`}>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-32" /></td>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-40" /></td>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-48" /></td>
+                    </tr>
+                  ))
+                ) : flatCells.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-12 text-center text-ink-muted">
+                      Адресов пока нет — нажмите «Добавить адрес»
+                    </td>
+                  </tr>
                 ) : (
-                  <ul className="divide-y divide-line">
-                    {location.cells.map((cell) => (
-                      <li
-                        key={cell.id}
-                        className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
-                      >
-                        <div className="min-w-0 flex-1 pt-0.5">
-                          <p className="text-sm font-semibold text-ink">{cell.name}</p>
-                          {cell.description ? (
-                            <p className="mt-0.5 text-sm text-ink-muted">
-                              {cell.description}
-                            </p>
-                          ) : null}
+                  flatCells.map((cell) => (
+                    <tr
+                      key={cell.id}
+                      className={autoserviceListTrClickableClass}
+                      onClick={() => setDetailsCell(cell)}
+                    >
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                        <div className="w-0 min-w-full truncate font-semibold text-ink">
+                          {cell.name}
                         </div>
-                        <div className="flex shrink-0">
-                          <button
-                            type="button"
-                            className={iconBtnClass}
-                            aria-label="Редактировать"
-                            title="Редактировать"
-                            onClick={() => handleEdit(cell)}
-                          >
-                            <svg
-                              className="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            className={`${iconBtnClass} hover:bg-danger-50 hover:text-danger-700`}
-                            aria-label="Удалить"
-                            title="Удалить"
-                            onClick={() => setCellToDelete(cell)}
-                          >
-                            <svg
-                              className="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
-                          </button>
+                      </td>
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                        <div className="w-0 min-w-full truncate text-ink-muted">
+                          {cell.locationAddress}
                         </div>
-                      </li>
-                    ))}
-                  </ul>
+                      </td>
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                        <div className="w-0 min-w-full truncate text-ink-muted">
+                          {cell.description || '—'}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className={autoserviceListMobileWrapClass}>
+            {loading ? (
+              <div className="divide-y divide-line-soft">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={`msk-cell-${index}`} className="border-b border-line-soft py-2 last:border-b-0">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="mt-1 h-3 w-40" />
+                  </div>
+                ))}
               </div>
-            </Card>
-          ))
-        : null}
+            ) : flatCells.length === 0 ? (
+              <p className="py-10 text-center text-sm text-ink-muted">
+                Адресов пока нет — нажмите «Добавить адрес»
+              </p>
+            ) : (
+              flatCells.map((cell) => (
+                <button
+                  key={cell.id}
+                  type="button"
+                  onClick={() => setDetailsCell(cell)}
+                  className="w-full border-b border-line-soft py-2 text-left last:border-b-0"
+                >
+                  <p className="truncate font-medium text-ink">{cell.name}</p>
+                  <p className="mt-0.5 truncate text-xs text-ink-muted">
+                    {cell.locationAddress}
+                  </p>
+                  {cell.description ? (
+                    <p className="mt-1 truncate text-sm text-ink-muted">
+                      {cell.description}
+                    </p>
+                  ) : null}
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
+
+      <Modal
+        open={Boolean(detailsCell)}
+        onClose={() => setDetailsCell(null)}
+        title={detailsCell?.name || 'Адрес'}
+        draggable
+        footer={(
+          <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
+            <Button
+              variant="danger"
+              onClick={() => setCellToDelete(detailsCell)}
+              className="max-md:min-h-11"
+            >
+              Удалить
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => handleEdit(detailsCell)}
+              className="max-md:min-h-11"
+            >
+              Редактировать
+            </Button>
+            <Button onClick={() => setDetailsCell(null)} className="max-md:min-h-11">
+              Закрыть
+            </Button>
+          </div>
+        )}
+      >
+        {detailsCell ? (
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-ink-muted">Адрес</dt>
+              <dd className="font-medium text-ink">{detailsCell.name}</dd>
+            </div>
+            <div>
+              <dt className="text-ink-muted">Склад</dt>
+              <dd className="text-ink">{detailsCell.locationAddress}</dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="text-ink-muted">Описание</dt>
+              <dd className="text-ink">{detailsCell.description || '—'}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={formOpen}
+        onClose={resetForm}
+        title={editingCell ? 'Редактировать адрес' : 'Новый адрес'}
+        footer={(
+          <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
+            <Button
+              variant="secondary"
+              onClick={resetForm}
+              disabled={saving}
+              className="max-md:min-h-11"
+            >
+              Отмена
+            </Button>
+            <Button
+              type="submit"
+              form="storage-cell-form"
+              loading={saving}
+              disabled={saving}
+              className="max-md:min-h-11"
+            >
+              {editingCell ? 'Сохранить' : 'Создать адрес'}
+            </Button>
+          </div>
+        )}
+      >
+        <form id="storage-cell-form" onSubmit={handleSubmit} className="space-y-4">
+          {!editingCell ? (
+            <div>
+              <FieldLabel htmlFor="cell-warehouse" required>
+                Склад
+              </FieldLabel>
+              <Select
+                id="cell-warehouse"
+                name="storage_location_id"
+                value={formData.storage_location_id}
+                onChange={handleInputChange}
+                required
+              >
+                <option value="">Выберите склад</option>
+                {sellerLocations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.address}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : null}
+
+          <div>
+            <FieldLabel htmlFor="cell-name" required>
+              Название ячейки
+            </FieldLabel>
+            <Input
+              id="cell-name"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              required
+              placeholder="Например: A1, Стеллаж 1, Полка 2"
+            />
+          </div>
+
+          <div>
+            <FieldLabel htmlFor="cell-description">Описание</FieldLabel>
+            <Textarea
+              id="cell-description"
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              rows={3}
+              placeholder="Описание ячейки (необязательно)"
+            />
+          </div>
+
+          {formError ? (
+            <p className="text-sm text-danger-600">{formError}</p>
+          ) : null}
+        </form>
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(cellToDelete)}
