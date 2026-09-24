@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import MobileFormField from '../MobileFormField/MobileFormField';
 import SoftServiceNotice from '../SoftServiceNotice/SoftServiceNotice';
 import NumericInput from '../UI/NumericInput';
@@ -24,6 +24,27 @@ import {
 const LOOKUP_INPUT_MAX_LENGTH = 32;
 const formInputClass = `${warehousePillControlClass} mt-0`;
 const formTextareaClass = `${formInputClass.replace('rounded-full', 'rounded-xl')} min-h-[80px] resize-y py-3`;
+const suggestListClass =
+  'mt-1 max-h-40 overflow-y-auto rounded-xl border border-line-strong bg-surface text-sm text-ink shadow-sm';
+const suggestItemClass =
+  'w-full px-3 py-2 text-left text-sm text-ink transition hover:bg-surface-muted';
+
+const normSuggestQuery = (q) => (q || '').trim().toLowerCase();
+
+const filterManufacturers = (rows, query) => {
+  const nq = normSuggestQuery(query);
+  return (rows || []).filter(
+    (m) =>
+      !nq ||
+      (m.description || '').toLowerCase().includes(nq) ||
+      (m.matchcode || '').toLowerCase().includes(nq),
+  );
+};
+
+const filterModels = (rows, query) => {
+  const nq = normSuggestQuery(query);
+  return (rows || []).filter((m) => !nq || (m.description || '').toLowerCase().includes(nq));
+};
 
 const emptyForm = {
   vin: '',
@@ -46,10 +67,78 @@ function ModalShell({ title, children, onClose }) {
 function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, notice, onRetryDecode, onBackToLookup }) {
   const [form, setForm] = useState(initial);
   const [error, setError] = useState('');
+  const [makeOptions, setMakeOptions] = useState([]);
+  const [manufacturerId, setManufacturerId] = useState(null);
+  const [modelOptions, setModelOptions] = useState([]);
+  const [modelPickedId, setModelPickedId] = useState(null);
+  const makeSearchSeq = useRef(0);
 
   useEffect(() => {
     setForm(initial);
+    setMakeOptions([]);
+    setManufacturerId(null);
+    setModelOptions([]);
+    setModelPickedId(null);
   }, [initial]);
+
+  useEffect(() => {
+    if (manufacturerId != null) {
+      setMakeOptions([]);
+      return undefined;
+    }
+    const term = form.make.trim();
+    if (!term) {
+      setMakeOptions([]);
+      return undefined;
+    }
+    const seq = ++makeSearchSeq.current;
+    const timer = setTimeout(async () => {
+      try {
+        const rows = await apiRequest(
+          `/vehicle-catalog/manufacturers?q=${encodeURIComponent(term)}&limit=80`,
+        );
+        if (seq === makeSearchSeq.current) {
+          setMakeOptions(Array.isArray(rows) ? rows : []);
+        }
+      } catch {
+        if (seq === makeSearchSeq.current) setMakeOptions([]);
+      }
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [form.make, manufacturerId]);
+
+  const handleMakeChange = (event) => {
+    const value = event.target.value;
+    setForm((prev) => ({ ...prev, make: value }));
+    setManufacturerId(null);
+    setModelOptions([]);
+    setModelPickedId(null);
+  };
+
+  const pickManufacturer = (row) => {
+    setForm((prev) => ({ ...prev, make: row.description || row.matchcode || prev.make }));
+    setManufacturerId(row.id);
+    setMakeOptions([]);
+    setModelOptions([]);
+    setModelPickedId(null);
+    apiRequest(`/vehicle-catalog/manufacturers/${row.id}/models`)
+      .then((rows) => setModelOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => setModelOptions([]));
+  };
+
+  const handleModelChange = (event) => {
+    const value = event.target.value;
+    setForm((prev) => ({ ...prev, model: value }));
+    setModelPickedId(null);
+  };
+
+  const pickModel = (row) => {
+    setForm((prev) => ({ ...prev, model: row.description || prev.model }));
+    setModelPickedId(row.id);
+  };
+
+  const filteredMakeOptions = filterManufacturers(makeOptions, form.make);
+  const filteredModelOptions = filterModels(modelOptions, form.model);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -90,21 +179,55 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
             id="garage-add-make"
             className={formInputClass}
             value={form.make}
-            onChange={(event) => setForm((prev) => ({ ...prev, make: event.target.value }))}
+            onChange={handleMakeChange}
             required
             disabled={saving}
             maxLength={80}
+            placeholder="Начните вводить или выберите из списка"
+            autoComplete="off"
           />
+          {manufacturerId == null && filteredMakeOptions.length > 0 ? (
+            <ul className={suggestListClass}>
+              {filteredMakeOptions.map((m) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    className={suggestItemClass}
+                    onClick={() => pickManufacturer(m)}
+                  >
+                    {m.description || m.matchcode || m.id}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </MobileFormField>
         <MobileFormField label="Модель" htmlFor="garage-add-model">
           <input
             id="garage-add-model"
             className={formInputClass}
             value={form.model}
-            onChange={(event) => setForm((prev) => ({ ...prev, model: event.target.value }))}
+            onChange={handleModelChange}
             disabled={saving}
             maxLength={80}
+            placeholder={
+              manufacturerId != null
+                ? 'Начните вводить или выберите из списка'
+                : 'Введите модель'
+            }
+            autoComplete="off"
           />
+          {modelPickedId == null && filteredModelOptions.length > 0 ? (
+            <ul className={suggestListClass}>
+              {filteredModelOptions.map((m) => (
+                <li key={m.id}>
+                  <button type="button" className={suggestItemClass} onClick={() => pickModel(m)}>
+                    {m.description || m.id}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </MobileFormField>
       </div>
 
@@ -118,6 +241,7 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
             min={1900}
             max={2100}
             disabled={saving}
+            placeholder="Например, 2018"
           />
         </MobileFormField>
         <MobileFormField label="Госномер" htmlFor="garage-add-plate">
@@ -128,6 +252,8 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
             onChange={(event) => setForm((prev) => ({ ...prev, plate: event.target.value.toUpperCase() }))}
             disabled={saving}
             maxLength={20}
+            placeholder="М460УН154"
+            autoComplete="off"
           />
         </MobileFormField>
       </div>
@@ -140,6 +266,8 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
           onChange={(event) => setForm((prev) => ({ ...prev, vin: sanitizeVinInput(event.target.value) }))}
           maxLength={VIN_INPUT_MAX_LENGTH}
           disabled={saving}
+          placeholder="11–17 символов"
+          autoComplete="off"
         />
       </MobileFormField>
 
@@ -151,6 +279,7 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
           value={form.notes}
           onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))}
           disabled={saving}
+          placeholder="Комплектация, замечания по кузову…"
         />
       </MobileFormField>
 

@@ -199,7 +199,7 @@ export default function Modal({
       <button
         type="button"
         className={cx(
-          'pointer-events-auto absolute inset-x-0 top-0 bg-ink/40',
+          'pointer-events-auto absolute inset-x-0 top-0 bg-ink/40 animate-fade-in',
           // Leave MobileBottomNav undimmed on mobile/tablet shell (< lg)
           'bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-0',
         )}

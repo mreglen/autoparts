@@ -188,9 +188,11 @@ code {
   @keyframes slideInUp {
     from {
       transform: translateY(100%);
+      opacity: 0.4;
     }
     to {
       transform: translateY(0);
+      opacity: 1;
     }
   }
 
@@ -230,7 +232,8 @@ code {
   }
 
   .animate-slide-in-up {
-    animation: slideInUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    animation: slideInUp 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: transform;
   }
 
   .animate-slide-out-down {

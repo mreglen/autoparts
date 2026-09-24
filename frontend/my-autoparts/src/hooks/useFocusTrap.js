@@ -36,11 +36,11 @@ export function useFocusTrap(containerRef, {
 
     const focusTimer = window.setTimeout(() => {
       if (initialFocusRef?.current) {
-        initialFocusRef.current.focus();
+        initialFocusRef.current.focus({ preventScroll: true });
         return;
       }
       const focusable = getFocusableElements(containerRef.current);
-      focusable[0]?.focus();
+      focusable[0]?.focus({ preventScroll: true });
     }, 0);
 
     const stackEntry = {};
