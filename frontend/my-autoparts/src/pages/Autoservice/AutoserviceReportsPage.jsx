@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { apiAxios, apiRequest } from '../../utils/apiClient';
 import {
@@ -40,6 +40,7 @@ import RepairOrderViewModal, {
   vehicleLabel,
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { useDebouncedCallback } from '../../hooks/useDebouncedCallback';
+import { withBackTo } from '../../hooks/useHistoryBack';
 import {
   formatAutoserviceWarehouseMoney,
 } from '../../utils/autoserviceWarehouseUi';
@@ -236,6 +237,7 @@ function MonthPickerField({ label = 'Месяц', value, onChange, className }) 
 
 export default function AutoserviceReportsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state) => state.auth.user);
   const canSeePayroll = Boolean(user?.is_director);
   const canSeeRosskoSales = ROSSKO_SALES_REPORT_ENABLED && Boolean(user?.can_see_rossko_sales_report);
@@ -1680,7 +1682,7 @@ export default function AutoserviceReportsPage() {
         }}
         onEdit={(order) => {
           setViewOrder(null);
-          navigate(`/autoservice/orders/${order.id}/edit`);
+          navigate(`/autoservice/orders/${order.id}/edit`, { state: withBackTo(location) });
         }}
       />
     </div>

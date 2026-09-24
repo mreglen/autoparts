@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
+from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.organization_employee import OrganizationEmployee, repair_order_employee_assignees
@@ -966,6 +967,16 @@ def _replace_works(
         order.works.append(work)
 
 
+def _order_accrual_timestamp(db: Session, order: RepairOrder) -> datetime | None:
+    if order.status_completed_at:
+        return order.status_completed_at
+    return (
+        db.query(func.max(AutoservicePayrollAccrual.accrued_at))
+        .filter(AutoservicePayrollAccrual.order_id == order.id)
+        .scalar()
+    )
+
+
 def _replace_client_parts(
     order: RepairOrder,
     items: list[RepairOrderClientPartIn],
@@ -1683,6 +1694,13 @@ def update_repair_order(
             else payload.works
         )
         _replace_works(db, row, org_id, works)
+        if row.status == "completed":
+            db.flush()
+            accrue_order_payroll(
+                db,
+                row,
+                accrued_at=_order_accrual_timestamp(db, row),
+            )
 
     if "client_parts" in payload.model_fields_set and payload.client_parts is not None:
         _replace_client_parts(row, payload.client_parts)

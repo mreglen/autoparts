@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { withBackTo } from '../../hooks/useHistoryBack';
 import { apiRequest } from '../../utils/apiClient';
 import {
   importCartItemsToRepairOrder,
@@ -404,6 +405,7 @@ function CartTableBlock({
 export default function CartPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const cart = useSelector(selectCart);
   const loading = useSelector(selectCartLoading);
   const error = useSelector(selectCartError);
@@ -869,8 +871,8 @@ export default function CartPage() {
       createdAt: Date.now(),
     });
     closeRepairOrderModal();
-    navigate('/autoservice/orders/new', { state: { fromCartImport: true } });
-  }, [closeRepairOrderModal, navigate, repairOrderItems]);
+    navigate('/autoservice/orders/new', { state: withBackTo(location, { fromCartImport: true }) });
+  }, [closeRepairOrderModal, navigate, location, repairOrderItems]);
 
   const handleAuthSuccess = useCallback(() => {
     setIsAuthModalOpen(false);

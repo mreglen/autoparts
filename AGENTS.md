@@ -236,6 +236,13 @@ sudo update
 - Планировщик в `main.py` раз в час вызывает `cleanup_expired_sessions` — удаляет только мёртвые сессии (истёк `refresh_expires_at`, `is_active=False` >24ч, легаси без refresh >24ч). Не возвращать очистку по `last_activity` — это разлогинивает пользователей через сутки неактивности.
 - `cleanup_old_user_sessions` — максимум 5 сессий на пользователя с одного IP (на логине).
 
+### 7.6 Начисления ЗП (payroll)
+
+- Начисления **материализуются** в `autoservice_payroll_accruals` — отчёты (`/autoservice/reports/payroll`) и страница сотрудника (`/autoservice/my/payroll`) читают эту таблицу по `accrued_at`, а не считают на лету.
+- Создаются при переходе заказа в `completed` (`accrue_order_payroll`), удаляются при выходе из `completed`, удалении заказа и удалении оплаты (`clear_order_accruals`).
+- При редактировании работ/исполнителей завершённого заказа (PATCH `repair-orders/{id}`) начисления пересчитываются с `accrued_at = status_completed_at` — начисление остаётся в месяце завершения заказа.
+- Изменение работ заказа идёт только через `_replace_works` в PATCH — других путей нет.
+
 ## 8. Типичные ошибки
 
 ### 8.1 Заказ-наряды

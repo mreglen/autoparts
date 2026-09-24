@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -19,6 +19,7 @@ import AutoserviceWarehouseReceiptsPage from './AutoserviceWarehouseReceiptsPage
 import AutoserviceWarehouseExpensesPage from './AutoserviceWarehouseExpensesPage';
 import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { withBackTo } from '../../hooks/useHistoryBack';
 import useNewPartsMarkupPercent from '../../hooks/useNewPartsMarkupPercent';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import { canEditClientMarkupSettings } from '../../utils/autoservicePermissions';
@@ -92,6 +93,7 @@ function WarehouseItemMobileCard({
 
 export default function AutoserviceWarehousePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isReady, isAuthenticated, user } = useAuthReady();
   const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
   const clientMarkupEnabled = canUseClientMarkup(user);
@@ -731,7 +733,7 @@ export default function AutoserviceWarehousePage() {
         onClose={() => setViewRepairOrder(null)}
         onEdit={(o) => {
           if (!o?.id) return;
-          navigate(`/autoservice/orders/${o.id}/edit`);
+          navigate(`/autoservice/orders/${o.id}/edit`, { state: withBackTo(location) });
         }}
         onOrderChange={(updated) => setViewRepairOrder(updated)}
       />

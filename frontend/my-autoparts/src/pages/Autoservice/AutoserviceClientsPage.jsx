@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { withBackTo } from '../../hooks/useHistoryBack';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -411,6 +412,7 @@ function ClientProfileModal({
   onSaved,
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const isGuest = isGuestClient(client);
   const clientId = client?.id;
   const [editing, setEditing] = useState(false);
@@ -799,7 +801,7 @@ function ClientProfileModal({
       onEdit={(order) => {
         setViewOrder(null);
         handleClose();
-        navigate(`/autoservice/orders/${order.id}/edit`);
+        navigate(`/autoservice/orders/${order.id}/edit`, { state: withBackTo(location) });
       }}
     />
     <ClientBookingViewModal booking={viewBooking} onClose={() => setViewBooking(null)} />

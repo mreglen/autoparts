@@ -47,7 +47,12 @@ def clear_order_accruals(db: Session, order_id: int) -> None:
     ).delete(synchronize_session=False)
 
 
-def accrue_order_payroll(db: Session, order: RepairOrder) -> None:
+def accrue_order_payroll(
+    db: Session,
+    order: RepairOrder,
+    *,
+    accrued_at: datetime | None = None,
+) -> None:
     clear_order_accruals(db, order.id)
     works = sorted(order.works or [], key=lambda w: (w.position, w.id))
     daily_employees: set[int] = set()
@@ -67,6 +72,7 @@ def accrue_order_payroll(db: Session, order: RepairOrder) -> None:
                     work_title=work.title,
                     accrual_type="work_percent",
                     amount=amount,
+                    accrued_at=accrued_at,
                 )
             )
             daily_employees.add(row.employee_id)
@@ -93,6 +99,7 @@ def accrue_order_payroll(db: Session, order: RepairOrder) -> None:
                 work_id=None,
                 accrual_type="daily_rate",
                 amount=rate,
+                accrued_at=accrued_at,
             )
         )
 

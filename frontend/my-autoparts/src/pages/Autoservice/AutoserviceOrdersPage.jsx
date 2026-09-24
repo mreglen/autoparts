@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { withBackTo } from '../../hooks/useHistoryBack';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -59,6 +60,7 @@ export default function AutoserviceOrdersPage() {
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const canReview = canReviewRepairOrders(user, permissionCodes || []);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const viewParam = searchParams.get('view');
   const viewHistory = viewParam === 'history';
@@ -268,12 +270,12 @@ export default function AutoserviceOrdersPage() {
   const openDraft = useCallback(
     (draft) => {
       if (draft.mode === 'edit' && draft.orderId) {
-        navigate(`/autoservice/orders/${draft.orderId}/edit`);
+        navigate(`/autoservice/orders/${draft.orderId}/edit`, { state: withBackTo(location) });
       } else {
-        navigate('/autoservice/orders/new');
+        navigate('/autoservice/orders/new', { state: withBackTo(location) });
       }
     },
-    [navigate],
+    [navigate, location],
   );
 
   const handleDeleteDraftConfirm = useCallback(() => {
@@ -389,7 +391,7 @@ export default function AutoserviceOrdersPage() {
     <div className="w-full min-w-0">
       <div className="lg:hidden">
         <AutoserviceOrdersMobileView
-          onCreate={() => navigate('/autoservice/orders/new')}
+          onCreate={() => navigate('/autoservice/orders/new', { state: withBackTo(location) })}
           orderTabs={orderTabs}
           tabValue={tabValue}
           onTabChange={setListView}
@@ -407,7 +409,7 @@ export default function AutoserviceOrdersPage() {
           onStatusChange={handleStatus}
           statusSavingId={statusSavingId}
           onView={setViewOrder}
-          onEdit={(row) => navigate(`/autoservice/orders/${row.id}/edit`)}
+          onEdit={(row) => navigate(`/autoservice/orders/${row.id}/edit`, { state: withBackTo(location) })}
           onDuplicate={viewReview ? undefined : handleDuplicate}
           onDelete={setDeleteConfirmOrder}
           onApprove={viewReview ? (row) => handleApprove(row.id) : undefined}
@@ -430,7 +432,7 @@ export default function AutoserviceOrdersPage() {
             {!viewHistory && !viewReview ? (
               <button
                 type="button"
-                onClick={() => navigate('/autoservice/orders/new')}
+                onClick={() => navigate('/autoservice/orders/new', { state: withBackTo(location) })}
                 className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:w-auto"
               >
                 Новый заказ-наряд
@@ -627,7 +629,7 @@ export default function AutoserviceOrdersPage() {
         onClose={() => setViewOrder(null)}
         onEdit={(order) => {
           setViewOrder(null);
-          navigate(`/autoservice/orders/${order.id}/edit`);
+          navigate(`/autoservice/orders/${order.id}/edit`, { state: withBackTo(location) });
         }}
       />
 

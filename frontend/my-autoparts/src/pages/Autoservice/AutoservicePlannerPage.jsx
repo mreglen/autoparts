@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { withBackTo } from '../../hooks/useHistoryBack';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import RepairOrderViewModal, { OrderStatusBadge, normalizeRepairOrderStatus } from '../../components/Autoservice/RepairOrderViewModal';
 import PlannerCreateChoiceModal from '../../components/Autoservice/PlannerCreateChoiceModal';
@@ -387,6 +388,7 @@ function MobileDayPlanner({
 
 export default function AutoservicePlannerPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isReady, isAuthenticated } = useAuthReady();
   const today = useMemo(() => new Date(), []);
   const todayIso = toIsoDate(today);
@@ -480,12 +482,12 @@ export default function AutoservicePlannerPage() {
   const beginCreateOrder = useCallback((ctx) => {
     const dayIso = ctx?.dayIso || todayIso;
     navigate('/autoservice/orders/new', {
-      state: {
+      state: withBackTo(location, {
         scheduledAtLocal: `${dayIso}T10:00`,
         ...(ctx?.zoneId != null ? { workZoneId: ctx.zoneId } : {}),
-      },
+      }),
     });
-  }, [navigate, todayIso]);
+  }, [navigate, location, todayIso]);
 
   const beginCreateInspection = useCallback((ctx) => {
     const dayIso = ctx?.dayIso || todayIso;
@@ -644,7 +646,7 @@ export default function AutoservicePlannerPage() {
         }}
         onEdit={(order) => {
           setViewOrder(null);
-          navigate(`/autoservice/orders/${order.id}/edit`);
+          navigate(`/autoservice/orders/${order.id}/edit`, { state: withBackTo(location) });
         }}
       />
 
@@ -686,7 +688,7 @@ export default function AutoservicePlannerPage() {
         onCreateOrder={(booking) => {
           setViewInspection(null);
           navigate('/autoservice/orders/new', {
-            state: {
+            state: withBackTo(location, {
               scheduledAtLocal: `${booking.preferred_date}T${booking.preferred_time?.slice(0, 5) || '10:00'}`,
               workZoneId: booking.work_zone_id,
               clientId: booking.client_id,
@@ -695,7 +697,7 @@ export default function AutoservicePlannerPage() {
               clientPhone: booking.phone,
               vehicleMake: booking.vehicle_make,
               inspectionBookingId: booking.id,
-            },
+            }),
           });
         }}
         initialBooking={

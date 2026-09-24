@@ -8,7 +8,12 @@ from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import RepairOrder, RepairOrderWork
-from app.services.autoservice_payroll import compute_employee_monthly_payroll, compute_org_monthly_payroll, month_bounds
+from app.services.autoservice_payroll import (
+    accrue_order_payroll,
+    compute_employee_monthly_payroll,
+    compute_org_monthly_payroll,
+    month_bounds,
+)
 
 
 def _vehicle(order_id: int):
@@ -268,3 +273,35 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         self.assertEqual(result["completed_orders"], 1)
         self.assertEqual(len(result["orders"]), 1)
         self.assertEqual(result["orders"][0]["works"][0]["title"], "Диагностика")
+
+    def test_accrue_order_payroll_recreates_accruals_with_given_timestamp(self):
+        db = MagicMock()
+        db.query.return_value.filter.return_value.all.return_value = []
+        work = SimpleNamespace(
+            id=501,
+            position=1,
+            title="Ремонт",
+            qty=2,
+            unit_price=Decimal("1000.00"),
+            executors=[
+                SimpleNamespace(employee_id=1, percent=Decimal("10.00")),
+                SimpleNamespace(employee_id=2, percent=Decimal("20.00")),
+            ],
+        )
+        order = SimpleNamespace(id=10, organization_id="ORG1", works=[work])
+        ts = datetime(2026, 8, 15, 12, 0, 0)
+
+        accrue_order_payroll(db, order, accrued_at=ts)
+
+        db.query.return_value.filter.return_value.delete.assert_called_once_with(
+            synchronize_session=False
+        )
+        added = [call.args[0] for call in db.add.call_args_list]
+        self.assertEqual(len(added), 2)
+        by_employee = {row.employee_id: row for row in added}
+        self.assertEqual(by_employee[1].amount, Decimal("200.00"))
+        self.assertEqual(by_employee[2].amount, Decimal("400.00"))
+        self.assertEqual(by_employee[1].accrued_at, ts)
+        self.assertEqual(by_employee[2].accrued_at, ts)
+        self.assertEqual(by_employee[1].work_id, 501)
+        self.assertEqual(by_employee[1].work_title, "Ремонт")

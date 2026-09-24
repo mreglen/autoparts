@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { withBackTo } from '../../hooks/useHistoryBack';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -95,6 +96,7 @@ function BookingMobileCard({ row, onView }) {
 export default function AutoserviceInspectionsPage() {
   const { isReady, user, isAuthenticated } = useAuthReady();
   const navigate = useNavigate();
+  const location = useLocation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -316,7 +318,7 @@ export default function AutoserviceInspectionsPage() {
         onCreateOrder={(booking) => {
           setViewBooking(null);
           navigate('/autoservice/orders/new', {
-            state: {
+            state: withBackTo(location, {
               scheduledAtLocal: `${booking.preferred_date}T${booking.preferred_time?.slice(0, 5) || '10:00'}`,
               workZoneId: booking.work_zone_id,
               clientId: booking.client_id,
@@ -326,7 +328,7 @@ export default function AutoserviceInspectionsPage() {
               vehicleMake: booking.vehicle_make || booking.vehicle?.make,
               vehicleModel: booking.vehicle_model || booking.vehicle?.model,
               inspectionBookingId: booking.id,
-            },
+            }),
           });
         }}
       />

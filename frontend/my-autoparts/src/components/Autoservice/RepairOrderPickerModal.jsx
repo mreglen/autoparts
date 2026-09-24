@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { withBackTo } from '../../hooks/useHistoryBack';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import { Input } from '../UI/Field';
@@ -32,6 +33,7 @@ export default function RepairOrderPickerModal({
   showCreateNew = true,
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state) => state.auth.user);
   const storedClientMarkupPercent = useSelector(
     (state) => Number(state.clientMarkup.percent) || 0,
@@ -146,7 +148,7 @@ export default function RepairOrderPickerModal({
     });
     onClose();
     navigate('/autoservice/orders/new', {
-      state: { fromPurchaseImport: true },
+      state: withBackTo(location, { fromPurchaseImport: true }),
     });
   };
 

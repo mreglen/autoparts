@@ -25,6 +25,11 @@ export function navigateBack(navigate, { fallback, explicitBack } = {}) {
 }
 
 
+export function withBackTo(location, state) {
+  return { ...state, backTo: `${location.pathname}${location.search}` };
+}
+
+
 export default function useHistoryBack(fallback) {
   const navigate = useNavigate();
   const location = useLocation();

@@ -8,7 +8,7 @@ export default function SearchablePillSelect({
   onChange,
   options = [],
   placeholder = 'Начните вводить…',
-  emptyOptionLabel = 'Без автомобиля',
+  emptyOptionLabel = null,
   addOptionLabel = 'Добавить автомобиль',
   onAddClick,
   disabled = false,
@@ -142,18 +142,20 @@ export default function SearchablePillSelect({
           aria-label={ariaLabel}
           className="absolute left-0 z-40 mt-1.5 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg"
         >
-          <li role="option" id={`${listboxId}-opt-empty`} aria-selected={value === ''}>
-            <button
-              type="button"
-              className={`flex w-full px-4 py-2.5 text-left text-sm transition hover:bg-gray-50 ${
-                value === '' ? 'bg-indigo-50 font-medium text-indigo-700' : 'text-gray-800'
-              }`}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => handleSelect('')}
-            >
-              {emptyOptionLabel}
-            </button>
-          </li>
+          {emptyOptionLabel != null ? (
+            <li role="option" id={`${listboxId}-opt-empty`} aria-selected={value === ''}>
+              <button
+                type="button"
+                className={`flex w-full px-4 py-2.5 text-left text-sm transition hover:bg-gray-50 ${
+                  value === '' ? 'bg-indigo-50 font-medium text-indigo-700' : 'text-gray-800'
+                }`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => handleSelect('')}
+              >
+                {emptyOptionLabel}
+              </button>
+            </li>
+          ) : null}
 
           {filtered.length === 0 ? (
             <li className="px-4 py-2.5 text-sm text-gray-500">Ничего не найдено</li>

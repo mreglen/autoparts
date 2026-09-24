@@ -2202,7 +2202,7 @@ export default function AutoserviceOrderFormPage() {
           clearRepairOrderCartDraft();
           if (afterCreate === 'edit') {
             justAutoCreatedOrderIdRef.current = created.id;
-            navigate(`/autoservice/orders/${created.id}/edit`, { replace: true });
+            navigate(`/autoservice/orders/${created.id}/edit`, { replace: true, state: location.state });
           }
           return importErr?.message || 'Заказ-наряд создан, но импорт позиций не удался';
         }
@@ -2216,7 +2216,7 @@ export default function AutoserviceOrderFormPage() {
         applyFormState(mapOrderToFormState(saved));
         justAutoCreatedOrderIdRef.current = saved?.id ?? null;
         pauseAutoSave();
-        navigate(`/autoservice/orders/${saved.id}/edit`, { replace: true });
+        navigate(`/autoservice/orders/${saved.id}/edit`, { replace: true, state: location.state });
       }
       return null;
     } catch (err) {
@@ -2336,7 +2336,7 @@ export default function AutoserviceOrderFormPage() {
     const validationError = validateForAutoSave();
     if (!canAttemptAutoSave() || validationError) {
       writeRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null, snapshot);
-      navigate('/autoservice/orders');
+      goBack();
       return;
     }
 
@@ -2352,7 +2352,7 @@ export default function AutoserviceOrderFormPage() {
     }
     lastSavedSnapshotRef.current = JSON.stringify(snapshot);
     clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null);
-    navigate('/autoservice/orders');
+    goBack();
   };
 
   if (!isReady) return <AuthLoadingScreen />;
