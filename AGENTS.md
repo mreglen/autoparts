@@ -246,7 +246,7 @@ sudo update
 
 - Начисления **материализуются** в `autoservice_payroll_accruals` — отчёты (`/autoservice/reports/payroll`) и страница сотрудника (`/autoservice/my/payroll`) читают эту таблицу по `accrued_at`, а не считают на лету.
 - Создаются при переходе заказа в `completed` (`accrue_order_payroll`), удаляются при выходе из `completed`, удалении заказа и удалении оплаты (`clear_order_accruals`).
-- При редактировании работ/исполнителей завершённого заказа (PATCH `repair-orders/{id}`) начисления пересчитываются с `accrued_at = status_completed_at` — начисление остаётся в месяце завершения заказа.
+- Закрытые заказы (`completed`/`cancelled`) редактировать нельзя: PATCH `repair-orders/{id}` и `.../shop-parts/{id}/manual` отвечают 400. Ветка пересчёта начислений при правке работ завершённого заказа в коде осталась, но сейчас недостижима — при возврате такой правки начисления пересчитываются с `accrued_at = status_completed_at`.
 - Изменение работ заказа идёт только через `_replace_works` в PATCH — других путей нет.
 
 ## 8. Типичные ошибки
