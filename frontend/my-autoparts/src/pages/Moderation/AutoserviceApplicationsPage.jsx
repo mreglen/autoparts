@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { ConfirmDialog } from '../../components/UI/Modal';
+import Modal, { ConfirmDialog } from '../../components/UI/Modal';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { PageHeader } from '../../components/UI/SectionHeader';
 import Card from '../../components/UI/Card';
@@ -9,9 +9,12 @@ import { Badge } from '../../components/UI/Badge';
 import Button from '../../components/UI/Button';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
+  approveAutoserviceApplication,
   disableAutoserviceOrganization,
+  fetchAutoserviceApplications,
   fetchAutoserviceConnectedOrgs,
   pauseAutoserviceOrganization,
+  rejectAutoserviceApplication,
   resumeAutoserviceOrganization,
 } from '../../redux/slices/AutoserviceAdminSlice';
 
@@ -20,19 +23,28 @@ function formatDate(value) {
   return new Date(value).toLocaleString('ru-RU');
 }
 
+const APPLICATION_STATUS = {
+  pending: { label: 'Ожидает', tone: 'warning' },
+  approved: { label: 'Одобрена', tone: 'success' },
+  rejected: { label: 'Отклонена', tone: 'danger' },
+};
+
 export default function AutoserviceApplicationsPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { isReady, user } = useAuthReady();
-  const { connectedOrgs, loading, actionLoading, error } = useSelector(
+  const { applications, connectedOrgs, loading, actionLoading, error } = useSelector(
     (state) => state.autoserviceAdmin,
   );
 
   const [disableOrgId, setDisableOrgId] = useState(null);
   const [toggleOrgId, setToggleOrgId] = useState(null);
   const [toggleToPaused, setToggleToPaused] = useState(true);
+  const [rejectAppId, setRejectAppId] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const refresh = useCallback(() => {
+    dispatch(fetchAutoserviceApplications());
     dispatch(fetchAutoserviceConnectedOrgs());
   }, [dispatch]);
 
@@ -75,6 +87,22 @@ export default function AutoserviceApplicationsPage() {
     refresh();
   };
 
+  const handleApprove = async (applicationId) => {
+    await dispatch(approveAutoserviceApplication(applicationId));
+    refresh();
+  };
+
+  const handleReject = async (event) => {
+    event.preventDefault();
+    if (!rejectAppId) return;
+    await dispatch(
+      rejectAutoserviceApplication({ applicationId: rejectAppId, reason: rejectReason.trim() }),
+    );
+    setRejectAppId(null);
+    setRejectReason('');
+    refresh();
+  };
+
   if (!isReady || !user?.is_admin) return null;
 
   return (
@@ -89,6 +117,79 @@ export default function AutoserviceApplicationsPage() {
           {error}
         </div>
       ) : null}
+
+      <section className="space-y-4">
+        <h2 className="text-sg-subtitle text-ink">Заявки на подключение</h2>
+        {loading ? (
+          <Card>
+            <p className="text-sm text-ink-muted">Загрузка…</p>
+          </Card>
+        ) : applications.length === 0 ? (
+          <Card>
+            <p className="text-sm text-ink-muted">Нет заявок</p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {applications.map((app) => {
+              const statusMeta = APPLICATION_STATUS[app.status] || {
+                label: app.status,
+                tone: 'neutral',
+              };
+              return (
+                <Card key={app.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-semibold text-ink">
+                          {app.organization_name || `Организация ${app.organization_id}`}
+                        </h3>
+                        <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
+                      </div>
+                      <p className="mt-1 text-sm text-ink-muted">
+                        {app.contact_name}
+                        {app.contact_phone ? ` · ${app.contact_phone}` : ''}
+                        {app.applicant_name ? ` · заявитель: ${app.applicant_name}` : ''}
+                      </p>
+                      {app.message ? (
+                        <p className="mt-1 text-sm text-ink-muted">{app.message}</p>
+                      ) : null}
+                      {app.rejection_reason ? (
+                        <p className="mt-1 text-sm text-danger-700">
+                          Причина отклонения: {app.rejection_reason}
+                        </p>
+                      ) : null}
+                      <p className="mt-1 text-xs text-ink-muted">
+                        Подана: {formatDate(app.created_at)}
+                        {app.reviewed_at ? ` · рассмотрена: ${formatDate(app.reviewed_at)}` : ''}
+                      </p>
+                    </div>
+                    {app.status === 'pending' ? (
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button
+                          onClick={() => handleApprove(app.id)}
+                          disabled={actionLoading}
+                        >
+                          Одобрить
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setRejectAppId(app.id);
+                            setRejectReason('');
+                          }}
+                          disabled={actionLoading}
+                        >
+                          Отклонить
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <section className="space-y-4">
         <h2 className="text-sg-subtitle text-ink">Подключённые автосервисы</h2>
@@ -158,6 +259,51 @@ export default function AutoserviceApplicationsPage() {
           </div>
         )}
       </section>
+
+      <Modal
+        open={Boolean(rejectAppId)}
+        onClose={() => setRejectAppId(null)}
+        title="Отклонить заявку"
+        size="sm"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full sm:w-auto"
+              onClick={() => setRejectAppId(null)}
+            >
+              Отмена
+            </Button>
+            <Button
+              type="submit"
+              form="reject-autoservice-application-form"
+              variant="danger"
+              className="w-full sm:w-auto"
+              disabled={actionLoading}
+            >
+              Отклонить
+            </Button>
+          </div>
+        )}
+      >
+        <form id="reject-autoservice-application-form" onSubmit={handleReject}>
+          <label
+            htmlFor="reject-autoservice-application-reason"
+            className="mb-2 block text-sm font-medium text-ink"
+          >
+            Причина отклонения
+          </label>
+          <textarea
+            id="reject-autoservice-application-reason"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            rows={4}
+            className="w-full min-h-[6rem] rounded-xl border border-gray-300 px-3 py-2 text-sm max-md:text-base focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            placeholder="Например: неполные данные, дубликат заявки…"
+          />
+        </form>
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(disableOrgId)}

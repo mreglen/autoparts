@@ -29,10 +29,13 @@ from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS,
     AUTOSERVICE_PERMISSION_ORDERS,
     AUTOSERVICE_PERMISSION_ORDERS_OWN,
+    get_or_create_autoservice_client_for_user,
+    my_active_autoservice_client,
     related_autoservice_client_ids,
     require_any_autoservice_permission,
     require_autoservice_permission,
     require_my_active_autoservice_client,
+    resolve_active_autoservice_org_or_404,
 )
 
 router = APIRouter(tags=["Autoservice garage"])
@@ -177,6 +180,7 @@ def decode_garage_frame(
 @router.get("/autoservice/garage/vehicles", response_model=list[GarageVehicleView])
 def list_garage_vehicles(
     client_id: int | None = Query(None),
+    organization_id: str | None = Query(None, max_length=10),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -211,7 +215,12 @@ def list_garage_vehicles(
         )
         return [_vehicle_to_view(row) for row in rows]
 
-    my_client = require_my_active_autoservice_client(db, current_user)
+    my_client = my_active_autoservice_client(db, current_user, organization_id)
+    if not my_client:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступно только клиентам автосервиса",
+        )
     related_ids = related_autoservice_client_ids(db, my_client)
     rows = (
         db.query(GarageVehicle)
@@ -229,10 +238,17 @@ def list_garage_vehicles(
 )
 def create_garage_vehicle(
     payload: GarageVehicleCreate,
+    organization_id: str | None = Query(None, max_length=10),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    my_client = require_my_active_autoservice_client(db, current_user)
+    if organization_id:
+        org = resolve_active_autoservice_org_or_404(db, organization_id)
+        my_client = get_or_create_autoservice_client_for_user(
+            db, current_user, org.id
+        )
+    else:
+        my_client = require_my_active_autoservice_client(db, current_user)
     row = _create_vehicle_for_client(db, client=my_client, payload=payload)
     return _vehicle_to_view(row)
 

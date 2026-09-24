@@ -30,6 +30,10 @@ const STATUS_META = {
     label: 'В ожидании',
     className: 'bg-warning-50 text-warning-700 ring-warning-100',
   },
+  confirmed: {
+    label: 'Подтверждена',
+    className: 'bg-brand-50 text-brand-700 ring-brand-100',
+  },
   processed: {
     label: 'Обработана',
     className: 'bg-success-50 text-success-700 ring-success-100',
@@ -100,6 +104,9 @@ function BookingRow({ row, onOpen }) {
           {row.preferred_time ? ` · ${String(row.preferred_time).slice(0, 5)}` : ''}
         </p>
         <StatusBadge status={row.status} />
+        {row.organization_name ? (
+          <span className="truncate text-xs text-ink-muted">{row.organization_name}</span>
+        ) : null}
       </div>
       <p className="mt-0.5 truncate text-ink-soft">{vehicleLabel || 'Без автомобиля'}</p>
       <p className="mt-0.5 truncate text-xs text-ink-muted">
@@ -139,6 +146,9 @@ export default function AutoserviceRepairBookingPage() {
   }, [client?.name, user?.first_name, user?.last_name]);
 
   const [tab, setTab] = useState('form');
+  const [orgs, setOrgs] = useState([]);
+  const [orgsLoading, setOrgsLoading] = useState(true);
+  const [selectedOrgId, setSelectedOrgId] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -161,6 +171,31 @@ export default function AutoserviceRepairBookingPage() {
   }, [dispatch, isReady, isAuthenticated]);
 
   useEffect(() => {
+    if (!isReady || !isAuthenticated) return undefined;
+    let cancelled = false;
+    apiRequest('/public/autoservice/organizations')
+      .then((data) => {
+        if (!cancelled) setOrgs(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setOrgs([]);
+      })
+      .finally(() => {
+        if (!cancelled) setOrgsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isReady, isAuthenticated]);
+
+  useEffect(() => {
+    if (selectedOrgId || orgs.length === 0) return;
+    const preferred = client?.organization_id;
+    const exists = preferred && orgs.some((org) => org.organization_id === preferred);
+    setSelectedOrgId(exists ? preferred : orgs[0].organization_id);
+  }, [orgs, client?.organization_id, selectedOrgId]);
+
+  useEffect(() => {
     setName(defaultName);
   }, [defaultName]);
 
@@ -181,10 +216,13 @@ export default function AutoserviceRepairBookingPage() {
     navigate(location.pathname, { replace: true, state: {} });
   }, [location.pathname, location.state?.selectedVehicleId, navigate]);
 
-  const loadVehicles = useCallback(async () => {
+  const loadVehicles = useCallback(async (organizationId) => {
     setVehiclesLoading(true);
     try {
-      const data = await apiRequest('/autoservice/garage/vehicles');
+      const url = organizationId
+        ? `/autoservice/garage/vehicles?organization_id=${encodeURIComponent(organizationId)}`
+        : '/autoservice/garage/vehicles';
+      const data = await apiRequest(url);
       setVehicles(Array.isArray(data) ? data : []);
     } catch {
       setVehicles([]);
@@ -209,10 +247,15 @@ export default function AutoserviceRepairBookingPage() {
 
   useEffect(() => {
     if (isReady && isAuthenticated && clientStatus === 'succeeded' && isClient) {
-      loadVehicles();
       loadBookings();
     }
-  }, [isReady, isAuthenticated, clientStatus, isClient, loadVehicles, loadBookings]);
+  }, [isReady, isAuthenticated, clientStatus, isClient, loadBookings]);
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated || !selectedOrgId) return;
+    setVehicleId('');
+    loadVehicles(selectedOrgId);
+  }, [isReady, isAuthenticated, selectedOrgId, loadVehicles]);
 
   const vehicleOptions = useMemo(
     () =>
@@ -222,6 +265,17 @@ export default function AutoserviceRepairBookingPage() {
         searchText: garageVehicleSearchText(vehicle),
       })),
     [vehicles],
+  );
+
+  const orgOptions = useMemo(
+    () =>
+      orgs.map((org) => ({
+        value: org.organization_id,
+        label: org.name || 'Автосервис',
+        hint: [org.address, org.phone].filter(Boolean).join(' · ') || null,
+        searchText: `${org.name || ''} ${org.address || ''}`,
+      })),
+    [orgs],
   );
 
   const handleVehicleCreated = (vehicle) => {
@@ -237,11 +291,16 @@ export default function AutoserviceRepairBookingPage() {
       setError('Укажите желаемую дату');
       return;
     }
+    if (!selectedOrgId) {
+      setError('Выберите автосервис');
+      return;
+    }
     setSaving(true);
     try {
       const row = await apiRequest('/autoservice/inspection-bookings/me', {
         method: 'POST',
         body: JSON.stringify({
+          organization_id: selectedOrgId,
           name: name.trim() || null,
           phone: phone.trim() || null,
           preferred_date: preferredDate,
@@ -265,6 +324,19 @@ export default function AutoserviceRepairBookingPage() {
 
   const formBlock = (
     <form onSubmit={handleSubmit} className="space-y-5">
+      <MobileFormField label="Автосервис" htmlFor="booking-org" required>
+        <SearchablePillSelect
+          id="booking-org"
+          ariaLabel="Автосервис"
+          value={selectedOrgId}
+          onChange={setSelectedOrgId}
+          options={orgOptions}
+          loading={orgsLoading}
+          disabled={saving}
+          placeholder="Выберите автосервис"
+        />
+      </MobileFormField>
+
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <MobileFormField label="Имя" htmlFor="booking-name">
@@ -430,7 +502,7 @@ export default function AutoserviceRepairBookingPage() {
         gapClassName="gap-4"
         tabs={[
           { id: 'form', label: 'Новая запись' },
-          { id: 'list', label: 'Мои запись' },
+          { id: 'list', label: 'Мои записи' },
         ]}
         value={tab}
         onChange={setTab}
@@ -456,7 +528,11 @@ export default function AutoserviceRepairBookingPage() {
       </div>
 
       {addVehicleOpen ? (
-        <GarageQuickAddModal onClose={() => setAddVehicleOpen(false)} onCreated={handleVehicleCreated} />
+        <GarageQuickAddModal
+          onClose={() => setAddVehicleOpen(false)}
+          onCreated={handleVehicleCreated}
+          organizationId={selectedOrgId || null}
+        />
       ) : null}
 
       <Modal
@@ -495,6 +571,10 @@ export default function AutoserviceRepairBookingPage() {
                 <dd className="mt-1 font-medium text-ink">
                   {bookingVehicleLabel(viewBooking) || 'Без автомобиля'}
                 </dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Автосервис</dt>
+                <dd className="mt-1 font-medium text-ink">{viewBooking.organization_name || '—'}</dd>
               </div>
               <div className="min-w-0">
                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Имя</dt>

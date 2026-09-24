@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -109,7 +110,7 @@ def require_autoservice_enabled(db: Session) -> None:
 
 
 def require_autoservice_org_id(db: Session, user: User | None = None) -> str:
-    if user and user.organization_id and not user.is_admin:
+    if user and user.organization_id:
         org = db.query(Organization).filter(Organization.id == user.organization_id).first()
         if org and getattr(org, "is_autoservice", False) and not getattr(org, "autoservice_paused", False):
             return org.id
@@ -335,3 +336,114 @@ def require_my_active_autoservice_client(db: Session, user: User) -> Autoservice
             detail="Доступно только клиентам автосервиса",
         )
     return client
+
+
+def resolve_active_autoservice_org_or_404(db: Session, organization_id: str) -> Organization:
+    org = db.query(Organization).filter(Organization.id == organization_id).first()
+    if (
+        not org
+        or not getattr(org, "is_autoservice", False)
+        or getattr(org, "autoservice_paused", False)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Автосервис не найден",
+        )
+    return org
+
+
+def my_active_autoservice_client(
+    db: Session,
+    user: User,
+    organization_id: str | None = None,
+) -> AutoserviceClient | None:
+    require_autoservice_enabled(db)
+    if organization_id:
+        resolve_active_autoservice_org_or_404(db, organization_id)
+        org_id = organization_id
+    else:
+        org_id = require_autoservice_org_id(db)
+    return find_active_autoservice_client_for_user(db, user, org_id)
+
+
+def get_or_create_autoservice_client_for_user(
+    db: Session,
+    user: User,
+    org_id: str,
+    *,
+    name: str | None = None,
+    phone: str | None = None,
+) -> AutoserviceClient:
+    """Find or create the user's client card inside the given autoservice org."""
+    existing = find_active_autoservice_client_for_user(db, user, org_id)
+    if existing:
+        return existing
+
+    raw_phone = (phone or "").strip() or (user.phone or "")
+    phone_norm = normalize_phone_or_400(raw_phone)
+    if not phone_norm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите телефон, чтобы записаться в этот автосервис",
+        )
+
+    by_phone = (
+        db.query(AutoserviceClient)
+        .filter(
+            AutoserviceClient.organization_id == org_id,
+            AutoserviceClient.phone == phone_norm,
+        )
+        .first()
+    )
+    if by_phone:
+        if by_phone.user_id is None:
+            by_phone.user_id = user.id
+            by_phone.name = user_display_name(user)
+            if by_phone.status != "active":
+                by_phone.status = "active"
+            db.flush()
+            return by_phone
+        if by_phone.user_id == user.id:
+            return by_phone
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Этот телефон уже привязан к другому клиенту автосервиса",
+        )
+
+    row = AutoserviceClient(
+        organization_id=org_id,
+        user_id=user.id,
+        name=(name or "").strip()[:120] or user_display_name(user),
+        phone=phone_norm,
+        person_type="individual",
+        status="active",
+        source="self",
+        consented_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        created_by_user_id=user.id,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def list_my_autoservice_client_orgs(db: Session, user: User) -> list[dict]:
+    rows = (
+        db.query(AutoserviceClient, Organization)
+        .join(Organization, Organization.id == AutoserviceClient.organization_id)
+        .filter(
+            AutoserviceClient.user_id == user.id,
+            AutoserviceClient.status == "active",
+            Organization.is_autoservice.is_(True),
+            Organization.autoservice_paused.is_(False),
+        )
+        .order_by(Organization.name.asc())
+        .all()
+    )
+    return [
+        {
+            "organization_id": client.organization_id,
+            "organization_name": org.name,
+            "client_id": client.id,
+        }
+        for client, org in rows
+    ]

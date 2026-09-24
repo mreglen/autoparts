@@ -10,6 +10,7 @@ from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.autoservice_settings import (
     AutoservicePublicInfo,
+    AutoservicePublicOrg,
     AutoserviceSettingsUpdate,
     AutoserviceSettingsView,
 )
@@ -56,6 +57,36 @@ def get_public_autoservice_info(db: Session = Depends(get_db)):
         address=org.address if org else None,
         phone=org.phone if org else None,
     )
+
+
+@router.get("/public/autoservice/organizations", response_model=list[AutoservicePublicOrg])
+def list_public_autoservice_organizations(db: Session = Depends(get_db)):
+    if not autoservice_enabled(db):
+        return []
+    orgs = (
+        db.query(Organization)
+        .outerjoin(
+            AutoserviceSettings,
+            AutoserviceSettings.organization_id == Organization.id,
+        )
+        .add_columns(AutoserviceSettings.public_name, AutoserviceSettings.public_description)
+        .filter(
+            Organization.is_autoservice.is_(True),
+            Organization.autoservice_paused.is_(False),
+        )
+        .order_by(Organization.name.asc())
+        .all()
+    )
+    return [
+        AutoservicePublicOrg(
+            organization_id=org.id,
+            name=public_name or org.name,
+            description=public_description,
+            address=org.address,
+            phone=org.phone,
+        )
+        for org, public_name, public_description in orgs
+    ]
 
 
 @router.get("/autoservice/settings", response_model=AutoserviceSettingsView)

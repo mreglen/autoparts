@@ -23,6 +23,39 @@ const SOURCE_LABELS = {
   client: 'Клиент',
 };
 
+const STATUS_META = {
+  new: {
+    label: 'Новая заявка',
+    className: 'bg-warning-50 text-warning-700 ring-warning-100',
+  },
+  confirmed: {
+    label: 'Подтверждена',
+    className: 'bg-brand-50 text-brand-700 ring-brand-100',
+  },
+  processed: {
+    label: 'Обработана',
+    className: 'bg-success-50 text-success-700 ring-success-100',
+  },
+  cancelled: {
+    label: 'Отменена',
+    className: 'bg-surface-subtle text-ink-muted ring-line',
+  },
+};
+
+function StatusBadge({ status }) {
+  const meta = STATUS_META[status] || {
+    label: status || '—',
+    className: 'bg-surface-subtle text-ink-soft ring-line',
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${meta.className}`}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
 function formatPreferredDateTime(row) {
   const date = formatServerDate(row?.preferred_date) || '—';
   return row?.preferred_time ? `${date}, ${row.preferred_time.slice(0, 5)}` : date;
@@ -42,7 +75,10 @@ function BookingMobileCard({ row, onView }) {
   return (
     <div className="border-b border-line-soft py-3 last:border-b-0">
       <button type="button" onClick={onView} className="w-full text-left">
-        <div className="text-sm font-semibold text-ink">{row.name}</div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-ink">{row.name}</span>
+          <StatusBadge status={row.status} />
+        </div>
         <p className="mt-1 text-sm text-ink-muted">{row.phone || '—'}</p>
         <p className="mt-0.5 text-xs text-ink-muted">
           Дата: {formatPreferredDateTime(row)}
@@ -189,18 +225,19 @@ export default function AutoserviceInspectionsPage() {
               <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
               <th className={`w-32 ${autoserviceListThClass}`}>Телефон</th>
               <th className={`w-44 ${autoserviceListThClass} hidden lg:table-cell`}>Автомобиль</th>
+              <th className={`w-32 ${autoserviceListThClass}`}>Статус</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
             {loading ? (
               <tr>
-                <td colSpan={4} className="py-12 text-center text-ink-muted">
+                <td colSpan={5} className="py-12 text-center text-ink-muted">
                   Загрузка…
                 </td>
               </tr>
             ) : filteredRows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-12 text-center text-ink-muted">
+                <td colSpan={5} className="py-12 text-center text-ink-muted">
                   {rows.length === 0 ? 'Записей пока нет' : 'Ничего не найдено'}
                 </td>
               </tr>
@@ -225,6 +262,9 @@ export default function AutoserviceInspectionsPage() {
                     title={formatVehicleBrief(row.vehicle)}
                   >
                     {formatVehicleBrief(row.vehicle)}
+                  </td>
+                  <td className={`${autoserviceListTdClass} whitespace-nowrap`}>
+                    <StatusBadge status={row.status} />
                   </td>
                 </tr>
               ))

@@ -177,7 +177,7 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
   );
 }
 
-export default function GarageQuickAddModal({ onClose, onCreated, clientId = null, onPending = null }) {
+export default function GarageQuickAddModal({ onClose, onCreated, clientId = null, organizationId = null, onPending = null }) {
   const [step, setStep] = useState('lookup');
   const [lookupInput, setLookupInput] = useState('');
   const [lookupDecoding, setLookupDecoding] = useState(false);
@@ -410,8 +410,11 @@ export default function GarageQuickAddModal({ onClose, onCreated, clientId = nul
         },
       );
       payload.year = body.year;
+      const vehiclesUrl = clientId
+        ? '/autoservice/garage/vehicles/staff'
+        : `/autoservice/garage/vehicles${organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : ''}`;
       const row = await apiRequest(
-        clientId ? '/autoservice/garage/vehicles/staff' : '/autoservice/garage/vehicles',
+        vehiclesUrl,
         {
         method: 'POST',
           body: JSON.stringify(clientId ? { ...payload, client_id: Number(clientId) } : payload),

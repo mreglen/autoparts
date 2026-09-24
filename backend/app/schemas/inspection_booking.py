@@ -4,7 +4,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-InspectionBookingStatus = Literal["new", "processed", "cancelled"]
+InspectionBookingStatus = Literal["new", "confirmed", "processed", "cancelled"]
 InspectionBookingSource = Literal["site", "staff", "client"]
 
 
@@ -29,6 +29,7 @@ class InspectionBookingPublicCreate(BaseModel):
 
 
 class InspectionBookingClientCreate(BaseModel):
+    organization_id: Optional[str] = Field(None, max_length=10)
     name: Optional[str] = Field(None, min_length=2, max_length=120)
     phone: Optional[str] = Field(None, min_length=5, max_length=40)
     preferred_date: date
@@ -80,6 +81,7 @@ class InspectionBookingView(BaseModel):
     vehicle_model: Optional[str] = Field(None, max_length=120)
     status: str
     source: str
+    organization_name: Optional[str] = None
     created_by_user_id: Optional[int] = None
     work_zone_id: Optional[int] = None
     notes: Optional[str] = None

@@ -22,10 +22,12 @@ from app.schemas.inspection_booking import (
 )
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS,
+    get_or_create_autoservice_client_for_user,
     normalize_phone_or_400,
     related_autoservice_client_ids,
     require_autoservice_permission,
     require_my_active_autoservice_client,
+    resolve_active_autoservice_org_or_404,
 )
 from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.phone import normalize_to_storage_format
@@ -34,7 +36,7 @@ from app.services.autoservice_notifications import notify_new_inspection_booking
 
 router = APIRouter(tags=["Autoservice inspections"])
 
-VALID_STATUSES = frozenset({"new", "processed", "cancelled"})
+VALID_STATUSES = frozenset({"new", "confirmed", "processed", "cancelled"})
 
 
 def _require_autoservice_enabled(db: Session) -> None:
@@ -109,6 +111,7 @@ def _booking_to_view(row: InspectionBooking) -> InspectionBookingView:
         vehicle_model=row.vehicle_model or (row.vehicle.model if row.vehicle else None),
         status=row.status,
         source=row.source,
+        organization_name=row.organization.name if row.organization else None,
         created_by_user_id=row.created_by_user_id,
         work_zone_id=row.work_zone_id,
         notes=row.notes,
@@ -157,13 +160,24 @@ def list_my_inspection_bookings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    client = require_my_active_autoservice_client(db, current_user)
-    related_ids = related_autoservice_client_ids(db, client)
+    my_clients = (
+        db.query(AutoserviceClient)
+        .filter(
+            AutoserviceClient.user_id == current_user.id,
+            AutoserviceClient.status == "active",
+        )
+        .all()
+    )
+    related_ids: set[int] = set()
+    for client in my_clients:
+        related_ids.update(related_autoservice_client_ids(db, client))
     rows = (
         db.query(InspectionBooking)
-        .options(joinedload(InspectionBooking.vehicle))
+        .options(
+            joinedload(InspectionBooking.vehicle),
+            joinedload(InspectionBooking.organization),
+        )
         .filter(
-            InspectionBooking.organization_id == client.organization_id,
             or_(
                 InspectionBooking.client_id.in_(related_ids),
                 InspectionBooking.created_by_user_id == current_user.id,
@@ -185,7 +199,17 @@ def create_client_inspection_booking(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    client = require_my_active_autoservice_client(db, current_user)
+    if payload.organization_id:
+        org = resolve_active_autoservice_org_or_404(db, payload.organization_id)
+        client = get_or_create_autoservice_client_for_user(
+            db,
+            current_user,
+            org.id,
+            name=payload.name,
+            phone=payload.phone,
+        )
+    else:
+        client = require_my_active_autoservice_client(db, current_user)
     name = (payload.name or "").strip() or client.name
     raw_phone = (payload.phone or "").strip() or client.phone
     phone = normalize_phone_or_400(raw_phone)
@@ -231,7 +255,10 @@ def list_inspection_bookings(
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
     q = (
         db.query(InspectionBooking)
-        .options(joinedload(InspectionBooking.vehicle))
+        .options(
+            joinedload(InspectionBooking.vehicle),
+            joinedload(InspectionBooking.organization),
+        )
         .filter(InspectionBooking.organization_id == org_id)
     )
     if client_id is not None:
@@ -336,7 +363,7 @@ def _create_staff_inspection_booking(
         preferred_time=payload.preferred_time,
         vehicle_make=(payload.vehicle_make or "").strip() or None,
         vehicle_model=(payload.vehicle_model or "").strip() or None,
-        status="new",
+        status="confirmed",
         source="staff",
         created_by_user_id=current_user.id if current_user else None,
         work_zone_id=work_zone_id,

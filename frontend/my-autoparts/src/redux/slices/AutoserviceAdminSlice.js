@@ -178,12 +178,19 @@ const autoserviceAdminSlice = createSlice({
         state.actionLoading = false;
         state.error = action.payload;
       })
+      .addCase(rejectAutoserviceApplication.pending, (state) => {
+        state.actionLoading = true;
+      })
       .addCase(rejectAutoserviceApplication.fulfilled, (state, action) => {
         state.actionLoading = false;
         const updated = action.payload;
         state.applications = state.applications.map((item) =>
           item.id === updated.id ? updated : item,
         );
+      })
+      .addCase(rejectAutoserviceApplication.rejected, (state, action) => {
+        state.actionLoading = false;
+        state.error = action.payload;
       })
       .addCase(disableAutoserviceOrganization.fulfilled, (state, action) => {
         state.connectedOrgs = state.connectedOrgs.filter(

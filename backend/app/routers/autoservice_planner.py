@@ -4,6 +4,7 @@ from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user, get_current_user_optional
@@ -162,7 +163,13 @@ def get_planner_week(
             InspectionBooking.organization_id == org_id,
             InspectionBooking.preferred_date >= day_dates[0],
             InspectionBooking.preferred_date <= week_end,
-            InspectionBooking.status == "new",
+            or_(
+                InspectionBooking.status == "confirmed",
+                and_(
+                    InspectionBooking.status == "new",
+                    InspectionBooking.source == "staff",
+                ),
+            ),
         )
         .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
         .all()
@@ -291,7 +298,13 @@ def get_planner_today_shortcut(
         .filter(
             InspectionBooking.organization_id == org_id,
             InspectionBooking.preferred_date == target,
-            InspectionBooking.status == "new",
+            or_(
+                InspectionBooking.status == "confirmed",
+                and_(
+                    InspectionBooking.status == "new",
+                    InspectionBooking.source == "staff",
+                ),
+            ),
         )
         .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
         .all()

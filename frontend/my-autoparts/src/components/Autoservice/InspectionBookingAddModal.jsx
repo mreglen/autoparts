@@ -12,6 +12,13 @@ import {
 const inputClass = 'sg-pill-input mt-1';
 const textareaClass = 'sg-pill-textarea mt-1';
 
+const BOOKING_STATUS_META = {
+  new: { label: 'Новая заявка', className: 'bg-warning-50 text-warning-700 ring-warning-100' },
+  confirmed: { label: 'Подтверждена', className: 'bg-brand-50 text-brand-700 ring-brand-100' },
+  processed: { label: 'Обработана', className: 'bg-success-50 text-success-700 ring-success-100' },
+  cancelled: { label: 'Отменена', className: 'bg-surface-subtle text-ink-muted ring-line' },
+};
+
 function zoneNameById(zones, zoneId) {
   if (zoneId == null) return null;
   const id = Number(zoneId);
@@ -54,6 +61,7 @@ export default function InspectionBookingAddModal({
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const editStartedAtRef = useRef(0);
@@ -86,6 +94,7 @@ export default function InspectionBookingAddModal({
     setError(null);
     setSaving(false);
     setDeleting(false);
+    setConfirming(false);
     setDeleteConfirmOpen(false);
     setIsEditing(!isEdit);
   }, [open, initialName, initialPhone, initialPreferred, initialPreferredTime, initialClientId, initialVehicleId, initialVehicleMake, initialVehicleModel, initialNotes, initialWorkZoneId, isEdit]);
@@ -294,6 +303,24 @@ export default function InspectionBookingAddModal({
     }
   };
 
+  const handleConfirm = async () => {
+    if (!initialBooking?.id) return;
+    setConfirming(true);
+    setError(null);
+    try {
+      const row = await apiRequest(`/autoservice/inspection-bookings/${initialBooking.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'confirmed' }),
+      });
+      onSaved?.(row);
+      onClose?.();
+    } catch (err) {
+      setError(err?.message || 'Не удалось подтвердить запись');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!initialBooking?.id) return;
     setDeleting(true);
@@ -366,6 +393,19 @@ export default function InspectionBookingAddModal({
     </div>
   ) : (
     <div className="flex items-center justify-end gap-2">
+      {isEdit && initialBooking?.status === 'new' ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleConfirm();
+          }}
+          disabled={confirming}
+          className="min-h-11 rounded-sg-sm bg-success-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-success-700 disabled:opacity-60"
+        >
+          {confirming ? 'Подтверждение…' : 'Подтвердить'}
+        </button>
+      ) : null}
       {isEdit && onCreateOrder ? (
         <button
           type="button"
@@ -631,6 +671,17 @@ export default function InspectionBookingAddModal({
         </form>
       ) : (
         <div className="space-y-4">
+          {initialBooking?.status ? (
+            <div>
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                  (BOOKING_STATUS_META[initialBooking.status] || BOOKING_STATUS_META.new).className
+                }`}
+              >
+                {(BOOKING_STATUS_META[initialBooking.status] || { label: initialBooking.status }).label}
+              </span>
+            </div>
+          ) : null}
           <div>
             <label className="block text-sm font-medium text-ink-soft">Клиент</label>
             <p className="mt-0.5 text-sm text-ink">{name || '—'}</p>
@@ -657,6 +708,7 @@ export default function InspectionBookingAddModal({
             <label className="block text-sm font-medium text-ink-soft">Заметка</label>
             <p className="mt-0.5 whitespace-pre-wrap text-sm text-ink">{notes || '—'}</p>
           </div>
+          {error ? <p className="text-sm text-danger-600">{error}</p> : null}
         </div>
       )}
       <ConfirmDialog

@@ -28,3 +28,13 @@ class AutoservicePublicInfo(BaseModel):
     description: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
+
+
+class AutoservicePublicOrg(BaseModel):
+    """Public directory entry for a connected autoservice organization."""
+
+    organization_id: str
+    name: Optional[str] = None
+    description: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None

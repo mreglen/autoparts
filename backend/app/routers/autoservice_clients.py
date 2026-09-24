@@ -39,6 +39,8 @@ from app.utils.autoservice_access import (
     require_autoservice_org_id,
     require_any_autoservice_permission,
     require_autoservice_permission,
+    resolve_active_autoservice_org_or_404,
+    list_my_autoservice_client_orgs,
     storage_phone_or_placeholder,
     user_display_name,
 )
@@ -359,13 +361,28 @@ def _apply_client_search_filter(query, org_id: str, q: str | None):
     return query.filter(or_(*client_clauses))
 
 
+@router.get("/autoservice/clients/me/orgs")
+def list_my_autoservice_orgs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Organizations where the current user already has an active client card."""
+    require_autoservice_enabled(db)
+    return list_my_autoservice_client_orgs(db, current_user)
+
+
 @router.get("/autoservice/clients/me", response_model=AutoserviceClientMeResponse)
 def get_my_autoservice_client(
+    organization_id: str | None = Query(None, max_length=10),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     require_autoservice_enabled(db)
-    org_id = require_autoservice_org_id(db)
+    if organization_id:
+        resolve_active_autoservice_org_or_404(db, organization_id)
+        org_id = organization_id
+    else:
+        org_id = require_autoservice_org_id(db)
     row = _find_by_user(db, org_id, current_user.id)
     if not row:
         phone = None
@@ -392,11 +409,16 @@ def get_my_autoservice_client(
 
 @router.post("/autoservice/clients/me", response_model=AutoserviceClientView)
 def become_autoservice_client(
+    organization_id: str | None = Query(None, max_length=10),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     require_autoservice_enabled(db)
-    org_id = require_autoservice_org_id(db)
+    if organization_id:
+        resolve_active_autoservice_org_or_404(db, organization_id)
+        org_id = organization_id
+    else:
+        org_id = require_autoservice_org_id(db)
 
     existing = _find_by_user(db, org_id, current_user.id)
     if existing:

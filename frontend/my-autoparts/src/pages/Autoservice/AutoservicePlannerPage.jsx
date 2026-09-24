@@ -32,6 +32,7 @@ const ORDER_STATUS_STYLES = {
 
 const INSPECTION_STATUS_STYLES = {
   new: 'bg-success-600 text-white hover:bg-success-700',
+  confirmed: 'bg-success-600 text-white hover:bg-success-700',
   processed: 'bg-success-700 text-white hover:bg-success-600',
   cancelled: 'bg-line text-ink-soft line-through hover:bg-line-strong',
 };
