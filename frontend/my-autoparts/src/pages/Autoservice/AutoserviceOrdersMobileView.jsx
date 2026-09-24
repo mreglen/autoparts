@@ -35,9 +35,11 @@ function OrderActionsMenu({
       <ActionsDropdownItem className="min-h-11" onClick={onView} disabled={duplicating}>
         Просмотр
       </ActionsDropdownItem>
-      <ActionsDropdownItem className="min-h-11" onClick={onEdit} disabled={duplicating}>
-        Изменить
-      </ActionsDropdownItem>
+      {onEdit ? (
+        <ActionsDropdownItem className="min-h-11" onClick={onEdit} disabled={duplicating}>
+          Изменить
+        </ActionsDropdownItem>
+      ) : null}
       {onDuplicate ? (
         <ActionsDropdownItem className="min-h-11" onClick={onDuplicate} disabled={duplicating}>
           {duplicating ? 'Копирование…' : 'Скопировать и создать'}
@@ -300,7 +302,11 @@ export default function AutoserviceOrdersMobileView({
                 onStatusChange={onStatusChange}
                 statusSavingId={statusSavingId}
                 onView={() => onView(row)}
-                onEdit={() => onEdit(row)}
+                onEdit={
+                  row.status === 'completed' || row.status === 'cancelled'
+                    ? undefined
+                    : () => onEdit(row)
+                }
                 onDuplicate={onDuplicate ? () => onDuplicate(row) : undefined}
                 onDelete={() => onDelete(row)}
                 onApprove={onApprove ? () => onApprove(row) : undefined}

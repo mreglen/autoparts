@@ -1119,6 +1119,8 @@ export default function AutoserviceOrderFormPage() {
   const [orderLoading, setOrderLoading] = useState(isEdit);
   const [orderError, setOrderError] = useState('');
   const [orderNumber, setOrderNumber] = useState(null);
+  const [orderStatus, setOrderStatus] = useState(null);
+  const isClosedOrder = isEdit && (orderStatus === 'completed' || orderStatus === 'cancelled');
   const [metaVatRate, setMetaVatRate] = useState(UPD_VAT_RATE);
   const [orderVatRateState, setOrderVatRateState] = useState(null);
   const [formInitialized, setFormInitialized] = useState(isCreate);
@@ -1329,6 +1331,7 @@ export default function AutoserviceOrderFormPage() {
     try {
       const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
       setOrderNumber(order?.order_number ?? null);
+      setOrderStatus(order?.status ?? null);
       setOrderVatRateState(order?.vat_rate != null ? Number(order.vat_rate) : null);
       applyFormState(mapOrderToFormState(order));
       pauseAutoSave();
@@ -2128,7 +2131,7 @@ export default function AutoserviceOrderFormPage() {
   };
 
   const persistRepairOrder = async ({ afterCreate = 'edit' } = {}) => {
-    if (persistInFlightRef.current) return null;
+    if (persistInFlightRef.current || isClosedOrder) return null;
     const validationError = validateForAutoSave();
     if (validationError) return validationError;
     if (!canAttemptAutoSave()) return null;
@@ -2232,7 +2235,7 @@ export default function AutoserviceOrderFormPage() {
   };
 
   useEffect(() => {
-    if (!formInitialized || !isEdit || skipAutoSaveRef.current) return undefined;
+    if (!formInitialized || !isEdit || isClosedOrder || skipAutoSaveRef.current) return undefined;
 
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
@@ -2290,6 +2293,7 @@ export default function AutoserviceOrderFormPage() {
     shopParts,
     isCreate,
     isEdit,
+    isClosedOrder,
     orderId,
   ]);
 
@@ -2333,6 +2337,10 @@ export default function AutoserviceOrderFormPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isClosedOrder) {
+      goBack();
+      return;
+    }
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
@@ -2416,7 +2424,17 @@ export default function AutoserviceOrderFormPage() {
 
       <Toast message={error} variant="error" onClose={() => setError('')} />
 
-      <form id="repair-order-form" onSubmit={handleSubmit} className="min-w-0 space-y-5">
+      {isClosedOrder ? (
+        <p
+          className="mb-4 rounded-sg-sm border border-line-soft bg-surface-muted px-4 py-3 text-sm text-ink-muted"
+          role="status"
+        >
+          Закрытый заказ-наряд нельзя редактировать — поля доступны только для просмотра.
+        </p>
+      ) : null}
+
+      <form id="repair-order-form" onSubmit={handleSubmit} className="min-w-0">
+        <fieldset disabled={isClosedOrder} className="min-w-0 space-y-5">
 
         <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="min-w-0">
@@ -2868,6 +2886,7 @@ export default function AutoserviceOrderFormPage() {
         </SectionCard>
         ) : null}
 
+        </fieldset>
       </form>
 
       <div
@@ -2899,14 +2918,16 @@ export default function AutoserviceOrderFormPage() {
                   Сохранено
                 </p>
               ) : null}
-              <button
-                type="submit"
-                form="repair-order-form"
-                disabled={saving}
-                className={`${btnPrimaryClass} max-lg:w-full max-lg:px-3`}
-              >
-                {saving ? 'Сохранение…' : 'Сохранить и закрыть'}
-              </button>
+              {!isClosedOrder ? (
+                <button
+                  type="submit"
+                  form="repair-order-form"
+                  disabled={saving}
+                  className={`${btnPrimaryClass} max-lg:w-full max-lg:px-3`}
+                >
+                  {saving ? 'Сохранение…' : 'Сохранить и закрыть'}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={handleClose}

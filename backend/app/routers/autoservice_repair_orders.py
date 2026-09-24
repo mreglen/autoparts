@@ -1639,6 +1639,11 @@ def update_repair_order(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="После одобрения заявку меняет приёмщик",
         )
+    if row.status in HISTORY_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Закрытый заказ-наряд нельзя редактировать",
+        )
 
     client_set = payload.client_id is not None
     vehicle_set = "vehicle_id" in payload.model_fields_set
@@ -1738,7 +1743,12 @@ def update_manual_repair_order_shop_part(
     current_user: User = Depends(get_current_user),
 ):
     org_id = _require_full_orders(db, current_user)
-    _get_org_order_or_404(db, org_id, order_id)
+    order_row = _get_org_order_or_404(db, org_id, order_id)
+    if order_row.status in HISTORY_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Закрытый заказ-наряд нельзя редактировать",
+        )
     part = update_manual_shop_part(
         db,
         org_id=org_id,

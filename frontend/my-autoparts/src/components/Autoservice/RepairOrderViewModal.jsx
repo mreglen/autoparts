@@ -911,7 +911,7 @@ export default function RepairOrderViewModal({
                   Печать
                 </button>
               ) : null}
-              {onEdit && !payOpen ? (
+              {onEdit && !payOpen && order?.status !== 'completed' && order?.status !== 'cancelled' ? (
                 <button type="button" onClick={() => onEdit(order)} className={secondaryBtnClass}>
                   Изменить
                 </button>
