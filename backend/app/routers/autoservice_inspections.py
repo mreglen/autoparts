@@ -74,7 +74,7 @@ def _resolve_garage_vehicle(
 ) -> GarageVehicle | None:
     if garage_vehicle_id is None:
         return None
-    related_ids = related_autoservice_client_ids(db, client)
+    related_ids = related_autoservice_client_ids(db, client, include_phone_matches=False)
     vehicle = (
         db.query(GarageVehicle)
         .filter(
@@ -169,7 +169,9 @@ def list_my_inspection_bookings(
     )
     related_ids: set[int] = set()
     for client in my_clients:
-        related_ids.update(related_autoservice_client_ids(db, client))
+        related_ids.update(
+            related_autoservice_client_ids(db, client, include_phone_matches=False)
+        )
     rows = (
         db.query(InspectionBooking)
         .options(

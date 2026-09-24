@@ -35,6 +35,8 @@ import {
   personTypeLabel,
   saveAutoserviceClientRequisites,
   createAutoserviceClientAccount,
+  fetchClientAccountCandidates,
+  linkAutoserviceClientAccount,
   validateInn,
 } from '../../utils/autoserviceClientRequisites';
 
@@ -431,6 +433,14 @@ function ClientProfileModal({
   const [createAccountConfirmOpen, setCreateAccountConfirmOpen] = useState(false);
   const [accountMessage, setAccountMessage] = useState('');
   const [vehicleOrderFilterId, setVehicleOrderFilterId] = useState(null);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkQuery, setLinkQuery] = useState('');
+  const debouncedLinkQuery = useDebouncedValue(linkQuery, 300);
+  const [linkCandidates, setLinkCandidates] = useState([]);
+  const [linkSearching, setLinkSearching] = useState(false);
+  const [linkError, setLinkError] = useState('');
+  const [linkTarget, setLinkTarget] = useState(null);
+  const [linking, setLinking] = useState(false);
 
   const guestEmail = String((editing ? form.email : client?.email) || '').trim();
   const canCreateAccount = isGuest && guestEmail && !validateEmail(guestEmail);
@@ -449,6 +459,13 @@ function ClientProfileModal({
     setCreateAccountConfirmOpen(false);
     setAccountMessage('');
     setVehicleOrderFilterId(null);
+    setLinkOpen(false);
+    setLinkQuery('');
+    setLinkCandidates([]);
+    setLinkSearching(false);
+    setLinkError('');
+    setLinkTarget(null);
+    setLinking(false);
   }, [open, clientId]);
 
   useEffect(() => {
@@ -585,6 +602,55 @@ function ClientProfileModal({
     }
   };
 
+  useEffect(() => {
+    if (!linkOpen || !clientId) return undefined;
+    const term = debouncedLinkQuery.trim();
+    if (term.length < 3) {
+      setLinkCandidates([]);
+      setLinkSearching(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setLinkSearching(true);
+    fetchClientAccountCandidates(clientId, term)
+      .then((items) => {
+        if (!cancelled) {
+          setLinkCandidates(items);
+          setLinkError('');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setLinkCandidates([]);
+          setLinkError(err?.message || 'Не удалось найти пользователей');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLinkSearching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [linkOpen, clientId, debouncedLinkQuery]);
+
+  const handleLinkAccount = async () => {
+    if (!clientId || !linkTarget) return;
+    setLinking(true);
+    try {
+      const updated = await linkAutoserviceClientAccount(clientId, linkTarget.user_id);
+      onSaved?.(updated);
+      setForm(emptyClientRequisites(updated));
+      setLinkOpen(false);
+      setLinkTarget(null);
+      setAccountMessage(`Карточка привязана к аккаунту ${linkTarget.name}.`);
+    } catch (err) {
+      setLinkError(err?.message || 'Не удалось привязать аккаунт');
+      setLinkTarget(null);
+    } finally {
+      setLinking(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Профиль' },
     { id: 'vehicles', label: 'Автомобили', count: loading ? undefined : vehicles.length },
@@ -615,6 +681,21 @@ function ClientProfileModal({
       draggable
       footer={
         <div className="flex flex-wrap justify-end gap-2">
+          {isGuest && (section === 'profile' || editing) ? (
+            <button
+              type="button"
+              onClick={() => {
+                setLinkOpen(true);
+                setLinkError('');
+                setLinkCandidates([]);
+                setLinkTarget(null);
+              }}
+              disabled={saving || creatingAccount || linking}
+              className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60"
+            >
+              Привязать аккаунт
+            </button>
+          ) : null}
           {canCreateAccount && (section === 'profile' || editing) ? (
             <button
               type="button"
@@ -817,6 +898,79 @@ function ClientProfileModal({
       confirmLabel="Создать аккаунт"
       cancelLabel="Отмена"
       loading={creatingAccount}
+    />
+    <Modal
+      open={linkOpen}
+      onClose={() => {
+        if (!linking) setLinkOpen(false);
+      }}
+      title="Привязать аккаунт"
+      size="sm"
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-ink-muted">
+          Найдите пользователя по телефону, email или имени — карточка клиента будет связана с его
+          личным кабинетом.
+        </p>
+        <input
+          autoFocus
+          className={inputClass}
+          placeholder="Телефон, email или имя"
+          value={linkQuery}
+          onChange={(e) => setLinkQuery(e.target.value)}
+        />
+        {linkError ? <p className="text-sm text-danger-600">{linkError}</p> : null}
+        {linkSearching ? (
+          <p className="py-4 text-center text-sm text-ink-muted">Поиск…</p>
+        ) : linkCandidates.length === 0 ? (
+          <p className="py-4 text-center text-sm text-ink-muted">
+            {debouncedLinkQuery.trim().length >= 3
+              ? 'Пользователи не найдены'
+              : 'Введите минимум 3 символа'}
+          </p>
+        ) : (
+          <ul className="divide-y divide-line-soft">
+            {linkCandidates.map((cand) => (
+              <li key={cand.user_id}>
+                <button
+                  type="button"
+                  disabled={cand.already_linked}
+                  onClick={() => setLinkTarget(cand)}
+                  className="w-full px-1 py-2.5 text-left transition hover:bg-surface-muted disabled:opacity-50"
+                >
+                  <p className="text-sm font-semibold text-ink">{cand.name}</p>
+                  <p className="mt-0.5 text-xs text-ink-muted">
+                    {[cand.phone, cand.email].filter(Boolean).join(' · ') || '—'}
+                  </p>
+                  {cand.already_linked ? (
+                    <p className="mt-0.5 text-xs text-amber-600">
+                      У пользователя уже есть карточка клиента
+                    </p>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Modal>
+    <ConfirmDialog
+      open={Boolean(linkTarget)}
+      onClose={() => {
+        if (!linking) setLinkTarget(null);
+      }}
+      onConfirm={handleLinkAccount}
+      title="Привязать аккаунт?"
+      message={
+        linkTarget
+          ? `Карточка «${client?.name || ''}» будет связана с аккаунтом ${linkTarget.name}${
+              linkTarget.email ? ` (${linkTarget.email})` : ''
+            }. Клиент увидит свои заказ-наряды и заявки.`
+          : ''
+      }
+      confirmLabel="Привязать"
+      cancelLabel="Отмена"
+      loading={linking}
     />
     </>
   );

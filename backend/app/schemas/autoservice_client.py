@@ -60,3 +60,19 @@ class AutoserviceClientCreateAccountResponse(BaseModel):
     email: str
     email_sent: bool
     status: Literal["created_and_linked"] = "created_and_linked"
+
+
+class AutoserviceClientAccountCandidate(BaseModel):
+    user_id: int
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    already_linked: bool = False
+
+
+class AutoserviceClientAccountCandidatesResponse(BaseModel):
+    items: list[AutoserviceClientAccountCandidate]
+
+
+class AutoserviceClientLinkAccountIn(BaseModel):
+    user_id: int = Field(ge=1)

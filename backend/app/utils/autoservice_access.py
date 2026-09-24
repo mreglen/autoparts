@@ -247,7 +247,12 @@ def user_display_name(user: User) -> str:
     return f"Пользователь {user.id}"
 
 
-def related_autoservice_client_ids(db: Session, client: AutoserviceClient) -> list[int]:
+def related_autoservice_client_ids(
+    db: Session,
+    client: AutoserviceClient,
+    *,
+    include_phone_matches: bool = True,
+) -> list[int]:
     """Same person may have several client rows (user_id / phone variants)."""
     ids = {client.id}
     org_id = client.organization_id
@@ -261,6 +266,8 @@ def related_autoservice_client_ids(db: Session, client: AutoserviceClient) -> li
             .all()
         ):
             ids.add(cid)
+    if not include_phone_matches:
+        return sorted(ids)
     phone = (client.phone or "").strip()
     if phone and not is_missing_phone_placeholder(phone):
         for (cid,) in (
@@ -291,7 +298,8 @@ def find_active_autoservice_client_for_user(
     user: User,
     org_id: str,
 ) -> AutoserviceClient | None:
-    row = (
+    # Никакой автопривязки по телефону: карточку связывает сотрудник вручную.
+    return (
         db.query(AutoserviceClient)
         .filter(
             AutoserviceClient.organization_id == org_id,
@@ -300,30 +308,6 @@ def find_active_autoservice_client_for_user(
         )
         .first()
     )
-    if row:
-        return row
-    if not user.phone:
-        return None
-    try:
-        phone = normalize_phone_or_400(user.phone)
-    except HTTPException:
-        return None
-    by_phone = (
-        db.query(AutoserviceClient)
-        .filter(
-            AutoserviceClient.organization_id == org_id,
-            AutoserviceClient.phone == phone,
-            AutoserviceClient.status == "active",
-        )
-        .first()
-    )
-    if by_phone and (by_phone.user_id is None or by_phone.user_id == user.id):
-        if by_phone.user_id is None:
-            by_phone.user_id = user.id
-            db.commit()
-            db.refresh(by_phone)
-        return by_phone
-    return None
 
 
 def require_my_active_autoservice_client(db: Session, user: User) -> AutoserviceClient:
@@ -396,18 +380,14 @@ def get_or_create_autoservice_client_for_user(
         .first()
     )
     if by_phone:
-        if by_phone.user_id is None:
-            by_phone.user_id = user.id
-            by_phone.name = user_display_name(user)
-            if by_phone.status != "active":
-                by_phone.status = "active"
-            db.flush()
-            return by_phone
         if by_phone.user_id == user.id:
             return by_phone
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Этот телефон уже привязан к другому клиенту автосервиса",
+            detail=(
+                "Клиент с таким телефоном уже есть в автосервисе — "
+                "попросите сотрудника привязать ваш аккаунт к карточке клиента"
+            ),
         )
 
     row = AutoserviceClient(

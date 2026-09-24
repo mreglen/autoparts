@@ -221,7 +221,7 @@ def list_garage_vehicles(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Доступно только клиентам автосервиса",
         )
-    related_ids = related_autoservice_client_ids(db, my_client)
+    related_ids = related_autoservice_client_ids(db, my_client, include_phone_matches=False)
     rows = (
         db.query(GarageVehicle)
         .filter(GarageVehicle.client_id.in_(related_ids))

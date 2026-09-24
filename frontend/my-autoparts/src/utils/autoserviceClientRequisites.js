@@ -153,6 +153,22 @@ export async function createAutoserviceClientAccount(clientId) {
   });
 }
 
+export async function fetchClientAccountCandidates(clientId, query) {
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  const data = await apiRequest(
+    `/autoservice/clients/${clientId}/account-candidates?${params.toString()}`,
+  );
+  return data?.items || [];
+}
+
+export async function linkAutoserviceClientAccount(clientId, userId) {
+  return apiRequest(`/autoservice/clients/${clientId}/link-account`, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId }),
+  });
+}
+
 export async function resolveClientForDocuments(orderClient) {
   if (!orderClient?.id) return orderClient || null;
   const hasRequisites =

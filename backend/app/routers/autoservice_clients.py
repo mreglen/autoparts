@@ -19,7 +19,10 @@ from app.models.repair_booking import RepairBooking
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_client import (
+    AutoserviceClientAccountCandidate,
+    AutoserviceClientAccountCandidatesResponse,
     AutoserviceClientCreateAccountResponse,
+    AutoserviceClientLinkAccountIn,
     AutoserviceClientMeResponse,
     AutoserviceClientStaffCreate,
     AutoserviceClientStaffUpdate,
@@ -683,3 +686,117 @@ def create_autoservice_client_account(
         email=email,
         email_sent=email_sent,
     )
+
+
+@router.get(
+    "/autoservice/clients/{client_id}/account-candidates",
+    response_model=AutoserviceClientAccountCandidatesResponse,
+)
+def list_autoservice_client_account_candidates(
+    client_id: int,
+    q: str = Query("", max_length=120),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_CLIENTS)
+    row = _get_org_client_or_404(db, org_id, client_id)
+    if row.user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="К карточке уже привязан аккаунт",
+        )
+
+    term = (q or "").strip()
+    if len(term) < 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Введите минимум 3 символа для поиска",
+        )
+
+    clauses = []
+    digits = "".join(ch for ch in term if ch.isdigit())
+    if len(digits) >= 4:
+        clauses.append(User.phone.ilike(f"%{digits}%"))
+    if "@" in term or any(ch.isalpha() for ch in term):
+        like = f"%{term}%"
+        clauses.extend(
+            [
+                User.email.ilike(like),
+                User.last_name.ilike(like),
+                User.first_name.ilike(like),
+            ]
+        )
+    if not clauses:
+        return AutoserviceClientAccountCandidatesResponse(items=[])
+
+    users = (
+        db.query(User)
+        .filter(or_(*clauses))
+        .order_by(User.last_name.asc(), User.first_name.asc(), User.id.asc())
+        .limit(10)
+        .all()
+    )
+    if not users:
+        return AutoserviceClientAccountCandidatesResponse(items=[])
+
+    linked_user_ids = {
+        uid
+        for (uid,) in db.query(AutoserviceClient.user_id)
+        .filter(
+            AutoserviceClient.organization_id == org_id,
+            AutoserviceClient.status == "active",
+            AutoserviceClient.user_id.in_([u.id for u in users]),
+        )
+        .all()
+    }
+    return AutoserviceClientAccountCandidatesResponse(
+        items=[
+            AutoserviceClientAccountCandidate(
+                user_id=u.id,
+                name=user_display_name(u),
+                email=u.email,
+                phone=u.phone,
+                already_linked=u.id in linked_user_ids,
+            )
+            for u in users
+        ]
+    )
+
+
+@router.post(
+    "/autoservice/clients/{client_id}/link-account",
+    response_model=AutoserviceClientView,
+)
+def link_autoservice_client_account(
+    client_id: int,
+    payload: AutoserviceClientLinkAccountIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_CLIENTS)
+    row = _get_org_client_or_404(db, org_id, client_id)
+    if row.user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="К карточке уже привязан аккаунт",
+        )
+
+    user = db.query(User).filter(User.id == payload.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден",
+        )
+
+    existing = _find_by_user(db, org_id, user.id)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="У этого пользователя уже есть карточка клиента в автосервисе",
+        )
+
+    row.user_id = user.id
+    _link_orphan_bookings(db, org_id, row)
+    db.commit()
+    db.refresh(row)
+    return _client_view_with_account_email(db, row)
