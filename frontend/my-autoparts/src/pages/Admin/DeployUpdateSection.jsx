@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
+import Toast from '../../components/UI/Toast';
 
 function statusLabel(status) {
   switch (status) {
@@ -117,16 +118,8 @@ export default function DeployUpdateSection() {
         </span>
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-          {notice}
-        </div>
-      )}
+      <Toast message={error} variant="error" onClose={() => setError(null)} />
+      <Toast message={notice} variant="success" onClose={() => setNotice(null)} />
       {!canRun && info?.reason && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           {info.reason}

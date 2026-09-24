@@ -58,7 +58,7 @@ export function mapCandidateToGarageCreatePayload(
   const base = {
     vin: formFields.vin?.trim() || null,
     make: formFields.make.trim(),
-    model: formFields.model.trim(),
+    model: formFields.model?.trim() || null,
     year: formFields.year ? Number(formFields.year) : null,
     color: formFields.color?.trim() || null,
     plate: formFields.plate?.trim() || null,

@@ -115,7 +115,7 @@ def _create_vehicle_for_client(
         organization_id=client.organization_id,
         vin=vin,
         make=payload.make.strip(),
-        model=payload.model.strip(),
+        model=(payload.model or "").strip() or None,
         year=payload.year,
         color=(payload.color or "").strip() or None,
         plate=(payload.plate or "").strip() or None,
@@ -309,8 +309,8 @@ def _apply_vehicle_update(db: Session, row: GarageVehicle, payload: GarageVehicl
         row.vin = vin
     if "make" in data and data["make"] is not None:
         row.make = data["make"].strip()
-    if "model" in data and data["model"] is not None:
-        row.model = data["model"].strip()
+    if "model" in data:
+        row.model = (data["model"] or "").strip() or None
     if "year" in data:
         row.year = data["year"]
     if "color" in data:

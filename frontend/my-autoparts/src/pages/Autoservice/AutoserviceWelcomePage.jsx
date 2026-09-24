@@ -6,6 +6,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import { apiRequest, apiRequestUnauth } from '../../utils/apiClient';
 import { BECOME_CLIENT_CONFIRM } from '../../utils/autoservicePublic';
 import { Button, PageHeader } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import { Badge } from '../../components/UI/Badge';
 import { ConfirmDialog } from '../../components/UI/Modal';
 
@@ -81,11 +82,7 @@ export default function AutoserviceWelcomePage() {
         Станьте клиентом сервиса, чтобы записываться на ремонт и видеть историю работ.
       </p>
 
-      {error ? (
-        <p className="mt-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError('')} />
 
       <div className="mt-4 divide-y divide-line-soft rounded-sg-lg border border-line bg-surface">
         {orgsLoading ? (

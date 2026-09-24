@@ -30,7 +30,7 @@ class GarageVehicle(Base):
     organization_id = Column(String(10), ForeignKey("organizations.id"), nullable=False, index=True)
     vin = Column(String(17), nullable=True)
     make = Column(String(80), nullable=False)
-    model = Column(String(80), nullable=False)
+    model = Column(String(80), nullable=True)
     year = Column(Integer, nullable=True)
     color = Column(String(40), nullable=True)
     plate = Column(String(20), nullable=True)

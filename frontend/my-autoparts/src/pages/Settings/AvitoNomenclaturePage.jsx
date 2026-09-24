@@ -21,6 +21,7 @@ import {
   warehousePageClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
+import Toast from '../../components/UI/Toast';
 import { canAccessAvitoIntegration } from './integrationAccess';
 import { useAvitoAccountStatus } from '../../hooks/useAvitoAccountStatus';
 import { canUseAvitoProFeatures } from '../../utils/avitoProAccess';
@@ -748,16 +749,8 @@ export default function AvitoNomenclaturePage() {
 
       <AvitoProExpiredBanner status={avitoAccountStatus} />
 
-      {error ? (
-        <InlineNotice tone="error" onClose={() => setError(null)}>
-          <p className="whitespace-pre-wrap">{error}</p>
-        </InlineNotice>
-      ) : null}
-      {notice ? (
-        <InlineNotice tone="success" onClose={() => setNotice(null)}>
-          <p>{notice}</p>
-        </InlineNotice>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError(null)} />
+      <Toast message={notice} variant="success" onClose={() => setNotice(null)} />
       {warnings?.length > 0 ? (
         <InlineNotice tone="warning">
           <p className="mb-1 font-medium">Предупреждения</p>

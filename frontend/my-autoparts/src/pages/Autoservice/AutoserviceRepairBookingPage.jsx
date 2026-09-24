@@ -7,6 +7,7 @@ import MobileFormField from '../../components/MobileFormField/MobileFormField';
 import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
 import { UnderlineTabs } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import {
@@ -408,11 +409,7 @@ export default function AutoserviceRepairBookingPage() {
         />
       </MobileFormField>
 
-      {error ? (
-        <p className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError('')} />
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <button type="submit" disabled={saving} className={`${btnPrimary} w-full sm:w-auto`}>
@@ -427,11 +424,7 @@ export default function AutoserviceRepairBookingPage() {
 
   const listBlock = (
     <>
-      {rowsError ? (
-        <p className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
-          {rowsError}
-        </p>
-      ) : null}
+      <Toast message={rowsError} variant="error" onClose={() => setRowsError('')} />
 
       {rowsLoading ? (
         <BookingsSkeleton />

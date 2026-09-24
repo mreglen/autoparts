@@ -25,6 +25,7 @@ import {
   Skeleton,
   Textarea,
 } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import {
   autoserviceListErrorClass,
   autoserviceListHeaderSubtitleClass,
@@ -49,37 +50,6 @@ function cellsCountLabel(count) {
   if (mod10 === 1 && mod100 !== 11) return `${n} адрес`;
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} адреса`;
   return `${n} адресов`;
-}
-
-function InlineNotice({ notice, onClose }) {
-  if (!notice) return null;
-  const isSuccess = notice.type === 'success';
-  return (
-    <div
-      className={`flex items-start justify-between gap-3 rounded-sg border px-4 py-3 ${
-        isSuccess
-          ? 'border-success-100 bg-success-50 text-success-700'
-          : 'border-danger-100 bg-danger-50 text-danger-700'
-      }`}
-      role="status"
-    >
-      <p className="text-sm font-medium">{notice.message}</p>
-      <button
-        type="button"
-        onClick={onClose}
-        className="shrink-0 rounded-md p-1 opacity-70 transition hover:opacity-100"
-        aria-label="Закрыть"
-      >
-        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-          <path
-            fillRule="evenodd"
-            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
-    </div>
-  );
 }
 
 const emptyForm = {
@@ -159,12 +129,6 @@ export default function StorageAddressesPage() {
     dispatch(fetchLocationsWithCells());
     dispatch(fetchStorageCells());
   }, [dispatch, lastModified, user?.organization_id]);
-
-  useEffect(() => {
-    if (!notice) return undefined;
-    const timer = setTimeout(() => setNotice(null), notice.type === 'success' ? 3000 : 5000);
-    return () => clearTimeout(timer);
-  }, [notice]);
 
   const resetForm = () => {
     setEditingCell(null);
@@ -307,7 +271,12 @@ export default function StorageAddressesPage() {
         </div>
       </div>
 
-      <InlineNotice notice={notice} onClose={() => setNotice(null)} />
+      <Toast
+        message={notice?.message || null}
+        variant={notice?.type === 'success' ? 'success' : 'error'}
+        onClose={() => setNotice(null)}
+        durationMs={notice?.type === 'success' ? 3000 : 5000}
+      />
 
       {!loading && error ? (
         <p className={autoserviceListErrorClass} role="alert">

@@ -57,7 +57,7 @@ class AutoserviceFinanceReceiptsResponse(BaseModel):
 class AutoservicePayrollReportOrderVehicle(BaseModel):
     id: int
     make: str
-    model: str
+    model: Optional[str] = None
     year: Optional[int] = None
     vin: Optional[str] = None
     plate: Optional[str] = None
@@ -121,7 +121,7 @@ class AutoservicePayrollReportResponse(BaseModel):
 class AutoserviceOrderEconomicsVehicle(BaseModel):
     id: int
     make: str
-    model: str
+    model: Optional[str] = None
     year: Optional[int] = None
     plate: Optional[str] = None
 

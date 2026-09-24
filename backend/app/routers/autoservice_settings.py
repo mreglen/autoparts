@@ -14,6 +14,7 @@ from app.schemas.autoservice_settings import (
     AutoserviceSettingsUpdate,
     AutoserviceSettingsView,
 )
+from app.services.autoservice_vat import apply_vat_rate_to_open_orders
 from app.utils.autoservice_access import require_autoservice_settings
 from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.site_settings_db import autoservice_enabled
@@ -110,6 +111,10 @@ def update_autoservice_settings(
         row.public_name = (payload.public_name or "").strip() or None
     if "public_description" in payload.model_fields_set:
         row.public_description = (payload.public_description or "").strip() or None
+    if "vat_rate" in payload.model_fields_set and payload.vat_rate is not None:
+        if payload.vat_rate != row.vat_rate:
+            row.vat_rate = payload.vat_rate
+            apply_vat_rate_to_open_orders(db, org_id, payload.vat_rate)
     db.commit()
     db.refresh(row)
     return AutoserviceSettingsView.model_validate(row)

@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -7,11 +8,13 @@ from pydantic import BaseModel, Field
 class AutoserviceSettingsUpdate(BaseModel):
     public_name: Optional[str] = Field(None, max_length=160)
     public_description: Optional[str] = Field(None, max_length=2000)
+    vat_rate: Optional[Decimal] = Field(None, ge=0, le=100)
 
 
 class AutoserviceSettingsView(BaseModel):
     id: int
     organization_id: str
+    vat_rate: Decimal = Decimal("22")
     public_name: Optional[str] = None
     public_description: Optional[str] = None
     created_at: datetime

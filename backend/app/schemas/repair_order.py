@@ -28,7 +28,7 @@ class RepairOrderUserBrief(BaseModel):
 class RepairOrderVehicleBrief(BaseModel):
     id: int
     make: str
-    model: str
+    model: Optional[str] = None
     year: Optional[int] = None
     vin: Optional[str] = None
     plate: Optional[str] = None
@@ -282,6 +282,7 @@ class RepairOrderStaffView(BaseModel):
     works: list[RepairOrderWorkView] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartView] = Field(default_factory=list)
     shop_parts: list[RepairOrderShopPartView] = Field(default_factory=list)
+    vat_rate: Decimal = Decimal("22")
     works_total: Decimal = Decimal("0.00")
     shop_parts_total: Decimal = Decimal("0.00")
     grand_total: Decimal = Decimal("0.00")
@@ -305,6 +306,7 @@ class RepairOrderClientView(BaseModel):
     works: list[RepairOrderClientWorkView] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartView] = Field(default_factory=list)
     shop_parts: list[RepairOrderClientShopPartView] = Field(default_factory=list)
+    vat_rate: Decimal = Decimal("22")
     works_total: Decimal = Decimal("0.00")
     shop_parts_total: Decimal = Decimal("0.00")
     grand_total: Decimal = Decimal("0.00")
@@ -323,6 +325,7 @@ class RepairOrderServiceEmployeeOption(BaseModel):
 
 class RepairOrderWorkZonesMeta(BaseModel):
     work_zones: list[RepairOrderWorkZoneBrief] = Field(default_factory=list)
+    vat_rate: Decimal = Decimal("22")
 
 
 class WarehouseProductOption(BaseModel):

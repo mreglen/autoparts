@@ -6,6 +6,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
+import Toast from '../../components/UI/Toast';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
@@ -213,11 +214,7 @@ export default function AutoserviceInspectionsPage() {
         </button>
       </div>
 
-      {error ? (
-        <p className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError(null)} />
 
       <div className="hidden w-full md:block overflow-x-auto">
         <table className={autoserviceListTableClass}>

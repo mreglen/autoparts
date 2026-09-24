@@ -11,6 +11,7 @@ import {
   EmptyState,
   Skeleton,
 } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import {
   warehouseListShellClass,
   warehousePageClass,
@@ -28,39 +29,6 @@ function itemArticle(item) {
 function itemKey(item, idx) {
   const article = itemArticle(item);
   return article ? `a:${article}` : `i:${idx}`;
-}
-
-function InlineNotice({ tone = 'success', children, onClose }) {
-  const tones = {
-    success: 'border-success-100 bg-success-50 text-success-700',
-    error: 'border-danger-100 bg-danger-50 text-danger-700',
-    warning: 'border-warning-100 bg-warning-50 text-warning-700',
-    info: 'border-line bg-surface-subtle text-ink-soft',
-  };
-  return (
-    <div
-      className={`flex items-start justify-between gap-3 rounded-sg border px-4 py-3 ${tones[tone] || tones.info}`}
-      role="status"
-    >
-      <div className="min-w-0 flex-1 text-sm">{children}</div>
-      {onClose ? (
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-md p-1 opacity-70 hover:opacity-100"
-          aria-label="Закрыть"
-        >
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-            <path
-              fillRule="evenodd"
-              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      ) : null}
-    </div>
-  );
 }
 
 function AvailabilityBadge({ value }) {
@@ -207,16 +175,8 @@ export default function DromNomenclaturePage() {
         </Button>
       </div>
 
-      {error ? (
-        <InlineNotice tone="error" onClose={() => setError(null)}>
-          <p className="whitespace-pre-wrap">{error}</p>
-        </InlineNotice>
-      ) : null}
-      {notice ? (
-        <InlineNotice tone="success" onClose={() => setNotice(null)}>
-          <p className="whitespace-pre-wrap">{notice}</p>
-        </InlineNotice>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError(null)} />
+      <Toast message={notice} variant="success" onClose={() => setNotice(null)} />
 
       {loading ? (
         <div className="space-y-3">

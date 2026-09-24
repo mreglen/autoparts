@@ -6,6 +6,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
 import NumericInput from '../../components/UI/NumericInput';
+import Toast from '../../components/UI/Toast';
 import { apiRequest } from '../../utils/apiClient';
 import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
@@ -71,8 +72,8 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
     setError(null);
     const make = form.make.trim();
     const model = form.model.trim();
-    if (!make || !model) {
-      setError('Укажите марку и модель');
+    if (!make) {
+      setError('Укажите марку');
       return;
     }
     const year = form.year ? Number(form.year) : null;
@@ -84,7 +85,7 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
       await onSubmit({
         vin: form.vin.trim() || null,
         make,
-        model,
+        model: model || null,
         year,
         color: form.color.trim() || null,
         plate: form.plate.trim() || null,
@@ -133,7 +134,6 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
             className={inputClass}
             value={form.model}
             onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
-            required
             disabled={saving}
           />
         </div>
@@ -651,11 +651,7 @@ export default function GaragePage() {
         </button>
       </div>
 
-      {pageError ? (
-        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {pageError}
-        </p>
-      ) : null}
+      <Toast message={pageError} variant="error" onClose={() => setPageError(null)} />
 
       <div className={autoserviceListTableWrapClass}>
         <div className="overflow-x-auto">

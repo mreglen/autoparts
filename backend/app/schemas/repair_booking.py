@@ -12,7 +12,7 @@ RepairBookingStatus = Literal["new", "processed", "cancelled"]
 class RepairBookingVehicleBrief(BaseModel):
     id: int
     make: str
-    model: str
+    model: Optional[str] = None
     year: Optional[int] = None
     plate: Optional[str] = None
     vin: Optional[str] = None

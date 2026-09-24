@@ -3,9 +3,9 @@ import { apiRequest } from '../../utils/apiClient';
 import { formatFinanceCurrency } from '../Finance/financeDisplay';
 import { Skeleton } from '../../components/UI';
 import Modal from '../../components/UI/Modal';
+import Toast from '../../components/UI/Toast';
 import RepairOrderViewModal, { vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
 import {
-  autoserviceListErrorClass,
   autoserviceListHeaderSubtitleClass,
   autoserviceListHeaderTitleClass,
   autoserviceListPrimaryButtonClass,
@@ -213,11 +213,7 @@ export default function AutoserviceMyPayrollPage() {
         </label>
       </div>
 
-      {error ? (
-        <div className={autoserviceListErrorClass} role="alert">
-          {error}
-        </div>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError('')} />
 
       {loading ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

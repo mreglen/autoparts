@@ -11,7 +11,7 @@ InspectionBookingSource = Literal["site", "staff", "client"]
 class InspectionBookingVehicleBrief(BaseModel):
     id: int
     make: str
-    model: str
+    model: Optional[str] = None
     year: Optional[int] = None
     plate: Optional[str] = None
     vin: Optional[str] = None

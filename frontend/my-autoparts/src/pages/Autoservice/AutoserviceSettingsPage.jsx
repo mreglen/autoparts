@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import Modal from '../../components/UI/Modal';
+import NumericInput from '../../components/UI/NumericInput';
 import WorkZonesSortableList from '../../components/Autoservice/WorkZonesSortableList';
 import { UnderlineTabs } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import { apiRequest, API_BASE, getAuthToken } from '../../utils/apiClient';
 
 const inputClass =
@@ -272,6 +274,7 @@ export default function AutoserviceSettingsPage() {
   const [tab, setTab] = useState('general');
   const [publicName, setPublicName] = useState('');
   const [publicDescription, setPublicDescription] = useState('');
+  const [vatRate, setVatRate] = useState('22');
   const [workZones, setWorkZones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [workZonesLoading, setWorkZonesLoading] = useState(false);
@@ -288,6 +291,7 @@ export default function AutoserviceSettingsPage() {
     const data = await apiRequest('/autoservice/settings');
     setPublicName(data?.public_name || '');
     setPublicDescription(data?.public_description || '');
+    setVatRate(data?.vat_rate != null ? String(data.vat_rate) : '22');
   }, []);
 
   const loadWorkZones = useCallback(async () => {
@@ -334,6 +338,11 @@ export default function AutoserviceSettingsPage() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    const parsedVat = Number(String(vatRate).replace(',', '.').trim());
+    if (!Number.isFinite(parsedVat) || parsedVat < 0 || parsedVat > 100) {
+      setError('Ставка НДС должна быть от 0 до 100');
+      return;
+    }
     setSaving(true);
     setError('');
     setSavedMessage('');
@@ -343,10 +352,12 @@ export default function AutoserviceSettingsPage() {
         body: JSON.stringify({
           public_name: publicName.trim() || null,
           public_description: publicDescription.trim() || null,
+          vat_rate: parsedVat,
         }),
       });
       setPublicName(data?.public_name || '');
       setPublicDescription(data?.public_description || '');
+      setVatRate(data?.vat_rate != null ? String(data.vat_rate) : '22');
       setSavedMessage('Сохранено');
     } catch (err) {
       setError(err?.message || 'Не удалось сохранить');
@@ -429,16 +440,8 @@ export default function AutoserviceSettingsPage() {
         onChange={setTab}
       />
 
-      {error ? (
-        <p className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {savedMessage && !error ? (
-        <p className="mb-4 rounded-sg border border-success-100 bg-success-50 px-4 py-3 text-sm text-success-700" role="status">
-          {savedMessage}
-        </p>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError('')} />
+      <Toast message={!error ? savedMessage : null} variant="success" onClose={() => setSavedMessage('')} />
 
       {loading ? (
         <p className="py-12 text-center text-sm text-ink-muted">Загрузка…</p>
@@ -457,6 +460,22 @@ export default function AutoserviceSettingsPage() {
                   maxLength={160}
                   className={inputClass}
                 />
+              </div>
+              <div>
+                <label htmlFor="vat_rate" className="block text-sm font-medium text-ink-soft">
+                  Ставка НДС, %
+                </label>
+                <NumericInput
+                  id="vat_rate"
+                  mode="decimal"
+                  maxLength={6}
+                  value={vatRate}
+                  onChange={(ev) => setVatRate(ev.target.value)}
+                  className={inputClass}
+                />
+                <p className="mt-1 text-xs text-ink-muted">
+                  Цены в заказ-нарядах считаются с НДС «в том числе». При смене ставки пересчитываются только незакрытые заказ-наряды.
+                </p>
               </div>
               <div>
                 <label htmlFor="public_description" className="block text-sm font-medium text-ink-soft">

@@ -20,6 +20,7 @@ import {
   formatSurnameInitials,
   formatUpdMoney,
   innKpp,
+  orderVatRate,
   roundMoney,
   splitVatInclusive,
 } from '../../utils/updDocument';
@@ -279,11 +280,13 @@ export default function RepairOrderInvoicePrintPage() {
     return rows;
   }, [order]);
 
+  const vatRate = orderVatRate(order);
+
   const totals = useMemo(() => {
     const withVat = lines.reduce((sum, row) => roundMoney(sum + Number(row.withVat || 0)), 0);
-    const split = splitVatInclusive(withVat);
+    const split = splitVatInclusive(withVat, vatRate);
     return { ...split, count: lines.length };
-  }, [lines]);
+  }, [lines, vatRate]);
 
   const missingRequired = REQUIRED_FIELDS.filter(
     ([key]) => !String(form[key] || '').trim() || String(form[key]).trim() === '--',

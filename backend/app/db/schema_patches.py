@@ -4149,7 +4149,7 @@ def ensure_garage_vehicles_table() -> None:
             organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
             vin VARCHAR(17),
             make VARCHAR(80) NOT NULL,
-            model VARCHAR(80) NOT NULL,
+            model VARCHAR(80),
             year INTEGER,
             color VARCHAR(40),
             plate VARCHAR(20),
@@ -4176,7 +4176,7 @@ def ensure_garage_vehicles_table() -> None:
             organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
             vin VARCHAR(17),
             make VARCHAR(80) NOT NULL,
-            model VARCHAR(80) NOT NULL,
+            model VARCHAR(80),
             year INTEGER,
             color VARCHAR(40),
             plate VARCHAR(20),
@@ -4240,6 +4240,22 @@ def ensure_garage_vehicle_laximo_columns() -> None:
     )
 
 
+def ensure_garage_vehicles_model_nullable() -> None:
+    """Allow garage vehicles to be created without a model."""
+    inspector = inspect(engine)
+    if "garage_vehicles" not in inspector.get_table_names():
+        return
+    columns = {col["name"]: col for col in inspector.get_columns("garage_vehicles")}
+    model_col = columns.get("model")
+    if model_col is None or model_col.get("nullable"):
+        return
+    if engine.dialect.name != "postgresql":
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE garage_vehicles ALTER COLUMN model DROP NOT NULL"))
+    logger.info("Applied garage_vehicles model nullable patch")
+
+
 def ensure_autoservice_settings_table() -> None:
     """Create autoservice_settings (one row per org, lifts_count)."""
     inspector = inspect(engine)
@@ -4254,6 +4270,7 @@ def ensure_autoservice_settings_table() -> None:
             id SERIAL PRIMARY KEY,
             organization_id VARCHAR(10) NOT NULL UNIQUE REFERENCES organizations(id),
             lifts_count INTEGER NOT NULL DEFAULT 0,
+            vat_rate NUMERIC(5,2) NOT NULL DEFAULT 22,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
@@ -4264,6 +4281,7 @@ def ensure_autoservice_settings_table() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             organization_id VARCHAR(10) NOT NULL UNIQUE REFERENCES organizations(id),
             lifts_count INTEGER NOT NULL DEFAULT 0,
+            vat_rate NUMERIC(5,2) NOT NULL DEFAULT 22,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
@@ -4300,6 +4318,36 @@ def ensure_autoservice_settings_public_columns() -> None:
             conn.execute(text(stmt))
 
     logger.info("Applied autoservice_settings public column patches: %s", statements)
+
+
+def ensure_autoservice_settings_vat_rate_column() -> None:
+    """Add vat_rate to autoservice_settings (default 22 for all orgs)."""
+    inspector = inspect(engine)
+    if "autoservice_settings" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("autoservice_settings")}
+    if "vat_rate" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE autoservice_settings ADD COLUMN vat_rate NUMERIC(5,2) NOT NULL DEFAULT 22")
+        )
+    logger.info("Applied autoservice_settings.vat_rate column patch")
+
+
+def ensure_repair_orders_vat_rate_column() -> None:
+    """Add vat_rate snapshot to repair_orders (22 matches previous hardcoded rate)."""
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+    if "vat_rate" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE repair_orders ADD COLUMN vat_rate NUMERIC(5,2) NOT NULL DEFAULT 22")
+        )
+    logger.info("Applied repair_orders.vat_rate column patch")
 
 
 def ensure_repair_bookings_table() -> None:
@@ -4409,6 +4457,7 @@ def ensure_repair_orders_tables() -> None:
             client_comment TEXT,
             scheduled_at TIMESTAMPTZ NOT NULL,
             accepted_by_user_id INTEGER NOT NULL REFERENCES users(id),
+            vat_rate NUMERIC(5,2) NOT NULL DEFAULT 22,
             status VARCHAR(32) NOT NULL DEFAULT 'open',
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -4433,6 +4482,7 @@ def ensure_repair_orders_tables() -> None:
             client_comment TEXT,
             scheduled_at DATETIME NOT NULL,
             accepted_by_user_id INTEGER NOT NULL REFERENCES users(id),
+            vat_rate NUMERIC(5,2) NOT NULL DEFAULT 22,
             status VARCHAR(32) NOT NULL DEFAULT 'open',
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

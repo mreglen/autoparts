@@ -15,6 +15,7 @@ import {
   Skeleton,
 } from '../../components/UI';
 import { SettingsToggle } from './settingsUi';
+import Toast from '../../components/UI/Toast';
 import { warehousePageClass } from '../../utils/warehouseListUi';
 
 function formatErrorMessage(err) {
@@ -324,16 +325,8 @@ export default function DromIntegrationPage() {
         </InlineNotice>
       </div>
 
-      {error ? (
-        <InlineNotice tone="error" onClose={() => setError(null)}>
-          <p className="whitespace-pre-wrap">{error}</p>
-        </InlineNotice>
-      ) : null}
-      {notice ? (
-        <InlineNotice tone="success" onClose={() => setNotice(null)}>
-          <p>{notice}</p>
-        </InlineNotice>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError(null)} />
+      <Toast message={notice} variant="success" onClose={() => setNotice(null)} />
 
       <InlineNotice tone="info">
         <p className="mb-1 font-medium text-ink">Как подключить</p>

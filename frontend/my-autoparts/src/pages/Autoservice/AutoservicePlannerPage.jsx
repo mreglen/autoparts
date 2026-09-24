@@ -7,6 +7,7 @@ import RepairOrderViewModal, { OrderStatusBadge, normalizeRepairOrderStatus } fr
 import PlannerCreateChoiceModal from '../../components/Autoservice/PlannerCreateChoiceModal';
 import PlannerCellContextMenu from '../../components/Autoservice/PlannerCellContextMenu';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
+import Toast from '../../components/UI/Toast';
 import { apiRequest } from '../../utils/apiClient';
 import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
 import { parseWallClockDate, toDateInputValue } from '../../utils/serverDate';
@@ -554,11 +555,7 @@ export default function AutoservicePlannerPage() {
         </div>
       </div>
 
-      {error ? (
-        <div className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
-          {error}
-        </div>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError('')} />
 
       <MobileDayPlanner
         dayHeaders={dayHeaders}

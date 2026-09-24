@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { fetchPendingSellers, approveSeller, rejectSeller } from '../../redux/slices/ModerationSlice';
+import { fetchPendingSellers, approveSeller, rejectSeller, clearError } from '../../redux/slices/ModerationSlice';
 import { ConfirmDialog } from '../../components/UI/Modal';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
+import Toast from '../../components/UI/Toast';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
@@ -109,11 +110,7 @@ export default function PendingSellersPage() {
                     ) : null}
                 </div>
 
-                {error && (
-                    <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200" role="alert">
-                        {error}
-                    </div>
-                )}
+                <Toast message={error} variant="error" onClose={() => dispatch(clearError())} />
 
                 {loading ? (
                     <div className="flex justify-center items-center py-12">

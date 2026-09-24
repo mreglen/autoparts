@@ -66,7 +66,8 @@ import {
   formatShopPartUnit,
   warehouseStockKey,
 } from '../../utils/repairOrderShopPartUtils';
-import { splitVatInclusive } from '../../utils/updDocument';
+import { UPD_VAT_RATE, formatVatRate, orderVatRate, splitVatInclusive } from '../../utils/updDocument';
+import Toast from '../../components/UI/Toast';
 
 const pillInputClass = 'sg-pill-input mt-1';
 const pillTextareaClass = 'sg-pill-textarea mt-1';
@@ -828,8 +829,8 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
     setError('');
     const make = form.make.trim();
     const model = form.model.trim();
-    if (!make || !model) {
-      setError('Укажите марку и модель');
+    if (!make) {
+      setError('Укажите марку');
       return;
     }
     const year = form.year ? Number(form.year) : null;
@@ -934,7 +935,6 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
               value={form.model}
               onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
               disabled={saving}
-              required
               maxLength={80}
             />
           </div>
@@ -1119,6 +1119,8 @@ export default function AutoserviceOrderFormPage() {
   const [orderLoading, setOrderLoading] = useState(isEdit);
   const [orderError, setOrderError] = useState('');
   const [orderNumber, setOrderNumber] = useState(null);
+  const [metaVatRate, setMetaVatRate] = useState(UPD_VAT_RATE);
+  const [orderVatRateState, setOrderVatRateState] = useState(null);
   const [formInitialized, setFormInitialized] = useState(isCreate);
 
   const [clientId, setClientId] = useState('');
@@ -1312,6 +1314,7 @@ export default function AutoserviceOrderFormPage() {
       setWorkCatalog(Array.isArray(worksData) ? worksData : []);
       setServiceEmployees(Array.isArray(employeesData) ? employeesData : []);
       setWorkZones(Array.isArray(zonesData?.work_zones) ? zonesData.work_zones : []);
+      setMetaVatRate(orderVatRate(zonesData));
     } catch (err) {
       setMetaError(err?.message || 'Не удалось загрузить справочники');
     } finally {
@@ -1326,6 +1329,7 @@ export default function AutoserviceOrderFormPage() {
     try {
       const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
       setOrderNumber(order?.order_number ?? null);
+      setOrderVatRateState(order?.vat_rate != null ? Number(order.vat_rate) : null);
       applyFormState(mapOrderToFormState(order));
       pauseAutoSave();
       setFormInitialized(true);
@@ -1597,7 +1601,8 @@ export default function AutoserviceOrderFormPage() {
   );
 
   const grandTotal = worksTotal + shopPartsTotal;
-  const grandVat = splitVatInclusive(grandTotal).vat;
+  const vatRate = orderVatRateState ?? metaVatRate;
+  const grandVat = splitVatInclusive(grandTotal, vatRate).vat;
 
   const handleClientCreated = async (row) => {
     await loadClients();
@@ -2409,12 +2414,9 @@ export default function AutoserviceOrderFormPage() {
         </p>
       ) : null}
 
+      <Toast message={error} variant="error" onClose={() => setError('')} />
+
       <form id="repair-order-form" onSubmit={handleSubmit} className="min-w-0 space-y-5">
-        {error ? (
-          <p className="rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
-            {error}
-          </p>
-        ) : null}
 
         <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="min-w-0">
@@ -2882,7 +2884,7 @@ export default function AutoserviceOrderFormPage() {
                 {ownMode ? null : (
                   <p className="text-[11px] leading-snug text-ink-muted sm:text-xs">
                     работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)} · НДС{' '}
-                    {formatMoney(grandVat)}
+                    {formatVatRate(vatRate)}% {formatMoney(grandVat)}
                   </p>
                 )}
               </div>

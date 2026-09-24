@@ -7,6 +7,7 @@ import AutoserviceLiveSearchField from '../../components/Autoservice/Autoservice
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
 import { Skeleton, UnderlineTabs, NumericInput } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   autoserviceListTableClass,
@@ -855,8 +856,8 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
     setError('');
     const make = form.make.trim();
     const model = form.model.trim();
-    if (!make || !model) {
-      setError('Укажите марку и модель');
+    if (!make) {
+      setError('Укажите марку');
       return;
     }
     const year = form.year ? Number(form.year) : null;
@@ -871,7 +872,7 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
         body: JSON.stringify({
           vin: form.vin.trim() || null,
           make,
-          model,
+          model: model || null,
           year,
           color: form.color.trim() || null,
           plate: form.plate.trim() || null,
@@ -943,7 +944,6 @@ function EditGuestVehicleModal({ open, vehicle, onClose, onSaved }) {
               className={inputClass}
               value={form.model}
               onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
-              required
               disabled={saving}
             />
           </div>
@@ -1027,8 +1027,8 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
     setError('');
     const make = form.make.trim();
     const model = form.model.trim();
-    if (!make || !model) {
-      setError('Укажите марку и модель');
+    if (!make) {
+      setError('Укажите марку');
       return;
     }
     const year = form.year ? Number(form.year) : null;
@@ -1044,7 +1044,7 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
           client_id: clientId,
           vin: form.vin.trim() || null,
           make,
-          model,
+          model: model || null,
           year,
           color: form.color.trim() || null,
           plate: form.plate.trim() || null,
@@ -1116,7 +1116,6 @@ function AddGuestVehicleModal({ open, clientId, onClose, onCreated }) {
               className={inputClass}
               value={form.model}
               onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
-              required
               disabled={saving}
             />
           </div>
@@ -1410,11 +1409,7 @@ export default function AutoserviceClientsPage() {
         </button>
       </div>
 
-      {error ? (
-        <p className="mb-4 rounded-sg border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError(null)} />
 
       <div className={autoserviceListTableWrapClass}>
         <table className={autoserviceListTableClass}>

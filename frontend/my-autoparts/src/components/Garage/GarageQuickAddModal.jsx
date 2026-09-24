@@ -20,6 +20,7 @@ import {
   warehouseSecondaryButtonClass,
 } from '../../utils/warehouseListUi';
 
+
 const LOOKUP_INPUT_MAX_LENGTH = 32;
 const formInputClass = `${warehousePillControlClass} mt-0`;
 const formTextareaClass = `${formInputClass.replace('rounded-full', 'rounded-xl')} min-h-[80px] resize-y py-3`;
@@ -55,8 +56,8 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
     setError('');
     const make = form.make.trim();
     const model = form.model.trim();
-    if (!make || !model) {
-      setError('Укажите марку и модель');
+    if (!make) {
+      setError('Укажите марку');
       return;
     }
     const year = form.year ? Number(form.year) : null;
@@ -68,7 +69,7 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
       await onSubmit({
         vin: form.vin.trim() || null,
         make,
-        model,
+        model: model || null,
         year,
         color: form.color.trim() || null,
         plate: form.plate.trim() || null,
@@ -95,13 +96,12 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
             maxLength={80}
           />
         </MobileFormField>
-        <MobileFormField label="Модель" htmlFor="garage-add-model" required>
+        <MobileFormField label="Модель" htmlFor="garage-add-model">
           <input
             id="garage-add-model"
             className={formInputClass}
             value={form.model}
             onChange={(event) => setForm((prev) => ({ ...prev, model: event.target.value }))}
-            required
             disabled={saving}
             maxLength={80}
           />
@@ -162,7 +162,7 @@ function VehicleFormFields({ initial, onSubmit, onCancel, saving, submitLabel, n
 
       <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-between">
         <button type="button" onClick={onBackToLookup} disabled={saving} className={warehouseSecondaryButtonClass}>
-          Назад
+          Назад к VIN
         </button>
         <div className="flex flex-col-reverse gap-2 sm:flex-row">
           <button type="button" onClick={onCancel} disabled={saving} className={warehouseSecondaryButtonClass}>

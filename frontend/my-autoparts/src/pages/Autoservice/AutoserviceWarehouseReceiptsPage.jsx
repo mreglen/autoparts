@@ -5,6 +5,7 @@ import AutoserviceLiveSearchField from '../../components/Autoservice/Autoservice
 import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
 import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import { ConfirmDialog, Modal, Skeleton } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
@@ -14,7 +15,6 @@ import AutoserviceWarehouseItemMovements from '../../components/Autoservice/Auto
 import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
-  autoserviceListErrorClass,
   autoserviceListHeaderSubtitleClass,
   autoserviceListHeaderTitleClass,
   autoserviceListMobileWrapClass,
@@ -315,11 +315,7 @@ export default function AutoserviceWarehouseReceiptsPage({ embedded = false }) {
         </div>
       ) : null}
 
-      {error ? (
-        <p className={autoserviceListErrorClass} role="alert">
-          {error}
-        </p>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError('')} />
 
       <div className={autoserviceListTableWrapClass}>
         <table className={autoserviceListTableClass}>

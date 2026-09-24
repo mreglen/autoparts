@@ -18,6 +18,7 @@ import {
   Input,
   Textarea,
 } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 
 function formatMoney(value) {
   return new Intl.NumberFormat('ru-RU').format(Number(value) || 0);
@@ -99,6 +100,11 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
 
   return (
     <Card>
+      <Toast
+        message={notice?.type === 'success' ? notice.message : null}
+        variant="success"
+        onClose={() => setNotice(null)}
+      />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-ink">Подключить автосервис</h3>
@@ -165,14 +171,9 @@ export default function AutoserviceTariffSection({ user, isDirector }) {
               placeholder="Кратко опишите формат работы сервиса (необязательно)"
             />
           </div>
-          {(myError || notice) &&
-            (notice?.type === 'success' ? (
-              <p className="rounded-sg border border-success-100 bg-success-50 px-4 py-3 text-sm text-success-700">
-                {notice.message}
-              </p>
-            ) : (
-              <FieldHint error>{notice?.message || myError}</FieldHint>
-            ))}
+          {(myError || notice) && notice?.type !== 'success' ? (
+            <FieldHint error>{notice?.message || myError}</FieldHint>
+          ) : null}
           <Button
             onClick={handleSubmit}
             disabled={!canSubmit || submitting || myLoading}

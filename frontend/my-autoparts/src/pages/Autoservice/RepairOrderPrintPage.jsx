@@ -16,7 +16,7 @@ import { Button, EmptyState, Modal, Skeleton } from '../../components/UI';
 import AutoserviceDocumentClientEditor from '../../components/Autoservice/AutoserviceDocumentClientEditor';
 import AutoservicePrintPreview from '../../components/Autoservice/AutoservicePrintPreview';
 import { downloadPrintSheetPdf, printDocumentSheet } from '../../utils/downloadPrintPdf';
-import { formatRublesInWords, splitVatInclusive } from '../../utils/updDocument';
+import { formatRublesInWords, orderVatRate, splitVatInclusive } from '../../utils/updDocument';
 import {
   clientRequisitesChanged,
   clientToOrderCustomer,
@@ -335,13 +335,14 @@ export default function RepairOrderPrintPage() {
         0,
       );
     const grand = order.grand_total ?? worksTotal + shopTotal;
+    const vatRate = orderVatRate(order);
     return {
       worksTotal,
       shopTotal,
       grand,
-      worksVat: splitVatInclusive(worksTotal).vat,
-      shopVat: splitVatInclusive(shopTotal).vat,
-      grandVat: splitVatInclusive(grand).vat,
+      worksVat: splitVatInclusive(worksTotal, vatRate).vat,
+      shopVat: splitVatInclusive(shopTotal, vatRate).vat,
+      grandVat: splitVatInclusive(grand, vatRate).vat,
     };
   }, [order]);
 

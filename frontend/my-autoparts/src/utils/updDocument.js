@@ -1,5 +1,17 @@
 export const UPD_VAT_RATE = 22;
 
+export function orderVatRate(source) {
+  const raw = source?.vat_rate;
+  if (raw == null || raw === '') return UPD_VAT_RATE;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : UPD_VAT_RATE;
+}
+
+export function formatVatRate(rate) {
+  const n = Number(rate);
+  return Number.isFinite(n) ? String(n) : String(UPD_VAT_RATE);
+}
+
 export function roundMoney(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }

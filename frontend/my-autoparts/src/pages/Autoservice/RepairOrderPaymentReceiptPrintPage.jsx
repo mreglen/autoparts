@@ -12,6 +12,7 @@ import {
   formatSurnameInitials,
   formatUpdMoney,
   innKpp,
+  orderVatRate,
   roundMoney,
   splitVatInclusive,
 } from '../../utils/updDocument';
@@ -124,11 +125,13 @@ export default function RepairOrderPaymentReceiptPrintPage() {
     });
   }, [order, selectedPayments]);
 
+  const vatRate = orderVatRate(order);
+
   const totals = useMemo(() => {
     const withVat = lines.reduce((sum, row) => roundMoney(sum + Number(row.amount || 0)), 0);
-    const split = splitVatInclusive(withVat);
+    const split = splitVatInclusive(withVat, vatRate);
     return { ...split, count: lines.length };
-  }, [lines]);
+  }, [lines, vatRate]);
 
   const sellerName = org?.legal_name || org?.name || '';
   const sellerAddress = org?.legal_address || org?.address || '';

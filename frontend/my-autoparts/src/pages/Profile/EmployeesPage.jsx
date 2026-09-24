@@ -8,6 +8,7 @@ import {
   createEmployeeAccount,
 } from '../../redux/slices/OrganizationSlice';
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
+import Toast from '../../components/UI/Toast';
 import {
   Button,
   ConfirmDialog,
@@ -392,8 +393,12 @@ export default function EmployeesPage() {
         action={<Button type="button" className="w-full sm:w-auto" onClick={() => { resetForm(); setShowAddForm(true); }}>Добавить сотрудника</Button>}
       />
 
-      {notice ? <InlineNotice tone="success" onClose={() => setNotice('')}>{notice}</InlineNotice> : null}
-      {formError && !showAddForm && !showEditForm ? <InlineNotice tone="error" onClose={() => setFormError('')}>{formError}</InlineNotice> : null}
+      <Toast message={notice} variant="success" onClose={() => setNotice('')} />
+      <Toast
+        message={formError && !showAddForm && !showEditForm ? formError : null}
+        variant="error"
+        onClose={() => setFormError('')}
+      />
 
       {!loadingEmployees && stats.total > 0 ? (
         <input

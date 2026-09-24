@@ -75,6 +75,7 @@ from app.utils.autoservice_access import (
 from app.utils.phone import normalize_to_storage_format
 from app.utils.repair_order_number import allocate_repair_order_number
 from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
+from app.services.autoservice_vat import DEFAULT_VAT_RATE, get_org_vat_rate
 from app.services.autoservice_payment_service import (
     batch_paid_amounts,
     create_repair_order_payment,
@@ -409,6 +410,7 @@ def _to_staff_view(
         works=works,
         client_parts=parts,
         shop_parts=shop,
+        vat_rate=row.vat_rate if row.vat_rate is not None else DEFAULT_VAT_RATE,
         works_total=works_total,
         shop_parts_total=shop_total,
         grand_total=grand_total,
@@ -439,6 +441,7 @@ def _to_client_view(row: RepairOrder) -> RepairOrderClientView:
         works=works,
         client_parts=parts,
         shop_parts=shop,
+        vat_rate=row.vat_rate if row.vat_rate is not None else DEFAULT_VAT_RATE,
         works_total=works_total,
         shop_parts_total=shop_total,
         grand_total=_money(works_total + shop_total),
@@ -765,7 +768,7 @@ def _resolve_create_client_and_vehicle(
 
     make = (payload.vehicle_make or "").strip()
     model = (payload.vehicle_model or "").strip()
-    if not make or not model:
+    if not make:
         return client, None
     vehicle = (
         db.query(GarageVehicle)
@@ -773,7 +776,7 @@ def _resolve_create_client_and_vehicle(
             GarageVehicle.client_id == client.id,
             GarageVehicle.organization_id == org_id,
             func.lower(GarageVehicle.make) == make.lower(),
-            func.lower(GarageVehicle.model) == model.lower(),
+            func.coalesce(func.lower(GarageVehicle.model), "") == model.lower(),
         )
         .order_by(GarageVehicle.id.desc())
         .first()
@@ -783,7 +786,7 @@ def _resolve_create_client_and_vehicle(
             client_id=client.id,
             organization_id=org_id,
             make=make[:80],
-            model=model[:80],
+            model=model[:80] or None,
             source="inspection",
         )
         db.add(vehicle)
@@ -1301,6 +1304,7 @@ def get_repair_order_work_zones_meta(
     zones = _list_active_work_zones(db, org_id)
     return RepairOrderWorkZonesMeta(
         work_zones=[RepairOrderWorkZoneBrief.model_validate(z) for z in zones],
+        vat_rate=get_org_vat_rate(db, org_id),
     )
 
 
@@ -1591,6 +1595,7 @@ def create_repair_order(
         accepted_by_user_id=current_user.id,
         created_by_user_id=current_user.id,
         status=initial_status,
+        vat_rate=get_org_vat_rate(db, org_id),
     )
     record_repair_order_status_timestamp(row, initial_status)
     row.assignees = assignees

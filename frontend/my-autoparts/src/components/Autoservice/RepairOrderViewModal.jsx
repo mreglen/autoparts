@@ -13,7 +13,7 @@ import {
   shopPartDisplayName,
   shopPartPricingOptions,
 } from '../../utils/repairOrderShopPartUtils';
-import { splitVatInclusive } from '../../utils/updDocument';
+import { formatVatRate, orderVatRate, splitVatInclusive } from '../../utils/updDocument';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { AUTOSERVICE_PAYMENT_METHOD_LABELS } from '../../utils/autoservicePaymentReceipt';
 
@@ -59,8 +59,8 @@ function formatMoney(value) {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function vatIncluded(amount) {
-  return splitVatInclusive(amount).vat;
+function vatIncluded(amount, rate) {
+  return splitVatInclusive(amount, rate).vat;
 }
 
 const PAYMENT_METHODS = [
@@ -854,8 +854,10 @@ export default function RepairOrderViewModal({
                   <span className="tabular-nums">{formatMoney(totals.grand)} ₽</span>
                 </p>
                 <p>
-                  В том числе НДС:{' '}
-                  <span className="tabular-nums">{formatMoney(vatIncluded(totals.grand))} ₽</span>
+                  В том числе НДС {formatVatRate(orderVatRate(order))}%:{' '}
+                  <span className="tabular-nums">
+                    {formatMoney(vatIncluded(totals.grand, orderVatRate(order)))} ₽
+                  </span>
                 </p>
               </div>
               {enablePayment && payment ? (

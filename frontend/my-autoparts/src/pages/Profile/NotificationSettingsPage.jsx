@@ -13,6 +13,7 @@ import {
   profilePrimaryBtn,
 } from './profileUi';
 import { isPwaStandalone } from '../../utils/pwaStandalone';
+import Toast from '../../components/UI/Toast';
 
 function isIosSafari() {
   if (typeof navigator === 'undefined') return false;
@@ -147,7 +148,6 @@ export default function NotificationSettingsPage() {
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
-    window.setTimeout(() => setToast(null), 3000);
   }, []);
 
   const loadPreferences = useCallback(async () => {
@@ -299,18 +299,12 @@ export default function NotificationSettingsPage() {
         ))}
       </ProfileBlock>
 
-      {toast ? (
-        <div
-          className={`fixed bottom-20 left-1/2 z-50 max-w-sm -translate-x-1/2 rounded-xl px-4 py-2.5 text-sm font-medium shadow-lg ring-1 sm:bottom-8 ${
-            toast.type === 'error'
-              ? 'bg-red-600 text-white ring-red-500/30'
-              : 'bg-gray-900 text-white ring-gray-700/50'
-          }`}
-          role="status"
-        >
-          {toast.message}
-        </div>
-      ) : null}
+      <Toast
+        message={toast?.message}
+        variant={toast?.type === 'error' ? 'error' : 'success'}
+        onClose={() => setToast(null)}
+        durationMs={3000}
+      />
     </div>
   );
 }

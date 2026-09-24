@@ -12,6 +12,7 @@ import RepairOrderViewModal, {
   vehicleLabel,
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { buildRepairOrderDuplicatePayload } from '../../utils/repairOrderDuplicate';
@@ -403,6 +404,7 @@ export default function AutoserviceOrdersPage() {
           loading={loading}
           onRefresh={() => load()}
           error={error}
+          onErrorClose={() => setError('')}
           rows={rows}
           emptyMessage={emptyMessage}
           statusActionsForRow={statusActionsForRow}
@@ -485,11 +487,7 @@ export default function AutoserviceOrdersPage() {
           </button>
         </div>
 
-        {error ? (
-          <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-            {error}
-          </p>
-        ) : null}
+        <Toast message={error} variant="error" onClose={() => setError('')} />
 
         <table className={autoserviceListTableClass}>
           <thead>

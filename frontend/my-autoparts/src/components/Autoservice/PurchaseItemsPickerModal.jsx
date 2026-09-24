@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
+import AutoserviceLiveSearchField from './AutoserviceLiveSearchField';
 import { apiAxios } from '../../utils/apiClient';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
 import {
@@ -18,6 +19,27 @@ import {
 } from '../../utils/warehouseListUi';
 
 const EMPTY_SELECTED_KEYS = new Set();
+
+const selectClass =
+  'h-10 min-w-0 shrink-0 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70 max-md:h-11';
+
+function orderConditionKey(source) {
+  if (source === 'new') return 'new';
+  if (source === 'used') return 'used';
+  return 'none';
+}
+
+function orderSupplierName(order) {
+  return (order?.organization_name || order?.seller || '').trim();
+}
+
+function purchaseItemMatchesQuery(item, query) {
+  const haystack = [item.name, item.product_name, item.brand, item.partnumber]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(query);
+}
 
 function formatPrice(amount) {
   return `${Number(amount || 0).toLocaleString('ru-RU')} ₽`;
@@ -42,7 +64,9 @@ export default function PurchaseItemsPickerModal({
   const [error, setError] = useState('');
   const [usedOrders, setUsedOrders] = useState([]);
   const [newOrders, setNewOrders] = useState([]);
-  const [expandedOrderKey, setExpandedOrderKey] = useState(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
+  const [conditionFilter, setConditionFilter] = useState('');
   const [selectedKeys, setSelectedKeys] = useState(() => new Set(initialSelectedKeys));
 
   useEffect(() => {
@@ -85,6 +109,34 @@ export default function PurchaseItemsPickerModal({
     () => buildUnifiedOrders(usedOrders, newOrders, [], { canViewNewOrders: true, avitoProActive: false }),
     [usedOrders, newOrders],
   );
+
+  const supplierOptions = useMemo(() => {
+    const names = new Set();
+    unifiedOrders.forEach(({ order }) => {
+      const name = orderSupplierName(order);
+      if (name) names.add(name);
+    });
+    return [...names];
+  }, [unifiedOrders]);
+
+  const filteredOrders = useMemo(() => {
+    const query = searchInput.trim().toLowerCase();
+    return unifiedOrders
+      .map((entry) => {
+        const order = entry.order;
+        const items = order.items || [];
+        if (conditionFilter && orderConditionKey(entry.source) !== conditionFilter) return null;
+        if (supplierFilter && orderSupplierName(order) !== supplierFilter) return null;
+        if (!query) return { entry, items };
+        const orderMatches = String(order.id ?? '')
+          .toLowerCase()
+          .includes(query);
+        if (orderMatches) return { entry, items };
+        const matched = items.filter((item) => purchaseItemMatchesQuery(item, query));
+        return matched.length ? { entry, items: matched } : null;
+      })
+      .filter(Boolean);
+  }, [unifiedOrders, searchInput, supplierFilter, conditionFilter]);
 
   const toggleItem = (orderType, orderId, item) => {
     const key = purchaseSelectionKey(orderType, orderId, item.id);
@@ -154,129 +206,144 @@ export default function PurchaseItemsPickerModal({
         </div>
       )}
     >
-      <div className="space-y-2">
+      <div className="space-y-3">
+        <div className="sticky -top-4 z-10 -mx-5 flex flex-col gap-2 bg-surface px-5 py-2 sm:flex-row sm:items-center">
+          <AutoserviceLiveSearchField
+            value={searchInput}
+            onChange={setSearchInput}
+            placeholder="Название, артикул, № заказа"
+            ariaLabel="Поиск по позициям и заказам"
+          />
+          <select
+            className={selectClass}
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            aria-label="Фильтр по поставщику"
+          >
+            <option value="">Все поставщики</option>
+            {supplierOptions.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+          <select
+            className={selectClass}
+            value={conditionFilter}
+            onChange={(e) => setConditionFilter(e.target.value)}
+            aria-label="Фильтр по состоянию"
+          >
+            <option value="">Состояние: все</option>
+            <option value="none">Не указано</option>
+            <option value="new">Новый</option>
+            <option value="used">Б/у</option>
+          </select>
+        </div>
+
         {error ? <p className="text-sm text-danger-600" role="alert">{error}</p> : null}
         {loading ? (
           <p className="py-6 text-center text-sm text-ink-muted">Загрузка заказов…</p>
-        ) : unifiedOrders.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ink-muted">Оформленных заказов пока нет</p>
+        ) : filteredOrders.length === 0 ? (
+          <p className="py-6 text-center text-sm text-ink-muted">
+            {unifiedOrders.length === 0 ? 'Оформленных заказов пока нет' : 'Ничего не найдено'}
+          </p>
         ) : (
-          <ul className="space-y-2">
-            {unifiedOrders.map((entry) => {
-              const orderType = entry.source;
-              const order = entry.order;
-              const key = getUnifiedOrderKey(entry);
-              const items = order.items || [];
-              const isExpanded = expandedOrderKey === key;
-              const itemKeys = items.map((item) => purchaseSelectionKey(orderType, order.id, item.id));
-              const allSelected = itemKeys.length > 0 && itemKeys.every((itemKey) => selectedKeys.has(itemKey));
-              const someSelected = itemKeys.some((itemKey) => selectedKeys.has(itemKey));
-              const sellerName = order.organization_name || '';
+          <div className="overflow-x-auto">
+            <table className={autoserviceListTableClass}>
+              <thead>
+                <tr className={autoserviceListTheadRowClass}>
+                  <th className={`w-8 ${autoserviceListThClass}`} aria-label="Выбрать" />
+                  <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
+                  <th className={`w-16 whitespace-nowrap ${autoserviceListThRightClass}`}>Кол-во</th>
+                  <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Цена</th>
+                  <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
+                </tr>
+              </thead>
+              {filteredOrders.map(({ entry, items }) => {
+                const orderType = entry.source;
+                const order = entry.order;
+                const key = getUnifiedOrderKey(entry);
+                const itemKeys = items.map((item) => purchaseSelectionKey(orderType, order.id, item.id));
+                const allSelected = itemKeys.length > 0 && itemKeys.every((itemKey) => selectedKeys.has(itemKey));
+                const someSelected = itemKeys.some((itemKey) => selectedKeys.has(itemKey));
+                const sellerName = orderSupplierName(order);
 
-              return (
-                <li key={key} className="rounded-sg border border-line bg-surface">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedOrderKey(isExpanded ? null : key)}
-                    className="flex w-full min-h-11 items-center justify-between gap-2 px-3 py-2 text-left"
-                  >
-                    <span className="min-w-0 text-sm text-ink">
-                      <span className="font-medium">
-                        №{order.id}
-                        <span className="font-normal text-ink-faint"> · {orderType === 'new' ? 'Новый' : 'Б/У'}</span>
-                      </span>
-                      {sellerName ? (
-                        <span className="text-ink-muted"> · {sellerName}</span>
-                      ) : null}
-                      <span>
-                        {formatOrderDate(order.created_at) ? ` · ${formatOrderDate(order.created_at)}` : ''}
-                      </span>
-                      <span className="text-ink-muted"> · {items.length} поз.</span>
-                      {order.total_amount != null ? (
-                        <span className="font-medium"> · {formatPrice(order.total_amount)}</span>
-                      ) : null}
-                    </span>
-                    <span className="shrink-0 text-xs text-brand-600">
-                      {isExpanded ? 'Свернуть' : 'Развернуть'}
-                    </span>
-                  </button>
-                  {isExpanded ? (
-                    <div className="border-t border-line px-2 py-2">
-                      <div className="overflow-x-auto">
-                        <table className={autoserviceListTableClass}>
-                          <thead>
-                            <tr className={autoserviceListTheadRowClass}>
-                              <th className={`w-8 ${autoserviceListThClass}`}>
-                                <input
-                                  type="checkbox"
-                                  checked={allSelected}
-                                  ref={(el) => {
-                                    if (el) el.indeterminate = someSelected && !allSelected;
-                                  }}
-                                  onChange={() => toggleAllInOrder(orderType, order.id, items)}
-                                  aria-label="Выбрать всё"
-                                  className="h-4 w-4 rounded border-line text-brand-600"
-                                />
-                              </th>
-                              <th className={`min-w-0 ${autoserviceListThClass}`}>Наименование</th>
-                              <th className={`w-16 whitespace-nowrap ${autoserviceListThRightClass}`}>Кол-во</th>
-                              <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Цена</th>
-                              <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
-                            </tr>
-                          </thead>
-                          <tbody className={autoserviceListTbodyClass}>
-                            {items.map((item) => {
-                              const itemKey = purchaseSelectionKey(orderType, order.id, item.id);
-                              const title = [
-                                item.brand,
-                                item.partnumber,
-                                item.name || item.product_name,
-                              ].filter(Boolean).join(' ') || 'Товар';
-                              const qty = Number(item.quantity || 0);
-                              const lineTotal = qty * Number(item.price || 0);
-                              return (
-                                <tr key={itemKey} className="cursor-pointer transition hover:bg-surface-muted/50">
-                                  <td className={`w-8 ${autoserviceListTdClass}`}>
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedKeys.has(itemKey)}
-                                      onChange={() => toggleItem(orderType, order.id, item)}
-                                      aria-label={title}
-                                      className="h-4 w-4 rounded border-line text-brand-600"
-                                    />
-                                  </td>
-                                  <td
-                                    className={`min-w-0 ${autoserviceListTdClass}`}
-                                    onClick={() => toggleItem(orderType, order.id, item)}
-                                  >
-                                    <div className="truncate text-ink">{title}</div>
-                                    {item.repair_order_id ? (
-                                      <div className="mt-0.5 text-xs text-ink-muted">
-                                        заказ-наряд{item.repair_order_number ? ` №${item.repair_order_number}` : ''}
-                                      </div>
-                                    ) : null}
-                                  </td>
-                                  <td className={`w-16 whitespace-nowrap tabular-nums text-ink-muted ${autoserviceListTdRightClass}`}>
-                                    {qty} шт.
-                                  </td>
-                                  <td className={`w-24 whitespace-nowrap tabular-nums ${autoserviceListTdRightClass}`}>
-                                    {formatPrice(item.price)}
-                                  </td>
-                                  <td className={`w-24 whitespace-nowrap tabular-nums font-semibold ${autoserviceListTdRightClass}`}>
-                                    {formatPrice(lineTotal)}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+                return (
+                  <tbody key={key} className={autoserviceListTbodyClass}>
+                    <tr className="border-t-2 border-line bg-surface-subtle">
+                      <td className={`w-8 ${autoserviceListTdClass}`}>
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someSelected && !allSelected;
+                          }}
+                          onChange={() => toggleAllInOrder(orderType, order.id, items)}
+                          aria-label={`Выбрать все позиции заказа №${order.id}`}
+                          className="h-4 w-4 rounded border-line text-brand-600"
+                        />
+                      </td>
+                      <td colSpan={4} className={`${autoserviceListTdClass} text-xs`}>
+                        <span className="font-semibold text-ink">№{order.id}</span>
+                        <span className="text-ink-faint"> · {orderType === 'new' ? 'Новый' : orderType === 'used' ? 'Б/у' : 'Не указано'}</span>
+                        {sellerName ? <span className="text-ink-muted"> · {sellerName}</span> : null}
+                        {formatOrderDate(order.created_at) ? (
+                          <span className="text-ink-muted"> · {formatOrderDate(order.created_at)}</span>
+                        ) : null}
+                        <span className="text-ink-muted"> · {items.length} поз.</span>
+                        {order.total_amount != null ? (
+                          <span className="font-medium text-ink"> · {formatPrice(order.total_amount)}</span>
+                        ) : null}
+                      </td>
+                    </tr>
+                    {items.map((item) => {
+                      const itemKey = purchaseSelectionKey(orderType, order.id, item.id);
+                      const title = [
+                        item.brand,
+                        item.partnumber,
+                        item.name || item.product_name,
+                      ].filter(Boolean).join(' ') || 'Товар';
+                      const qty = Number(item.quantity || 0);
+                      const lineTotal = qty * Number(item.price || 0);
+                      return (
+                        <tr
+                          key={itemKey}
+                          className="cursor-pointer transition hover:bg-surface-muted/50"
+                          onClick={() => toggleItem(orderType, order.id, item)}
+                        >
+                          <td className={`w-8 ${autoserviceListTdClass}`}>
+                            <input
+                              type="checkbox"
+                              checked={selectedKeys.has(itemKey)}
+                              onChange={() => toggleItem(orderType, order.id, item)}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={title}
+                              className="h-4 w-4 rounded border-line text-brand-600"
+                            />
+                          </td>
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                            <div className="truncate text-ink">{title}</div>
+                            {item.repair_order_id ? (
+                              <div className="mt-0.5 text-[11px] text-ink-muted">
+                                заказ-наряд{item.repair_order_number ? ` №${item.repair_order_number}` : ''}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className={`w-16 whitespace-nowrap tabular-nums text-ink-muted ${autoserviceListTdRightClass}`}>
+                            {qty} шт.
+                          </td>
+                          <td className={`w-24 whitespace-nowrap tabular-nums ${autoserviceListTdRightClass}`}>
+                            {formatPrice(item.price)}
+                          </td>
+                          <td className={`w-24 whitespace-nowrap tabular-nums font-semibold ${autoserviceListTdRightClass}`}>
+                            {formatPrice(lineTotal)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                );
+              })}
+            </table>
+          </div>
         )}
       </div>
     </Modal>

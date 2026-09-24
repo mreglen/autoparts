@@ -9,8 +9,8 @@ import {
 import { formatServerDateTime, toDateInputValue } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
-import { Skeleton } from '../../components/UI';
-import { ConfirmDialog } from '../../components/UI/Modal';
+import { Button, ConfirmDialog, Modal, Skeleton } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import {
@@ -27,7 +27,7 @@ import {
   autoserviceListThClass,
   autoserviceListThRightClass,
   autoserviceListTheadRowClass,
-  autoserviceListTrClass,
+  autoserviceListTrClickableClass,
   warehouseEmptyShellClass,
   warehousePillControlClass,
   warehouseToolbarClass,
@@ -94,11 +94,7 @@ function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
 
 function FinanceReceiptRows({
   entries,
-  todayDate,
-  savingPaymentId,
-  deletingPaymentId,
-  onPaymentDateSave,
-  onDeletePayment,
+  onOpen,
   showMethod = false,
   showMatchHint = false,
   emptyText = 'Нет поступлений за период',
@@ -115,11 +111,19 @@ function FinanceReceiptRows({
     <>
       <div className="md:hidden">
         {entries.map(({ row, hint }) => (
-          <div
+          <button
+            type="button"
             key={row.id}
-            className="space-y-1.5 border-b border-line-soft py-3 last:border-0"
+            onClick={() => onOpen(row)}
+            className="block w-full space-y-1.5 border-b border-line-soft py-3 text-left transition last:border-0 hover:bg-surface-muted/50"
           >
             <FinanceField label="Клиент">{financeReceiptClientLabel(row)}</FinanceField>
+            {!showMethod ? (
+              <>
+                <FinanceField label="№">{row.sequential_number}</FinanceField>
+                <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
+              </>
+            ) : null}
             {showMethod ? (
               <FinanceField label="Способ">{FINANCE_METHOD_LABELS[row.method] || row.method}</FinanceField>
             ) : null}
@@ -128,32 +132,7 @@ function FinanceReceiptRows({
             {showMatchHint && hint ? (
               <p className="text-xs text-brand-700">{hint}</p>
             ) : null}
-            {!showMethod ? (
-              <>
-                <FinanceField label="№">{row.sequential_number}</FinanceField>
-                <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
-                <div className="flex justify-between gap-3 text-sm">
-                  <span className="shrink-0 text-ink-muted">Дата</span>
-                  <PaymentReceiptDateField
-                    row={row}
-                    todayDate={todayDate}
-                    saving={savingPaymentId === row.id}
-                    onSave={onPaymentDateSave}
-                  />
-                </div>
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => onDeletePayment(row)}
-                    disabled={Boolean(deletingPaymentId)}
-                    className="text-sm font-medium text-danger-600 transition hover:text-danger-700 disabled:cursor-wait disabled:opacity-60"
-                  >
-                    Отменить оплату
-                  </button>
-                </div>
-              </>
-            ) : null}
-          </div>
+          </button>
         ))}
       </div>
 
@@ -168,12 +147,15 @@ function FinanceReceiptRows({
               <th className={`w-32 ${autoserviceListThRightClass}`}>Сумма</th>
               <th className={`w-40 ${autoserviceListThClass}`}>Дата</th>
               {showMatchHint ? <th className={autoserviceListThClass}>Найдено</th> : null}
-              {showMethod ? null : <th className={`w-24 ${autoserviceListThRightClass}`}>Действия</th>}
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
             {entries.map(({ row, hint }) => (
-              <tr key={row.id} className={autoserviceListTrClass}>
+              <tr
+                key={row.id}
+                className={autoserviceListTrClickableClass}
+                onClick={() => onOpen(row)}
+              >
                 {showMethod ? null : (
                   <td className={`${autoserviceListTdClass} tabular-nums font-medium text-ink`}>
                     {row.sequential_number}
@@ -192,32 +174,11 @@ function FinanceReceiptRows({
                   {formatFinanceCurrency(row.amount)}
                 </td>
                 <td className={autoserviceListTdClass}>
-                  {showMethod ? (
-                    formatServerDateTime(row.created_at)
-                  ) : (
-                    <PaymentReceiptDateField
-                      row={row}
-                      todayDate={todayDate}
-                      saving={savingPaymentId === row.id}
-                      onSave={onPaymentDateSave}
-                    />
-                  )}
+                  {formatServerDateTime(row.created_at)}
                 </td>
                 {showMatchHint ? (
                   <td className={`${autoserviceListTdClass} text-ink-muted`}>{hint || '—'}</td>
                 ) : null}
-                {showMethod ? null : (
-                  <td className={autoserviceListTdRightClass}>
-                    <button
-                      type="button"
-                      onClick={() => onDeletePayment(row)}
-                      disabled={Boolean(deletingPaymentId)}
-                      className="text-sm font-medium text-danger-600 transition hover:text-danger-700 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      Отменить
-                    </button>
-                  </td>
-                )}
               </tr>
             ))}
           </tbody>
@@ -237,6 +198,7 @@ export default function AutoserviceFinancePage() {
   const [data, setData] = useState({ totals: {}, total_amount: 0, count: 0, items: [] });
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [savingPaymentId, setSavingPaymentId] = useState(null);
+  const [detailsPayment, setDetailsPayment] = useState(null);
   const [deletePayment, setDeletePayment] = useState(null);
   const [deletingPaymentId, setDeletingPaymentId] = useState(null);
   const [searchInput, setSearchInput] = useState('');
@@ -275,10 +237,11 @@ export default function AutoserviceFinancePage() {
     setSavingPaymentId(paymentId);
     setError('');
     try {
-      await apiRequest(`/autoservice/finance/receipts/${paymentId}`, {
+      const updated = await apiRequest(`/autoservice/finance/receipts/${paymentId}`, {
         method: 'PATCH',
         body: JSON.stringify({ paid_at: paidAt }),
       });
+      setDetailsPayment((prev) => (prev && prev.id === paymentId ? { ...prev, ...updated } : prev));
       await load();
     } catch (e) {
       setError(e?.message || 'Не удалось изменить дату поступления');
@@ -296,6 +259,7 @@ export default function AutoserviceFinancePage() {
         method: 'DELETE',
       });
       setDeletePayment(null);
+      setDetailsPayment(null);
       await load();
     } catch (e) {
       setError(e?.message || 'Не удалось отменить оплату');
@@ -408,11 +372,7 @@ export default function AutoserviceFinancePage() {
         </div>
       </MobileCollapsibleFilters>
 
-      {error ? (
-        <div className="rounded-sg-lg bg-danger-50 px-4 py-3 text-sm text-danger-700 ring-1 ring-danger-200/80">
-          {error}
-        </div>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError('')} />
 
       <div className={warehouseToolbarClass}>
         <button
@@ -487,11 +447,7 @@ export default function AutoserviceFinancePage() {
       ) : searchApplied && !selectedMethod ? (
         <FinanceReceiptRows
           entries={searchResults}
-          todayDate={todayDate}
-          savingPaymentId={savingPaymentId}
-          deletingPaymentId={deletingPaymentId}
-          onPaymentDateSave={handlePaymentDateSave}
-          onDeletePayment={setDeletePayment}
+          onOpen={setDetailsPayment}
           showMethod
           showMatchHint
           emptyText="Ничего не найдено"
@@ -520,11 +476,7 @@ export default function AutoserviceFinancePage() {
 
           <FinanceReceiptRows
             entries={selectedEntries}
-            todayDate={todayDate}
-            savingPaymentId={savingPaymentId}
-            deletingPaymentId={deletingPaymentId}
-            onPaymentDateSave={handlePaymentDateSave}
-            onDeletePayment={setDeletePayment}
+            onOpen={setDetailsPayment}
             showMatchHint={searchApplied}
             emptyText={searchApplied ? 'Ничего не найдено' : 'Нет поступлений за период'}
           />
@@ -549,6 +501,63 @@ export default function AutoserviceFinancePage() {
           ))}
         </div>
       )}
+
+      <Modal
+        open={Boolean(detailsPayment)}
+        onClose={() => {
+          if (!deletingPaymentId) setDetailsPayment(null);
+        }}
+        title={
+          detailsPayment
+            ? `Поступление № ${detailsPayment.sequential_number}`
+            : ''
+        }
+        size="sm"
+        footer={detailsPayment ? (
+          <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
+            <Button
+              variant="secondary"
+              onClick={() => setDetailsPayment(null)}
+              disabled={Boolean(deletingPaymentId)}
+              className="max-md:min-h-11"
+            >
+              Закрыть
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => setDeletePayment(detailsPayment)}
+              disabled={Boolean(deletingPaymentId)}
+              className="max-md:min-h-11"
+            >
+              Отменить оплату
+            </Button>
+          </div>
+        ) : null}
+      >
+        {detailsPayment ? (
+          <div className="space-y-1.5">
+            <FinanceField label="Клиент">{financeReceiptClientLabel(detailsPayment)}</FinanceField>
+            <FinanceField label="Заказ-наряд">
+              № {detailsPayment.repair_order_number || '—'}
+            </FinanceField>
+            <FinanceField label="Способ">
+              {FINANCE_METHOD_LABELS[detailsPayment.method] || detailsPayment.method}
+            </FinanceField>
+            <FinanceField label="Сумма">
+              {formatFinanceCurrency(detailsPayment.amount)}
+            </FinanceField>
+            <div className="flex justify-between gap-3 pt-1 text-sm">
+              <span className="shrink-0 text-ink-muted">Дата</span>
+              <PaymentReceiptDateField
+                row={detailsPayment}
+                todayDate={todayDate}
+                saving={savingPaymentId === detailsPayment.id}
+                onSave={handlePaymentDateSave}
+              />
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(deletePayment)}

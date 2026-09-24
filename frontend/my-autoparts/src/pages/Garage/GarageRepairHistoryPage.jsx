@@ -8,6 +8,7 @@ import RepairOrderViewModal, {
   vehicleLabel,
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { UnderlineTabs } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import { apiRequest } from '../../utils/apiClient';
 import { formatWallClockDateTime } from '../../utils/serverDate';
 import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
@@ -223,11 +224,7 @@ export default function GarageRepairHistoryPage() {
         </button>
       </div>
 
-      {error ? (
-        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <Toast message={error} variant="error" onClose={() => setError('')} />
 
       <div className={autoserviceListTableWrapClass}>
         <div className="overflow-x-auto">

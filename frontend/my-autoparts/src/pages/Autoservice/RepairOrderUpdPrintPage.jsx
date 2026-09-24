@@ -16,11 +16,12 @@ import AutoservicePrintPreview from '../../components/Autoservice/AutoservicePri
 import { downloadPrintSheetPdf, printDocumentSheet } from '../../utils/downloadPrintPdf';
 import {
   UPD_UNIT_META,
-  UPD_VAT_RATE,
   formatUpdLongDate,
   formatUpdMoney,
   formatUpdQuotedDate,
+  formatVatRate,
   innKpp,
+  orderVatRate,
   roundMoney,
   splitVatInclusive,
 } from '../../utils/updDocument';
@@ -403,12 +404,14 @@ export default function RepairOrderUpdPrintPage() {
     seeded.current = true;
   }, [order, org, orgId, client]);
 
+  const vatRate = orderVatRate(order);
+
   const lines = useMemo(() => {
     if (!order) return [];
     const rows = [];
     (order.works || []).forEach((w) => {
       const withVat = roundMoney(w.line_sum ?? lineSum(w.qty, w.unit_price));
-      const split = splitVatInclusive(withVat);
+      const split = splitVatInclusive(withVat, vatRate);
       const qty = Number(w.qty) || 0;
       const unitPrice = qty ? Math.round((split.without / qty) * 100) / 100 : split.without;
       rows.push({
@@ -425,7 +428,7 @@ export default function RepairOrderUpdPrintPage() {
         p.line_sum ??
           shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p)),
       );
-      const split = splitVatInclusive(withVat);
+      const split = splitVatInclusive(withVat, vatRate);
       const qty = Number(p.qty) || 0;
       const unitKey = p.unit && UPD_UNIT_META[p.unit] ? p.unit : 'pcs';
       rows.push({
@@ -439,7 +442,7 @@ export default function RepairOrderUpdPrintPage() {
       });
     });
     return rows;
-  }, [order]);
+  }, [order, vatRate]);
 
   const totals = useMemo(
     () =>
@@ -786,7 +789,7 @@ export default function RepairOrderUpdPrintPage() {
                 <Td align="right">{row.empty ? '--' : formatUpdMoney(row.unitPrice)}</Td>
                 <Td align="right">{row.empty ? '--' : formatUpdMoney(row.without)}</Td>
                 <Td align="center">без акциза</Td>
-                <Td align="center">{UPD_VAT_RATE}%</Td>
+                <Td align="center">{row.empty ? '--' : `${formatVatRate(vatRate)}%`}</Td>
                 <Td align="right">{row.empty ? '--' : formatUpdMoney(row.vat)}</Td>
                 <Td align="right">{row.empty ? '--' : formatUpdMoney(row.withVat)}</Td>
                 <Td align="center">--</Td>

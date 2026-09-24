@@ -3,6 +3,7 @@ import AutoserviceLiveSearchField from '../../components/Autoservice/Autoservice
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import { RepairOrderStatusPicker, vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
+import Toast from '../../components/UI/Toast';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 
 function OrderActionsMenu({
@@ -183,6 +184,7 @@ export default function AutoserviceOrdersMobileView({
   loading,
   onRefresh,
   error,
+  onErrorClose,
   rows,
   emptyMessage,
   statusActionsForRow,
@@ -255,11 +257,7 @@ export default function AutoserviceOrdersMobileView({
         ) : null}
       </div>
 
-      {error ? (
-        <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <Toast message={error} variant="error" onClose={onErrorClose} />
 
       <div className="mt-4 border-t border-gray-100">
         {loading ? (

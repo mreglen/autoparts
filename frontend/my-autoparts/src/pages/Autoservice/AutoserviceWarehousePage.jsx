@@ -9,6 +9,7 @@ import AutoserviceLiveSearchField from '../../components/Autoservice/Autoservice
 import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
+import Toast from '../../components/UI/Toast';
 import { NumericInput, Skeleton, UnderlineTabs } from '../../components/UI';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
 import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
@@ -35,7 +36,6 @@ import { formatShopPartUnit, formatShopPartQty } from '../../utils/repairOrderSh
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
-  autoserviceListErrorClass,
   autoserviceListHeaderSubtitleClass,
   autoserviceListHeaderTitleClass,
   autoserviceListMobileWrapClass,
@@ -492,11 +492,7 @@ export default function AutoserviceWarehousePage() {
             </div>
           ) : null}
 
-          {error ? (
-            <p className={autoserviceListErrorClass} role="alert">
-              {error}
-            </p>
-          ) : null}
+          <Toast message={error} variant="error" onClose={() => setError('')} />
         </>
       ) : null}
 

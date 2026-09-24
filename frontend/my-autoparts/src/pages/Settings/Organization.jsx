@@ -15,6 +15,7 @@ import AutoserviceTariffSection from './AutoserviceTariffSection';
 import DadataAddressInput from '../../components/DadataAddressInput/DadataAddressInput';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import PageIntro from '../../components/PageIntro/PageIntro';
+import Toast from '../../components/UI/Toast';
 import {
   Button,
   Card,
@@ -28,37 +29,6 @@ import {
   fieldClass,
 } from '../../components/UI';
 import { warehousePageClass } from '../../utils/warehouseListUi';
-
-function InlineNotice({ tone = 'error', children, onClose }) {
-  const tones = {
-    success: 'border-success-100 bg-success-50 text-success-700',
-    error: 'border-danger-100 bg-danger-50 text-danger-700',
-  };
-  return (
-    <div
-      className={`flex items-start justify-between gap-3 rounded-sg border px-4 py-3 ${tones[tone] || tones.error}`}
-      role="status"
-    >
-      <div className="min-w-0 flex-1 text-sm">{children}</div>
-      {onClose ? (
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-md p-1 opacity-70 hover:opacity-100"
-          aria-label="Закрыть"
-        >
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
-            <path
-              fillRule="evenodd"
-              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-      ) : null}
-    </div>
-  );
-}
 
 function OrgLogo({ src, name }) {
   if (src) {
@@ -291,11 +261,11 @@ export default function Organization() {
         ) : null}
       </div>
 
-      {formError && !isEditing ? (
-        <InlineNotice tone="error" onClose={() => setFormError('')}>
-          <p>{formError}</p>
-        </InlineNotice>
-      ) : null}
+      <Toast
+        message={formError && !isEditing ? formError : null}
+        variant="error"
+        onClose={() => setFormError('')}
+      />
 
       {isEditing && isDirector ? (
         <Card>

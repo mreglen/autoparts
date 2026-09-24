@@ -40,8 +40,11 @@ from app.db.schema_patches import (
     ensure_autoservice_tariff_applications_table,
     ensure_garage_vehicles_table,
     ensure_garage_vehicle_laximo_columns,
+    ensure_garage_vehicles_model_nullable,
     ensure_autoservice_settings_table,
     ensure_autoservice_settings_public_columns,
+    ensure_autoservice_settings_vat_rate_column,
+    ensure_repair_orders_vat_rate_column,
     ensure_repair_bookings_table,
     ensure_repair_bookings_garage_vehicle_column,
     ensure_repair_orders_tables,
@@ -271,11 +274,14 @@ try:
     ensure_autoservice_tariff_applications_table()
     ensure_garage_vehicles_table()
     ensure_garage_vehicle_laximo_columns()
+    ensure_garage_vehicles_model_nullable()
     ensure_autoservice_settings_table()
     ensure_autoservice_settings_public_columns()
+    ensure_autoservice_settings_vat_rate_column()
     ensure_repair_bookings_table()
     ensure_repair_bookings_garage_vehicle_column()
     ensure_repair_orders_tables()
+    ensure_repair_orders_vat_rate_column()
     ensure_repair_order_lines_tables()
     ensure_repair_order_shop_parts_table()
     ensure_repair_order_shop_parts_extended()
