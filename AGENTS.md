@@ -105,19 +105,24 @@ python -m unittest tests.<module>
 
 ### Frontend
 
+Сборщик — **Vite 7** (миграция с CRA/react-scripts). Тесты — **Vitest** (jsdom, `jest.`→`vi.`).
+
 ```bash
 cd frontend/my-autoparts
-npm test -- --watchAll=false
-npm run build
+npm test            # vitest run (watch: npm run test:watch)
+npm run build       # vite build → build/ + inject-sw-precache
+npm start           # vite dev на :3000
 ```
 
-Сборка может завершаться с предупреждениями:
+Особенности конфига (`vite.config.js`):
 
-- missing source maps от camera package;
-- stale Browserslist;
-- существующие ESLint warnings.
+- JSX живёт в `.js`-файлах — esbuild настроен `loader: 'jsx'` для `src/**/*.js(x)`, переименование в `.jsx` не требуется.
+- Env-переменные: `VITE_API_BASE_URL`, `VITE_BACKEND_BASE_URL`, `VITE_SENTRY_DSN` (через `import.meta.env.*`, НЕ `process.env`).
+- `build.outDir: 'build'` — деплой rsync'ит `build/` в `/var/www/my-autoparts` без изменений путей.
+- `build.sourcemap: true` — deploy-скрипт грепает `assets/*.js.map` для проверки чанков.
+- На сервере требуется Node ≥20 — `update.sh` сам ставит Node 22 через `ensure_nodejs()`.
 
-Эти warning — не ошибки, если `npm run build` возвращает exit 0.
+Сборка может завершаться с предупреждениями (stale Browserslist и т.п.) — не ошибки, если exit 0.
 
 ### E2E
 

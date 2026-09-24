@@ -22,23 +22,36 @@
     "react-leaflet": "^5.0.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.8.2",
-    "react-scripts": "5.0.1",
     "tesseract.js": "^5.1.1",
     "web-vitals": "^4.2.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build && node scripts/inject-sw-precache.js",
-    "test": "react-scripts test",
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build && node scripts/inject-sw-precache.js",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report",
-    "eject": "react-scripts eject"
+    "test:e2e:report": "playwright show-report"
   },
   "eslintConfig": {
     "extends": [
       "react-app",
       "react-app/jest"
+    ],
+    "overrides": [
+      {
+        "files": [
+          "**/*.test.js",
+          "**/*.test.jsx",
+          "src/setupTests.js"
+        ],
+        "globals": {
+          "vi": "readonly"
+        }
+      }
     ]
   },
   "browserslist": {
@@ -56,10 +69,16 @@
   "devDependencies": {
     "@lhci/cli": "^0.14.0",
     "@playwright/test": "^1.49.1",
+    "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
+    "eslint": "^8.57.1",
+    "eslint-config-react-app": "^7.0.1",
     "jest-axe": "^11.0.0",
+    "jsdom": "^25.0.1",
     "postcss": "^8.5.6",
     "serve": "^14.2.4",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "vite": "^7.1.9",
+    "vitest": "^3.2.4"
   }
 }

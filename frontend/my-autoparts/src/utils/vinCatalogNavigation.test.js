@@ -11,13 +11,13 @@ describe('vinCatalogNavigation', () => {
   });
 
   it('resolveSearchOrVin navigates to vin catalog for VIN text', () => {
-    const navigate = jest.fn();
+    const navigate = vi.fn();
     expect(resolveSearchOrVin(navigate, 'XW8ZZZ7PZDG00269')).toBe('vin');
     expect(navigate).toHaveBeenCalledWith('/autoparts/vin?vin=XW8ZZZ7PZDG00269', { replace: false });
   });
 
   it('resolveSearchOrVin returns text for regular queries', () => {
-    const navigate = jest.fn();
+    const navigate = vi.fn();
     expect(resolveSearchOrVin(navigate, 'фильтр масла')).toBe('text');
     expect(navigate).not.toHaveBeenCalled();
   });

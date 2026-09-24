@@ -5,15 +5,15 @@ import { axe, toHaveNoViolations } from 'jest-axe';
 
 expect.extend(toHaveNoViolations);
 
-jest.mock('react-redux', () => ({
-  useDispatch: () => jest.fn(() => ({ unwrap: () => Promise.resolve() })),
+vi.mock('react-redux', () => ({
+  useDispatch: () => vi.fn(() => ({ unwrap: () => Promise.resolve() })),
   useSelector: (selector) => selector({
     auth: { loading: false, error: null },
   }),
 }));
 
-jest.mock('react-router-dom', () => ({
-  useNavigate: () => jest.fn(),
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
   useLocation: () => ({ state: null }),
   Link: ({ children, to }) => <a href={to}>{children}</a>,
 }), { virtual: true });

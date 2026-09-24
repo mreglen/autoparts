@@ -24,9 +24,9 @@ describe('buildMyPartsSteps', () => {
   });
 
   test('filters step opens and closes filter panel via callbacks', async () => {
-    const onOpenFilters = jest.fn();
-    const onCloseFilters = jest.fn();
-    const onSwitchTab = jest.fn();
+    const onOpenFilters = vi.fn();
+    const onCloseFilters = vi.fn();
+    const onSwitchTab = vi.fn();
     const steps = buildMyPartsSteps({ onOpenFilters, onCloseFilters, onSwitchTab });
     const filtersStep = steps.find((step) => step.id === MY_PARTS_TOUR_STEP_IDS.FILTERS);
 
@@ -39,7 +39,7 @@ describe('buildMyPartsSteps', () => {
   });
 
   test('tab steps switch to the expected sections', async () => {
-    const onSwitchTab = jest.fn();
+    const onSwitchTab = vi.fn();
     const steps = buildMyPartsSteps({ onSwitchTab });
 
     await steps.find((step) => step.id === MY_PARTS_TOUR_STEP_IDS.TABS_MODERATION).beforeEnter();
@@ -50,7 +50,7 @@ describe('buildMyPartsSteps', () => {
   });
 
   test('row step opens row actions when parts exist', async () => {
-    const onSetRowActionsOpen = jest.fn();
+    const onSetRowActionsOpen = vi.fn();
     const steps = buildMyPartsSteps({ hasParts: true, onSetRowActionsOpen });
     const rowStep = steps.find((step) => step.id === MY_PARTS_TOUR_STEP_IDS.ROW);
 

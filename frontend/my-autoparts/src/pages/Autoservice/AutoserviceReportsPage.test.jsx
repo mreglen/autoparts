@@ -5,8 +5,8 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { apiRequest } from '../../utils/apiClient';
 
-const mockNavigate = jest.fn();
-const mockSetSearchParams = jest.fn();
+const mockNavigate = vi.fn();
+const mockSetSearchParams = vi.fn();
 let mockSearchParams = new URLSearchParams('');
 
 const ROSSKO_REPORT = {
@@ -54,19 +54,20 @@ const ROSSKO_REPORT = {
   ],
 };
 
-jest.mock('../../utils/apiClient', () => ({
-  apiRequest: jest.fn(),
+vi.mock('../../utils/apiClient', () => ({
+  apiRequest: vi.fn(),
   apiAxios: {
-    get: jest.fn(() => Promise.resolve({ data: new Blob(['xlsx']) })),
+    get: vi.fn(() => Promise.resolve({ data: new Blob(['xlsx']) })),
   },
 }));
 
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useLocation: () => ({ pathname: '/autoservice/reports', search: '', hash: '', state: null }),
   useSearchParams: () => [mockSearchParams, mockSetSearchParams],
 }), { virtual: true });
 
-jest.mock('../../components/Autoservice/RepairOrderViewModal', () => ({
+vi.mock('../../components/Autoservice/RepairOrderViewModal', () => ({
   __esModule: true,
   default: () => null,
   OrderStatusBadge: () => null,
@@ -74,7 +75,7 @@ jest.mock('../../components/Autoservice/RepairOrderViewModal', () => ({
   vehicleLabel: () => '',
 }));
 
-jest.mock('../../hooks/useDebouncedCallback', () => ({
+vi.mock('../../hooks/useDebouncedCallback', () => ({
   useDebouncedCallback: (fn) => fn,
 }));
 

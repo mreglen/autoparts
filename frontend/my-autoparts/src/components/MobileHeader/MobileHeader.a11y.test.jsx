@@ -5,38 +5,38 @@ import { axe, toHaveNoViolations } from 'jest-axe';
 
 expect.extend(toHaveNoViolations);
 
-jest.mock('react-redux', () => ({
+vi.mock('react-redux', () => ({
   useSelector: (selector) => selector({
     auth: { token: null, user: null },
   }),
 }));
 
-jest.mock('../../hooks/useSelectedCity', () => ({
+vi.mock('../../hooks/useSelectedCity', () => ({
   useSelectedCity: () => ({
     city: 'Москва',
     isModalOpen: false,
-    openModal: jest.fn(),
-    closeModal: jest.fn(),
-    selectCity: jest.fn(),
+    openModal: vi.fn(),
+    closeModal: vi.fn(),
+    selectCity: vi.fn(),
     cities: [],
     citiesStatus: 'idle',
     citiesError: null,
-    loadCities: jest.fn(),
+    loadCities: vi.fn(),
   }),
 }));
 
-jest.mock('../../utils/siteReviewsPublic', () => ({
+vi.mock('../../utils/siteReviewsPublic', () => ({
   useShowYandexBadge: () => false,
 }));
 
-jest.mock('../../utils/pwaStandalone', () => ({
+vi.mock('../../utils/pwaStandalone', () => ({
   PWA_START_PATH: '/autoparts/new',
   usePwaStandalone: () => false,
 }));
 
-jest.mock('../../hooks/useHistoryBack', () => () => jest.fn());
+vi.mock('../../hooks/useHistoryBack', () => ({ default: () => vi.fn() }));
 
-jest.mock('../Header/headerPrimitives', () => ({
+vi.mock('../Header/headerPrimitives', () => ({
   HeaderAvatar: () => <span data-testid="header-avatar" />,
   HeaderCityChip: ({ city }) => <button type="button">{city}</button>,
   HeaderIconButton: ({ children, label, onClick }) => (
@@ -45,9 +45,9 @@ jest.mock('../Header/headerPrimitives', () => ({
   HeaderLogo: () => <span data-testid="header-logo">Logo</span>,
 }));
 
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   Link: ({ children, to, ...props }) => <a href={to} {...props}>{children}</a>,
-  useNavigate: () => jest.fn(),
+  useNavigate: () => vi.fn(),
   useLocation: () => ({ pathname: '/autoparts/new' }),
 }), { virtual: true });
 

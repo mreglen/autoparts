@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/react';
 const EXTENSION_NOISE = /(chrome-extension|moz-extension|safari-extension)/i;
 
 export function initSentry() {
-  const dsn = process.env.REACT_APP_SENTRY_DSN;
+  const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (!dsn) return;
 
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -11,7 +11,7 @@ export function initSentry() {
 
   Sentry.init({
     dsn,
-    environment: process.env.NODE_ENV,
+    environment: import.meta.env.MODE,
     tracesSampleRate: 0.1,
     beforeSend(event) {
       const message = event?.exception?.values?.[0]?.value || '';
@@ -22,7 +22,7 @@ export function initSentry() {
 }
 
 export function captureBoundaryError(error, info) {
-  if (!process.env.REACT_APP_SENTRY_DSN) return;
+  if (!import.meta.env.VITE_SENTRY_DSN) return;
   Sentry.captureException(error, {
     extra: {
       componentStack: info?.componentStack,

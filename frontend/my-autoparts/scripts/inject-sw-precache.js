@@ -1,24 +1,23 @@
 /**
- * Post-build: inject hashed CRA assets into service-worker precache list.
+ * Post-build: inject hashed Vite assets into service-worker precache list.
  */
 const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
 const buildDir = path.join(root, 'build');
-const manifestPath = path.join(buildDir, 'asset-manifest.json');
+const assetsDir = path.join(buildDir, 'assets');
 const swSrc = path.join(root, 'public', 'service-worker.js');
 const swDest = path.join(buildDir, 'service-worker.js');
 
-if (!fs.existsSync(buildDir) || !fs.existsSync(manifestPath)) {
-  console.error('[inject-sw-precache] build/asset-manifest.json not found — run after react-scripts build');
+if (!fs.existsSync(assetsDir)) {
+  console.error('[inject-sw-precache] build/assets not found — run after vite build');
   process.exit(1);
 }
 
-const assetManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-const fromFiles = Object.values(assetManifest.files || {})
-  .filter(Boolean)
-  .map((entry) => (entry.startsWith('/') ? entry : `/${entry}`));
+const hashed = fs.readdirSync(assetsDir)
+  .filter((name) => !name.endsWith('.map'))
+  .map((name) => `/assets/${name}`);
 
 const stable = [
   '/',
@@ -30,7 +29,7 @@ const stable = [
   '/img/LogoWithoutBg.png',
 ];
 
-const precache = [...new Set([...stable, ...fromFiles])];
+const precache = [...new Set([...stable, ...hashed])];
 
 let sw = fs.readFileSync(swSrc, 'utf8');
 const marker = /\/\*__PRECACHE__\*\/\[[\s\S]*?\]/;

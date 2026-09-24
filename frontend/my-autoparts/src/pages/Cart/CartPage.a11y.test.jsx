@@ -5,13 +5,13 @@ import { axe, toHaveNoViolations } from 'jest-axe';
 
 expect.extend(toHaveNoViolations);
 
-jest.mock('../../hooks/useNetworkStatus', () => () => ({ offline: false }));
+vi.mock('../../hooks/useNetworkStatus', () => ({ default: () => ({ offline: false }) }));
 
-const mockDispatch = jest.fn(() => ({
+const mockDispatch = vi.fn(() => ({
   unwrap: () => Promise.resolve(),
 }));
 
-jest.mock('react-redux', () => ({
+vi.mock('react-redux', () => ({
   useDispatch: () => mockDispatch,
   useSelector: (selector) => selector({
     cart: {
@@ -31,13 +31,14 @@ jest.mock('react-redux', () => ({
   }),
 }));
 
-jest.mock('../../redux/slices/CartSlice', () => ({
-  ...jest.requireActual('../../redux/slices/CartSlice'),
-  fetchCart: jest.fn(() => ({ type: 'cart/fetchCart/fulfilled' })),
+vi.mock('../../redux/slices/CartSlice', async () => ({
+  ...(await vi.importActual('../../redux/slices/CartSlice')),
+  fetchCart: vi.fn(() => ({ type: 'cart/fetchCart/fulfilled' })),
 }));
 
-jest.mock('react-router-dom', () => ({
-  useNavigate: () => jest.fn(),
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/cart', search: '', hash: '', state: null }),
 }), { virtual: true });
 
 // eslint-disable-next-line import/first

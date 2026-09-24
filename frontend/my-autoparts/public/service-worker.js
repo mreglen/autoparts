@@ -1,4 +1,4 @@
-const CACHE_NAME = 'autoparts-shell-v2';
+const CACHE_NAME = 'autoparts-shell-v3';
 
 const PRECACHE_ASSETS = /*__PRECACHE__*/[
   '/',
@@ -22,6 +22,7 @@ function isApiRequest(url) {
 function isStaticAsset(pathname) {
   return (
     pathname.startsWith('/static/')
+    || pathname.startsWith('/assets/')
     || pathname.startsWith('/favicons/')
     || pathname.startsWith('/img/')
     || pathname.endsWith('.js')

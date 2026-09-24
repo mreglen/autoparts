@@ -7,11 +7,11 @@ import {
 } from './vinScanMobile';
 
 function mockMatchMedia(queries) {
-  window.matchMedia = jest.fn((query) => ({
+  window.matchMedia = vi.fn((query) => ({
     matches: Boolean(queries[query]),
     media: query,
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
   }));
 }
 

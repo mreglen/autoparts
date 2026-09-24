@@ -263,25 +263,47 @@ install_backend_deps() {
 
 ensure_frontend_env() {
   local env="$FRONTEND/.env"
+  if [[ -f "$env" ]] && grep -qE '^REACT_APP_' "$env"; then
+    log "Миграция frontend/.env: REACT_APP_* -> VITE_*"
+    sed -i 's/^REACT_APP_/VITE_/' "$env"
+    chown fast:fast "$env"
+    chmod 600 "$env"
+  fi
   if [[ ! -f "$env" ]]; then
     log "Создание frontend/.env для production (отсутствовал — из-за этого были 405 /undefined/...)"
     cat > "$env" <<'EOF'
-REACT_APP_API_BASE_URL=https://svoygarage.ru/server/api
-REACT_APP_BACKEND_BASE_URL=https://svoygarage.ru/server
+VITE_API_BASE_URL=https://svoygarage.ru/server/api
+VITE_BACKEND_BASE_URL=https://svoygarage.ru/server
 EOF
     chown fast:fast "$env"
     chmod 600 "$env"
   fi
-  if ! grep -qE '^REACT_APP_API_BASE_URL=https?://[^[:space:]]+/api' "$env"; then
-    die "frontend/.env: нужен REACT_APP_API_BASE_URL=https://svoygarage.ru/server/api"
+  if ! grep -qE '^VITE_API_BASE_URL=https?://[^[:space:]]+/api' "$env"; then
+    die "frontend/.env: нужен VITE_API_BASE_URL=https://svoygarage.ru/server/api"
   fi
-  if grep -qE '^REACT_APP_API_BASE_URL=.*127\.0\.0\.1|^REACT_APP_API_BASE_URL=.*localhost' "$env"; then
+  if grep -qE '^VITE_API_BASE_URL=.*127\.0\.0\.1|^VITE_API_BASE_URL=.*localhost' "$env"; then
     die "frontend/.env указывает на localhost — для production нужен https://svoygarage.ru/server/api"
   fi
 }
 
+ensure_nodejs() {
+  local major
+  major=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')
+  if [[ -n "$major" && "$major" -ge 20 ]]; then
+    log "Node.js $(node -v) — ок для Vite"
+    return 0
+  fi
+  log "Node.js $(node -v 2>/dev/null || echo 'отсутствует') < 20 — установка Node 22 LTS (NodeSource)..."
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+  major=$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')
+  [[ -n "$major" && "$major" -ge 20 ]] || die "Node.js не обновился (node -v = $(node -v 2>/dev/null || echo none))"
+  log "Node.js обновлён: $(node -v), npm $(npm -v)"
+}
+
 build_frontend() {
   ensure_frontend_env
+  ensure_nodejs
   log "npm install + build (2–5 мин, backend пока работает)..."
   chown -R fast:fast "$FRONTEND"
   rm -rf "$FRONTEND/build"
@@ -296,7 +318,7 @@ build_frontend() {
     npm run build
   "
   [[ -f "$FRONTEND/build/index.html" ]] || die "Сборка frontend не создала build/index.html"
-  if ! grep -q 'svoygarage.ru/server/api' "$FRONTEND"/build/static/js/main*.js 2>/dev/null; then
+  if ! grep -q 'svoygarage.ru/server/api' "$FRONTEND"/build/assets/*.js 2>/dev/null; then
     die "В сборке нет https://svoygarage.ru/server/api — проверьте frontend/.env и пересоберите"
   fi
 }
@@ -763,20 +785,20 @@ verify_nginx_cache() {
   cache2=$(curl -sI -H 'Host: svoygarage.ru' \
     "https://127.0.0.1/server/api/catalog/products?page=1&page_size=1" -k \
     | grep -i x-cache-status | awk '{print $2}' | tr -d '\r' || echo "unknown")
-  main_js=$(basename "$(ls /var/www/my-autoparts/static/js/main.*.js 2>/dev/null | head -1)" 2>/dev/null || echo "main.js")
+  main_js=$(basename "$(ls /var/www/my-autoparts/assets/index-*.js 2>/dev/null | head -1)" 2>/dev/null || echo "index.js")
   brotli_enc=$(curl -sI -H 'Host: svoygarage.ru' -H 'Accept-Encoding: br' \
-    "https://127.0.0.1/static/js/${main_js}" -k 2>/dev/null \
+    "https://127.0.0.1/assets/${main_js}" -k 2>/dev/null \
     | grep -i content-encoding | awk '{print $2}' | tr -d '\r' || echo "none")
   log "Nginx cache: catalog1=$cache1 catalog2=$cache2; ${main_js} br=$brotli_enc"
 }
 
 verify_frontend_chunks() {
-  [[ -d "$WEB_ROOT/static/js" ]] || return 0
+  [[ -d "$WEB_ROOT/assets" ]] || return 0
   local main_js chunk_count prefetch_ok used_ok prefetch_status used_status
-  main_js=$(basename "$(ls "$WEB_ROOT/static/js/main."*.js 2>/dev/null | head -1)" 2>/dev/null || echo "none")
-  chunk_count=$(ls "$WEB_ROOT/static/js/"*.chunk.js 2>/dev/null | wc -l)
-  prefetch_ok=$(grep -rl 'prefetchPartDetail' "$WEB_ROOT/static/js/"*.map 2>/dev/null | head -1 || true)
-  used_ok=$(grep -rl 'UsedPartsList' "$WEB_ROOT/static/js/"*.map 2>/dev/null | head -1 || true)
+  main_js=$(basename "$(ls "$WEB_ROOT/assets/index-"*.js 2>/dev/null | head -1)" 2>/dev/null || echo "none")
+  chunk_count=$(ls "$WEB_ROOT/assets/"*.js 2>/dev/null | wc -l)
+  prefetch_ok=$(grep -rl 'prefetchPartDetail' "$WEB_ROOT/assets/"*.js.map 2>/dev/null | head -1 || true)
+  used_ok=$(grep -rl 'UsedPartsList' "$WEB_ROOT/assets/"*.js.map 2>/dev/null | head -1 || true)
   prefetch_status="miss"
   used_status="miss"
   [[ -n "$prefetch_ok" ]] && prefetch_status="ok"

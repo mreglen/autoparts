@@ -3,11 +3,11 @@ import { fetchChatMediaBlobUrl, getChatMediaPath } from './chatMediaAuth';
 describe('chatMediaAuth', () => {
   beforeEach(() => {
     localStorage.setItem('token', 'test-token');
-    global.fetch = jest.fn().mockResolvedValue({
+    global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       blob: async () => new Blob(['x'], { type: 'image/jpeg' }),
     });
-    global.URL.createObjectURL = jest.fn(() => 'blob:mock');
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock');
   });
 
   it('builds path without token query', () => {

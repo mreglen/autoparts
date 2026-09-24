@@ -2,19 +2,19 @@ import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { AddClientModal, SearchableSelect } from './AutoserviceOrderFormPage';
 
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: '/autoservice/orders/new', state: null }),
-  useNavigate: () => jest.fn(),
+  useNavigate: () => vi.fn(),
   useParams: () => ({}),
 }), { virtual: true });
 
 const baseProps = {
   value: '',
-  onChange: jest.fn(),
+  onChange: vi.fn(),
   options: [{ value: '1', label: 'Иван · +7 900 000-00-00' }],
   placeholder: 'Поиск клиента',
   remoteSearch: true,
-  onInputChange: jest.fn(),
+  onInputChange: vi.fn(),
 };
 
 test('keeps the client search focused and open while remote results are loading', () => {
@@ -48,8 +48,8 @@ test('prefills the add-client name from the current search query', () => {
   render(
     <AddClientModal
       initialName="Иванов Иван Иванович"
-      onClose={jest.fn()}
-      onCreated={jest.fn()}
+      onClose={vi.fn()}
+      onCreated={vi.fn()}
     />,
   );
 

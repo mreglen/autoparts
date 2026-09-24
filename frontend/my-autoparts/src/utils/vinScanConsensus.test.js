@@ -1,10 +1,9 @@
 import { VinScanConsensus, canInstantAcceptVin, consensusProgressLabel } from './vinScanConsensus';
-
-jest.mock('./vinScanMobile', () => ({
-  isMobileVinScanDevice: jest.fn(() => false),
-}));
-
 import { isMobileVinScanDevice } from './vinScanMobile';
+
+vi.mock('./vinScanMobile', () => ({
+  isMobileVinScanDevice: vi.fn(() => false),
+}));
 
 describe('VinScanConsensus', () => {
   it('builds stable 17-char VIN from noisy readings', () => {

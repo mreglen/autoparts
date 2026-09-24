@@ -5,23 +5,23 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import RosskoReducer from '../../../redux/slices/RosskoSlice';
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 let mockPathname = '/autoparts/used';
 let mockSearchParams = new URLSearchParams('q=bmw');
 
-jest.mock('../../../utils/apiClient', () => ({
+vi.mock('../../../utils/apiClient', () => ({
   apiAxios: {
-    post: jest.fn(() => Promise.resolve({ data: { parts: [] } })),
+    post: vi.fn(() => Promise.resolve({ data: { parts: [] } })),
   },
 }));
 
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
   useLocation: () => ({ pathname: mockPathname }),
   useSearchParams: () => [mockSearchParams],
 }), { virtual: true });
 
-jest.mock('../../../components/VinScanner/VinScanModal', () => ({
+vi.mock('../../../components/VinScanner/VinScanModal', () => ({
   __esModule: true,
   default: ({ open, onConfirm, onClose }) => (
     open ? (

@@ -2,7 +2,7 @@ import { openOrderItemProductFlow } from './avitoProductFlow';
 
 describe('openOrderItemProductFlow destination', () => {
   it('navigates to seller card when destination is seller', async () => {
-    const navigate = jest.fn();
+    const navigate = vi.fn();
     await openOrderItemProductFlow({
       item: { product_id: 42, brand: 'Bosch', article: 'ABC' },
       navigate,
@@ -12,7 +12,7 @@ describe('openOrderItemProductFlow destination', () => {
   });
 
   it('navigates to public part page by default', async () => {
-    const navigate = jest.fn();
+    const navigate = vi.fn();
     await openOrderItemProductFlow({
       item: { product_id: 42, brand: 'Bosch', article: 'ABC' },
       navigate,
@@ -21,7 +21,7 @@ describe('openOrderItemProductFlow destination', () => {
   });
 
   it('navigates to public part id-only path when brand/article missing', async () => {
-    const navigate = jest.fn();
+    const navigate = vi.fn();
     await openOrderItemProductFlow({
       item: { product_id: 42 },
       navigate,

@@ -28,12 +28,12 @@ const pageIsLoopback = () => {
 };
 
 const shouldIgnoreLoopbackBase = (url) => (
-    isLoopbackUrl(url) && (process.env.NODE_ENV === 'production' || !pageIsLoopback())
+    isLoopbackUrl(url) && (import.meta.env.PROD || !pageIsLoopback())
 );
 
-/** Fallback when CRA build missed REACT_APP_* (avoids `/undefined/...` → nginx 405). */
+/** Fallback when build missed VITE_* (avoids `/undefined/...` → nginx 405). */
 const resolveApiBase = () => {
-    let fromEnv = normalizeBaseUrl(process.env.REACT_APP_API_BASE_URL);
+    let fromEnv = normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL);
     if (shouldIgnoreLoopbackBase(fromEnv)) {
         fromEnv = '';
     }
@@ -45,7 +45,7 @@ const resolveApiBase = () => {
 };
 
 const resolveBackendBase = () => {
-    let fromEnv = normalizeBaseUrl(process.env.REACT_APP_BACKEND_BASE_URL);
+    let fromEnv = normalizeBaseUrl(import.meta.env.VITE_BACKEND_BASE_URL);
     if (shouldIgnoreLoopbackBase(fromEnv)) {
         fromEnv = '';
     }

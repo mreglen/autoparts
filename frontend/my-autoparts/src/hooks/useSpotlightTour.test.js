@@ -40,7 +40,7 @@ describe('useSpotlightTour', () => {
   });
 
   test('completes tour on last step and calls onComplete', async () => {
-    const onComplete = jest.fn();
+    const onComplete = vi.fn();
     const { result } = renderHook(() => useSpotlightTour({ steps: STEPS, onComplete }));
 
     await act(async () => {
@@ -64,7 +64,7 @@ describe('useSpotlightTour', () => {
   });
 
   test('skipTour calls onSkip and resets state', async () => {
-    const onSkip = jest.fn();
+    const onSkip = vi.fn();
     const { result } = renderHook(() => useSpotlightTour({ steps: STEPS, onSkip }));
 
     await act(async () => {
@@ -80,7 +80,7 @@ describe('useSpotlightTour', () => {
   });
 
   test('skipCurrentStep advances without completing tour', async () => {
-    const onComplete = jest.fn();
+    const onComplete = vi.fn();
     const { result } = renderHook(() => useSpotlightTour({ steps: STEPS, onComplete }));
 
     await act(async () => {

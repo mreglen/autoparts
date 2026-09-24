@@ -79,7 +79,7 @@
       (function () {
         var p = window.location.pathname || '';
         if (p.indexOf('/part/') !== -1 || p.indexOf('/autoparts/new/part/') !== -1) {
-          document.write('<script src="%PUBLIC_URL%/seo-head-bootstrap.js"><\/script>');
+          document.write('<script src="/seo-head-bootstrap.js"><\/script>');
         }
       })();
     </script>
@@ -93,7 +93,7 @@
            }
            try {
              if (localStorage.getItem('cookie_consent_accepted') !== '1') {
-               return;
+                 return;
              }
            } catch (e) {
              return;
@@ -116,25 +116,25 @@
     <!-- /Yandex.Metrika counter -->
     <link
       rel="preload"
-      href="%PUBLIC_URL%/fonts/onest/onest-cyrillic.woff2"
+      href="/fonts/onest/onest-cyrillic.woff2"
       as="font"
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="%PUBLIC_URL%/fonts/onest.css" />
-    <link rel="preload" as="image" href="%PUBLIC_URL%/img/LogoWithoutBg.png" />
+    <link rel="stylesheet" href="/fonts/onest.css" />
+    <link rel="preload" as="image" href="/img/LogoWithoutBg.png" />
     <!-- Favicon (public/favicons/) -->
-    <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/favicons/favicon.svg" sizes="120x120" />
-    <link rel="icon" href="%PUBLIC_URL%/favicons/favicon.ico" sizes="any" />
-    <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicons/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/favicons/favicon-16x16.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/favicons/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicons/favicon.svg" sizes="120x120" />
+    <link rel="icon" href="/favicons/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicons/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicons/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
     <title>Свой Гараж</title>
     <script>
       (function () {
         var path = window.location.pathname || '';
         var isPlanner = path === '/autoservice/planner' || path.indexOf('/autoservice/planner/') === 0;
-        var manifest = isPlanner ? '%PUBLIC_URL%/manifest-planner.json' : '%PUBLIC_URL%/manifest.json';
+        var manifest = isPlanner ? '/manifest-planner.json' : '/manifest.json';
         var title = isPlanner ? 'Планировщик — Свой Гараж' : 'Свой Гараж';
         var link = document.createElement('link');
         link.rel = 'manifest';
@@ -151,18 +151,9 @@
     <!-- Yandex.Metrika noscript (disabled in development) -->
     </noscript>
     <div id="pwa-splash" aria-hidden="true">
-      <img src="%PUBLIC_URL%/img/LogoWithoutBg.png" alt="" width="112" height="112" decoding="sync" />
+      <img src="/img/LogoWithoutBg.png" alt="" width="112" height="112" decoding="sync" />
     </div>
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
+    <script type="module" src="/src/index.js"></script>
   </body>
 </html>
