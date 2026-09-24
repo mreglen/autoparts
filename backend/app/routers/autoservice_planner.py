@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import PlainTextResponse
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.auth import get_current_user, get_current_user_optional
+from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.garage_vehicle import GarageVehicle
@@ -26,8 +25,6 @@ from app.utils.autoservice_access import (
     display_client_phone,
     require_autoservice_permission,
 )
-from app.utils.org_access import resolve_autoservice_organization_id
-
 router = APIRouter(tags=["Autoservice planner"])
 
 UNASSIGNED_ZONE_NAME = "Без рабочей зоны"
@@ -231,121 +228,3 @@ def get_planner_week(
         days=[PlannerWeekDayHeader(date=day) for day in day_dates],
         zones=zone_rows,
     )
-
-
-@router.get("/autoservice/planner/shortcuts/today", response_class=PlainTextResponse)
-def get_planner_today_shortcut(
-    target_date: date | None = Query(None, alias="date"),
-    organization_id: str | None = Query(None),
-    db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_current_user_optional),
-):
-    if current_user:
-        org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
-    elif organization_id:
-        org_id = organization_id
-    else:
-        org_id = resolve_autoservice_organization_id(db)
-        if not org_id:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Организация автосервиса не настроена",
-            )
-    target = target_date or date.today()
-    range_start = datetime.combine(target, time.min)
-    range_end = datetime.combine(target + timedelta(days=1), time.min)
-
-    zones = (
-        db.query(AutoserviceWorkZone)
-        .filter(
-            AutoserviceWorkZone.organization_id == org_id,
-            AutoserviceWorkZone.is_active.is_(True),
-        )
-        .order_by(AutoserviceWorkZone.sort_order.asc(), AutoserviceWorkZone.id.asc())
-        .all()
-    )
-
-    orders = (
-        db.query(RepairOrder)
-        .options(
-            joinedload(RepairOrder.client),
-            joinedload(RepairOrder.vehicle),
-            joinedload(RepairOrder.work_zone),
-        )
-        .filter(
-            RepairOrder.organization_id == org_id,
-            RepairOrder.scheduled_at < range_end,
-            (
-                (RepairOrder.scheduled_end_at > range_start)
-                | (RepairOrder.status == "in_progress")
-                | (
-                    RepairOrder.scheduled_end_at.is_(None)
-                    & (RepairOrder.scheduled_at >= range_start)
-                )
-            ),
-            RepairOrder.status.notin_(("cancelled", "review")),
-        )
-        .order_by(RepairOrder.scheduled_at.asc(), RepairOrder.id.asc())
-        .all()
-    )
-
-    inspections = (
-        db.query(InspectionBooking)
-        .options(
-            joinedload(InspectionBooking.vehicle),
-            joinedload(InspectionBooking.work_zone),
-        )
-        .filter(
-            InspectionBooking.organization_id == org_id,
-            InspectionBooking.preferred_date == target,
-            or_(
-                InspectionBooking.status == "confirmed",
-                and_(
-                    InspectionBooking.status == "new",
-                    InspectionBooking.source == "staff",
-                ),
-            ),
-        )
-        .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
-        .all()
-    )
-
-    items = [_planner_order(row) for row in orders] + [_planner_inspection(row) for row in inspections]
-    items.sort(key=lambda x: (x.scheduled_at or datetime.min, x.id))
-
-    if not items:
-        return PlainTextResponse(f"На {target.strftime('%d.%m.%Y')} записей нет.")
-
-    zone_map: dict[int | None, str] = {None: UNASSIGNED_ZONE_NAME}
-    for zone in zones:
-        zone_map[zone.id] = zone.name
-
-    grouped: dict[str, list] = {}
-    for item in items:
-        zone_name = zone_map.get(item.work_zone_id) or UNASSIGNED_ZONE_NAME
-        grouped.setdefault(zone_name, []).append(item)
-
-    zone_names = [zone.name for zone in zones] + [UNASSIGNED_ZONE_NAME]
-    lines = [f"Планировщик на {target.strftime('%d.%m.%Y')}", ""]
-    for zone_name in zone_names:
-        if zone_name not in grouped:
-            continue
-        lines.append(f"{zone_name}:")
-        for item in grouped[zone_name]:
-            if item.kind == "inspection":
-                time_label = item.preferred_time.strftime("%H:%M") if item.preferred_time else "—"
-                label = f"{time_label} — Осмотр · {item.client_name}"
-            else:
-                start = item.scheduled_at
-                end = item.scheduled_end_at
-                if end:
-                    time_label = f"{start.strftime('%H:%M')}-{end.strftime('%H:%M')}"
-                else:
-                    time_label = start.strftime('%H:%M')
-                label = f"{time_label} — №{item.order_number} · {item.client_name}"
-            if item.vehicle and item.vehicle != "—":
-                label += f" · {item.vehicle}"
-            lines.append(f"  {label}")
-        lines.append("")
-
-    return PlainTextResponse("\n".join(lines).rstrip())

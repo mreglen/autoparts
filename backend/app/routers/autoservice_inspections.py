@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import PlainTextResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -389,43 +388,6 @@ def create_staff_inspection_booking(
 ):
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
     return _create_staff_inspection_booking(payload, db, current_user, org_id)
-
-
-@router.post(
-    "/autoservice/inspection-bookings/shortcut",
-    response_class=PlainTextResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_staff_inspection_booking_shortcut(
-    payload: InspectionBookingStaffCreate,
-    organization_id: str | None = Query(None),
-    db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_current_user_optional),
-):
-    if current_user:
-        org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
-    elif organization_id:
-        org_id = organization_id
-    else:
-        org_id = _require_autoservice_org_id(db)
-    view = _create_staff_inspection_booking(payload, db, current_user, org_id)
-    time_label = view.preferred_time.strftime("%H:%M") if view.preferred_time else "—"
-    vehicle_label = "—"
-    if view.vehicle:
-        vehicle_label = f"{view.vehicle.make or ''} {view.vehicle.model or ''}".strip() or "—"
-    elif view.vehicle_make or view.vehicle_model:
-        vehicle_label = f"{view.vehicle_make or ''} {view.vehicle_model or ''}".strip() or "—"
-    return PlainTextResponse(
-        "\n".join([
-            "✅ Запись на осмотр создана",
-            f"№{view.id}",
-            f"Клиент: {view.name}",
-            f"Телефон: {view.phone or '—'}",
-            f"Дата: {view.preferred_date.strftime('%d.%m.%Y')}",
-            f"Время: {time_label}",
-            f"Авто: {vehicle_label}",
-        ])
-    )
 
 
 @router.patch(

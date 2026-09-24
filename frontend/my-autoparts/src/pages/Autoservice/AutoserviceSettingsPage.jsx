@@ -6,7 +6,7 @@ import NumericInput from '../../components/UI/NumericInput';
 import WorkZonesSortableList from '../../components/Autoservice/WorkZonesSortableList';
 import { UnderlineTabs } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
-import { apiRequest, API_BASE, getAuthToken } from '../../utils/apiClient';
+import { apiRequest } from '../../utils/apiClient';
 
 const inputClass =
   'sg-pill-input mt-1 w-full';
@@ -183,92 +183,6 @@ function WorkZoneModal({ open, mode, zone, onClose, onSaved }) {
 }
 
 
-function IosShortcutsPanel() {
-  const [copied, setCopied] = useState(false);
-  const token = useMemo(() => getAuthToken() || '', []);
-  const todayUrl = `${API_BASE}/autoservice/planner/shortcuts/today`;
-  const createUrl = `${API_BASE}/autoservice/inspection-bookings/shortcut`;
-  const createBody = JSON.stringify(
-    {
-      name: 'Иван Иванов',
-      phone: '+79990001122',
-      preferred_date: '2026-09-15',
-      preferred_time: '10:00:00',
-      vehicle_make: 'Toyota',
-      vehicle_model: 'Camry',
-      work_zone_id: 1,
-      notes: '',
-    },
-    null,
-    2,
-  );
-
-  const handleCopyToken = async () => {
-    if (!token) return;
-    try {
-      await navigator.clipboard.writeText(token);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      // clipboard unavailable
-    }
-  };
-
-  return (
-    <section className="max-w-2xl space-y-5">
-      <h3 className="text-base font-semibold text-ink">iOS Shortcuts</h3>
-      <p className="text-sm text-ink-muted">
-        Используйте URL и токен в приложении «Команды» (Shortcuts), чтобы создавать записи на
-        осмотр и смотреть планировщик прямо с рабочего стола.
-      </p>
-
-      <div>
-        <label htmlFor="ios-shortcuts-token" className="block text-sm font-medium text-ink-soft">
-          Токен авторизации
-        </label>
-        <div className="mt-1 flex gap-2">
-          <input
-            id="ios-shortcuts-token"
-            type="text"
-            readOnly
-            value={token || 'Не авторизован'}
-            className={fieldClass}
-          />
-          <button
-            type="button"
-            onClick={handleCopyToken}
-            disabled={!token}
-            className={`${btnPrimary} shrink-0`}
-          >
-            {copied ? 'Скопировано' : 'Копировать'}
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-ink-faint">
-          Вставьте как заголовок Authorization: Bearer {'<токен>'}
-        </p>
-      </div>
-
-      <div>
-        <span className="block text-sm font-medium text-ink-soft">Показать планировщик на сегодня</span>
-        <code className="mt-1 block break-all rounded-sg bg-surface-subtle px-3 py-2 text-xs text-ink">
-          GET {todayUrl}
-        </code>
-      </div>
-
-      <div>
-        <span className="block text-sm font-medium text-ink-soft">Создать запись на осмотр</span>
-        <code className="mt-1 block break-all rounded-sg bg-surface-subtle px-3 py-2 text-xs text-ink">
-          POST {createUrl}
-        </code>
-        <pre className="mt-2 overflow-x-auto rounded-sg bg-surface-subtle p-3 text-xs text-ink">
-          {createBody}
-        </pre>
-      </div>
-    </section>
-  );
-}
-
-
 export default function AutoserviceSettingsPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const [tab, setTab] = useState('general');
@@ -434,7 +348,6 @@ export default function AutoserviceSettingsPage() {
           { id: 'general', label: 'Общее' },
           { id: 'zones', label: 'Зоны' },
           { id: 'works', label: 'Работы' },
-          { id: 'ios-shortcuts', label: 'iOS Shortcuts' },
         ]}
         value={tab}
         onChange={setTab}
@@ -584,8 +497,6 @@ export default function AutoserviceSettingsPage() {
               </div>
             </section>
           ) : null}
-
-          {tab === 'ios-shortcuts' ? <IosShortcutsPanel /> : null}
         </>
       )}
 
