@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
+import PillDropdown from '../PillDropdown/PillDropdown';
 import AutoserviceLiveSearchField from './AutoserviceLiveSearchField';
 import { apiAxios } from '../../utils/apiClient';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
@@ -20,8 +21,11 @@ import {
 
 const EMPTY_SELECTED_KEYS = new Set();
 
-const selectClass =
-  'h-10 min-w-0 shrink-0 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70 max-md:h-11';
+const CONDITION_OPTIONS = [
+  { value: '', label: 'Состояние: все' },
+  { value: 'new', label: 'Новый' },
+  { value: 'used', label: 'Б/у' },
+];
 
 function orderConditionKey(source) {
   if (source === 'new') return 'new';
@@ -67,6 +71,8 @@ export default function PurchaseItemsPickerModal({
   const [searchInput, setSearchInput] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
   const [conditionFilter, setConditionFilter] = useState('');
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const [conditionOpen, setConditionOpen] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState(() => new Set(initialSelectedKeys));
 
   useEffect(() => {
@@ -116,7 +122,10 @@ export default function PurchaseItemsPickerModal({
       const name = orderSupplierName(order);
       if (name) names.add(name);
     });
-    return [...names];
+    return [
+      { value: '', label: 'Все поставщики' },
+      ...[...names].map((name) => ({ value: name, label: name })),
+    ];
   }, [unifiedOrders]);
 
   const filteredOrders = useMemo(() => {
@@ -128,9 +137,9 @@ export default function PurchaseItemsPickerModal({
         if (conditionFilter && orderConditionKey(entry.source) !== conditionFilter) return null;
         if (supplierFilter && orderSupplierName(order) !== supplierFilter) return null;
         if (!query) return { entry, items };
-        const orderMatches = String(order.id ?? '')
-          .toLowerCase()
-          .includes(query);
+        const orderMatches =
+          String(order.id ?? '').toLowerCase().includes(query)
+          || formatOrderDate(order.created_at).includes(query);
         if (orderMatches) return { entry, items };
         const matched = items.filter((item) => purchaseItemMatchesQuery(item, query));
         return matched.length ? { entry, items: matched } : null;
@@ -211,31 +220,33 @@ export default function PurchaseItemsPickerModal({
           <AutoserviceLiveSearchField
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="Название, артикул, № заказа"
+            placeholder="Название, артикул, № заказа, дата"
             ariaLabel="Поиск по позициям и заказам"
           />
-          <select
-            className={selectClass}
+          <PillDropdown
             value={supplierFilter}
-            onChange={(e) => setSupplierFilter(e.target.value)}
-            aria-label="Фильтр по поставщику"
-          >
-            <option value="">Все поставщики</option>
-            {supplierOptions.map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
-          <select
-            className={selectClass}
+            onChange={setSupplierFilter}
+            options={supplierOptions}
+            placeholder="Все поставщики"
+            ariaLabel="Фильтр по поставщику"
+            isOpen={supplierOpen}
+            onOpenChange={setSupplierOpen}
+            fullWidth={false}
+            className="shrink-0 max-md:w-full"
+            triggerClassName="max-md:w-full"
+          />
+          <PillDropdown
             value={conditionFilter}
-            onChange={(e) => setConditionFilter(e.target.value)}
-            aria-label="Фильтр по состоянию"
-          >
-            <option value="">Состояние: все</option>
-            <option value="none">Не указано</option>
-            <option value="new">Новый</option>
-            <option value="used">Б/у</option>
-          </select>
+            onChange={setConditionFilter}
+            options={CONDITION_OPTIONS}
+            placeholder="Состояние"
+            ariaLabel="Фильтр по состоянию"
+            isOpen={conditionOpen}
+            onOpenChange={setConditionOpen}
+            fullWidth={false}
+            className="shrink-0 max-md:w-full"
+            triggerClassName="max-md:w-full"
+          />
         </div>
 
         {error ? <p className="text-sm text-danger-600" role="alert">{error}</p> : null}
