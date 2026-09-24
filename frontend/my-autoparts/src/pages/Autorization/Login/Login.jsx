@@ -3,17 +3,20 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { login as loginThunk } from '../../../redux/slices/AuthSlice';
+import ImageCaptcha from '../../../components/ImageCaptcha/ImageCaptcha';
 
 export default function Login() {
     const [loginValue, setLoginValue] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false); // <-- added
+    const [captchaPassed, setCaptchaPassed] = useState(false);
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { loading, error } = useSelector((state) => state.auth);
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        if (!captchaPassed) return;
         dispatch(loginThunk({ login: loginValue, password }))
             .unwrap()
             .then(() => {
@@ -75,9 +78,12 @@ export default function Login() {
                     )}
                 </button>
             </div>
+
+            <ImageCaptcha onVerify={setCaptchaPassed} />
+
             <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !captchaPassed}
                 className="w-full py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-60"
             >
                 {loading ? 'Вход...' : 'Войти'}
