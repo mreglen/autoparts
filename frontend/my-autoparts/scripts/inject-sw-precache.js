@@ -24,6 +24,7 @@ const stable = [
   '/index.html',
   '/offline.html',
   '/manifest.json',
+  '/manifest-planner.json',
   '/favicons/android-chrome-192x192.png',
   '/favicons/android-chrome-512x512.png',
   '/img/LogoWithoutBg.png',

@@ -5,6 +5,7 @@ const PRECACHE_ASSETS = /*__PRECACHE__*/[
   '/index.html',
   '/offline.html',
   '/manifest.json',
+  '/manifest-planner.json',
   '/fonts/onest.css',
   '/fonts/onest/onest-cyrillic.woff2',
   '/fonts/onest/onest-latin.woff2',
