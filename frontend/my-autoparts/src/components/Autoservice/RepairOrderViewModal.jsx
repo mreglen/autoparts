@@ -801,7 +801,7 @@ export default function RepairOrderViewModal({
       open={!!order || loading}
       onClose={handleClose}
       size="lg"
-      className="max-lg:!rounded-none"
+      className="max-lg:!rounded-none max-sm:h-full"
       wrapperZIndex={wrapperZIndex}
       draggable
       title={
