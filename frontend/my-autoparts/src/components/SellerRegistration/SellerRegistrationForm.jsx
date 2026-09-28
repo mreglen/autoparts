@@ -19,6 +19,18 @@ const VERIFICATION_CODE_LENGTH = 6;
 const inputClass =
     'w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition';
 
+function BusinessCheck({ selected }) {
+    return (
+        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${selected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300'}`}>
+            {selected ? (
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path d="M5 10.5 8.25 14 15 6.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            ) : null}
+        </span>
+    );
+}
+
 export default function SellerRegistrationForm({ id = 'seller-registration' }) {
     const dispatch = useDispatch();
     const {
@@ -389,7 +401,7 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
                             >
                                 <span className="flex items-center justify-between gap-3">
                                     <span className="font-semibold text-gray-900">Автосервис</span>
-                                    <span className={`flex h-6 w-6 items-center justify-center rounded-full border ${businessDirections.autoservice ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300'}`}>{businessDirections.autoservice ? '✓' : ''}</span>
+                                    <BusinessCheck selected={businessDirections.autoservice} />
                                 </span>
                                 <span className="mt-2 block text-sm text-gray-600">Запись, клиенты, заказ-наряды, склад и планировщик.</span>
                             </button>
@@ -400,7 +412,7 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
                             >
                                 <span className="flex items-center justify-between gap-3">
                                     <span className="font-semibold text-gray-900">Продавец (авторазбор)</span>
-                                    <span className={`flex h-6 w-6 items-center justify-center rounded-full border ${businessDirections.seller ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300'}`}>{businessDirections.seller ? '✓' : ''}</span>
+                                    <BusinessCheck selected={businessDirections.seller} />
                                 </span>
                                 <span className="mt-2 block text-sm text-gray-600">Продажа запчастей, складской учёт, заказы и общение с покупателями.</span>
                             </button>
