@@ -67,6 +67,7 @@ function SchemaImage({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [layout, setLayout] = useState(null);
+  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
   const gestureRef = useRef(null);
 
   const recompute = useCallback(() => {
@@ -76,6 +77,7 @@ function SchemaImage({
     const natH = img.naturalHeight;
     if (!natW || !natH) return;
     // client* = CSS box of <img>; with object-contain object-top content sits at top.
+    setNaturalSize({ width: natW, height: natH });
     setLayout(containLayout(img.clientWidth, img.clientHeight, natW, natH));
   }, []);
 
@@ -196,6 +198,27 @@ function SchemaImage({
       .filter(Boolean);
   }, [imageMap, layout]);
 
+  const fullscreenAreas = useMemo(() => {
+    const natW = naturalSize.width;
+    const natH = naturalSize.height;
+    if (!natW || !natH) return [];
+    return (imageMap || []).map((area, idx) => {
+      const x1 = toNum(area.x1);
+      const y1 = toNum(area.y1);
+      const x2 = toNum(area.x2);
+      const y2 = toNum(area.y2);
+      const code = normalizeCode(area.code_on_image);
+      if (x1 == null || y1 == null || x2 == null || y2 == null || !code) return null;
+      const centerX = (Math.min(x1, x2) + Math.abs(x2 - x1) / 2) / natW * 100;
+      const centerY = (Math.min(y1, y2) + Math.abs(y2 - y1) / 2) / natH * 100;
+      return {
+        key: `fullscreen-${code}-${idx}`,
+        code,
+        style: { left: `calc(${centerX}% - 14px)`, top: `calc(${centerY}% - 14px)` },
+      };
+    }).filter(Boolean);
+  }, [imageMap, naturalSize]);
+
   if (!src) {
     return (
       <div className="flex min-h-[120px] items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-400">
@@ -265,14 +288,33 @@ function SchemaImage({
             onTouchCancel={handleTouchEnd}
           >
             <div className="flex h-full w-full items-center justify-center">
-              <img
-                src={src}
-                alt={alt || ''}
-                className="max-h-full max-w-full select-none object-contain"
+              <div
+                className="relative inline-flex max-h-full max-w-full"
                 style={{ transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})` }}
                 onClick={(e) => e.stopPropagation()}
-                draggable={false}
-              />
+              >
+                <img
+                  src={src}
+                  alt={alt || ''}
+                  className="block max-h-[calc(100dvh-7rem)] max-w-[calc(100vw-1rem)] select-none object-contain"
+                  draggable={false}
+                />
+                {fullscreenAreas.map((area) => (
+                  <button
+                    key={area.key}
+                    type="button"
+                    aria-label={`Выбрать позицию ${area.code}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectCode?.(area.code, { fullscreen: true });
+                    }}
+                    className="absolute z-20 flex h-7 w-7 items-center justify-center rounded-full border-2 border-indigo-600 bg-white/90 text-[10px] font-bold text-indigo-700 shadow-md md:hidden"
+                    style={area.style}
+                  >
+                    {area.code}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <div className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-1 rounded-lg bg-white/95 p-1 shadow">
@@ -334,6 +376,7 @@ export default function VinCatalogUnitView({
 }) {
   const [hoverCode, setHoverCode] = useState(null);
   const [activeSchemaIndex, setActiveSchemaIndex] = useState(0);
+  const [codeOptions, setCodeOptions] = useState(null);
   const rowRefs = useRef({});
   const requestedSchemaMaps = useRef(new Set());
   const listPanelRef = useRef(null);
@@ -354,6 +397,7 @@ export default function VinCatalogUnitView({
 
   useEffect(() => {
     setActiveSchemaIndex(0);
+    setCodeOptions(null);
     requestedSchemaMaps.current.clear();
   }, [title]);
 
@@ -391,20 +435,29 @@ export default function VinCatalogUnitView({
     scrollRowIntoPanel(el, panel);
   }, []);
 
+  const selectDetail = useCallback((detail) => {
+    setCodeOptions(null);
+    if (detail?.filter && onDetailFilter) {
+      onDetailFilter(detail);
+      return;
+    }
+    if ((detail?.oem || '').trim()) onSelectDetail?.(detail);
+  }, [onDetailFilter, onSelectDetail]);
+
   const onSelectCode = useCallback(
-    (code) => {
-      const rows = codeToRows.get(normalizeCode(code)) || [];
-      const first = rows.find((r) => (r.detail?.oem || '').trim())?.detail || rows[0]?.detail;
-      if (!first) return;
-      if (rows[0]?.key) ensureRowVisible(rows[0].key);
-      if (first.filter && onDetailFilter) {
-        onDetailFilter(first);
+    (code, options = {}) => {
+      const normalizedCode = normalizeCode(code);
+      const rows = codeToRows.get(normalizedCode) || [];
+      if (!rows.length) return;
+      if (options.fullscreen) {
+        setCodeOptions({ code: normalizedCode, rows });
         return;
       }
-      if (!(first.oem || '').trim()) return;
-      onSelectDetail?.(first);
+      if (rows[0]?.key) ensureRowVisible(rows[0].key);
+      const first = rows.find((r) => (r.detail?.oem || '').trim())?.detail || rows[0]?.detail;
+      selectDetail(first);
     },
-    [codeToRows, ensureRowVisible, onDetailFilter, onSelectDetail]
+    [codeToRows, ensureRowVisible, selectDetail]
   );
 
   return (
@@ -573,6 +626,38 @@ export default function VinCatalogUnitView({
           )}
         </div>
       </div>
+
+      {codeOptions ? (
+        <div className="fixed inset-0 z-[90] md:hidden" role="dialog" aria-modal="true" aria-label={`Артикулы позиции ${codeOptions.code}`}>
+          <button type="button" aria-label="Закрыть выбор артикула" onClick={() => setCodeOptions(null)} className="absolute inset-0 bg-black/35" />
+          <div className="absolute inset-x-0 bottom-0 max-h-[65dvh] overflow-y-auto rounded-t-2xl bg-white px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gray-300" />
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Позиция № {codeOptions.code}</p>
+                <p className="text-xs text-gray-500">Выберите артикул</p>
+              </div>
+              <button type="button" onClick={() => setCodeOptions(null)} className="min-h-10 rounded-lg px-3 text-sm font-medium text-indigo-600">Закрыть</button>
+            </div>
+            <div className="space-y-2">
+              {codeOptions.rows.map(({ detail, key }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => selectDetail(detail)}
+                  className="flex min-h-16 w-full items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left active:bg-indigo-50"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="line-clamp-2 block text-sm font-medium text-gray-900">{detail.name || 'Без названия'}</span>
+                    <span className="mt-1 block font-mono text-xs font-semibold text-indigo-700">{detail.oem || 'Требуется уточнение'}</span>
+                  </span>
+                  <span className="shrink-0 text-gray-400">›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

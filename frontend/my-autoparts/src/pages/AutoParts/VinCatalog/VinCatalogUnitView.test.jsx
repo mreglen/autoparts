@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import VinCatalogUnitView from './VinCatalogUnitView';
 
 const baseProps = {
@@ -48,6 +48,35 @@ describe('VinCatalogUnitView', () => {
     expect(card).toHaveClass('min-h-16');
     fireEvent.click(card);
     expect(onSelectDetail).toHaveBeenCalledWith(detail);
+  });
+
+  it('opens article choices from a fullscreen image position', () => {
+    const onSelectDetail = vi.fn();
+    const details = [
+      { detail_id: 'a', name: 'Прокладка', oem: '1140FF', code_on_image: '7' },
+      { detail_id: 'b', name: 'Крышка', oem: '1140AF', code_on_image: '7' },
+    ];
+    render(
+      <VinCatalogUnitView
+        {...baseProps}
+        schemas={[{ unit_id: 'one', name: 'Схема двигателя', image_url: '/engine.png', imageMap: [{ code_on_image: '7', x1: 90, y1: 90, x2: 110, y2: 110 }], imageMapLoaded: true, details }]}
+        details={details}
+        onSelectDetail={onSelectDetail}
+      />
+    );
+
+    const image = screen.getByAltText('Схема двигателя');
+    Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 200 });
+    Object.defineProperty(image, 'naturalHeight', { configurable: true, value: 200 });
+    fireEvent.load(image);
+    fireEvent.click(screen.getByText('Увеличить'));
+    fireEvent.click(screen.getByRole('button', { name: 'Выбрать позицию 7' }));
+    const dialog = screen.getByRole('dialog', { name: 'Артикулы позиции 7' });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText('1140FF')).toBeInTheDocument();
+    expect(within(dialog).getByText('1140AF')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: /Прокладка/ }));
+    expect(onSelectDetail).toHaveBeenCalledWith(details[0]);
   });
 
   it('opens the selected schema in the fullscreen viewer', () => {
