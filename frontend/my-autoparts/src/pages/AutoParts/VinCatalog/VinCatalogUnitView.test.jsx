@@ -33,6 +33,23 @@ describe('VinCatalogUnitView', () => {
     await waitFor(() => expect(onLoadSchemaImageMap).toHaveBeenCalledWith(expect.objectContaining({ unit_id: 'rear' })));
   });
 
+  it('renders touch-friendly detail cards and opens a part', () => {
+    const onSelectDetail = vi.fn();
+    const detail = { detail_id: 'part-1', name: 'Масляный фильтр', oem: '68191349AC', code_on_image: '7' };
+    render(
+      <VinCatalogUnitView
+        {...baseProps}
+        details={[detail]}
+        onSelectDetail={onSelectDetail}
+      />
+    );
+
+    const card = screen.getByRole('button', { name: /Масляный фильтр/ });
+    expect(card).toHaveClass('min-h-16');
+    fireEvent.click(card);
+    expect(onSelectDetail).toHaveBeenCalledWith(detail);
+  });
+
   it('opens the selected schema in the fullscreen viewer', () => {
     render(
       <VinCatalogUnitView
@@ -44,6 +61,11 @@ describe('VinCatalogUnitView', () => {
     fireEvent.click(screen.getByText('Увеличить'));
     expect(screen.getAllByRole('button', { name: 'Увеличить' })).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Уменьшить' })).toBeInTheDocument();
+    const viewer = screen.getByTestId('schema-touch-viewer');
+    fireEvent.touchStart(viewer, { touches: [{ clientX: 100, clientY: 100 }, { clientX: 200, clientY: 100 }] });
+    fireEvent.touchMove(viewer, { touches: [{ clientX: 50, clientY: 100 }, { clientX: 250, clientY: 100 }] });
+    expect(screen.getByText('200%')).toBeInTheDocument();
+    fireEvent.touchEnd(viewer, { touches: [] });
     fireEvent.click(screen.getByText('Закрыть'));
     expect(screen.queryByText('Закрыть')).not.toBeInTheDocument();
   });

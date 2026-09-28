@@ -11,7 +11,7 @@ export default function VinCatalogNodeGrid({ nodes, onSelect }) {
     <div
       className={
         withImages
-          ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3'
+          ? 'grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3'
           : 'grid grid-cols-1 gap-2 sm:grid-cols-2'
       }
     >
@@ -21,12 +21,12 @@ export default function VinCatalogNodeGrid({ nodes, onSelect }) {
           type="button"
           onClick={() => onSelect(node)}
           className={`group flex overflow-hidden rounded-lg border border-gray-200 bg-white text-left transition hover:border-indigo-300 hover:shadow-sm ${
-            withImages ? 'min-h-[10rem] flex-col' : 'items-center gap-3 px-4 py-3'
+            withImages ? 'min-h-32 flex-col sm:min-h-[10rem]' : 'min-h-12 items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3'
           }`}
         >
           {node.imageUrl ? (
             <>
-              <div className="flex h-40 w-full items-center justify-center bg-gray-50 p-3">
+              <div className="flex h-24 w-full items-center justify-center bg-gray-50 p-2 sm:h-40 sm:p-3">
                 <img
                   src={node.imageUrl}
                   alt=""
@@ -34,8 +34,8 @@ export default function VinCatalogNodeGrid({ nodes, onSelect }) {
                   loading="lazy"
                 />
               </div>
-              <div className="px-3 py-3">
-                <span className="text-sm font-medium leading-snug text-gray-900 group-hover:text-indigo-700">
+              <div className="px-2 py-2 sm:px-3 sm:py-3">
+                <span className="line-clamp-2 text-xs font-medium leading-snug text-gray-900 group-hover:text-indigo-700 sm:text-sm">
                   {node.name}
                 </span>
               </div>

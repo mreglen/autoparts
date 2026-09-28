@@ -65,7 +65,9 @@ function SchemaImage({
   const imgRef = useRef(null);
   const [zoomed, setZoomed] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [layout, setLayout] = useState(null);
+  const gestureRef = useRef(null);
 
   const recompute = useCallback(() => {
     const img = imgRef.current;
@@ -89,6 +91,71 @@ function SchemaImage({
       window.removeEventListener('resize', recompute);
     };
   }, [recompute, src]);
+
+  const resetViewer = () => {
+    setZoomed(false);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    gestureRef.current = null;
+  };
+
+  const touchDistance = (touches) => Math.hypot(
+    touches[0].clientX - touches[1].clientX,
+    touches[0].clientY - touches[1].clientY
+  );
+
+  const handleTouchStart = (event) => {
+    event.stopPropagation();
+    if (event.touches.length === 2) {
+      gestureRef.current = {
+        type: 'pinch',
+        distance: touchDistance(event.touches),
+        zoom,
+      };
+      return;
+    }
+    if (event.touches.length === 1 && zoom > 1) {
+      gestureRef.current = {
+        type: 'pan',
+        x: event.touches[0].clientX,
+        y: event.touches[0].clientY,
+        pan,
+      };
+    }
+  };
+
+  const handleTouchMove = (event) => {
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (gesture.type === 'pinch' && event.touches.length === 2) {
+      const nextZoom = Math.min(4, Math.max(1, gesture.zoom * touchDistance(event.touches) / gesture.distance));
+      setZoom(nextZoom);
+      if (nextZoom === 1) setPan({ x: 0, y: 0 });
+      return;
+    }
+    if (gesture.type === 'pan' && event.touches.length === 1) {
+      setPan({
+        x: gesture.pan.x + event.touches[0].clientX - gesture.x,
+        y: gesture.pan.y + event.touches[0].clientY - gesture.y,
+      });
+    }
+  };
+
+  const handleTouchEnd = (event) => {
+    event.stopPropagation();
+    if (event.touches.length === 1 && zoom > 1) {
+      gestureRef.current = {
+        type: 'pan',
+        x: event.touches[0].clientX,
+        y: event.touches[0].clientY,
+        pan,
+      };
+      return;
+    }
+    gestureRef.current = null;
+  };
 
   const areas = useMemo(() => {
     if (!layout) return [];
@@ -186,35 +253,36 @@ function SchemaImage({
       {zoomed ? (
         <div
           className="fixed inset-0 z-[80] bg-black/80"
-          onClick={() => {
-            setZoomed(false);
-            setZoom(1);
-          }}
+          onClick={resetViewer}
           role="presentation"
         >
-          <div className="h-full w-full overflow-auto p-6 pt-16">
-            <div className="flex min-h-full min-w-full items-center justify-center">
+          <div
+            className="h-full w-full touch-none overflow-hidden p-6 pt-16"
+            data-testid="schema-touch-viewer"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+          >
+            <div className="flex h-full w-full items-center justify-center">
               <img
                 src={src}
                 alt={alt || ''}
-                className="max-h-[calc(100vh-6rem)] max-w-[calc(100vw-3rem)] object-contain transition-transform"
-                style={{ transform: `scale(${zoom})` }}
+                className="max-h-full max-w-full select-none object-contain"
+                style={{ transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})` }}
                 onClick={(e) => e.stopPropagation()}
                 draggable={false}
               />
             </div>
           </div>
           <div className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-1 rounded-lg bg-white/95 p-1 shadow">
-            <button type="button" onClick={(e) => { e.stopPropagation(); setZoom((v) => Math.max(1, v - 0.5)); }} className="h-9 w-9 rounded-md text-lg text-gray-800 hover:bg-gray-100" aria-label="Уменьшить">−</button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setZoom((v) => { const next = Math.max(1, v - 0.5); if (next === 1) setPan({ x: 0, y: 0 }); return next; }); }} className="h-9 w-9 rounded-md text-lg text-gray-800 hover:bg-gray-100" aria-label="Уменьшить">−</button>
             <span className="min-w-14 text-center text-xs font-medium text-gray-600">{Math.round(zoom * 100)}%</span>
             <button type="button" onClick={(e) => { e.stopPropagation(); setZoom((v) => Math.min(4, v + 0.5)); }} className="h-9 w-9 rounded-md text-lg text-gray-800 hover:bg-gray-100" aria-label="Увеличить">+</button>
           </div>
           <button
             type="button"
-            onClick={() => {
-              setZoomed(false);
-              setZoom(1);
-            }}
+            onClick={resetViewer}
             className="absolute right-4 top-3 rounded-lg bg-white/95 px-3 py-2 text-sm font-medium text-gray-800 shadow"
           >
             Закрыть
@@ -404,7 +472,40 @@ export default function VinCatalogUnitView({
           ) : !detailsList.length ? (
             <p className="py-8 text-center text-sm text-gray-500">Нет деталей</p>
           ) : (
-            <table className="min-w-full text-left text-sm">
+            <>
+              <div className="space-y-2 md:hidden">
+                {detailsList.map((d, idx) => {
+                  const code = normalizeCode(d.code_on_image);
+                  const needsFilter = Boolean(d.filter);
+                  return (
+                    <button
+                      key={detailRowKey(d, idx)}
+                      type="button"
+                      onClick={() => {
+                        if (needsFilter && onDetailFilter) {
+                          onDetailFilter(d);
+                          return;
+                        }
+                        if ((d.oem || '').trim()) onSelectDetail(d);
+                      }}
+                      className="flex min-h-16 w-full items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left active:bg-indigo-50"
+                    >
+                      <span className="flex h-9 min-w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 px-2 font-mono text-xs font-semibold text-indigo-700">
+                        {code || '—'}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 block text-sm font-medium leading-snug text-gray-900">{d.name || 'Без названия'}</span>
+                        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="font-mono text-xs text-indigo-700">{d.oem || 'OEM не указан'}</span>
+                          <AvailCell row={lookupAvail(availability, d.oem)} loading={availabilityLoading} />
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-gray-400">{needsFilter ? '?' : '›'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <table className="hidden min-w-full text-left text-sm md:table">
               <thead className="sticky top-0 bg-white">
                 <tr className="border-b border-gray-200 text-xs text-gray-500">
                   <th className="w-10 py-2 pr-2 font-medium">№</th>
@@ -467,7 +568,8 @@ export default function VinCatalogUnitView({
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </>
           )}
         </div>
       </div>

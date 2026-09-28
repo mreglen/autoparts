@@ -304,22 +304,36 @@ export default function VinCatalogBrowse({
         ) : null}
       </div>
 
-      <div className="lg:hidden">
+      <div className="sticky top-1 z-30 lg:hidden">
         <button
           type="button"
-          onClick={() => setMobileTreeOpen((v) => !v)}
-          className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800"
+          onClick={() => setMobileTreeOpen(true)}
+          className="flex min-h-12 w-full items-center justify-between rounded-xl border border-indigo-200 bg-white/95 px-4 py-2.5 text-sm font-semibold text-gray-900 shadow-sm backdrop-blur"
         >
-          {mobileTreeOpen ? 'Скрыть разделы' : 'Разделы'}
+          <span className="min-w-0 truncate">{selectedUnit?.name || unitInfo?.name || 'Выбрать раздел'}</span>
+          <span className="ml-3 shrink-0 text-xs font-medium text-indigo-600">Разделы</span>
         </button>
       </div>
 
+      {mobileTreeOpen ? (
+        <button
+          type="button"
+          aria-label="Закрыть разделы"
+          onClick={() => setMobileTreeOpen(false)}
+          className="fixed inset-0 z-[60] bg-black/45 lg:hidden"
+        />
+      ) : null}
+
       <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside
-          className={`rounded-lg border border-gray-200 bg-white ${
-            mobileTreeOpen ? 'block' : 'hidden lg:block'
+          className={`fixed inset-x-0 bottom-0 z-[70] max-h-[85dvh] overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-2xl lg:static lg:block lg:max-h-none lg:rounded-lg lg:shadow-none ${
+            mobileTreeOpen ? 'block' : 'hidden'
           }`}
         >
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 lg:hidden">
+            <span className="text-sm font-semibold text-gray-900">Каталог</span>
+            <button type="button" onClick={() => setMobileTreeOpen(false)} className="min-h-10 rounded-lg px-3 text-sm font-medium text-indigo-600">Готово</button>
+          </div>
           <VinCatalogTree
             nodes={treeNodesWithCache}
             openIds={treeOpenIds}
