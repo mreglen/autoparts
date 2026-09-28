@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
-import { Card } from '../../../components/UI';
+import { Badge, Card, SkeletonCard } from '../../../components/UI';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { buildNewPartDetailPath } from '../../../utils/partRoutes';
+import { extractProductDescription } from '../../../utils/productDisplayName';
 import { mapPartToStocksData } from './rosskoHelpers';
 import {
-  formatDeliveryTimeText,
+  formatDeliveryParts,
   formatPriceRub,
   getMinStockPrice,
 } from './newPartStockUtils';
-import NewPartHorizontalScroll from './NewPartHorizontalScroll';
 
 const safeText = (value, fallback = '—') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -37,134 +37,80 @@ async function resolveAnalogUrl(part) {
   return null;
 }
 
-function AnalogMobileCard({ part, markupPercent, onNavigateCreate }) {
-  const [href, setHref] = useState(null);
-  const [resolving, setResolving] = useState(true);
-  const stocks = mapPartToStocksData(part);
-  const minPrice = getMinStockPrice(stocks, markupPercent);
-  const delivery = stocks[0]
-    ? formatDeliveryTimeText(
-      stocks[0].delivery_start,
-      stocks[0].delivery_end,
-      stocks[0].description || stocks[0].warehouse_name || '',
-    )
-    : '—';
-  const brand = safeText(part?.brand);
-  const article = safeText(part?.partnumber || part?.article);
-  const name = safeText(part?.name, `${brand} ${article}`.trim());
-
-  useEffect(() => {
-    let cancelled = false;
-    setResolving(true);
-    resolveAnalogUrl(part).then((url) => {
-      if (!cancelled) {
-        setHref(url);
-        setResolving(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [part]);
-
-  const handleClick = (event) => {
-    if (href) return;
-    event.preventDefault();
-    onNavigateCreate(part);
-  };
-
-  const linkClass = 'inline-flex min-h-[44px] items-center font-medium text-brand-600 hover:text-brand-800';
-
-  return (
-    <Card as="article" padding="sm">
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="rounded bg-surface-subtle px-2 py-0.5 font-medium text-ink-soft">{brand}</span>
-        <span className="rounded bg-surface-subtle px-2 py-0.5 font-medium text-ink-soft">{article}</span>
-      </div>
-      <p className="mt-2 text-sm font-semibold leading-snug text-ink">{name}</p>
-      <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs text-ink-muted">Цена от</p>
-          <p className="text-lg font-bold text-ink">{minPrice ? `${formatPriceRub(minPrice)} ₽` : '—'}</p>
-          <p className="mt-1 text-xs text-ink-muted">{delivery}</p>
-        </div>
-        {resolving ? (
-          <span className="text-xs text-ink-faint">…</span>
-        ) : href ? (
-          <Link to={href} className={linkClass}>
-            Открыть
-          </Link>
-        ) : (
-          <button type="button" onClick={handleClick} className={linkClass}>
-            Открыть
-          </button>
-        )}
-      </div>
-    </Card>
-  );
+function pickEarliestStock(stocks) {
+  return stocks.reduce((best, stock) => {
+    if (!best) return stock;
+    const a = new Date(stock.delivery_start).getTime();
+    const b = new Date(best.delivery_start).getTime();
+    return Number.isFinite(a) && a < b ? stock : best;
+  }, null);
 }
 
-function AnalogRow({ part, markupPercent, onNavigateCreate }) {
+function AnalogItem({ part, markupPercent, onNavigateCreate }) {
   const [href, setHref] = useState(null);
-  const [resolving, setResolving] = useState(true);
-  const stocks = mapPartToStocksData(part);
+  const stocks = mapPartToStocksData(part).filter(
+    (stock) => stock.price > 0 && stock.available_count > 0,
+  );
   const minPrice = getMinStockPrice(stocks, markupPercent);
-  const delivery = stocks[0]
-    ? formatDeliveryTimeText(
-      stocks[0].delivery_start,
-      stocks[0].delivery_end,
-      stocks[0].description || stocks[0].warehouse_name || '',
-    )
-    : '—';
+  const totalQty = stocks.reduce((sum, stock) => sum + (Number(stock.available_count) || 0), 0);
+  const earliest = pickEarliestStock(stocks);
+  const delivery = earliest ? formatDeliveryParts(earliest.delivery_start, earliest.delivery_end) : null;
+  const soon = delivery?.dateLine === 'Сегодня' || delivery?.dateLine === 'Завтра';
   const brand = safeText(part?.brand);
   const article = safeText(part?.partnumber || part?.article);
-  const name = safeText(part?.name, `${brand} ${article}`.trim());
+  const name = extractProductDescription(safeText(part?.name, ''), brand, article) || `${brand} ${article}`.trim();
 
   useEffect(() => {
     let cancelled = false;
-    setResolving(true);
     resolveAnalogUrl(part).then((url) => {
-      if (!cancelled) {
-        setHref(url);
-        setResolving(false);
-      }
+      if (!cancelled) setHref(url);
     });
     return () => {
       cancelled = true;
     };
   }, [part]);
 
-  const handleClick = (event) => {
-    if (href) return;
-    event.preventDefault();
-    onNavigateCreate(part);
-  };
+  const body = (
+    <>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge>{brand}</Badge>
+          <Badge className="font-mono">{article}</Badge>
+          {soon ? <Badge tone="success">Быстро</Badge> : null}
+        </div>
+        <p className="mt-2 line-clamp-2 text-sm font-medium leading-snug text-ink">{name}</p>
+        <p className="mt-1 text-xs text-ink-muted">
+          {delivery ? `${delivery.dateLine}, ${delivery.timeLine}` : 'Срок уточняется'}
+          {totalQty ? ` · ${totalQty} шт.` : ''}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end sm:justify-center">
+        <div className="text-left sm:text-right">
+          <p className="text-[11px] text-ink-muted">Цена от</p>
+          <p className="text-lg font-bold tabular-nums leading-tight text-ink">
+            {minPrice ? `${formatPriceRub(minPrice)} ₽` : '—'}
+          </p>
+        </div>
+        <span className="inline-flex h-9 items-center rounded-lg bg-brand-50 px-3 text-sm font-semibold text-brand-700 transition group-hover:bg-brand-600 group-hover:text-white">
+          Открыть
+        </span>
+      </div>
+    </>
+  );
 
-  const linkClass = 'font-medium text-brand-600 hover:text-brand-800';
+  const className = 'group flex w-full flex-col gap-3 rounded-sg-lg border border-line bg-surface p-4 text-left shadow-sg transition hover:border-brand-200 hover:shadow-sg-md sm:flex-row sm:items-center';
 
+  if (href) {
+    return (
+      <Link to={href} className={className}>
+        {body}
+      </Link>
+    );
+  }
   return (
-    <tr className="border-b border-line-soft last:border-0">
-      <td className="px-3 py-2 text-ink-soft">{brand}</td>
-      <td className="px-3 py-2 text-ink-soft">{article}</td>
-      <td className="px-3 py-2 text-ink-soft">{name}</td>
-      <td className="px-3 py-2 font-medium text-ink">
-        {minPrice ? `${formatPriceRub(minPrice)} ₽` : '—'}
-      </td>
-      <td className="px-3 py-2 text-ink-muted">{delivery}</td>
-      <td className="px-3 py-2">
-        {resolving ? (
-          <span className="text-xs text-ink-faint">…</span>
-        ) : href ? (
-          <Link to={href} className={linkClass}>
-            Открыть
-          </Link>
-        ) : (
-          <button type="button" onClick={handleClick} className={linkClass}>
-            Открыть
-          </button>
-        )}
-      </td>
-    </tr>
+    <button type="button" onClick={() => onNavigateCreate(part)} className={className}>
+      {body}
+    </button>
   );
 }
 
@@ -172,57 +118,34 @@ export default function NewPartAnalogsTable({ analogParts, loading, onNavigateCr
   const markupPercent = useNewPartsMarkupPercent('auto');
 
   if (loading) {
-    return <p className="text-sm text-ink-muted">Загрузка аналогов…</p>;
+    return (
+      <div className="grid gap-3 lg:grid-cols-2">
+        <SkeletonCard lines={3} />
+        <SkeletonCard lines={3} />
+      </div>
+    );
   }
   if (!analogParts.length) {
-    return <p className="text-sm text-ink-muted">Аналоги не найдены.</p>;
+    return (
+      <Card padding="sm">
+        <p className="text-sm text-ink-muted">Аналоги по этому запросу не найдены.</p>
+      </Card>
+    );
   }
 
   return (
-    <>
-      <div className="space-y-3 md:hidden">
-        {analogParts.map((part, idx) => {
-          const key = safeText(part?.guid) || `${safeText(part?.brand)}|${safeText(part?.partnumber)}|${idx}`;
-          return (
-            <AnalogMobileCard
-              key={key}
-              part={part}
-              markupPercent={markupPercent}
-              onNavigateCreate={onNavigateCreate}
-            />
-          );
-        })}
-      </div>
-
-      <Card padding="none" className="hidden md:block">
-        <NewPartHorizontalScroll className="p-0" hint="Листайте таблицу аналогов →" showHint={analogParts.length > 2}>
-          <table className="min-w-[52rem] w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-line bg-surface-muted text-xs uppercase tracking-wide text-ink-muted">
-                <th className="px-3 py-2 font-medium">Бренд</th>
-                <th className="px-3 py-2 font-medium">Артикул</th>
-                <th className="px-3 py-2 font-medium">Название</th>
-                <th className="px-3 py-2 font-medium">Цена от</th>
-                <th className="px-3 py-2 font-medium">Поставка</th>
-                <th className="px-3 py-2 font-medium">Ссылка</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analogParts.map((part, idx) => {
-                const key = safeText(part?.guid) || `${safeText(part?.brand)}|${safeText(part?.partnumber)}|${idx}`;
-                return (
-                  <AnalogRow
-                    key={key}
-                    part={part}
-                    markupPercent={markupPercent}
-                    onNavigateCreate={onNavigateCreate}
-                  />
-                );
-              })}
-            </tbody>
-          </table>
-        </NewPartHorizontalScroll>
-      </Card>
-    </>
+    <div className="grid gap-3 lg:grid-cols-2">
+      {analogParts.map((part, idx) => {
+        const key = safeText(part?.guid) || `${safeText(part?.brand)}|${safeText(part?.partnumber)}|${idx}`;
+        return (
+          <AnalogItem
+            key={key}
+            part={part}
+            markupPercent={markupPercent}
+            onNavigateCreate={onNavigateCreate}
+          />
+        );
+      })}
+    </div>
   );
 }

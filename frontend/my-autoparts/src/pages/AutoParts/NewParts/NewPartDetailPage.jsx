@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import { Helmet } from 'react-helmet-async';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
@@ -10,15 +9,7 @@ import { resolveOgImageUrl } from '../../../utils/seoConstants';
 import { buildNewPartDetailPath, parseNewPartDetailParam } from '../../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import Breadcrumbs from '../../../components/Breadcrumbs/Breadcrumbs';
-import PartDetailFaqBlock from '../../PartDetail/PartDetailFaqBlock';
-import PartDetailAboutBlock from '../../PartDetail/PartDetailAboutBlock';
-import PartDetailFitmentBlock from '../../PartDetail/PartDetailFitmentBlock';
-import PartDetailSeoCrossLinks from '../../PartDetail/PartDetailSeoCrossLinks';
-import { mapLaximoApplicableVehicles } from '../../../utils/fitmentDisplay';
-import NewPartProductCard from './NewPartProductCard';
-import NewPartDeliveryStockBlock from './NewPartDeliveryStockBlock';
-import NewPartAnalogsTable from './NewPartAnalogsTable';
-import NewPartUsedMatchesBlock from './NewPartUsedMatchesBlock';
+import VinCatalogOffersTable from '../VinCatalog/VinCatalogOffersTable';
 import { buildNewPartCardJsonLd } from '../../../utils/productJsonLd';
 import { buildProductStructuredDataBlocks, seoFromNewPartMetaResponse } from '../../../utils/productSeo';
 import { buildProductFaqJsonLd } from '../../../utils/partDetailFaq';
@@ -36,26 +27,12 @@ import {
   mapPartToStocksData,
   pickBestRosskoPart,
 } from './rosskoHelpers';
-import { extractCityFromAddress } from '../../../utils/organizationCity';
-import { slugifyBrand } from '../../../utils/slugUtils';
-import NewPartHorizontalScroll from './NewPartHorizontalScroll';
 import NewPartDetailThumb from './NewPartDetailThumb';
-import NewPartDetailMobileGallery from './NewPartDetailMobileGallery';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import useDeferredMount from '../../../hooks/useDeferredMount';
-import { useNewPartCartActions } from './useNewPartCartActions';
-import NewPartCartQuantityControl from './NewPartCartQuantityControl';
-import ProductDetailStickyBar from '../../../components/ProductDetail/ProductDetailStickyBar';
 import ShareButton from '../../../components/ShareButton/ShareButton';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
-import { MOBILE_PRODUCT_STICKY_SCROLL_PAD } from '../../../constants/mobileTokens';
-import { formatDeliveryTimeText } from './newPartStockUtils';
-import {
-  PART_DETAIL_CACHE,
-  readPartDetailCache,
-  writePartDetailCache,
-} from '../../../utils/partDetailCache';
-import { Badge, Button, EmptyState, SectionHeader, SkeletonCard } from '../../../components/UI';
+import { Badge, Button, EmptyState, SkeletonCard } from '../../../components/UI';
 
 const safeText = (value, fallback = '') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -101,40 +78,6 @@ const collectCrossParts = (part) => {
   return Array.isArray(crossParts) ? crossParts : [crossParts];
 };
 
-const dedupeById = (items) => {
-  const seen = new Set();
-  const unique = [];
-  (items || []).forEach((item) => {
-    const id = Number(item?.id);
-    if (!id || seen.has(id)) return;
-    seen.add(id);
-    unique.push(item);
-  });
-  return unique;
-};
-
-function normalizeUsedMatch(item) {
-  const photo = item?.photos?.[0];
-  const photoUrl = item?.photo_url
-    || photo?.photo_url
-    || photo?.list_photo_url
-    || null;
-  const org = item?.organization || null;
-  const orgAddress = item?.organization_address || org?.address || null;
-  return {
-    id: item.id,
-    brand: item.brand,
-    article: item.article,
-    name: item.name,
-    price: item.price,
-    photo_url: photoUrl,
-    organization_name: item.organization_name || org?.name || null,
-    organization_address: orgAddress,
-    city: item.city || extractCityFromAddress(orgAddress),
-    compatible_vehicles: Array.isArray(item.compatible_vehicles) ? item.compatible_vehicles : [],
-  };
-}
-
 export default function NewPartDetailPage() {
   const { cardId: cardIdParam } = useParams();
   const location = useLocation();
@@ -149,25 +92,13 @@ export default function NewPartDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [card, setCard] = useState(null);
-  const [usedMatches, setUsedMatches] = useState([]);
-  const [usedMatchError, setUsedMatchError] = useState('');
-  const [usedMatchLoading, setUsedMatchLoading] = useState(false);
   const [apiSeo, setApiSeo] = useState(null);
-  const [referenceVehicles, setReferenceVehicles] = useState([]);
-  const [fitmentLoading, setFitmentLoading] = useState(false);
-  const [fitmentMeta, setFitmentMeta] = useState(null);
 
   const cardReady = Boolean(card?.id);
   const { enabled: secondaryEnabled } = useDeferredMount({
     mode: 'idle',
     active: cardReady && !loading && !error,
     idleTimeoutMs: 1200,
-  });
-  const { enabled: analogsVisible, sentinelRef: analogsSentinelRef } = useDeferredMount({
-    mode: 'idle-or-visible',
-    active: cardReady && !loading && !error,
-    rootMargin: '200px',
-    idleTimeoutMs: 1800,
   });
 
   useEffect(() => {
@@ -243,53 +174,6 @@ export default function NewPartDetailPage() {
   }, [card?.brand, card?.article]);
 
   useEffect(() => {
-    if (!secondaryEnabled || !card?.brand || !card?.article) {
-      if (!card?.brand || !card?.article) setUsedMatches([]);
-      return;
-    }
-    const run = async () => {
-      setUsedMatchLoading(true);
-      setUsedMatchError('');
-      try {
-        const brandText = String(card.brand).trim();
-        const articleText = String(card.article).trim();
-        const queryText = `${brandText} ${articleText}`.trim();
-
-        const [exactResp, catalogResp, analogResp] = await Promise.all([
-          apiAxiosUnauth.get('/products/public/find-used-match', {
-            params: { brand: brandText, article: articleText, limit: 20 },
-          }),
-          apiAxiosUnauth.get('/catalog/products', {
-            params: {
-              q: queryText,
-              is_new: false,
-              page: 1,
-              page_size: 20,
-              sort: 'created_at_desc',
-            },
-          }),
-          apiAxiosUnauth.get('/search-products/search-used-parts', {
-            params: { q: queryText, only_analogs: true },
-          }),
-        ]);
-
-        const exactItems = Array.isArray(exactResp?.data) ? exactResp.data : [];
-        const catalogItems = Array.isArray(catalogResp?.data?.items) ? catalogResp.data.items : [];
-        const analogItems = Array.isArray(analogResp?.data?.analog_parts) ? analogResp.data.analog_parts : [];
-        setUsedMatches(
-          dedupeById([...exactItems, ...catalogItems, ...analogItems]).map(normalizeUsedMatch)
-        );
-      } catch (_e) {
-        setUsedMatches([]);
-        setUsedMatchError('Не удалось загрузить б/у варианты');
-      } finally {
-        setUsedMatchLoading(false);
-      }
-    };
-    run();
-  }, [secondaryEnabled, card?.brand, card?.article]);
-
-  useEffect(() => {
     if (!card?.id) return;
     const canonicalPath = buildNewPartDetailPath(card);
     if (canonicalPath && location.pathname !== canonicalPath) {
@@ -316,105 +200,50 @@ export default function NewPartDetailPage() {
     run();
   }, [secondaryEnabled, card]);
 
-  useEffect(() => {
-    if (!secondaryEnabled || !card?.brand || !card?.article) {
-      if (!card?.brand || !card?.article) {
-        setReferenceVehicles([]);
-        setFitmentMeta(null);
-      }
-      return undefined;
-    }
-    const brandText = String(card.brand).trim();
-    const articleText = String(card.article).trim();
-    const fitmentKey = `${brandText}|${articleText}|new`;
-    const cached = readPartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey);
-    if (cached !== null) {
-      setReferenceVehicles(Array.isArray(cached) ? cached : []);
-      setFitmentMeta({ checked: true });
-      setFitmentLoading(false);
-      return undefined;
-    }
-
-    let cancelled = false;
-    setFitmentLoading(true);
-    (async () => {
-      try {
-        const [refResponse, laximoResponse] = await Promise.all([
-          apiAxiosUnauth.get('/public/part-reference-fitment', {
-            params: { brand: brandText, article: articleText },
-          }),
-          apiAxiosUnauth
-            .post('/public/laximo/oem/applicable-vehicles', {
-              oem: articleText,
-              brand: brandText,
-            })
-            .catch(() => null),
-        ]);
-        const vehicles = Array.isArray(refResponse?.data?.vehicles)
-          ? refResponse.data.vehicles
-          : [];
-        const laximoData = laximoResponse?.data;
-        const laximoOk = laximoData?.ok !== false;
-        const laximoRows = laximoOk
-          ? mapLaximoApplicableVehicles(laximoData?.vehicles)
-          : [];
-        const merged = [...vehicles, ...laximoRows];
-        if (!cancelled) {
-          writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, merged);
-          setReferenceVehicles(merged);
-          setFitmentMeta({
-            checked: true,
-            laximoOk,
-            coverage: laximoData?.coverage || (laximoRows.length ? 'full' : 'none'),
-            dataSource: laximoData?.data_source || (laximoRows.length ? 'laximo' : 'none'),
-            fitmentStatus: laximoData?.fitment_status || null,
-          });
-        }
-      } catch (_e) {
-        if (!cancelled) {
-          writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, []);
-          setReferenceVehicles([]);
-          setFitmentMeta({ checked: true, laximoOk: false, coverage: 'none' });
-        }
-      } finally {
-        if (!cancelled) setFitmentLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [secondaryEnabled, card?.brand, card?.article]);
-
   const livePart = useMemo(() => {
     if (!card) return null;
     const fromRossko = pickBestRosskoPart(rosskoData, card.article, card.brand);
     if (fromRossko) return fromRossko;
-    return buildPartFromCard(card);
+    const fallback = buildPartFromCard(card);
+    const cardStocks = stocksFromCardApi(card);
+    if (!cardStocks.length) return fallback;
+    return {
+      ...fallback,
+      stocks: {
+        stock: cardStocks.map((stock) => ({
+          id: stock.stock_id,
+          price: stock.price,
+          count: stock.available_count,
+          deliveryStart: stock.delivery_start,
+          deliveryEnd: stock.delivery_end,
+          description: stock.description,
+          is_preferred: Boolean(stock.is_preferred),
+        })),
+      },
+    };
   }, [card, rosskoData]);
 
   const liveStocks = useMemo(() => {
-    const fromRossko = mapPartToStocksData(livePart);
-    if (fromRossko.length > 0) return fromRossko;
-    return stocksFromCardApi(card);
-  }, [livePart, card]);
+    if (!livePart) return [];
+    return mapPartToStocksData(livePart);
+  }, [livePart]);
 
   const displayPrice = useMemo(
-    () => getMinStockPrice(liveStocks, markupPercent) ?? getMinStockPrice(stocksFromCardApi(card), markupPercent),
-    [liveStocks, card, markupPercent]
+    () => getMinStockPrice(liveStocks, markupPercent),
+    [liveStocks, markupPercent]
   );
 
   const seoPrice = useMemo(
-    () => getMinStockPrice(liveStocks, 0) ?? getMinStockPrice(stocksFromCardApi(card), 0),
-    [liveStocks, card]
+    () => getMinStockPrice(liveStocks, 0),
+    [liveStocks]
   );
 
   const analogParts = useMemo(() => {
-    const bestPart = livePart;
     const rosskoParts = getRosskoParts(rosskoData);
-    const sourceParts = rosskoParts.length > 0 ? rosskoParts : (bestPart ? [bestPart] : []);
+    const sourceParts = rosskoParts.length > 0 ? rosskoParts : (livePart ? [livePart] : []);
     if (!sourceParts.length) return [];
     const crosses = sourceParts.flatMap((part) => collectCrossParts(part));
-    const mainGuid = safeText(bestPart?.guid);
+    const mainGuid = safeText(livePart?.guid);
     const seen = new Set();
     return crosses.filter((part) => {
       const guid = safeText(part?.guid);
@@ -510,8 +339,6 @@ export default function NewPartDetailPage() {
     }
   }, [navigate, backToListPath]);
 
-  const cartActions = useNewPartCartActions({ part: livePart, stocksData: liveStocks });
-
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-3 py-6 sm:px-4">
@@ -551,9 +378,6 @@ export default function NewPartDetailPage() {
   const canonicalUrl = `${SITE_ORIGIN}${canonicalPath}`;
   const inStock = apiSeo?.inStock ?? ((card?.stock_count || 0) > 0 || liveStocks.length > 0);
   const partTypeName = apiSeo?.partTypeName || extractProductDescription(card?.name, brand, article);
-  const bodyDescription = apiSeo?.bodyDescription || apiSeo?.seoSummary || '';
-  const usedCatalogPath = apiSeo?.usedCatalogPath
-    || `/autoparts/used?q=${encodeURIComponent(`${brand} ${article}`.trim())}`;
 
   const parsedApiJsonLd = apiSeo?.jsonLd;
   const productJsonLd = parsedApiJsonLd?.['@graph']
@@ -581,47 +405,44 @@ export default function NewPartDetailPage() {
     price: seoPrice ?? displayPrice,
     stockSummary: apiSeo?.stockSummary,
   });
-  const faqItems = apiSeo?.faqItems || null;
   const structuredDataBlocks = buildProductStructuredDataBlocks({
     productJsonLd,
     breadcrumbJsonLd,
     faqJsonLd,
   });
 
+  const offersLoading = rosskoStatus === 'loading' && liveStocks.length === 0;
   const analogsLoading = rosskoStatus === 'loading' && analogParts.length === 0;
   const hasLiveStocks = Boolean(livePart) && liveStocks.length > 0;
   const partDescription = livePart
     ? extractProductDescription(safeText(livePart?.name), brand, article)
     : extractProductDescription(card?.name, brand, article);
 
-  const mainProductBlock = hasLiveStocks ? (
-    <NewPartProductCard
-      part={livePart}
-      stocksData={liveStocks}
-      sectionType="available"
-      uniqueId={`detail-${numericCardId}`}
-      isDetailView
-      hideMobileCartCta
-    />
-  ) : (
-    <EmptyState
-      title="Нет доступных складов"
-      description="Сейчас эту деталь нельзя добавить в корзину. Проверьте аналоги ниже."
-      className="border-solid py-8"
-    />
+  const headerActions = (
+    <div className="flex shrink-0 items-center gap-2">
+      <FavoriteHeartOverlay
+        variant="inline"
+        rossko={{
+          brand,
+          partnumber: article,
+          guid: livePart?.guid,
+          title: pageH1,
+          minPrice: displayPrice,
+        }}
+      />
+      <ShareButton
+        url={canonicalUrl}
+        title={pageH1}
+        text={partDescription || pageH1}
+        showLabel={false}
+        size="sm"
+        className="rounded-full"
+      />
+    </div>
   );
 
-  const showStickyCart = hasLiveStocks && inStock && cartActions.mainStock;
-  const stickyDeliveryMeta = cartActions.mainStock
-    ? formatDeliveryTimeText(
-      cartActions.mainStock.delivery_start,
-      cartActions.mainStock.delivery_end,
-      cartActions.mainStock.description || cartActions.mainStock.warehouse_name || '',
-    )
-    : '';
-
   return (
-    <div className={`mx-auto max-w-6xl sm:px-4 sm:py-6 ${showStickyCart ? MOBILE_PRODUCT_STICKY_SCROLL_PAD : 'max-md:pb-28'} px-0 py-0 lg:px-3 lg:py-4`}>
+    <div className="mx-auto max-w-5xl px-3 py-3 sm:px-4 sm:py-6">
       <PageSeoHelmet seo={seo} />
       <Helmet>
         {structuredDataBlocks.map((block) => (
@@ -631,179 +452,62 @@ export default function NewPartDetailPage() {
         ))}
       </Helmet>
 
-      <div className="relative bg-surface-subtle lg:hidden">
-        <NewPartDetailMobileGallery
+      <div className="flex items-center justify-between gap-3">
+        <Button variant="ghost" size="sm" onClick={handleBackToList} className="-ml-2">
+          ← Назад
+        </Button>
+        <div className="lg:hidden">{headerActions}</div>
+      </div>
+      <div className="mt-1 max-lg:hidden">
+        <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
+      </div>
+
+      <header className="mt-3 flex items-start gap-3 sm:gap-4">
+        <NewPartDetailThumb
           imageUrl={card?.image_url}
           attribution={card?.image_attribution}
           alt={`${brand} ${article}`}
         />
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <button
-            type="button"
-            onClick={handleBackToList}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface/80 text-ink-soft shadow-sg-sm backdrop-blur"
-            aria-label="Назад"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div className="pointer-events-auto flex items-center gap-2">
-            <FavoriteHeartOverlay
-              variant="inline"
-              rossko={{
-                brand,
-                partnumber: article,
-                guid: livePart?.guid,
-                title: pageH1,
-                minPrice: cartActions.mainPrice,
-              }}
-            />
-            <ShareButton
-              url={canonicalUrl}
-              title={pageH1}
-              text={partDescription || pageH1}
-              showLabel={false}
-              size="sm"
-              className="h-11 w-11 min-h-11 rounded-full border-0 bg-surface/80 p-0 shadow-sg-sm backdrop-blur"
-            />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge tone="brand">{brand}</Badge>
+            <Badge className="font-mono">{article}</Badge>
+            <Badge tone={inStock ? 'success' : 'warning'}>{inStock ? 'В наличии' : 'Под заказ'}</Badge>
           </div>
+          <h1 className="mt-2 text-lg font-bold leading-snug text-ink sm:text-2xl">{pageH1}</h1>
+          {partDescription && partDescription !== pageH1 ? (
+            <p className="mt-1 line-clamp-2 text-sm text-ink-muted">{partDescription}</p>
+          ) : null}
         </div>
-      </div>
+        <div className="max-lg:hidden">{headerActions}</div>
+      </header>
 
-      <div className="px-3 py-4 lg:px-0">
-      <div className="max-lg:hidden">
-        <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
-      </div>
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleBackToList}
-        className="-ml-2 mt-2 max-lg:hidden"
-      >
-        ← К поиску
-      </Button>
-
-      <section className="mt-3 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="min-w-0">
-          <div className="flex gap-3 sm:gap-4">
-            <NewPartDetailThumb
-              imageUrl={card?.image_url}
-              attribution={card?.image_attribution}
-              alt={`${brand} ${article}`}
-              className="hidden lg:flex"
-            />
-            <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold leading-snug text-ink sm:text-2xl">{pageH1}</h1>
-              <NewPartHorizontalScroll className="mt-2.5" hint="Листайте теги →" showHint={false}>
-                <div className="flex flex-nowrap gap-1.5 pb-0.5">
-                  <Badge className="shrink-0">{brand}</Badge>
-                  <Badge className="shrink-0 font-mono">{article}</Badge>
-                  <Badge tone={inStock ? 'success' : 'warning'} className="shrink-0">
-                    {inStock ? 'В наличии' : 'Под заказ'}
-                  </Badge>
-                  {slugifyBrand(brand) ? (
-                    <Link
-                      to={`/autoparts/new/brand/${encodeURIComponent(slugifyBrand(brand))}`}
-                      className="shrink-0 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100"
-                    >
-                      Все {brand}
-                    </Link>
-                  ) : null}
-                </div>
-              </NewPartHorizontalScroll>
-              {partDescription ? (
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{partDescription}</p>
-              ) : null}
-              <PartDetailSeoCrossLinks
-                brand={brand}
-                article={article}
-                isNew
-                usedCatalogPath={usedCatalogPath}
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 lg:hidden">{mainProductBlock}</div>
-        </div>
-
-        <aside className="hidden lg:block lg:sticky lg:top-4">
-          {mainProductBlock}
-        </aside>
-      </section>
-
-      <div className="mt-6 space-y-6">
-        <NewPartDeliveryStockBlock stocks={liveStocks} inStock={inStock} compactMobile={showStickyCart} />
-
-        <PartDetailAboutBlock bodyDescription={bodyDescription} isNew />
-        <PartDetailFitmentBlock
-          sellerVehicles={[]}
-          referenceVehicles={referenceVehicles}
-          loading={secondaryEnabled ? fitmentLoading : true}
-        />
-
-        <NewPartUsedMatchesBlock
-          brand={brand}
-          article={article}
-          items={usedMatches}
-          loading={secondaryEnabled ? usedMatchLoading : true}
-          error={usedMatchError}
-        />
-
-        {secondaryEnabled ? (
-          <PartDetailFaqBlock
-            brand={brand}
-            article={article}
-            partTypeName={partTypeName}
-            isNew
-            city={apiSeo?.city}
-            fitmentText={apiSeo?.fitmentText}
-            inStock={inStock}
-            items={faqItems}
-          />
-        ) : null}
-
-        <section ref={analogsSentinelRef}>
-          <SectionHeader
-            title="Аналоги"
-            action={analogsVisible && !analogsLoading && analogParts.length > 0
-              ? <Badge>{analogParts.length}</Badge>
-              : null}
-            className="mb-3"
-          />
-          {analogsVisible ? (
-            <NewPartAnalogsTable
-              analogParts={analogParts}
-              loading={analogsLoading}
-              onNavigateCreate={handleAnalogNavigateCreate}
-            />
+      <div className="mt-5 space-y-6">
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-ink">Предложения</h2>
+          {offersLoading || !hasLiveStocks ? (
+            <SkeletonCard lines={4} className="min-h-40" />
           ) : (
-            <p className="py-4 text-sm text-ink-muted">Загрузка аналогов…</p>
+            <VinCatalogOffersTable
+              parts={livePart ? [livePart] : []}
+              emptyText="Нет доступных предложений"
+              onOpenPart={() => {}}
+            />
           )}
         </section>
-      </div>
-      </div>
 
-      {showStickyCart ? (
-        <ProductDetailStickyBar
-          priceLabel="Цена"
-          priceValue={`${cartActions.mainPrice} ₽`}
-          meta={stickyDeliveryMeta !== '—' ? stickyDeliveryMeta : undefined}
-        >
-          <div className="flex justify-end">
-            <NewPartCartQuantityControl
-              quantity={cartActions.mainQuantity}
-              onAdd={() => cartActions.handleAddToCart(cartActions.mainStock)}
-              onAddToBasket={(basketId) => cartActions.handleAddToCart(cartActions.mainStock, basketId)}
-              onRemove={() => cartActions.handleRemoveFromCart(cartActions.mainStock)}
-              disabled={cartActions.disabledControl}
-              noStock={cartActions.mainStockInfo.noStock}
-              loading={cartActions.addingToCart}
-            />
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-ink">Аналоги</h2>
+            {!analogsLoading && analogParts.length > 0 ? <Badge>{analogParts.length}</Badge> : null}
           </div>
-        </ProductDetailStickyBar>
-      ) : null}
+          <VinCatalogOffersTable
+            parts={analogParts}
+            emptyText="Аналоги не найдены"
+            onOpenPart={({ part }) => handleAnalogNavigateCreate(part)}
+          />
+        </section>
+      </div>
     </div>
   );
 }

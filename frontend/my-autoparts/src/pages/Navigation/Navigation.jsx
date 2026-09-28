@@ -213,7 +213,7 @@ export default function Navigation() {
                   <Link
                     to={profilePath}
                     aria-label="Профиль"
-                    className="flex items-center gap-2 rounded-sg py-1 pl-1 pr-3 text-ink-muted transition hover:bg-surface-subtle hover:text-brand-600"
+                    className="group flex items-center gap-2 rounded-sg py-1 pl-1 pr-3 text-ink-muted transition hover:bg-surface-subtle hover:text-brand-600"
                   >
                     <HeaderAvatar
                       initial={firstName}
@@ -222,7 +222,7 @@ export default function Navigation() {
                       lastName={user.last_name}
                       size="sm"
                     />
-                    <span className="hidden max-w-[120px] truncate text-sm font-medium text-ink lg:block">
+                    <span className="hidden max-w-[120px] truncate text-sm font-medium text-ink group-hover:text-brand-600 lg:block">
                       {firstName}
                     </span>
                   </Link>
