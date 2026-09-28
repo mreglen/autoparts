@@ -3,7 +3,13 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import { EmptyState, PageHeader, SectionHeader, Skeleton } from '../../components/UI';
+import {
+  EmptyState,
+  PageHeader,
+  SectionHeader,
+  Skeleton,
+  UnderlineTabs,
+} from '../../components/UI';
 import { OrderStatusBadge } from '../../components/Autoservice/RepairOrderViewModal';
 import { apiRequest } from '../../utils/apiClient';
 import { getGreeting, getFirstName, MetricCard, QuickAction } from '../Dashboard/dashboardUi';
@@ -76,6 +82,7 @@ export default function AutoserviceDashboardPage() {
   const [plannerData, setPlannerData] = useState(null);
   const [revenue30d, setRevenue30d] = useState(null);
   const [reviewCount, setReviewCount] = useState(0);
+  const [activeTab, setActiveTab] = useState('overview');
 
   const can = useCallback(
     (code) => hasAutoservicePermission(user, permissionCodes, code),
@@ -237,6 +244,17 @@ export default function AutoserviceDashboardPage() {
 
   const firstName = getFirstName(user);
 
+  const serviceTabs = useMemo(() => {
+    const tabs = [
+      { id: 'overview', label: 'Сводка' },
+      { id: 'today', label: 'Сегодня', count: todayItems.length },
+    ];
+    if (canSeeFinance) {
+      tabs.push({ id: 'finance', label: 'Финансы' });
+    }
+    return tabs;
+  }, [todayItems.length, canSeeFinance]);
+
   if (!isReady) return <AuthLoadingScreen />;
 
   if (loading) {
@@ -322,7 +340,14 @@ export default function AutoserviceDashboardPage() {
         ) : null}
       </section>
 
-      {quickActions.length > 0 && (
+      <UnderlineTabs
+        tabs={serviceTabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        className="mb-2"
+      />
+
+      {activeTab === 'overview' && quickActions.length > 0 && (
         <section className="space-y-3">
           <SectionHeader title="Быстрые действия" />
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
@@ -333,54 +358,69 @@ export default function AutoserviceDashboardPage() {
         </section>
       )}
 
-      <section className="space-y-3">
-        <SectionHeader
-          title="Сегодня"
-          subtitle={todayItems.length > 0 ? `${todayItems.length} записей` : undefined}
-        />
-        {todayItems.length === 0 ? (
-          <EmptyState
-            illustration="success"
-            title="Записей нет"
-            description="На сегодня ничего не запланировано"
+      {activeTab === 'today' && (
+        <section className="space-y-3">
+          <SectionHeader
+            title="Сегодня"
+            subtitle={todayItems.length > 0 ? `${todayItems.length} записей` : undefined}
           />
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {todayItems.map((item) => (
-              <button
-                key={`${item.kind || 'order'}-${item.id}`}
-                type="button"
-                onClick={() => navigate('/autoservice/planner')}
-                className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-gray-50/80"
-              >
-                <span className="w-16 shrink-0 text-sm font-semibold tabular-nums text-ink">
-                  {todayItemTimeLabel(item)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-ink">
-                    {item.kind === 'inspection'
-                      ? formatPersonNameWithInitials(item.client_name) || 'Осмотр'
-                      : (item.vehicle && item.vehicle !== '—' ? item.vehicle : 'Авто')}
+          {todayItems.length === 0 ? (
+            <EmptyState
+              illustration="success"
+              title="Записей нет"
+              description="На сегодня ничего не запланировано"
+            />
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {todayItems.map((item) => (
+                <button
+                  key={`${item.kind || 'order'}-${item.id}`}
+                  type="button"
+                  onClick={() => navigate('/autoservice/planner')}
+                  className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-gray-50/80"
+                >
+                  <span className="w-16 shrink-0 text-sm font-semibold tabular-nums text-ink">
+                    {todayItemTimeLabel(item)}
                   </span>
-                  <span className="mt-0.5 block truncate text-sm text-ink-muted">
-                    {item.kind === 'inspection'
-                      ? `Осмотр${item.client_phone ? ` · ${item.client_phone}` : ''}`
-                      : formatPersonNameWithInitials(item.client_name)}
-                    {item.zoneName ? ` · ${item.zoneName}` : ''}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-ink">
+                      {item.kind === 'inspection'
+                        ? formatPersonNameWithInitials(item.client_name) || 'Осмотр'
+                        : (item.vehicle && item.vehicle !== '—' ? item.vehicle : 'Авто')}
+                    </span>
+                    <span className="mt-0.5 block truncate text-sm text-ink-muted">
+                      {item.kind === 'inspection'
+                        ? `Осмотр${item.client_phone ? ` · ${item.client_phone}` : ''}`
+                        : formatPersonNameWithInitials(item.client_name)}
+                      {item.zoneName ? ` · ${item.zoneName}` : ''}
+                    </span>
                   </span>
-                </span>
-                {item.kind === 'inspection' ? (
-                  <span className="shrink-0 rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700">
-                    Осмотр
-                  </span>
-                ) : (
-                  <OrderStatusBadge status={item.status} className="shrink-0" />
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+                  {item.kind === 'inspection' ? (
+                    <span className="shrink-0 rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700">
+                      Осмотр
+                    </span>
+                  ) : (
+                    <OrderStatusBadge status={item.status} className="shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'finance' && canSeeFinance && (
+        <section className="space-y-3">
+          <SectionHeader title="Финансы автосервиса" />
+          <MetricCard
+            label="Выручка за 30 дней"
+            value={formatFinanceCurrency(revenue30d ?? 0)}
+            hint="Платежи по заказ-нарядам"
+            href="/autoservice/finance"
+            accent="brand"
+          />
+        </section>
+      )}
     </div>
   );
 }

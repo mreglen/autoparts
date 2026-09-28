@@ -11,6 +11,7 @@ import {
   PageHeader,
   SectionHeader,
   Skeleton,
+  UnderlineTabs,
 } from '../../components/UI';
 import {
   computeProductStats,
@@ -99,6 +100,7 @@ export default function DashboardPage() {
   const [onboarding, setOnboarding] = useState(null);
   const [onboardingLoading, setOnboardingLoading] = useState(false);
   const [tasksSectionHidden, setTasksSectionHidden] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
   const canAccess = Boolean(user?.is_admin || user?.is_seller || user?.is_employee);
   const showOnboarding = Boolean(user?.is_seller || user?.is_director);
@@ -117,6 +119,17 @@ export default function DashboardPage() {
     || user?.is_seller
     || (user?.is_employee && permissionCodes?.includes('my-parts'))
   );
+
+  const sellerTabs = useMemo(() => {
+    const tabs = [
+      { id: 'overview', label: 'Обзор' },
+      { id: 'tasks', label: 'Задачи', count: tasks.length },
+    ];
+    if (canViewFinance) {
+      tabs.push({ id: 'sales', label: 'Продажи' });
+    }
+    return tabs;
+  }, [tasks.length, canViewFinance]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -351,7 +364,7 @@ export default function DashboardPage() {
 
   return (
     <div className={`${warehousePageClass} w-full min-w-0 space-y-6 pb-12 lg:space-y-8`}>
-      {showOnboarding && (
+      {showOnboarding && activeTab === 'overview' && (
         <SellerOnboardingPanel onboarding={onboarding} loading={onboardingLoading} />
       )}
 
@@ -415,7 +428,14 @@ export default function DashboardPage() {
         )}
       </section>
 
-      {quickActions.length > 0 && (
+      <UnderlineTabs
+        tabs={sellerTabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        className="mb-2"
+      />
+
+      {activeTab === 'overview' && quickActions.length > 0 && (
         <section className="space-y-3">
           <SectionHeader title="Быстрые действия" />
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
@@ -426,55 +446,57 @@ export default function DashboardPage() {
         </section>
       )}
 
-      <section className="space-y-3">
-        {tasksSectionHidden ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gray-100 px-4 py-3">
-            <span className="text-sm text-ink-muted">
-              Блок «Требует внимания» скрыт
-              {tasks.length > 0 ? ` · ${tasks.length} задач` : ''}
-            </span>
-            <Button size="sm" variant="secondary" onClick={() => toggleTasksSection(false)}>
-              Показать
-            </Button>
-          </div>
-        ) : (
-          <>
-            <SectionHeader
-              title="Требует внимания"
-              subtitle={tasks.length > 0 ? `${tasks.length} задач` : undefined}
-              action={(
-                <Button size="sm" variant="ghost" onClick={() => toggleTasksSection(true)}>
-                  Скрыть
-                </Button>
-              )}
-            />
-
-            {tasksLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-              </div>
-            ) : tasks.length === 0 ? (
-              <EmptyState
-                illustration="success"
-                title="Всё в порядке"
-                description="Срочных задач нет — можно спокойно работать"
+      {activeTab === 'tasks' && (
+        <section className="space-y-3">
+          {tasksSectionHidden ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gray-100 px-4 py-3">
+              <span className="text-sm text-ink-muted">
+                Блок «Требует внимания» скрыт
+                {tasks.length > 0 ? ` · ${tasks.length} задач` : ''}
+              </span>
+              <Button size="sm" variant="secondary" onClick={() => toggleTasksSection(false)}>
+                Показать
+              </Button>
+            </div>
+          ) : (
+            <>
+              <SectionHeader
+                title="Требует внимания"
+                subtitle={tasks.length > 0 ? `${tasks.length} задач` : undefined}
+                action={(
+                  <Button size="sm" variant="ghost" onClick={() => toggleTasksSection(true)}>
+                    Скрыть
+                  </Button>
+                )}
               />
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {urgentTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onNavigate={navigate} />
-                ))}
-                {otherTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onNavigate={navigate} />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </section>
 
-      {canViewFinance && recentSales.length > 0 && (
+              {tasksLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-14 w-full" />
+                  <Skeleton className="h-14 w-full" />
+                </div>
+              ) : tasks.length === 0 ? (
+                <EmptyState
+                  illustration="success"
+                  title="Всё в порядке"
+                  description="Срочных задач нет — можно спокойно работать"
+                />
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {urgentTasks.map((task) => (
+                    <TaskRow key={task.id} task={task} onNavigate={navigate} />
+                  ))}
+                  {otherTasks.map((task) => (
+                    <TaskRow key={task.id} task={task} onNavigate={navigate} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'sales' && canViewFinance && (
         <section className="space-y-3">
           <SectionHeader
             title="Последние продажи"
@@ -484,24 +506,32 @@ export default function DashboardPage() {
               </Button>
             )}
           />
-          <ul className="divide-y divide-gray-100">
-            {recentSales.map((sale) => (
-              <li key={sale.id} className="flex items-center justify-between gap-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-ink">
-                    {sale.product?.brand ? `${sale.product.brand} · ` : ''}
-                    {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
+          {recentSales.length === 0 ? (
+            <EmptyState
+              illustration="info"
+              title="Продаж пока нет"
+              description="За последнее время продажи не фиксировались"
+            />
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {recentSales.map((sale) => (
+                <li key={sale.id} className="flex items-center justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink">
+                      {sale.product?.brand ? `${sale.product.brand} · ` : ''}
+                      {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
+                    </p>
+                    <p className="mt-0.5 text-xs text-ink-muted">
+                      {formatShortDate(sale.movement_date)} · {sale.quantity} шт.
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-sm font-semibold tabular-nums text-success-700">
+                    {formatCurrency(saleLineTotal(sale))}
                   </p>
-                  <p className="mt-0.5 text-xs text-ink-muted">
-                    {formatShortDate(sale.movement_date)} · {sale.quantity} шт.
-                  </p>
-                </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-success-700">
-                  {formatCurrency(saleLineTotal(sale))}
-                </p>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
     </div>
