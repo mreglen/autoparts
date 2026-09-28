@@ -185,21 +185,22 @@ export default function VinCatalogPage() {
   };
 
   /** Загружает схемы всех узлов группы: у одной группы бывает несколько чертежей. */
-  const loadUnitSchemas = async (unitList, fallbackSsd, vehicleOverride = null) => {
+  const loadUnitSchemas = (unitList) => {
+    schemasReqId.current += 1;
     const list = (Array.isArray(unitList) ? unitList : []).filter((u) => u?.image_url);
-    if (!list.length) {
-      setUnitSchemas([]);
-      return;
-    }
-    const reqId = ++schemasReqId.current;
-    setUnitSchemas(list.map((u) => ({ ...u, imageMap: [] })));
-    const maps = await Promise.all(
-      list.map((u) =>
-        u.unit_id ? fetchImageMap(u.unit_id, u.ssd || fallbackSsd, vehicleOverride) : Promise.resolve([])
-      )
-    );
+    setUnitSchemas(list.map((u) => ({ ...u, imageMap: [], imageMapLoaded: false })));
+  };
+
+  const loadSchemaImageMap = async (schema) => {
+    if (!schema?.unit_id || schema.imageMapLoaded) return;
+    const reqId = schemasReqId.current;
+    const map = await fetchImageMap(schema.unit_id, schema.ssd);
     if (reqId !== schemasReqId.current) return;
-    setUnitSchemas(list.map((u, idx) => ({ ...u, imageMap: maps[idx] || [] })));
+    setUnitSchemas((prev) => prev.map((item) => (
+      item.unit_id === schema.unit_id
+        ? { ...item, imageMap: map, imageMapLoaded: true }
+        : item
+    )));
   };
 
   const startBrowse = async (cand, { wizard = false } = {}) => {
@@ -1105,6 +1106,7 @@ export default function VinCatalogPage() {
           availabilityLoading={availabilityLoading}
           imageMap={imageMap}
           unitSchemas={unitSchemas}
+          onLoadSchemaImageMap={loadSchemaImageMap}
           searchQuery={searchQuery}
           searchLoading={searchLoading}
           searchEmpty={searchEmpty}

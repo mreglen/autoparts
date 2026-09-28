@@ -325,18 +325,21 @@ def normalize_quick_group(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _dict_rows(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    return []
+
+
 def _quick_group_roots(data: Any) -> list[dict[str, Any]]:
-    if data is None:
-        return []
-    if isinstance(data, list):
-        return [item for item in data if isinstance(item, dict)]
     if isinstance(data, dict):
         for key in ("quickGroups", "groups", "rows", "items", "data"):
-            nested = data.get(key)
-            if isinstance(nested, list):
-                return [item for item in nested if isinstance(item, dict)]
-        return [data]
-    return []
+            nested = _pick(data, key)
+            if nested is not None:
+                return _dict_rows(nested)
+    return _dict_rows(data)
 
 
 def flatten_quick_groups(data: Any) -> list[dict[str, Any]]:
@@ -360,48 +363,48 @@ def _flatten_quick_group_nodes(
         row = normalize_quick_group(node)
         row["parent_id"] = parent_id or None
         out.append(row)
-        children = node.get("children")
-        if isinstance(children, list) and children:
-            child_nodes = [c for c in children if isinstance(c, dict)]
+        child_nodes = _dict_rows(_pick(node, "children"))
+        if child_nodes:
             out.extend(_flatten_quick_group_nodes(child_nodes, parent_id=qid))
     return out
 
 
 def _quick_detail_categories(data: Any) -> list[dict[str, Any]]:
-    if data is None:
-        return []
-    if isinstance(data, list):
-        cats: list[dict[str, Any]] = []
-        for item in data:
-            if not isinstance(item, dict):
+    roots = _dict_rows(data)
+    categories: list[dict[str, Any]] = []
+
+    def collect(items: list[dict[str, Any]]) -> None:
+        for item in items:
+            wrapped = _pick(item, "categories")
+            if wrapped is not None:
+                collect(_dict_rows(wrapped))
                 continue
-            if isinstance(item.get("units"), list):
-                cats.append(item)
-            elif _pick(item, "categoryId", "categoryid"):
-                cats.append(item)
-        return cats or [item for item in data if isinstance(item, dict)]
-    if isinstance(data, dict):
-        for key in ("categories", "rows", "items", "data"):
-            nested = data.get(key)
-            if isinstance(nested, list):
-                return [item for item in nested if isinstance(item, dict)]
-        if isinstance(data.get("units"), list):
-            return [data]
-        return [data]
-    return []
+            is_category = _pick(item, "units") is not None or _pick(
+                item, "categoryId", "categoryid"
+            ) is not None
+            if is_category:
+                categories.append(item)
+            else:
+                for key in ("rows", "items", "data", "quickDetails"):
+                    nested = _pick(item, key)
+                    if nested is not None:
+                        collect(_dict_rows(nested))
+                        break
+            children = _dict_rows(_pick(item, "children"))
+            if children:
+                collect(children)
+
+    collect(roots)
+    return categories or roots
 
 
 def _quick_detail_flat_rows(data: Any) -> list[dict[str, Any]]:
-    if data is None:
-        return []
-    if isinstance(data, list):
-        return [item for item in data if isinstance(item, dict)]
     if isinstance(data, dict):
         for key in ("details", "units", "rows", "items", "data", "quickDetails"):
-            nested = data.get(key)
-            if isinstance(nested, list):
-                return [item for item in nested if isinstance(item, dict)]
-    return []
+            nested = _pick(data, key)
+            if nested is not None:
+                return _dict_rows(nested)
+    return _dict_rows(data)
 
 
 def parse_quick_detail_response(
@@ -429,25 +432,18 @@ def parse_quick_detail_response(
         details.append(row)
 
     for cat in _quick_detail_categories(data):
-        units = cat.get("units")
-        if not isinstance(units, list):
-            continue
+        units = _dict_rows(_pick(cat, "units"))
         for unit in units:
-            if not isinstance(unit, dict):
-                continue
             unit_norm = normalize_unit_info(unit)
             if primary_unit is None:
                 primary_unit = unit_norm
-            unit_details = unit.get("details")
+            unit_details = _dict_rows(_pick(unit, "details"))
             has_match = False
-            if isinstance(unit_details, list):
-                for item in unit_details:
-                    if not isinstance(item, dict):
-                        continue
-                    _append_detail(item)
-                    match_raw = item.get("match")
-                    if match_raw is True or str(match_raw).lower() in ("t", "true", "1"):
-                        has_match = True
+            for item in unit_details:
+                _append_detail(item)
+                match_raw = _pick(item, "match")
+                if match_raw is True or str(match_raw).lower() in ("t", "true", "1"):
+                    has_match = True
             if has_match and matched_unit is None:
                 matched_unit = unit_norm
 
@@ -500,18 +496,11 @@ def parse_quick_detail_units(data: Any) -> list[dict[str, Any]]:
         units.append(unit_norm)
 
     for cat in _quick_detail_categories(data):
-        cat_units = cat.get("units")
-        if not isinstance(cat_units, list):
-            continue
-        for unit in cat_units:
-            if not isinstance(unit, dict):
-                continue
-            raw_details = unit.get("details")
+        for unit in _dict_rows(_pick(cat, "units")):
             detail_rows = [
                 normalize_detail(item)
-                for item in raw_details
-                if isinstance(item, dict)
-            ] if isinstance(raw_details, list) else []
+                for item in _dict_rows(_pick(unit, "details"))
+            ]
             _add_unit(unit, detail_rows)
 
     if units:

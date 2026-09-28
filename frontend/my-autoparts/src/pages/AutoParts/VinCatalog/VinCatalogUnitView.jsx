@@ -64,6 +64,7 @@ function SchemaImage({
   const wrapRef = useRef(null);
   const imgRef = useRef(null);
   const [zoomed, setZoomed] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [layout, setLayout] = useState(null);
 
   const recompute = useCallback(() => {
@@ -184,20 +185,37 @@ function SchemaImage({
       </div>
       {zoomed ? (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setZoomed(false)}
+          className="fixed inset-0 z-[80] bg-black/80"
+          onClick={() => {
+            setZoomed(false);
+            setZoom(1);
+          }}
           role="presentation"
         >
-          <img
-            src={src}
-            alt={alt || ''}
-            className="max-h-[92vh] max-w-[96vw] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="h-full w-full overflow-auto p-6 pt-16">
+            <div className="flex min-h-full min-w-full items-center justify-center">
+              <img
+                src={src}
+                alt={alt || ''}
+                className="max-h-[calc(100vh-6rem)] max-w-[calc(100vw-3rem)] object-contain transition-transform"
+                style={{ transform: `scale(${zoom})` }}
+                onClick={(e) => e.stopPropagation()}
+                draggable={false}
+              />
+            </div>
+          </div>
+          <div className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-1 rounded-lg bg-white/95 p-1 shadow">
+            <button type="button" onClick={(e) => { e.stopPropagation(); setZoom((v) => Math.max(1, v - 0.5)); }} className="h-9 w-9 rounded-md text-lg text-gray-800 hover:bg-gray-100" aria-label="Уменьшить">−</button>
+            <span className="min-w-14 text-center text-xs font-medium text-gray-600">{Math.round(zoom * 100)}%</span>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setZoom((v) => Math.min(4, v + 0.5)); }} className="h-9 w-9 rounded-md text-lg text-gray-800 hover:bg-gray-100" aria-label="Увеличить">+</button>
+          </div>
           <button
             type="button"
-            onClick={() => setZoomed(false)}
-            className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-sm font-medium text-gray-800 shadow"
+            onClick={() => {
+              setZoomed(false);
+              setZoom(1);
+            }}
+            className="absolute right-4 top-3 rounded-lg bg-white/95 px-3 py-2 text-sm font-medium text-gray-800 shadow"
           >
             Закрыть
           </button>
@@ -236,6 +254,7 @@ export default function VinCatalogUnitView({
   imageUrl,
   imageMap,
   schemas = [],
+  onLoadSchemaImageMap,
   details,
   availability,
   availabilityLoading = false,
@@ -246,10 +265,12 @@ export default function VinCatalogUnitView({
   onDetailFilter,
 }) {
   const [hoverCode, setHoverCode] = useState(null);
+  const [activeSchemaIndex, setActiveSchemaIndex] = useState(0);
   const rowRefs = useRef({});
+  const requestedSchemaMaps = useRef(new Set());
   const listPanelRef = useRef(null);
 
-  const detailsList = details || [];
+  const allDetails = details || [];
 
   // Группа может содержать несколько узлов — показываем все их схемы.
   const schemaList = useMemo(() => {
@@ -260,6 +281,20 @@ export default function VinCatalogUnitView({
   }, [schemas, imageUrl, imageMap, title]);
 
   const hasSchemas = schemaList.length > 0;
+  const activeSchema = schemaList[Math.min(activeSchemaIndex, Math.max(schemaList.length - 1, 0))] || null;
+  const detailsList = activeSchema?.details?.length ? activeSchema.details : allDetails;
+
+  useEffect(() => {
+    setActiveSchemaIndex(0);
+    requestedSchemaMaps.current.clear();
+  }, [title]);
+
+  useEffect(() => {
+    const key = activeSchema?.unit_id;
+    if (!key || activeSchema.imageMapLoaded || requestedSchemaMaps.current.has(key)) return;
+    requestedSchemaMaps.current.add(key);
+    onLoadSchemaImageMap?.(activeSchema);
+  }, [activeSchema, onLoadSchemaImageMap]);
 
   const codeToRows = useMemo(() => {
     const map = new Map();
@@ -308,31 +343,52 @@ export default function VinCatalogUnitView({
     <div className="space-y-2">
       <div className={`grid gap-3 items-start ${hasSchemas ? 'lg:grid-cols-[1.2fr_1fr]' : ''}`}>
         {hasSchemas ? (
-          <div className="space-y-3 lg:max-h-[min(70vh,640px)] lg:overflow-y-auto">
-            {schemaList.map((schema, idx) => (
-              <div key={`${schema.unit_id || 'schema'}-${idx}`} className="space-y-1">
-                {schemaList.length > 1 && schema.name ? (
-                  <p className="text-xs font-medium text-gray-600">{schema.name}</p>
-                ) : null}
-                <SchemaImage
-                  src={schema.image_url}
-                  alt={schema.name || title}
-                  imageMap={schema.imageMap}
-                  hoverCode={hoverCode}
-                  onHoverCode={(code) => {
-                    if (!code) {
-                      setHover(null, null);
-                      return;
-                    }
-                    const rows = codeToRows.get(code) || [];
-                    const rowKey = rows[0]?.key || null;
-                    setHover(code, rowKey);
-                    ensureRowVisible(rowKey);
-                  }}
-                  onSelectCode={onSelectCode}
-                />
+          <div className="min-w-0 space-y-2">
+            {schemaList.length > 1 ? (
+              <div className="flex items-center justify-between gap-2">
+                <button type="button" onClick={() => setActiveSchemaIndex((v) => (v - 1 + schemaList.length) % schemaList.length)} className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">←</button>
+                <span className="text-xs font-medium text-gray-600">Схема {activeSchemaIndex + 1} из {schemaList.length}</span>
+                <button type="button" onClick={() => setActiveSchemaIndex((v) => (v + 1) % schemaList.length)} className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">→</button>
               </div>
-            ))}
+            ) : null}
+            {activeSchema?.name ? (
+              <p className="truncate text-xs font-medium text-gray-700" title={activeSchema.name}>{activeSchema.name}</p>
+            ) : null}
+            <SchemaImage
+              src={activeSchema?.image_url}
+              alt={activeSchema?.name || title}
+              imageMap={activeSchema?.imageMap || []}
+              hoverCode={hoverCode}
+              onHoverCode={(code) => {
+                if (!code) {
+                  setHover(null, null);
+                  return;
+                }
+                const rows = codeToRows.get(code) || [];
+                const rowKey = rows[0]?.key || null;
+                setHover(code, rowKey);
+                ensureRowVisible(rowKey);
+              }}
+              onSelectCode={onSelectCode}
+            />
+            {schemaList.length > 1 ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {schemaList.map((schema, idx) => (
+                  <button
+                    key={`${schema.unit_id || 'schema'}-${idx}`}
+                    type="button"
+                    onClick={() => setActiveSchemaIndex(idx)}
+                    className={`w-24 shrink-0 overflow-hidden rounded-md border bg-white text-left ${idx === activeSchemaIndex ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-200 hover:border-indigo-300'}`}
+                    title={schema.name || `Схема ${idx + 1}`}
+                  >
+                    <div className="flex h-16 items-center justify-center bg-gray-50 p-1">
+                      <img src={schema.image_url} alt="" className="max-h-full max-w-full object-contain" loading="lazy" />
+                    </div>
+                    <span className="block truncate px-1.5 py-1 text-[10px] text-gray-600">{schema.name || `Схема ${idx + 1}`}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 

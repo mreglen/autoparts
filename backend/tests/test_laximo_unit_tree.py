@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from app.schemas.laximo_catalog import CategoryOut, QuickGroupOut
 from app.services.laximo.catalog_features import (
     clear_catalog_features_cache,
     get_catalog_features,
@@ -115,6 +116,44 @@ class UnitTreeNormalizeTests(unittest.TestCase):
         self.assertEqual(flat[2]["parent_id"], "1")
         self.assertTrue(flat[2]["link"])
 
+    def test_flatten_quick_groups_accepts_case_insensitive_singletons(self):
+        raw = {
+            "QuickGroups": {
+                "quickGroupId": "root",
+                "name": "Root",
+                "ImageUrl": "https://img/%size%/root.png",
+                "Children": {
+                    "quickGroupId": "middle",
+                    "name": "Middle",
+                    "CHILDREN": {
+                        "quickGroupId": "leaf",
+                        "name": "Leaf",
+                    },
+                },
+            }
+        }
+        flat = flatten_quick_groups(raw)
+        self.assertEqual(
+            [row["quick_group_id"] for row in flat],
+            ["root", "middle", "leaf"],
+        )
+        self.assertEqual(flat[2]["parent_id"], "middle")
+        self.assertEqual(flat[0]["image_url"], "https://img/source/root.png")
+
+    def test_category_and_quick_group_schemas_include_source_image(self):
+        category = CategoryOut(
+            **normalize_category(
+                {"id": "c1", "ImageUrl": "https://img/%size%/c.png"}
+            )
+        )
+        group = QuickGroupOut(
+            **flatten_quick_groups(
+                {"id": "q1", "LargeImageUrl": "https://img/%size%/q.png"}
+            )[0]
+        )
+        self.assertEqual(category.model_dump()["image_url"], "https://img/source/c.png")
+        self.assertEqual(group.model_dump()["image_url"], "https://img/source/q.png")
+
     def test_parse_quick_detail_response_nested_units(self):
         raw = [
             {
@@ -181,6 +220,36 @@ class UnitTreeNormalizeTests(unittest.TestCase):
         self.assertIn("source", units[1]["image_url"])
         self.assertEqual(units[0]["details"][0]["oem"], "OEM1")
         self.assertEqual(units[1]["details"][0]["oem"], "OEM2")
+
+    def test_parse_quick_detail_accepts_deep_case_insensitive_singletons(self):
+        raw = {
+            "QuickDetails": {
+                "Categories": {
+                    "categoryId": "root",
+                    "Children": {
+                        "categoryId": "deep",
+                        "Units": {
+                            "unitId": "u-deep",
+                            "name": "Deep schema",
+                            "ImageUrl": "https://img/%size%/deep.png",
+                            "Details": {
+                                "OEM": "OEM-DEEP",
+                                "codeOnImage": "7",
+                                "Match": True,
+                            },
+                        },
+                    },
+                }
+            }
+        }
+        unit, details = parse_quick_detail_response(raw)
+        units = parse_quick_detail_units(raw)
+        self.assertEqual(unit["unit_id"], "u-deep")
+        self.assertEqual(details[0]["oem"], "OEM-DEEP")
+        self.assertTrue(details[0]["match"])
+        self.assertEqual(len(units), 1)
+        self.assertEqual(units[0]["details"][0]["oem"], "OEM-DEEP")
+        self.assertEqual(units[0]["image_url"], "https://img/source/deep.png")
 
     def test_parse_quick_detail_units_dedupes_identical_units(self):
         raw = [

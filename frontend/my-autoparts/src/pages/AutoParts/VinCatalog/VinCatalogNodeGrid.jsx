@@ -26,7 +26,7 @@ export default function VinCatalogNodeGrid({ nodes, onSelect }) {
         >
           {node.imageUrl ? (
             <>
-              <div className="flex h-40 items-center justify-center bg-gray-50 p-3">
+              <div className="flex h-40 w-full items-center justify-center bg-gray-50 p-3">
                 <img
                   src={node.imageUrl}
                   alt=""

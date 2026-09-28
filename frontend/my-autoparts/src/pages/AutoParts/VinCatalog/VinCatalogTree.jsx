@@ -14,6 +14,14 @@ export default function VinCatalogTree({
   onClearSearch,
   onSwitchMode,
 }) {
+  const nodeCount = (nodes || []).reduce((total, node) => {
+    const countChildren = (items) => (items || []).reduce(
+      (sum, item) => sum + 1 + countChildren(item.children),
+      0
+    );
+    return total + 1 + countChildren(node.children);
+  }, 0);
+
   const renderNode = (node, depth = 0) => {
     const isOpen = openIds.has(node.id);
     const isSelected = selectedId === node.id;
@@ -135,6 +143,10 @@ export default function VinCatalogTree({
         </div>
       ) : null}
 
+      <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2 text-xs text-gray-500">
+        <span>{mode === 'quick' ? 'Группы деталей' : 'Разделы каталога'}</span>
+        <span>{nodeCount}</span>
+      </div>
       <ul className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {(nodes || []).map((n) => renderNode(n))}
       </ul>

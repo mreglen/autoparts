@@ -27,6 +27,7 @@ class CategoryOut(BaseModel):
     parent_category_id: Optional[str] = None
     ssd: Optional[str] = None
     has_children: bool = False
+    image_url: Optional[str] = None
 
 
 class CategoriesResponse(CatalogSoftBase):
@@ -97,6 +98,7 @@ class QuickGroupOut(BaseModel):
     link: bool = False
     parent_id: Optional[str] = None
     synonyms: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class QuickGroupsResponse(CatalogSoftBase):

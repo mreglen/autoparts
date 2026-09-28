@@ -98,6 +98,7 @@ export default function VinCatalogBrowse({
   availabilityLoading,
   imageMap,
   unitSchemas = [],
+  onLoadSchemaImageMap,
   searchQuery,
   searchLoading,
   searchEmpty,
@@ -338,6 +339,27 @@ export default function VinCatalogBrowse({
         </aside>
 
         <section className="min-w-0 self-start rounded-lg border border-gray-200 bg-white p-2 sm:p-3">
+          <div className="mb-2 flex min-h-7 items-center justify-between gap-2 border-b border-gray-100 pb-2 text-xs text-gray-500">
+            <span>
+              {panelMode === 'unit'
+                ? unitInfo?.name || selectedUnit?.name || 'Узел'
+                : panelMode === 'search'
+                  ? 'Результаты поиска'
+                  : `${gridNodes.length} разделов и узлов`}
+            </span>
+            {panelMode === 'unit' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClearUnitView?.();
+                  setPanelMode('grid');
+                }}
+                className="font-medium text-indigo-600 hover:text-indigo-800"
+              >
+                ← К разделу
+              </button>
+            ) : null}
+          </div>
           {loading || filterLoading ? (
             !details.length ? (
               <p className="text-sm text-gray-500">Загрузка…</p>
@@ -417,6 +439,7 @@ export default function VinCatalogBrowse({
               imageUrl={unitInfo?.image_url}
               imageMap={imageMap}
               schemas={unitSchemas}
+              onLoadSchemaImageMap={onLoadSchemaImageMap}
               details={details}
               availability={availability}
               availabilityLoading={availabilityLoading}
