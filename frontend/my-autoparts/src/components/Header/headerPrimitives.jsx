@@ -79,7 +79,7 @@ export function HeaderAvatar({
       firstName={firstName || initial}
       lastName={lastName}
       size={avatarSize}
-      className={`${sizeClass} !bg-surface-muted !text-ink ${className}`.trim()}
+      className={`${sizeClass} ${className}`.trim()}
     />
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, NavLink, Link } from 'react-router-dom';
 import { logout } from '../../redux/slices/AuthSlice';
@@ -213,7 +213,7 @@ export default function Navigation() {
                   <Link
                     to={profilePath}
                     aria-label="Профиль"
-                    className="group flex items-center gap-2 rounded-sg py-1 pl-1 pr-3 text-ink-muted transition hover:bg-surface-subtle hover:text-brand-600"
+                    className="group flex items-center gap-2 rounded-sg bg-surface-muted py-1 pl-1 pr-3 text-ink-muted transition hover:text-brand-600"
                   >
                     <HeaderAvatar
                       initial={firstName}
