@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import ClientMarkupPopover from '../../../components/NewParts/ClientMarkupPopover';
-import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
+
 import { CLIENT_MARKUP_DISPLAY_BOTH } from '../../../redux/slices/ClientMarkupSlice';
 import { canSeeRosskoWarehouseNames, canUseClientMarkup, computeClientPrices } from '../../../utils/clientMarkupUtils';
 import { canEditClientMarkupSettings } from '../../../utils/autoservicePermissions';
@@ -18,7 +18,6 @@ import {
   refreshNewPartsCartOffers,
   removeFromCart,
   selectCart,
-  selectCartLoading,
   updateCartItemQuantity,
 } from '../../../redux/slices/CartSlice';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
@@ -119,50 +118,33 @@ function DeliveryCell({ deliveryStart, deliveryEnd, warehouseName, preferredWare
   );
 }
 
-function CartQtyControl({
-  quantity,
-  maxQty,
-  onAdd,
-  onAddToBasket,
-  onRemove,
-  disabled,
-  showBasketPicker = true,
-}) {
+function CartQtyControl({ quantity, maxQty, onAdd, onRemove, disabled }) {
   const safeQty = toSafeInt(quantity, 0);
   const atMax = safeQty >= maxQty;
-
-  if (safeQty > 0) {
-    return (
-      <div className="inline-flex items-center gap-0.5">
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={disabled}
-          className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 bg-white text-sm text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Уменьшить количество"
-        >
-          −
-        </button>
-        <span className="min-w-[1.25rem] text-center text-xs font-bold text-gray-900">{safeQty}</span>
-        <button
-          type="button"
-          onClick={onAdd}
-          disabled={disabled || atMax}
-          className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 bg-white text-sm text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Увеличить количество"
-        >
-          +
-        </button>
-      </div>
-    );
-  }
+  const atMin = safeQty <= 0;
 
   return (
-    <NewPartsBasketHoverMenu
-      onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
-      disabled={disabled}
-      showPicker={showBasketPicker}
-    />
+    <div className="inline-flex items-center gap-0.5">
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled || atMin}
+        className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 bg-white text-sm text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        aria-label="Уменьшить количество"
+      >
+        −
+      </button>
+      <span className="min-w-[1.25rem] text-center text-xs font-bold text-gray-900">{safeQty}</span>
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={disabled || atMax}
+        className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 bg-white text-sm text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        aria-label="Увеличить количество"
+      >
+        +
+      </button>
+    </div>
   );
 }
 
@@ -237,7 +219,6 @@ function StockOfferRow({
 }) {
   const dispatch = useDispatch();
   const cart = useSelector(selectCart);
-  const cartLoading = useSelector(selectCartLoading);
   const [busy, setBusy] = useState(false);
 
   const maxQty = Math.max(1, Number(stock.available_count) || 1);
@@ -261,7 +242,7 @@ function StockOfferRow({
   }, [brand, cart?.new_parts_items, number, stock?.stock_id, vinBasketId]);
 
   const cartQuantity = cartItemInStore ? toSafeInt(cartItemInStore.quantity, 0) : 0;
-  const disabled = busy || cartLoading;
+  const disabled = busy;
 
   const prepareCartItem = (quantityToAdd) => {
     const item = {
@@ -405,13 +386,12 @@ function StockOfferRow({
       <td className="whitespace-nowrap px-3 py-2 text-right overflow-visible">
         <div className="inline-flex flex-col items-end relative z-40">
           <CartQtyControl
-          quantity={cartQuantity}
-          maxQty={maxQty}
-          onAdd={() => handleAdd()}
-          onAddToBasket={handleAdd}
-          onRemove={handleRemove}
-          disabled={disabled}
-        />
+            quantity={cartQuantity}
+            maxQty={maxQty}
+            onAdd={() => handleAdd()}
+            onRemove={handleRemove}
+            disabled={disabled}
+          />
         </div>
       </td>
     </tr>

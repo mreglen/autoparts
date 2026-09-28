@@ -6,16 +6,12 @@ import {
   getFinanceTodayDate,
   getMonthRangeDefaults,
 } from '../Finance/financeDisplay';
-import { formatServerDateTime, toDateInputValue } from '../../utils/serverDate';
+import { formatServerDateTime } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
-import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import { Button, ConfirmDialog, Modal, Skeleton } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
-import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import {
-  filterFinanceReceipts,
-  financeReceiptClientLabel,
   FINANCE_METHOD_LABELS,
 } from '../../utils/financeReceiptSearch';
 import {
@@ -33,11 +29,18 @@ import {
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
 
-const METHOD_BLOCKS = [
-  { id: 'card', label: 'Оплата картой' },
-  { id: 'cash', label: 'Наличными' },
+const ALL_METHODS = [
+  { id: 'all', label: 'Все' },
+  { id: 'card', label: 'Карта' },
+  { id: 'cash', label: 'Наличные' },
   { id: 'bank', label: 'Расчётный счёт' },
 ];
+
+const METHOD_COLORS = {
+  card: 'bg-blue-50 text-blue-700 ring-blue-100',
+  cash: 'bg-green-50 text-green-700 ring-green-100',
+  bank: 'bg-amber-50 text-amber-700 ring-amber-100',
+};
 
 const tabFilterButtonClass = (active) =>
   `inline-flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
@@ -50,6 +53,16 @@ function receiptsWord(count) {
   if (count === 1) return 'поступление';
   if (count >= 2 && count <= 4) return 'поступления';
   return 'поступлений';
+}
+
+function MethodBadge({ method }) {
+  const label = FINANCE_METHOD_LABELS[method] || method || '—';
+  const colorClass = METHOD_COLORS[method] || 'bg-surface-subtle text-ink-soft ring-line';
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${colorClass}`}>
+      {label}
+    </span>
+  );
 }
 
 function FinanceField({ label, children }) {
@@ -65,16 +78,20 @@ const paymentDateInputClass =
   'sg-pill-input sg-native-date-input w-full min-w-[9.5rem] disabled:cursor-wait disabled:opacity-60';
 
 function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
-  const [draft, setDraft] = useState(() => toDateInputValue(row.created_at));
+  const [draft, setDraft] = useState(() => {
+    const d = new Date(row.created_at);
+    return d.toISOString().slice(0, 10);
+  });
 
   useEffect(() => {
-    setDraft(toDateInputValue(row.created_at));
+    const d = new Date(row.created_at);
+    setDraft(d.toISOString().slice(0, 10));
   }, [row.created_at, row.id]);
 
   const handleChange = async (nextValue) => {
     const clamped = clampFinanceDate(nextValue, todayDate);
     setDraft(clamped);
-    const current = toDateInputValue(row.created_at);
+    const current = new Date(row.created_at).toISOString().slice(0, 10);
     if (!clamped || clamped === current) return;
     await onSave(row.id, clamped);
   };
@@ -92,14 +109,8 @@ function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
   );
 }
 
-function FinanceReceiptRows({
-  entries,
-  onOpen,
-  showMethod = false,
-  showMatchHint = false,
-  emptyText = 'Нет поступлений за период',
-}) {
-  if (!entries.length) {
+function FinanceReceiptRows({ rows, onOpen, emptyText = 'Нет поступлений за период' }) {
+  if (!rows.length) {
     return (
       <p className={`${warehouseEmptyShellClass} text-sm text-ink-muted`}>
         {emptyText}
@@ -109,29 +120,18 @@ function FinanceReceiptRows({
 
   return (
     <>
-      <div className="md:hidden">
-        {entries.map(({ row, hint }) => (
+      <div className="md:hidden divide-y divide-line-soft">
+        {rows.map((row) => (
           <button
             type="button"
             key={row.id}
             onClick={() => onOpen(row)}
-            className="block w-full space-y-1.5 border-b border-line-soft py-3 text-left transition last:border-0 hover:bg-surface-muted/50"
+            className="block w-full space-y-1.5 py-3 text-left transition hover:bg-surface-muted/50"
           >
-            <FinanceField label="Клиент">{financeReceiptClientLabel(row)}</FinanceField>
-            {!showMethod ? (
-              <>
-                <FinanceField label="№">{row.sequential_number}</FinanceField>
-                <FinanceField label="Заказ-наряд">№ {row.repair_order_number}</FinanceField>
-              </>
-            ) : null}
-            {showMethod ? (
-              <FinanceField label="Способ">{FINANCE_METHOD_LABELS[row.method] || row.method}</FinanceField>
-            ) : null}
-            <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
             <FinanceField label="Дата">{formatServerDateTime(row.created_at)}</FinanceField>
-            {showMatchHint && hint ? (
-              <p className="text-xs text-brand-700">{hint}</p>
-            ) : null}
+            <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
+            <FinanceField label="Способ"><MethodBadge method={row.method} /></FinanceField>
+            <FinanceField label="Заказ-наряд">№ {row.repair_order_number || '—'}</FinanceField>
           </button>
         ))}
       </div>
@@ -140,45 +140,31 @@ function FinanceReceiptRows({
         <table className={autoserviceListTableClass}>
           <thead>
             <tr className={autoserviceListTheadRowClass}>
-              {showMethod ? null : <th className={`w-16 ${autoserviceListThClass}`}>№</th>}
-              {showMethod ? null : <th className={`w-28 ${autoserviceListThClass}`}>Заказ-наряд</th>}
-              <th className={autoserviceListThClass}>Клиент</th>
-              {showMethod ? <th className={`w-32 ${autoserviceListThClass}`}>Способ</th> : null}
-              <th className={`w-32 ${autoserviceListThRightClass}`}>Сумма</th>
-              <th className={`w-40 ${autoserviceListThClass}`}>Дата</th>
-              {showMatchHint ? <th className={autoserviceListThClass}>Найдено</th> : null}
+              <th className={`w-36 ${autoserviceListThClass}`}>Дата</th>
+              <th className={`w-36 ${autoserviceListThRightClass}`}>Сумма</th>
+              <th className={`w-40 ${autoserviceListThClass}`}>Способ оплаты</th>
+              <th className={autoserviceListThClass}>Заказ-наряд</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
-            {entries.map(({ row, hint }) => (
+            {rows.map((row) => (
               <tr
                 key={row.id}
                 className={autoserviceListTrClickableClass}
                 onClick={() => onOpen(row)}
               >
-                {showMethod ? null : (
-                  <td className={`${autoserviceListTdClass} tabular-nums font-medium text-ink`}>
-                    {row.sequential_number}
-                  </td>
-                )}
-                {showMethod ? null : (
-                  <td className={`${autoserviceListTdClass} tabular-nums`}>№ {row.repair_order_number}</td>
-                )}
-                <td className={autoserviceListTdClass}>
-                  {financeReceiptClientLabel(row)}
+                <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
+                  {formatServerDateTime(row.created_at)}
                 </td>
-                {showMethod ? (
-                  <td className={autoserviceListTdClass}>{FINANCE_METHOD_LABELS[row.method] || row.method}</td>
-                ) : null}
-                <td className={`${autoserviceListTdRightClass} font-medium tabular-nums`}>
+                <td className={`${autoserviceListTdRightClass} font-semibold tabular-nums`}>
                   {formatFinanceCurrency(row.amount)}
                 </td>
                 <td className={autoserviceListTdClass}>
-                  {formatServerDateTime(row.created_at)}
+                  <MethodBadge method={row.method} />
                 </td>
-                {showMatchHint ? (
-                  <td className={`${autoserviceListTdClass} text-ink-muted`}>{hint || '—'}</td>
-                ) : null}
+                <td className={`${autoserviceListTdClass} tabular-nums`}>
+                  № {row.repair_order_number || '—'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -196,13 +182,11 @@ export default function AutoserviceFinancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState({ totals: {}, total_amount: 0, count: 0, items: [] });
-  const [selectedMethod, setSelectedMethod] = useState(null);
+  const [selectedMethod, setSelectedMethod] = useState('all');
   const [savingPaymentId, setSavingPaymentId] = useState(null);
   const [detailsPayment, setDetailsPayment] = useState(null);
   const [deletePayment, setDeletePayment] = useState(null);
   const [deletingPaymentId, setDeletingPaymentId] = useState(null);
-  const [searchInput, setSearchInput] = useState('');
-  const searchQuery = useDebouncedValue(searchInput, 280);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -269,46 +253,33 @@ export default function AutoserviceFinancePage() {
   };
 
   const items = useMemo(() => data.items || [], [data.items]);
-  const searchApplied = Boolean(searchQuery.trim());
 
-  const searchResults = useMemo(
-    () => filterFinanceReceipts(items, searchQuery, {
-      method: selectedMethod || undefined,
-    }),
-    [items, searchQuery, selectedMethod],
-  );
+  const filteredRows = useMemo(() => {
+    if (selectedMethod === 'all') return items;
+    return items.filter((row) => row.method === selectedMethod);
+  }, [items, selectedMethod]);
 
   const methodStats = useMemo(() => {
-    const sourceItems = searchApplied
-      ? searchResults.map((entry) => entry.row)
-      : items;
     const counts = { card: 0, cash: 0, bank: 0 };
-    sourceItems.forEach((row) => {
+    items.forEach((row) => {
       if (counts[row.method] != null) counts[row.method] += 1;
     });
-    return METHOD_BLOCKS.map((block) => ({
+    return ALL_METHODS.slice(1).map((block) => ({
       ...block,
-      amount: searchApplied
-        ? searchResults
-          .filter((entry) => entry.row.method === block.id)
-          .reduce((sum, entry) => sum + Number(entry.row.amount || 0), 0)
-        : Number(data.totals?.[block.id] || 0),
+      amount: Number(data.totals?.[block.id] || 0),
       count: counts[block.id],
     }));
-  }, [items, data.totals, searchApplied, searchResults]);
+  }, [items, data.totals]);
 
-  const selectedBlock = methodStats.find((block) => block.id === selectedMethod) || null;
-  const selectedEntries = useMemo(() => {
-    if (searchApplied) return searchResults;
-    if (!selectedMethod) return [];
-    return items
-      .filter((row) => row.method === selectedMethod)
-      .map((row) => ({
-        row,
-        match: null,
-        hint: null,
-      }));
-  }, [searchApplied, searchResults, selectedMethod, items]);
+  const selectedLabel = useMemo(() => {
+    const found = ALL_METHODS.find((m) => m.id === selectedMethod);
+    return found?.label || 'Все';
+  }, [selectedMethod]);
+
+  const selectedTotal = useMemo(() => {
+    if (selectedMethod === 'all') return data.total_amount || 0;
+    return filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  }, [filteredRows, selectedMethod, data.total_amount]);
 
   return (
     <div className="min-w-0 space-y-4 lg:mt-5">
@@ -320,25 +291,42 @@ export default function AutoserviceFinancePage() {
               <Skeleton className="mx-auto h-8 w-24 sm:h-9" />
             ) : (
               <div className="text-2xl font-bold tabular-nums leading-none text-ink sm:text-[1.75rem]">
-                {formatFinanceCurrency(data.total_amount)}
+                {formatFinanceCurrency(selectedTotal)}
               </div>
             )}
-            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">Итого</div>
+            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">{selectedLabel}</div>
           </div>
           <div className="text-center">
             {loading ? (
               <Skeleton className="mx-auto h-8 w-12 sm:h-9" />
             ) : (
               <div className="text-2xl font-bold tabular-nums leading-none text-brand-600 sm:text-[1.75rem]">
-                {data.count ?? 0}
+                {filteredRows.length}
               </div>
             )}
-            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">Платежей</div>
+            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">{receiptsWord(filteredRows.length)}</div>
           </div>
         </div>
       </div>
 
-      <MobileCollapsibleFilters title="Период и параметры">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {methodStats.map((block) => (
+          <div
+            key={block.id}
+            className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80"
+          >
+            <p className="text-xs font-medium text-ink-muted">{block.label}</p>
+            <p className="mt-2 text-lg font-bold tabular-nums text-ink sm:text-xl">
+              {loading ? <Skeleton className="h-6 w-28" /> : formatFinanceCurrency(block.amount)}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {loading ? '...' : `${block.count} ${receiptsWord(block.count)}`}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <MobileCollapsibleFilters title="Период">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block min-w-0">
             <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
@@ -375,131 +363,48 @@ export default function AutoserviceFinancePage() {
       <Toast message={error} variant="error" onClose={() => setError('')} />
 
       <div className={warehouseToolbarClass}>
-        <button
-          type="button"
-          onClick={() => setSelectedMethod(null)}
-          className={tabFilterButtonClass(!selectedMethod)}
-        >
-          Поступления
-        </button>
+        {ALL_METHODS.map((method) => (
+          <button
+            key={method.id}
+            type="button"
+            onClick={() => setSelectedMethod(method.id)}
+            className={tabFilterButtonClass(selectedMethod === method.id)}
+          >
+            {method.label}
+          </button>
+        ))}
       </div>
 
-      <AutoserviceLiveSearchField
-        value={searchInput}
-        onChange={setSearchInput}
-        placeholder="Клиент, телефон, заказ-наряд, № поступления"
-        ariaLabel="Поиск поступлений"
-      />
-
-      {searchApplied && !selectedMethod ? (
-        <p className="text-sm text-ink-muted">
-          {loading ? 'Поиск…' : `Найдено ${searchResults.length} из ${items.length}`}
-        </p>
-      ) : null}
-
       {loading ? (
-        selectedBlock ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <Skeleton className="h-9 w-24 rounded-full" />
-              <div className="space-y-2">
-                <Skeleton className="ml-auto h-4 w-28" />
-                <Skeleton className="ml-auto h-3 w-36" />
-              </div>
-            </div>
-            <div className="space-y-3 md:hidden">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="space-y-3 rounded-sg-lg bg-surface p-4 ring-1 ring-line/80">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-4/5" />
-                  <Skeleton className="h-4 w-3/5" />
-                </div>
-              ))}
-            </div>
-            <div className="hidden overflow-hidden rounded-sg-lg bg-surface ring-1 ring-line/80 md:block">
-              <div className="space-y-0 divide-y divide-line-soft px-4 py-2">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex items-center gap-4 py-3">
-                    <Skeleton className="h-4 w-10" />
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-4 flex-1" />
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-4 w-28" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="space-y-3">
+          <div className="space-y-3 md:hidden">
             {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80"
-              >
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="mt-3 h-6 w-28" />
-                <Skeleton className="mt-2 h-3 w-20" />
+              <div key={i} className="space-y-3 rounded-sg-lg bg-surface p-4 ring-1 ring-line/80">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-4/5" />
+                <Skeleton className="h-4 w-3/5" />
               </div>
             ))}
           </div>
-        )
-      ) : searchApplied && !selectedMethod ? (
-        <FinanceReceiptRows
-          entries={searchResults}
-          onOpen={setDetailsPayment}
-          showMethod
-          showMatchHint
-          emptyText="Ничего не найдено"
-        />
-      ) : selectedBlock ? (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setSelectedMethod(null)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface-subtle px-3 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Назад
-            </button>
-            <div className="text-right">
-              <p className="text-sm font-semibold text-ink">{selectedBlock.label}</p>
-              <p className="text-xs text-ink-muted">
-                {formatFinanceCurrency(selectedBlock.amount)} · {selectedBlock.count} {receiptsWord(selectedBlock.count)}
-                {searchApplied ? ` · по запросу «${searchQuery.trim()}»` : ''}
-              </p>
+          <div className="hidden overflow-hidden rounded-sg-lg bg-surface ring-1 ring-line/80 md:block">
+            <div className="space-y-0 divide-y divide-line-soft px-4 py-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-4 py-3">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 flex-1" />
+                </div>
+              ))}
             </div>
           </div>
-
-          <FinanceReceiptRows
-            entries={selectedEntries}
-            onOpen={setDetailsPayment}
-            showMatchHint={searchApplied}
-            emptyText={searchApplied ? 'Ничего не найдено' : 'Нет поступлений за период'}
-          />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {methodStats.map((block) => (
-            <button
-              key={block.id}
-              type="button"
-              onClick={() => setSelectedMethod(block.id)}
-              className="rounded-sg-lg bg-surface p-4 text-left ring-1 ring-line/80 transition hover:bg-surface-muted hover:ring-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-            >
-              <p className="text-xs font-medium text-ink-muted">{block.label}</p>
-              <p className="mt-2 text-lg font-bold tabular-nums text-ink sm:text-xl">
-                {formatFinanceCurrency(block.amount)}
-              </p>
-              <p className="mt-1 text-xs text-ink-muted">
-                {block.count} {receiptsWord(block.count)}
-              </p>
-            </button>
-          ))}
-        </div>
+        <FinanceReceiptRows
+          rows={filteredRows}
+          onOpen={setDetailsPayment}
+          emptyText="Нет поступлений за период"
+        />
       )}
 
       <Modal
@@ -507,11 +412,7 @@ export default function AutoserviceFinancePage() {
         onClose={() => {
           if (!deletingPaymentId) setDetailsPayment(null);
         }}
-        title={
-          detailsPayment
-            ? `Поступление № ${detailsPayment.sequential_number}`
-            : ''
-        }
+        title={detailsPayment ? `Поступление № ${detailsPayment.sequential_number}` : ''}
         size="sm"
         footer={detailsPayment ? (
           <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
@@ -536,16 +437,11 @@ export default function AutoserviceFinancePage() {
       >
         {detailsPayment ? (
           <div className="space-y-1.5">
-            <FinanceField label="Клиент">{financeReceiptClientLabel(detailsPayment)}</FinanceField>
-            <FinanceField label="Заказ-наряд">
-              № {detailsPayment.repair_order_number || '—'}
-            </FinanceField>
-            <FinanceField label="Способ">
-              {FINANCE_METHOD_LABELS[detailsPayment.method] || detailsPayment.method}
-            </FinanceField>
-            <FinanceField label="Сумма">
-              {formatFinanceCurrency(detailsPayment.amount)}
-            </FinanceField>
+            <FinanceField label="Клиент">{detailsPayment.client_name || '—'}</FinanceField>
+            <FinanceField label="Телефон">{detailsPayment.client_phone || '—'}</FinanceField>
+            <FinanceField label="Заказ-наряд">№ {detailsPayment.repair_order_number || '—'}</FinanceField>
+            <FinanceField label="Способ">{FINANCE_METHOD_LABELS[detailsPayment.method] || detailsPayment.method}</FinanceField>
+            <FinanceField label="Сумма">{formatFinanceCurrency(detailsPayment.amount)}</FinanceField>
             <div className="flex justify-between gap-3 pt-1 text-sm">
               <span className="shrink-0 text-ink-muted">Дата</span>
               <PaymentReceiptDateField

@@ -4,13 +4,12 @@ import {
   addNewPartsToCart,
   removeFromCart,
   selectCart,
-  selectCartLoading,
   updateCartItemQuantity,
 } from '../../../redux/slices/CartSlice';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
-import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
+
 import useNewPartsMarkupPercent from '../../../hooks/useNewPartsMarkupPercent';
 import { applyMarkup } from '../NewParts/newPartStockUtils';
 import {
@@ -64,46 +63,33 @@ function formatDeliveryShort(deliveryStart, deliveryEnd) {
   }
 }
 
-function QtyControl({ quantity, onAdd, onAddToBasket, onRemove, disabled, noStock }) {
+function QtyControl({ quantity, onAdd, onRemove, disabled, noStock }) {
   const q = toSafeInt(quantity, 0);
-  if (q > 0) {
-    return (
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={disabled}
-          className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-base hover:bg-gray-50 disabled:opacity-50"
-        >
-          −
-        </button>
-        <span className="w-6 text-center text-sm font-semibold text-gray-900">{q}</span>
-        <button
-          type="button"
-          onClick={onAdd}
-          disabled={disabled || noStock}
-          className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-base hover:bg-gray-50 disabled:opacity-50"
-        >
-          +
-        </button>
-      </div>
-    );
-  }
   return (
-    <NewPartsBasketHoverMenu
-      onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
-      disabled={disabled || noStock}
-      buttonClassName="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-      label="В корзину"
-    >
-      В корзину
-    </NewPartsBasketHoverMenu>
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled || q <= 0}
+        className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-base hover:bg-gray-50 disabled:opacity-50"
+      >
+        −
+      </button>
+      <span className="w-6 text-center text-sm font-semibold text-gray-900">{q}</span>
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={disabled || noStock}
+        className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-base hover:bg-gray-50 disabled:opacity-50"
+      >
+        +
+      </button>
+    </div>
   );
 }
 
 export default function VinCatalogOfferCard({ part, sectionType = 'available', uniqueId }) {
   const dispatch = useDispatch();
-  const cartLoading = useSelector(selectCartLoading);
   const cart = useSelector(selectCart);
   const newPartsMarkupPercent = useNewPartsMarkupPercent('auto');
 
@@ -242,7 +228,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
 
   if (!mainStock) return null;
 
-  const disabledControl = addingToCart || cartLoading;
+  const disabledControl = addingToCart;
   const mainQuantity = getCartQuantity(mainStock);
   const mainStockInfo = getStockAvailability(mainStock);
   const price = priceWithMarkup(mainStock.price);
@@ -292,7 +278,6 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
         <QtyControl
           quantity={mainQuantity}
           onAdd={() => handleAddToCart(mainStock)}
-          onAddToBasket={(basketId) => handleAddToCart(mainStock, basketId)}
           onRemove={() => handleRemoveFromCart(mainStock)}
           disabled={disabledControl}
           noStock={mainStockInfo.noStock}
@@ -329,7 +314,6 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
                     <QtyControl
                       quantity={quantity}
                       onAdd={() => handleAddToCart(stock)}
-                      onAddToBasket={(basketId) => handleAddToCart(stock, basketId)}
                       onRemove={() => handleRemoveFromCart(stock)}
                       disabled={disabledControl}
                       noStock={stockInfo.noStock}
