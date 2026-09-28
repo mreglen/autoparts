@@ -152,7 +152,7 @@ export default function AutoserviceDashboardPage() {
 
   useEffect(() => {
     const onPullRefresh = (event) => {
-      if (event.detail?.pathname === '/dashboard') load();
+      if (event.detail?.pathname === '/dashboard/autoservice') load();
     };
     window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);

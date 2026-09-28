@@ -17,7 +17,8 @@ import {
 } from '../../../utils/cabinetMode';
 
 export const TAB_PATH_MAP = {
-    dashboard: '/dashboard',
+    'dashboard-seller': '/dashboard/seller',
+    'dashboard-autoservice': '/dashboard/autoservice',
     'admin-panel': '/admin-settings',
     'design-system': '/design-system',
     profile: '/profile',
@@ -255,7 +256,7 @@ const buildBuyerTabs = (user, hasPermission, options) => {
 const buildSellerTabs = (user, hasPermission, options) => {
     const showWarehouseInventory = options.showWarehouseInventory === true;
     const tabs = [
-        { id: 'dashboard', label: 'Сводка' },
+        { id: 'dashboard-seller', label: 'Сводка' },
         {
             id: 'purchases',
             label: 'Покупки',
@@ -296,7 +297,7 @@ const buildAutoserviceTabs = (user, hasPermission, options) => {
     };
     const staffTab = buildAutoserviceStaffTab(user, autoserviceAccessOptions, hasPermission);
     const tabs = [
-        { id: 'dashboard', label: 'Сводка' },
+        { id: 'dashboard-autoservice', label: 'Сводка' },
         {
             id: 'purchases',
             label: 'Покупки',
@@ -341,7 +342,7 @@ const PATH_TAB_MAP = Object.fromEntries(
     Object.entries(TAB_PATH_MAP).map(([tabId, path]) => [path, tabId]),
 );
 
-export const getActiveTabFromPath = (path, user) => {
+export const getActiveTabFromPath = (path, user, cabinetMode) => {
     if (path.startsWith('/my-parts') || path.startsWith('/warehouse/scan')) return 'parts';
     if (
         path.startsWith('/profile/favorites') ||
@@ -376,7 +377,10 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/autoservice/payroll')) return 'autoservice-payroll';
     if (path.startsWith('/autoservice/inspections')) return 'autoservice-inspections';
     if (path.startsWith('/autoservice/settings')) return 'autoservice-settings';
-    return PATH_TAB_MAP[path] || (user?.is_seller ? 'dashboard' : 'profile');
+    if (path.startsWith('/dashboard/seller')) return 'dashboard-seller';
+    if (path.startsWith('/dashboard/autoservice')) return 'dashboard-autoservice';
+    if (path.startsWith('/dashboard')) return cabinetMode === CABINET_MODE_AUTOSERVICE ? 'dashboard-autoservice' : 'dashboard-seller';
+    return PATH_TAB_MAP[path] || (cabinetMode === CABINET_MODE_AUTOSERVICE ? 'dashboard-autoservice' : 'dashboard-seller');
 };
 
 export const flattenSettingsProfile = (tabs) => {

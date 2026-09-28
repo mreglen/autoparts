@@ -104,7 +104,7 @@ function resolveRedirectOnCabinetChange(pathname, nextMode, user) {
             pathname.startsWith('/autoservice/welcome') ||
             pathname.startsWith('/autoservice/repair-booking')
         ) {
-            return '/dashboard';
+            return '/dashboard/seller';
         }
     }
 
@@ -126,9 +126,10 @@ function resolveRedirectOnCabinetChange(pathname, nextMode, user) {
             pathname.startsWith('/stock-') ||
             pathname.startsWith('/warehouse-sales') ||
             pathname.startsWith('/warehouse/inventory') ||
-            pathname.startsWith('/chats')
+            pathname.startsWith('/chats') ||
+            pathname.startsWith('/dashboard')
         ) {
-            return '/autoservice/planner';
+            return '/dashboard/autoservice';
         }
     }
 
@@ -172,7 +173,7 @@ export function useMobileMenuShell(userOverride) {
         cabinetOptions,
     ]);
 
-    const activeTab = getActiveTabFromPath(location.pathname, user);
+    const activeTab = getActiveTabFromPath(location.pathname, user, cabinetMode);
     const tabs = getAvailableTabs(user, permissionCodes, {
         showWarehouseInventory,
         showAutoservice,
@@ -274,6 +275,8 @@ export function getPageTitle(pathname) {
         '/reviews': 'Отзывы',
         '/cart': 'Корзина',
         '/dashboard': 'Сводка',
+        '/dashboard/seller': 'Сводка',
+        '/dashboard/autoservice': 'Сводка',
         '/profile': 'Профиль',
         '/profile/favorites': 'Избранное',
         '/profile/views': 'Просмотры',

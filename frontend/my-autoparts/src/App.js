@@ -132,6 +132,7 @@ const AutoserviceMyPayrollPage = lazy(() => import('./pages/Autoservice/Autoserv
 const AutoserviceReportsPage = lazy(() => import('./pages/Autoservice/AutoserviceReportsPage'));
 const AutoserviceInspectionsPage = lazy(() => import('./pages/Autoservice/AutoserviceInspectionsPage'));
 const AutoserviceWarehousePage = lazy(() => import('./pages/Autoservice/AutoserviceWarehousePage'));
+const AutoserviceDashboardPage = lazy(() => import('./pages/Autoservice/AutoserviceDashboardPage'));
 const AutoserviceWarehouseReceiptsPage = lazy(() => import('./pages/Autoservice/AutoserviceWarehouseReceiptsPage'));
 const AutoserviceWarehouseExpensesPage = lazy(() => import('./pages/Autoservice/AutoserviceWarehouseExpensesPage'));
 const GaragePage = lazy(() => import('./pages/Garage/GaragePage'));
@@ -247,13 +248,23 @@ function ReviewsRoute() {
 function WarehouseInventoryRoute() {
   const showWarehouseInventory = useShowWarehouseInventory();
   if (!showWarehouseInventory) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/dashboard/seller" replace />;
   }
   return (
     <LazyRoute>
       <WmsStoragesPage />
     </LazyRoute>
   );
+}
+
+function DashboardIndexRoute() {
+  const user = useSelector((state) => state.auth.user);
+  const autoserviceOrganizationId = useAutoserviceOrganizationId();
+  const mode = getCabinetMode(user, { autoserviceOrganizationId });
+  if (mode === CABINET_MODE_AUTOSERVICE) {
+    return <Navigate to="/dashboard/autoservice" replace />;
+  }
+  return <Navigate to="/dashboard/seller" replace />;
 }
 
 function AutoservicePublicRoute() {
@@ -627,11 +638,20 @@ function App() {
               </LazyRoute>
             )}
           />
+          <Route path="/dashboard" element={<DashboardIndexRoute />} />
           <Route
-            path="/dashboard"
+            path="/dashboard/seller"
             element={(
               <LazyRoute>
                 <DashboardPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/dashboard/autoservice"
+            element={(
+              <LazyRoute>
+                <AutoserviceDashboardPage />
               </LazyRoute>
             )}
           />

@@ -159,9 +159,9 @@ export function getDefaultPathForCabinetMode(cabinetMode) {
     case CABINET_MODE_ADMIN:
       return '/sellers';
     case CABINET_MODE_AUTOSERVICE:
-      return '/autoservice/planner';
+      return '/dashboard/autoservice';
     case CABINET_MODE_SELLER:
-      return '/dashboard';
+      return '/dashboard/seller';
     case CABINET_MODE_BUYER:
     default:
       return '/purchases/orders';

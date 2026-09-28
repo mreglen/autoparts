@@ -24,11 +24,8 @@ import {
 } from './dashboardUtils';
 import SellerOnboardingPanel from './SellerOnboardingPanel';
 import { getGreeting, getFirstName, MetricCard, QuickAction } from './dashboardUi';
-import AutoserviceDashboardPage from '../Autoservice/AutoserviceDashboardPage';
 import { warehousePageClass } from '../../utils/warehouseListUi';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
-import { CABINET_MODE_AUTOSERVICE, getCabinetMode } from '../../utils/cabinetMode';
-import { useAutoserviceOrganizationId } from '../../utils/autoservicePublic';
 
 const TASK_TONE = {
   high: 'danger',
@@ -90,8 +87,6 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { isReady, user } = useAuthReady();
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
-  const autoserviceOrganizationId = useAutoserviceOrganizationId();
-  const isAutoserviceMode = getCabinetMode(user, { autoserviceOrganizationId }) === CABINET_MODE_AUTOSERVICE;
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -213,12 +208,12 @@ export default function DashboardPage() {
   }, [user, showOnboarding, canViewFinance]);
 
   useEffect(() => {
-    if (isReady && canAccess && !isAutoserviceMode) loadDashboard();
-  }, [isReady, canAccess, isAutoserviceMode, loadDashboard]);
+    if (isReady && canAccess) loadDashboard();
+  }, [isReady, canAccess, loadDashboard]);
 
   useEffect(() => {
     const onPullRefresh = (event) => {
-      if (event.detail?.pathname === '/dashboard') {
+      if (event.detail?.pathname === '/dashboard/seller') {
         loadDashboard();
       }
     };
@@ -291,10 +286,6 @@ export default function DashboardPage() {
 
   if (!isReady) return <AuthLoadingScreen />;
   if (!canAccess) return null;
-
-  if (isAutoserviceMode) {
-    return <AutoserviceDashboardPage />;
-  }
 
   if (loading) {
     return (
