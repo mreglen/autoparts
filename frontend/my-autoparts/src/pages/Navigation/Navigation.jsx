@@ -162,7 +162,7 @@ export default function Navigation() {
         <div className="flex h-[4.25rem] min-w-0 w-full items-center gap-4 lg:gap-5">
           <HeaderLogo wordmarkClassName="hidden xl:block" />
 
-          <Button as={NavLink} to="/catalog" size="sm" className="shrink-0">
+          <Button as={NavLink} to="/catalog" size="md" className="shrink-0">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
