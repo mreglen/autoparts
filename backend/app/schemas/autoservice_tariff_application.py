@@ -10,6 +10,9 @@ class AutoserviceTariffApplicationCreate(BaseModel):
     contact_name: str = Field(..., min_length=1, max_length=160)
     contact_phone: str = Field(..., min_length=5, max_length=32)
     message: Optional[str] = Field(None, max_length=2000)
+    # None = legacy payload treated as requested_autoservice=True
+    requested_seller: Optional[bool] = None
+    requested_autoservice: Optional[bool] = None
 
 
 class AutoserviceTariffApplicationOut(BaseModel):
@@ -27,6 +30,8 @@ class AutoserviceTariffApplicationOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     organization_is_autoservice: bool = False
+    requested_seller: bool = False
+    requested_autoservice: bool = True
 
     class Config:
         from_attributes = True

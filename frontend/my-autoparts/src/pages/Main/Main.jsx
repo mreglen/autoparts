@@ -19,10 +19,10 @@ const softCardClass =
   'rounded-[1.75rem] border border-white/70 bg-white/85 shadow-[0_8px_32px_rgba(15,23,42,0.06)] backdrop-blur-sm sm:rounded-[2rem]';
 
 const sellerBenefits = [
-  'Публикация новых и б/у позиций в общем каталоге',
-  'Складской учёт, приход и расход в одном кабинете',
-  'Чаты с покупателями и управление заказами',
-  'Скидка на закупку новых запчастей для пополнения склада',
+  'Автосервис: запись, клиенты, заказ-наряды и планировщик',
+  'Авторазбор: публикация запчастей, склад и продажи',
+  'Можно подключить одно направление или оба сразу',
+  'Доступ включается после проверки заявки администратором',
 ];
 
 const searchExamples = ['Тормозные колодки', 'Артикул детали', 'VIN автомобиля'];
@@ -312,7 +312,7 @@ function Main() {
             <div className="lg:col-span-5">
               <p className="text-sm font-semibold text-brand-600">Для магазинов и сервисов</p>
               <h2 className="mt-2 text-2xl font-bold tracking-tight text-ink md:text-3xl">
-                Подключиться как продавец
+                Зарегистрировать организацию
               </h2>
               <p className="mt-4 text-pretty leading-relaxed text-ink-muted">
                 Оставьте заявку — после проверки пришлём доступ в кабинет на email.

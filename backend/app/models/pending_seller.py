@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, Text
 from sqlalchemy.sql import func
 from app.db.database import Base
 
@@ -19,3 +19,7 @@ class PendingSeller(Base):
     name_organization = Column(String)
     description_organization = Column(Text, nullable=True)
     address_organization = Column(String)
+
+    # Requested business directions
+    wants_seller = Column(Boolean, nullable=False, default=True)
+    wants_autoservice = Column(Boolean, nullable=False, default=False)

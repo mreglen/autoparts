@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, func
 
 from app.db.database import Base
 
@@ -12,6 +12,8 @@ class AutoserviceTariffApplication(Base):
     contact_name = Column(String(160), nullable=False)
     contact_phone = Column(String(32), nullable=False)
     message = Column(Text, nullable=True)
+    requested_seller = Column(Boolean, nullable=False, default=False)
+    requested_autoservice = Column(Boolean, nullable=False, default=True)
     status = Column(String(32), nullable=False, default="pending", index=True)
     rejection_reason = Column(Text, nullable=True)
     reviewed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

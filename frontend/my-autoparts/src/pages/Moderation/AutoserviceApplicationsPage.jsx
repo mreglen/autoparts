@@ -8,6 +8,7 @@ import Card from '../../components/UI/Card';
 import { Badge } from '../../components/UI/Badge';
 import Button from '../../components/UI/Button';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+import PendingSellersPage from './PendingSellersPage';
 import {
   approveAutoserviceApplication,
   disableAutoserviceOrganization,
@@ -108,8 +109,8 @@ export default function AutoserviceApplicationsPage() {
   return (
     <div className="space-y-8 max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
       <PageHeader
-        title="Регистрация автосервиса"
-        subtitle="Подключённые автосервисы и управление тарифом"
+        title="Регистрация организаций"
+        subtitle="Новые организации, дополнительные направления и подключённые автосервисы"
       />
 
       {error ? (
@@ -119,7 +120,11 @@ export default function AutoserviceApplicationsPage() {
       ) : null}
 
       <section className="space-y-4">
-        <h2 className="text-sg-subtitle text-ink">Заявки на подключение</h2>
+        <PendingSellersPage embedded />
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-sg-subtitle text-ink">Заявки на дополнительные направления</h2>
         {loading ? (
           <Card>
             <p className="text-sm text-ink-muted">Загрузка…</p>
@@ -144,6 +149,10 @@ export default function AutoserviceApplicationsPage() {
                           {app.organization_name || `Организация ${app.organization_id}`}
                         </h3>
                         <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {app.requested_autoservice !== false ? <Badge tone="brand">Автосервис</Badge> : null}
+                        {app.requested_seller ? <Badge tone="neutral">Продавец (авторазбор)</Badge> : null}
                       </div>
                       <p className="mt-1 text-sm text-ink-muted">
                         {app.contact_name}

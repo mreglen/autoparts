@@ -6722,3 +6722,119 @@ def ensure_marzvpn_admin_tables() -> None:
             conn.execute(text(idx))
         logger.info("Applied marzvpn_payments table patch")
 
+
+def _boolean_not_null_default(default: str) -> str:
+    if engine.dialect.name == "postgresql":
+        return f"BOOLEAN NOT NULL DEFAULT {default}"
+    default_int = "1" if default == "TRUE" else "0"
+    return f"BOOLEAN NOT NULL DEFAULT {default_int}"
+
+
+def ensure_organizations_is_seller_business_column() -> None:
+    """Add is_seller_business flag to organizations."""
+    inspector = inspect(engine)
+    if "organizations" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("organizations")}
+    if "is_seller_business" in columns:
+        return
+
+    stmt = (
+        "ALTER TABLE organizations ADD COLUMN is_seller_business "
+        + _boolean_not_null_default("FALSE")
+    )
+
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+        # Backfill: orgs that already have seller users.
+        if engine.dialect.name == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    UPDATE organizations o
+                    SET is_seller_business = TRUE
+                    WHERE EXISTS (
+                        SELECT 1 FROM users u
+                        WHERE u.organization_id = o.id AND u.is_seller = TRUE
+                    )
+                    """
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    UPDATE organizations
+                    SET is_seller_business = 1
+                    WHERE EXISTS (
+                        SELECT 1 FROM users u
+                        WHERE u.organization_id = organizations.id AND u.is_seller = 1
+                    )
+                    """
+                )
+            )
+
+    logger.info("Applied organizations is_seller_business column patch")
+
+
+def ensure_pending_sellers_direction_columns() -> None:
+    """Add wants_seller/wants_autoservice flags to pending_sellers."""
+    inspector = inspect(engine)
+    if "pending_sellers" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("pending_sellers")}
+    statements = []
+
+    if "wants_seller" not in columns:
+        statements.append(
+            "ALTER TABLE pending_sellers ADD COLUMN wants_seller "
+            + _boolean_not_null_default("TRUE")
+        )
+    if "wants_autoservice" not in columns:
+        statements.append(
+            "ALTER TABLE pending_sellers ADD COLUMN wants_autoservice "
+            + _boolean_not_null_default("FALSE")
+        )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied pending_sellers direction column patches: %s", statements)
+
+
+def ensure_autoservice_application_direction_columns() -> None:
+    """Add requested_seller/requested_autoservice to autoservice_tariff_applications."""
+    inspector = inspect(engine)
+    if "autoservice_tariff_applications" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("autoservice_tariff_applications")}
+    statements = []
+
+    if "requested_seller" not in columns:
+        statements.append(
+            "ALTER TABLE autoservice_tariff_applications ADD COLUMN requested_seller "
+            + _boolean_not_null_default("FALSE")
+        )
+    if "requested_autoservice" not in columns:
+        # Legacy applications were autoservice-only requests.
+        statements.append(
+            "ALTER TABLE autoservice_tariff_applications ADD COLUMN requested_autoservice "
+            + _boolean_not_null_default("TRUE")
+        )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied autoservice_tariff_applications direction column patches: %s", statements)
+

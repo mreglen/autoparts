@@ -11,6 +11,9 @@ from app.db.schema_patches import (
     ensure_garage_order_delivery_columns,
     ensure_organization_markup_columns,
     ensure_organizations_autoservice_columns,
+    ensure_organizations_is_seller_business_column,
+    ensure_pending_sellers_direction_columns,
+    ensure_autoservice_application_direction_columns,
     ensure_organizations_autoservice_paused_columns,
     ensure_organizations_allow_unpaid_checkout_column,
     ensure_organizations_legal_details_columns,
@@ -242,6 +245,8 @@ except Exception as e:
 try:
     ensure_organization_markup_columns()
     ensure_organizations_autoservice_columns()
+    ensure_organizations_is_seller_business_column()
+    ensure_pending_sellers_direction_columns()
     ensure_organizations_autoservice_paused_columns()
     ensure_organizations_allow_unpaid_checkout_column()
     ensure_organizations_legal_details_columns()
@@ -272,6 +277,7 @@ try:
     ensure_autoservice_clients_table()
     ensure_autoservice_clients_requisites_columns()
     ensure_autoservice_tariff_applications_table()
+    ensure_autoservice_application_direction_columns()
     ensure_garage_vehicles_table()
     ensure_garage_vehicle_laximo_columns()
     ensure_garage_vehicles_model_nullable()

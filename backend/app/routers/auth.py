@@ -86,6 +86,9 @@ def build_user_profile_response(user: User, db: Session | None = None) -> dict:
             getattr(user.organization, "is_autoservice", False)
             and not getattr(user.organization, "autoservice_paused", False)
         ) if user.organization_id and user.organization else False,
+        "organization_is_seller_business": bool(
+            getattr(user.organization, "is_seller_business", False)
+        ) if user.organization_id and user.organization else False,
         "organization_has_admin_director": bool(
             org_has_admin_director(db, user.organization_id)
         ) if db and user.organization_id else False,
@@ -590,7 +593,9 @@ def seller_register(data: SellerRegisterRequest, db: Session = Depends(get_db)):
             description_organization=data.description_organization,
             address_organization=data.address_organization,
             phone=normalized_phone,
-            email=data.email.lower()
+            email=data.email.lower(),
+            wants_seller=data.wants_seller,
+            wants_autoservice=data.wants_autoservice,
         )
         
         db.add(pending_seller)
@@ -607,6 +612,8 @@ def seller_register(data: SellerRegisterRequest, db: Session = Depends(get_db)):
                 "patronymic": pending_seller.patronymic,
                 "name_organization": pending_seller.name_organization,
                 "phone": normalized_phone,
+                "wants_seller": pending_seller.wants_seller,
+                "wants_autoservice": pending_seller.wants_autoservice,
             }
         )
         
@@ -621,7 +628,7 @@ def seller_register(data: SellerRegisterRequest, db: Session = Depends(get_db)):
             organization_name=pending_seller.name_organization
         )
         
-        return SellerRegisterResponse(msg="Заявка успешно отправлена. Ожидайте модерации. Подтверждение отправлено на ваш email.")
+        return SellerRegisterResponse(msg="Заявка на регистрацию организации отправлена. Выбранные направления будут подключены после модерации.")
 
     except HTTPException:
         db.rollback()

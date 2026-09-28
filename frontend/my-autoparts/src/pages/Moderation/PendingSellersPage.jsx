@@ -9,7 +9,7 @@ import Toast from '../../components/UI/Toast';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
-export default function PendingSellersPage() {
+export default function PendingSellersPage({ embedded = false }) {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { isReady, user } = useAuthReady();
@@ -39,7 +39,7 @@ export default function PendingSellersPage() {
 
     useEffect(() => {
         const onPullRefresh = (event) => {
-            if (event.detail?.pathname === '/moderation/pending-sellers') {
+            if (['/moderation/pending-sellers', '/moderation/autoservice-applications'].includes(event.detail?.pathname)) {
                 reloadSellers();
             }
         };
@@ -98,11 +98,11 @@ export default function PendingSellersPage() {
     };
 
     return (
-        <div className="max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]">
-            <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-                <div className="mb-6 sm:mb-8">
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Регистрация продавцов</h1>
-                    <p className="mt-2 text-gray-600">Модерация заявок на регистрацию продавцов</p>
+        <div className={embedded ? '' : 'max-lg:pb-[var(--sg-mobile-bottom-nav-total,4.5rem)]'}>
+            <div className={embedded ? '' : 'mt-4 px-4 sm:mt-5 sm:px-0'}>
+                <div className={embedded ? 'mb-4' : 'mb-6 sm:mb-8'}>
+                    {embedded ? <h2 className="text-sg-subtitle text-ink">Новые организации</h2> : <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Регистрация организаций</h1>}
+                    <p className="mt-2 text-gray-600">Заявки с выбранными направлениями бизнеса</p>
                     {!loading && pendingSellers.length > 0 ? (
                         <p className="mt-1 text-sm font-medium text-indigo-700">
                             {pendingSellers.length} заявок в очереди
@@ -119,7 +119,7 @@ export default function PendingSellersPage() {
                 ) : pendingSellers.length === 0 ? (
                     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-8 text-center">
                         <h3 className="text-lg font-medium text-gray-900 mb-2">Нет заявок в ожидании</h3>
-                        <p className="text-gray-500">Пока нет новых заявок от продавцов</p>
+                        <p className="text-gray-500">Пока нет новых заявок на регистрацию организаций</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -140,6 +140,13 @@ export default function PendingSellersPage() {
                                         <div>
                                             <p className="text-sm font-medium text-gray-500">Организация</p>
                                             <p className="text-gray-900">{seller.name_organization}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500">Направления</p>
+                                            <div className="mt-1 flex flex-wrap gap-1.5">
+                                                {seller.wants_autoservice ? <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">Автосервис</span> : null}
+                                                {seller.wants_seller !== false ? <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">Продавец (авторазбор)</span> : null}
+                                            </div>
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium text-gray-500">Описание</p>
@@ -189,8 +196,8 @@ export default function PendingSellersPage() {
                 open={showApproveModal}
                 onClose={handleCloseModals}
                 onConfirm={handleApproveConfirm}
-                title="Одобрение продавца"
-                message="Вы уверены, что хотите одобрить этого продавца? Будет сгенерирован пароль и отправлен на email продавца."
+                title="Одобрение организации"
+                message="Подтвердить выбранные направления? Доступ и сгенерированный пароль будут отправлены заявителю на email."
                 confirmLabel="Одобрить"
             />
 

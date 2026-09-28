@@ -1136,7 +1136,34 @@ def get_pending_sellers(
     db: Session = Depends(get_db)
 ):
     pending_sellers = db.query(PendingSeller).all()
-    return pending_sellers
+    return [_serialize_pending_seller(row) for row in pending_sellers]
+
+
+def _pending_seller_wants(row: PendingSeller) -> tuple[bool, bool]:
+    """Resolve requested directions; legacy rows default to seller only."""
+    wants_seller = getattr(row, "wants_seller", None)
+    wants_autoservice = getattr(row, "wants_autoservice", None)
+    if wants_seller is None and wants_autoservice is None:
+        return True, False
+    return bool(wants_seller), bool(wants_autoservice)
+
+
+def _serialize_pending_seller(row: PendingSeller) -> dict:
+    wants_seller, wants_autoservice = _pending_seller_wants(row)
+    return {
+        "id": row.id,
+        "email": row.email,
+        "phone": row.phone,
+        "created_at": row.created_at,
+        "last_name": row.last_name,
+        "first_name": row.first_name,
+        "patronymic": row.patronymic,
+        "name_organization": row.name_organization,
+        "description_organization": row.description_organization,
+        "address_organization": row.address_organization,
+        "wants_seller": wants_seller,
+        "wants_autoservice": wants_autoservice,
+    }
 
 
 @router.get("/sellers")
@@ -1276,10 +1303,12 @@ def approve_pending_seller(
         raise HTTPException(status_code=404, detail="Заявка не найдена")
     
     try:
+        wants_seller, wants_autoservice = _pending_seller_wants(pending_seller)
+
         # Generate random password
         password = generate_random_password(10)
         hashed_password = get_password_hash(password)
-        
+
         # Create organization
         org_id = random_id(10)
         organization = Organization(
@@ -1287,10 +1316,15 @@ def approve_pending_seller(
             name=pending_seller.name_organization,
             address=pending_seller.address_organization,
             description=pending_seller.description_organization,
+            is_seller_business=wants_seller,
+            is_autoservice=wants_autoservice,
         )
         db.add(organization)
         db.flush()
-        
+
+        if wants_autoservice:
+            _ensure_autoservice_settings(db, organization)
+
         # Create user
         user = User(
             last_name=pending_seller.last_name,
@@ -1298,7 +1332,7 @@ def approve_pending_seller(
             patronymic=pending_seller.patronymic,
             email=pending_seller.email,
             phone=pending_seller.phone,
-            is_seller=True,
+            is_seller=wants_seller,
             is_director=True,
             organization_id=org_id,
             hashed_password=hashed_password
@@ -1323,7 +1357,9 @@ def approve_pending_seller(
             email=user.email,
             details={
                 "approved_by": current_user.email,
-                "organization_name": organization.name
+                "organization_name": organization.name,
+                "wants_seller": wants_seller,
+                "wants_autoservice": wants_autoservice,
             }
         )
         
@@ -1413,9 +1449,19 @@ def reject_pending_seller(
         raise HTTPException(status_code=500, detail="Ошибка при отклонении заявки")
 
 
+def _application_requested_flags(row: AutoserviceTariffApplication) -> tuple[bool, bool]:
+    """Resolve requested directions; legacy rows default to autoservice only."""
+    requested_seller = getattr(row, "requested_seller", None)
+    requested_autoservice = getattr(row, "requested_autoservice", None)
+    if requested_seller is None and requested_autoservice is None:
+        return False, True
+    return bool(requested_seller), bool(requested_autoservice)
+
+
 def _serialize_autoservice_application(db: Session, row: AutoserviceTariffApplication) -> dict:
     org = db.query(Organization).filter(Organization.id == row.organization_id).first()
     applicant = db.query(User).filter(User.id == row.applicant_user_id).first()
+    requested_seller, requested_autoservice = _application_requested_flags(row)
     applicant_name = None
     if applicant:
         parts = [applicant.last_name or "", applicant.first_name or "", applicant.patronymic or ""]
@@ -1437,6 +1483,9 @@ def _serialize_autoservice_application(db: Session, row: AutoserviceTariffApplic
         "organization_is_autoservice": (
             bool(getattr(org, "is_autoservice", False)) and not bool(getattr(org, "autoservice_paused", False))
         ) if org else False,
+        "organization_is_seller_business": bool(getattr(org, "is_seller_business", False)) if org else False,
+        "requested_seller": requested_seller,
+        "requested_autoservice": requested_autoservice,
     }
 
 
@@ -1523,14 +1572,28 @@ def approve_autoservice_application(
     if not org:
         raise HTTPException(status_code=404, detail="Организация не найдена")
 
+    requested_seller, requested_autoservice = _application_requested_flags(row)
+
     now = datetime.now(timezone.utc)
     row.status = "approved"
     row.reviewed_by_user_id = current_user.id
     row.reviewed_at = now
     row.rejection_reason = None
-    org.is_autoservice = True
-    org.autoservice_paused = False
-    _ensure_autoservice_settings(db, org)
+    if requested_autoservice:
+        org.is_autoservice = True
+        org.autoservice_paused = False
+        _ensure_autoservice_settings(db, org)
+    if requested_seller:
+        org.is_seller_business = True
+        (
+            db.query(User)
+            .filter(
+                User.organization_id == org.id,
+                User.is_director.is_(True),
+                User.is_seller.is_(False),
+            )
+            .update({"is_seller": True}, synchronize_session=False)
+        )
     db.commit()
     db.refresh(row)
     log_audit(
@@ -1540,7 +1603,12 @@ def approve_autoservice_application(
         summary=f"Автосервис подключён: {org.name}",
         user=current_user,
         organization_id=org.id,
-        details={"application_id": row.id, "organization_id": org.id},
+        details={
+            "application_id": row.id,
+            "organization_id": org.id,
+            "requested_seller": requested_seller,
+            "requested_autoservice": requested_autoservice,
+        },
         entity_type="autoservice_tariff_application",
         entity_id=str(row.id),
     )

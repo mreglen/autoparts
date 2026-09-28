@@ -507,10 +507,10 @@ export default function Organization() {
 
       <section className="space-y-4">
         <SectionHeader
-          title="Автосервис"
-          subtitle="Тариф для записи, заказ-нарядов и клиентской базы"
+          title="Направления бизнеса"
+          subtitle="Подключённые возможности организации и заявки на новые направления"
         />
-        <AutoserviceTariffSection user={user} isDirector={isDirector} />
+        <AutoserviceTariffSection user={user} org={org} isDirector={isDirector} />
       </section>
     </div>
   );

@@ -26,6 +26,7 @@ class Organization(Base):
     new_parts_markup_tier = Column(String(16), nullable=True)
     append_marketplace_site_info = Column(Boolean, nullable=False, default=False)
     is_autoservice = Column(Boolean, nullable=False, default=False)
+    is_seller_business = Column(Boolean, nullable=False, default=False)
     autoservice_paused = Column(Boolean, nullable=False, default=False)
     allow_unpaid_checkout = Column(Boolean, nullable=False, default=False)
     users = relationship("User", back_populates="organization")

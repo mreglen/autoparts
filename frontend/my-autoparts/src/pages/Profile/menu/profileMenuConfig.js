@@ -314,8 +314,7 @@ const buildAutoserviceTabs = (user, hasPermission, options) => {
 const buildAdminTabs = (user, hasPermission) => {
     const tabs = [
         { id: 'sellers', label: 'Продавцы' },
-        { id: 'pending-sellers', label: 'Регистрация продавцов' },
-        { id: 'autoservice-applications', label: 'Регистрация автосервиса' },
+        { id: 'autoservice-applications', label: 'Регистрация организаций' },
         { id: 'product-moderation', label: 'Проверка запчастей' },
         { id: 'analytics', label: 'Аналитика' },
         { id: 'admin-panel', label: 'Настройки' },

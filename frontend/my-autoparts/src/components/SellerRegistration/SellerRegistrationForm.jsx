@@ -42,7 +42,8 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
     const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false);
     const [showLegalErrors, setShowLegalErrors] = useState(false);
     const acceptedLegalConsent = acceptedPersonalData && acceptedPrivacyPolicy;
-    const [currentStep, setCurrentStep] = useState(1);
+    const [currentStep, setCurrentStep] = useState(0);
+    const [businessDirections, setBusinessDirections] = useState({ seller: false, autoservice: false });
     const [initialized, setInitialized] = useState(false);
     const dropdownRef = useRef(null);
     const inputRef = useRef(null);
@@ -84,8 +85,8 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
             <div id={id} className="rounded-2xl border border-gray-200/90 bg-white p-6 shadow-xl shadow-gray-900/5 ring-1 ring-gray-100 sm:p-8">
                 <h3 className="text-xl font-bold text-gray-900">Вы уже вошли в аккаунт</h3>
                 <p className="mt-2 text-sm leading-relaxed text-gray-600">
-                    Заявка на регистрацию продавца доступна только гостям. Если нужно подключить магазин к текущему
-                    аккаунту — напишите в поддержку или зайдите в настройки организации.
+                    Регистрация новой организации доступна только гостям. Дополнительное направление для текущей
+                    организации можно подключить в настройках организации.
                 </p>
                 <Link
                     to="/profile"
@@ -243,6 +244,8 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
             address_organization: formData.address_organization,
             phone: formData.phone,
             email: formData.email,
+            wants_seller: businessDirections.seller,
+            wants_autoservice: businessDirections.autoservice,
         }))
             .unwrap()
             .then(() => {
@@ -357,9 +360,9 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
         <div id={id} className="overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-xl shadow-gray-900/5 ring-1 ring-gray-100">
             <div className="border-b border-gray-100 bg-gradient-to-r from-blue-50/80 to-indigo-50/60 px-6 py-5 sm:px-8">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-800 shadow-sm">
-                    Для магазинов
+                    Для бизнеса
                 </div>
-                <h3 className="mt-3 text-2xl font-bold text-gray-900">Регистрация продавца</h3>
+                <h3 className="mt-3 text-2xl font-bold text-gray-900">Регистрация организации</h3>
                 <p className="mt-1 text-sm text-gray-600">
                     Оставьте заявку — после проверки администратором придёт письмо с доступом в кабинет.
                 </p>
@@ -372,11 +375,54 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
                     </div>
                 )}
 
-                <div className="mb-2 flex justify-between">
-                    {stepLabel(1, 'Данные')}
-                    {stepLabel(2, 'Email')}
-                    {stepLabel(3, 'Организация')}
-                </div>
+                {currentStep === 0 ? (
+                    <div className="space-y-5">
+                        <div>
+                            <h4 className="text-lg font-semibold text-gray-900">Выберите направления бизнеса</h4>
+                            <p className="mt-1 text-sm text-gray-500">Можно выбрать одно или оба направления.</p>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <button
+                                type="button"
+                                onClick={() => setBusinessDirections((prev) => ({ ...prev, autoservice: !prev.autoservice }))}
+                                className={`rounded-xl border-2 p-4 text-left transition ${businessDirections.autoservice ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-gray-200 hover:border-indigo-300'}`}
+                            >
+                                <span className="flex items-center justify-between gap-3">
+                                    <span className="font-semibold text-gray-900">Автосервис</span>
+                                    <span className={`flex h-6 w-6 items-center justify-center rounded-full border ${businessDirections.autoservice ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300'}`}>{businessDirections.autoservice ? '✓' : ''}</span>
+                                </span>
+                                <span className="mt-2 block text-sm text-gray-600">Запись, клиенты, заказ-наряды, склад и планировщик.</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setBusinessDirections((prev) => ({ ...prev, seller: !prev.seller }))}
+                                className={`rounded-xl border-2 p-4 text-left transition ${businessDirections.seller ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-gray-200 hover:border-indigo-300'}`}
+                            >
+                                <span className="flex items-center justify-between gap-3">
+                                    <span className="font-semibold text-gray-900">Продавец (авторазбор)</span>
+                                    <span className={`flex h-6 w-6 items-center justify-center rounded-full border ${businessDirections.seller ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300'}`}>{businessDirections.seller ? '✓' : ''}</span>
+                                </span>
+                                <span className="mt-2 block text-sm text-gray-600">Продажа запчастей, складской учёт, заказы и общение с покупателями.</span>
+                            </button>
+                        </div>
+                        <div className="flex justify-end">
+                            <button
+                                type="button"
+                                disabled={!businessDirections.seller && !businessDirections.autoservice}
+                                onClick={() => setCurrentStep(1)}
+                                className="rounded-lg bg-indigo-600 px-5 py-2.5 font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                                Продолжить
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="mb-2 flex justify-between">
+                        {stepLabel(1, 'Данные')}
+                        {stepLabel(2, 'Email')}
+                        {stepLabel(3, 'Организация')}
+                    </div>
+                )}
 
                 {currentStep === 1 && (
                     <div className="space-y-4">
@@ -427,7 +473,10 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
                             showError={showLegalErrors}
                         />
 
-                        <div className="flex justify-end pt-1">
+                        <div className="flex items-center justify-between pt-1">
+                            <button type="button" onClick={() => setCurrentStep(0)} className="font-medium text-gray-600 hover:text-gray-900">
+                                Направления
+                            </button>
                             <button
                                 type="button"
                                 onClick={goToStep2}
@@ -570,7 +619,7 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
 
             {showSuccessModal && (
                 <SuccessNotification
-                    message="Проверьте email — там подтверждение заявки на регистрацию продавца. После одобрения администратором придёт письмо с паролем для входа."
+                    message="Проверьте email — там подтверждение заявки на регистрацию организации. После одобрения выбранных направлений придёт письмо с паролем для входа."
                     onClose={() => setShowSuccessModal(false)}
                     onConfirm={() => {
                         setShowSuccessModal(false);
