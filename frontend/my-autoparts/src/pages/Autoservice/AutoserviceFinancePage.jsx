@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 import {
   clampFinanceDate,
@@ -9,6 +9,7 @@ import {
 import { formatServerDateTime } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import { Button, ConfirmDialog, Modal, Skeleton } from '../../components/UI';
+import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 import Toast from '../../components/UI/Toast';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
@@ -19,9 +20,7 @@ import {
   autoserviceListTableWrapClass,
   autoserviceListTbodyClass,
   autoserviceListTdClass,
-  autoserviceListTdRightClass,
   autoserviceListThClass,
-  autoserviceListThRightClass,
   autoserviceListTheadRowClass,
   autoserviceListTrClickableClass,
   warehouseEmptyShellClass,
@@ -37,17 +36,72 @@ const ALL_METHODS = [
 ];
 
 const METHOD_COLORS = {
-  card: 'bg-blue-50 text-blue-700 ring-blue-100',
-  cash: 'bg-green-50 text-green-700 ring-green-100',
-  bank: 'bg-amber-50 text-amber-700 ring-amber-100',
+  card: 'bg-blue-50 text-blue-700',
+  cash: 'bg-green-50 text-green-700',
+  bank: 'bg-amber-50 text-amber-700',
 };
 
-const tabFilterButtonClass = (active) =>
-  `inline-flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
-    active
-      ? 'bg-surface text-ink shadow-sm ring-1 ring-line'
-      : 'text-ink-muted hover:bg-surface/60 hover:text-ink'
-  }`;
+function MethodSegmentedFilter({ methods, selected, onChange }) {
+  const containerRef = useRef(null);
+  const [thumb, setThumb] = useState(null);
+
+  const measure = useCallback(() => {
+    const container = containerRef.current;
+    const active = container?.querySelector('[data-selected="true"]');
+    if (!active) {
+      setThumb(null);
+      return;
+    }
+    setThumb({
+      left: active.offsetLeft,
+      top: active.offsetTop,
+      width: active.offsetWidth,
+      height: active.offsetHeight,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure, selected]);
+
+  useEffect(() => {
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure]);
+
+  return (
+    <div ref={containerRef} className={`${warehouseToolbarClass} relative`}>
+      {thumb ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute rounded-full bg-surface shadow-sm ring-1 ring-line transition-all duration-200 ease-out"
+          style={{
+            left: thumb.left,
+            top: thumb.top,
+            width: thumb.width,
+            height: thumb.height,
+          }}
+        />
+      ) : null}
+      {methods.map((method) => {
+        const active = selected === method.id;
+        return (
+          <button
+            key={method.id}
+            type="button"
+            data-selected={active || undefined}
+            onClick={() => onChange(method.id)}
+            className={`relative z-10 inline-flex h-9 shrink-0 items-center rounded-full px-4 text-sm font-medium transition ${
+              active ? 'text-ink' : 'text-ink-muted hover:bg-surface/60 hover:text-ink'
+            }`}
+          >
+            {method.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function receiptsWord(count) {
   if (count === 1) return 'поступление';
@@ -57,9 +111,9 @@ function receiptsWord(count) {
 
 function MethodBadge({ method }) {
   const label = FINANCE_METHOD_LABELS[method] || method || '—';
-  const colorClass = METHOD_COLORS[method] || 'bg-surface-subtle text-ink-soft ring-line';
+  const colorClass = METHOD_COLORS[method] || 'bg-surface-subtle text-ink-soft';
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${colorClass}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${colorClass}`}>
       {label}
     </span>
   );
@@ -109,7 +163,7 @@ function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
   );
 }
 
-function FinanceReceiptRows({ rows, onOpen, emptyText = 'Нет поступлений за период' }) {
+function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет поступлений за период' }) {
   if (!rows.length) {
     return (
       <p className={`${warehouseEmptyShellClass} text-sm text-ink-muted`}>
@@ -122,17 +176,33 @@ function FinanceReceiptRows({ rows, onOpen, emptyText = 'Нет поступле
     <>
       <div className="md:hidden divide-y divide-line-soft">
         {rows.map((row) => (
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             key={row.id}
             onClick={() => onOpen(row)}
-            className="block w-full space-y-1.5 py-3 text-left transition hover:bg-surface-muted/50"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpen(row); }}
+            className="block w-full cursor-pointer space-y-1.5 py-3 text-left transition hover:bg-surface-muted/50"
           >
             <FinanceField label="Дата">{formatServerDateTime(row.created_at)}</FinanceField>
-            <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
+            <FinanceField label="Клиент">{row.client_name || '—'}</FinanceField>
             <FinanceField label="Способ"><MethodBadge method={row.method} /></FinanceField>
-            <FinanceField label="Заказ-наряд">№ {row.repair_order_number || '—'}</FinanceField>
-          </button>
+            <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
+            <FinanceField label="Документ">
+              {row.repair_order_number ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenOrder?.(row.repair_order_id);
+                  }}
+                  className="font-medium text-brand-600 hover:underline"
+                >
+                  Заказ-наряд № {row.repair_order_number}
+                </button>
+              ) : '—'}
+            </FinanceField>
+          </div>
         ))}
       </div>
 
@@ -140,10 +210,11 @@ function FinanceReceiptRows({ rows, onOpen, emptyText = 'Нет поступле
         <table className={autoserviceListTableClass}>
           <thead>
             <tr className={autoserviceListTheadRowClass}>
-              <th className={`w-36 ${autoserviceListThClass}`}>Дата</th>
-              <th className={`w-36 ${autoserviceListThRightClass}`}>Сумма</th>
-              <th className={`w-40 ${autoserviceListThClass}`}>Способ оплаты</th>
-              <th className={autoserviceListThClass}>Заказ-наряд</th>
+              <th className={`w-[15%] ${autoserviceListThClass} text-center`}>Дата</th>
+              <th className={`w-[30%] ${autoserviceListThClass} text-center`}>Клиент</th>
+              <th className={`w-[20%] ${autoserviceListThClass} text-center`}>Способ оплаты</th>
+              <th className={`w-[15%] ${autoserviceListThClass} text-center`}>Сумма</th>
+              <th className={`w-[20%] ${autoserviceListThClass} text-center`}>Документ</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
@@ -153,17 +224,31 @@ function FinanceReceiptRows({ rows, onOpen, emptyText = 'Нет поступле
                 className={autoserviceListTrClickableClass}
                 onClick={() => onOpen(row)}
               >
-                <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
+                <td className={`${autoserviceListTdClass} whitespace-nowrap text-center text-ink-muted`}>
                   {formatServerDateTime(row.created_at)}
                 </td>
-                <td className={`${autoserviceListTdRightClass} font-semibold tabular-nums`}>
-                  {formatFinanceCurrency(row.amount)}
+                <td className={`${autoserviceListTdClass} truncate text-center`}>
+                  {row.client_name || '—'}
                 </td>
-                <td className={autoserviceListTdClass}>
+                <td className={`${autoserviceListTdClass} text-center`}>
                   <MethodBadge method={row.method} />
                 </td>
-                <td className={`${autoserviceListTdClass} tabular-nums`}>
-                  № {row.repair_order_number || '—'}
+                <td className={`${autoserviceListTdClass} text-center font-semibold tabular-nums`}>
+                  {formatFinanceCurrency(row.amount)}
+                </td>
+                <td className={`${autoserviceListTdClass} text-center tabular-nums`}>
+                  {row.repair_order_number ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenOrder?.(row.repair_order_id);
+                      }}
+                      className="cursor-pointer border-0 bg-transparent p-0 font-medium text-brand-600 hover:underline"
+                    >
+                      Заказ-наряд № {row.repair_order_number}
+                    </button>
+                  ) : '—'}
                 </td>
               </tr>
             ))}
@@ -187,6 +272,8 @@ export default function AutoserviceFinancePage() {
   const [detailsPayment, setDetailsPayment] = useState(null);
   const [deletePayment, setDeletePayment] = useState(null);
   const [deletingPaymentId, setDeletingPaymentId] = useState(null);
+  const [viewRepairOrder, setViewRepairOrder] = useState(null);
+  const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -252,24 +339,25 @@ export default function AutoserviceFinancePage() {
     }
   };
 
+  const openRepairOrder = useCallback(async (orderId) => {
+    if (!orderId) return;
+    setViewRepairOrderLoading(true);
+    try {
+      const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
+      setViewRepairOrder(order);
+    } catch (err) {
+      setError(err?.message || 'Не удалось открыть заказ-наряд');
+    } finally {
+      setViewRepairOrderLoading(false);
+    }
+  }, []);
+
   const items = useMemo(() => data.items || [], [data.items]);
 
   const filteredRows = useMemo(() => {
     if (selectedMethod === 'all') return items;
     return items.filter((row) => row.method === selectedMethod);
   }, [items, selectedMethod]);
-
-  const methodStats = useMemo(() => {
-    const counts = { card: 0, cash: 0, bank: 0 };
-    items.forEach((row) => {
-      if (counts[row.method] != null) counts[row.method] += 1;
-    });
-    return ALL_METHODS.slice(1).map((block) => ({
-      ...block,
-      amount: Number(data.totals?.[block.id] || 0),
-      count: counts[block.id],
-    }));
-  }, [items, data.totals]);
 
   const selectedLabel = useMemo(() => {
     const found = ALL_METHODS.find((m) => m.id === selectedMethod);
@@ -309,23 +397,6 @@ export default function AutoserviceFinancePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {methodStats.map((block) => (
-          <div
-            key={block.id}
-            className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80"
-          >
-            <p className="text-xs font-medium text-ink-muted">{block.label}</p>
-            <p className="mt-2 text-lg font-bold tabular-nums text-ink sm:text-xl">
-              {loading ? <Skeleton className="h-6 w-28" /> : formatFinanceCurrency(block.amount)}
-            </p>
-            <p className="mt-1 text-xs text-ink-muted">
-              {loading ? '...' : `${block.count} ${receiptsWord(block.count)}`}
-            </p>
-          </div>
-        ))}
-      </div>
-
       <MobileCollapsibleFilters title="Период">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block min-w-0">
@@ -362,18 +433,11 @@ export default function AutoserviceFinancePage() {
 
       <Toast message={error} variant="error" onClose={() => setError('')} />
 
-      <div className={warehouseToolbarClass}>
-        {ALL_METHODS.map((method) => (
-          <button
-            key={method.id}
-            type="button"
-            onClick={() => setSelectedMethod(method.id)}
-            className={tabFilterButtonClass(selectedMethod === method.id)}
-          >
-            {method.label}
-          </button>
-        ))}
-      </div>
+      <MethodSegmentedFilter
+        methods={ALL_METHODS}
+        selected={selectedMethod}
+        onChange={setSelectedMethod}
+      />
 
       {loading ? (
         <div className="space-y-3">
@@ -403,6 +467,7 @@ export default function AutoserviceFinancePage() {
         <FinanceReceiptRows
           rows={filteredRows}
           onOpen={setDetailsPayment}
+          onOpenOrder={openRepairOrder}
           emptyText="Нет поступлений за период"
         />
       )}
@@ -470,6 +535,15 @@ export default function AutoserviceFinancePage() {
         confirmLabel="Удалить"
         danger
         loading={Boolean(deletingPaymentId)}
+      />
+
+      <RepairOrderViewModal
+        order={viewRepairOrder}
+        loading={viewRepairOrderLoading}
+        enablePayment
+        wrapperZIndex="var(--sg-z-modal-elevated-shell)"
+        onClose={() => setViewRepairOrder(null)}
+        onOrderChange={(updated) => setViewRepairOrder(updated)}
       />
     </div>
   );

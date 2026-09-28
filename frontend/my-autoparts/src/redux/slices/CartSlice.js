@@ -116,6 +116,35 @@ function removeQuantityUpdatingId(state, itemId) {
     state.quantityUpdatingIds = state.quantityUpdatingIds.filter((id) => id !== itemId);
 }
 
+function upsertNewPartsCartItem(state, item) {
+    if (!item?.id) return;
+    const list = state.cart?.new_parts_items;
+    if (Array.isArray(list)) {
+        const index = list.findIndex((existing) => existing.id === item.id);
+        if (index === -1) list.push(item);
+        else list[index] = { ...list[index], ...item };
+    }
+    const baskets = state.cart?.new_parts_baskets;
+    if (Array.isArray(baskets)) {
+        const basket = baskets.find((b) => b.id === item.basket_id);
+        if (basket) {
+            basket.items = Array.isArray(basket.items) ? basket.items : [];
+            const index = basket.items.findIndex((i) => i.id === item.id);
+            if (index === -1) basket.items.push(item);
+            else basket.items[index] = { ...basket.items[index], ...item };
+            basket.item_count = basket.items.reduce(
+                (sum, i) => sum + (Number(i.quantity) || 0),
+                0,
+            );
+            basket.total_price = basket.items.reduce(
+                (sum, i) => sum + (Number(i.price) || 0) * (Number(i.quantity) || 0),
+                0,
+            );
+        }
+    }
+    syncBasketsFromCart(state);
+}
+
 function syncSummaryFromCart(state) {
     const summary = computeCartSummary(state.cart);
     state.summary = summary;
@@ -217,7 +246,7 @@ export const addNewPartsToCart = createAsyncThunk(
                 payload.supplier_unit_price = truncateRubles(cartItem.supplier_unit_price);
             }
             const response = await apiAxios.post('/cart/new-parts', payload);
-            await dispatch(fetchCart());
+            void dispatch(fetchCart());
             return response.data;
         } catch (error) {
             return rejectWithValue(
@@ -476,8 +505,12 @@ const cartSlice = createSlice({
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(addNewPartsToCart.fulfilled, (state) => {
+            .addCase(addNewPartsToCart.fulfilled, (state, action) => {
                 state.loading = false;
+                if (action.payload) {
+                    upsertNewPartsCartItem(state, action.payload);
+                    syncSummaryFromCart(state);
+                }
             })
             .addCase(addNewPartsToCart.rejected, (state, action) => {
                 state.loading = false;

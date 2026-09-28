@@ -382,6 +382,71 @@ const clientPartControlSelectClass = `${compactControlSelectClass} w-[3.75rem] p
 const workExecutorBtnClass =
   'inline-flex h-9 min-w-0 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm text-ink transition hover:bg-surface-muted max-lg:flex-1 lg:h-8 lg:w-44';
 
+function WorkExecutorPicker({ employees, work, onToggle, onPercentChange, onAddEmployee }) {
+  const [query, setQuery] = useState('');
+  const executors = work?.executors || [];
+  const checkedById = new Map(
+    executors
+      .filter((ex) => ex.employee_id)
+      .map((ex) => [String(ex.employee_id), ex]),
+  );
+  const q = query.trim().toLowerCase();
+  const filtered = (employees || []).filter(
+    (emp) => !q || String(emp.name || '').toLowerCase().includes(q),
+  );
+
+  return (
+    <div className="space-y-3">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Поиск сотрудника…"
+        className="sg-pill-input sg-pill-input-sm w-full"
+      />
+      {filtered.length === 0 ? (
+        <p className="text-sm text-ink-muted">{q ? 'Не найдено' : 'Нет сотрудников'}</p>
+      ) : (
+        <div className="divide-y divide-line-soft">
+          {filtered.map((emp) => {
+            const ex = checkedById.get(String(emp.id));
+            const checked = Boolean(ex);
+            return (
+              <div key={emp.id} className="flex min-w-0 items-center gap-2 py-2">
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggle(emp.id)}
+                    className="h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="min-w-0 truncate text-sm text-ink">{emp.name}</span>
+                </label>
+                {checked ? (
+                  <>
+                    <NumericInput
+                      mode="numeric"
+                      className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center`}
+                      value={ex.percent}
+                      aria-label="Процент оплаты"
+                      onChange={(e) => onPercentChange(emp.id, e.target.value)}
+                    />
+                    <span className="shrink-0 text-xs text-ink-muted">%</span>
+                    <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
+                      {formatMoney(workPayAmount(work?.qty, work?.unit_price, ex.percent))} ₽
+                    </span>
+                  </>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <SectionAddLink onClick={onAddEmployee} label="+ Сотрудник" />
+    </div>
+  );
+}
+
 function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
   return {
     id: p.id,
@@ -1578,18 +1643,6 @@ export default function AutoserviceOrderFormPage() {
     setMileageKm(String(vehicle.mileage_km));
   }, [formInitialized, vehicleId, vehicles]);
 
-  const employeeOptions = useMemo(
-    () => [
-      { value: '', label: '—', searchText: '' },
-      ...serviceEmployees.map((emp) => ({
-        value: String(emp.id),
-        label: emp.name,
-        searchText: emp.name,
-      })),
-    ],
-    [serviceEmployees],
-  );
-
   const worksTotal = useMemo(
     () => works.reduce((sum, w) => sum + lineSum(w.qty, w.unit_price), 0),
     [works],
@@ -1641,34 +1694,31 @@ export default function AutoserviceOrderFormPage() {
     }
   };
 
-  const addWorkExecutor = (workIndex, employeeId = '') => {
-    const emp = serviceEmployees.find((e) => String(e.id) === String(employeeId));
-    const percent = emp ? String(emp.work_percent ?? 0) : '';
-    setWorks((prev) => prev.map((w, i) => (
-      i === workIndex
-        ? { ...w, executors: [...(w.executors || []), emptyExecutor(employeeId, percent)] }
-        : w
-    )));
-  };
-
-  const updateWorkExecutor = (workIndex, execIndex, patch) => {
+  const toggleWorkExecutor = (workIndex, employeeId) => {
     setWorks((prev) => prev.map((w, i) => {
       if (i !== workIndex) return w;
-      const next = (w.executors || []).map((ex, j) => (j === execIndex ? { ...ex, ...patch } : ex));
-      if (patch.employee_id) {
-        const emp = serviceEmployees.find((e) => String(e.id) === String(patch.employee_id));
-        if (emp && !patch.percent) {
-          next[execIndex] = { ...next[execIndex], percent: String(emp.work_percent ?? 0) };
-        }
+      const executors = w.executors || [];
+      const existingIndex = executors.findIndex(
+        (ex) => String(ex.employee_id) === String(employeeId),
+      );
+      if (existingIndex >= 0) {
+        return { ...w, executors: executors.filter((_, j) => j !== existingIndex) };
       }
-      return { ...w, executors: next };
+      const emp = serviceEmployees.find((e) => String(e.id) === String(employeeId));
+      const percent = emp ? String(emp.work_percent ?? 0) : '';
+      return { ...w, executors: [...executors, emptyExecutor(employeeId, percent)] };
     }));
   };
 
-  const removeWorkExecutor = (workIndex, execIndex) => {
+  const updateWorkExecutorPercent = (workIndex, employeeId, percent) => {
     setWorks((prev) => prev.map((w, i) => (
       i === workIndex
-        ? { ...w, executors: (w.executors || []).filter((_, j) => j !== execIndex) }
+        ? {
+            ...w,
+            executors: (w.executors || []).map((ex) => (
+              String(ex.employee_id) === String(employeeId) ? { ...ex, percent } : ex
+            )),
+          }
         : w
     )));
   };
@@ -1677,10 +1727,20 @@ export default function AutoserviceOrderFormPage() {
     await loadServiceEmployees();
     if (!row?.id || !addEmployeeTarget) return;
     const { workIndex, execIndex } = addEmployeeTarget;
-    updateWorkExecutor(workIndex, execIndex, {
-      employee_id: String(row.id),
-      percent: String(row.work_percent ?? 0),
-    });
+    setWorks((prev) => prev.map((w, i) => {
+      if (i !== workIndex) return w;
+      const executors = [...(w.executors || [])];
+      const entry = {
+        employee_id: String(row.id),
+        percent: String(row.work_percent ?? 0),
+      };
+      if (execIndex < executors.length) {
+        executors[execIndex] = { ...executors[execIndex], ...entry };
+      } else {
+        executors.push(entry);
+      }
+      return { ...w, executors };
+    }));
     setAddEmployeeTarget(null);
   };
 
@@ -3073,55 +3133,16 @@ export default function AutoserviceOrderFormPage() {
         )}
       >
         {workExecutorEditIndex != null && works[workExecutorEditIndex] ? (
-          <div className="space-y-3">
-            {(works[workExecutorEditIndex].executors || []).length === 0 ? (
-              <p className="text-sm text-ink-muted">Сотрудник не назначен</p>
-            ) : (
-              (works[workExecutorEditIndex].executors || []).map((ex, execIndex) => (
-                <div key={execIndex} className="flex min-w-0 items-center gap-2">
-                  <SearchableSelect
-                    className="min-w-0 flex-1"
-                    inputClassName="sg-pill-input sg-pill-input-sm w-full min-w-0 flex-1"
-                    value={ex.employee_id}
-                    onChange={(next) => updateWorkExecutor(workExecutorEditIndex, execIndex, { employee_id: next })}
-                    options={employeeOptions}
-                    placeholder="Сотрудник"
-                    emptyMessage="Нет сотрудников"
-                    noResultsMessage="Не найдено"
-                    addOptionLabel="Добавить сотрудника"
-                    onAddClick={() => openAddEmployeeModal(workExecutorEditIndex, execIndex)}
-                  />
-                  <NumericInput
-                    mode="numeric"
-                    className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center`}
-                    value={ex.percent}
-                    aria-label="Процент оплаты"
-                    onChange={(e) => updateWorkExecutor(workExecutorEditIndex, execIndex, { percent: e.target.value })}
-                  />
-                  <span className="shrink-0 text-xs text-ink-muted">%</span>
-                  <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
-                    {formatMoney(workPayAmount(
-                      works[workExecutorEditIndex].qty,
-                      works[workExecutorEditIndex].unit_price,
-                      ex.percent,
-                    ))} ₽
-                  </span>
-                  <button
-                    type="button"
-                    className={lineDeleteBtnCompactClass}
-                    aria-label="Удалить сотрудника"
-                    onClick={() => removeWorkExecutor(workExecutorEditIndex, execIndex)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))
+          <WorkExecutorPicker
+            employees={serviceEmployees}
+            work={works[workExecutorEditIndex]}
+            onToggle={(employeeId) => toggleWorkExecutor(workExecutorEditIndex, employeeId)}
+            onPercentChange={(employeeId, percent) => updateWorkExecutorPercent(workExecutorEditIndex, employeeId, percent)}
+            onAddEmployee={() => openAddEmployeeModal(
+              workExecutorEditIndex,
+              (works[workExecutorEditIndex].executors || []).length,
             )}
-            <SectionAddLink
-              onClick={() => addWorkExecutor(workExecutorEditIndex)}
-              label="+ Сотрудник"
-            />
-          </div>
+          />
         ) : null}
       </Modal>
 

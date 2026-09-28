@@ -22,6 +22,8 @@ import {
 } from '../../../redux/slices/CartSlice';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import VinCatalogOfferMobileCard from './VinCatalogOfferMobileCard';
+import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
+import CartQtyInput from '../../../components/Cart/CartQtyInput';
 
 function toSafeInt(value, fallback = 1) {
   const n = Number(value);
@@ -118,23 +120,37 @@ function DeliveryCell({ deliveryStart, deliveryEnd, warehouseName, preferredWare
   );
 }
 
-function CartQtyControl({ quantity, maxQty, onAdd, onRemove, disabled }) {
+function CartQtyControl({ quantity, maxQty, onAdd, onAddToBasket, onRemove, onSetQuantity, disabled }) {
   const safeQty = toSafeInt(quantity, 0);
   const atMax = safeQty >= maxQty;
-  const atMin = safeQty <= 0;
+
+  if (safeQty <= 0) {
+    return (
+      <NewPartsBasketHoverMenu
+        onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
+        disabled={disabled}
+      />
+    );
+  }
 
   return (
     <div className="inline-flex items-center gap-0.5">
       <button
         type="button"
         onClick={onRemove}
-        disabled={disabled || atMin}
+        disabled={disabled}
         className="inline-flex h-7 w-7 items-center justify-center rounded border border-gray-300 bg-white text-sm text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         aria-label="Уменьшить количество"
       >
         −
       </button>
-      <span className="min-w-[1.25rem] text-center text-xs font-bold text-gray-900">{safeQty}</span>
+      <CartQtyInput
+        value={safeQty}
+        maxQty={maxQty}
+        onCommit={onSetQuantity}
+        disabled={disabled}
+        className="h-7 w-9 rounded border border-gray-300 bg-white text-center text-xs font-bold text-gray-900 focus:border-indigo-400 focus:outline-none disabled:opacity-50"
+      />
       <button
         type="button"
         onClick={onAdd}
@@ -269,6 +285,19 @@ function StockOfferRow({
 
   const handleAdd = async (basketId) => {
     if (cartQuantity >= maxQty) return;
+    // Existing item: optimistic increment without waiting for a cart refetch
+    if (!basketId && cartItemInStore) {
+      const next = Math.min(cartQuantity + 1, maxQty);
+      if (next === cartQuantity) return;
+      try {
+        await dispatch(
+          updateCartItemQuantity({ itemId: cartItemInStore.id, quantity: next })
+        ).unwrap();
+      } catch {
+        // silent
+      }
+      return;
+    }
     setBusy(true);
     try {
       const cartItem = prepareCartItem(1);
@@ -296,22 +325,43 @@ function StockOfferRow({
 
   const handleRemove = async () => {
     if (!cartItemInStore) return;
-    setBusy(true);
-    try {
-      if (cartItemInStore.quantity > 1) {
+    if (cartItemInStore.quantity > 1) {
+      try {
         await dispatch(
           updateCartItemQuantity({
             itemId: cartItemInStore.id,
             quantity: cartItemInStore.quantity - 1,
           })
         ).unwrap();
-      } else {
-        await dispatch(removeFromCart(cartItemInStore.id)).unwrap();
+      } catch {
+        // silent
       }
+      return;
+    }
+    setBusy(true);
+    try {
+      await dispatch(removeFromCart(cartItemInStore.id)).unwrap();
     } catch {
       // silent
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleSetQuantity = async (nextRaw) => {
+    if (!cartItemInStore) return;
+    const target = Math.max(0, Math.min(toSafeInt(nextRaw, 0), maxQty));
+    if (target === cartQuantity) return;
+    try {
+      if (target === 0) {
+        await dispatch(removeFromCart(cartItemInStore.id)).unwrap();
+      } else {
+        await dispatch(
+          updateCartItemQuantity({ itemId: cartItemInStore.id, quantity: target })
+        ).unwrap();
+      }
+    } catch {
+      // silent
     }
   };
 
@@ -389,7 +439,9 @@ function StockOfferRow({
             quantity={cartQuantity}
             maxQty={maxQty}
             onAdd={() => handleAdd()}
+            onAddToBasket={handleAdd}
             onRemove={handleRemove}
+            onSetQuantity={handleSetQuantity}
             disabled={disabled}
           />
         </div>

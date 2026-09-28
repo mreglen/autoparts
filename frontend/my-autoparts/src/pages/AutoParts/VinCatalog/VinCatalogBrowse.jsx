@@ -7,6 +7,7 @@ import VinCatalogTree from './VinCatalogTree';
 import VinCatalogNodeGrid from './VinCatalogNodeGrid';
 import VinCatalogUnitView from './VinCatalogUnitView';
 import VinCatalogPartDrawer from './VinCatalogPartDrawer';
+import VinVehicleInfoModal from './VinVehicleInfoModal';
 
 function buildQuickTree(groups) {
   const list = Array.isArray(groups) ? groups : [];
@@ -129,6 +130,7 @@ export default function VinCatalogBrowse({
   const [hoverRowKey, setHoverRowKey] = useState(null);
   const [drawerDetail, setDrawerDetail] = useState(null);
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
+  const [vehicleInfoOpen, setVehicleInfoOpen] = useState(false);
   const [childrenCache, setChildrenCache] = useState({});
 
   const title = candidateLabel(vehicle) || vehicle?.display_name || 'Автомобиль';
@@ -291,6 +293,13 @@ export default function VinCatalogBrowse({
         {vin && !fromWizard ? (
           <span className="font-mono text-xs text-gray-400">{vin}</span>
         ) : null}
+        <button
+          type="button"
+          onClick={() => setVehicleInfoOpen(true)}
+          className="border-b border-indigo-300 text-xs font-medium text-indigo-600 transition hover:border-indigo-600 hover:text-indigo-800"
+        >
+          Инфо
+        </button>
         {fromWizard ? (
           <span className="text-xs text-amber-700">по параметрам</span>
         ) : null}
@@ -476,6 +485,13 @@ export default function VinCatalogBrowse({
         vinBasketId={vinBasketId}
         ensureVinBasket={ensureVinBasket}
         vehicleBrand={vehicle?.make || ''}
+      />
+
+      <VinVehicleInfoModal
+        open={vehicleInfoOpen}
+        onClose={() => setVehicleInfoOpen(false)}
+        vehicle={vehicle}
+        vin={vin}
       />
     </div>
   );

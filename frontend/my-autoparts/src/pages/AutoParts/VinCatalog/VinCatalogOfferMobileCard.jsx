@@ -9,6 +9,8 @@ import {
   selectCart,
   updateCartItemQuantity,
 } from '../../../redux/slices/CartSlice';
+import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
+import CartQtyInput from '../../../components/Cart/CartQtyInput';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 
 function toSafeInt(value, fallback = 0) {
@@ -33,25 +35,39 @@ function DeliveryLine({ deliveryStart, deliveryEnd, warehouseName, preferredWare
   );
 }
 
-function MobileCartQtyControl({ quantity, maxQty, onAdd, onRemove, disabled }) {
+function MobileCartQtyControl({ quantity, maxQty, onAdd, onAddToBasket, onRemove, onSetQuantity, disabled }) {
   const safeQty = toSafeInt(quantity, 0);
   const atMax = safeQty >= maxQty;
-  const atMin = safeQty <= 0;
+
+  if (safeQty <= 0) {
+    return (
+      <NewPartsBasketHoverMenu
+        onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
+        disabled={disabled}
+        buttonClassName="flex h-11 w-11 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+        label="В корзину"
+      />
+    );
+  }
 
   return (
     <div className="inline-flex items-center overflow-hidden rounded-lg border border-gray-200">
       <button
         type="button"
         onClick={onRemove}
-        disabled={disabled || atMin}
+        disabled={disabled}
         className="flex h-11 w-11 items-center justify-center text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         aria-label="Уменьшить количество"
       >
         −
       </button>
-      <span className="flex h-11 min-w-[2rem] items-center justify-center border-x border-gray-200 px-2 text-sm font-semibold">
-        {safeQty}
-      </span>
+      <CartQtyInput
+        value={safeQty}
+        maxQty={maxQty}
+        onCommit={onSetQuantity}
+        disabled={disabled}
+        className="flex h-11 w-12 items-center justify-center border-x border-gray-200 px-2 text-center text-sm font-semibold focus:outline-none disabled:opacity-50"
+      />
       <button
         type="button"
         onClick={onAdd}
@@ -133,6 +149,18 @@ function MobileStockOffer({
 
   const handleAdd = async (basketId) => {
     if (cartQuantity >= maxQty) return;
+    if (!basketId && cartItemInStore) {
+      const next = Math.min(cartQuantity + 1, maxQty);
+      if (next === cartQuantity) return;
+      try {
+        await dispatch(
+          updateCartItemQuantity({ itemId: cartItemInStore.id, quantity: next })
+        ).unwrap();
+      } catch {
+        // silent
+      }
+      return;
+    }
     setBusy(true);
     try {
       const cartItem = prepareCartItem();
@@ -160,22 +188,43 @@ function MobileStockOffer({
 
   const handleRemove = async () => {
     if (!cartItemInStore) return;
-    setBusy(true);
-    try {
-      if (cartItemInStore.quantity > 1) {
+    if (cartItemInStore.quantity > 1) {
+      try {
         await dispatch(
           updateCartItemQuantity({
             itemId: cartItemInStore.id,
             quantity: cartItemInStore.quantity - 1,
           })
         ).unwrap();
-      } else {
-        await dispatch(removeFromCart(cartItemInStore.id)).unwrap();
+      } catch {
+        // silent
       }
+      return;
+    }
+    setBusy(true);
+    try {
+      await dispatch(removeFromCart(cartItemInStore.id)).unwrap();
     } catch {
       // silent
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleSetQuantity = async (nextRaw) => {
+    if (!cartItemInStore) return;
+    const target = Math.max(0, Math.min(toSafeInt(nextRaw, 0), maxQty));
+    if (target === cartQuantity) return;
+    try {
+      if (target === 0) {
+        await dispatch(removeFromCart(cartItemInStore.id)).unwrap();
+      } else {
+        await dispatch(
+          updateCartItemQuantity({ itemId: cartItemInStore.id, quantity: target })
+        ).unwrap();
+      }
+    } catch {
+      // silent
     }
   };
 
@@ -217,7 +266,9 @@ function MobileStockOffer({
           quantity={cartQuantity}
           maxQty={maxQty}
           onAdd={() => handleAdd()}
+          onAddToBasket={handleAdd}
           onRemove={handleRemove}
+          onSetQuantity={handleSetQuantity}
           disabled={disabled}
         />
       </div>

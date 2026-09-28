@@ -6,6 +6,8 @@ import {
   selectCart,
   updateCartItemQuantity,
 } from '../../../redux/slices/CartSlice';
+import NewPartsBasketHoverMenu from '../../../components/Cart/NewPartsBasketHoverMenu';
+import CartQtyInput from '../../../components/Cart/CartQtyInput';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
@@ -63,23 +65,39 @@ function formatDeliveryShort(deliveryStart, deliveryEnd) {
   }
 }
 
-function QtyControl({ quantity, onAdd, onRemove, disabled, noStock }) {
+function QtyControl({ quantity, maxQty, onAdd, onAddToBasket, onRemove, onSetQuantity, disabled, noStock }) {
   const q = toSafeInt(quantity, 0);
+  if (q <= 0) {
+    return (
+      <NewPartsBasketHoverMenu
+        onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
+        disabled={disabled || noStock}
+        buttonClassName="flex h-8 w-8 items-center justify-center rounded border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+        label="В корзину"
+      />
+    );
+  }
   return (
     <div className="flex items-center gap-1">
       <button
         type="button"
         onClick={onRemove}
-        disabled={disabled || q <= 0}
+        disabled={disabled}
         className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-base hover:bg-gray-50 disabled:opacity-50"
       >
         −
       </button>
-      <span className="w-6 text-center text-sm font-semibold text-gray-900">{q}</span>
+      <CartQtyInput
+        value={q}
+        maxQty={maxQty}
+        onCommit={onSetQuantity}
+        disabled={disabled}
+        className="h-8 w-10 rounded border border-gray-300 bg-white text-center text-sm font-semibold text-gray-900 focus:border-indigo-400 focus:outline-none disabled:opacity-50"
+      />
       <button
         type="button"
         onClick={onAdd}
-        disabled={disabled || noStock}
+        disabled={disabled || noStock || q >= maxQty}
         className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-base hover:bg-gray-50 disabled:opacity-50"
       >
         +
@@ -182,14 +200,24 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
 
   const handleAddToCart = async (stock, basketId) => {
     if (!stock) return;
+    const existing = getCartItemByStock(stock);
+    const currentCartQuantity = existing ? toSafeInt(existing.quantity, 0) : 0;
+    const availableStock = Number(stock.available_count) || 0;
+    if (availableStock <= currentCartQuantity) return;
+    if (!basketId && existing) {
+      try {
+        await dispatch(
+          updateCartItemQuantity({ itemId: existing.id, quantity: currentCartQuantity + 1 })
+        ).unwrap();
+      } catch {
+        // silent
+      }
+      return;
+    }
     setAddingToCart(true);
     try {
-      const currentCartQuantity = getCartQuantity(stock);
-      const availableStock = Number(stock.available_count) || 0;
-      if (availableStock <= currentCartQuantity) return;
       const cartItem = prepareCartItem(stock, 1);
       if (!cartItem.stock_id || cartItem.price <= 0) return;
-      const existing = getCartItemByStock(stock);
       await dispatch(
         addNewPartsToCart({
           ...cartItem,
@@ -208,21 +236,44 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
   };
 
   const handleRemoveFromCart = async (stock) => {
-    setAddingToCart(true);
-    try {
-      const cartItem = getCartItemByStock(stock);
-      if (!cartItem) return;
-      if (cartItem.quantity > 1) {
+    const cartItem = getCartItemByStock(stock);
+    if (!cartItem) return;
+    if (cartItem.quantity > 1) {
+      try {
         await dispatch(
           updateCartItemQuantity({ itemId: cartItem.id, quantity: cartItem.quantity - 1 })
         ).unwrap();
-      } else {
-        await dispatch(removeFromCart(cartItem.id)).unwrap();
+      } catch {
+        // silent
       }
+      return;
+    }
+    setAddingToCart(true);
+    try {
+      await dispatch(removeFromCart(cartItem.id)).unwrap();
     } catch {
       // silent
     } finally {
       setAddingToCart(false);
+    }
+  };
+
+  const handleSetCartQuantity = async (stock, nextRaw) => {
+    const cartItem = getCartItemByStock(stock);
+    if (!cartItem) return;
+    const maxQty = Math.max(1, Number(stock?.available_count) || 1);
+    const target = Math.max(0, Math.min(toSafeInt(nextRaw, 0), maxQty));
+    if (target === toSafeInt(cartItem.quantity, 0)) return;
+    try {
+      if (target === 0) {
+        await dispatch(removeFromCart(cartItem.id)).unwrap();
+      } else {
+        await dispatch(
+          updateCartItemQuantity({ itemId: cartItem.id, quantity: target })
+        ).unwrap();
+      }
+    } catch {
+      // silent
     }
   };
 
@@ -277,8 +328,11 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
         </div>
         <QtyControl
           quantity={mainQuantity}
+          maxQty={mainAvailableCount}
           onAdd={() => handleAddToCart(mainStock)}
+          onAddToBasket={(basketId) => handleAddToCart(mainStock, basketId)}
           onRemove={() => handleRemoveFromCart(mainStock)}
+          onSetQuantity={(n) => handleSetCartQuantity(mainStock, n)}
           disabled={disabledControl}
           noStock={mainStockInfo.noStock}
         />
@@ -313,8 +367,11 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
                     </div>
                     <QtyControl
                       quantity={quantity}
+                      maxQty={Math.max(1, Number(stock?.available_count) || 1)}
                       onAdd={() => handleAddToCart(stock)}
+                      onAddToBasket={(basketId) => handleAddToCart(stock, basketId)}
                       onRemove={() => handleRemoveFromCart(stock)}
+                      onSetQuantity={(n) => handleSetCartQuantity(stock, n)}
                       disabled={disabledControl}
                       noStock={stockInfo.noStock}
                     />
