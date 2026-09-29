@@ -258,8 +258,8 @@ export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
       </div>
 
       {filtersOpen ? (
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <label className="block min-w-0">
+        <div className="mb-4 flex flex-wrap items-end gap-3">
+          <label className="block w-36 min-w-0">
             <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
             <input
               type="date"
@@ -269,7 +269,7 @@ export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
               className={warehousePillControlClass}
             />
           </label>
-          <label className="block min-w-0">
+          <label className="block w-36 min-w-0">
             <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
             <input
               type="date"
@@ -279,7 +279,7 @@ export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
               className={warehousePillControlClass}
             />
           </label>
-          <label className="col-span-2 block min-w-0">
+          <label className="block w-full min-w-0 sm:w-72">
             <span className="mb-1.5 block text-xs font-medium text-ink-muted">Поставщик</span>
             <SearchablePillSelect
               value={supplierFilter}

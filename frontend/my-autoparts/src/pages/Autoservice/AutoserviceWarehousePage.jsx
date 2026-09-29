@@ -474,7 +474,7 @@ export default function AutoserviceWarehousePage() {
           </div>
 
           {filtersOpen ? (
-            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:w-72">
               <label className="block min-w-0">
                 <span className="mb-1.5 block text-xs font-medium text-ink-muted">Поставщик</span>
                 <SearchablePillSelect

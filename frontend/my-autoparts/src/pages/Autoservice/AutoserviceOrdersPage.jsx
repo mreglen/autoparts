@@ -34,6 +34,9 @@ import {
   autoserviceListTdClass,
 } from '../../utils/warehouseListUi';
 
+const pillButtonClass =
+  'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
+
 function formatDateTime(value) {
   return formatWallClockDateTime(value);
 }
@@ -76,6 +79,9 @@ export default function AutoserviceOrdersPage() {
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const qApplied = useDebouncedValue(q);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [historyStatus, setHistoryStatus] = useState('');
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
@@ -313,6 +319,17 @@ export default function AutoserviceOrdersPage() {
     [applyOrderToList],
   );
 
+  const filteredRows = useMemo(() => {
+    if (!dateFrom && !dateTo) return rows;
+    const from = dateFrom || '0000-01-01';
+    const to = dateTo || '9999-12-31';
+    return rows.filter((row) => {
+      const raw = String(row?.scheduled_at || '');
+      const day = /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : '';
+      return Boolean(day) && day >= from && day <= to;
+    });
+  }, [rows, dateFrom, dateTo]);
+
   const filteredDrafts = useMemo(() => {
     if (!viewDrafts) return drafts;
     const term = qApplied.trim().toLowerCase();
@@ -405,7 +422,7 @@ export default function AutoserviceOrdersPage() {
           onRefresh={() => load()}
           error={error}
           onErrorClose={() => setError('')}
-          rows={rows}
+          rows={filteredRows}
           emptyMessage={emptyMessage}
           statusActionsForRow={statusActionsForRow}
           onStatusChange={handleStatus}
@@ -461,6 +478,23 @@ export default function AutoserviceOrdersPage() {
             ariaLabel="Поиск заказ-нарядов"
           />
 
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className={`${pillButtonClass} shrink-0 ${filtersOpen ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
+            aria-expanded={filtersOpen}
+          >
+            Фильтры
+            <svg
+              className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
           {viewHistory ? (
             <select
               className="h-10 min-w-0 shrink-0 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
@@ -486,6 +520,43 @@ export default function AutoserviceOrdersPage() {
             </svg>
           </button>
         </div>
+
+        {filtersOpen ? (
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <label className="block min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
+              <input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-10 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+              />
+            </label>
+            <label className="block min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-10 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+              />
+            </label>
+            {dateFrom || dateTo ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom('');
+                  setDateTo('');
+                }}
+                className={`${pillButtonClass} shrink-0 text-gray-500`}
+              >
+                Сбросить
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <Toast message={error} variant="error" onClose={() => setError('')} />
 
@@ -573,14 +644,14 @@ export default function AutoserviceOrdersPage() {
                   </tr>
                 ))
               )
-            ) : rows.length === 0 ? (
+            ) : filteredRows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-ink-muted">
                   {emptyMessage}
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
+              filteredRows.map((row) => (
                 <tr
                   key={row.id}
                   className={autoserviceListTrClickableClass}
