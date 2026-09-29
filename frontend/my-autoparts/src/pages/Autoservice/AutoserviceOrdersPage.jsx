@@ -9,14 +9,13 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 
 import RepairOrderViewModal, {
   RepairOrderStatusPicker,
-  vehicleLabel,
+  vehicleMakeModelLabel,
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
 import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
-import { buildRepairOrderDuplicatePayload } from '../../utils/repairOrderDuplicate';
-import { formatServerDate, formatWallClockDateTime } from '../../utils/serverDate';
+import { formatServerDate } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
@@ -36,10 +35,6 @@ import {
 
 const pillButtonClass =
   'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
-
-function formatDateTime(value) {
-  return formatWallClockDateTime(value);
-}
 
 function formatMoney(value) {
   const n = Number(value);
@@ -85,8 +80,6 @@ export default function AutoserviceOrdersPage() {
   const [historyStatus, setHistoryStatus] = useState('');
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
-  const [duplicatingId, setDuplicatingId] = useState(null);
-  const [approvingId, setApprovingId] = useState(null);
   const [deleteConfirmOrder, setDeleteConfirmOrder] = useState(null);
   const [deleteConfirmDraft, setDeleteConfirmDraft] = useState(null);
   const [closeConfirmOrder, setCloseConfirmOrder] = useState(null);
@@ -213,21 +206,6 @@ export default function AutoserviceOrdersPage() {
     await updateOrderStatus(id, nextStatus);
   };
 
-  const handleApprove = async (id) => {
-    setApprovingId(id);
-    setError('');
-    try {
-      const updated = await apiRequest(`/autoservice/repair-orders/${id}/approve`, {
-        method: 'POST',
-      });
-      applyOrderToList(updated);
-    } catch (e) {
-      setError(e?.message || 'Не удалось принять заявку');
-    } finally {
-      setApprovingId(null);
-    }
-  };
-
   const statusActions = useMemo(
     () =>
       viewReview
@@ -249,30 +227,6 @@ export default function AutoserviceOrdersPage() {
   );
 
   const statusActionsForRow = useCallback(() => statusActions, [statusActions]);
-
-  const handleDuplicate = async (row) => {
-    setDuplicatingId(row.id);
-    setError('');
-    try {
-      const order = await apiRequest(`/autoservice/repair-orders/${row.id}`);
-      const created = await apiRequest('/autoservice/repair-orders', {
-        method: 'POST',
-        body: JSON.stringify(buildRepairOrderDuplicatePayload(order)),
-      });
-      if (viewHistory) {
-        setSearchParams({});
-      } else if (viewReview) {
-        setSearchParams({});
-      } else {
-        await load();
-      }
-      setViewOrder(created);
-    } catch (e) {
-      setError(e?.message || 'Не удалось скопировать заказ-наряд');
-    } finally {
-      setDuplicatingId(null);
-    }
-  };
 
   const openDraft = useCallback(
     (draft) => {
@@ -419,7 +373,6 @@ export default function AutoserviceOrdersPage() {
           historyStatus={historyStatus}
           onHistoryStatusChange={setHistoryStatus}
           loading={loading}
-          onRefresh={() => load()}
           error={error}
           onErrorClose={() => setError('')}
           rows={filteredRows}
@@ -428,16 +381,8 @@ export default function AutoserviceOrdersPage() {
           onStatusChange={handleStatus}
           statusSavingId={statusSavingId}
           onView={setViewOrder}
-          onEdit={(row) => navigate(`/autoservice/orders/${row.id}/edit`, { state: withBackTo(location) })}
-          onDuplicate={viewReview ? undefined : handleDuplicate}
-          onDelete={setDeleteConfirmOrder}
-          onApprove={viewReview ? (row) => handleApprove(row.id) : undefined}
-          duplicatingId={duplicatingId}
-          approvingId={approvingId}
-          formatDateTime={formatDateTime}
           drafts={viewDrafts ? filteredDrafts : undefined}
           onDraftOpen={openDraft}
-          onDraftDelete={setDeleteConfirmDraft}
           dateFrom={dateFrom}
           dateTo={dateTo}
           onDateFromChange={setDateFrom}
@@ -512,17 +457,6 @@ export default function AutoserviceOrdersPage() {
             </select>
           ) : null}
 
-          <button
-            type="button"
-            onClick={() => load()}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
-            title="Обновить"
-            aria-label="Обновить"
-          >
-            <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
         </div>
 
         {filtersOpen ? (
@@ -672,7 +606,7 @@ export default function AutoserviceOrdersPage() {
                   <td className={autoserviceListTdClass}>
                     <span className="tabular-nums text-ink-muted">{formatServerDate(row.scheduled_at)}</span>
                   </td>
-                  <td className={`${autoserviceListTdClass} font-semibold text-ink`}>{vehicleLabel(row.vehicle)}</td>
+                  <td className={`${autoserviceListTdClass} font-semibold text-ink`}>{vehicleMakeModelLabel(row.vehicle)}</td>
                   <td className={autoserviceListTdClass}>
                     <div className="font-semibold text-ink">{row.client?.name || '—'}</div>
                   </td>

@@ -6,7 +6,6 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
-import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
 import Toast from '../../components/UI/Toast';
@@ -492,7 +491,7 @@ export default function AutoserviceWarehousePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-            <AutoserviceListRefreshButton loading={loading} onClick={loadItems} />
+
           </div>
 
           {filtersOpen ? (

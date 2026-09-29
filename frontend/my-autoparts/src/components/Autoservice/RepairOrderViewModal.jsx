@@ -250,6 +250,11 @@ export function vehicleLabel(v) {
   return base;
 }
 
+export function vehicleMakeModelLabel(v) {
+  if (!v) return '—';
+  return [v.make, v.model].filter(Boolean).join(' ') || '—';
+}
+
 export function OrderStatusBadge({ status, className = '', noRing = false }) {
   const normalized = normalizeRepairOrderStatus(status);
   const tone = STATUS_STYLES[normalized] || STATUS_STYLES[status] || STATUS_STYLES.open;
@@ -300,6 +305,7 @@ export function RepairOrderStatusPicker({
   isOpen,
   onOpenChange,
   menuClassName = '',
+  noRing = false,
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = isOpen !== undefined;
@@ -324,7 +330,7 @@ export function RepairOrderStatusPicker({
   }, [open, setOpen]);
 
   if (available.length === 0) {
-    return <OrderStatusBadge status={status} />;
+    return <OrderStatusBadge status={status} noRing={noRing} />;
   }
 
   return (
@@ -340,7 +346,7 @@ export function RepairOrderStatusPicker({
         title="Сменить статус"
         aria-label="Сменить статус"
       >
-        <OrderStatusBadge status={status} className={saving ? 'opacity-70' : ''} />
+        <OrderStatusBadge status={status} noRing={noRing} className={saving ? 'opacity-70' : ''} />
       </button>
       {open ? (
         <div className={buildActionsDropdownMenuClassName(false, `w-44 z-[120] ${menuClassName}`.trim())}>

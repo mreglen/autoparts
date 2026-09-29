@@ -1,59 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
-import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
-import { RepairOrderStatusPicker, vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
+import { RepairOrderStatusPicker, vehicleMakeModelLabel } from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
+import { formatServerDate } from '../../utils/serverDate';
 
-function OrderActionsMenu({
-  onView,
-  onEdit,
-  onDuplicate,
-  onDelete,
-  onApprove,
-  duplicating = false,
-  approveSaving = false,
-  isOpen,
-  onOpenChange,
-}) {
-  return (
-    <ActionsDropdown
-      isOpen={isOpen}
-      onOpenChange={onOpenChange}
-      menuClassName="w-52 z-50"
-      estimatedMenuHeight={onApprove ? 248 : 204}
-      showLabel={false}
-      disabled={duplicating || approveSaving}
-      buttonClassName="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-wait disabled:opacity-60"
-    >
-      {onApprove ? (
-        <ActionsDropdownItem className="min-h-11" onClick={onApprove} disabled={duplicating || approveSaving}>
-          {approveSaving ? 'Принятие…' : 'Принять в работу'}
-        </ActionsDropdownItem>
-      ) : null}
-      <ActionsDropdownItem className="min-h-11" onClick={onView} disabled={duplicating}>
-        Просмотр
-      </ActionsDropdownItem>
-      {onEdit ? (
-        <ActionsDropdownItem className="min-h-11" onClick={onEdit} disabled={duplicating}>
-          Изменить
-        </ActionsDropdownItem>
-      ) : null}
-      {onDuplicate ? (
-        <ActionsDropdownItem className="min-h-11" onClick={onDuplicate} disabled={duplicating}>
-          {duplicating ? 'Копирование…' : 'Скопировать и создать'}
-        </ActionsDropdownItem>
-      ) : null}
-      <ActionsDropdownItem className="min-h-11" onClick={onDelete} disabled={duplicating} danger>
-        Удалить
-      </ActionsDropdownItem>
-    </ActionsDropdown>
-  );
-}
-
-function DraftMobileRow({ draft, onOpen, onDelete }) {
-  const [actionsOpen, setActionsOpen] = useState(false);
+function DraftMobileRow({ draft, onOpen }) {
   const title = draft.mode === 'create'
     ? 'Новый заказ-наряд'
     : `Заказ-наряд #${draft.orderId}`;
@@ -67,39 +20,25 @@ function DraftMobileRow({ draft, onOpen, onDelete }) {
     : '';
 
   return (
-    <div className={`py-3 ${actionsOpen ? 'relative z-30' : ''}`}>
-      <div className="flex items-start gap-2">
-        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="shrink-0 text-base font-semibold text-gray-900">{title}</span>
-            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+    <div className="py-3">
+      <button type="button" onClick={onOpen} className="flex w-full min-w-0 items-center gap-3 text-left">
+        <span className="w-12 shrink-0 self-center text-center text-base font-semibold tabular-nums text-gray-900">
+          {draft.orderId ? `№${draft.orderId}` : '+'}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-sm font-medium text-gray-900">{title}</span>
+            <span className="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
               Черновик
             </span>
-          </div>
+          </span>
           {vehicle ? (
-            <p className="mt-1.5 line-clamp-2 text-sm font-medium text-gray-800">{vehicle}</p>
+            <p className="mt-1 line-clamp-2 text-sm font-medium text-gray-800">{vehicle}</p>
           ) : null}
           {client ? <p className="mt-0.5 truncate text-sm text-gray-800">{client}</p> : null}
           <p className="mt-1 text-xs text-gray-500">Сохранён {savedAt}</p>
-        </button>
-        <div className="shrink-0">
-          <ActionsDropdown
-            isOpen={actionsOpen}
-            onOpenChange={setActionsOpen}
-            menuClassName="w-52 z-50"
-            estimatedMenuHeight={120}
-            showLabel={false}
-            buttonClassName="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
-          >
-            <ActionsDropdownItem className="min-h-11" onClick={onOpen}>
-              Продолжить
-            </ActionsDropdownItem>
-            <ActionsDropdownItem className="min-h-11" onClick={onDelete} danger>
-              Удалить
-            </ActionsDropdownItem>
-          </ActionsDropdown>
-        </div>
-      </div>
+        </span>
+      </button>
     </div>
   );
 }
@@ -110,62 +49,34 @@ function OrderMobileRow({
   statusSavingId,
   onStatusChange,
   onView,
-  onEdit,
-  onDuplicate,
-  onDelete,
-  onApprove,
-  duplicating = false,
-  approveSaving = false,
-  formatDateTime,
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const menuOpen = statusOpen || actionsOpen;
-  const zone = row.work_zone?.name;
-  const when = formatDateTime(row.scheduled_at);
+  const when = formatServerDate(row.scheduled_at);
 
   return (
-    <div className={`py-3 ${menuOpen ? 'relative z-30' : ''}`}>
-      <div className="flex items-start gap-2">
-        <button type="button" onClick={onView} className="min-w-0 flex-1 text-left">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="shrink-0 text-base font-semibold tabular-nums text-gray-900">
-              {repairOrderNumberLabel(row)}
-            </span>
-            <RepairOrderStatusPicker
-              status={row.status}
-              options={statusActions}
-              saving={statusSavingId === row.id}
-              disabled={statusSavingId === row.id}
-              isOpen={statusOpen}
-              onOpenChange={setStatusOpen}
-              onChange={(nextStatus) => onStatusChange(row.id, nextStatus)}
-            />
-          </div>
-          <p className="mt-1.5 line-clamp-2 text-sm font-medium text-gray-800">{vehicleLabel(row.vehicle)}</p>
+    <div className={`py-3 ${statusOpen ? 'relative z-30' : ''}`}>
+      <button type="button" onClick={onView} className="flex w-full min-w-0 items-center gap-3 text-left">
+        <span className="w-12 shrink-0 self-center text-center text-base font-semibold tabular-nums text-gray-900">
+          {repairOrderNumberLabel(row)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-sm font-medium text-gray-800">{vehicleMakeModelLabel(row.vehicle)}</p>
           <p className="mt-0.5 truncate text-sm text-gray-800">{row.client?.name || '—'}</p>
-          {row.client?.phone ? (
-            <p className="mt-0.5 truncate text-sm text-gray-500">{row.client.phone}</p>
-          ) : null}
-          <p className="mt-1 text-xs text-gray-500">
-            {when}
-            {zone ? ` · ${zone}` : ''}
-          </p>
-        </button>
-        <div className="shrink-0">
-          <OrderActionsMenu
-            onView={onView}
-            onEdit={onEdit}
-            onDuplicate={onDuplicate}
-            onDelete={onDelete}
-            onApprove={onApprove}
-            duplicating={duplicating}
-            approveSaving={approveSaving}
-            isOpen={actionsOpen}
-            onOpenChange={setActionsOpen}
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1 self-center">
+          <span className="text-xs tabular-nums text-gray-500">{when}</span>
+          <RepairOrderStatusPicker
+            status={row.status}
+            options={statusActions}
+            saving={statusSavingId === row.id}
+            disabled={statusSavingId === row.id}
+            isOpen={statusOpen}
+            onOpenChange={setStatusOpen}
+            noRing
+            onChange={(nextStatus) => onStatusChange(row.id, nextStatus)}
           />
-        </div>
-      </div>
+        </span>
+      </button>
     </div>
   );
 }
@@ -184,7 +95,6 @@ export default function AutoserviceOrdersMobileView({
   historyStatus,
   onHistoryStatusChange,
   loading,
-  onRefresh,
   error,
   onErrorClose,
   rows,
@@ -193,16 +103,8 @@ export default function AutoserviceOrdersMobileView({
   onStatusChange,
   statusSavingId,
   onView,
-  onEdit,
-  onDuplicate,
-  onDelete,
-  onApprove,
-  duplicatingId,
-  approvingId,
-  formatDateTime,
   drafts,
   onDraftOpen,
-  onDraftDelete,
   dateFrom = '',
   dateTo = '',
   onDateFromChange,
@@ -233,7 +135,7 @@ export default function AutoserviceOrdersMobileView({
   }, [orderTabs, tabValue, onTabChange]);
 
   return (
-    <div className="w-full min-w-0">
+    <div className="-mx-3 min-w-0 px-1.5">
       <button
         type="button"
         onClick={onCreate}
@@ -274,17 +176,6 @@ export default function AutoserviceOrdersMobileView({
               stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
-            title="Обновить"
-            aria-label="Обновить"
-          >
-            <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15" />
             </svg>
           </button>
         </div>
@@ -348,13 +239,13 @@ export default function AutoserviceOrdersMobileView({
         {loading ? (
           <div className="divide-y divide-gray-100">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={`msk-${i}`} className="flex items-start justify-between gap-3 py-3">
+              <div key={`msk-${i}`} className="flex items-center gap-3 py-3">
+                <Skeleton className="h-4 w-12 shrink-0" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className="h-4 w-24" />
                   <Skeleton className="h-4 w-40" />
                   <Skeleton className="h-3 w-32" />
                 </div>
-                <Skeleton className="h-11 w-11 rounded-lg" />
               </div>
             ))}
           </div>
@@ -368,7 +259,6 @@ export default function AutoserviceOrdersMobileView({
                   key={draft.key}
                   draft={draft}
                   onOpen={() => onDraftOpen?.(draft)}
-                  onDelete={() => onDraftDelete?.(draft)}
                 />
               ))}
             </div>
@@ -385,17 +275,6 @@ export default function AutoserviceOrdersMobileView({
                 onStatusChange={onStatusChange}
                 statusSavingId={statusSavingId}
                 onView={() => onView(row)}
-                onEdit={
-                  row.status === 'completed' || row.status === 'cancelled'
-                    ? undefined
-                    : () => onEdit(row)
-                }
-                onDuplicate={onDuplicate ? () => onDuplicate(row) : undefined}
-                onDelete={() => onDelete(row)}
-                onApprove={onApprove ? () => onApprove(row) : undefined}
-                duplicating={duplicatingId === row.id}
-                approveSaving={approvingId === row.id}
-                formatDateTime={formatDateTime}
               />
             ))}
           </div>

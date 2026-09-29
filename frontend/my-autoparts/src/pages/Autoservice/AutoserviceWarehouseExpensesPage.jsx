@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
-import AutoserviceListRefreshButton from '../../components/Autoservice/AutoserviceListRefreshButton';
 import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import { Modal, Skeleton } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
@@ -254,7 +253,7 @@ export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-        <AutoserviceListRefreshButton loading={loading} onClick={loadData} />
+
       </div>
 
       {filtersOpen ? (

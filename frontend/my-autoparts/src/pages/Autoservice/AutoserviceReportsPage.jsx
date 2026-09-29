@@ -46,12 +46,6 @@ import {
 } from '../../utils/autoserviceWarehouseUi';
 import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
 
-const METHOD_LABELS = {
-  card: 'Карта',
-  cash: 'Наличными',
-  bank: 'Расчётный счёт',
-};
-
 const ECONOMICS_STATUS_FILTERS = [
   { id: 'all', label: 'Все' },
   { id: 'pending', label: 'Ожидание' },
@@ -243,7 +237,7 @@ export default function AutoserviceReportsPage() {
   const canSeeRosskoSales = ROSSKO_SALES_REPORT_ENABLED && Boolean(user?.can_see_rossko_sales_report);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const requestedTab = tabParam === 'payroll' || tabParam === 'payments' || tabParam === 'warehouse-stock' || tabParam === 'rossko-sales'
+  const requestedTab = tabParam === 'payroll' || tabParam === 'warehouse-stock' || tabParam === 'rossko-sales'
     ? tabParam
     : 'economics';
   const tab = requestedTab === 'payroll' && !canSeePayroll
@@ -257,11 +251,6 @@ export default function AutoserviceReportsPage() {
   const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
   const [dateTo, setDateTo] = useState(defaults.dateTo);
   const [monthValue, setMonthValue] = useState(currentMonthValue);
-
-  const [paymentsLoading, setPaymentsLoading] = useState(true);
-  const [paymentsError, setPaymentsError] = useState('');
-  const [payments, setPayments] = useState({ total_amount: 0, count: 0, items: [] });
-  const [paymentsExporting, setPaymentsExporting] = useState(false);
 
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [payrollError, setPayrollError] = useState('');
@@ -302,7 +291,6 @@ export default function AutoserviceReportsPage() {
   const tabs = useMemo(() => {
     const items = [
       { id: 'economics', label: 'Экономика' },
-      { id: 'payments', label: 'Платежи' },
       { id: 'warehouse-stock', label: 'Остатки на складе' },
     ];
     if (canSeePayroll) items.splice(2, 0, { id: 'payroll', label: 'Зарплаты' });
@@ -313,10 +301,6 @@ export default function AutoserviceReportsPage() {
   const setTab = (next) => {
     if (next === 'payroll' && canSeePayroll) {
       setSearchParams({ tab: 'payroll' });
-      return;
-    }
-    if (next === 'payments') {
-      setSearchParams({ tab: 'payments' });
       return;
     }
     if (next === 'warehouse-stock') {
@@ -341,46 +325,6 @@ export default function AutoserviceReportsPage() {
   const debouncedSetRosskoSalesSearch = useDebouncedCallback((value) => {
     setRosskoSalesSearch(value.trim());
   }, 300);
-
-  const loadPayments = useCallback(async () => {
-    setPaymentsLoading(true);
-    setPaymentsError('');
-    try {
-      const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
-      const response = await apiRequest(`/autoservice/finance/receipts?${params.toString()}`);
-      setPayments(response || { total_amount: 0, count: 0, items: [] });
-    } catch (e) {
-      setPaymentsError(e?.message || 'Не удалось загрузить платежи');
-      setPayments({ total_amount: 0, count: 0, items: [] });
-    } finally {
-      setPaymentsLoading(false);
-    }
-  }, [dateFrom, dateTo]);
-
-  const exportPayments = useCallback(async () => {
-    setPaymentsExporting(true);
-    try {
-      const response = await apiAxios.get('/autoservice/finance/receipts.xlsx', {
-        params: { date_from: dateFrom, date_to: dateTo },
-        responseType: 'blob',
-      });
-      const blob = new Blob([response.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `autoservice_payments_${dateFrom}_${dateTo}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (e) {
-      setPaymentsError(e?.message || 'Не удалось выгрузить Excel');
-    } finally {
-      setPaymentsExporting(false);
-    }
-  }, [dateFrom, dateTo]);
 
   const loadPayroll = useCallback(async () => {
     if (!canSeePayroll) return;
@@ -595,16 +539,10 @@ export default function AutoserviceReportsPage() {
 
   const handleOrderUpdated = useCallback((updated) => {
     setViewOrder(updated);
-    if (tab === 'payments') {
-      loadPayments();
-    } else if (tab === 'economics') {
+    if (tab === 'economics') {
       loadEconomics();
     }
-  }, [tab, loadPayments, loadEconomics]);
-
-  useEffect(() => {
-    if (tab === 'payments') loadPayments();
-  }, [tab, loadPayments]);
+  }, [tab, loadEconomics]);
 
   useEffect(() => {
     if (tab === 'payroll') {
@@ -660,17 +598,15 @@ export default function AutoserviceReportsPage() {
   useEffect(() => {
     const onPullRefresh = (event) => {
       if (event.detail?.pathname !== '/autoservice/reports') return;
-      if (tab === 'payments') loadPayments();
-      else if (tab === 'payroll') loadPayroll();
+      if (tab === 'payroll') loadPayroll();
       else if (tab === 'economics') loadEconomics();
       else if (tab === 'warehouse-stock') loadWarehouseStock();
       else if (tab === 'rossko-sales') loadRosskoSales();
     };
     window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
-  }, [tab, loadPayments, loadPayroll, loadEconomics, loadWarehouseStock, loadRosskoSales]);
+  }, [tab, loadPayroll, loadEconomics, loadWarehouseStock, loadRosskoSales]);
 
-  const paymentItems = payments.items || [];
   const payrollRows = payroll.employees || [];
   const economicsItems = economics.items || [];
   const economicsSummary = economics.summary || EMPTY_ECONOMICS.summary;
@@ -700,20 +636,7 @@ export default function AutoserviceReportsPage() {
         title="Отчёты"
         subtitle=""
         action={
-          tab === 'payments' ? (
-            <div className="text-right">
-              {paymentsLoading ? (
-                <Skeleton className="ml-auto h-8 w-24" />
-              ) : (
-                <>
-                  <p className="text-2xl font-bold tabular-nums leading-none text-ink">
-                    {formatFinanceCurrency(payments.total_amount)}
-                  </p>
-                  <p className="mt-1.5 text-xs text-ink-muted sm:text-sm">{payments.count ?? 0} платежей</p>
-                </>
-              )}
-            </div>
-          ) : tab === 'payroll' ? (
+          tab === 'payroll' ? (
             <div className="text-right">
               {payrollLoading ? (
                 <Skeleton className="ml-auto h-8 w-24" />
@@ -770,164 +693,7 @@ export default function AutoserviceReportsPage() {
 
       <UnderlineTabs ariaLabel="Вкладки отчётов" gapClassName="gap-5 sm:gap-6" tabs={tabs} value={tab} onChange={setTab} />
 
-      {tab === 'payments' ? (
-        <>
-          <MobileCollapsibleFilters title="Период">
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="block min-w-0">
-                <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo < todayDate ? dateTo : todayDate}
-                  onChange={(e) => {
-                    const next = clampFinanceDate(e.target.value, todayDate);
-                    setDateFrom(next);
-                    if (next > dateTo) setDateTo(next);
-                  }}
-                  className={warehousePillControlClass}
-                />
-              </label>
-              <label className="block min-w-0">
-                <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom}
-                  max={todayDate}
-                  onChange={(e) => {
-                    const next = clampFinanceDate(e.target.value, todayDate);
-                    setDateTo(next);
-                    if (next < dateFrom) setDateFrom(next);
-                  }}
-                  className={warehousePillControlClass}
-                />
-              </label>
-            </div>
-          </MobileCollapsibleFilters>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-ink-muted">
-              {payments.count ?? 0} платеж{(payments.count ?? 0) === 1 ? '' : (payments.count ?? 0) >= 2 && (payments.count ?? 0) <= 4 ? 'а' : 'ей'} за период
-            </p>
-            <button
-              type="button"
-              onClick={exportPayments}
-              disabled={paymentsExporting || paymentsLoading}
-              className={`${warehousePrimaryButtonClass} w-full shrink-0 sm:w-auto`}
-            >
-              {paymentsExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
-            </button>
-          </div>
-
-          {paymentsError ? (
-            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{paymentsError}</div>
-          ) : null}
-
-          {viewOrderError ? (
-            <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{viewOrderError}</div>
-          ) : null}
-
-          {paymentsLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : (
-            <>
-              <div className="space-y-3 md:hidden">
-                {!paymentItems.length ? (
-                  <p className={`${warehouseEmptyShellClass} text-sm text-ink-muted`}>
-                    Нет платежей за период
-                  </p>
-                ) : (
-                  paymentItems.map((row) => (
-                    <div
-                      key={`${row.sequential_number}-${row.created_at}`}
-                      className="space-y-2 py-3"
-                    >
-                      <ReportField label="№">{row.sequential_number}</ReportField>
-                      <ReportField label="Заказ-наряд">
-                        <RepairOrderLink
-                          orderId={row.repair_order_id}
-                          orderNumber={row.repair_order_number}
-                          onOpen={openOrderView}
-                        />
-                      </ReportField>
-                      <ReportField label="Клиент">{row.client_name || '—'}</ReportField>
-                      <ReportField label="Способ">{METHOD_LABELS[row.method] || row.method}</ReportField>
-                      <ReportField label="Сумма">{formatFinanceCurrency(row.amount)}</ReportField>
-                      <ReportField label="Дата">{formatServerDateTime(row.created_at)}</ReportField>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className={`hidden md:block ${paymentItems.length ? '' : 'min-h-[16rem]'}`}>
-                {paymentItems.length ? (
-                  <div className={autoserviceListTableWrapClass}>
-                    <table className={autoserviceListTableClass}>
-                      <thead>
-                        <tr className={autoserviceListTheadRowClass}>
-                          <th className={`w-16 ${autoserviceListThClass}`}>№</th>
-                          <th className={`w-28 ${autoserviceListThClass}`}>Заказ-наряд</th>
-                          <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
-                          <th className={`w-32 ${autoserviceListThClass}`}>Способ</th>
-                          <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
-                          <th className={`w-36 whitespace-nowrap ${autoserviceListThRightClass}`}>Дата</th>
-                        </tr>
-                      </thead>
-                      <tbody className={autoserviceListTbodyClass}>
-                        {paymentItems.map((row) => (
-                          <tr
-                            key={`${row.sequential_number}-${row.created_at}`}
-                            className={autoserviceListTrClass}
-                          >
-                            <td className={autoserviceListTdClass}>{row.sequential_number}</td>
-                            <td className={autoserviceListTdClass}>
-                              <RepairOrderLink
-                                orderId={row.repair_order_id}
-                                orderNumber={row.repair_order_number}
-                                onOpen={openOrderView}
-                              />
-                            </td>
-                            <td className={autoserviceListTdClass}>{row.client_name || '—'}</td>
-                            <td className={autoserviceListTdClass}>{METHOD_LABELS[row.method] || row.method || '—'}</td>
-                            <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
-                              {formatFinanceCurrency(row.amount)}
-                            </td>
-                            <td className={`w-36 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>
-                              {row.created_at ? formatServerDateTime(row.created_at) : '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="border-t border-line">
-                        <tr className={autoserviceListTrClass}>
-                          <td className={autoserviceListTdClass} colSpan={4}>
-                            <span className="font-semibold text-ink">Итого</span>
-                            <span className="ml-1 text-ink-muted">{payments.count ?? 0} платежей</span>
-                          </td>
-                          <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
-                            {formatFinanceCurrency(payments.total_amount)}
-                          </td>
-                          <td className={`w-36 whitespace-nowrap ${autoserviceListTdRightClass}`} />
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                ) : (
-                  <EmptyState
-                    illustration="empty"
-                    title="Нет платежей"
-                    description="За выбранный период оплат по заказ-нарядам нет."
-                  />
-                )}
-              </div>
-            </>
-          )}
-        </>
-      ) : tab === 'payroll' ? (
+      {tab === 'payroll' ? (
         <>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <MonthPickerField

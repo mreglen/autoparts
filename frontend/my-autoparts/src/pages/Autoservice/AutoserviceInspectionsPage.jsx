@@ -196,22 +196,6 @@ export default function AutoserviceInspectionsPage() {
           placeholder="Имя, телефон, авто или комментарий"
           ariaLabel="Поиск записей"
         />
-        <button
-          type="button"
-          onClick={load}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-subtle text-ink-muted transition hover:bg-surface-muted hover:text-ink"
-          title="Обновить"
-          aria-label="Обновить"
-        >
-          <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"
-            />
-          </svg>
-        </button>
       </div>
 
       <Toast message={error} variant="error" onClose={() => setError(null)} />
