@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
-import { RepairOrderStatusPicker, vehicleMakeModelLabel } from '../../components/Autoservice/RepairOrderViewModal';
+import {
+  RepairOrderStatusPicker,
+  REPAIR_ORDER_STATUS_LABELS,
+  vehicleMakeModelLabel,
+} from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
@@ -109,6 +113,8 @@ export default function AutoserviceOrdersMobileView({
   dateTo = '',
   onDateFromChange,
   onDateToChange,
+  statusFilter = '',
+  onStatusFilterChange,
 }) {
   const isDrafts = Array.isArray(drafts);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -213,12 +219,27 @@ export default function AutoserviceOrdersMobileView({
                 className="h-11 w-full rounded-full border-0 bg-gray-100 px-4 text-base text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
               />
             </label>
-            {dateFrom || dateTo ? (
+            <label className="block w-full min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-gray-500">Статус</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => onStatusFilterChange?.(e.target.value)}
+                className="h-11 w-full rounded-full border-0 bg-gray-100 px-4 text-base text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+                aria-label="Фильтр по статусу"
+              >
+                <option value="">Все статусы</option>
+                {['pending', 'in_progress', 'done', 'completed', 'cancelled', 'review'].map((value) => (
+                  <option key={value} value={value}>{REPAIR_ORDER_STATUS_LABELS[value]}</option>
+                ))}
+              </select>
+            </label>
+            {dateFrom || dateTo || statusFilter ? (
               <button
                 type="button"
                 onClick={() => {
                   onDateFromChange?.('');
                   onDateToChange?.('');
+                  onStatusFilterChange?.('');
                 }}
                 className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-500 transition hover:bg-gray-200"
               >

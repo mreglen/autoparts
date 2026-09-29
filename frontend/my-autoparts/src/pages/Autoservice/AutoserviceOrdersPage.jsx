@@ -9,6 +9,8 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 
 import RepairOrderViewModal, {
   RepairOrderStatusPicker,
+  REPAIR_ORDER_STATUS_LABELS,
+  normalizeRepairOrderStatus,
   vehicleMakeModelLabel,
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
@@ -77,6 +79,7 @@ export default function AutoserviceOrdersPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [historyStatus, setHistoryStatus] = useState('');
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
@@ -274,15 +277,19 @@ export default function AutoserviceOrdersPage() {
   );
 
   const filteredRows = useMemo(() => {
-    if (!dateFrom && !dateTo) return rows;
+    if (!dateFrom && !dateTo && !statusFilter) return rows;
     const from = dateFrom || '0000-01-01';
     const to = dateTo || '9999-12-31';
     return rows.filter((row) => {
-      const raw = String(row?.scheduled_at || '');
-      const day = /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : '';
-      return Boolean(day) && day >= from && day <= to;
+      if (statusFilter && normalizeRepairOrderStatus(row?.status) !== statusFilter) return false;
+      if (dateFrom || dateTo) {
+        const raw = String(row?.scheduled_at || '');
+        const day = /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : '';
+        if (!day || day < from || day > to) return false;
+      }
+      return true;
     });
-  }, [rows, dateFrom, dateTo]);
+  }, [rows, dateFrom, dateTo, statusFilter]);
 
   const filteredDrafts = useMemo(() => {
     if (!viewDrafts) return drafts;
@@ -387,6 +394,8 @@ export default function AutoserviceOrdersPage() {
           dateTo={dateTo}
           onDateFromChange={setDateFrom}
           onDateToChange={setDateTo}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
         />
       </div>
 
@@ -481,12 +490,27 @@ export default function AutoserviceOrdersPage() {
                 className="h-10 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
               />
             </label>
-            {dateFrom || dateTo ? (
+            <label className="block w-40 min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-ink-muted">Статус</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-10 w-full rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+                aria-label="Фильтр по статусу"
+              >
+                <option value="">Все статусы</option>
+                {['pending', 'in_progress', 'done', 'completed', 'cancelled', 'review'].map((value) => (
+                  <option key={value} value={value}>{REPAIR_ORDER_STATUS_LABELS[value]}</option>
+                ))}
+              </select>
+            </label>
+            {dateFrom || dateTo || statusFilter ? (
               <button
                 type="button"
                 onClick={() => {
                   setDateFrom('');
                   setDateTo('');
+                  setStatusFilter('');
                 }}
                 className={`${pillButtonClass} shrink-0 text-gray-500`}
               >
