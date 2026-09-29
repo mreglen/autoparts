@@ -553,7 +553,7 @@ function AutoParts() {
   );
 
   return (
-    <div className={`mt-0 px-0 w-full ${activeTab === 'my' ? 'sm:mt-3' : 'sm:mt-5'}`}>
+    <div className={`mt-0 px-0 w-full ${activeTab === 'my' ? 'sm:mt-1' : 'sm:mt-2'}`}>
       <PageSeoHelmet seo={seo} />
       {searchParams.get('vin_unavailable') === '1' ? (
         <div className="mb-4 max-lg:px-3">
@@ -584,7 +584,7 @@ function AutoParts() {
         )}
 
         {/* Переключатель вкладок */}
-        <div className={`max-lg:px-3 max-lg:py-1 ${activeTab === 'my' ? 'mb-2 sm:mb-3 lg:hidden' : 'mb-3 sm:mb-6'}`}>
+        <div className={`max-lg:px-3 max-lg:py-1 ${activeTab === 'my' ? 'mb-2 sm:mb-3 lg:hidden' : 'mb-2 sm:mb-3'}`}>
           {activeTab === 'my' ? (
             usedToolbar(sortMenuRef)
           ) : (

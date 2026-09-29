@@ -65,43 +65,114 @@ function formatDeliveryShort(deliveryStart, deliveryEnd) {
   }
 }
 
-function QtyControl({ quantity, maxQty, onAdd, onAddToBasket, onRemove, onSetQuantity, disabled, noStock }) {
-  const q = toSafeInt(quantity, 0);
-  if (q <= 0) {
-    return (
-      <NewPartsBasketHoverMenu
-        onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
-        disabled={disabled || noStock}
-        buttonClassName="flex h-8 w-8 items-center justify-center rounded border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
-        label="В корзину"
-      />
-    );
-  }
+function StepperChevron({ up }) {
   return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={onRemove}
-        disabled={disabled}
-        className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-base hover:bg-gray-50 disabled:opacity-50"
-      >
-        −
-      </button>
-      <CartQtyInput
-        value={q}
-        maxQty={maxQty}
-        onCommit={onSetQuantity}
-        disabled={disabled}
-        className="h-8 w-10 rounded border border-gray-300 bg-white text-center text-sm font-semibold text-gray-900 focus:border-indigo-400 focus:outline-none disabled:opacity-50"
+    <svg className="h-2.5 w-2.5" viewBox="0 0 10 6" fill="none" aria-hidden>
+      <path
+        d={up ? 'M1 5L5 1L9 5' : 'M1 1L5 5L9 1'}
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      <button
-        type="button"
-        onClick={onAdd}
-        disabled={disabled || noStock || q >= maxQty}
-        className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-base hover:bg-gray-50 disabled:opacity-50"
+    </svg>
+  );
+}
+
+function AddedCheckIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M4 10.5L8.5 15L16 6"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function RemoveCrossIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M5 5L15 15M15 5L5 15"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function AddedStateIcon() {
+  return (
+    <span className="relative inline-flex">
+      <AddedCheckIcon className="h-4 w-4 group-hover:hidden" />
+      <RemoveCrossIcon className="h-4 w-4 hidden group-hover:inline" />
+    </span>
+  );
+}
+
+function QtyControl({ quantity, maxQty, onAdd, onAddToBasket, onRemove, onSetQuantity, disabled, noStock }) {
+  const safeMax = Math.max(1, maxQty || 1);
+  const q = toSafeInt(quantity, 0);
+  const isAdded = q > 0;
+  const atMax = q >= safeMax;
+  const [pendingQty, setPendingQty] = useState(1);
+  const shownQty = isAdded ? q : Math.min(Math.max(1, pendingQty), safeMax);
+
+  const addToBasket = (basketId) => {
+    const fn = onAddToBasket || (async () => { await onAdd?.(); });
+    return fn(basketId, shownQty);
+  };
+
+  const incPending = () => setPendingQty((v) => Math.min(Math.max(1, v + 1), safeMax));
+  const decPending = () => setPendingQty((v) => Math.max(1, v - 1));
+  const commitPending = (v) => setPendingQty(Math.max(1, Math.min(toSafeInt(v, 1), safeMax)));
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="inline-flex items-stretch overflow-hidden rounded-md border border-indigo-300 bg-white">
+        <CartQtyInput
+          value={shownQty}
+          maxQty={safeMax}
+          onCommit={isAdded ? onSetQuantity : commitPending}
+          disabled={disabled || (!isAdded && noStock)}
+          className="h-8 w-10 border-0 border-r border-indigo-200 bg-white text-center text-sm font-semibold text-indigo-700 focus:outline-none disabled:opacity-50"
+        />
+        <div className="flex flex-col divide-y divide-indigo-300">
+          <button
+            type="button"
+            onClick={isAdded ? onAdd : incPending}
+            disabled={disabled || noStock || atMax || (!isAdded && shownQty >= safeMax)}
+            className="flex flex-1 items-center justify-center bg-indigo-500 px-1.5 text-white transition hover:bg-indigo-600 disabled:opacity-50"
+            aria-label="Увеличить количество"
+          >
+            <StepperChevron up />
+          </button>
+          <button
+            type="button"
+            onClick={isAdded ? onRemove : decPending}
+            disabled={disabled || (!isAdded && shownQty <= 1)}
+            className="flex flex-1 items-center justify-center bg-indigo-500 px-1.5 text-white transition hover:bg-indigo-600 disabled:opacity-50"
+            aria-label="Уменьшить количество"
+          >
+            <StepperChevron />
+          </button>
+        </div>
+      </div>
+      <NewPartsBasketHoverMenu
+        onAddToBasket={addToBasket}
+        onRemove={isAdded ? () => onSetQuantity?.(0) : undefined}
+        disabled={disabled || noStock}
+        buttonClassName="group flex h-8 w-8 items-center justify-center rounded border border-indigo-200 bg-white text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-50"
+        label={isAdded ? 'Убрать из корзины' : 'В корзину'}
       >
-        +
-      </button>
+        {isAdded ? <AddedStateIcon /> : null}
+      </NewPartsBasketHoverMenu>
     </div>
   );
 }
@@ -198,16 +269,17 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
     return cartItem;
   };
 
-  const handleAddToCart = async (stock, basketId) => {
+  const handleAddToCart = async (stock, basketId, qtyToAdd = 1) => {
     if (!stock) return;
     const existing = getCartItemByStock(stock);
     const currentCartQuantity = existing ? toSafeInt(existing.quantity, 0) : 0;
     const availableStock = Number(stock.available_count) || 0;
-    if (availableStock <= currentCartQuantity) return;
+    const addQty = Math.max(1, Math.min(toSafeInt(qtyToAdd, 1), availableStock - currentCartQuantity));
+    if (addQty <= 0 || availableStock <= currentCartQuantity) return;
     if (!basketId && existing) {
       try {
         await dispatch(
-          updateCartItemQuantity({ itemId: existing.id, quantity: currentCartQuantity + 1 })
+          updateCartItemQuantity({ itemId: existing.id, quantity: currentCartQuantity + addQty })
         ).unwrap();
       } catch {
         // silent
@@ -216,7 +288,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
     }
     setAddingToCart(true);
     try {
-      const cartItem = prepareCartItem(stock, 1);
+      const cartItem = prepareCartItem(stock, addQty);
       if (!cartItem.stock_id || cartItem.price <= 0) return;
       await dispatch(
         addNewPartsToCart({
@@ -330,7 +402,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
           quantity={mainQuantity}
           maxQty={mainAvailableCount}
           onAdd={() => handleAddToCart(mainStock)}
-          onAddToBasket={(basketId) => handleAddToCart(mainStock, basketId)}
+          onAddToBasket={(basketId, qty) => handleAddToCart(mainStock, basketId, qty)}
           onRemove={() => handleRemoveFromCart(mainStock)}
           onSetQuantity={(n) => handleSetCartQuantity(mainStock, n)}
           disabled={disabledControl}
@@ -369,7 +441,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
                       quantity={quantity}
                       maxQty={Math.max(1, Number(stock?.available_count) || 1)}
                       onAdd={() => handleAddToCart(stock)}
-                      onAddToBasket={(basketId) => handleAddToCart(stock, basketId)}
+                      onAddToBasket={(basketId, qty) => handleAddToCart(stock, basketId, qty)}
                       onRemove={() => handleRemoveFromCart(stock)}
                       onSetQuantity={(n) => handleSetCartQuantity(stock, n)}
                       disabled={disabledControl}

@@ -97,6 +97,7 @@ function NewPartProductCard({
     getStockAvailability,
     handleAddToCart,
     handleRemoveFromCart,
+    handleSetQuantity,
     priceWithMarkup,
   } = useNewPartCartActions({ part, stocksData });
 
@@ -136,9 +137,11 @@ function NewPartProductCard({
     <div className={`flex flex-col gap-2 ${className}`}>
       <NewPartCartQuantityControl
         quantity={mainQuantity}
+        maxQty={mainAvailableCount}
         onAdd={() => handleAddToCart(mainStock)}
-        onAddToBasket={(basketId) => handleAddToCart(mainStock, basketId)}
+        onAddToBasket={(basketId, qty) => handleAddToCart(mainStock, basketId, qty)}
         onRemove={() => handleRemoveFromCart(mainStock)}
+        onSetQuantity={(value) => handleSetQuantity(mainStock, value)}
         disabled={disabledControl}
         noStock={mainStockInfo.noStock}
         loading={addingToCart}
@@ -212,9 +215,11 @@ function NewPartProductCard({
                         </div>
                         <NewPartCartQuantityControl
                           quantity={quantity}
+                          maxQty={availableCount}
                           onAdd={() => handleAddToCart(stock)}
-                          onAddToBasket={(basketId) => handleAddToCart(stock, basketId)}
+                          onAddToBasket={(basketId, qty) => handleAddToCart(stock, basketId, qty)}
                           onRemove={() => handleRemoveFromCart(stock)}
+                          onSetQuantity={(value) => handleSetQuantity(stock, value)}
                           disabled={disabledControl}
                           noStock={stockInfo.noStock}
                           loading={addingToCart}
@@ -335,9 +340,11 @@ function NewPartProductCard({
                       </div>
                       <NewPartCartQuantityControl
                         quantity={quantity}
+                        maxQty={availableCount}
                         onAdd={() => handleAddToCart(stock)}
-                        onAddToBasket={(basketId) => handleAddToCart(stock, basketId)}
+                        onAddToBasket={(basketId, qty) => handleAddToCart(stock, basketId, qty)}
                         onRemove={() => handleRemoveFromCart(stock)}
+                        onSetQuantity={(value) => handleSetQuantity(stock, value)}
                         disabled={disabledControl}
                         noStock={stockInfo.noStock}
                         loading={addingToCart}

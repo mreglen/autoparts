@@ -65,7 +65,7 @@ export function getPublicMainClasses({
     return 'max-w-sg-content max-lg:px-0 max-lg:py-0 px-4 sm:px-6 lg:px-8 py-2 sm:py-3';
   }
   if (isAutopartsPage) {
-    return 'max-w-sg-content max-lg:px-0 max-lg:py-2 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';
+    return 'max-w-sg-content max-lg:px-0 max-lg:py-2 px-4 sm:px-6 lg:px-8 py-2 sm:py-3';
   }
   if (path === '/cart' || path.startsWith('/cart/')) {
     return 'max-w-sg-content max-lg:px-3 max-lg:py-3 px-4 sm:px-6 lg:px-8 py-6 sm:py-8';

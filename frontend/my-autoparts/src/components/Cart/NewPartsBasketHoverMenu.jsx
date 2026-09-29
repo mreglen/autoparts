@@ -39,6 +39,7 @@ function CartIcon({ className = 'h-4 w-4' }) {
  */
 export default function NewPartsBasketHoverMenu({
   onAddToBasket,
+  onRemove,
   disabled = false,
   showPicker = true,
   className = '',
@@ -50,6 +51,7 @@ export default function NewPartsBasketHoverMenu({
   const dispatch = useDispatch();
   const cart = useSelector(selectCart);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const [busy, setBusy] = useState(false);
   const [menuError, setMenuError] = useState('');
   const wrapRef = useRef(null);
@@ -78,6 +80,10 @@ export default function NewPartsBasketHoverMenu({
     if (!showPicker || disabled || busy) return;
     clearCloseTimer();
     setMenuError('');
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (rect) {
+      setOpenUpward(rect.bottom + 250 > window.innerHeight && rect.top > 250);
+    }
     setMenuOpen(true);
     // Only fetch cart if we don't have actual baskets from the cart
     if (!cart?.new_parts_baskets?.length) {
@@ -142,6 +148,19 @@ export default function NewPartsBasketHoverMenu({
     event.preventDefault();
     event.stopPropagation();
     if (disabled || busy) return;
+    if (onRemove) {
+      setBusy(true);
+      setMenuError('');
+      try {
+        await onRemove();
+        setMenuOpen(false);
+      } catch (err) {
+        setMenuError(typeof err === 'string' ? err : 'Не удалось удалить из корзины');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     // Click immediately adds to the default basket; hover opens the picker
     await runAdd(undefined);
   };
@@ -172,7 +191,7 @@ export default function NewPartsBasketHoverMenu({
       {showPicker && menuOpen ? (
         <div
           role="menu"
-          className={`absolute ${alignClass} top-full z-[60] mt-1 w-56 rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg`}
+          className={`absolute ${alignClass} ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'} z-[60] w-56 rounded-lg border border-gray-200 bg-white p-1.5 shadow-lg`}
           onMouseEnter={clearCloseTimer}
           onMouseLeave={scheduleClose}
         >

@@ -61,9 +61,11 @@ function OfferRow({ stock, index, isBest, cartActions, showWarehouseNames, hideC
       <div className={`order-4 col-span-2 flex justify-end sm:order-none sm:col-span-1 ${hideCta ? 'max-lg:hidden' : ''}`}>
         <NewPartCartQuantityControl
           quantity={quantity}
+          maxQty={availableCount}
           onAdd={() => cartActions.handleAddToCart(stock)}
-          onAddToBasket={(basketId) => cartActions.handleAddToCart(stock, basketId)}
+          onAddToBasket={(basketId, qty) => cartActions.handleAddToCart(stock, basketId, qty)}
           onRemove={() => cartActions.handleRemoveFromCart(stock)}
+          onSetQuantity={(value) => cartActions.handleSetQuantity(stock, value)}
           disabled={cartActions.disabledControl}
           noStock={stockInfo.noStock}
           loading={cartActions.addingToCart}

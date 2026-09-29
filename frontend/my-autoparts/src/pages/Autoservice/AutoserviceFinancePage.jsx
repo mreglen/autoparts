@@ -20,7 +20,9 @@ import {
   autoserviceListTableWrapClass,
   autoserviceListTbodyClass,
   autoserviceListTdClass,
+  autoserviceListTdRightClass,
   autoserviceListThClass,
+  autoserviceListThRightClass,
   autoserviceListTheadRowClass,
   autoserviceListTrClickableClass,
   warehouseEmptyShellClass,
@@ -210,11 +212,11 @@ function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет п�
         <table className={autoserviceListTableClass}>
           <thead>
             <tr className={autoserviceListTheadRowClass}>
-              <th className={`w-[15%] ${autoserviceListThClass} text-center`}>Дата</th>
-              <th className={`w-[30%] ${autoserviceListThClass} text-center`}>Клиент</th>
-              <th className={`w-[20%] ${autoserviceListThClass} text-center`}>Способ оплаты</th>
-              <th className={`w-[15%] ${autoserviceListThClass} text-center`}>Сумма</th>
-              <th className={`w-[20%] ${autoserviceListThClass} text-center`}>Документ</th>
+              <th className={`w-36 ${autoserviceListThClass}`}>Дата</th>
+              <th className={`min-w-0 pl-4 ${autoserviceListThClass}`}>Клиент</th>
+              <th className={`w-32 ${autoserviceListThClass}`}>Способ оплаты</th>
+              <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
+              <th className={`w-44 pl-3 text-center ${autoserviceListThClass}`}>Документ</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
@@ -224,19 +226,19 @@ function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет п�
                 className={autoserviceListTrClickableClass}
                 onClick={() => onOpen(row)}
               >
-                <td className={`${autoserviceListTdClass} whitespace-nowrap text-center text-ink-muted`}>
+                <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
                   {formatServerDateTime(row.created_at)}
                 </td>
-                <td className={`${autoserviceListTdClass} truncate text-center`}>
+                <td className={`${autoserviceListTdClass} truncate pl-4`}>
                   {row.client_name || '—'}
                 </td>
-                <td className={`${autoserviceListTdClass} text-center`}>
+                <td className={autoserviceListTdClass}>
                   <MethodBadge method={row.method} />
                 </td>
-                <td className={`${autoserviceListTdClass} text-center font-semibold tabular-nums`}>
+                <td className={`${autoserviceListTdRightClass} font-semibold tabular-nums`}>
                   {formatFinanceCurrency(row.amount)}
                 </td>
-                <td className={`${autoserviceListTdClass} text-center tabular-nums`}>
+                <td className={`${autoserviceListTdClass} pl-3 text-center tabular-nums`}>
                   {row.repair_order_number ? (
                     <button
                       type="button"
@@ -274,6 +276,19 @@ export default function AutoserviceFinancePage() {
   const [deletingPaymentId, setDeletingPaymentId] = useState(null);
   const [viewRepairOrder, setViewRepairOrder] = useState(null);
   const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
+  const [filterSwitching, setFilterSwitching] = useState(false);
+  const filterSwitchTimerRef = useRef(null);
+
+  const handleMethodChange = useCallback((methodId) => {
+    setSelectedMethod(methodId);
+    setFilterSwitching(true);
+    if (filterSwitchTimerRef.current) clearTimeout(filterSwitchTimerRef.current);
+    filterSwitchTimerRef.current = setTimeout(() => setFilterSwitching(false), 350);
+  }, []);
+
+  useEffect(() => () => {
+    if (filterSwitchTimerRef.current) clearTimeout(filterSwitchTimerRef.current);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -436,10 +451,10 @@ export default function AutoserviceFinancePage() {
       <MethodSegmentedFilter
         methods={ALL_METHODS}
         selected={selectedMethod}
-        onChange={setSelectedMethod}
+        onChange={handleMethodChange}
       />
 
-      {loading ? (
+      {loading || filterSwitching ? (
         <div className="space-y-3">
           <div className="space-y-3 md:hidden">
             {[1, 2, 3].map((i) => (

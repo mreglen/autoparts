@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatDeliveryParts } from '../AutoParts/NewParts/newPartStockUtils';
+import CartQtyInput from '../../components/Cart/CartQtyInput';
 
 function DeliveryCell({
   deliveryStart,
@@ -28,38 +29,43 @@ function DeliveryCell({
   return null;
 }
 
-function QuantityStepper({ quantity, onDecrease, onIncrease, max, disabled = false }) {
+function QuantityStepper({ quantity, onDecrease, onIncrease, onSetQuantity, max, disabled = false }) {
   const atMin = quantity <= 1;
   const atMax = quantity >= max;
   return (
-    <div className="inline-flex items-center overflow-hidden rounded-lg border border-line bg-surface">
-      <button
-        type="button"
-        onClick={onDecrease}
-        disabled={disabled || atMin}
-        className="flex h-9 w-9 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
-        aria-label="Уменьшить"
-      >
-        −
-      </button>
-      <input
-        type="text"
-        readOnly
+    <div className="inline-flex items-stretch overflow-hidden rounded-md border border-indigo-300 bg-white">
+      <CartQtyInput
         value={quantity}
-        className="h-9 w-8 border-x border-line bg-surface text-center text-sm font-medium text-ink"
-        aria-label="Количество"
-        title={max > 0 ? `Доступно: ${max}` : undefined}
+        maxQty={max > 0 ? max : undefined}
+        onCommit={(value) => onSetQuantity(Math.max(1, value))}
+        disabled={disabled}
+        className="h-9 w-11 border-0 border-r border-indigo-200 bg-white text-center text-sm font-semibold text-indigo-700 focus:outline-none disabled:opacity-50"
       />
-      <button
-        type="button"
-        onClick={onIncrease}
-        disabled={disabled || atMax}
-        className="flex h-9 w-9 items-center justify-center text-ink-muted transition hover:bg-surface-muted disabled:opacity-40"
-        aria-label="Увеличить"
-        title={atMax ? `Максимум ${max} шт.` : undefined}
-      >
-        +
-      </button>
+      <div className="flex flex-col divide-y divide-indigo-300">
+        <button
+          type="button"
+          onClick={onIncrease}
+          disabled={disabled || atMax}
+          className="flex flex-1 items-center justify-center bg-indigo-500 px-2 text-white transition hover:bg-indigo-600 disabled:opacity-50"
+          aria-label="Увеличить"
+          title={atMax ? `Максимум ${max} шт.` : undefined}
+        >
+          <svg className="h-2.5 w-2.5" viewBox="0 0 10 6" fill="none" aria-hidden>
+            <path d="M1 5L5 1L9 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={onDecrease}
+          disabled={disabled || atMin}
+          className="flex flex-1 items-center justify-center bg-indigo-500 px-2 text-white transition hover:bg-indigo-600 disabled:opacity-50"
+          aria-label="Уменьшить"
+        >
+          <svg className="h-2.5 w-2.5" viewBox="0 0 10 6" fill="none" aria-hidden>
+            <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
@@ -152,6 +158,7 @@ export default function CartItemMobileCard({
           disabled={quantityBusy}
           onDecrease={() => onQuantityChange(item.id, quantity - 1)}
           onIncrease={() => onQuantityChange(item.id, quantity + 1)}
+          onSetQuantity={(value) => onQuantityChange(item.id, value)}
         />
         <div className="min-w-[4rem] text-right">
           <p className="text-[10px] uppercase tracking-wide text-ink-muted">Сумма</p>

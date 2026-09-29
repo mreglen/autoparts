@@ -35,48 +35,114 @@ function DeliveryLine({ deliveryStart, deliveryEnd, warehouseName, preferredWare
   );
 }
 
-function MobileCartQtyControl({ quantity, maxQty, onAdd, onAddToBasket, onRemove, onSetQuantity, disabled }) {
-  const safeQty = toSafeInt(quantity, 0);
-  const atMax = safeQty >= maxQty;
-
-  if (safeQty <= 0) {
-    return (
-      <NewPartsBasketHoverMenu
-        onAddToBasket={onAddToBasket || (async () => { await onAdd?.(); })}
-        disabled={disabled}
-        buttonClassName="flex h-11 w-11 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
-        label="В корзину"
+function MobileStepperChevron({ up }) {
+  return (
+    <svg className="h-3 w-3" viewBox="0 0 10 6" fill="none" aria-hidden>
+      <path
+        d={up ? 'M1 5L5 1L9 5' : 'M1 1L5 5L9 1'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-    );
-  }
+    </svg>
+  );
+}
+
+function AddedCheckIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M4 10.5L8.5 15L16 6"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function RemoveCrossIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M5 5L15 15M15 5L5 15"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function AddedStateIcon({ className }) {
+  return (
+    <span className="relative inline-flex">
+      <AddedCheckIcon className={`${className} group-hover:hidden`} />
+      <RemoveCrossIcon className={`${className} hidden group-hover:inline`} />
+    </span>
+  );
+}
+
+function MobileCartQtyControl({ quantity, maxQty, onAdd, onAddToBasket, onRemove, onSetQuantity, disabled }) {
+  const safeMax = Math.max(1, maxQty || 1);
+  const safeQty = toSafeInt(quantity, 0);
+  const isAdded = safeQty > 0;
+  const atMax = safeQty >= safeMax;
+  const [pendingQty, setPendingQty] = useState(1);
+  const shownQty = isAdded ? safeQty : Math.min(Math.max(1, pendingQty), safeMax);
+
+  const addToBasket = (basketId) => {
+    const fn = onAddToBasket || (async () => { await onAdd?.(); });
+    return fn(basketId, shownQty);
+  };
+
+  const incPending = () => setPendingQty((v) => Math.min(Math.max(1, v + 1), safeMax));
+  const decPending = () => setPendingQty((v) => Math.max(1, v - 1));
+  const commitPending = (v) => setPendingQty(Math.max(1, Math.min(toSafeInt(v, 1), safeMax)));
 
   return (
-    <div className="inline-flex items-center overflow-hidden rounded-lg border border-gray-200">
-      <button
-        type="button"
-        onClick={onRemove}
+    <div className="inline-flex items-center gap-2">
+      <div className="inline-flex items-stretch overflow-hidden rounded-lg border border-indigo-300 bg-white">
+        <CartQtyInput
+          value={shownQty}
+          maxQty={safeMax}
+          onCommit={isAdded ? onSetQuantity : commitPending}
+          disabled={disabled}
+          className="h-11 w-12 border-0 border-r border-indigo-200 bg-white text-center text-sm font-semibold text-indigo-700 focus:outline-none disabled:opacity-50"
+        />
+        <div className="flex flex-col divide-y divide-indigo-300">
+          <button
+            type="button"
+            onClick={isAdded ? onAdd : incPending}
+            disabled={disabled || atMax || (!isAdded && shownQty >= safeMax)}
+            className="flex flex-1 items-center justify-center bg-indigo-500 px-2.5 text-white transition hover:bg-indigo-600 disabled:opacity-50"
+            aria-label="Увеличить количество"
+          >
+            <MobileStepperChevron up />
+          </button>
+          <button
+            type="button"
+            onClick={isAdded ? onRemove : decPending}
+            disabled={disabled || (!isAdded && shownQty <= 1)}
+            className="flex flex-1 items-center justify-center bg-indigo-500 px-2.5 text-white transition hover:bg-indigo-600 disabled:opacity-50"
+            aria-label="Уменьшить количество"
+          >
+            <MobileStepperChevron />
+          </button>
+        </div>
+      </div>
+      <NewPartsBasketHoverMenu
+        onAddToBasket={addToBasket}
+        onRemove={isAdded ? () => onSetQuantity?.(0) : undefined}
         disabled={disabled}
-        className="flex h-11 w-11 items-center justify-center text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-        aria-label="Уменьшить количество"
+        buttonClassName="group flex h-11 w-11 items-center justify-center rounded-lg border border-indigo-200 bg-white text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-50"
+        label={isAdded ? 'Убрать из корзины' : 'В корзину'}
       >
-        −
-      </button>
-      <CartQtyInput
-        value={safeQty}
-        maxQty={maxQty}
-        onCommit={onSetQuantity}
-        disabled={disabled}
-        className="flex h-11 w-12 items-center justify-center border-x border-gray-200 px-2 text-center text-sm font-semibold focus:outline-none disabled:opacity-50"
-      />
-      <button
-        type="button"
-        onClick={onAdd}
-        disabled={disabled || atMax}
-        className="flex h-11 w-11 items-center justify-center text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-        aria-label="Увеличить количество"
-      >
-        +
-      </button>
+        {isAdded ? <AddedStateIcon className="h-5 w-5" /> : null}
+      </NewPartsBasketHoverMenu>
     </div>
   );
 }
@@ -124,11 +190,11 @@ function MobileStockOffer({
   const cartQuantity = cartItemInStore ? toSafeInt(cartItemInStore.quantity, 0) : 0;
   const disabled = busy;
 
-  const prepareCartItem = () => {
+  const prepareCartItem = (quantityToAdd = 1) => {
     const item = {
       brand,
       partnumber: number,
-      quantity: 1,
+      quantity: quantityToAdd,
       price: purchasePrice,
       supplier_unit_price: Number(stock.price) > 0 ? Number(stock.price) : undefined,
       stock_id: String(stock.stock_id || '').trim(),
@@ -147,10 +213,12 @@ function MobileStockOffer({
     return item;
   };
 
-  const handleAdd = async (basketId) => {
+  const handleAdd = async (basketId, qtyToAdd = 1) => {
     if (cartQuantity >= maxQty) return;
+    const addQty = Math.max(1, Math.min(toSafeInt(qtyToAdd, 1), maxQty - cartQuantity));
+    if (addQty <= 0) return;
     if (!basketId && cartItemInStore) {
-      const next = Math.min(cartQuantity + 1, maxQty);
+      const next = Math.min(cartQuantity + addQty, maxQty);
       if (next === cartQuantity) return;
       try {
         await dispatch(
@@ -163,7 +231,7 @@ function MobileStockOffer({
     }
     setBusy(true);
     try {
-      const cartItem = prepareCartItem();
+      const cartItem = prepareCartItem(addQty);
       if (!cartItem.stock_id || cartItem.price <= 0) return;
       let targetBasketId = basketId ?? cartItemInStore?.basket_id ?? vinBasketId;
       if (!targetBasketId && ensureVinBasket) {

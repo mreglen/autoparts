@@ -166,16 +166,22 @@ export function useNewPartCartActions({ part, stocksData }) {
     return cartItem;
   };
 
-  const handleAddToCart = async (stock, basketId) => {
+  const handleAddToCart = async (stock, basketId, qtyToAdd = 1) => {
     if (!stock) return;
     setAddingToCart(true);
     try {
       const currentCartQuantity = getCartQuantity(stock);
       const availableStock = Number(stock.available_count) || 0;
-      if (availableStock <= currentCartQuantity) return;
-      const cartItem = prepareCartItem(stock, 1);
-      if (!cartItem.stock_id || cartItem.price <= 0) return;
+      const addQty = Math.max(1, Math.min(toSafeInt(qtyToAdd, 1), availableStock - currentCartQuantity));
+      if (addQty <= 0 || availableStock <= currentCartQuantity) return;
       const existing = getCartItemByStock(stock);
+      if (!basketId && existing) {
+        const next = Math.min(currentCartQuantity + addQty, availableStock);
+        await dispatch(updateCartItemQuantity({ itemId: existing.id, quantity: next })).unwrap();
+        return;
+      }
+      const cartItem = prepareCartItem(stock, addQty);
+      if (!cartItem.stock_id || cartItem.price <= 0) return;
       await dispatch(
         addNewPartsToCart({
           ...cartItem,
@@ -210,6 +216,25 @@ export function useNewPartCartActions({ part, stocksData }) {
     }
   };
 
+  const handleSetQuantity = async (stock, nextQuantity) => {
+    const cartItem = getCartItemByStock(stock);
+    if (!cartItem) return;
+    const maxQty = Math.max(1, Number(stock?.available_count) || 1);
+    const next = Math.max(0, Math.min(maxQty, toSafeInt(nextQuantity, 0)));
+    setAddingToCart(true);
+    try {
+      if (next <= 0) {
+        await dispatch(removeFromCart(cartItem.id)).unwrap();
+      } else if (next !== toSafeInt(cartItem.quantity, 0)) {
+        await dispatch(updateCartItemQuantity({ itemId: cartItem.id, quantity: next })).unwrap();
+      }
+    } catch (_e) {
+      // silent
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
   const mainQuantity = mainStock ? getCartQuantity(mainStock) : 0;
   const mainStockInfo = mainStock ? getStockAvailability(mainStock) : { noStock: true, limitedStock: false };
   const mainPrice = mainStock ? priceWithMarkup(mainStock.price) : null;
@@ -231,6 +256,7 @@ export function useNewPartCartActions({ part, stocksData }) {
     getStockAvailability,
     handleAddToCart,
     handleRemoveFromCart,
+    handleSetQuantity,
     priceWithMarkup,
   };
 }

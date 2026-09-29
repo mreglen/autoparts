@@ -139,10 +139,10 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
     />
   );
 
-  const renderSection = (title, parts, accentClass, emptyText) => (
+  const renderSection = (title, parts, accentClass, emptyText, topGap = 'mt-0') => (
     <>
-      <div className="my-4 text-lg font-medium">
-        <h2 className={`inline-block border-b-4 pb-2 ${accentClass}`}>{title}</h2>
+      <div className={`mb-2 text-lg font-medium ${topGap}`}>
+        <h2 className={`inline-block border-b-4 pb-1.5 ${accentClass}`}>{title}</h2>
       </div>
       {renderPartsTable(parts, emptyText)}
     </>
@@ -174,7 +174,7 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
       <h1 className="sr-only">
         {safeSearchQuery ? `Результаты поиска: ${safeSearchQuery}` : 'Новые запчасти с доставкой'}
       </h1>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
         <p className="text-sm text-gray-600">
           Найдено: <span className="font-semibold text-gray-900">{filteredRosskoParts.length}</span>
           {showAnalogs && filteredCrossParts.length > 0 && (
@@ -214,6 +214,7 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
               filteredCrossParts,
               'border-blue-500',
               'Нет аналогов',
+              'mt-5',
             )
           )}
         </div>
