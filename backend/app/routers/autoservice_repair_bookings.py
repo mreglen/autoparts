@@ -22,6 +22,8 @@ from app.schemas.repair_booking import (
 )
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS,
+    AUTOSERVICE_PERMISSION_INSPECTIONS_CONFIRM,
+    has_autoservice_permission,
     normalize_phone_or_400,
     related_autoservice_client_ids,
     require_autoservice_permission,
@@ -182,7 +184,13 @@ def create_repair_booking_staff(
         name=name[:120],
         phone=phone,
         preferred_date=payload.preferred_date,
-        status="new",
+        status=(
+            "confirmed"
+            if has_autoservice_permission(
+                db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_CONFIRM
+            )
+            else "new"
+        ),
         source="staff",
         created_by_user_id=current_user.id,
         notes=(payload.comment or "").strip() or None,

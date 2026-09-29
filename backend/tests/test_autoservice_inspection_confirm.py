@@ -12,10 +12,12 @@ import app.models  # noqa: F401
 from fastapi import HTTPException
 
 from app.routers import autoservice_inspections as inspections_router
+from app.routers import autoservice_repair_bookings as repair_bookings_router
 from app.schemas.inspection_booking import (
     InspectionBookingPatch,
     InspectionBookingStaffCreate,
 )
+from app.schemas.repair_booking import RepairBookingStaffCreate
 
 MOD = "app.routers.autoservice_inspections"
 
@@ -57,6 +59,38 @@ class StaffBookingCreateTests(unittest.TestCase):
         row, notify = self._create(can_confirm=True)
         self.assertEqual(row.status, "confirmed")
         notify.assert_called_once()
+
+
+class LegacyStaffRepairBookingTests(unittest.TestCase):
+    def _create(self, can_confirm):
+        db = MagicMock()
+        user = MagicMock()
+        user.id = 5
+        payload = RepairBookingStaffCreate(
+            name="Иван Петров",
+            phone="+7 999 123-45-67",
+            preferred_date=date(2026, 10, 5),
+        )
+        RMOD = "app.routers.autoservice_repair_bookings"
+        with patch(
+            f"{RMOD}.require_autoservice_permission", return_value="ORG1"
+        ), patch(
+            f"{RMOD}.has_autoservice_permission", return_value=can_confirm
+        ), patch(
+            f"{RMOD}._inspection_to_repair_view", side_effect=lambda r: r
+        ):
+            return repair_bookings_router.create_repair_booking_staff(
+                payload=payload, db=db, current_user=user
+            )
+
+    def test_legacy_staff_booking_auto_confirms_with_permission(self):
+        row = self._create(can_confirm=True)
+        self.assertEqual(row.status, "confirmed")
+        self.assertEqual(row.source, "staff")
+
+    def test_legacy_staff_booking_stays_new_without_permission(self):
+        row = self._create(can_confirm=False)
+        self.assertEqual(row.status, "new")
 
 
 class PatchConfirmGuardTests(unittest.TestCase):
