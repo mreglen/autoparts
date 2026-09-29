@@ -10,7 +10,10 @@ from app.models.autoservice_client import AutoserviceClient
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.garage_vehicle import GarageVehicle
 from app.models.inspection_booking import InspectionBooking
+from app.models.organization import Organization
 from app.models.user import User
+from app.schemas.sms import SmsSendResult
+from app.services.smsc_client import send_smsc_sms
 from app.schemas.inspection_booking import (
     InspectionBookingClientCreate,
     InspectionBookingPatch,
@@ -22,6 +25,7 @@ from app.schemas.inspection_booking import (
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS,
     AUTOSERVICE_PERMISSION_INSPECTIONS_CONFIRM,
+    AUTOSERVICE_PERMISSION_PLANNER,
     has_autoservice_permission,
     get_or_create_autoservice_client_for_user,
     normalize_phone_or_400,
@@ -623,3 +627,58 @@ def delete_inspection_booking(
         )
     db.delete(row)
     db.commit()
+
+
+@router.post(
+    "/autoservice/inspection-bookings/{booking_id}/sms",
+    response_model=SmsSendResult,
+)
+def send_inspection_booking_sms(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Send a fixed-template SMS about the booking to its phone via SMSC."""
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
+    row = (
+        db.query(InspectionBooking)
+        .filter(
+            InspectionBooking.id == booking_id,
+            InspectionBooking.organization_id == org_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Запись не найдена",
+        )
+    if not (row.phone or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="В записи нет телефона",
+        )
+
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org_name = (org.name if org else None) or "Свой Гараж"
+    date_label = row.preferred_date.strftime("%d.%m.%Y") if row.preferred_date else ""
+    time_label = row.preferred_time.strftime("%H:%M") if row.preferred_time else ""
+    when = " ".join(part for part in (date_label, f"в {time_label}" if time_label else "") if part)
+    text = (
+        f"Здравствуйте, {row.name}! Вы записаны в автосервис \"{org_name}\" на {when}."
+    )
+
+    message = send_smsc_sms(
+        db,
+        row.phone,
+        text,
+        organization_id=org_id,
+        inspection_booking_id=row.id,
+        user_id=current_user.id,
+    )
+    db.commit()
+    return SmsSendResult(
+        status=message.status,
+        cost=message.cost,
+        error_message=message.error_message,
+    )

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import Modal, { ConfirmDialog } from '../UI/Modal';
+import Toast from '../UI/Toast';
 import PhoneInput from '../UI/PhoneInput';
 import SearchablePillSelect from '../SearchablePillSelect/SearchablePillSelect';
 import { apiRequest } from '../../utils/apiClient';
@@ -9,7 +10,11 @@ import {
   formatPhoneFromRaw,
   validatePhoneOptional,
 } from '../../utils/contactValidation';
-import { canConfirmInspectionBookings } from '../../utils/autoservicePermissions';
+import {
+  AUTOSERVICE_PERMISSION,
+  canConfirmInspectionBookings,
+  hasAutoservicePermission,
+} from '../../utils/autoservicePermissions';
 
 const inputClass = 'sg-pill-input mt-1';
 const textareaClass = 'sg-pill-textarea mt-1';
@@ -43,6 +48,7 @@ export default function InspectionBookingAddModal({
   const user = useSelector((state) => state.auth.user);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const canConfirm = canConfirmInspectionBookings(user, permissionCodes);
+  const canSendSms = hasAutoservicePermission(user, permissionCodes, AUTOSERVICE_PERMISSION.planner);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [preferredDate, setPreferredDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -67,6 +73,8 @@ export default function InspectionBookingAddModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsToast, setSmsToast] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [zoneConflict, setZoneConflict] = useState(null);
@@ -102,6 +110,8 @@ export default function InspectionBookingAddModal({
     setSaving(false);
     setDeleting(false);
     setConfirming(false);
+    setSmsSending(false);
+    setSmsToast(null);
     setDeleteConfirmOpen(false);
     setZoneConflict(null);
     conflictCheckedRef.current = false;
@@ -351,6 +361,26 @@ export default function InspectionBookingAddModal({
       setError(err?.message || 'Не удалось подтвердить запись');
     } finally {
       setConfirming(false);
+    }
+  };
+
+  const handleSendSms = async () => {
+    if (!initialBooking?.id || smsSending) return;
+    setSmsSending(true);
+    try {
+      const result = await apiRequest(`/autoservice/inspection-bookings/${initialBooking.id}/sms`, {
+        method: 'POST',
+      });
+      if (result?.status === 'sent') {
+        const cost = result.cost != null ? ` · ${Number(result.cost).toFixed(2)} ₽` : '';
+        setSmsToast({ variant: 'success', message: `SMS отправлено${cost}` });
+      } else {
+        setSmsToast({ variant: 'error', message: result?.error_message || 'SMS не отправлено' });
+      }
+    } catch (err) {
+      setSmsToast({ variant: 'error', message: err?.message || 'Не удалось отправить SMS' });
+    } finally {
+      setSmsSending(false);
     }
   };
 
@@ -704,8 +734,8 @@ export default function InspectionBookingAddModal({
         </form>
       ) : (
         <div className="space-y-4">
-          {initialBooking?.status ? (
-            <div>
+          <div className="flex items-center gap-2">
+            {initialBooking?.status ? (
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
                   (BOOKING_STATUS_META[initialBooking.status] || BOOKING_STATUS_META.new).className
@@ -713,8 +743,21 @@ export default function InspectionBookingAddModal({
               >
                 {(BOOKING_STATUS_META[initialBooking.status] || { label: initialBooking.status }).label}
               </span>
-            </div>
-          ) : null}
+            ) : null}
+            {canSendSms && phone ? (
+              <button
+                type="button"
+                onClick={handleSendSms}
+                disabled={smsSending}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-sg-sm border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-60"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 10h8m-8 4h5m7-8v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h12a2 2 0 012 2z" />
+                </svg>
+                {smsSending ? 'Отправка…' : 'Отправить SMS'}
+              </button>
+            ) : null}
+          </div>
           <div>
             <label className="block text-sm font-medium text-ink-soft">Клиент</label>
             <p className="mt-0.5 text-sm text-ink">{name || '—'}</p>
@@ -770,6 +813,13 @@ export default function InspectionBookingAddModal({
         confirmLabel="Сохранить"
         cancelLabel="Назад"
       />
+      {smsToast ? (
+        <Toast
+          message={smsToast.message}
+          variant={smsToast.variant}
+          onClose={() => setSmsToast(null)}
+        />
+      ) : null}
     </Modal>
   );
 }

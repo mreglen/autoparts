@@ -7052,3 +7052,77 @@ def ensure_autoservice_warehouse_items_nonnegative() -> None:
 
     logger.info("Applied autoservice_warehouse_items check constraints: %s", statements)
 
+
+def ensure_sms_messages_table() -> None:
+    """Create sms_messages Ч лог отправленных SMS (SMSC)."""
+    inspector = inspect(engine)
+    if "sms_messages" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE sms_messages (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NULL,
+            inspection_booking_id INTEGER NULL,
+            phone VARCHAR(40) NOT NULL,
+            text TEXT NOT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'sent',
+            cost NUMERIC(12, 4) NULL,
+            error_message TEXT NULL,
+            provider_message_id VARCHAR(64) NULL,
+            created_by_user_id INTEGER NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE sms_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NULL,
+            inspection_booking_id INTEGER NULL,
+            phone VARCHAR(40) NOT NULL,
+            text TEXT NOT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'sent',
+            cost NUMERIC(12, 4) NULL,
+            error_message TEXT NULL,
+            provider_message_id VARCHAR(64) NULL,
+            created_by_user_id INTEGER NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    index_stmts = [
+        "CREATE INDEX IF NOT EXISTS ix_sms_messages_organization_id ON sms_messages (organization_id)",
+        "CREATE INDEX IF NOT EXISTS ix_sms_messages_inspection_booking_id ON sms_messages (inspection_booking_id)",
+        "CREATE INDEX IF NOT EXISTS ix_sms_messages_status ON sms_messages (status)",
+        "CREATE INDEX IF NOT EXISTS ix_sms_messages_created_at ON sms_messages (created_at)",
+    ]
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        for stmt in index_stmts:
+            conn.execute(text(stmt))
+
+    logger.info("Applied sms_messages table patch")
+
+
+def ensure_site_settings_smsc_columns() -> None:
+    """SMSC credentials in site_settings."""
+    inspector = inspect(engine)
+    if "site_settings" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("site_settings")}
+    statements = []
+    if "smsc_login" not in columns:
+        statements.append("ALTER TABLE site_settings ADD COLUMN smsc_login VARCHAR(64)")
+    if "smsc_password" not in columns:
+        statements.append("ALTER TABLE site_settings ADD COLUMN smsc_password VARCHAR(200)")
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied site_settings SMSC columns patch: %s", statements)
