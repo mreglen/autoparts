@@ -226,6 +226,8 @@ sudo update
 - Мёртвые эндпоинты `GET /repair-orders/staff-options` и `POST /repair-orders/{id}/approve` удалены (P3): статус `review` выходит только через PATCH status → cancelled, либо через правку заявки собственником.
 - Конфликты планировщика: `GET /autoservice/planner/conflicts?work_zone_id&start&end&exclude_order_id|exclude_booking_id` — фронт спрашивает перед сохранением заказа/записи и показывает ConfirmDialog.
 - Платежи имеют soft-delete (`cancelled_at`) — во всех агрегатах долга/оплат исключать их (`AutoservicePayment.cancelled_at.is_(None)`).
+- Рабочий стол сотрудника — `GET /autoservice/dashboard/summary` (один запрос, блоки по правам, `own` не видит `review_orders`/`debt`). Статистика клиентов — `services/autoservice_client_stats.py`, сериализаторы планировщика — `services/autoservice_planner_items.py` (переиспользуются планировщиком и дашбордом).
+- Публичная `/autoservice` (визитка) скрыта из роутера — файл `AutoservicePublicPage.jsx` оставлен нетронутым; моб. вкладка «Сервис» ведёт на `/dashboard/autoservice` и видна только сотрудникам автосервис-организации/админу.
 
 ### 7.3 Автосервис / склад
 

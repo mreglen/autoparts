@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceClientAddModal from '../../components/Autoservice/AutoserviceClientAddModal';
@@ -101,6 +101,14 @@ export default function AutoserviceClientsPage() {
   const [vehiclesLoadingId, setVehiclesLoadingId] = useState(null);
   const [editVehicle, setEditVehicle] = useState(null);
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setAddOpen(true);
+    searchParams.delete('new');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleVinClick = useCallback(async (rawVin) => {
     const vin = normalizeVinForLookupOrNull(rawVin);

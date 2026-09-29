@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { selectCartSummary } from '../../redux/slices/CartSlice';
 import { selectTotalUnreadCount } from '../../utils/chatUnread';
 import { usePwaStandalone } from '../../utils/pwaStandalone';
-import { isAutoserviceClientPath, selectShowAutoservice } from '../../utils/autoservicePublic';
+import { isAutoserviceStaffPath } from '../../utils/autoservicePublic';
 import { Z_MOBILE_BOTTOM_NAV } from '../../constants/mobileTokens';
 
 const EMPTY_CART_SUMMARY = { itemCount: 0, totalPrice: 0 };
@@ -54,14 +54,15 @@ const navItems = [
     {
         id: 'autoservice',
         label: 'Сервис',
-        to: '/autoservice',
-        match: (path) => isAutoserviceClientPath(path),
-        showAutoserviceOnly: true,
+        to: '/dashboard/autoservice',
+        match: (path) =>
+            path.startsWith('/dashboard/autoservice') || isAutoserviceStaffPath(path),
+        staffOnly: true,
         icon: (
             <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085"
+                d="M14.7 6.3a4.5 4.5 0 00-6.3 6.3l-4.85 4.85a2.1 2.1 0 102.97 2.97l4.85-4.85a4.5 4.5 0 006.3-6.3l-2.62 2.62a1.8 1.8 0 01-2.55-2.55l2.62-2.62z"
             />
         ),
     },
@@ -177,14 +178,14 @@ export default function MobileBottomNav() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const showAutoservice = useSelector(selectShowAutoservice);
     const isPwa = usePwaStandalone();
+    const isAutoserviceStaff = Boolean(user?.is_admin || user?.organization_is_autoservice);
     const visibleNavItems = React.useMemo(() => {
         let items = isAuthenticated ? navItems : navItems.filter((item) => !item.authOnly);
-        if (!showAutoservice) items = items.filter((item) => !item.showAutoserviceOnly);
+        if (!isAutoserviceStaff) items = items.filter((item) => !item.staffOnly);
         if (isPwa) items = items.filter((item) => item.id !== 'home');
         return items;
-    }, [isAuthenticated, isPwa, showAutoservice]);
+    }, [isAuthenticated, isPwa, isAutoserviceStaff]);
 
     const getBadge = (id) => {
         if (id === 'cart') return cartData.itemCount;

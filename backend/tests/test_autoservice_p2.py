@@ -9,8 +9,8 @@ import app.models  # noqa: F401
 from app.models.autoservice_payment import AutoservicePayment
 from app.models.inspection_booking import InspectionBooking
 from app.models.repair_order import RepairOrder, RepairOrderShopPart, RepairOrderWork
-from app.routers import autoservice_clients as clients_router
 from app.routers import autoservice_planner as planner_router
+from app.services.autoservice_client_stats import client_stats_map
 from app.services import autoservice_order_economics as economics
 
 
@@ -83,7 +83,7 @@ class ClientStatsMapTests(unittest.TestCase):
 
         db.query.side_effect = query_side_effect
 
-        stats = clients_router._client_stats_map(db, "ORG1", [10, 11])
+        stats = client_stats_map(db, "ORG1", [10, 11])
 
         c10 = stats[10]
         # order1: (1000 + 1200)*0.9 = 1980 ; order2: 200
@@ -99,7 +99,7 @@ class ClientStatsMapTests(unittest.TestCase):
 
     def test_empty_ids(self):
         db = MagicMock()
-        self.assertEqual(clients_router._client_stats_map(db, "ORG1", []), {})
+        self.assertEqual(client_stats_map(db, "ORG1", []), {})
         db.query.assert_not_called()
 
 

@@ -8,22 +8,16 @@ import {
   PageHeader,
   SectionHeader,
   Skeleton,
-  UnderlineTabs,
 } from '../../components/UI';
-import { OrderStatusBadge } from '../../components/Autoservice/RepairOrderViewModal';
+import RepairOrderViewModal, {
+  OrderStatusBadge,
+} from '../../components/Autoservice/RepairOrderViewModal';
 import { apiRequest } from '../../utils/apiClient';
-import { getGreeting, getFirstName, MetricCard, QuickAction } from '../Dashboard/dashboardUi';
+import { getGreeting, getFirstName, MetricCard, PrimaryAction, QuickAction } from '../Dashboard/dashboardUi';
 import { formatFinanceCurrency } from '../Finance/financeDisplay';
 import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
 import {
-  getWeekStart,
-  plannerItemCoversDay,
-  sortDayOrders,
-  toIsoDate,
-} from '../../utils/autoservicePlannerLayout';
-import {
   AUTOSERVICE_PERMISSION,
-  canReviewRepairOrders,
   hasAutoservicePermission,
 } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
@@ -67,6 +61,12 @@ const ICONS = {
   ),
 };
 
+const PLUS_ICON = (
+  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+  </svg>
+);
+
 function todayItemTimeLabel(item) {
   if (item?.kind === 'inspection') return item.preferred_time?.slice(0, 5) || '—';
   return formatOrderClockRange(item);
@@ -78,71 +78,29 @@ export default function AutoserviceDashboardPage() {
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
-  const [plannerData, setPlannerData] = useState(null);
-  const [revenue30d, setRevenue30d] = useState(null);
-  const [reviewCount, setReviewCount] = useState(0);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [summary, setSummary] = useState(null);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [viewOrderLoading, setViewOrderLoading] = useState(false);
 
   const can = useCallback(
     (code) => hasAutoservicePermission(user, permissionCodes, code),
     [user, permissionCodes],
   );
-  const canReview = canReviewRepairOrders(user, permissionCodes);
-  const canSeeFinance = can(AUTOSERVICE_PERMISSION.finance);
   const canSeeOrders = can(AUTOSERVICE_PERMISSION.orders) || can(AUTOSERVICE_PERMISSION.ordersOwn);
-
-  const today = useMemo(() => new Date(), []);
-  const todayIso = toIsoDate(today);
-  const weekStartIso = toIsoDate(getWeekStart(today));
+  const isOwnLevel = summary?.level === 'own';
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
-    const from = new Date(today);
-    from.setDate(from.getDate() - 29);
-    const receiptsParams = new URLSearchParams({
-      date_from: toIsoDate(from),
-      date_to: todayIso,
-    });
-    const canSeePlanner = can(AUTOSERVICE_PERMISSION.planner);
-    const results = await Promise.allSettled([
-      canSeeOrders
-        ? apiRequest('/autoservice/repair-orders?scope=active&limit=1')
-        : Promise.resolve(null),
-      canSeePlanner
-        ? apiRequest(`/autoservice/planner/week?week_start=${weekStartIso}`)
-        : Promise.resolve(null),
-      canSeeFinance
-        ? apiRequest(`/autoservice/finance/receipts?${receiptsParams.toString()}`)
-        : Promise.resolve(null),
-      canReview
-        ? apiRequest('/autoservice/repair-orders?scope=review&limit=1')
-        : Promise.resolve(null),
-    ]);
-
-    const [ordersRes, plannerRes, receiptsRes, reviewRes] = results;
-    const requested = [
-      canSeeOrders ? ordersRes : null,
-      canSeePlanner ? plannerRes : null,
-    ].filter(Boolean);
-    if (requested.length > 0 && requested.every((r) => r.status === 'rejected')) {
-      setError('Не удалось загрузить сводку автосервиса');
+    try {
+      const data = await apiRequest('/autoservice/dashboard/summary');
+      setSummary(data || null);
+    } catch (e) {
+      setError(e?.message || 'Не удалось загрузить сводку автосервиса');
+    } finally {
       setLoading(false);
-      return;
     }
-    setActiveOrdersCount(
-      ordersRes.status === 'fulfilled' ? Number(ordersRes.value?.total) || 0 : 0,
-    );
-    setPlannerData(plannerRes.status === 'fulfilled' ? plannerRes.value || null : null);
-    setRevenue30d(
-      receiptsRes.status === 'fulfilled' ? receiptsRes.value?.total_amount ?? null : null,
-    );
-    setReviewCount(
-      reviewRes.status === 'fulfilled' ? Number(reviewRes.value?.total) || 0 : 0,
-    );
-    setLoading(false);
-  }, [today, todayIso, weekStartIso, can, canSeeOrders, canSeeFinance, canReview]);
+  }, []);
 
   useEffect(() => {
     if (isReady && user) load();
@@ -156,21 +114,85 @@ export default function AutoserviceDashboardPage() {
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
   }, [load]);
 
-  const todayItems = useMemo(() => {
-    const seen = new Set();
-    const items = [];
-    for (const zone of plannerData?.zones || []) {
-      for (const day of zone.days || []) {
-        for (const item of day.orders || []) {
-          const key = `${item.kind || 'order'}-${item.id}`;
-          if (seen.has(key) || !plannerItemCoversDay(item, todayIso)) continue;
-          seen.add(key);
-          items.push({ ...item, zoneName: zone.name });
-        }
-      }
+  const openOrder = useCallback(async (orderId) => {
+    if (!orderId) return;
+    setViewOrderLoading(true);
+    try {
+      const order = await apiRequest(`/autoservice/repair-orders/${orderId}`);
+      setViewOrder(order);
+    } catch {
+      setError('Не удалось загрузить заказ-наряд');
+    } finally {
+      setViewOrderLoading(false);
     }
-    return sortDayOrders(items);
-  }, [plannerData, todayIso]);
+  }, []);
+
+  const primaryActions = useMemo(() => {
+    const actions = [];
+    if (canSeeOrders) {
+      actions.push({ label: 'Заказ-наряд', href: '/autoservice/orders/new' });
+    }
+    if (can(AUTOSERVICE_PERMISSION.inspections)) {
+      actions.push({ label: 'Запись на осмотр', href: '/autoservice/inspections?new=1' });
+    }
+    if (can(AUTOSERVICE_PERMISSION.clients)) {
+      actions.push({ label: 'Клиент', href: '/autoservice/clients?new=1' });
+    }
+    return actions;
+  }, [can, canSeeOrders]);
+
+  const attentionTiles = useMemo(() => {
+    if (!summary) return [];
+    const tiles = [];
+    if (summary.review_orders > 0) {
+      tiles.push({
+        label: 'На проверке',
+        value: summary.review_orders,
+        hint: textForReviewHint(summary.review_orders),
+        href: '/autoservice/orders?view=review',
+        accent: 'warning',
+      });
+    }
+    if (summary.new_bookings > 0) {
+      tiles.push({
+        label: 'Новые записи на осмотр',
+        value: summary.new_bookings,
+        hint: 'Требуют подтверждения',
+        href: '/autoservice/inspections',
+        accent: 'warning',
+      });
+    }
+    if (Number(summary.debt_total) > 0) {
+      tiles.push({
+        label: 'Долги клиентов',
+        value: formatFinanceCurrency(summary.debt_total),
+        hint: `${summary.debtors_count} ${plural(summary.debtors_count, 'клиент', 'клиента', 'клиентов')}`,
+        href: '/autoservice/clients',
+        accent: 'warning',
+      });
+    }
+    if (summary.in_progress_orders != null) {
+      tiles.push({
+        label: 'В работе',
+        value: summary.in_progress_orders,
+        hint: isOwnLevel ? 'Мои заказы' : `${summary.active_orders ?? 0} активных`,
+        href: '/autoservice/orders',
+        accent: 'brand',
+      });
+    }
+    if (summary.revenue_30d != null) {
+      tiles.push({
+        label: 'Выручка за 30 дней',
+        value: formatFinanceCurrency(summary.revenue_30d),
+        hint: 'Платежи по заказ-нарядам',
+        href: '/autoservice/finance',
+        accent: 'success',
+      });
+    }
+    return tiles;
+  }, [summary, isOwnLevel]);
+
+  const todayItems = summary?.today || [];
 
   const quickActions = useMemo(() => {
     const actions = [];
@@ -219,7 +241,7 @@ export default function AutoserviceDashboardPage() {
         tone: 'success',
       });
     }
-    if (canSeeFinance) {
+    if (can(AUTOSERVICE_PERMISSION.finance)) {
       actions.push({
         label: 'Финансы',
         description: 'Платежи за период',
@@ -238,20 +260,10 @@ export default function AutoserviceDashboardPage() {
       });
     }
     return actions;
-  }, [can, canSeeOrders, canSeeFinance]);
+  }, [can, canSeeOrders]);
 
   const firstName = getFirstName(user);
-
-  const serviceTabs = useMemo(() => {
-    const tabs = [
-      { id: 'overview', label: 'Сводка' },
-      { id: 'today', label: 'Сегодня', count: todayItems.length },
-    ];
-    if (canSeeFinance) {
-      tabs.push({ id: 'finance', label: 'Финансы' });
-    }
-    return tabs;
-  }, [todayItems.length, canSeeFinance]);
+  const payroll = summary?.payroll_month;
 
   if (!isReady) return <AuthLoadingScreen />;
 
@@ -262,6 +274,9 @@ export default function AutoserviceDashboardPage() {
           <Skeleton className="h-8 w-56 sm:h-9" />
           <Skeleton className="h-4 w-64" />
         </div>
+        <div className="flex gap-2.5">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-11 w-36" />)}
+        </div>
         <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-sg-lg border border-line bg-surface p-5 shadow-sg">
@@ -270,20 +285,6 @@ export default function AutoserviceDashboardPage() {
               <Skeleton className="mt-2 h-4 w-40" />
             </div>
           ))}
-        </section>
-        <section className="space-y-3">
-          <Skeleton className="h-6 w-40" />
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center gap-3 rounded-sg-lg border border-line bg-surface p-4 shadow-sg">
-                <Skeleton className="h-10 w-10 rounded-xl" />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-3 w-36" />
-                </div>
-              </div>
-            ))}
-          </div>
         </section>
       </div>
     );
@@ -308,46 +309,107 @@ export default function AutoserviceDashboardPage() {
       <PageHeader
         className="mb-0"
         title={`${getGreeting()}${firstName ? `, ${firstName}` : ''}`}
-        subtitle="Сводка автосервиса на сегодня"
+        subtitle="Рабочий стол автосервиса"
       />
 
-      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
-        <MetricCard
-          label="Заказ-наряды в работе"
-          value={activeOrdersCount}
-          hint={canReview && reviewCount > 0 ? `+ ${reviewCount} на проверке` : 'Активные заказы'}
-          href={canSeeOrders ? '/autoservice/orders' : undefined}
-          accent="brand"
+      {primaryActions.length > 0 && (
+        <section className="flex flex-wrap gap-2.5 max-lg:flex-col sm:flex-row">
+          {primaryActions.map((action) => (
+            <PrimaryAction
+              key={action.href}
+              label={`+ ${action.label}`}
+              href={action.href}
+              icon={PLUS_ICON}
+            />
+          ))}
+        </section>
+      )}
+
+      {attentionTiles.length > 0 && (
+        <section className="space-y-3">
+          <SectionHeader title="Требует внимания" />
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
+            {attentionTiles.map((tile) => (
+              <MetricCard key={tile.label} {...tile} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <SectionHeader
+          title={isOwnLevel ? 'Мои заказы сегодня' : 'Сегодня'}
+          subtitle={todayItems.length > 0 ? `${todayItems.length} записей` : undefined}
         />
-        <MetricCard
-          label="Записей сегодня"
-          value={todayItems.length}
-          hint={todayItems.length === 0 ? 'Свободный день' : 'Заказы и осмотры'}
-          href={can(AUTOSERVICE_PERMISSION.planner) ? '/autoservice/planner' : undefined}
-          accent="success"
-        />
-        {canSeeFinance ? (
-          <MetricCard
-            label="Выручка за 30 дней"
-            value={formatFinanceCurrency(revenue30d ?? 0)}
-            hint="Платежи автосервиса"
-            href="/autoservice/finance"
-            accent="brand"
-            className="max-lg:col-span-2"
+        {todayItems.length === 0 ? (
+          <EmptyState
+            illustration="success"
+            title="Записей нет"
+            description="На сегодня ничего не запланировано"
           />
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {todayItems.map((item) => (
+              <button
+                key={`${item.kind || 'order'}-${item.id}`}
+                type="button"
+                onClick={() => {
+                  if (item.kind === 'inspection') {
+                    navigate('/autoservice/inspections');
+                  } else {
+                    openOrder(item.id);
+                  }
+                }}
+                className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-gray-50/80"
+              >
+                <span className="w-16 shrink-0 text-sm font-semibold tabular-nums text-ink">
+                  {todayItemTimeLabel(item)}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ink">
+                    {item.kind === 'inspection'
+                      ? formatPersonNameWithInitials(item.client_name) || 'Осмотр'
+                      : (item.vehicle && item.vehicle !== '—' ? item.vehicle : 'Авто')}
+                  </span>
+                  <span className="mt-0.5 block truncate text-sm text-ink-muted">
+                    {item.kind === 'inspection'
+                      ? `Осмотр${item.client_phone ? ` · ${item.client_phone}` : ''}`
+                      : formatPersonNameWithInitials(item.client_name)}
+                    {item.work_zone_name ? ` · ${item.work_zone_name}` : ''}
+                  </span>
+                </span>
+                {item.kind === 'inspection' ? (
+                  <span className="shrink-0 rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700">
+                    Осмотр
+                  </span>
+                ) : (
+                  <OrderStatusBadge status={item.status} className="shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+        {viewOrderLoading ? (
+          <p className="text-xs text-ink-muted">Открываем заказ-наряд…</p>
         ) : null}
       </section>
 
-      <UnderlineTabs
-        tabs={serviceTabs}
-        value={activeTab}
-        onChange={setActiveTab}
-        className="mb-2"
-      />
-
-      {activeTab === 'overview' && quickActions.length > 0 && (
+      {payroll ? (
         <section className="space-y-3">
-          <SectionHeader title="Быстрые действия" />
+          <SectionHeader title="Моя зарплата" />
+          <MetricCard
+            label={`Начислено за ${payroll.month}.${payroll.year}`}
+            value={formatFinanceCurrency(payroll.total)}
+            hint={`${payroll.completed_orders} ${plural(payroll.completed_orders, 'закрытый заказ', 'закрытых заказа', 'закрытых заказов')}`}
+            href="/autoservice/payroll"
+            accent="success"
+          />
+        </section>
+      ) : null}
+
+      {quickActions.length > 0 && (
+        <section className="space-y-3">
+          <SectionHeader title="Разделы" />
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {quickActions.map((action) => (
               <QuickAction key={action.href} {...action} />
@@ -356,69 +418,31 @@ export default function AutoserviceDashboardPage() {
         </section>
       )}
 
-      {activeTab === 'today' && (
-        <section className="space-y-3">
-          <SectionHeader
-            title="Сегодня"
-            subtitle={todayItems.length > 0 ? `${todayItems.length} записей` : undefined}
-          />
-          {todayItems.length === 0 ? (
-            <EmptyState
-              illustration="success"
-              title="Записей нет"
-              description="На сегодня ничего не запланировано"
-            />
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {todayItems.map((item) => (
-                <button
-                  key={`${item.kind || 'order'}-${item.id}`}
-                  type="button"
-                  onClick={() => navigate('/autoservice/planner')}
-                  className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-gray-50/80"
-                >
-                  <span className="w-16 shrink-0 text-sm font-semibold tabular-nums text-ink">
-                    {todayItemTimeLabel(item)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-ink">
-                      {item.kind === 'inspection'
-                        ? formatPersonNameWithInitials(item.client_name) || 'Осмотр'
-                        : (item.vehicle && item.vehicle !== '—' ? item.vehicle : 'Авто')}
-                    </span>
-                    <span className="mt-0.5 block truncate text-sm text-ink-muted">
-                      {item.kind === 'inspection'
-                        ? `Осмотр${item.client_phone ? ` · ${item.client_phone}` : ''}`
-                        : formatPersonNameWithInitials(item.client_name)}
-                      {item.zoneName ? ` · ${item.zoneName}` : ''}
-                    </span>
-                  </span>
-                  {item.kind === 'inspection' ? (
-                    <span className="shrink-0 rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700">
-                      Осмотр
-                    </span>
-                  ) : (
-                    <OrderStatusBadge status={item.status} className="shrink-0" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {activeTab === 'finance' && canSeeFinance && (
-        <section className="space-y-3">
-          <SectionHeader title="Финансы автосервиса" />
-          <MetricCard
-            label="Выручка за 30 дней"
-            value={formatFinanceCurrency(revenue30d ?? 0)}
-            hint="Платежи по заказ-нарядам"
-            href="/autoservice/finance"
-            accent="brand"
-          />
-        </section>
-      )}
+      <RepairOrderViewModal
+        order={viewOrder}
+        enablePayment={viewOrder?.status !== 'review'}
+        onOrderChange={(updated) => {
+          setViewOrder(updated);
+          load();
+        }}
+        onClose={() => setViewOrder(null)}
+        onEdit={(order) => {
+          setViewOrder(null);
+          navigate(`/autoservice/orders/${order.id}/edit`);
+        }}
+      />
     </div>
   );
+}
+
+function plural(n, one, few, many) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
+}
+
+function textForReviewHint(count) {
+  return `${count} ${plural(count, 'заявка ждёт', 'заявки ждут', 'заявок ждут')}`;
 }

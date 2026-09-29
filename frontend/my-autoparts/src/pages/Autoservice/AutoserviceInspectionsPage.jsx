@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { withBackTo } from '../../hooks/useHistoryBack';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
@@ -106,6 +106,14 @@ export default function AutoserviceInspectionsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [viewBooking, setViewBooking] = useState(null);
   const [zones, setZones] = useState([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    setAddOpen(true);
+    searchParams.delete('new');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const load = useCallback(async () => {
     setLoading(true);

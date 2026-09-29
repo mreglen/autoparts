@@ -59,6 +59,18 @@ export const ACTION_TONES = {
   accent: 'bg-accent-50 text-accent-600',
 };
 
+export function PrimaryAction({ label, href, icon }) {
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-11 items-center gap-2 rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sg transition hover:bg-brand-700 max-lg:flex-1 max-lg:justify-center"
+    >
+      {icon}
+      {label}
+    </Link>
+  );
+}
+
 export function QuickAction({ label, description, href, icon, tone = 'brand' }) {
   return (
     <Card as={Link} to={href} hover padding="sm" className="flex items-center gap-3 max-lg:flex-col max-lg:items-start max-lg:gap-2.5">

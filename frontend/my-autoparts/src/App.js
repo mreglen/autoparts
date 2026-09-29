@@ -1,6 +1,6 @@
 // src/App.jsx
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
 import { clearAuthTokens } from './utils/apiClient';
@@ -115,7 +115,6 @@ const OrganizationsPage = lazy(() => import('./pages/Organizations/Organizations
 const OrganizationPublicPage = lazy(() => import('./pages/Organizations/OrganizationPublicPage'));
 const PublicUserProfilePage = lazy(() => import('./pages/PublicProfiles/PublicUserProfilePage'));
 const ReviewsPage = lazy(() => import('./pages/About/ReviewsPage'));
-const AutoservicePublicPage = lazy(() => import('./pages/Autoservice/AutoservicePublicPage'));
 const AutoserviceClientsPage = lazy(() => import('./pages/Autoservice/AutoserviceClientsPage'));
 const AutoserviceSettingsPage = lazy(() => import('./pages/Autoservice/AutoserviceSettingsPage'));
 const AutoserviceOrdersPage = lazy(() => import('./pages/Autoservice/AutoserviceOrdersPage'));
@@ -267,15 +266,20 @@ function DashboardIndexRoute() {
   return <Navigate to="/dashboard/seller" replace />;
 }
 
-function AutoservicePublicRoute() {
-  const showAutoservice = useShowAutoservice();
-  if (!showAutoservice) {
-    return <Navigate to="/" replace />;
+function AutoserviceDashboardRoute() {
+  const autoserviceOrganizationId = useAutoserviceOrganizationId();
+  const user = useSelector((state) => state.auth.user);
+  const cabinetMode = getCabinetMode(user, { autoserviceOrganizationId });
+
+  if (user && !user.is_admin && !user.organization_is_autoservice) {
+    return <Navigate to={getDefaultPathForCabinetMode(cabinetMode)} replace />;
   }
   return (
-    <LazyRoute>
-      <AutoservicePublicPage />
-    </LazyRoute>
+    <RequireAuth>
+      <LazyRoute>
+        <AutoserviceDashboardPage />
+      </LazyRoute>
+    </RequireAuth>
   );
 }
 
@@ -305,17 +309,6 @@ function AutoserviceClientRoute({ children }) {
     </RequireAuth>
   );
 }
-
-const AUTOSERVICE_STAFF_TABS = [
-  '/autoservice/clients',
-  '/autoservice/orders',
-  '/autoservice/finance',
-  '/autoservice/payroll',
-  '/autoservice/reports',
-  '/autoservice/inspections',
-  '/autoservice/warehouse',
-  '/autoservice/settings',
-];
 
 function AutoserviceStaffRoute({ section, settingsOnly = false }) {
   const showAutoservice = useShowAutoservice();
@@ -550,7 +543,6 @@ function App() {
           <Route path="/delivery" element={<LazyRoute><DeliveryPage /></LazyRoute>} />
           <Route path="/payment" element={<LazyRoute><PaymentPage /></LazyRoute>} />
           <Route path="/reviews" element={<ReviewsRoute />} />
-          <Route path="/autoservice" element={<AutoservicePublicRoute />} />
           <Route
             path="/organizations"
             element={(
@@ -650,9 +642,7 @@ function App() {
           <Route
             path="/dashboard/autoservice"
             element={(
-              <LazyRoute>
-                <AutoserviceDashboardPage />
-              </LazyRoute>
+              <AutoserviceDashboardRoute />
             )}
           />
           <Route

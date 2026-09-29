@@ -99,7 +99,6 @@ const AUTOSERVICE_CLIENT_PATH_PREFIXES = [
 
 /** Client autoservice routes not available in seller/autoservice/admin cabinets (admin). */
 export function isAutoserviceClientPath(pathname) {
-  if (pathname === '/autoservice' || pathname === '/autoservice/') return true;
   return AUTOSERVICE_CLIENT_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
