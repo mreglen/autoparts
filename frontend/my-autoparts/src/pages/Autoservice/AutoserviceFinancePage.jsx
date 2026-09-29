@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { apiRequest } from '../../utils/apiClient';
+import { apiAxios, apiRequest } from '../../utils/apiClient';
 import {
   clampFinanceDate,
   formatFinanceCurrency,
@@ -277,6 +277,7 @@ export default function AutoserviceFinancePage() {
   const [viewRepairOrder, setViewRepairOrder] = useState(null);
   const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
   const [filterSwitching, setFilterSwitching] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const filterSwitchTimerRef = useRef(null);
 
   const handleMethodChange = useCallback((methodId) => {
@@ -354,6 +355,32 @@ export default function AutoserviceFinancePage() {
     }
   };
 
+  const exportReceipts = useCallback(async () => {
+    setExporting(true);
+    setError('');
+    try {
+      const response = await apiAxios.get('/autoservice/finance/receipts.xlsx', {
+        params: { date_from: dateFrom, date_to: dateTo },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `autoservice_payments_${dateFrom}_${dateTo}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e?.message || 'Не удалось выгрузить Excel');
+    } finally {
+      setExporting(false);
+    }
+  }, [dateFrom, dateTo]);
+
   const openRepairOrder = useCallback(async (orderId) => {
     if (!orderId) return;
     setViewRepairOrderLoading(true);
@@ -387,7 +414,17 @@ export default function AutoserviceFinancePage() {
   return (
     <div className="min-w-0 space-y-4 lg:mt-5">
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <h1 className="text-2xl font-bold text-ink max-lg:hidden sm:text-[1.75rem]">Финансы</h1>
+        <div className="flex items-center justify-between gap-3 max-lg:w-full">
+          <h1 className="text-2xl font-bold text-ink max-lg:hidden sm:text-[1.75rem]">Финансы</h1>
+          <button
+            type="button"
+            onClick={exportReceipts}
+            disabled={exporting}
+            className="inline-flex h-9 items-center rounded-full bg-surface-subtle px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60"
+          >
+            {exporting ? 'Выгрузка…' : 'Экспорт xlsx'}
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-4 sm:flex sm:shrink-0 sm:gap-8">
           <div className="text-center">
             {loading ? (

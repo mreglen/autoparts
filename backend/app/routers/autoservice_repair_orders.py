@@ -52,7 +52,6 @@ from app.schemas.repair_order import (
     RepairOrderEmployeeBrief,
     RepairOrderListPage,
     RepairOrderServiceEmployeeOption,
-    RepairOrderStaffOption,
     RepairOrderStaffView,
     RepairOrderStatusPatch,
     RepairOrderUpdate,
@@ -1408,32 +1407,6 @@ def list_repair_order_service_employee_options(
     ]
 
 
-@router.get(
-    "/autoservice/repair-orders/staff-options",
-    response_model=list[RepairOrderStaffOption],
-)
-def list_repair_order_staff_options(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    org_id = _require_full_orders(db, current_user)
-    users = (
-        db.query(User)
-        .filter(
-            User.organization_id == org_id,
-            or_(
-                User.is_admin.is_(True),
-                User.is_director.is_(True),
-                User.is_seller.is_(True),
-                User.is_employee.is_(True),
-            ),
-        )
-        .order_by(User.last_name.asc(), User.first_name.asc(), User.id.asc())
-        .all()
-    )
-    return [RepairOrderStaffOption(id=u.id, name=user_display_name(u)) for u in users]
-
-
 @router.get("/autoservice/repair-orders/me", response_model=list[RepairOrderClientView])
 def list_my_repair_orders(
     scope: str = Query("active"),
@@ -1926,32 +1899,6 @@ def import_autoservice_stock_to_repair_order(
         items=[(entry.item_id, entry.qty) for entry in payload.items],
         markup_percent=payload.markup_percent,
     )
-    db.commit()
-    row = _get_org_order_or_404(db, org_id, order_id)
-    return _to_staff_view(db, row)
-
-
-@router.post(
-    "/autoservice/repair-orders/{order_id}/approve",
-    response_model=RepairOrderStaffView,
-)
-def approve_repair_order(
-    order_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    org_id = _require_full_orders(db, current_user)
-    row = _get_org_order_or_404(db, org_id, order_id)
-    if row.status not in REVIEW_STATUSES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Заявка уже не на проверке",
-        )
-    if not row.order_number:
-        row.order_number = allocate_repair_order_number(db, org_id)
-    row.status = "pending"
-    row.accepted_by_user_id = current_user.id
-    record_repair_order_status_timestamp(row, "pending")
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
     return _to_staff_view(db, row)

@@ -222,6 +222,10 @@ sudo update
 - Разные организации могут иметь одинаковый `order_number` (например, №16 у каждой организации).
 - Глобально заказ идентифицируется по `id`.
 - Текущая аллокация номера в `app/utils/repair_order_number.py` неатомарна: при одновременном создании двух заказов одной организацией возможен `IntegrityError`.
+- `discount_percent` (Decimal 0–100) хранится на заказе и на клиенте (`autoservice_clients.discount_percent`); при создании заказа без явной скидки подставляется скидка клиента. `grand_total` везде считается через `_discount_factor` (router) / `_order_grand_total` (economics) — не дублировать логику.
+- Мёртвые эндпоинты `GET /repair-orders/staff-options` и `POST /repair-orders/{id}/approve` удалены (P3): статус `review` выходит только через PATCH status → cancelled, либо через правку заявки собственником.
+- Конфликты планировщика: `GET /autoservice/planner/conflicts?work_zone_id&start&end&exclude_order_id|exclude_booking_id` — фронт спрашивает перед сохранением заказа/записи и показывает ConfirmDialog.
+- Платежи имеют soft-delete (`cancelled_at`) — во всех агрегатах долга/оплат исключать их (`AutoservicePayment.cancelled_at.is_(None)`).
 
 ### 7.3 Автосервис / склад
 

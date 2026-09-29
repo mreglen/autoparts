@@ -10,6 +10,7 @@ import {
   AUTOSERVICE_PUBLIC_TAGLINE,
 } from '../../utils/autoserviceConstants';
 import { BECOME_CLIENT_CONFIRM } from '../../utils/autoservicePublic';
+import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiAxios, apiAxiosUnauth, apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import PhoneInput from '../../components/UI/PhoneInput';
@@ -97,6 +98,7 @@ export default function AutoservicePublicPage() {
   const [becomeSaving, setBecomeSaving] = useState(false);
   const [becomeError, setBecomeError] = useState(null);
   const [becomeSuccess, setBecomeSuccess] = useState(false);
+  const [becomeConfirmOpen, setBecomeConfirmOpen] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
 
   useEffect(() => {
@@ -130,10 +132,8 @@ export default function AutoservicePublicPage() {
 
   const handleBecomeClient = async () => {
     setBecomeError(null);
-    if (!window.confirm(BECOME_CLIENT_CONFIRM(AUTOSERVICE_PUBLIC_NAME))) {
-      return;
-    }
     setBecomeSaving(true);
+    setBecomeConfirmOpen(false);
     try {
       await apiRequest('/autoservice/clients/me', { method: 'POST' });
       setIsClient(true);
@@ -539,7 +539,7 @@ export default function AutoservicePublicPage() {
                       </p>
                       <button
                         type="button"
-                        onClick={handleBecomeClient}
+                        onClick={() => setBecomeConfirmOpen(true)}
                         disabled={becomeSaving}
                         className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-indigo-700 shadow-lg transition hover:bg-indigo-50 disabled:opacity-60"
                       >
@@ -586,6 +586,17 @@ export default function AutoservicePublicPage() {
           </div>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={becomeConfirmOpen}
+        onClose={() => setBecomeConfirmOpen(false)}
+        onConfirm={handleBecomeClient}
+        title="Стать клиентом автосервиса"
+        message={BECOME_CLIENT_CONFIRM(AUTOSERVICE_PUBLIC_NAME)}
+        confirmLabel="Стать клиентом"
+        cancelLabel="Отмена"
+        loading={becomeSaving}
+      />
     </div>
   );
 }

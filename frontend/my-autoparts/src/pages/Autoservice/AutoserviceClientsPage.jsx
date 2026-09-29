@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
+import AutoserviceClientAddModal from '../../components/Autoservice/AutoserviceClientAddModal';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import Modal from '../../components/UI/Modal';
 import { Skeleton } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
@@ -24,11 +24,7 @@ import {
   EditGuestVehicleModal,
 } from '../../components/Autoservice/ClientProfileModals';
 import { apiRequest } from '../../utils/apiClient';
-import { validatePhoneOptional } from '../../utils/contactValidation';
-import PhoneInput from '../../components/UI/PhoneInput';
 import { normalizeVinForLookupOrNull } from '../../utils/laximoVin';
-
-const inputClass = 'sg-pill-input mt-1';
 
 function formatMoney(value) {
   const n = Number(value);
@@ -90,118 +86,6 @@ function ClientMobileCard({ row, hint, onOpen }) {
 }
 
 
-function AddClientModal({ open, onClose, onCreated }) {
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [phoneError, setPhoneError] = useState('');
-  const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setName('');
-    setPhone('');
-    setPhoneError('');
-    setError(null);
-    setSaving(false);
-  }, [open]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    setPhoneError('');
-    const trimmedName = name.trim();
-    if (trimmedName.length < 2) {
-      setError('Укажите имя');
-      return;
-    }
-    const phoneErr = validatePhoneOptional(phone);
-    if (phoneErr) {
-      setPhoneError(phoneErr);
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = { name: trimmedName };
-      if (phone.trim()) payload.phone = phone;
-      const row = await apiRequest('/autoservice/clients', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      onCreated(row);
-      onClose();
-    } catch (err) {
-      const msg = err?.message || 'Не удалось добавить клиента';
-      if (/телефон/i.test(msg)) {
-        setPhoneError(msg);
-      } else {
-        setError(msg);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Добавить клиента"
-      size="sm"
-      draggable
-      footer={
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
-            disabled={saving}
-          >
-            Отмена
-          </button>
-          <button
-            type="submit"
-            form="add-autoservice-client"
-            disabled={saving}
-            className="rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
-          >
-            {saving ? 'Сохранение…' : 'Добавить'}
-          </button>
-        </div>
-      }
-    >
-      <form id="add-autoservice-client" onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-ink-soft">ФИО</label>
-          <input
-            className={inputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Иванов Иван Иванович"
-            disabled={saving}
-            required
-            maxLength={120}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-ink-soft">Телефон (необязательно)</label>
-          <PhoneInput
-            className={`${inputClass} ${phoneError ? '!border-danger-600 !bg-danger-50 focus:!border-danger-600' : ''}`}
-            value={phone}
-            onChange={(e) => {
-              setPhone(e.target.value);
-              setPhoneError('');
-            }}
-            placeholder="+7 (___) ___-__-__"
-            disabled={saving}
-          />
-          {phoneError ? <p className="mt-1 text-sm text-danger-600">{phoneError}</p> : null}
-        </div>
-        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
-      </form>
-    </Modal>
-  );
-}
 
 export default function AutoserviceClientsPage() {
   const navigate = useNavigate();
@@ -402,7 +286,7 @@ export default function AutoserviceClientsPage() {
         )}
       </div>
 
-      <AddClientModal
+      <AutoserviceClientAddModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onCreated={(row) => {

@@ -1,27 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import useHistoryBack from '../../hooks/useHistoryBack';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import GarageQuickAddModal from '../../components/Garage/GarageQuickAddModal';
 import { apiRequest } from '../../utils/apiClient';
 import { validatePhoneOptional } from '../../utils/contactValidation';
-import PhoneInput from '../../components/UI/PhoneInput';
 import { parseWallClockDate } from '../../utils/serverDate';
-import {
-  candidateLabel,
-  mapCandidateToGarageCreatePayload,
-  mapCandidateToGarageForm,
-  softNoticeVariantFromReason,
-} from '../../utils/laximoVinCandidate';
-import { normalizeVinForLookupOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import { canEditClientMarkupSettings } from '../../utils/autoservicePermissions';
 import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
+import AutoserviceClientAddModal from '../../components/Autoservice/AutoserviceClientAddModal';
+import AutoserviceSearchableSelect from '../../components/Autoservice/AutoserviceSearchableSelect';
 import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import NumericInput from '../../components/UI/NumericInput';
 import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItemsPickerModal';
@@ -504,256 +496,6 @@ function SectionCard({ title, children, action }) {
   );
 }
 
-export function SearchableSelect({
-  value,
-  onChange,
-  options,
-  placeholder = 'Выберите…',
-  disabled = false,
-  loading = false,
-  searching = false,
-  emptyMessage = 'Ничего не найдено',
-  noResultsMessage = 'Ничего не найдено',
-  addOptionLabel = 'Добавить',
-  onAddClick,
-  className = '',
-  inputClassName = pillInputClass,
-  remoteSearch = false,
-  onQueryChange,
-  onInputChange,
-}) {
-  const rootRef = useRef(null);
-  const listRef = useRef(null);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [listPos, setListPos] = useState(null);
-
-  const updateListPos = useCallback(() => {
-    const rect = rootRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const below = window.innerHeight - rect.bottom;
-    const openUp = below < 208 && rect.top > below;
-    setListPos({
-      left: rect.left,
-      width: rect.width,
-      top: openUp ? undefined : rect.bottom + 4,
-      bottom: openUp ? window.innerHeight - rect.top + 4 : undefined,
-      maxHeight: Math.max(96, Math.min(192, (openUp ? rect.top - 12 : below - 12))),
-    });
-  }, []);
-
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (rootRef.current?.contains(e.target) || listRef.current?.contains(e.target)) return;
-      setOpen(false);
-      setQuery('');
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, []);
-
-  useEffect(() => {
-    if (!open) {
-      setListPos(null);
-      return undefined;
-    }
-    updateListPos();
-    window.addEventListener('scroll', updateListPos, true);
-    window.addEventListener('resize', updateListPos);
-    return () => {
-      window.removeEventListener('scroll', updateListPos, true);
-      window.removeEventListener('resize', updateListPos);
-    };
-  }, [open, updateListPos]);
-
-  const selected = options.find((o) => String(o.value) === String(value));
-
-  const filtered = useMemo(() => {
-    if (remoteSearch) return options;
-    const q = query.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter((o) => (o.searchText || o.label).toLowerCase().includes(q));
-  }, [options, query, remoteSearch]);
-
-  useEffect(() => {
-    if (!remoteSearch || !onQueryChange || !open) return undefined;
-    const timer = setTimeout(() => {
-      onQueryChange(query);
-    }, 220);
-    return () => clearTimeout(timer);
-  }, [query, remoteSearch, onQueryChange, open]);
-
-  const displayValue = open ? query : selected?.label || '';
-  const listEmptyMessage = options.length === 0 ? emptyMessage : noResultsMessage;
-
-  return (
-    <div ref={rootRef} className={`relative min-w-0 ${className}`}>
-      <input
-        type="text"
-        className={inputClassName}
-        disabled={disabled || loading}
-        placeholder={loading ? 'Загрузка…' : placeholder}
-        value={displayValue}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          onInputChange?.(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => {
-          setOpen(true);
-          if (!remoteSearch) {
-            setQuery('');
-          }
-        }}
-        autoComplete="off"
-      />
-      {open && !disabled && !loading && listPos ? createPortal(
-        <ul
-          ref={listRef}
-          aria-busy={searching}
-          className="fixed z-[140] overflow-y-auto rounded-sg-lg border border-line bg-surface py-1 shadow-sg-md"
-          style={listPos}
-        >
-          {searching ? (
-            <li className="px-4 py-2 text-xs text-ink-muted">Поиск клиентов…</li>
-          ) : null}
-          {filtered.length === 0 ? (
-            <li className="px-4 py-2.5 text-sm text-ink-muted">
-              {searching ? 'Введите ещё символы или дождитесь результатов' : listEmptyMessage}
-            </li>
-          ) : (
-            filtered.map((o) => (
-              <li key={String(o.value) || '__empty__'}>
-                <button
-                  type="button"
-                  className={`block w-full min-h-11 px-4 py-2.5 text-left text-sm hover:bg-brand-50 lg:min-h-0 ${
-                    String(o.value) === String(value) ? 'bg-brand-50 font-medium text-brand-700' : 'text-ink-soft'
-                  }`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    onChange(String(o.value));
-                    setOpen(false);
-                    setQuery('');
-                  }}
-                >
-                  <span className="block font-medium">{o.label}</span>
-                  {o.hint ? (
-                    <span className="mt-0.5 block text-xs text-brand-600">{o.hint}</span>
-                  ) : null}
-                </button>
-              </li>
-            ))
-          )}
-          {onAddClick ? (
-            <li className="sticky bottom-0 border-t border-line-soft bg-surface">
-              <button
-                type="button"
-                className="flex w-full min-h-11 items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-brand-600 hover:bg-brand-50 lg:min-h-0"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  setOpen(false);
-                  setQuery('');
-                  onAddClick();
-                }}
-              >
-                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                {addOptionLabel}
-              </button>
-            </li>
-          ) : null}
-        </ul>,
-        document.body,
-      ) : null}
-    </div>
-  );
-}
-
-export function AddClientModal({ onClose, onCreated, initialName = '' }) {
-  const [name, setName] = useState(() => String(initialName || '').trim());
-  const [phone, setPhone] = useState('');
-  const [phoneError, setPhoneError] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const nameInputRef = useRef(null);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setPhoneError('');
-    const trimmedName = name.trim();
-    if (trimmedName.length < 2) {
-      setError('Укажите имя');
-      return;
-    }
-    const phoneErr = validatePhoneOptional(phone);
-    if (phoneErr) {
-      setPhoneError(phoneErr);
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = { name: trimmedName };
-      if (phone.trim()) payload.phone = phone;
-      const row = await apiRequest('/autoservice/clients', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      onCreated(row);
-      onClose();
-    } catch (err) {
-      setError(err?.message || 'Не удалось добавить клиента');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal open title="Добавить клиента" onClose={onClose} initialFocusRef={nameInputRef} draggable>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sg-caption font-medium text-ink-muted">ФИО</label>
-          <input
-            ref={nameInputRef}
-            className={pillInputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Иванов Иван Иванович"
-            disabled={saving}
-            required
-            maxLength={120}
-            autoComplete="name"
-          />
-        </div>
-        <div>
-          <label className="block text-sg-caption font-medium text-ink-muted">Телефон (необязательно)</label>
-          <PhoneInput
-            className={`${pillInputClass} ${phoneError ? '!border-danger-600 !bg-danger-50 focus:!border-danger-600' : ''}`}
-            value={phone}
-            onChange={(e) => {
-              setPhone(e.target.value);
-              setPhoneError('');
-            }}
-            placeholder="+7 (___) ___-__-__"
-            disabled={saving}
-            autoComplete="tel"
-          />
-          {phoneError ? <p className="mt-1 text-sm text-danger-600">{phoneError}</p> : null}
-        </div>
-        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
-        <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
-          <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
-            Отмена
-          </button>
-          <button type="submit" disabled={saving} className={btnPrimaryClass}>
-            {saving ? 'Сохранение…' : 'Добавить'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 
 function AddEmployeeModal({ onClose, onCreated }) {
   const [name, setName] = useState('');
@@ -818,244 +560,6 @@ function AddEmployeeModal({ onClose, onCreated }) {
             onChange={(e) => setWorkPercent(e.target.value)}
             disabled={saving}
           />
-        </div>
-        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
-        <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
-          <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
-            Отмена
-          </button>
-          <button type="submit" disabled={saving} className={btnPrimaryClass}>
-            {saving ? 'Сохранение…' : 'Добавить'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-function AddVehicleModal({ clientId, onClose, onCreated }) {
-  const [form, setForm] = useState({
-    make: '',
-    model: '',
-    year: '',
-    vin: '',
-    plate: '',
-    color: '',
-    notes: '',
-  });
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [vinDecoding, setVinDecoding] = useState(false);
-  const [notice, setNotice] = useState(null);
-  const [candidates, setCandidates] = useState([]);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
-
-  const applyCandidate = (candidate, vin) => {
-    const mapped = mapCandidateToGarageForm(candidate, vin);
-    setSelectedCandidate(candidate);
-    setForm((p) => ({
-      ...p,
-      vin: mapped.vin,
-      make: mapped.make,
-      model: mapped.model,
-      year: mapped.year,
-      color: mapped.color || p.color,
-    }));
-    setCandidates([]);
-    setNotice(null);
-  };
-
-  const handleDecodeVin = async () => {
-    setError('');
-    const vin = normalizeVinForLookupOrNull(form.vin);
-    if (!vin) {
-      setError('VIN должен содержать от 11 до 17 символов');
-      return;
-    }
-    setForm((prev) => ({ ...prev, vin }));
-    setVinDecoding(true);
-    try {
-      const result = await apiRequest('/laximo/vehicles/by-vin', {
-        method: 'POST',
-        body: JSON.stringify({ vin }),
-      });
-      const list = Array.isArray(result?.candidates) ? result.candidates : [];
-      if (result?.ok && list.length === 1) {
-        applyCandidate(list[0], vin);
-        return;
-      }
-      if (result?.ok && list.length > 1) {
-        setCandidates(list);
-        setSelectedCandidate(null);
-        setNotice(null);
-        return;
-      }
-      setSelectedCandidate(null);
-      setCandidates([]);
-      setNotice(softNoticeVariantFromReason(result?.reason));
-    } catch (err) {
-      setError(err?.message || 'Не удалось распознать VIN');
-    } finally {
-      setVinDecoding(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    const make = form.make.trim();
-    const model = form.model.trim();
-    if (!make) {
-      setError('Укажите марку');
-      return;
-    }
-    const year = form.year ? Number(form.year) : null;
-    if (form.year && (!Number.isFinite(year) || year < 1900 || year > 2100)) {
-      setError('Некорректный год');
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = mapCandidateToGarageCreatePayload(selectedCandidate, {
-        vin: form.vin.trim() || '',
-        make,
-        model,
-        year: form.year,
-        color: form.color,
-        plate: form.plate,
-        notes: form.notes,
-      });
-      payload.year = year;
-      payload.client_id = Number(clientId);
-      const row = await apiRequest('/autoservice/garage/vehicles/staff', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      onCreated(row);
-      onClose();
-    } catch (err) {
-      setError(err?.message || 'Не удалось добавить автомобиль');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal open title="Добавить автомобиль" onClose={onClose} draggable>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {notice ? (
-          <SoftServiceNotice
-            variant={notice}
-            onRetry={() => {
-              setNotice(null);
-              handleDecodeVin();
-            }}
-          />
-        ) : null}
-        <div className="rounded-sg border border-line bg-surface-muted p-4">
-          <FieldLabel>Найти по VIN</FieldLabel>
-          <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-            <input
-              className={`${pillInputClass} mt-0`}
-              value={form.vin}
-              onChange={(e) => {
-                setForm((p) => ({ ...p, vin: sanitizeVinInput(e.target.value) }));
-                setError('');
-                setNotice(null);
-              }}
-              disabled={saving || vinDecoding}
-              maxLength={VIN_INPUT_MAX_LENGTH}
-              placeholder="11–17 символов"
-            />
-            <button
-              type="button"
-              onClick={handleDecodeVin}
-              disabled={saving || vinDecoding}
-              className={`${btnPrimaryClass} shrink-0`}
-            >
-              {vinDecoding ? 'Проверка…' : 'Распознать'}
-            </button>
-          </div>
-          {candidates.length > 1 ? (
-            <ul className="mt-3 space-y-2">
-              {candidates.map((c, idx) => (
-                <li key={`${c.vehicle_id || 'v'}-${idx}`}>
-                  <button
-                    type="button"
-                    onClick={() => applyCandidate(c, form.vin.trim().toUpperCase())}
-                    className="w-full rounded-full border border-line bg-surface px-4 py-2.5 text-left text-sm text-ink-soft transition hover:border-brand-300 hover:bg-brand-50"
-                  >
-                    {candidateLabel(c)}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sg-caption font-medium text-ink-muted">Марка</label>
-            <input
-              className={pillInputClass}
-              value={form.make}
-              onChange={(e) => setForm((p) => ({ ...p, make: e.target.value }))}
-              disabled={saving}
-              required
-              maxLength={80}
-            />
-          </div>
-          <div>
-            <label className="block text-sg-caption font-medium text-ink-muted">Модель</label>
-            <input
-              className={pillInputClass}
-              value={form.model}
-              onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
-              disabled={saving}
-              maxLength={80}
-            />
-          </div>
-          <div>
-            <label className="block text-sg-caption font-medium text-ink-muted">Год</label>
-            <NumericInput
-              mode="numeric"
-              maxLength={4}
-              className={pillInputClass}
-              value={form.year}
-              onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
-              disabled={saving}
-            />
-          </div>
-          <div>
-            <label className="block text-sg-caption font-medium text-ink-muted">Госномер</label>
-            <input
-              className={pillInputClass}
-              value={form.plate}
-              onChange={(e) => setForm((p) => ({ ...p, plate: e.target.value }))}
-              disabled={saving}
-              maxLength={20}
-            />
-          </div>
-          <div>
-            <label className="block text-sg-caption font-medium text-ink-muted">Цвет</label>
-            <input
-              className={pillInputClass}
-              value={form.color}
-              onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
-              disabled={saving}
-              maxLength={40}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sg-caption font-medium text-ink-muted">Заметки</label>
-            <textarea
-              className={pillTextareaClass}
-              rows={2}
-              value={form.notes}
-              onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-              disabled={saving}
-              maxLength={2000}
-            />
-          </div>
         </div>
         {error ? <p className="text-sm text-danger-600">{error}</p> : null}
         <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
@@ -2475,7 +1979,7 @@ export default function AutoserviceOrderFormPage() {
     const validationError = validateForAutoSave();
     if (!canAttemptAutoSave() || validationError) {
       writeRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null, snapshot);
-      goBack();
+      setError(validationError || 'Заполните клиента и дату записи');
       return;
     }
 
@@ -2572,7 +2076,7 @@ export default function AutoserviceOrderFormPage() {
               >
                 Клиент
               </FieldLabel>
-              <SearchableSelect
+              <AutoserviceSearchableSelect
                 value={clientId}
                 onChange={handleClientSelect}
                 options={clientOptions}
@@ -2599,7 +2103,7 @@ export default function AutoserviceOrderFormPage() {
               >
                 Автомобиль
               </FieldLabel>
-              <SearchableSelect
+              <AutoserviceSearchableSelect
                 value={vehicleId}
                 onChange={handleVehicleSelect}
                 options={vehicleOptions}
@@ -3065,7 +2569,7 @@ export default function AutoserviceOrderFormPage() {
       </div>
 
       {addClientOpen && !ownMode ? (
-        <AddClientModal
+        <AutoserviceClientAddModal
           initialName={clientSearchQueryRef.current}
           onClose={() => setAddClientOpen(false)}
           onCreated={handleClientCreated}

@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { AddClientModal, SearchableSelect } from './AutoserviceOrderFormPage';
+import AutoserviceClientAddModal from '../../components/Autoservice/AutoserviceClientAddModal';
+import SearchableSelect from '../../components/Autoservice/AutoserviceSearchableSelect';
+import './AutoserviceOrderFormPage';
 
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: '/autoservice/orders/new', state: null }),
@@ -46,7 +48,7 @@ test('keeps the client search focused and open while remote results are loading'
 
 test('prefills the add-client name from the current search query', () => {
   render(
-    <AddClientModal
+    <AutoserviceClientAddModal
       initialName="Иванов Иван Иванович"
       onClose={vi.fn()}
       onCreated={vi.fn()}

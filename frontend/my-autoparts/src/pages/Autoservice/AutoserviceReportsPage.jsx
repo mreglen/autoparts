@@ -11,6 +11,9 @@ import {
 import { formatServerDateTime, formatWallClockDateTime } from '../../utils/serverDate';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
+import Modal from '../../components/UI/Modal';
+import NumericInput from '../../components/UI/NumericInput';
+import Toast from '../../components/UI/Toast';
 import {
   EmptyState,
   PageHeader,
@@ -256,6 +259,10 @@ export default function AutoserviceReportsPage() {
   const [payrollError, setPayrollError] = useState('');
   const [payroll, setPayroll] = useState({ total: 0, employees: [] });
   const [payrollExporting, setPayrollExporting] = useState(false);
+  const [bulkPercentOpen, setBulkPercentOpen] = useState(false);
+  const [bulkPercent, setBulkPercent] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkNotice, setBulkNotice] = useState('');
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null);
 
   const [economicsLoading, setEconomicsLoading] = useState(false);
@@ -391,6 +398,29 @@ export default function AutoserviceReportsPage() {
       setEconomicsLoading(false);
     }
   }, [dateFrom, dateTo, economicsStatus, economicsPayment, economicsSearch]);
+
+  const applyBulkPercent = useCallback(async () => {
+    const pct = Number(String(bulkPercent).replace(',', '.').trim());
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+      setPayrollError('Процент должен быть от 0 до 100');
+      return;
+    }
+    setBulkSaving(true);
+    try {
+      await apiRequest('/autoservice/service-employees/bulk-percent', {
+        method: 'POST',
+        body: JSON.stringify({ work_percent: pct }),
+      });
+      setBulkPercentOpen(false);
+      setBulkPercent('');
+      setBulkNotice('Процент обновлён у всех активных исполнителей');
+      loadPayroll();
+    } catch (e) {
+      setPayrollError(e?.message || 'Не удалось обновить процент исполнителей');
+    } finally {
+      setBulkSaving(false);
+    }
+  }, [bulkPercent, loadPayroll]);
 
   const exportEconomics = useCallback(async () => {
     setEconomicsExporting(true);
@@ -701,14 +731,23 @@ export default function AutoserviceReportsPage() {
               onChange={(e) => setMonthValue(e.target.value || currentMonthValue())}
               className={warehousePillControlClass}
             />
-            <button
-              type="button"
-              onClick={exportPayroll}
-              disabled={payrollExporting || payrollLoading}
-              className={`${warehousePrimaryButtonClass} w-full shrink-0 sm:w-auto`}
-            >
-              {payrollExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
-            </button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setBulkPercentOpen(true)}
+                className={`${warehousePillControlClass} inline-flex h-10 items-center justify-center text-sm font-medium`}
+              >
+                Процент всем
+              </button>
+              <button
+                type="button"
+                onClick={exportPayroll}
+                disabled={payrollExporting || payrollLoading}
+                className={`${warehousePrimaryButtonClass} w-full shrink-0 sm:w-auto`}
+              >
+                {payrollExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
+              </button>
+            </div>
           </div>
 
           {payrollError ? (
@@ -1451,6 +1490,53 @@ export default function AutoserviceReportsPage() {
           navigate(`/autoservice/orders/${order.id}/edit`, { state: withBackTo(location) });
         }}
       />
+      <Modal
+        open={bulkPercentOpen}
+        onClose={() => setBulkPercentOpen(false)}
+        title="Процент всем исполнителям"
+        size="sm"
+        footer={
+          <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
+            <button
+              type="button"
+              onClick={() => setBulkPercentOpen(false)}
+              disabled={bulkSaving}
+              className="rounded-sg-sm border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink-soft transition hover:bg-surface-muted max-md:min-h-11"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              form="bulk-percent-form"
+              disabled={bulkSaving}
+              className={`${warehousePrimaryButtonClass} max-md:min-h-11`}
+            >
+              {bulkSaving ? 'Сохранение…' : 'Применить'}
+            </button>
+          </div>
+        }
+      >
+        <form
+          id="bulk-percent-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            applyBulkPercent();
+          }}
+        >
+          <label className="block text-sm font-medium text-ink-soft">Процент от работ, %</label>
+          <NumericInput
+            mode="decimal"
+            className="sg-pill-input mt-1 w-full"
+            value={bulkPercent}
+            onChange={(e) => setBulkPercent(e.target.value)}
+            placeholder="Например, 30"
+          />
+          <p className="mt-2 text-xs text-ink-muted">
+            Процент будет установлен всем активным исполнителям автосервиса.
+          </p>
+        </form>
+      </Modal>
+      <Toast message={bulkNotice} variant="success" onClose={() => setBulkNotice('')} />
     </div>
   );
 }

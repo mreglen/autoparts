@@ -11,7 +11,7 @@ import Button from '../../components/UI/Button';
 import Toast from '../../components/UI/Toast';
 import { NumericInput, Skeleton, UnderlineTabs } from '../../components/UI';
 import RepairOrderPickerModal from '../../components/Autoservice/RepairOrderPickerModal';
-import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
+import RepairOrderViewModal, { REPAIR_ORDER_STATUS_LABELS } from '../../components/Autoservice/RepairOrderViewModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import AutoserviceWarehouseItemMovements from '../../components/Autoservice/AutoserviceWarehouseItemMovements';
 import AutoserviceWarehouseReturnModal from '../../components/Autoservice/AutoserviceWarehouseReturnModal';
@@ -55,17 +55,6 @@ import {
 
 const pillButtonClass =
   'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
-
-const REPAIR_ORDER_STATUS_LABELS = {
-  review: 'На проверке',
-  pending: 'Ожидание',
-  accepted: 'Принят',
-  open: 'Открыт',
-  in_progress: 'В работе',
-  done: 'Выполнен',
-  completed: 'Завершён',
-  cancelled: 'Отменён',
-};
 
 function formatReservationQty(qty, unit = 'pcs') {
   return `${formatShopPartQty(qty, unit)} ${formatShopPartUnit(unit)}`;

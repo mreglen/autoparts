@@ -1,18 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import Modal from '../../components/UI/Modal';
+import Modal, { ConfirmDialog } from '../../components/UI/Modal';
 import NumericInput from '../../components/UI/NumericInput';
 import WorkZonesSortableList from '../../components/Autoservice/WorkZonesSortableList';
-import { UnderlineTabs } from '../../components/UI';
+import { Skeleton, UnderlineTabs } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
 import { apiRequest } from '../../utils/apiClient';
+import {
+  autoserviceListMobileWrapClass,
+  autoserviceListTableClass,
+  autoserviceListTableWrapClass,
+  autoserviceListTbodyClass,
+  autoserviceListTdClass,
+  autoserviceListTdRightClass,
+  autoserviceListThClass,
+  autoserviceListThRightClass,
+  autoserviceListTheadRowClass,
+  autoserviceListTrClickableClass,
+} from '../../utils/warehouseListUi';
 
 const inputClass =
   'sg-pill-input mt-1 w-full';
-
-const fieldClass =
-  'sg-pill-input w-full';
 
 const textareaClass =
   'sg-pill-textarea mt-1 w-full';
@@ -23,86 +32,133 @@ const btnPrimary =
 const btnGhost =
   'inline-flex min-h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60 sm:min-h-10';
 
-function WorksModal({ open, works, loading, onClose, onAdd, onRefresh }) {
+function WorksModal({ open, work, onClose, onSaved }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [saving, setSaving] = useState(false);
+  const [toggling, setToggling] = useState(false);
+  const [error, setError] = useState('');
+  const isEdit = Boolean(work?.id);
 
   useEffect(() => {
     if (!open) return;
-    setName('');
-    setPrice('');
+    setName(work?.name || '');
+    setPrice(work?.default_unit_price != null ? String(work.default_unit_price) : '');
     setSaving(false);
-  }, [open]);
+    setToggling(false);
+    setError('');
+  }, [open, work]);
 
-  const handleAdd = async (e) => {
+  const parsedPrice = () => {
+    const parsed = Number(String(price).replace(',', '.').trim());
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      setError('Укажите название');
+      return;
+    }
     setSaving(true);
+    setError('');
     try {
-      const parsedPrice = Number(String(price).replace(',', '.').trim());
-      await onAdd({ name: trimmed, default_unit_price: Number.isFinite(parsedPrice) ? parsedPrice : 0 });
-      setName('');
-      setPrice('');
-      await onRefresh();
+      if (isEdit) {
+        await apiRequest(`/autoservice/works/${work.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: trimmed, default_unit_price: parsedPrice() }),
+        });
+      } else {
+        await apiRequest('/autoservice/works', {
+          method: 'POST',
+          body: JSON.stringify({ name: trimmed, default_unit_price: parsedPrice() }),
+        });
+      }
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить работу');
     } finally {
       setSaving(false);
     }
   };
 
-  const activeWorks = useMemo(() => works.filter((w) => w.is_active), [works]);
+  const handleToggleActive = async () => {
+    if (!isEdit || toggling) return;
+    setToggling(true);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/works/${work.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: !work.is_active }),
+      });
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось изменить видимость');
+    } finally {
+      setToggling(false);
+    }
+  };
 
   return (
-    <Modal open={open} onClose={onClose} title="Работы" size="md">
-      <form onSubmit={handleAdd} className="mb-4 border-b border-line-soft pb-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="min-w-0 flex-1">
-            <label htmlFor="work-name" className="mb-1 block text-xs font-medium text-ink-muted">
-              Название
-            </label>
-            <input
-              id="work-name"
-              className={fieldClass}
-              placeholder="Например, замена масла"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div className="w-full sm:w-36">
-            <label htmlFor="work-price" className="mb-1 block text-xs font-medium text-ink-muted">
-              Цена, ₽
-            </label>
-            <input
-              id="work-price"
-              type="text"
-              inputMode="decimal"
-              className={fieldClass}
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-            />
-          </div>
-          <button type="submit" disabled={saving} className={`${btnPrimary} shrink-0`}>
-            {saving ? '…' : 'Добавить'}
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? 'Редактировать работу' : 'Новая работа'}
+      size="sm"
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          {isEdit ? (
+            <button
+              type="button"
+              onClick={handleToggleActive}
+              disabled={saving || toggling}
+              className={`${btnGhost} mr-auto`}
+            >
+              {toggling ? '…' : work.is_active ? 'Скрыть' : 'Показать'}
+            </button>
+          ) : null}
+          <button type="button" onClick={onClose} className={btnGhost} disabled={saving}>
+            Отмена
+          </button>
+          <button type="submit" form="work-form" disabled={saving} className={btnPrimary}>
+            {saving ? '…' : 'Сохранить'}
           </button>
         </div>
+      }
+    >
+      <form id="work-form" onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="work-name" className="mb-1 block text-xs font-medium text-ink-muted">
+            Название
+          </label>
+          <input
+            id="work-name"
+            autoFocus
+            className={inputClass}
+            placeholder="Например, замена масла"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={160}
+          />
+        </div>
+        <div>
+          <label htmlFor="work-price" className="mb-1 block text-xs font-medium text-ink-muted">
+            Цена по умолчанию, ₽
+          </label>
+          <input
+            id="work-price"
+            type="text"
+            inputMode="decimal"
+            className={inputClass}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+          />
+        </div>
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
       </form>
-      {loading ? (
-        <p className="py-6 text-center text-sm text-ink-muted">Загрузка…</p>
-      ) : activeWorks.length === 0 ? (
-        <p className="py-6 text-center text-sm text-ink-muted">Пока пусто</p>
-      ) : (
-        <ul className="divide-y divide-line-soft">
-          {activeWorks.map((w) => (
-            <li key={w.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-              <span className="min-w-0 truncate font-medium text-ink">{w.name}</span>
-              <span className="shrink-0 tabular-nums text-ink-muted">
-                {Number(w.default_unit_price).toLocaleString('ru-RU')} ₽
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
     </Modal>
   );
 }
@@ -196,7 +252,10 @@ export default function AutoserviceSettingsPage() {
   const [error, setError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
   const [zoneModal, setZoneModal] = useState(null);
-  const [worksOpen, setWorksOpen] = useState(false);
+  const [zoneDeleteConfirm, setZoneDeleteConfirm] = useState(null);
+  const [zoneDeleting, setZoneDeleting] = useState(false);
+  const [workModal, setWorkModal] = useState(null);
+  const [showInactiveWorks, setShowInactiveWorks] = useState(false);
   const [works, setWorks] = useState([]);
   const [worksLoading, setWorksLoading] = useState(false);
   const [zonesReordering, setZonesReordering] = useState(false);
@@ -248,7 +307,11 @@ export default function AutoserviceSettingsPage() {
     if (isReady && isAuthenticated) load();
   }, [isReady, isAuthenticated, load]);
 
-  const activeWorks = useMemo(() => works.filter((w) => w.is_active), [works]);
+  const displayedWorks = useMemo(
+    () => (showInactiveWorks ? works : works.filter((w) => w.is_active)),
+    [works, showInactiveWorks],
+  );
+  const hiddenWorksCount = useMemo(() => works.filter((w) => !w.is_active).length, [works]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -281,13 +344,23 @@ export default function AutoserviceSettingsPage() {
   };
 
   const removeWorkZone = async (zoneId) => {
-    if (!window.confirm('Удалить зону?')) return;
+    setZoneDeleteConfirm(zoneId);
+  };
+
+  const confirmRemoveWorkZone = async () => {
+    const zoneId = zoneDeleteConfirm;
+    if (!zoneId || zoneDeleting) return;
+    setZoneDeleting(true);
     setError('');
     try {
       await apiRequest(`/autoservice/work-zones/${zoneId}`, { method: 'DELETE' });
+      setZoneDeleteConfirm(null);
       await loadWorkZones();
     } catch (err) {
       setError(err?.message || 'Не удалось удалить');
+      setZoneDeleteConfirm(null);
+    } finally {
+      setZoneDeleting(false);
     }
   };
 
@@ -307,10 +380,6 @@ export default function AutoserviceSettingsPage() {
     } finally {
       setZonesReordering(false);
     }
-  };
-
-  const addWork = async (payload) => {
-    await apiRequest('/autoservice/works', { method: 'POST', body: JSON.stringify(payload) });
   };
 
   if (!isReady) return <AuthLoadingScreen />;
@@ -420,39 +489,70 @@ export default function AutoserviceSettingsPage() {
             <section>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm text-ink-muted">
-                  {worksLoading ? 'Загрузка…' : `${activeWorks.length} работ`}
+                  {worksLoading ? 'Загрузка…' : `${displayedWorks.length} работ`}
                 </p>
-                <button type="button" onClick={() => setWorksOpen(true)} className={btnPrimary}>
-                  Управление
-                </button>
+                <div className="flex items-center gap-3">
+                  {hiddenWorksCount > 0 ? (
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-ink-soft">
+                      <input
+                        type="checkbox"
+                        checked={showInactiveWorks}
+                        onChange={(e) => setShowInactiveWorks(e.target.checked)}
+                        className="h-4 w-4 rounded border-line accent-brand-600"
+                      />
+                      Скрытые ({hiddenWorksCount})
+                    </label>
+                  ) : null}
+                  <button type="button" onClick={() => setWorkModal({ work: null })} className={btnPrimary}>
+                    Добавить
+                  </button>
+                </div>
               </div>
-              <div className="hidden md:block">
-                <table className="min-w-full divide-y divide-line text-sm">
+              <div className={autoserviceListTableWrapClass}>
+                <table className={autoserviceListTableClass}>
                   <thead>
-                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                      <th className="py-3 pr-3">Название</th>
-                      <th className="w-36 py-3 text-right">Цена</th>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className={autoserviceListThClass}>Название</th>
+                      <th className={`w-28 ${autoserviceListThRightClass}`}>Цена</th>
+                      <th className={`w-24 ${autoserviceListThClass}`}>Статус</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-line-soft">
+                  <tbody className={autoserviceListTbodyClass}>
                     {worksLoading ? (
+                      Array.from({ length: 4 }).map((_, index) => (
+                        <tr key={`work-sk-${index}`}>
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-48" /></td>
+                          <td className={`w-28 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-14" /></td>
+                          <td className={`w-24 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-14" /></td>
+                        </tr>
+                      ))
+                    ) : displayedWorks.length === 0 ? (
                       <tr>
-                        <td colSpan={2} className="py-12 text-center text-ink-muted">
-                          Загрузка…
-                        </td>
-                      </tr>
-                    ) : activeWorks.length === 0 ? (
-                      <tr>
-                        <td colSpan={2} className="py-12 text-center text-ink-muted">
+                        <td colSpan={3} className="py-12 text-center text-ink-muted">
                           Работ пока нет
                         </td>
                       </tr>
                     ) : (
-                      activeWorks.map((w) => (
-                        <tr key={w.id} className="transition-colors hover:bg-surface-muted/70">
-                          <td className="py-3 pr-3 align-middle font-medium text-ink">{w.name}</td>
-                          <td className="py-3 text-right align-middle tabular-nums text-ink-soft">
+                      displayedWorks.map((w) => (
+                        <tr
+                          key={w.id}
+                          className={autoserviceListTrClickableClass}
+                          onClick={() => setWorkModal({ work: w })}
+                        >
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                            <div className="w-0 min-w-full truncate font-semibold text-ink">{w.name}</div>
+                          </td>
+                          <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-soft`}>
                             {Number(w.default_unit_price).toLocaleString('ru-RU')} ₽
+                          </td>
+                          <td className={`w-24 ${autoserviceListTdClass}`}>
+                            {w.is_active ? (
+                              <span className="text-xs text-ink-muted">Активна</span>
+                            ) : (
+                              <span className="inline-flex rounded-full bg-surface-subtle px-2 py-0.5 text-xs font-medium text-ink-muted ring-1 ring-inset ring-line">
+                                Скрыта
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -460,22 +560,33 @@ export default function AutoserviceSettingsPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="md:hidden">
+              <div className={autoserviceListMobileWrapClass}>
                 {worksLoading ? (
-                  <p className="py-10 text-center text-sm text-ink-muted">Загрузка…</p>
-                ) : activeWorks.length === 0 ? (
+                  <div className="divide-y divide-line-soft">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div key={`mwork-sk-${index}`} className="py-2">
+                        <Skeleton className="h-4 w-40" />
+                      </div>
+                    ))}
+                  </div>
+                ) : displayedWorks.length === 0 ? (
                   <p className="py-10 text-center text-sm text-ink-muted">Работ пока нет</p>
                 ) : (
-                  activeWorks.map((w) => (
-                    <div
+                  displayedWorks.map((w) => (
+                    <button
                       key={w.id}
-                      className="flex items-center justify-between gap-3 border-b border-line-soft py-3 last:border-b-0"
+                      type="button"
+                      onClick={() => setWorkModal({ work: w })}
+                      className="flex w-full items-center justify-between gap-3 border-b border-line-soft py-2.5 text-left last:border-b-0"
                     >
-                      <p className="min-w-0 truncate text-sm font-semibold text-ink">{w.name}</p>
+                      <p className="min-w-0 truncate text-sm font-semibold text-ink">
+                        {w.name}
+                        {!w.is_active ? <span className="ml-1 text-xs text-ink-faint">(скрыта)</span> : null}
+                      </p>
                       <p className="shrink-0 text-sm tabular-nums text-ink-muted">
                         {Number(w.default_unit_price).toLocaleString('ru-RU')} ₽
                       </p>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
@@ -485,12 +596,22 @@ export default function AutoserviceSettingsPage() {
       )}
 
       <WorksModal
-        open={worksOpen}
-        works={works}
-        loading={worksLoading}
-        onClose={() => setWorksOpen(false)}
-        onAdd={addWork}
-        onRefresh={loadWorks}
+        open={Boolean(workModal)}
+        work={workModal?.work}
+        onClose={() => setWorkModal(null)}
+        onSaved={loadWorks}
+      />
+
+      <ConfirmDialog
+        open={Boolean(zoneDeleteConfirm)}
+        onClose={() => setZoneDeleteConfirm(null)}
+        onConfirm={confirmRemoveWorkZone}
+        title="Удалить зону?"
+        message="Зона будет удалена из планировщика."
+        confirmLabel="Удалить"
+        cancelLabel="Отмена"
+        danger
+        loading={zoneDeleting}
       />
 
       <WorkZoneModal

@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 import { selectCartSummary } from '../../redux/slices/CartSlice';
 import { selectTotalUnreadCount } from '../../utils/chatUnread';
 import { usePwaStandalone } from '../../utils/pwaStandalone';
+import { isAutoserviceClientPath, selectShowAutoservice } from '../../utils/autoservicePublic';
 import { Z_MOBILE_BOTTOM_NAV } from '../../constants/mobileTokens';
 
 const EMPTY_CART_SUMMARY = { itemCount: 0, totalPrice: 0 };
@@ -47,6 +48,20 @@ const navItems = [
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+            />
+        ),
+    },
+    {
+        id: 'autoservice',
+        label: 'Сервис',
+        to: '/autoservice',
+        match: (path) => isAutoserviceClientPath(path),
+        showAutoserviceOnly: true,
+        icon: (
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085"
             />
         ),
     },
@@ -162,12 +177,14 @@ export default function MobileBottomNav() {
     const navigate = useNavigate();
     const location = useLocation();
 
+    const showAutoservice = useSelector(selectShowAutoservice);
     const isPwa = usePwaStandalone();
     const visibleNavItems = React.useMemo(() => {
         let items = isAuthenticated ? navItems : navItems.filter((item) => !item.authOnly);
+        if (!showAutoservice) items = items.filter((item) => !item.showAutoserviceOnly);
         if (isPwa) items = items.filter((item) => item.id !== 'home');
         return items;
-    }, [isAuthenticated, isPwa]);
+    }, [isAuthenticated, isPwa, showAutoservice]);
 
     const getBadge = (id) => {
         if (id === 'cart') return cartData.itemCount;
@@ -176,13 +193,15 @@ export default function MobileBottomNav() {
     };
 
     const gridColsClass =
-        visibleNavItems.length === 5
-            ? 'grid-cols-5'
-            : visibleNavItems.length === 4
-              ? 'grid-cols-4'
-              : visibleNavItems.length === 2
-                ? 'grid-cols-2'
-                : 'grid-cols-3';
+        visibleNavItems.length >= 6
+            ? 'grid-cols-6'
+            : visibleNavItems.length === 5
+              ? 'grid-cols-5'
+              : visibleNavItems.length === 4
+                ? 'grid-cols-4'
+                : visibleNavItems.length === 2
+                  ? 'grid-cols-2'
+                  : 'grid-cols-3';
 
     return (
         <nav

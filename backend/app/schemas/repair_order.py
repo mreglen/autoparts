@@ -322,11 +322,6 @@ class RepairOrderClientView(BaseModel):
     grand_total: Decimal = Decimal("0.00")
 
 
-class RepairOrderStaffOption(BaseModel):
-    id: int
-    name: str
-
-
 class RepairOrderServiceEmployeeOption(BaseModel):
     id: int
     name: str
