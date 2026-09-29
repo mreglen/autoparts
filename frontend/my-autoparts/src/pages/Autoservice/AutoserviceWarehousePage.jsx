@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
@@ -135,6 +135,27 @@ export default function AutoserviceWarehousePage() {
   const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
 
   const supplierTerm = (supplierFilter || supplierCustom).trim();
+
+  const tabSwipeStartRef = useRef({ x: 0, y: 0 });
+  const handleTabSwipeStart = useCallback((event) => {
+    const touch = event.targetTouches[0];
+    tabSwipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
+  const handleTabSwipeEnd = useCallback((event) => {
+    const { x, y } = tabSwipeStartRef.current;
+    tabSwipeStartRef.current = { x: 0, y: 0 };
+    if (!x && !y) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - x;
+    const dy = touch.clientY - y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const order = ['stock', 'receipts', 'expenses'];
+    const index = order.indexOf(activeTab);
+    const next = dx < 0 ? index + 1 : index - 1;
+    if (index >= 0 && next >= 0 && next < order.length) {
+      setActiveTab(order[next]);
+    }
+  }, [activeTab]);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -445,6 +466,7 @@ export default function AutoserviceWarehousePage() {
         onChange={setActiveTab}
       />
 
+      <div onTouchStart={handleTabSwipeStart} onTouchEnd={handleTabSwipeEnd}>
       {activeTab === 'stock' ? (
         <>
           <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -603,6 +625,7 @@ export default function AutoserviceWarehousePage() {
           </div>
         </>
       )}
+      </div>
 
       <AutoserviceWarehouseReturnModal
         receiptId={returnLot?.receipt_id || null}

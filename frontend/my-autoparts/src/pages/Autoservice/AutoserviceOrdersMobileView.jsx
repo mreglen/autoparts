@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 import { RepairOrderStatusPicker, vehicleLabel } from '../../components/Autoservice/RepairOrderViewModal';
@@ -203,8 +203,35 @@ export default function AutoserviceOrdersMobileView({
   drafts,
   onDraftOpen,
   onDraftDelete,
+  dateFrom = '',
+  dateTo = '',
+  onDateFromChange,
+  onDateToChange,
 }) {
   const isDrafts = Array.isArray(drafts);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const swipeStartRef = useRef({ x: 0, y: 0 });
+  const handleSwipeStart = useCallback((event) => {
+    const touch = event.targetTouches[0];
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
+  const handleSwipeEnd = useCallback((event) => {
+    const { x, y } = swipeStartRef.current;
+    swipeStartRef.current = { x: 0, y: 0 };
+    if (!x && !y) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - x;
+    const dy = touch.clientY - y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const order = (orderTabs || []).map((tab) => tab.id);
+    const index = order.indexOf(tabValue);
+    const next = dx < 0 ? index + 1 : index - 1;
+    if (index >= 0 && next >= 0 && next < order.length) {
+      onTabChange?.(order[next]);
+    }
+  }, [orderTabs, tabValue, onTabChange]);
+
   return (
     <div className="w-full min-w-0">
       <button
@@ -235,6 +262,22 @@ export default function AutoserviceOrdersMobileView({
           />
           <button
             type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className={`inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 ${filtersOpen ? 'bg-white text-gray-700 ring-2 ring-indigo-400/70' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            aria-expanded={filtersOpen}
+          >
+            Фильтры
+            <svg
+              className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <button
+            type="button"
             onClick={onRefresh}
             className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200 hover:text-gray-900"
             title="Обновить"
@@ -257,11 +300,51 @@ export default function AutoserviceOrdersMobileView({
             <option value="cancelled">Отменён</option>
           </select>
         ) : null}
+        {filtersOpen ? (
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="block w-36 min-w-0 flex-1">
+              <span className="mb-1.5 block text-xs font-medium text-gray-500">Период с</span>
+              <input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => onDateFromChange?.(e.target.value)}
+                className="h-11 w-full rounded-full border-0 bg-gray-100 px-4 text-base text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+              />
+            </label>
+            <label className="block w-36 min-w-0 flex-1">
+              <span className="mb-1.5 block text-xs font-medium text-gray-500">Период по</span>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => onDateToChange?.(e.target.value)}
+                className="h-11 w-full rounded-full border-0 bg-gray-100 px-4 text-base text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+              />
+            </label>
+            {dateFrom || dateTo ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onDateFromChange?.('');
+                  onDateToChange?.('');
+                }}
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-500 transition hover:bg-gray-200"
+              >
+                Сбросить
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <Toast message={error} variant="error" onClose={onErrorClose} />
 
-      <div className="mt-4 border-t border-gray-100">
+      <div
+        className="mt-4 border-t border-gray-100"
+        onTouchStart={handleSwipeStart}
+        onTouchEnd={handleSwipeEnd}
+      >
         {loading ? (
           <div className="divide-y divide-gray-100">
             {Array.from({ length: 5 }).map((_, i) => (

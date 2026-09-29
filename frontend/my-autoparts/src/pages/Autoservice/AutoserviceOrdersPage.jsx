@@ -438,6 +438,10 @@ export default function AutoserviceOrdersPage() {
           drafts={viewDrafts ? filteredDrafts : undefined}
           onDraftOpen={openDraft}
           onDraftDelete={setDeleteConfirmDraft}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
         />
       </div>
 
