@@ -184,26 +184,35 @@ function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет п�
             key={row.id}
             onClick={() => onOpen(row)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpen(row); }}
-            className="block w-full cursor-pointer space-y-1.5 py-3 text-left transition hover:bg-surface-muted/50"
+            className="block w-full cursor-pointer py-2.5 text-left transition hover:bg-surface-muted/50"
           >
-            <FinanceField label="Дата">{formatServerDateTime(row.paid_at || row.created_at)}</FinanceField>
-            <FinanceField label="Клиент">{row.client_name || '—'}</FinanceField>
-            <FinanceField label="Способ"><MethodBadge method={row.method} /></FinanceField>
-            <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
-            <FinanceField label="Документ">
-              {row.repair_order_number ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenOrder?.(row.repair_order_id);
-                  }}
-                  className="font-medium text-brand-600 hover:underline"
-                >
-                  Заказ-наряд № {row.repair_order_number}
-                </button>
-              ) : '—'}
-            </FinanceField>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate text-sm font-semibold text-ink">
+                {row.client_name || '—'}
+              </span>
+              <span className="shrink-0 text-sm font-bold tabular-nums text-ink">
+                {formatFinanceCurrency(row.amount)}
+              </span>
+            </div>
+            <div className="mt-0.5 flex items-center justify-between gap-3">
+              <span className="min-w-0 truncate text-xs text-ink-muted">
+                {formatServerDateTime(row.paid_at || row.created_at)}
+                {' · '}
+                {row.repair_order_number ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenOrder?.(row.repair_order_id);
+                    }}
+                    className="font-medium text-brand-600 hover:underline"
+                  >
+                    Заказ-наряд № {row.repair_order_number}
+                  </button>
+                ) : '—'}
+              </span>
+              <MethodBadge method={row.method} />
+            </div>
           </div>
         ))}
       </div>
@@ -229,7 +238,7 @@ function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет п�
                 <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
                   {formatServerDateTime(row.paid_at || row.created_at)}
                 </td>
-                <td className={`${autoserviceListTdClass} truncate pl-4`}>
+                <td className={`${autoserviceListTdClass} truncate pl-4 font-semibold`}>
                   {row.client_name || '—'}
                 </td>
                 <td className={autoserviceListTdClass}>
