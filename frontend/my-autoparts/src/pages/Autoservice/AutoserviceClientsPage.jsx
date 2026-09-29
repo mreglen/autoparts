@@ -65,7 +65,7 @@ function ClientMobileCard({ row, hint, onOpen }) {
     <button
       type="button"
       onClick={() => onOpen(row)}
-      className="w-full rounded-sg border border-line bg-surface px-4 py-3 text-left shadow-sm transition hover:border-brand-200 hover:bg-brand-50/30"
+      className="w-full py-3 text-left"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -379,7 +379,7 @@ export default function AutoserviceClientsPage() {
             {qApplied.trim() ? 'Ничего не найдено' : 'Клиентов пока нет'}
           </p>
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-line-soft">
             {rows.map((row) => (
               <ClientMobileCard
                 key={row.id}
