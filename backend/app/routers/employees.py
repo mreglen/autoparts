@@ -76,6 +76,7 @@ def _ensure_default_permissions(db: Session) -> None:
         {"code": "autoservice.reports", "name": "Отчёты автосервиса"},
         {"code": "autoservice.clients", "name": "Клиенты автосервиса"},
         {"code": "autoservice.inspections", "name": "Записи автосервиса"},
+        {"code": "autoservice.inspections.confirm", "name": "Записи: подтверждение заявок"},
         {"code": "autoservice.settings", "name": "Настройки автосервиса"},
         {"code": "autoservice.markup", "name": "Настройки наценки"},
         {"code": QR_PART_CARD_PERMISSION, "name": "QR-карточка запчасти"},

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
 import Modal, { ConfirmDialog } from '../UI/Modal';
 import PhoneInput from '../UI/PhoneInput';
 import SearchablePillSelect from '../SearchablePillSelect/SearchablePillSelect';
@@ -8,6 +9,7 @@ import {
   formatPhoneFromRaw,
   validatePhoneOptional,
 } from '../../utils/contactValidation';
+import { canConfirmInspectionBookings } from '../../utils/autoservicePermissions';
 
 const inputClass = 'sg-pill-input mt-1';
 const textareaClass = 'sg-pill-textarea mt-1';
@@ -38,6 +40,9 @@ export default function InspectionBookingAddModal({
   title = 'Запись на осмотр',
   initialBooking = null,
 }) {
+  const user = useSelector((state) => state.auth.user);
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const canConfirm = canConfirmInspectionBookings(user, permissionCodes);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [preferredDate, setPreferredDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -421,7 +426,7 @@ export default function InspectionBookingAddModal({
     </div>
   ) : (
     <div className="flex items-center justify-end gap-2">
-      {isEdit && initialBooking?.status === 'new' ? (
+      {isEdit && initialBooking?.status === 'new' && canConfirm ? (
         <button
           type="button"
           onClick={(e) => {

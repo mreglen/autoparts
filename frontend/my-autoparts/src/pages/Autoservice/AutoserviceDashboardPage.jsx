@@ -317,7 +317,7 @@ export default function AutoserviceDashboardPage() {
           {primaryActions.map((action) => (
             <PrimaryAction
               key={action.href}
-              label={`+ ${action.label}`}
+              label={`${action.label}`}
               href={action.href}
               icon={PLUS_ICON}
             />

@@ -21,6 +21,8 @@ from app.schemas.inspection_booking import (
 )
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS,
+    AUTOSERVICE_PERMISSION_INSPECTIONS_CONFIRM,
+    has_autoservice_permission,
     get_or_create_autoservice_client_for_user,
     normalize_phone_or_400,
     related_autoservice_client_ids,
@@ -370,7 +372,13 @@ def _create_staff_inspection_booking(
         preferred_time=payload.preferred_time,
         vehicle_make=(payload.vehicle_make or "").strip() or None,
         vehicle_model=(payload.vehicle_model or "").strip() or None,
-        status="confirmed",
+        status=(
+            "confirmed"
+            if has_autoservice_permission(
+                db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_CONFIRM
+            )
+            else "new"
+        ),
         source="staff",
         created_by_user_id=current_user.id if current_user else None,
         work_zone_id=work_zone_id,
@@ -381,7 +389,8 @@ def _create_staff_inspection_booking(
     db.refresh(row)
     if vehicle:
         row.vehicle = vehicle
-    notify_inspection_booking_client(db, row, "confirmed")
+    if row.status == "confirmed":
+        notify_inspection_booking_client(db, row, "confirmed")
     return _booking_to_view(row)
 
 
@@ -437,6 +446,14 @@ def patch_inspection_booking(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Недопустимый статус",
             )
+        if data["status"] == "confirmed" and row.status != "confirmed":
+            if not has_autoservice_permission(
+                db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_CONFIRM
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Нет права подтверждать заявки",
+                )
         row.status = data["status"]
     if "name" in data and data["name"] is not None:
         name = data["name"].strip()

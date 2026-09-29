@@ -179,13 +179,7 @@ def get_planner_week(
             InspectionBooking.organization_id == org_id,
             InspectionBooking.preferred_date >= day_dates[0],
             InspectionBooking.preferred_date <= week_end,
-            or_(
-                InspectionBooking.status == "confirmed",
-                and_(
-                    InspectionBooking.status == "new",
-                    InspectionBooking.source == "staff",
-                ),
-            ),
+            InspectionBooking.status == "confirmed",
         )
         .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
         .all()

@@ -8,6 +8,7 @@ export const AUTOSERVICE_PERMISSION = {
   reports: 'autoservice.reports',
   clients: 'autoservice.clients',
   inspections: 'autoservice.inspections',
+  inspectionsConfirm: 'autoservice.inspections.confirm',
   settings: 'autoservice.settings',
   markup: 'autoservice.markup',
 };
@@ -119,6 +120,10 @@ export function canAccessRepairOrders(user, permissionCodes) {
 
 export function canReviewRepairOrders(user, permissionCodes) {
   return hasAutoservicePermission(user, permissionCodes, AUTOSERVICE_PERMISSION.orders);
+}
+
+export function canConfirmInspectionBookings(user, permissionCodes) {
+  return hasAutoservicePermission(user, permissionCodes, AUTOSERVICE_PERMISSION.inspectionsConfirm);
 }
 
 export function hasAnyAutoservicePermission(user, permissionCodes) {

@@ -112,13 +112,7 @@ def _today_items(db: Session, org_id: str, user: User, level: str | None) -> lis
             .filter(
                 InspectionBooking.organization_id == org_id,
                 InspectionBooking.preferred_date == now.date(),
-                or_(
-                    InspectionBooking.status == "confirmed",
-                    and_(
-                        InspectionBooking.status == "new",
-                        InspectionBooking.source == "staff",
-                    ),
-                ),
+                InspectionBooking.status == "confirmed",
             )
             .order_by(InspectionBooking.preferred_time.asc())
             .all()
