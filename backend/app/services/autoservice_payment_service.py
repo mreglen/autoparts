@@ -17,8 +17,6 @@ from app.schemas.autoservice_finance import (
     RepairOrderPaymentsListResponse,
 )
 from app.utils.autoservice_access import display_client_phone
-from app.services.autoservice_payroll import clear_order_accruals
-from app.services.repair_order_status_timestamps import record_repair_order_status_timestamp
 
 _TWOPLACES = Decimal("0.01")
 _VALID_METHODS = {"card", "cash", "bank"}
@@ -64,6 +62,7 @@ def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceRecei
         amount=_money(payment.amount),
         method=method,
         created_at=payment.created_at,
+        paid_at=payment.paid_at or payment.created_at,
     )
 
 
@@ -79,7 +78,10 @@ def allocate_autoservice_payment_number(db: Session, organization_id: str) -> in
 def sum_order_payments(db: Session, order_id: int) -> Decimal:
     total = (
         db.query(func.coalesce(func.sum(AutoservicePayment.amount), 0))
-        .filter(AutoservicePayment.repair_order_id == order_id)
+        .filter(
+            AutoservicePayment.repair_order_id == order_id,
+            AutoservicePayment.cancelled_at.is_(None),
+        )
         .scalar()
     )
     return _money(total or 0)
@@ -107,6 +109,8 @@ def list_repair_order_payments(
             method=row.method if row.method in _VALID_METHODS else "cash",
             amount=_money(row.amount),
             created_at=row.created_at,
+            paid_at=row.paid_at or row.created_at,
+            is_cancelled=row.cancelled_at is not None,
         )
         for row in rows
     ]
@@ -121,7 +125,10 @@ def batch_paid_amounts(db: Session, order_ids: list[int]) -> dict[int, Decimal]:
             AutoservicePayment.repair_order_id,
             func.coalesce(func.sum(AutoservicePayment.amount), 0),
         )
-        .filter(AutoservicePayment.repair_order_id.in_(order_ids))
+        .filter(
+            AutoservicePayment.repair_order_id.in_(order_ids),
+            AutoservicePayment.cancelled_at.is_(None),
+        )
         .group_by(AutoservicePayment.repair_order_id)
         .all()
     )
@@ -175,7 +182,6 @@ def create_repair_order_payment(
         )
 
     effective_date = paid_at or date.today()
-    created_at = _created_at_for_payment_date(effective_date)
     payment = AutoservicePayment(
         organization_id=org_id,
         repair_order_id=order.id,
@@ -183,7 +189,7 @@ def create_repair_order_payment(
         method=method,
         amount=pay_amount,
         created_by_user_id=user_id,
-        created_at=created_at,
+        paid_at=_created_at_for_payment_date(effective_date),
     )
     db.add(payment)
     db.flush()
@@ -209,6 +215,9 @@ def list_finance_receipts(
     date_to: date,
 ) -> AutoserviceFinanceReceiptsResponse:
     start, end = _period_bounds(date_from, date_to)
+    effective_date = func.coalesce(
+        AutoservicePayment.paid_at, AutoservicePayment.created_at
+    )
     rows = (
         db.query(AutoservicePayment)
         .options(
@@ -217,10 +226,11 @@ def list_finance_receipts(
         .join(RepairOrder, AutoservicePayment.repair_order_id == RepairOrder.id)
         .filter(
             AutoservicePayment.organization_id == org_id,
-            AutoservicePayment.created_at >= start,
-            AutoservicePayment.created_at <= end,
+            AutoservicePayment.cancelled_at.is_(None),
+            effective_date >= start,
+            effective_date <= end,
         )
-        .order_by(AutoservicePayment.created_at.desc(), AutoservicePayment.id.desc())
+        .order_by(effective_date.desc(), AutoservicePayment.id.desc())
         .all()
     )
     totals = AutoservicePaymentMethodTotals()
@@ -262,7 +272,12 @@ def update_autoservice_payment_date(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Поступление не найдено",
         )
-    payment.created_at = _created_at_for_payment_date(paid_at)
+    if payment.cancelled_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Поступление отменено",
+        )
+    payment.paid_at = _created_at_for_payment_date(paid_at)
     db.flush()
     return _finance_receipt_row(payment)
 
@@ -272,7 +287,10 @@ def delete_autoservice_payment(
     *,
     org_id: str,
     payment_id: int,
+    user_id: int | None = None,
 ) -> None:
+    """Cancel a payment (soft-delete): keeps audit trail, order status and
+    payroll accruals untouched."""
     payment = (
         db.query(AutoservicePayment)
         .options(joinedload(AutoservicePayment.order))
@@ -287,10 +305,8 @@ def delete_autoservice_payment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Поступление не найдено",
         )
-    order = payment.order
-    db.delete(payment)
+    if payment.cancelled_at is not None:
+        return
+    payment.cancelled_at = datetime.now()
+    payment.cancelled_by_user_id = user_id
     db.flush()
-    if order and order.status in ("completed", "ready", "issued"):
-        order.status = "done"
-        record_repair_order_status_timestamp(order, "done")
-        clear_order_accruals(db, order.id)

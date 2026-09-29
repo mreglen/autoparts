@@ -749,7 +749,7 @@ export default function RepairOrderViewModal({
   const paymentsByDate = useMemo(() => {
     const groups = new Map();
     orderPayments.forEach((payment) => {
-      const dateKey = formatServerDate(payment.created_at) || '—';
+      const dateKey = formatServerDate(payment.paid_at || payment.created_at) || '—';
       const bucket = groups.get(dateKey) || [];
       bucket.push(payment);
       groups.set(dateKey, bucket);
@@ -1234,28 +1234,31 @@ export default function RepairOrderViewModal({
                 <div className="space-y-2">
                   {rows.map((payment) => {
                     const selected = selectedPaymentId === payment.id;
+                    const cancelled = Boolean(payment.is_cancelled);
                     return (
                       <button
                         key={payment.id}
                         type="button"
                         aria-pressed={selected}
+                        disabled={cancelled}
                         onClick={() => setSelectedPaymentId(selected ? null : payment.id)}
-                        className={`flex w-full items-start gap-3 rounded-sg-sm border px-3 py-2.5 text-left transition hover:bg-surface-muted ${
-                          selected
-                            ? 'border-brand-500 ring-1 ring-brand-500'
-                            : 'border-line'
+                        className={`flex w-full items-start gap-3 rounded-sg-sm border px-3 py-2.5 text-left transition ${
+                          cancelled
+                            ? 'border-line opacity-60'
+                            : `hover:bg-surface-muted ${selected ? 'border-brand-500 ring-1 ring-brand-500' : 'border-line'}`
                         }`}
                       >
                         <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-medium text-ink">
+                          <span className={`block text-sm font-medium text-ink ${cancelled ? 'line-through' : ''}`}>
                             {AUTOSERVICE_PAYMENT_METHOD_LABELS[payment.method] || payment.method}
                             {' · '}
                             <span className="tabular-nums">{formatMoney(payment.amount)} ₽</span>
                           </span>
                           <span className="mt-0.5 block text-xs text-ink-muted">
+                            {cancelled ? 'Отменено · ' : ''}
                             Чек № {payment.sequential_number}
-                            {formatServerDateTime(payment.created_at) !== '—'
-                              ? ` · ${formatServerDateTime(payment.created_at)}`
+                            {formatServerDateTime(payment.paid_at || payment.created_at) !== '—'
+                              ? ` · ${formatServerDateTime(payment.paid_at || payment.created_at)}`
                               : ''}
                           </span>
                         </span>

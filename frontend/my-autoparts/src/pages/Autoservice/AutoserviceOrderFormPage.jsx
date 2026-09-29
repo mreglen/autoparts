@@ -394,6 +394,11 @@ function WorkExecutorPicker({ employees, work, onToggle, onPercentChange, onAddE
   const filtered = (employees || []).filter(
     (emp) => !q || String(emp.name || '').toLowerCase().includes(q),
   );
+  const totalPercent = executors.reduce(
+    (sum, ex) => sum + (Number(ex.percent) || 0),
+    0,
+  );
+  const overLimit = totalPercent > 100;
 
   return (
     <div className="space-y-3">
@@ -426,7 +431,7 @@ function WorkExecutorPicker({ employees, work, onToggle, onPercentChange, onAddE
                   <>
                     <NumericInput
                       mode="numeric"
-                      className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center`}
+                      className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center ${overLimit ? 'border-danger-600 text-danger-600' : ''}`}
                       value={ex.percent}
                       aria-label="Процент оплаты"
                       onChange={(e) => onPercentChange(emp.id, e.target.value)}
@@ -442,6 +447,12 @@ function WorkExecutorPicker({ employees, work, onToggle, onPercentChange, onAddE
           })}
         </div>
       )}
+      {executors.length > 0 ? (
+        <p className={`text-xs ${overLimit ? 'font-medium text-danger-600' : 'text-ink-muted'}`}>
+          Всего {formatMoney(totalPercent)}%
+          {overLimit ? ' — сумма процентов не может превышать 100%' : ` · доступно ещё ${formatMoney(Math.max(0, 100 - totalPercent))}%`}
+        </p>
+      ) : null}
       <SectionAddLink onClick={onAddEmployee} label="+ Сотрудник" />
     </div>
   );

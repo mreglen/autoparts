@@ -6839,6 +6839,41 @@ def ensure_autoservice_application_direction_columns() -> None:
     logger.info("Applied autoservice_tariff_applications direction column patches: %s", statements)
 
 
+def ensure_autoservice_payments_audit_columns() -> None:
+    """Add paid_at / soft-delete columns to autoservice_payments."""
+    inspector = inspect(engine)
+    if "autoservice_payments" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("autoservice_payments")}
+    statements: list[str] = []
+    ts = "TIMESTAMPTZ" if engine.dialect.name == "postgresql" else "DATETIME"
+
+    if "paid_at" not in columns:
+        statements.append(f"ALTER TABLE autoservice_payments ADD COLUMN paid_at {ts}")
+    if "cancelled_at" not in columns:
+        statements.append(f"ALTER TABLE autoservice_payments ADD COLUMN cancelled_at {ts}")
+    if "cancelled_by_user_id" not in columns:
+        statements.append(
+            "ALTER TABLE autoservice_payments ADD COLUMN cancelled_by_user_id INTEGER"
+        )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        conn.execute(
+            text(
+                "UPDATE autoservice_payments SET paid_at = created_at "
+                "WHERE paid_at IS NULL"
+            )
+        )
+
+    logger.info("Applied autoservice_payments audit column patches: %s", statements)
+
+
 def ensure_repair_order_shop_parts_consumed_flag() -> None:
     """Add autoservice_stock_consumed for idempotent order stock fulfillment."""
     inspector = inspect(engine)
@@ -6902,6 +6937,35 @@ def ensure_repair_order_shop_parts_consumed_flag() -> None:
             )
 
     logger.info("Applied repair_order_shop_parts consumed flag patch")
+
+
+def ensure_payroll_accruals_employee_not_null() -> None:
+    """Drop orphaned accruals and make employee_id NOT NULL."""
+    inspector = inspect(engine)
+    if "autoservice_payroll_accruals" not in inspector.get_table_names():
+        return
+    columns = {col["name"]: col for col in inspector.get_columns("autoservice_payroll_accruals")}
+    col = columns.get("employee_id")
+    if col is None or col.get("nullable") is False:
+        return
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM autoservice_payroll_accruals WHERE employee_id IS NULL")
+            )
+            if engine.dialect.name == "postgresql":
+                conn.execute(
+                    text(
+                        "ALTER TABLE autoservice_payroll_accruals "
+                        "ALTER COLUMN employee_id SET NOT NULL"
+                    )
+                )
+    except Exception:
+        logger.exception("payroll accruals employee_id NOT NULL patch failed")
+        return
+
+    logger.info("Applied autoservice_payroll_accruals employee_id NOT NULL patch")
 
 
 def ensure_autoservice_warehouse_items_nonnegative() -> None:

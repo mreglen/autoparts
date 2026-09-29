@@ -39,6 +39,14 @@ class AutoservicePayment(Base):
         index=True,
     )
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    paid_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
+    cancelled_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True,
+    )
 
     order = relationship("RepairOrder", foreign_keys=[repair_order_id], overlaps="payments")
     created_by = relationship("User", foreign_keys=[created_by_user_id])
+    cancelled_by = relationship("User", foreign_keys=[cancelled_by_user_id])

@@ -957,6 +957,17 @@ def _replace_works(
                 detail="Название работы не может быть пустым",
             )
         _resolve_executor(db, org_id, item.executor_user_id)
+        total_percent = sum(
+            (_money(e.percent) for e in item.executors), Decimal("0.00")
+        )
+        if total_percent > Decimal("100"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Сумма процентов исполнителей по работе «{resolved_title}» "
+                    "превышает 100%"
+                ),
+            )
         executor_rows = _resolve_work_executors(db, org_id, item.executors)
         work = RepairOrderWork(
             position=idx,

@@ -86,7 +86,7 @@ export default function RepairOrderPaymentReceiptPrintPage() {
         await resolveClientForDocuments(orderData?.client);
         if (cancelled) return;
         setOrder(orderData);
-        setPayments(paymentsData?.items || []);
+        setPayments((paymentsData?.items || []).filter((row) => !row.is_cancelled));
       } catch (e) {
         if (!cancelled) {
           setOrder(null);
@@ -116,7 +116,7 @@ export default function RepairOrderPaymentReceiptPrintPage() {
       return {
         id: payment.id,
         title: `Оплата по заказ-наряду № ${orderLabel}`,
-        dateLabel: formatServerDate(payment.created_at),
+        dateLabel: formatServerDate(payment.paid_at || payment.created_at),
         methodLabel: AUTOSERVICE_PAYMENT_METHOD_LABELS[payment.method] || payment.method,
         amount,
         method: payment.method,

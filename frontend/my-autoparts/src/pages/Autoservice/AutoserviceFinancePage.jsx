@@ -135,19 +135,19 @@ const paymentDateInputClass =
 
 function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
   const [draft, setDraft] = useState(() => {
-    const d = new Date(row.created_at);
+    const d = new Date(row.paid_at || row.created_at);
     return d.toISOString().slice(0, 10);
   });
 
   useEffect(() => {
-    const d = new Date(row.created_at);
+    const d = new Date(row.paid_at || row.created_at);
     setDraft(d.toISOString().slice(0, 10));
-  }, [row.created_at, row.id]);
+  }, [row.paid_at, row.created_at, row.id]);
 
   const handleChange = async (nextValue) => {
     const clamped = clampFinanceDate(nextValue, todayDate);
     setDraft(clamped);
-    const current = new Date(row.created_at).toISOString().slice(0, 10);
+    const current = new Date(row.paid_at || row.created_at).toISOString().slice(0, 10);
     if (!clamped || clamped === current) return;
     await onSave(row.id, clamped);
   };
@@ -186,7 +186,7 @@ function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет п�
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpen(row); }}
             className="block w-full cursor-pointer space-y-1.5 py-3 text-left transition hover:bg-surface-muted/50"
           >
-            <FinanceField label="Дата">{formatServerDateTime(row.created_at)}</FinanceField>
+            <FinanceField label="Дата">{formatServerDateTime(row.paid_at || row.created_at)}</FinanceField>
             <FinanceField label="Клиент">{row.client_name || '—'}</FinanceField>
             <FinanceField label="Способ"><MethodBadge method={row.method} /></FinanceField>
             <FinanceField label="Сумма">{formatFinanceCurrency(row.amount)}</FinanceField>
@@ -227,7 +227,7 @@ function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет п�
                 onClick={() => onOpen(row)}
               >
                 <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
-                  {formatServerDateTime(row.created_at)}
+                  {formatServerDateTime(row.paid_at || row.created_at)}
                 </td>
                 <td className={`${autoserviceListTdClass} truncate pl-4`}>
                   {row.client_name || '—'}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -10,6 +11,8 @@ from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import RepairOrder, RepairOrderWork
+
+logger = logging.getLogger(__name__)
 
 
 def _money(value: Decimal | float | int) -> Decimal:
@@ -60,6 +63,12 @@ def accrue_order_payroll(
     for work in works:
         line_total = _line_sum(work.qty, _money(work.unit_price))
         for row in work.executors or []:
+            if row.employee_id is None:
+                logger.warning(
+                    "payroll skip: order %s work %s executor %s has no employee_id",
+                    order.id, work.id, row.id,
+                )
+                continue
             amount = _money(line_total * _money(row.percent) / Decimal("100"))
             if amount <= 0:
                 continue

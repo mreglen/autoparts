@@ -135,6 +135,7 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             amount=Decimal("100.00"),
             method="card",
             created_at=datetime(2026, 8, 10, 12, 0, 0),
+            paid_at=datetime(2026, 8, 10, 12, 0, 0),
             order=order,
         )
         payment_cash = MagicMock(
@@ -144,6 +145,7 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             amount=Decimal("50.00"),
             method="cash",
             created_at=datetime(2026, 8, 11, 12, 0, 0),
+            paid_at=datetime(2026, 8, 11, 12, 0, 0),
             order=order,
         )
         query = db.query.return_value
@@ -178,6 +180,7 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             amount=Decimal("10.00"),
             method="cash",
             created_at=datetime(2026, 8, 10, 12, 0, 0),
+            paid_at=datetime(2026, 8, 12, 9, 0, 0),
             order=order,
         )
         row = _finance_receipt_row(payment)
@@ -193,6 +196,8 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             amount=Decimal("80.00"),
             method="bank",
             created_at=datetime(2026, 8, 5, 12, 0, 0),
+            paid_at=datetime(2026, 8, 5, 12, 0, 0),
+            cancelled_at=None,
             order=order,
         )
         db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
@@ -206,43 +211,51 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
             )
 
         self.assertEqual(result.id, 15)
-        self.assertEqual(payment.created_at, datetime(2026, 8, 19, 12, 0))
+        self.assertEqual(payment.paid_at, datetime(2026, 8, 19, 12, 0))
+        self.assertEqual(payment.created_at, datetime(2026, 8, 5, 12, 0, 0))
         db.flush.assert_called_once()
 
-    def test_delete_autoservice_payment_reopens_completed_order(self):
+    def test_update_payment_date_rejects_cancelled(self):
+        db = MagicMock()
+        payment = MagicMock(id=15, cancelled_at=datetime(2026, 8, 20))
+        db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
+
+        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
+            with self.assertRaises(HTTPException) as ctx:
+                update_autoservice_payment_date(
+                    db,
+                    org_id="ORG1",
+                    payment_id=15,
+                    paid_at=date(2026, 8, 19),
+                )
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    def test_delete_autoservice_payment_soft_deletes_keeps_order(self):
         db = MagicMock()
         order = self._order()
         order.status = "completed"
-        payment = MagicMock(id=15, order=order)
+        payment = MagicMock(id=15, order=order, cancelled_at=None)
         db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
 
-        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()), patch(
-            "app.services.autoservice_payment_service.record_repair_order_status_timestamp",
-        ) as record_ts, patch(
-            "app.services.autoservice_payment_service.clear_order_accruals",
-        ) as clear_accruals:
-            delete_autoservice_payment(db, org_id="ORG1", payment_id=15)
+        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
+            delete_autoservice_payment(db, org_id="ORG1", payment_id=15, user_id=9)
 
-        db.delete.assert_called_once_with(payment)
-        self.assertEqual(order.status, "done")
-        record_ts.assert_called_once_with(order, "done")
-        clear_accruals.assert_called_once_with(db, order.id)
+        db.delete.assert_not_called()
+        self.assertIsNotNone(payment.cancelled_at)
+        self.assertEqual(payment.cancelled_by_user_id, 9)
+        self.assertEqual(order.status, "completed")
+        db.flush.assert_called_once()
 
-    def test_delete_autoservice_payment_keeps_open_order_status(self):
+    def test_delete_autoservice_payment_already_cancelled_is_noop(self):
         db = MagicMock()
-        order = self._order()
-        order.status = "pending"
-        payment = MagicMock(id=16, order=order)
+        payment = MagicMock(id=16, cancelled_at=datetime(2026, 8, 20))
         db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
 
-        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()), patch(
-            "app.services.autoservice_payment_service.clear_order_accruals",
-        ) as clear_accruals:
+        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
             delete_autoservice_payment(db, org_id="ORG1", payment_id=16)
 
-        db.delete.assert_called_once_with(payment)
-        self.assertEqual(order.status, "pending")
-        clear_accruals.assert_not_called()
+        db.delete.assert_not_called()
+        db.flush.assert_not_called()
 
 
 if __name__ == "__main__":

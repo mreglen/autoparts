@@ -10,6 +10,7 @@ from app.models.autoservice_settings import AutoserviceSettings
 from app.models.product import Product
 from app.models.stock_out import StockOut
 from app.services.stock_out_sales import list_warehouse_sales, warehouse_sales_totals
+from app.services.autoservice_notifications import notify_tariff_application_reviewed
 from app.db.database import get_db
 from app.utils.site_settings_db import get_or_create_site_settings
 from app.utils.admin_org_access import get_seller_organization
@@ -1596,6 +1597,7 @@ def approve_autoservice_application(
         )
     db.commit()
     db.refresh(row)
+    notify_tariff_application_reviewed(db, application=row, org=org, approved=True)
     log_audit(
         db,
         event_type="autoservice_application_approved",
@@ -1637,6 +1639,7 @@ def reject_autoservice_application(
     row.rejection_reason = request.reason or "Причина не указана"
     db.commit()
     db.refresh(row)
+    notify_tariff_application_reviewed(db, application=row, org=None, approved=False)
     log_audit(
         db,
         event_type="autoservice_application_rejected",

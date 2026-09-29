@@ -106,7 +106,9 @@ def delete_autoservice_finance_receipt(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_FINANCE)
-    delete_autoservice_payment(db, org_id=org_id, payment_id=payment_id)
+    delete_autoservice_payment(
+        db, org_id=org_id, payment_id=payment_id, user_id=current_user.id
+    )
     db.commit()
 
 

@@ -4,7 +4,10 @@ import logging
 
 from app.celery_app import celery_app
 from app.db.database import SessionLocal
-from app.services.autoservice_notifications import run_daily_planner_digests
+from app.services.autoservice_notifications import (
+    run_booking_reminders,
+    run_daily_planner_digests,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +18,17 @@ def send_daily_planner_digest() -> dict:
     try:
         result = run_daily_planner_digests(db)
         logger.info("Autoservice daily planner digest finished: %s", result)
+        return result
+    finally:
+        db.close()
+
+
+@celery_app.task(name="autoservice.send_booking_reminders")
+def send_booking_reminders() -> dict:
+    db = SessionLocal()
+    try:
+        result = run_booking_reminders(db)
+        logger.info("Autoservice booking reminders finished: %s", result)
         return result
     finally:
         db.close()

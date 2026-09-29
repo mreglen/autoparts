@@ -60,6 +60,11 @@ celery_app.conf.update(
             "task": "analytics.run_monthly_query_review",
             "schedule": crontab(day_of_month=1, hour=3, minute=0),
         },
+        # Напоминания клиентам о записи на завтра — ежедневно в 10:00 МСК (07:00 UTC)
+        "autoservice-booking-reminders": {
+            "task": "autoservice.send_booking_reminders",
+            "schedule": crontab(hour=7, minute=0),
+        },
         # marzvpn.verify_keys_authenticity — отдельный beat бота (redis db/2),
         # чтобы не дублировать с marzban-vpn-bot-celerybeat.
     },

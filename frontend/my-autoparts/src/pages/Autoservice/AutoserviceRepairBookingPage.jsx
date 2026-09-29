@@ -164,6 +164,7 @@ export default function AutoserviceRepairBookingPage() {
   const [rowsLoading, setRowsLoading] = useState(false);
   const [rowsError, setRowsError] = useState('');
   const [viewBooking, setViewBooking] = useState(null);
+  const [cancelSaving, setCancelSaving] = useState(false);
 
   useEffect(() => {
     if (isReady && isAuthenticated) {
@@ -316,6 +317,22 @@ export default function AutoserviceRepairBookingPage() {
       setError(err?.message || 'Не удалось отправить запись');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    if (!viewBooking?.id || cancelSaving) return;
+    setCancelSaving(true);
+    try {
+      const updated = await apiRequest(`/autoservice/inspection-bookings/me/${viewBooking.id}/cancel`, {
+        method: 'POST',
+      });
+      setRows((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+      setViewBooking(updated);
+    } catch (err) {
+      setRowsError(err?.message || 'Не удалось отменить запись');
+    } finally {
+      setCancelSaving(false);
     }
   };
 
@@ -518,7 +535,17 @@ export default function AutoserviceRepairBookingPage() {
         size="sm"
         draggable
         footer={
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            {viewBooking && (viewBooking.status === 'new' || viewBooking.status === 'confirmed') ? (
+              <button
+                type="button"
+                onClick={handleCancelBooking}
+                disabled={cancelSaving}
+                className={`${btnGhost} text-danger-600`}
+              >
+                {cancelSaving ? 'Отмена…' : 'Отменить запись'}
+              </button>
+            ) : null}
             <button type="button" onClick={() => setViewBooking(null)} className={btnGhost}>
               Закрыть
             </button>

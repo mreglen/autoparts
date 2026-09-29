@@ -31,7 +31,11 @@ from app.utils.autoservice_access import (
 from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.phone import normalize_to_storage_format
 from app.utils.site_settings_db import autoservice_enabled
-from app.services.autoservice_notifications import notify_new_inspection_booking
+from app.services.autoservice_notifications import (
+    notify_booking_cancelled_by_client,
+    notify_inspection_booking_client,
+    notify_new_inspection_booking,
+)
 
 router = APIRouter(tags=["Autoservice inspections"])
 
@@ -148,6 +152,7 @@ def create_public_inspection_booking(
     db.commit()
     db.refresh(row)
     notify_new_inspection_booking(db, row)
+    notify_inspection_booking_client(db, row, "accepted")
     return _booking_to_view(row)
 
 
@@ -240,6 +245,7 @@ def create_client_inspection_booking(
     if vehicle:
         row.vehicle = vehicle
     notify_new_inspection_booking(db, row)
+    notify_inspection_booking_client(db, row, "accepted")
     return _booking_to_view(row)
 
 
@@ -375,6 +381,7 @@ def _create_staff_inspection_booking(
     db.refresh(row)
     if vehicle:
         row.vehicle = vehicle
+    notify_inspection_booking_client(db, row, "confirmed")
     return _booking_to_view(row)
 
 
@@ -423,6 +430,7 @@ def patch_inspection_booking(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Заявка не найдена",
         )
+    previous_status = row.status
     if "status" in data and data["status"] is not None:
         if data["status"] not in VALID_STATUSES:
             raise HTTPException(
@@ -512,6 +520,64 @@ def patch_inspection_booking(
         row.notes = (notes or "").strip() or None
     db.commit()
     db.refresh(row)
+    if row.status == "confirmed" and previous_status != "confirmed":
+        notify_inspection_booking_client(db, row, "confirmed")
+    elif row.status == "cancelled" and previous_status != "cancelled":
+        notify_inspection_booking_client(db, row, "cancelled")
+    return _booking_to_view(row)
+
+
+@router.post(
+    "/autoservice/inspection-bookings/me/{booking_id}/cancel",
+    response_model=InspectionBookingView,
+)
+def cancel_my_inspection_booking(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    my_clients = (
+        db.query(AutoserviceClient)
+        .filter(
+            AutoserviceClient.user_id == current_user.id,
+            AutoserviceClient.status == "active",
+        )
+        .all()
+    )
+    related_ids: set[int] = set()
+    for client in my_clients:
+        related_ids.update(
+            related_autoservice_client_ids(db, client, include_phone_matches=False)
+        )
+    row = (
+        db.query(InspectionBooking)
+        .options(
+            joinedload(InspectionBooking.vehicle),
+            joinedload(InspectionBooking.organization),
+        )
+        .filter(
+            InspectionBooking.id == booking_id,
+            or_(
+                InspectionBooking.client_id.in_(related_ids),
+                InspectionBooking.created_by_user_id == current_user.id,
+            ),
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Заявка не найдена",
+        )
+    if row.status not in ("new", "confirmed"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Эту запись уже нельзя отменить",
+        )
+    row.status = "cancelled"
+    db.commit()
+    db.refresh(row)
+    notify_booking_cancelled_by_client(db, row)
     return _booking_to_view(row)
 
 

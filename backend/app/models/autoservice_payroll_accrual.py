@@ -19,7 +19,7 @@ class AutoservicePayrollAccrual(Base):
     employee_id = Column(
         Integer,
         ForeignKey("autoservice_service_employees.id", ondelete="CASCADE"),
-        nullable=True,
+        nullable=False,
         index=True,
     )
     organization_employee_id = Column(

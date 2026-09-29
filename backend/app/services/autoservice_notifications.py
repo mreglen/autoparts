@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session, joinedload
 
+from app.models.autoservice_client import AutoserviceClient
 from app.models.autoservice_digest_log import AutoserviceDigestLog
 from app.models.garage_vehicle import GarageVehicle
 from app.models.inspection_booking import InspectionBooking
@@ -14,9 +15,20 @@ from app.models.organization import Organization
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.services.notification_service import (
+    EVENT_AUTOSERVICE_APPLICATION_REVIEWED,
+    EVENT_AUTOSERVICE_BOOKING_ACCEPTED,
+    EVENT_AUTOSERVICE_BOOKING_CANCELLED,
+    EVENT_AUTOSERVICE_BOOKING_CANCELLED_STAFF,
+    EVENT_AUTOSERVICE_BOOKING_CONFIRMED,
+    EVENT_AUTOSERVICE_BOOKING_REMINDER,
     EVENT_AUTOSERVICE_NEW_INSPECTION,
     EVENT_AUTOSERVICE_PLANNER_DAILY,
     dispatch_user_notification,
+)
+from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_INSPECTIONS,
+    AUTOSERVICE_PERMISSION_PLANNER,
+    has_autoservice_permission,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,14 +61,23 @@ def list_active_autoservice_organization_ids(db: Session) -> list[str]:
     return [row[0] for row in rows]
 
 
-def get_autoservice_staff_recipient_user_ids(db: Session, organization_id: str | None) -> list[int]:
+def get_autoservice_staff_recipient_user_ids(
+    db: Session,
+    organization_id: str | None,
+    permission: str | None = None,
+) -> list[int]:
     if not organization_id:
         return []
     org = db.query(Organization).filter(Organization.id == organization_id).first()
     if not org or not getattr(org, "is_autoservice", False) or getattr(org, "autoservice_paused", False):
         return []
     users = db.query(User).filter(User.organization_id == organization_id).all()
-    return [user.id for user in users if user_is_autoservice_staff(user)]
+    return [
+        user.id
+        for user in users
+        if user_is_autoservice_staff(user)
+        and (permission is None or has_autoservice_permission(db, user, permission))
+    ]
 
 
 def dispatch_org_autoservice_notification(
@@ -67,8 +88,9 @@ def dispatch_org_autoservice_notification(
     push_data: dict | None,
     email_subject: str,
     email_body: str,
+    permission: str | None = None,
 ) -> None:
-    for user_id in get_autoservice_staff_recipient_user_ids(db, organization_id):
+    for user_id in get_autoservice_staff_recipient_user_ids(db, organization_id, permission):
         dispatch_user_notification(
             user_id,
             event_type=event_type,
@@ -222,6 +244,7 @@ def send_daily_planner_digest_for_org(
         },
         email_subject=title,
         email_body=email_body,
+        permission=AUTOSERVICE_PERMISSION_PLANNER,
     )
     _mark_digest_sent(db, organization_id, target_date, DIGEST_KIND_PLANNER_DAILY)
     return True
@@ -277,4 +300,229 @@ def notify_new_inspection_booking(db: Session, booking: InspectionBooking) -> No
         },
         email_subject=title,
         email_body=email_body,
+        permission=AUTOSERVICE_PERMISSION_INSPECTIONS,
     )
+
+
+def _booking_client_user_ids(db: Session, booking: InspectionBooking) -> list[int]:
+    ids: set[int] = set()
+    if booking.created_by_user_id:
+        ids.add(int(booking.created_by_user_id))
+    if booking.client_id:
+        client = (
+            db.query(AutoserviceClient)
+            .filter(AutoserviceClient.id == booking.client_id)
+            .first()
+        )
+        if client and client.user_id:
+            ids.add(int(client.user_id))
+    return sorted(ids)
+
+
+def _booking_datetime_label(booking: InspectionBooking) -> str:
+    label = _format_preferred_date(booking.preferred_date)
+    if booking.preferred_time:
+        label += f" {booking.preferred_time.strftime('%H:%M')}"
+    return label
+
+
+def notify_inspection_booking_client(
+    db: Session,
+    booking: InspectionBooking,
+    kind: str,
+) -> None:
+    """Notify the client user linked to the booking (accepted/confirmed/cancelled)."""
+    user_ids = _booking_client_user_ids(db, booking)
+    if not user_ids:
+        return
+
+    org_name = booking.organization.name if booking.organization else ""
+    when = _booking_datetime_label(booking)
+    if kind == "accepted":
+        title = "Заявка на осмотр принята"
+        body = f"Заявка №{booking.id} принята, ожидайте подтверждения на {when}."
+        event_type = EVENT_AUTOSERVICE_BOOKING_ACCEPTED
+    elif kind == "confirmed":
+        title = "Запись подтверждена"
+        body = f"Запись №{booking.id} подтверждена на {when}."
+        event_type = EVENT_AUTOSERVICE_BOOKING_CONFIRMED
+    elif kind == "cancelled":
+        title = "Запись отменена"
+        body = f"Запись №{booking.id} на {when} отменена автосервисом."
+        event_type = EVENT_AUTOSERVICE_BOOKING_CANCELLED
+    else:
+        return
+
+    if org_name:
+        body = f"{org_name}: {body}"
+    push_data = {
+        "type": "autoservice_inspection_client",
+        "url": "/autoservice/my-bookings",
+        "inspectionId": booking.id,
+        "title": title,
+        "body": body,
+    }
+    email_body = (
+        f"{body}\n\n"
+        f"Открыть: {SITE_ORIGIN}/autoservice/my-bookings\n\n"
+        "С уважением,\nСвой Гараж"
+    )
+    for user_id in user_ids:
+        dispatch_user_notification(
+            user_id,
+            event_type=event_type,
+            push_data=push_data,
+            email_subject=title,
+            email_body=email_body,
+        )
+
+
+def notify_booking_cancelled_by_client(db: Session, booking: InspectionBooking) -> None:
+    title = f"Клиент отменил запись №{booking.id}"
+    body = f"{booking.name} отменил запись на {_booking_datetime_label(booking)}."
+    dispatch_org_autoservice_notification(
+        db,
+        booking.organization_id,
+        event_type=EVENT_AUTOSERVICE_BOOKING_CANCELLED_STAFF,
+        push_data={
+            "type": "autoservice_inspection",
+            "url": "/autoservice/inspections",
+            "inspectionId": booking.id,
+            "title": title,
+            "body": body,
+        },
+        email_subject=title,
+        email_body=f"{body}\n\nОткрыть: {SITE_ORIGIN}/autoservice/inspections\n\nС уважением,\nСвой Гараж",
+        permission=AUTOSERVICE_PERMISSION_INSPECTIONS,
+    )
+
+
+def _booking_reminder_kind(booking_id: int) -> str:
+    return f"booking_reminder:{booking_id}"
+
+
+def _booking_reminder_sent(db: Session, booking: InspectionBooking) -> bool:
+    exists = (
+        db.query(AutoserviceDigestLog.id)
+        .filter(
+            AutoserviceDigestLog.organization_id == booking.organization_id,
+            AutoserviceDigestLog.digest_date == booking.preferred_date,
+            AutoserviceDigestLog.kind == _booking_reminder_kind(booking.id),
+        )
+        .first()
+    )
+    return exists is not None
+
+
+def _mark_booking_reminder_sent(db: Session, booking: InspectionBooking) -> None:
+    db.add(
+        AutoserviceDigestLog(
+            organization_id=booking.organization_id,
+            digest_date=booking.preferred_date,
+            kind=_booking_reminder_kind(booking.id),
+        )
+    )
+    db.commit()
+
+
+def send_booking_reminder(db: Session, booking: InspectionBooking) -> bool:
+    if _booking_reminder_sent(db, booking):
+        return False
+    user_ids = _booking_client_user_ids(db, booking)
+    if not user_ids:
+        return False
+
+    org_name = booking.organization.name if booking.organization else ""
+    title = "Напоминание о записи"
+    body = f"Завтра {_booking_datetime_label(booking)} — запись №{booking.id}."
+    if org_name:
+        body = f"{org_name}: {body}"
+    for user_id in user_ids:
+        dispatch_user_notification(
+            user_id,
+            event_type=EVENT_AUTOSERVICE_BOOKING_REMINDER,
+            push_data={
+                "type": "autoservice_inspection_client",
+                "url": "/autoservice/my-bookings",
+                "inspectionId": booking.id,
+                "title": title,
+                "body": body,
+            },
+            email_subject=title,
+            email_body=f"{body}\n\nОткрыть: {SITE_ORIGIN}/autoservice/my-bookings\n\nС уважением,\nСвой Гараж",
+        )
+    _mark_booking_reminder_sent(db, booking)
+    return True
+
+
+def run_booking_reminders(db: Session, target_date: date | None = None) -> dict:
+    """Notify clients one day before confirmed/pending bookings."""
+    target = target_date or (_today_msk() + timedelta(days=1))
+    rows = (
+        db.query(InspectionBooking)
+        .options(
+            joinedload(InspectionBooking.organization),
+            joinedload(InspectionBooking.vehicle),
+        )
+        .filter(
+            InspectionBooking.preferred_date == target,
+            InspectionBooking.status.in_(("new", "confirmed")),
+        )
+        .all()
+    )
+    sent = 0
+    for booking in rows:
+        try:
+            if send_booking_reminder(db, booking):
+                sent += 1
+        except Exception:
+            logger.exception("Booking reminder failed for booking %s", booking.id)
+    return {"target_date": target.isoformat(), "sent": sent}
+
+
+def notify_tariff_application_reviewed(
+    db: Session,
+    *,
+    application,
+    org: Organization | None,
+    approved: bool,
+) -> None:
+    """Notify organization directors about approve/reject of the tariff application."""
+    if org is None:
+        org = (
+            db.query(Organization)
+            .filter(Organization.id == application.organization_id)
+            .first()
+        )
+    org_name = org.name if org else application.organization_id
+    if approved:
+        title = "Заявка на тариф одобрена"
+        body = f"Заявка №{application.id} одобрена — тариф подключён."
+    else:
+        title = "Заявка на тариф отклонена"
+        reason = getattr(application, "rejection_reason", None) or "Причина не указана"
+        body = f"Заявка №{application.id} отклонена. Причина: {reason}."
+
+    body = f"{org_name}: {body}"
+    recipients = (
+        db.query(User.id)
+        .filter(
+            User.organization_id == application.organization_id,
+            User.is_director.is_(True),
+        )
+        .all()
+    )
+    for (user_id,) in recipients:
+        dispatch_user_notification(
+            user_id,
+            event_type=EVENT_AUTOSERVICE_APPLICATION_REVIEWED,
+            push_data={
+                "type": "autoservice_application",
+                "url": "/autoservice/tariff",
+                "applicationId": application.id,
+                "title": title,
+                "body": body,
+            },
+            email_subject=title,
+            email_body=f"{body}\n\nОткрыть: {SITE_ORIGIN}/autoservice\n\nС уважением,\nСвой Гараж",
+        )

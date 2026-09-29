@@ -29,6 +29,7 @@ class AutoserviceFinanceReceiptRow(BaseModel):
     amount: Decimal
     method: AutoservicePaymentMethod
     created_at: datetime
+    paid_at: Optional[datetime] = None
 
 
 class RepairOrderPaymentView(BaseModel):
@@ -37,6 +38,8 @@ class RepairOrderPaymentView(BaseModel):
     method: AutoservicePaymentMethod
     amount: Decimal
     created_at: datetime
+    paid_at: Optional[datetime] = None
+    is_cancelled: bool = False
 
 
 class RepairOrderPaymentsListResponse(BaseModel):
