@@ -903,10 +903,11 @@ export default function RepairOrderViewModal({
                   disabled={statusSaving || completeSaving || paySaving}
                   isOpen={statusPickerOpen}
                   onOpenChange={setStatusPickerOpen}
+                  noRing
                   onChange={handleStatusChange}
                 />
               ) : (
-                <OrderStatusBadge status={order.status} />
+                <OrderStatusBadge status={order.status} noRing />
               )}
             </div>
             {statusError ? (
