@@ -5,7 +5,7 @@ from io import BytesIO
 from openpyxl import Workbook
 
 from app.services.autoservice_rossko_sales_report import RosskoSalesReportFilters, build_rossko_sales_report
-from app.services.finance_xlsx_export import HEADER_FONT, _autosize_columns, _write_header
+from app.services.finance_xlsx_export import HEADER_FONT, _autosize_columns, _write_header, naive_datetime
 
 
 def _sheet_summary(wb: Workbook, report: dict) -> None:
@@ -55,7 +55,7 @@ def _sheet_operations(wb: Workbook, items: list[dict]) -> None:
     ]
     _write_header(ws, headers)
     for index, row in enumerate(items, start=2):
-        ws.cell(row=index, column=1, value=row.get("operation_at"))
+        ws.cell(row=index, column=1, value=naive_datetime(row.get("operation_at")))
         ws.cell(row=index, column=2, value=row.get("order_id"))
         ws.cell(row=index, column=3, value=row.get("rossko_order_id"))
         ws.cell(row=index, column=4, value=row.get("buyer_name"))
@@ -113,7 +113,7 @@ def _sheet_items(wb: Workbook, items: list[dict]) -> None:
     for order in items:
         for line in order.get("items") or []:
             ws.cell(row=row_idx, column=1, value=order.get("order_id"))
-            ws.cell(row=row_idx, column=2, value=order.get("operation_at"))
+            ws.cell(row=row_idx, column=2, value=naive_datetime(order.get("operation_at")))
             ws.cell(row=row_idx, column=3, value=line.get("brand"))
             ws.cell(row=row_idx, column=4, value=line.get("partnumber"))
             ws.cell(row=row_idx, column=5, value=line.get("name"))

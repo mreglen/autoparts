@@ -13,7 +13,7 @@ from app.services.autoservice_order_economics import (
     order_economics_payment_label,
     order_economics_status_label,
 )
-from app.services.finance_xlsx_export import HEADER_FONT, _autosize_columns, _write_header
+from app.services.finance_xlsx_export import HEADER_FONT, _autosize_columns, _write_header, naive_datetime
 
 STATUS_LABELS = {
     "all": "Все",
@@ -99,7 +99,7 @@ def _sheet_orders(wb: Workbook, items: list[dict]) -> None:
         ws.cell(row=index, column=1, value=row["order_number"])
         ws.cell(row=index, column=2, value=row["client_name"])
         ws.cell(row=index, column=3, value=_vehicle_label(row.get("vehicle")))
-        ws.cell(row=index, column=4, value=row["scheduled_at"])
+        ws.cell(row=index, column=4, value=naive_datetime(row["scheduled_at"]))
         ws.cell(row=index, column=5, value=row["grand_total"])
         ws.cell(row=index, column=6, value=row["parts_cost"])
         ws.cell(row=index, column=7, value=row["payroll_total"])

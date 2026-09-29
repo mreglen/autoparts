@@ -6,7 +6,7 @@ from io import BytesIO
 from openpyxl import Workbook
 
 from app.services.autoservice_payment_service import list_finance_receipts
-from app.services.finance_xlsx_export import HEADER_FONT, _autosize_columns, _write_header
+from app.services.finance_xlsx_export import HEADER_FONT, _autosize_columns, _write_header, naive_datetime
 
 METHOD_LABELS = {
     "card": "Карта",
@@ -55,7 +55,7 @@ def _sheet_payments(wb: Workbook, items) -> None:
         ws.cell(row=index, column=3, value=row.client_name)
         ws.cell(row=index, column=4, value=METHOD_LABELS.get(row.method, row.method))
         ws.cell(row=index, column=5, value=row.amount)
-        ws.cell(row=index, column=6, value=row.paid_at or row.created_at)
+        ws.cell(row=index, column=6, value=naive_datetime(row.paid_at or row.created_at))
     _autosize_columns(ws)
 
 

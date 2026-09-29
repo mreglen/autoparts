@@ -25,6 +25,13 @@ from app.services.finance_reports import (
 HEADER_FONT = Font(bold=True)
 
 
+def naive_datetime(value):
+    """PostgreSQL TIMESTAMPTZ отдаёт aware datetime — openpyxl их не принимает."""
+    if value is not None and getattr(value, "tzinfo", None) is not None:
+        return value.replace(tzinfo=None)
+    return value
+
+
 def _write_header(ws, headers: list[str]) -> None:
     for col, title in enumerate(headers, start=1):
         cell = ws.cell(row=1, column=col, value=title)
