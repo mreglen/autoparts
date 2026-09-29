@@ -17,4 +17,3 @@ class SmsMessage(Base):
     provider_message_id = Column(String(64), nullable=True)
     created_by_user_id = Column(Integer, nullable=True, index=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
-ё

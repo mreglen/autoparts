@@ -7054,7 +7054,7 @@ def ensure_autoservice_warehouse_items_nonnegative() -> None:
 
 
 def ensure_sms_messages_table() -> None:
-    """Create sms_messages Ч лог отправленных SMS (SMSC)."""
+    """Create sms_messages - log of sent SMS (SMSC)."""
     inspector = inspect(engine)
     if "sms_messages" in inspector.get_table_names():
         return
