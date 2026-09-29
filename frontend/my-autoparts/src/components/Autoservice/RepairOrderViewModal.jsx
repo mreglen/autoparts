@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Modal from '../UI/Modal';
 import { ActionsDropdownItem } from '../ActionsDropdown/ActionsDropdown';
 import { formatServerDateTime, formatServerDate, formatWallClockDateTime } from '../../utils/serverDate';
@@ -16,6 +17,17 @@ import {
 import { formatVatRate, orderVatRate, splitVatInclusive } from '../../utils/updDocument';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { AUTOSERVICE_PAYMENT_METHOD_LABELS } from '../../utils/autoservicePaymentReceipt';
+import { normalizeVinForLookupOrNull } from '../../utils/laximoVin';
+
+const LazyClientProfileModal = lazy(() =>
+  import('./ClientProfileModals').then((m) => ({ default: m.ClientProfileModal })),
+);
+const LazyAddGuestVehicleModal = lazy(() =>
+  import('./ClientProfileModals').then((m) => ({ default: m.AddGuestVehicleModal })),
+);
+const LazyEditGuestVehicleModal = lazy(() =>
+  import('./ClientProfileModals').then((m) => ({ default: m.EditGuestVehicleModal })),
+);
 
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
@@ -556,6 +568,7 @@ export default function RepairOrderViewModal({
   enablePayment = false,
   wrapperZIndex = null,
 }) {
+  const navigate = useNavigate();
   const [payOpen, setPayOpen] = useState(false);
   const [payMethod, setPayMethod] = useState(null);
   const [payAmount, setPayAmount] = useState('');
@@ -578,6 +591,11 @@ export default function RepairOrderViewModal({
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
+  const [clientCardOpen, setClientCardOpen] = useState(false);
+  const [clientVehicles, setClientVehicles] = useState([]);
+  const [clientVehiclesLoading, setClientVehiclesLoading] = useState(false);
+  const [clientEditVehicle, setClientEditVehicle] = useState(null);
+  const [clientAddVehicleOpen, setClientAddVehicleOpen] = useState(false);
 
   useEffect(() => {
     setPayOpen(false);
@@ -598,7 +616,67 @@ export default function RepairOrderViewModal({
     setCancelConfirmOpen(false);
     setCancelSaving(false);
     setStatusPickerOpen(false);
+    setClientCardOpen(false);
+    setClientVehicles([]);
+    setClientVehiclesLoading(false);
+    setClientEditVehicle(null);
+    setClientAddVehicleOpen(false);
   }, [order?.id]);
+
+  const clientCardId = order?.client?.id || null;
+
+  const loadClientVehicles = useCallback(async (clientId) => {
+    if (!clientId) return;
+    setClientVehiclesLoading(true);
+    try {
+      const data = await apiRequest(`/autoservice/garage/vehicles?client_id=${clientId}`);
+      setClientVehicles(Array.isArray(data) ? data : []);
+    } catch {
+      setClientVehicles([]);
+    } finally {
+      setClientVehiclesLoading(false);
+    }
+  }, []);
+
+  const openClientCard = useCallback(() => {
+    if (!clientCardId) return;
+    setClientCardOpen(true);
+    loadClientVehicles(clientCardId);
+  }, [clientCardId, loadClientVehicles]);
+
+  const openVehicleEdit = useCallback(async () => {
+    const vehicleId = order?.vehicle?.id;
+    if (!vehicleId) return;
+    if (clientCardId) {
+      try {
+        const data = await apiRequest(`/autoservice/garage/vehicles?client_id=${clientCardId}`);
+        const full = (Array.isArray(data) ? data : []).find((v) => v.id === vehicleId);
+        if (full) {
+          setClientEditVehicle(full);
+          return;
+        }
+      } catch {
+        /* fall back to order.vehicle */
+      }
+    }
+    setClientEditVehicle(order.vehicle);
+  }, [clientCardId, order?.vehicle]);
+
+  const handleClientVinClick = useCallback(
+    async (rawVin) => {
+      const vin = normalizeVinForLookupOrNull(rawVin);
+      if (!vin) return;
+      try {
+        if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(vin);
+      } catch {
+        /* clipboard may be unavailable */
+      }
+      setClientCardOpen(false);
+      onClose?.();
+      navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+    },
+    [navigate, onClose],
+  );
 
   const totals = order ? orderTotals(order) : null;
   const payment = order && totals ? paymentSummary(order, totals.grand) : null;
@@ -992,9 +1070,33 @@ export default function RepairOrderViewModal({
         <div className="space-y-5">
           <dl className="grid gap-4 sm:grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)]">
             <MetaItem label="Клиент">
-              <span className="inline-block whitespace-nowrap">{clientLine}</span>
+              {order?.client?.id ? (
+                <button
+                  type="button"
+                  onClick={openClientCard}
+                  className="inline-block whitespace-nowrap font-medium text-brand-700 underline decoration-brand-300 underline-offset-2 transition hover:text-brand-800 hover:decoration-brand-600"
+                  title="Открыть карточку клиента"
+                >
+                  {clientLine}
+                </button>
+              ) : (
+                <span className="inline-block whitespace-nowrap">{clientLine}</span>
+              )}
             </MetaItem>
-            <MetaItem label="Авто">{vehicleLabel(order.vehicle)}</MetaItem>
+            <MetaItem label="Авто">
+              {order?.vehicle?.id ? (
+                <button
+                  type="button"
+                  onClick={openVehicleEdit}
+                  className="font-medium text-brand-700 underline decoration-brand-300 underline-offset-2 transition hover:text-brand-800 hover:decoration-brand-600"
+                  title="Изменить автомобиль"
+                >
+                  {vehicleLabel(order.vehicle)}
+                </button>
+              ) : (
+                vehicleLabel(order.vehicle)
+              )}
+            </MetaItem>
             <MetaItem label="Дата">{formatDateTime(order.scheduled_at) || '—'}</MetaItem>
             <MetaItem label="Пробег">
               {order.mileage_km != null && order.mileage_km !== ''
@@ -1213,6 +1315,45 @@ export default function RepairOrderViewModal({
         </div>
       </div>
     </Modal>
+
+    <Suspense fallback={null}>
+      <LazyClientProfileModal
+        open={clientCardOpen && Boolean(clientCardId)}
+        client={order?.client}
+        vehicles={clientVehicles}
+        loading={clientVehiclesLoading}
+        onClose={() => setClientCardOpen(false)}
+        onEditVehicle={setClientEditVehicle}
+        onAddVehicle={() => setClientAddVehicleOpen(true)}
+        onVinClick={handleClientVinClick}
+        onSaved={(updated) => {
+          if (order && updated) {
+            onOrderChange?.({ ...order, client: { ...order.client, ...updated } });
+          }
+        }}
+      />
+      <LazyAddGuestVehicleModal
+        open={clientAddVehicleOpen}
+        clientId={clientCardId}
+        onClose={() => setClientAddVehicleOpen(false)}
+        onCreated={(created) => {
+          if (created?.client_id) {
+            setClientVehicles((prev) => [created, ...prev]);
+          }
+        }}
+      />
+      <LazyEditGuestVehicleModal
+        open={Boolean(clientEditVehicle)}
+        vehicle={clientEditVehicle}
+        onClose={() => setClientEditVehicle(null)}
+        onSaved={(updated) => {
+          setClientVehicles((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+          if (order?.vehicle?.id === updated.id) {
+            onOrderChange?.({ ...order, vehicle: { ...order.vehicle, ...updated } });
+          }
+        }}
+      />
+    </Suspense>
     </>
   );
 }
