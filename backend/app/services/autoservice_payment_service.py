@@ -68,12 +68,12 @@ def _finance_receipt_row(payment: AutoservicePayment) -> AutoserviceFinanceRecei
 
 
 def allocate_autoservice_payment_number(db: Session, organization_id: str) -> int:
-    current = (
-        db.query(func.max(AutoservicePayment.sequential_number))
-        .filter(AutoservicePayment.organization_id == organization_id)
-        .scalar()
+    from app.services.autoservice_counters import (
+        COUNTER_AUTOSERVICE_PAYMENT,
+        next_counter_value,
     )
-    return int(current or 0) + 1
+
+    return next_counter_value(db, organization_id, COUNTER_AUTOSERVICE_PAYMENT)
 
 
 def sum_order_payments(db: Session, order_id: int) -> Decimal:

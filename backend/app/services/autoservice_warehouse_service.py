@@ -762,44 +762,6 @@ def import_purchase_groups_to_warehouse(
     return added, skipped, not_found
 
 
-def consume_reserved_autoservice_stock(
-    db: Session,
-    *,
-    org_id: str,
-    user_id: int,
-    item: AutoserviceWarehouseItem,
-    quantity: int,
-    reason: str | None = None,
-    client_unit_price: Decimal | None = None,
-    repair_order_id: int | None = None,
-) -> AutoserviceWarehouseExpense | None:
-    """Write off reserved qty into expenses (used when a repair order is completed)."""
-    qty = int(quantity or 0)
-    if qty <= 0:
-        return None
-    reserved = int(item.reserved_qty or 0)
-    if reserved <= 0:
-        return None
-    consume = min(qty, reserved, int(item.quantity or 0))
-    if consume <= 0:
-        return None
-    item.reserved_qty = reserved - consume
-    item.quantity = int(item.quantity or 0) - consume
-    expense = AutoserviceWarehouseExpense(
-        organization_id=org_id,
-        item_id=item.id,
-        quantity=consume,
-        unit_price=_money(item.unit_price),
-        client_unit_price=_money(client_unit_price) if client_unit_price is not None else _money(item.unit_price),
-        reason=(reason or "").strip()[:255] or None,
-        repair_order_id=repair_order_id,
-        created_by=user_id,
-    )
-    db.add(expense)
-    db.flush()
-    return expense
-
-
 def fulfill_autoservice_stock_on_order_complete(
     db: Session,
     *,
@@ -807,11 +769,18 @@ def fulfill_autoservice_stock_on_order_complete(
     org_id: str,
     user_id: int,
 ) -> int:
-    """Turn reserved autoservice-stock lines into expenses when the order is completed."""
+    """Turn autoservice-stock lines into expenses when the order is completed.
+
+    Idempotent via the autoservice_stock_consumed flag on each part line: a
+    re-completed order does not double-deduct, and reverting (cancel/delete)
+    clears the flag so a later completion consumes again.
+    """
     created = 0
     order_label = f"Заказ-наряд №{order.order_number}"
     for part in order.shop_parts or []:
         if part.source != "autoservice_stock" or not part.autoservice_stock_item_id:
+            continue
+        if getattr(part, "autoservice_stock_consumed", False):
             continue
         item = (
             db.query(AutoserviceWarehouseItem)
@@ -824,19 +793,85 @@ def fulfill_autoservice_stock_on_order_complete(
         )
         if not item:
             continue
-        expense = consume_reserved_autoservice_stock(
-            db,
-            org_id=org_id,
-            user_id=user_id,
-            item=item,
-            quantity=max(1, int(Decimal(str(part.qty or 1)).quantize(Decimal("1")))),
-            reason=order_label,
-            client_unit_price=_effective_client_price(part),
-            repair_order_id=order.id,
+        qty = max(1, int(Decimal(str(part.qty or 1)).quantize(Decimal("1"))))
+        consume = min(qty, int(item.quantity or 0))
+        if consume <= 0:
+            continue
+        item.reserved_qty = max(0, int(item.reserved_qty or 0) - qty)
+        item.quantity = int(item.quantity or 0) - consume
+        db.add(
+            AutoserviceWarehouseExpense(
+                organization_id=org_id,
+                item_id=item.id,
+                quantity=consume,
+                unit_price=_money(item.unit_price),
+                client_unit_price=_effective_client_price(part),
+                reason=order_label,
+                repair_order_id=order.id,
+                created_by=user_id,
+            )
         )
-        if expense:
-            created += 1
+        part.autoservice_stock_consumed = True
+        db.flush()
+        created += 1
     return created
+
+
+def revert_autoservice_stock_for_order(
+    db: Session,
+    *,
+    org_id: str,
+    order: RepairOrder,
+) -> int:
+    """Return autoservice-stock expensed for this order back to warehouse.
+
+    Idempotent: matches expenses by repair_order_id; falls back to the legacy
+    reason label for expenses written before the link existed.
+    """
+    order_label = f"Заказ-наряд №{order.order_number}"
+    expenses = (
+        db.query(AutoserviceWarehouseExpense)
+        .options(joinedload(AutoserviceWarehouseExpense.item))
+        .filter(
+            AutoserviceWarehouseExpense.organization_id == org_id,
+            or_(
+                AutoserviceWarehouseExpense.repair_order_id == order.id,
+                AutoserviceWarehouseExpense.reason == order_label,
+            ),
+        )
+        .all()
+    )
+    item_ids = {expense.item_id for expense in expenses if expense.item_id}
+    locked_items = (
+        {
+            row.id: row
+            for row in (
+                db.query(AutoserviceWarehouseItem)
+                .filter(
+                    AutoserviceWarehouseItem.id.in_(item_ids),
+                    AutoserviceWarehouseItem.organization_id == org_id,
+                )
+                .with_for_update()
+                .all()
+            )
+        }
+        if item_ids
+        else {}
+    )
+
+    restored = 0
+    for expense in expenses:
+        item = locked_items.get(expense.item_id) or expense.item
+        if item:
+            item.quantity = int(item.quantity or 0) + int(expense.quantity or 0)
+        db.delete(expense)
+        restored += 1
+    for part in order.shop_parts or []:
+        if part.source == "autoservice_stock" and getattr(
+            part, "autoservice_stock_consumed", False
+        ):
+            part.autoservice_stock_consumed = False
+    return restored
 
 
 def create_autoservice_expense(
@@ -854,6 +889,7 @@ def create_autoservice_expense(
             AutoserviceWarehouseItem.id == item_id,
             AutoserviceWarehouseItem.organization_id == org_id,
         )
+        .with_for_update()
         .first()
     )
     if not item:
@@ -897,6 +933,11 @@ def delete_autoservice_expense(
     )
     if not expense:
         raise HTTPException(status_code=404, detail="Списание не найдено")
+    if expense.repair_order_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Списание связано с заказ-нарядом — измените статус заказа, чтобы вернуть товар",
+        )
     item = expense.item
     if item:
         item.quantity = int(item.quantity or 0) + int(expense.quantity or 0)

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
-from app.models.autoservice_warehouse import AutoserviceWarehouseExpense, AutoserviceWarehouseItem
 from app.models.repair_order import RepairOrder
 from app.services.autoservice_payroll import clear_order_accruals
 from app.services.repair_order_stock_reserve import release_order_reservations
@@ -16,35 +15,11 @@ def _restore_completed_order_stock(
     order: RepairOrder,
 ) -> None:
     """Return autoservice-stock consumed on order completion back to warehouse."""
-    order_label = f"Заказ-наряд №{order.order_number}"
-    expenses = (
-        db.query(AutoserviceWarehouseExpense)
-        .options(joinedload(AutoserviceWarehouseExpense.item))
-        .filter(
-            AutoserviceWarehouseExpense.organization_id == org_id,
-            AutoserviceWarehouseExpense.reason == order_label,
-        )
-        .all()
+    from app.services.autoservice_warehouse_service import (
+        revert_autoservice_stock_for_order,
     )
-    item_ids = {expense.item_id for expense in expenses if expense.item_id}
-    locked_items = {
-        row.id: row
-        for row in (
-            db.query(AutoserviceWarehouseItem)
-            .filter(
-                AutoserviceWarehouseItem.id.in_(item_ids),
-                AutoserviceWarehouseItem.organization_id == org_id,
-            )
-            .with_for_update()
-            .all()
-        )
-    } if item_ids else {}
 
-    for expense in expenses:
-        item = locked_items.get(expense.item_id) or expense.item
-        if item:
-            item.quantity = int(item.quantity or 0) + int(expense.quantity or 0)
-        db.delete(expense)
+    revert_autoservice_stock_for_order(db, org_id=org_id, order=order)
 
 
 def delete_repair_order(

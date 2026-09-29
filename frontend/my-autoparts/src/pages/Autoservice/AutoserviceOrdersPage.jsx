@@ -10,7 +10,6 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import RepairOrderViewModal, {
   RepairOrderStatusPicker,
   REPAIR_ORDER_STATUS_LABELS,
-  normalizeRepairOrderStatus,
   vehicleMakeModelLabel,
 } from '../../components/Autoservice/RepairOrderViewModal';
 import { Skeleton, UnderlineTabs } from '../../components/UI';
@@ -34,6 +33,8 @@ import {
   autoserviceListTrClickableClass,
   autoserviceListTdClass,
 } from '../../utils/warehouseListUi';
+
+const PAGE_SIZE = 50;
 
 const pillButtonClass =
   'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
@@ -71,6 +72,9 @@ export default function AutoserviceOrdersPage() {
   const [drafts, setDrafts] = useState(() => listRepairOrderFormDrafts());
 
   const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [reviewCount, setReviewCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -88,42 +92,104 @@ export default function AutoserviceOrdersPage() {
   const [closeConfirmOrder, setCloseConfirmOrder] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const prevScopeKeyRef = useRef(null);
+  const offsetRef = useRef(0);
+  const loadSeqRef = useRef(0);
+  const sentinelRef = useRef(null);
 
   const scope = viewReview ? 'review' : viewHistory ? 'history' : viewAll ? 'all' : 'active';
+
+  const buildParams = useCallback(
+    (offset) => {
+      const params = new URLSearchParams({
+        scope,
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+      });
+      if (qApplied.trim()) params.set('q', qApplied.trim());
+      const statusParam = viewHistory ? historyStatus || statusFilter : statusFilter;
+      if (statusParam) params.set('status', statusParam);
+      if (dateFrom) params.set('date_from', dateFrom);
+      if (dateTo) params.set('date_to', dateTo);
+      return params;
+    },
+    [scope, qApplied, viewHistory, historyStatus, statusFilter, dateFrom, dateTo],
+  );
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (viewDrafts) {
       setRows([]);
+      setTotal(0);
+      setHasMore(false);
       setError('');
       setLoading(false);
       return;
     }
+    const seq = ++loadSeqRef.current;
     if (!silent) setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ scope });
-      if (qApplied.trim()) params.set('q', qApplied.trim());
-      if (viewHistory && historyStatus) params.set('status', historyStatus);
-      const data = await apiRequest(`/autoservice/repair-orders?${params.toString()}`);
-      const nextRows = Array.isArray(data) ? data : [];
-      setRows(nextRows);
+      const data = await apiRequest(`/autoservice/repair-orders?${buildParams(0).toString()}`);
+      if (seq !== loadSeqRef.current) return;
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setRows(items);
+      setTotal(Number(data?.total) || items.length);
+      setHasMore(Boolean(data?.has_more));
+      offsetRef.current = items.length;
       if (scope === 'review') {
-        setReviewCount(nextRows.length);
+        setReviewCount(Number(data?.total) || items.length);
       } else if (canReview) {
-        try {
-          const reviewData = await apiRequest('/autoservice/repair-orders?scope=review');
-          setReviewCount(Array.isArray(reviewData) ? reviewData.length : 0);
-        } catch {
-          /* count is optional */
-        }
+        apiRequest('/autoservice/repair-orders?scope=review&limit=1')
+          .then((d) => {
+            if (loadSeqRef.current === seq) setReviewCount(Number(d?.total) || 0);
+          })
+          .catch(() => {});
       }
     } catch (e) {
+      if (seq !== loadSeqRef.current) return;
       setError(e?.message || 'Не удалось загрузить записи');
       setRows([]);
+      setHasMore(false);
     } finally {
-      if (!silent) setLoading(false);
+      if (seq === loadSeqRef.current && !silent) setLoading(false);
     }
-  }, [scope, qApplied, viewHistory, viewDrafts, historyStatus, canReview]);
+  }, [viewDrafts, buildParams, scope, canReview]);
+
+  const loadMore = useCallback(async () => {
+    if (viewDrafts || loading || loadingMore || !hasMore) return;
+    const seq = loadSeqRef.current;
+    setLoadingMore(true);
+    try {
+      const data = await apiRequest(
+        `/autoservice/repair-orders?${buildParams(offsetRef.current).toString()}`,
+      );
+      if (seq !== loadSeqRef.current) return;
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setRows((prev) => {
+        const seen = new Set(prev.map((row) => row.id));
+        return [...prev, ...items.filter((row) => !seen.has(row.id))];
+      });
+      offsetRef.current += items.length;
+      setTotal(Number(data?.total) || 0);
+      setHasMore(Boolean(data?.has_more));
+    } catch {
+      /* keep already loaded rows */
+    } finally {
+      if (seq === loadSeqRef.current) setLoadingMore(false);
+    }
+  }, [viewDrafts, loading, loadingMore, hasMore, buildParams]);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || viewDrafts || !hasMore) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMore();
+      },
+      { rootMargin: '300px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore, viewDrafts]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
@@ -276,21 +342,6 @@ export default function AutoserviceOrdersPage() {
     [applyOrderToList],
   );
 
-  const filteredRows = useMemo(() => {
-    if (!dateFrom && !dateTo && !statusFilter) return rows;
-    const from = dateFrom || '0000-01-01';
-    const to = dateTo || '9999-12-31';
-    return rows.filter((row) => {
-      if (statusFilter && normalizeRepairOrderStatus(row?.status) !== statusFilter) return false;
-      if (dateFrom || dateTo) {
-        const raw = String(row?.scheduled_at || '');
-        const day = /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : '';
-        if (!day || day < from || day > to) return false;
-      }
-      return true;
-    });
-  }, [rows, dateFrom, dateTo, statusFilter]);
-
   const filteredDrafts = useMemo(() => {
     if (!viewDrafts) return drafts;
     const term = qApplied.trim().toLowerCase();
@@ -330,16 +381,16 @@ export default function AutoserviceOrdersPage() {
     : viewDrafts
       ? `${drafts.length} черновиков`
       : viewAll
-        ? `${rows.length} всего`
+        ? `${total} всего`
         : viewHistory
       ? canReview
-        ? `${rows.length} завершённых и отменённых`
-        : `${rows.length} ваших завершённых и отменённых`
+        ? `${total} завершённых и отменённых`
+        : `${total} ваших завершённых и отменённых`
       : viewReview
-        ? `${rows.length} заявок от сотрудников`
+        ? `${total} заявок от сотрудников`
         : canReview
-          ? `${rows.length} активных`
-          : `${rows.length} ваших активных`;
+          ? `${total} активных`
+          : `${total} ваших активных`;
   const orderTabs = [
     { id: 'active', label: 'Активные' },
     { id: 'all', label: 'Все' },
@@ -382,7 +433,10 @@ export default function AutoserviceOrdersPage() {
           loading={loading}
           error={error}
           onErrorClose={() => setError('')}
-          rows={filteredRows}
+          rows={rows}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          sentinelRef={sentinelRef}
           emptyMessage={emptyMessage}
           statusActionsForRow={statusActionsForRow}
           onStatusChange={handleStatus}
@@ -606,14 +660,14 @@ export default function AutoserviceOrdersPage() {
                   </tr>
                 ))
               )
-            ) : filteredRows.length === 0 ? (
+            ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-ink-muted">
                   {emptyMessage}
                 </td>
               </tr>
             ) : (
-              filteredRows.map((row) => (
+              rows.map((row) => (
                 <tr
                   key={row.id}
                   className={autoserviceListTrClickableClass}
@@ -651,6 +705,11 @@ export default function AutoserviceOrdersPage() {
             )}
           </tbody>
         </table>
+        {!loading && !viewDrafts && hasMore ? (
+          <div ref={sentinelRef} className="flex justify-center py-3" aria-hidden="true">
+            {loadingMore ? <Skeleton className="h-4 w-40" /> : null}
+          </div>
+        ) : null}
       </div>
 
       <RepairOrderViewModal

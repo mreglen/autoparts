@@ -387,21 +387,6 @@ def get_my_autoservice_client(
     else:
         org_id = require_autoservice_org_id(db)
     row = _find_by_user(db, org_id, current_user.id)
-    if not row:
-        phone = None
-        if current_user.phone:
-            try:
-                phone = normalize_phone_or_400(current_user.phone)
-            except HTTPException:
-                phone = None
-        if phone:
-            row = _find_by_phone(db, org_id, phone)
-            if row and row.user_id is None:
-                row.user_id = current_user.id
-                db.commit()
-                db.refresh(row)
-            elif row and row.user_id != current_user.id:
-                row = None
     if not row or row.status != "active":
         return AutoserviceClientMeResponse(is_client=False, client=None)
     return AutoserviceClientMeResponse(

@@ -78,7 +78,7 @@ export default function AutoserviceDashboardPage() {
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeOrders, setActiveOrders] = useState([]);
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
   const [plannerData, setPlannerData] = useState(null);
   const [revenue30d, setRevenue30d] = useState(null);
   const [reviewCount, setReviewCount] = useState(0);
@@ -108,7 +108,7 @@ export default function AutoserviceDashboardPage() {
     const canSeePlanner = can(AUTOSERVICE_PERMISSION.planner);
     const results = await Promise.allSettled([
       canSeeOrders
-        ? apiRequest('/autoservice/repair-orders?scope=active')
+        ? apiRequest('/autoservice/repair-orders?scope=active&limit=1')
         : Promise.resolve(null),
       canSeePlanner
         ? apiRequest(`/autoservice/planner/week?week_start=${weekStartIso}`)
@@ -117,7 +117,7 @@ export default function AutoserviceDashboardPage() {
         ? apiRequest(`/autoservice/finance/receipts?${receiptsParams.toString()}`)
         : Promise.resolve(null),
       canReview
-        ? apiRequest('/autoservice/repair-orders?scope=review')
+        ? apiRequest('/autoservice/repair-orders?scope=review&limit=1')
         : Promise.resolve(null),
     ]);
 
@@ -131,17 +131,15 @@ export default function AutoserviceDashboardPage() {
       setLoading(false);
       return;
     }
-    setActiveOrders(
-      ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value) ? ordersRes.value : [],
+    setActiveOrdersCount(
+      ordersRes.status === 'fulfilled' ? Number(ordersRes.value?.total) || 0 : 0,
     );
     setPlannerData(plannerRes.status === 'fulfilled' ? plannerRes.value || null : null);
     setRevenue30d(
       receiptsRes.status === 'fulfilled' ? receiptsRes.value?.total_amount ?? null : null,
     );
     setReviewCount(
-      reviewRes.status === 'fulfilled' && Array.isArray(reviewRes.value)
-        ? reviewRes.value.length
-        : 0,
+      reviewRes.status === 'fulfilled' ? Number(reviewRes.value?.total) || 0 : 0,
     );
     setLoading(false);
   }, [today, todayIso, weekStartIso, can, canSeeOrders, canSeeFinance, canReview]);
@@ -316,7 +314,7 @@ export default function AutoserviceDashboardPage() {
       <section className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
         <MetricCard
           label="Заказ-наряды в работе"
-          value={activeOrders.length}
+          value={activeOrdersCount}
           hint={canReview && reviewCount > 0 ? `+ ${reviewCount} на проверке` : 'Активные заказы'}
           href={canSeeOrders ? '/autoservice/orders' : undefined}
           accent="brand"

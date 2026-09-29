@@ -403,9 +403,9 @@ function ClientProfileModal({
       setOrdersLoading(true);
       try {
         const data = await apiRequest(
-          `/autoservice/repair-orders?scope=all&client_id=${encodeURIComponent(clientId)}`,
+          `/autoservice/repair-orders?scope=all&limit=200&client_id=${encodeURIComponent(clientId)}`,
         );
-        if (!cancelled) setOrders(Array.isArray(data) ? data : []);
+        if (!cancelled) setOrders(Array.isArray(data?.items) ? data.items : []);
       } catch {
         if (!cancelled) setOrders([]);
       } finally {

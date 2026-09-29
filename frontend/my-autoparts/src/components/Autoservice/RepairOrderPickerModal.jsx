@@ -49,10 +49,10 @@ export default function RepairOrderPickerModal({
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ scope: 'active' });
+      const params = new URLSearchParams({ scope: 'active', limit: '200' });
       if (search.trim()) params.set('q', search.trim());
       const data = await apiRequest(`/autoservice/repair-orders?${params.toString()}`);
-      setOrders(Array.isArray(data) ? data : []);
+      setOrders(Array.isArray(data?.items) ? data.items : []);
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить заказ-наряды');
       setOrders([]);

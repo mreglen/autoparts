@@ -53,6 +53,7 @@ from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.autoservice_work import AutoserviceWork
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.autoservice_payment import AutoservicePayment
+from app.models.autoservice_counter import AutoserviceCounter
 from app.models.autoservice_warehouse import AutoserviceWarehouseItem
 from app.models.organization_employee import OrganizationEmployee
 from app.models.garage_vehicle import GarageVehicle

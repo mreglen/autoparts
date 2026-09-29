@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     Column,
     Date,
     DateTime,
@@ -270,6 +271,7 @@ class RepairOrderShopPart(Base):
         nullable=True,
         index=True,
     )
+    autoservice_stock_consumed = Column(Boolean, nullable=False, default=False)
     brand = Column(String(120), nullable=True)
     partnumber = Column(String(120), nullable=True)
     rossko_brand = Column(String(120), nullable=True)

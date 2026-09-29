@@ -291,6 +291,12 @@ class RepairOrderStaffView(BaseModel):
     is_paid: bool = False
 
 
+class RepairOrderListPage(BaseModel):
+    items: list[RepairOrderStaffView] = Field(default_factory=list)
+    total: int = 0
+    has_more: bool = False
+
+
 class RepairOrderClientView(BaseModel):
     id: int
     order_number: Optional[str] = None

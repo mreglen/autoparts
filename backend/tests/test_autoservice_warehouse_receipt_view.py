@@ -13,6 +13,7 @@ class AutoserviceWarehouseReceiptViewTests(unittest.TestCase):
         item.article = "0986424791"
         item.name = "Колодки"
         item.unit = "pcs"
+        item.unit_price = Decimal("100.00")
 
         row = MagicMock()
         row.id = 11
@@ -54,6 +55,7 @@ class AutoserviceWarehouseReceiptViewTests(unittest.TestCase):
         item.article = None
         item.name = "Масло"
         item.unit = "l"
+        item.unit_price = Decimal("100.00")
 
         line = MagicMock()
         line.id = 1

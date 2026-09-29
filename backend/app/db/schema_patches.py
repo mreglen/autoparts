@@ -6838,3 +6838,119 @@ def ensure_autoservice_application_direction_columns() -> None:
 
     logger.info("Applied autoservice_tariff_applications direction column patches: %s", statements)
 
+
+def ensure_repair_order_shop_parts_consumed_flag() -> None:
+    """Add autoservice_stock_consumed for idempotent order stock fulfillment."""
+    inspector = inspect(engine)
+    if "repair_order_shop_parts" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("repair_order_shop_parts")}
+    if "autoservice_stock_consumed" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE repair_order_shop_parts ADD COLUMN autoservice_stock_consumed "
+                + _boolean_not_null_default("FALSE")
+            )
+        )
+        conn.execute(
+            text(
+                """
+                UPDATE repair_order_shop_parts p
+                SET autoservice_stock_consumed = TRUE
+                WHERE p.source = 'autoservice_stock'
+                  AND EXISTS (
+                      SELECT 1 FROM repair_orders o
+                      WHERE o.id = p.order_id AND o.status = 'completed'
+                  )
+                """
+            )
+        )
+        # Repair legacy leak: expenses left behind by orders cancelled after
+        # completion. Return quantities and drop those expenses.
+        if "autoservice_warehouse_expenses" in inspector.get_table_names():
+            conn.execute(
+                text(
+                    """
+                    UPDATE autoservice_warehouse_items i
+                    SET quantity = COALESCE(i.quantity, 0) + (
+                        SELECT COALESCE(SUM(e.quantity), 0)
+                        FROM autoservice_warehouse_expenses e
+                        JOIN repair_orders o ON o.id = e.repair_order_id
+                        WHERE e.item_id = i.id AND o.status = 'cancelled'
+                    )
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM autoservice_warehouse_expenses e
+                        JOIN repair_orders o ON o.id = e.repair_order_id
+                        WHERE e.item_id = i.id AND o.status = 'cancelled'
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    DELETE FROM autoservice_warehouse_expenses
+                    WHERE repair_order_id IN (
+                        SELECT id FROM repair_orders WHERE status = 'cancelled'
+                    )
+                    """
+                )
+            )
+
+    logger.info("Applied repair_order_shop_parts consumed flag patch")
+
+
+def ensure_autoservice_warehouse_items_nonnegative() -> None:
+    """CHECK quantity >= 0 and reserved_qty >= 0 on autoservice_warehouse_items."""
+    if engine.dialect.name != "postgresql":
+        return
+    inspector = inspect(engine)
+    if "autoservice_warehouse_items" not in inspector.get_table_names():
+        return
+
+    existing = {
+        c["name"]
+        for c in inspector.get_check_constraints("autoservice_warehouse_items")
+    }
+    statements = []
+    if "ck_autoservice_wh_items_quantity_nonneg" not in existing:
+        statements.append(
+            "ALTER TABLE autoservice_warehouse_items "
+            "ADD CONSTRAINT ck_autoservice_wh_items_quantity_nonneg "
+            "CHECK (quantity >= 0)"
+        )
+    if "ck_autoservice_wh_items_reserved_nonneg" not in existing:
+        statements.append(
+            "ALTER TABLE autoservice_warehouse_items "
+            "ADD CONSTRAINT ck_autoservice_wh_items_reserved_nonneg "
+            "CHECK (reserved_qty >= 0)"
+        )
+    if not statements:
+        return
+
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE autoservice_warehouse_items SET quantity = 0 "
+                    "WHERE quantity < 0"
+                )
+            )
+            conn.execute(
+                text(
+                    "UPDATE autoservice_warehouse_items SET reserved_qty = 0 "
+                    "WHERE reserved_qty < 0"
+                )
+            )
+            for stmt in statements:
+                conn.execute(text(stmt))
+    except Exception:
+        logger.exception("autoservice_warehouse_items non-negative checks failed")
+        return
+
+    logger.info("Applied autoservice_warehouse_items check constraints: %s", statements)
+

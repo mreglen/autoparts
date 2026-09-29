@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -50,6 +50,7 @@ from app.schemas.repair_order import (
     RepairOrderShopPartIn,
     RepairOrderShopPartView,
     RepairOrderEmployeeBrief,
+    RepairOrderListPage,
     RepairOrderServiceEmployeeOption,
     RepairOrderStaffOption,
     RepairOrderStaffView,
@@ -105,6 +106,7 @@ from app.services.repair_order_stock_reserve import (
 from app.services.autoservice_warehouse_service import (
     _receipt_doc_date,
     fulfill_autoservice_stock_on_order_complete,
+    revert_autoservice_stock_for_order,
     manual_receipt_for_shop_part,
     product_available_qty,
     ReceiptDocumentBatch,
@@ -367,13 +369,17 @@ def _to_staff_view(
     row: RepairOrder,
     *,
     paid_amount: Decimal | None = None,
+    enrich_parts: bool = True,
 ) -> RepairOrderStaffView:
     works = [_work_view(w) for w in _sorted_works(row)]
     parts = [_client_part_view(p) for p in _sorted_client_parts(row)]
-    shop = [
-        _shop_part_view(p, db=db, org_id=row.organization_id)
-        for p in _sorted_shop_parts(row)
-    ]
+    if enrich_parts:
+        shop = [
+            _shop_part_view(p, db=db, org_id=row.organization_id)
+            for p in _sorted_shop_parts(row)
+        ]
+    else:
+        shop = [_shop_part_view(p) for p in _sorted_shop_parts(row)]
     works_total = _money(sum((w.line_sum for w in works), Decimal("0.00")))
     shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
     grand_total = _money(works_total + shop_total)
@@ -1450,12 +1456,16 @@ def get_my_repair_order(
     return _to_client_view(row)
 
 
-@router.get("/autoservice/repair-orders", response_model=list[RepairOrderStaffView])
+@router.get("/autoservice/repair-orders", response_model=RepairOrderListPage)
 def list_repair_orders(
     scope: str = Query("active"),
     q: str | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
     client_id: int | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -1500,13 +1510,40 @@ def list_repair_orders(
             query = query.filter(RepairOrder.status == status_filter)
         else:
             query = query.filter(RepairOrder.status.in_(HISTORY_STATUSES))
+    if status_filter and scope != "history":
+        if status_filter not in ALL_STATUSES + REVIEW_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Недопустимый статус",
+            )
+        query = query.filter(RepairOrder.status == status_filter)
+    if date_from:
+        query = query.filter(func.date(RepairOrder.scheduled_at) >= date_from)
+    if date_to:
+        query = query.filter(func.date(RepairOrder.scheduled_at) <= date_to)
     query = _apply_search_filter(query, q)
-    rows = query.order_by(RepairOrder.scheduled_at.desc(), RepairOrder.id.desc()).all()
+    total = query.order_by(None).count()
+    rows = (
+        query.order_by(RepairOrder.scheduled_at.desc(), RepairOrder.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     paid_map = batch_paid_amounts(db, [row.id for row in rows])
-    return [
-        _to_staff_view(db, row, paid_amount=paid_map.get(row.id, Decimal("0.00")))
+    items = [
+        _to_staff_view(
+            db,
+            row,
+            paid_amount=paid_map.get(row.id, Decimal("0.00")),
+            enrich_parts=False,
+        )
         for row in rows
     ]
+    return RepairOrderListPage(
+        items=items,
+        total=total,
+        has_more=offset + len(items) < total,
+    )
 
 
 @router.get(
@@ -1934,8 +1971,9 @@ def patch_repair_order_status(
             detail="Недопустимый статус",
         )
     prev_status = row.status
-    if payload.status == "cancelled" and prev_status not in ("cancelled", "completed"):
+    if payload.status == "cancelled" and prev_status != "cancelled":
         release_order_reservations(db, row)
+        revert_autoservice_stock_for_order(db, org_id=org_id, order=row)
     if prev_status != payload.status:
         record_repair_order_status_timestamp(row, payload.status)
     row.status = payload.status

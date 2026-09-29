@@ -102,6 +102,9 @@ export default function AutoserviceOrdersMobileView({
   error,
   onErrorClose,
   rows,
+  hasMore = false,
+  loadingMore = false,
+  sentinelRef,
   emptyMessage,
   statusActionsForRow,
   onStatusChange,
@@ -300,6 +303,11 @@ export default function AutoserviceOrdersMobileView({
             ))}
           </div>
         )}
+        {!loading && !isDrafts && hasMore ? (
+          <div ref={sentinelRef} className="flex justify-center py-3" aria-hidden="true">
+            {loadingMore ? <Skeleton className="h-4 w-40" /> : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -74,6 +74,8 @@ from app.db.schema_patches import (
     ensure_product_reserved_qty_column,
     ensure_repair_order_shop_parts_autoservice_stock,
     ensure_repair_order_shop_parts_warehouse_receipt_id,
+    ensure_repair_order_shop_parts_consumed_flag,
+    ensure_autoservice_warehouse_items_nonnegative,
     ensure_repair_order_status_timestamps,
     ensure_repair_orders_shipping_date,
     ensure_repair_orders_mileage_km,
@@ -311,6 +313,8 @@ try:
     ensure_product_reserved_qty_column()
     ensure_repair_order_shop_parts_autoservice_stock()
     ensure_repair_order_shop_parts_warehouse_receipt_id()
+    ensure_repair_order_shop_parts_consumed_flag()
+    ensure_autoservice_warehouse_items_nonnegative()
     ensure_repair_order_status_timestamps()
     ensure_repair_orders_shipping_date()
     ensure_repair_orders_mileage_km()

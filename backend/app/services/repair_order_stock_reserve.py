@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from fastapi import HTTPException, status
@@ -11,8 +12,21 @@ from app.models.repair_order import RepairOrder, RepairOrderShopPart
 from app.services.autoservice_warehouse_service import autoservice_item_available_qty, product_available_qty
 
 
+logger = logging.getLogger(__name__)
+
+
 def _qty_int(value) -> int:
     return max(1, int(Decimal(str(value or 1)).quantize(Decimal("1"))))
+
+
+def _release_reserved_qty(holder, *, qty: int, part: RepairOrderShopPart) -> None:
+    reserved = int(holder.reserved_qty or 0)
+    if reserved < qty:
+        logger.warning(
+            "shop_part %s reservation desync: reserved=%s, releasing=%s",
+            part.id, reserved, qty,
+        )
+    holder.reserved_qty = max(0, reserved - qty)
 
 
 def release_shop_part_reservation(db: Session, part: RepairOrderShopPart) -> None:
@@ -20,7 +34,7 @@ def release_shop_part_reservation(db: Session, part: RepairOrderShopPart) -> Non
     if part.source == "warehouse" and part.product_id:
         product = db.query(Product).filter(Product.id == part.product_id).first()
         if product:
-            product.reserved_qty = max(0, int(product.reserved_qty or 0) - qty)
+            _release_reserved_qty(product, qty=qty, part=part)
     elif part.source == "autoservice_stock" and part.autoservice_stock_item_id:
         item = (
             db.query(AutoserviceWarehouseItem)
@@ -28,7 +42,7 @@ def release_shop_part_reservation(db: Session, part: RepairOrderShopPart) -> Non
             .first()
         )
         if item:
-            item.reserved_qty = max(0, int(item.reserved_qty or 0) - qty)
+            _release_reserved_qty(item, qty=qty, part=part)
 
 
 def apply_shop_part_reservation(db: Session, part: RepairOrderShopPart) -> None:

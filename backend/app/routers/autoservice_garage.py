@@ -9,6 +9,8 @@ from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
 from app.models.garage_vehicle import GarageVehicle
+from app.models.inspection_booking import InspectionBooking
+from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.garage_vehicle import (
     GarageVehicleCreate,
@@ -397,6 +399,24 @@ def delete_garage_vehicle(
 ):
     my_client = require_my_active_autoservice_client(db, current_user)
     row = _get_client_vehicle_or_404(db, vehicle_id, my_client.id)
+    orders_count = (
+        db.query(RepairOrder.id)
+        .filter(RepairOrder.vehicle_id == row.id)
+        .count()
+    )
+    bookings_count = (
+        db.query(InspectionBooking.id)
+        .filter(InspectionBooking.garage_vehicle_id == row.id)
+        .count()
+    )
+    if orders_count or bookings_count:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Автомобиль нельзя удалить: с ним связано "
+                f"{orders_count} заказ-нарядов и {bookings_count} записей"
+            ),
+        )
     db.delete(row)
     db.commit()
     return None

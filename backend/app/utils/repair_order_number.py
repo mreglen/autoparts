@@ -3,18 +3,11 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.models.repair_order import RepairOrder
+from app.services.autoservice_counters import (
+    COUNTER_REPAIR_ORDER,
+    next_counter_value,
+)
 
 
 def allocate_repair_order_number(db: Session, organization_id: str) -> str:
-    rows = (
-        db.query(RepairOrder.order_number)
-        .filter(RepairOrder.organization_id == organization_id)
-        .all()
-    )
-    max_seq = 0
-    for (num,) in rows:
-        s = str(num or "").strip()
-        if s.isdigit():
-            max_seq = max(max_seq, int(s))
-    return str(max_seq + 1)
+    return str(next_counter_value(db, organization_id, COUNTER_REPAIR_ORDER))
