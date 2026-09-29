@@ -21,12 +21,10 @@ import AutoserviceWarehouseReturnsTab from '../../components/Autoservice/Autoser
 import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { withBackTo } from '../../hooks/useHistoryBack';
-import useNewPartsMarkupPercent from '../../hooks/useNewPartsMarkupPercent';
 import { canUseClientMarkup } from '../../utils/clientMarkupUtils';
 import { canEditClientMarkupSettings } from '../../utils/autoservicePermissions';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import {
-  autoserviceWarehouseClientPrice,
   autoserviceWarehouseItemLabel,
   formatAutoserviceWarehouseMoney,
   formatAutoserviceWarehouseQty,
@@ -90,7 +88,6 @@ export default function AutoserviceWarehousePage() {
   const storedClientMarkupPercent = useSelector(
     (state) => Number(state.clientMarkup.percent) || 0,
   );
-  const catalogMarkupPercent = useNewPartsMarkupPercent('autoservice');
   const clientMarkupPercent = clientMarkupEnabled ? storedClientMarkupPercent : 0;
   const [items, setItems] = useState([]);
   const [purchaseLots, setPurchaseLots] = useState([]);
@@ -551,10 +548,7 @@ export default function AutoserviceWarehousePage() {
                   </tr>
                 ) : (
                   filteredItems.map((item) => {
-                    const displayPrice = autoserviceWarehouseClientPrice(
-                      item.unit_price,
-                      catalogMarkupPercent,
-                    );
+                    const displayPrice = Number(item.unit_price || 0);
                     return (
                       <tr
                         key={item.id}
@@ -600,10 +594,7 @@ export default function AutoserviceWarehousePage() {
               </p>
             ) : (
               filteredItems.map((item) => {
-                const displayPrice = autoserviceWarehouseClientPrice(
-                  item.unit_price,
-                  catalogMarkupPercent,
-                );
+                const displayPrice = Number(item.unit_price || 0);
                 return (
                   <WarehouseItemMobileCard
                     key={item.id}
@@ -654,9 +645,7 @@ export default function AutoserviceWarehousePage() {
               <div>
                 <dt className="text-ink-muted">Цена</dt>
                 <dd className="tabular-nums font-semibold text-ink">
-                  {formatAutoserviceWarehouseMoney(
-                    autoserviceWarehouseClientPrice(detailsItem.unit_price, catalogMarkupPercent),
-                  )}
+                  {formatAutoserviceWarehouseMoney(detailsItem.unit_price)}
                 </dd>
               </div>
             </dl>
