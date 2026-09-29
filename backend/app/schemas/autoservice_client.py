@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
@@ -23,6 +24,7 @@ class AutoserviceClientStaffUpdate(BaseModel):
     inn: Optional[str] = Field(default=None, max_length=20)
     kpp: Optional[str] = Field(default=None, max_length=20)
     ogrn: Optional[str] = Field(default=None, max_length=20)
+    discount_percent: Optional[Decimal] = Field(default=None, ge=0, le=100)
 
 
 class AutoserviceClientView(BaseModel):
@@ -43,6 +45,12 @@ class AutoserviceClientView(BaseModel):
     consented_at: datetime
     created_by_user_id: Optional[int] = None
     created_at: datetime
+    discount_percent: Decimal = Decimal("0")
+    orders_count: int = 0
+    orders_total: Decimal = Decimal("0")
+    paid_total: Decimal = Decimal("0")
+    debt_amount: Decimal = Decimal("0")
+    last_visit_at: Optional[datetime] = None
     matched_vehicle_id: Optional[int] = None
     matched_vehicle_label: Optional[str] = None
 

@@ -30,6 +30,12 @@ import { normalizeVinForLookupOrNull } from '../../utils/laximoVin';
 
 const inputClass = 'sg-pill-input mt-1';
 
+function formatMoney(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return '0,00';
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function normalizeSearchText(value) {
   return String(value || '')
     .toLowerCase()
@@ -321,18 +327,19 @@ export default function AutoserviceClientsPage() {
               <th className={`w-56 ${autoserviceListThClass}`}>Имя</th>
               <th className={`w-36 ${autoserviceListThClass}`}>Телефон</th>
               <th className={`w-28 ${autoserviceListThClass}`}>Аккаунт</th>
+              <th className={`w-28 ${autoserviceListThClass} text-right`}>Долг</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
             {loading ? (
               <tr>
-                <td colSpan={3} className="py-12 text-center text-ink-muted">
+                <td colSpan={4} className="py-12 text-center text-ink-muted">
                   Загрузка…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={3} className="py-12 text-center text-ink-muted">
+                <td colSpan={4} className="py-12 text-center text-ink-muted">
                   {qApplied.trim() ? 'Ничего не найдено' : 'Клиентов пока нет'}
                 </td>
               </tr>
@@ -358,6 +365,9 @@ export default function AutoserviceClientsPage() {
                     </td>
                     <td className={autoserviceListTdClass}>
                       <AccountBadge userId={row.user_id} />
+                    </td>
+                    <td className={`${autoserviceListTdClass} whitespace-nowrap text-right tabular-nums ${Number(row.debt_amount) > 0 ? 'font-medium text-danger-600' : 'text-ink-muted'}`}>
+                      {Number(row.debt_amount) > 0 ? `${formatMoney(row.debt_amount)} ₽` : '—'}
                     </td>
                   </tr>
                 );

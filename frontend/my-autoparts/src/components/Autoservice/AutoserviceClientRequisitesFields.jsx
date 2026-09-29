@@ -118,6 +118,19 @@ export default function AutoserviceClientRequisitesFields({
         </div>
       ) : null}
 
+      <div className="sm:max-w-[200px]">
+        <FieldLabel htmlFor={`${idPrefix}-discount`}>Персональная скидка, %</FieldLabel>
+        <NumericInput
+          id={`${idPrefix}-discount`}
+          maxLength={5}
+          value={form?.discount_percent || ''}
+          onChange={(e) => setField('discount_percent', e.target.value)}
+          placeholder="0"
+          disabled={disabled}
+        />
+        <FieldHint>Подставится в новые заказ-наряды</FieldHint>
+      </div>
+
       <div>
         <FieldLabel htmlFor={`${idPrefix}-address`}>
           {personType === 'legal' ? 'Юридический адрес' : 'Адрес'}

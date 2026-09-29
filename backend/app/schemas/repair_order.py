@@ -219,6 +219,7 @@ class RepairOrderCreate(BaseModel):
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
     work_zone_id: Optional[int] = None
+    discount_percent: Optional[Decimal] = Field(None, ge=0, le=100)
     assignee_user_ids: list[int] = Field(default_factory=list)
     works: list[RepairOrderWorkIn] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartIn] = Field(default_factory=list)
@@ -235,6 +236,7 @@ class RepairOrderUpdate(BaseModel):
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
     work_zone_id: Optional[int] = None
+    discount_percent: Optional[Decimal] = Field(None, ge=0, le=100)
     assignee_user_ids: Optional[list[int]] = None
     works: Optional[list[RepairOrderWorkIn]] = None
     client_parts: Optional[list[RepairOrderClientPartIn]] = None
@@ -283,6 +285,7 @@ class RepairOrderStaffView(BaseModel):
     client_parts: list[RepairOrderClientPartView] = Field(default_factory=list)
     shop_parts: list[RepairOrderShopPartView] = Field(default_factory=list)
     vat_rate: Decimal = Decimal("22")
+    discount_percent: Decimal = Decimal("0")
     works_total: Decimal = Decimal("0.00")
     shop_parts_total: Decimal = Decimal("0.00")
     grand_total: Decimal = Decimal("0.00")
@@ -313,6 +316,7 @@ class RepairOrderClientView(BaseModel):
     client_parts: list[RepairOrderClientPartView] = Field(default_factory=list)
     shop_parts: list[RepairOrderClientShopPartView] = Field(default_factory=list)
     vat_rate: Decimal = Decimal("22")
+    discount_percent: Decimal = Decimal("0")
     works_total: Decimal = Decimal("0.00")
     shop_parts_total: Decimal = Decimal("0.00")
     grand_total: Decimal = Decimal("0.00")

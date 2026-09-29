@@ -356,12 +356,21 @@ def _work_zone_brief(zone: AutoserviceWorkZone | None) -> RepairOrderWorkZoneBri
     return RepairOrderWorkZoneBrief(id=zone.id, name=zone.name, sort_order=zone.sort_order)
 
 
+def _discount_factor(row: RepairOrder) -> Decimal:
+    pct = _money(getattr(row, "discount_percent", None) or 0)
+    if pct <= Decimal("0"):
+        return Decimal("1")
+    if pct > Decimal("100"):
+        pct = Decimal("100")
+    return Decimal("1") - pct / Decimal("100")
+
+
 def _order_grand_total(row: RepairOrder) -> Decimal:
     works = [_work_view(w) for w in _sorted_works(row)]
     shop = [_shop_part_view(p) for p in _sorted_shop_parts(row)]
     works_total = _money(sum((w.line_sum for w in works), Decimal("0.00")))
     shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
-    return _money(works_total + shop_total)
+    return _money((works_total + shop_total) * _discount_factor(row))
 
 
 def _to_staff_view(
@@ -382,7 +391,7 @@ def _to_staff_view(
         shop = [_shop_part_view(p) for p in _sorted_shop_parts(row)]
     works_total = _money(sum((w.line_sum for w in works), Decimal("0.00")))
     shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
-    grand_total = _money(works_total + shop_total)
+    grand_total = _money((works_total + shop_total) * _discount_factor(row))
     if paid_amount is None:
         paid, remaining, is_paid = order_payment_summary(db, row, grand_total)
     else:
@@ -417,6 +426,7 @@ def _to_staff_view(
         client_parts=parts,
         shop_parts=shop,
         vat_rate=row.vat_rate if row.vat_rate is not None else DEFAULT_VAT_RATE,
+        discount_percent=_money(getattr(row, "discount_percent", None) or 0),
         works_total=works_total,
         shop_parts_total=shop_total,
         grand_total=grand_total,
@@ -448,9 +458,10 @@ def _to_client_view(row: RepairOrder) -> RepairOrderClientView:
         client_parts=parts,
         shop_parts=shop,
         vat_rate=row.vat_rate if row.vat_rate is not None else DEFAULT_VAT_RATE,
+        discount_percent=_money(getattr(row, "discount_percent", None) or 0),
         works_total=works_total,
         shop_parts_total=shop_total,
-        grand_total=_money(works_total + shop_total),
+        grand_total=_money((works_total + shop_total) * _discount_factor(row)),
     )
 
 
@@ -1628,6 +1639,9 @@ def create_repair_order(
         shop_parts = payload.shop_parts
         order_number = allocate_repair_order_number(db, org_id)
         initial_status = "pending"
+    discount_percent = payload.discount_percent
+    if discount_percent is None:
+        discount_percent = _money(getattr(client, "discount_percent", None) or 0)
     row = RepairOrder(
         organization_id=org_id,
         order_number=order_number,
@@ -1644,6 +1658,7 @@ def create_repair_order(
         created_by_user_id=current_user.id,
         status=initial_status,
         vat_rate=get_org_vat_rate(db, org_id),
+        discount_percent=_money(discount_percent),
     )
     record_repair_order_status_timestamp(row, initial_status)
     row.assignees = assignees
@@ -1741,6 +1756,9 @@ def update_repair_order(
 
     if not is_own and "work_zone_id" in payload.model_fields_set:
         row.work_zone_id = _validate_work_zone_id(db, org_id, payload.work_zone_id)
+
+    if not is_own and "discount_percent" in payload.model_fields_set:
+        row.discount_percent = _money(payload.discount_percent or 0)
 
     if not is_own and payload.assignee_user_ids is not None:
         row.assignees = _resolve_assignees(db, org_id, payload.assignee_user_ids)

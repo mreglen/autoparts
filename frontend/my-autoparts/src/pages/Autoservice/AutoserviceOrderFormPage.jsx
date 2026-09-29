@@ -1099,6 +1099,7 @@ function mapOrderToFormState(order) {
     comment: order?.client_comment || '',
     staffComment: order?.staff_comment || '',
     workZoneId: order?.work_zone_id != null ? String(order.work_zone_id) : '',
+    discountPercent: Number(order?.discount_percent) || 0,
     scheduledEndAt: order?.scheduled_end_at
       ? toLocalInputValue(order.scheduled_end_at)
       : '',
@@ -1202,6 +1203,9 @@ export default function AutoserviceOrderFormPage() {
   const [formInitialized, setFormInitialized] = useState(isCreate);
 
   const [clientId, setClientId] = useState('');
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [discountNotice, setDiscountNotice] = useState('');
+  const [zoneConflict, setZoneConflict] = useState(null);
   const [vehicleId, setVehicleId] = useState('');
   const [pendingClientName, setPendingClientName] = useState('');
   const [pendingClientPhone, setPendingClientPhone] = useState('');
@@ -1282,6 +1286,9 @@ export default function AutoserviceOrderFormPage() {
     setShippingDate(state.shippingDate || todayDateInputValue());
     setMileageKm(state.mileageKm || '');
     mileageTouchedRef.current = Boolean(state.mileageKm);
+    if (state.discountPercent != null) {
+      setDiscountPercent(Number(state.discountPercent) || 0);
+    }
     setWorks((state.works || []).map((w) => ({
       ...w,
       unit_price: workUnitPriceFromApi(w.unit_price),
@@ -1305,6 +1312,7 @@ export default function AutoserviceOrderFormPage() {
     scheduledEndAt,
     shippingDate,
     mileageKm,
+    discountPercent,
     works,
     clientParts,
     shopParts,
@@ -1323,6 +1331,7 @@ export default function AutoserviceOrderFormPage() {
     scheduledEndAt,
     shippingDate,
     mileageKm,
+    discountPercent,
     works,
     clientParts,
     shopParts,
@@ -1513,6 +1522,11 @@ export default function AutoserviceOrderFormPage() {
     });
     if (match) {
       setClientId(String(match.id));
+      const pct = Number(match.discount_percent) || 0;
+      setDiscountPercent(pct);
+      if (pct > 0) {
+        setDiscountNotice(`Применена персональная скидка клиента ${pct}%`);
+      }
     }
     plannerPrefillRef.current = null;
   }, [isCreate, formInitialized, metaLoading, clients]);
@@ -1601,10 +1615,16 @@ export default function AutoserviceOrderFormPage() {
       setPendingClientName('');
       setPendingClientPhone('');
     }
+    const selected = clients.find((c) => String(c.id) === String(nextClientId));
+    const pct = Number(selected?.discount_percent) || 0;
+    setDiscountPercent(pct);
+    if (pct > 0) {
+      setDiscountNotice(`Применена персональная скидка клиента ${pct}%`);
+    }
     if (option?.matchedVehicleId) {
       setVehicleId(String(option.matchedVehicleId));
     }
-  }, [clientOptions]);
+  }, [clientOptions, clients]);
 
   const vehicleOptions = useMemo(
     () => [
@@ -1667,7 +1687,8 @@ export default function AutoserviceOrderFormPage() {
     [shopParts],
   );
 
-  const grandTotal = worksTotal + shopPartsTotal;
+  const grandTotal = Math.round((worksTotal + shopPartsTotal) * (1 - discountPercent / 100) * 100) / 100;
+  const discountAmount = Math.round((worksTotal + shopPartsTotal) * (discountPercent / 100) * 100) / 100;
   const vatRate = orderVatRateState ?? metaVatRate;
   const grandVat = splitVatInclusive(grandTotal, vatRate).vat;
 
@@ -2036,6 +2057,7 @@ export default function AutoserviceOrderFormPage() {
       client_comment: comment.trim() || null,
       staff_comment: staffComment.trim() || null,
       work_zone_id: workZoneId ? Number(workZoneId) : null,
+      discount_percent: discountPercent > 0 ? discountPercent : null,
       assignee_user_ids: [],
       works: worksSource.map((w) => ({
         title: w.title.trim(),
@@ -2406,6 +2428,39 @@ export default function AutoserviceOrderFormPage() {
     goBack();
   };
 
+  const fetchZoneConflicts = async () => {
+    if (ownMode || !workZoneId || !scheduledAt) return [];
+    const iso = fromLocalInputValue(scheduledAt);
+    if (!iso) return [];
+    const params = new URLSearchParams({ work_zone_id: workZoneId, start: iso });
+    const endIso = scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null;
+    if (endIso) params.set('end', endIso);
+    const excludeId = isEdit ? orderId : justAutoCreatedOrderIdRef.current;
+    if (excludeId) params.set('exclude_order_id', excludeId);
+    try {
+      const data = await apiRequest(`/autoservice/planner/conflicts?${params.toString()}`);
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const submitAndClose = async (snapshot) => {
+    setSaving(true);
+    setAutoSaveStatus('saving');
+    setError('');
+    const err = await persistRepairOrder({ afterCreate: 'close' });
+    setSaving(false);
+    if (err) {
+      setAutoSaveStatus('error');
+      setError(err);
+      return;
+    }
+    lastSavedSnapshotRef.current = JSON.stringify(snapshot);
+    clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null);
+    goBack();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isClosedOrder) {
@@ -2424,19 +2479,13 @@ export default function AutoserviceOrderFormPage() {
       return;
     }
 
-    setSaving(true);
-    setAutoSaveStatus('saving');
-    setError('');
-    const err = await persistRepairOrder({ afterCreate: 'close' });
-    setSaving(false);
-    if (err) {
-      setAutoSaveStatus('error');
-      setError(err);
+    const conflicts = await fetchZoneConflicts();
+    if (conflicts.length) {
+      const zone = workZones.find((z) => String(z.id) === String(workZoneId));
+      setZoneConflict({ items: conflicts, zoneName: zone?.name || 'выбранная зона', snapshot });
       return;
     }
-    lastSavedSnapshotRef.current = JSON.stringify(snapshot);
-    clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null);
-    goBack();
+    await submitAndClose(snapshot);
   };
 
   if (!isReady) return <AuthLoadingScreen />;
@@ -2494,6 +2543,7 @@ export default function AutoserviceOrderFormPage() {
       ) : null}
 
       <Toast message={error} variant="error" onClose={() => setError('')} />
+      <Toast message={discountNotice} variant="success" onClose={() => setDiscountNotice('')} />
 
       {isClosedOrder ? (
         <p
@@ -2975,6 +3025,7 @@ export default function AutoserviceOrderFormPage() {
                   <p className="text-[11px] leading-snug text-ink-muted sm:text-xs">
                     работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)} · НДС{' '}
                     {formatVatRate(vatRate)}% {formatMoney(grandVat)}
+                    {discountPercent > 0 ? ` · скидка ${discountPercent}% −${formatMoney(discountAmount)}` : ''}
                   </p>
                 )}
               </div>
@@ -3245,6 +3296,24 @@ export default function AutoserviceOrderFormPage() {
         confirmLabel="Удалить"
         cancelLabel="Отмена"
         danger
+      />
+      <ConfirmDialog
+        open={Boolean(zoneConflict)}
+        onClose={() => setZoneConflict(null)}
+        onConfirm={() => {
+          const pending = zoneConflict;
+          setZoneConflict(null);
+          if (pending) submitAndClose(pending.snapshot);
+        }}
+        title="Рабочая зона занята"
+        message={zoneConflict
+          ? `Зона «${zoneConflict.zoneName}» уже занята: ${zoneConflict.items
+              .slice(0, 3)
+              .map((item) => (item.order_number ? `№${item.order_number}` : 'запись'))
+              .join(', ')}. Сохранить всё равно?`
+          : ''}
+        confirmLabel="Сохранить"
+        cancelLabel="Назад"
       />
     </div>
   );

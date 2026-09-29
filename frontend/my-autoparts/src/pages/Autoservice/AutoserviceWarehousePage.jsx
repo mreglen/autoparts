@@ -17,6 +17,7 @@ import AutoserviceWarehouseItemMovements from '../../components/Autoservice/Auto
 import AutoserviceWarehouseReturnModal from '../../components/Autoservice/AutoserviceWarehouseReturnModal';
 import AutoserviceWarehouseReceiptsPage from './AutoserviceWarehouseReceiptsPage';
 import AutoserviceWarehouseExpensesPage from './AutoserviceWarehouseExpensesPage';
+import AutoserviceWarehouseReturnsTab from '../../components/Autoservice/AutoserviceWarehouseReturnsTab';
 import SearchablePillSelect from '../../components/SearchablePillSelect/SearchablePillSelect';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { withBackTo } from '../../hooks/useHistoryBack';
@@ -148,7 +149,7 @@ export default function AutoserviceWarehousePage() {
     const dx = touch.clientX - x;
     const dy = touch.clientY - y;
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    const order = ['stock', 'receipts', 'expenses'];
+    const order = ['stock', 'receipts', 'expenses', 'returns'];
     const index = order.indexOf(activeTab);
     const next = dx < 0 ? index + 1 : index - 1;
     if (index >= 0 && next >= 0 && next < order.length) {
@@ -460,6 +461,7 @@ export default function AutoserviceWarehousePage() {
           { id: 'stock', label: 'Остатки' },
           { id: 'receipts', label: 'Поступления' },
           { id: 'expenses', label: 'Расходы' },
+          { id: 'returns', label: 'Возвраты' },
         ]}
         value={activeTab}
         onChange={setActiveTab}
@@ -521,6 +523,8 @@ export default function AutoserviceWarehousePage() {
         <AutoserviceWarehouseReceiptsPage embedded />
       ) : activeTab === 'expenses' ? (
         <AutoserviceWarehouseExpensesPage embedded />
+      ) : activeTab === 'returns' ? (
+        <AutoserviceWarehouseReturnsTab />
       ) : (
         <>
           <div className={autoserviceListTableWrapClass}>

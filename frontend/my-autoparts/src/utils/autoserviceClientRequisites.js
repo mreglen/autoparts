@@ -19,7 +19,7 @@ export const CLIENT_PLACEHOLDERS = {
   ogrnip: '15 цифр',
 };
 
-const REQUISITE_KEYS = ['name', 'phone', 'email', 'person_type', 'legal_name', 'address', 'inn', 'kpp', 'ogrn'];
+const REQUISITE_KEYS = ['name', 'phone', 'email', 'person_type', 'legal_name', 'address', 'inn', 'kpp', 'ogrn', 'discount_percent'];
 
 export function normalizePersonType(value) {
   if (value === 'ie' || value === 'legal') return value;
@@ -53,6 +53,7 @@ export function emptyClientRequisites(client) {
     inn: client?.inn || '',
     kpp: client?.kpp || '',
     ogrn: client?.ogrn || '',
+    discount_percent: client?.discount_percent ? String(client.discount_percent) : '',
   };
 }
 
@@ -92,6 +93,9 @@ export function clientRequisitesPatchPayload(form, { isGuest } = {}) {
     inn: String(form?.inn || '').trim() || null,
     kpp: personType === 'legal' ? String(form?.kpp || '').trim() || null : null,
     ogrn: personType === 'individual' ? null : String(form?.ogrn || '').trim() || null,
+    discount_percent: String(form?.discount_percent || '').trim() === ''
+      ? null
+      : Number(form.discount_percent),
   };
   if (isGuest) {
     payload.name = String(form?.name || '').trim();

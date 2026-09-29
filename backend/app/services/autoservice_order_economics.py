@@ -165,6 +165,15 @@ def _sorted_shop_parts(order: RepairOrder) -> list[RepairOrderShopPart]:
     return sorted(order.shop_parts or [], key=lambda part: (part.position, part.id))
 
 
+def _order_discount_factor(order: RepairOrder) -> Decimal:
+    pct = _money(getattr(order, "discount_percent", None) or 0)
+    if pct <= Decimal("0"):
+        return Decimal("1")
+    if pct > Decimal("100"):
+        pct = Decimal("100")
+    return Decimal("1") - pct / Decimal("100")
+
+
 def _order_grand_total(order: RepairOrder) -> Decimal:
     works_total = _money(
         sum(
@@ -181,7 +190,7 @@ def _order_grand_total(order: RepairOrder) -> Decimal:
             Decimal("0.00"),
         )
     )
-    return _money(works_total + shop_total)
+    return _money((works_total + shop_total) * _order_discount_factor(order))
 
 
 def _order_parts_cost(order: RepairOrder) -> Decimal:

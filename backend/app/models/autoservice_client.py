@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -32,6 +35,7 @@ class AutoserviceClient(Base):
     kpp = Column(String(9), nullable=True)
     ogrn = Column(String(15), nullable=True)
     status = Column(String(32), nullable=False, default="active")
+    discount_percent = Column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     source = Column(String(32), nullable=False)
     consented_at = Column(DateTime, nullable=False)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)

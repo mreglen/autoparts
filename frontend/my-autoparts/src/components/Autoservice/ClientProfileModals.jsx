@@ -139,6 +139,9 @@ function ClientProfileFields({ client }) {
     ['Email', client?.email],
     ['Тип', personTypeLabel(type)],
   ];
+  if (Number(client?.discount_percent) > 0) {
+    rows.push(['Персональная скидка', `${client.discount_percent}%`]);
+  }
   if (type === 'legal') {
     rows.push(['Наименование', client?.legal_name]);
   }
@@ -484,6 +487,12 @@ function ClientProfileModal({
       setError(innErr);
       return;
     }
+    const discountRaw = String(form.discount_percent || '').trim();
+    const discountNum = Number(discountRaw);
+    if (discountRaw && (!Number.isFinite(discountNum) || discountNum < 0 || discountNum > 100)) {
+      setError('Скидка: от 0 до 100');
+      return;
+    }
     if (!clientRequisitesChanged(form, emptyClientRequisites(client))) {
       setEditing(false);
       return;
@@ -707,6 +716,29 @@ function ClientProfileModal({
                   </p>
                 )}
               </div>
+
+              {!editing ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-sg-sm border border-line-soft bg-surface-muted px-3 py-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Заказов</p>
+                    <p className="mt-0.5 text-sm font-semibold text-ink">{client.orders_count ?? 0}</p>
+                  </div>
+                  <div className="rounded-sg-sm border border-line-soft bg-surface-muted px-3 py-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">На сумму</p>
+                    <p className="mt-0.5 text-sm font-semibold text-ink">{formatMoney(client.orders_total)} ₽</p>
+                  </div>
+                  <div className="rounded-sg-sm border border-line-soft bg-surface-muted px-3 py-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Оплачено</p>
+                    <p className="mt-0.5 text-sm font-semibold text-ink">{formatMoney(client.paid_total)} ₽</p>
+                  </div>
+                  <div className="rounded-sg-sm border border-line-soft bg-surface-muted px-3 py-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Долг</p>
+                    <p className={`mt-0.5 text-sm font-semibold ${Number(client.debt_amount) > 0 ? 'text-danger-600' : 'text-ink'}`}>
+                      {formatMoney(client.debt_amount)} ₽
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               {editing ? (
                 <form id="edit-autoservice-client" onSubmit={handleSave} className="space-y-3">

@@ -99,6 +99,7 @@ class RepairOrder(Base):
     shipping_date = Column(Date, nullable=True)
     mileage_km = Column(Integer, nullable=True)
     vat_rate = Column(Numeric(5, 2), nullable=False, default=Decimal("22"))
+    discount_percent = Column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime,

@@ -6939,6 +6939,40 @@ def ensure_repair_order_shop_parts_consumed_flag() -> None:
     logger.info("Applied repair_order_shop_parts consumed flag patch")
 
 
+def ensure_repair_orders_discount_column() -> None:
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+    if "discount_percent" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE repair_orders ADD COLUMN discount_percent "
+                "NUMERIC(5,2) NOT NULL DEFAULT 0"
+            )
+        )
+    logger.info("Applied repair_orders.discount_percent patch")
+
+
+def ensure_autoservice_clients_discount_column() -> None:
+    inspector = inspect(engine)
+    if "autoservice_clients" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("autoservice_clients")}
+    if "discount_percent" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE autoservice_clients ADD COLUMN discount_percent "
+                "NUMERIC(5,2) NOT NULL DEFAULT 0"
+            )
+        )
+    logger.info("Applied autoservice_clients.discount_percent patch")
+
+
 def ensure_payroll_accruals_employee_not_null() -> None:
     """Drop orphaned accruals and make employee_id NOT NULL."""
     inspector = inspect(engine)

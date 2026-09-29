@@ -64,7 +64,9 @@ export default function InspectionBookingAddModal({
   const [confirming, setConfirming] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [zoneConflict, setZoneConflict] = useState(null);
   const editStartedAtRef = useRef(0);
+  const conflictCheckedRef = useRef(false);
   const isEdit = Boolean(initialBooking?.id);
   const initialName = (isEdit ? initialBooking.name : '') || '';
   const initialPhone = (isEdit ? initialBooking.phone : '') || '';
@@ -96,8 +98,14 @@ export default function InspectionBookingAddModal({
     setDeleting(false);
     setConfirming(false);
     setDeleteConfirmOpen(false);
+    setZoneConflict(null);
+    conflictCheckedRef.current = false;
     setIsEditing(!isEdit);
   }, [open, initialName, initialPhone, initialPreferred, initialPreferredTime, initialClientId, initialVehicleId, initialVehicleMake, initialVehicleModel, initialNotes, initialWorkZoneId, isEdit]);
+
+  useEffect(() => {
+    conflictCheckedRef.current = false;
+  }, [selectedWorkZoneId, preferredDate, preferredTime]);
 
   const clientSearchRef = useRef(0);
   const loadClients = useCallback(async (q = '') => {
@@ -266,6 +274,26 @@ export default function InspectionBookingAddModal({
     if (!preferredDate) {
       setError(isEdit ? 'Укажите дату' : 'Укажите желаемую дату');
       return;
+    }
+    if (selectedWorkZoneId != null && !conflictCheckedRef.current) {
+      try {
+        const params = new URLSearchParams({
+          work_zone_id: String(selectedWorkZoneId),
+          start: `${preferredDate}T${preferredTime || '09:00'}:00`,
+        });
+        if (isEdit && initialBooking?.id) {
+          params.set('exclude_booking_id', String(initialBooking.id));
+        }
+        const conflicts = await apiRequest(`/autoservice/planner/conflicts?${params.toString()}`);
+        if (Array.isArray(conflicts) && conflicts.length) {
+          const zone = (zones || []).find((z) => Number(z.id) === Number(selectedWorkZoneId));
+          setZoneConflict({ items: conflicts, zoneName: zone?.name || 'выбранная зона' });
+          return;
+        }
+      } catch {
+        // игнорируем ошибку проверки — сохраняем
+      }
+      conflictCheckedRef.current = true;
     }
     setSaving(true);
     try {
@@ -721,6 +749,21 @@ export default function InspectionBookingAddModal({
         cancelLabel="Отмена"
         danger
         loading={deleting}
+      />
+      <ConfirmDialog
+        open={Boolean(zoneConflict)}
+        onClose={() => setZoneConflict(null)}
+        onConfirm={() => {
+          setZoneConflict(null);
+          conflictCheckedRef.current = true;
+          handleSubmit({ preventDefault: () => {} });
+        }}
+        title="Рабочая зона занята"
+        message={zoneConflict
+          ? `Зона «${zoneConflict.zoneName}» уже занята ${zoneConflict.items.length} записью/заказом в этот день. Сохранить всё равно?`
+          : ''}
+        confirmLabel="Сохранить"
+        cancelLabel="Назад"
       />
     </Modal>
   );

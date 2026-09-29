@@ -102,6 +102,74 @@ def _place_item(
         unassigned_days[day_key].append(item)
 
 
+@router.get(
+    "/autoservice/planner/conflicts",
+    response_model=list[PlannerRepairOrder],
+)
+def get_planner_conflicts(
+    work_zone_id: int = Query(..., ge=1),
+    start: datetime = Query(...),
+    end: datetime | None = Query(None),
+    exclude_order_id: int | None = Query(None, ge=1),
+    exclude_booking_id: int | None = Query(None, ge=1),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Пересекающиеся записи в рабочей зоне — для предупреждения при сохранении."""
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
+    eff_start = start.replace(tzinfo=None)
+    eff_end = (end or start).replace(tzinfo=None)
+    if eff_end <= eff_start:
+        eff_end = eff_start + timedelta(hours=1)
+
+    orders_query = (
+        db.query(RepairOrder)
+        .options(
+            joinedload(RepairOrder.client),
+            joinedload(RepairOrder.vehicle),
+            joinedload(RepairOrder.work_zone),
+        )
+        .filter(
+            RepairOrder.organization_id == org_id,
+            RepairOrder.work_zone_id == work_zone_id,
+            RepairOrder.scheduled_at < eff_end,
+            or_(
+                RepairOrder.scheduled_end_at > eff_start,
+                and_(
+                    RepairOrder.scheduled_end_at.is_(None),
+                    RepairOrder.scheduled_at >= eff_start,
+                ),
+            ),
+            RepairOrder.status.notin_(("cancelled", "review")),
+        )
+    )
+    if exclude_order_id:
+        orders_query = orders_query.filter(RepairOrder.id != exclude_order_id)
+    orders = orders_query.order_by(RepairOrder.scheduled_at.asc()).all()
+
+    bookings_query = (
+        db.query(InspectionBooking)
+        .options(
+            joinedload(InspectionBooking.vehicle),
+            joinedload(InspectionBooking.work_zone),
+        )
+        .filter(
+            InspectionBooking.organization_id == org_id,
+            InspectionBooking.work_zone_id == work_zone_id,
+            InspectionBooking.preferred_date == eff_start.date(),
+            InspectionBooking.status.in_(("new", "confirmed")),
+        )
+    )
+    if exclude_booking_id:
+        bookings_query = bookings_query.filter(InspectionBooking.id != exclude_booking_id)
+    bookings = bookings_query.order_by(InspectionBooking.preferred_time.asc()).all()
+
+    items = [_planner_order(row) for row in orders]
+    items.extend(_planner_inspection(row) for row in bookings)
+    items.sort(key=lambda item: item.scheduled_at)
+    return items
+
+
 @router.get("/autoservice/planner/week", response_model=PlannerWeekResponse)
 def get_planner_week(
     week_start: date = Query(..., alias="week_start"),
