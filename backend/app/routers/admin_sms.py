@@ -1,4 +1,4 @@
-"""Админка SMS (SMSC): настройки кредов + история отправок с ценами."""
+"""Админка SMS (SMS Gold): настройки кредов + история отправок с ценами."""
 from datetime import date, datetime, time
 from decimal import Decimal
 
@@ -11,8 +11,8 @@ from app.db.database import get_db
 from app.models.sms_message import SmsMessage
 from app.models.user import User
 from app.schemas.sms import (
-    SmscSettingsUpdate,
-    SmscSettingsView,
+    SmsGoldSettingsUpdate,
+    SmsGoldSettingsView,
     SmsHistoryResponse,
     SmsMessageView,
 )
@@ -22,42 +22,45 @@ from app.utils.site_settings_db import get_or_create_site_settings
 router = APIRouter(prefix="/admin/sms", tags=["Admin SMS"])
 
 
-@router.get("/settings", response_model=SmscSettingsView)
+@router.get("/settings", response_model=SmsGoldSettingsView)
 def get_sms_settings(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
     row = get_or_create_site_settings(db)
-    return SmscSettingsView(
-        login=(row.smsc_login or ""),
-        configured=bool((row.smsc_login or "").strip() and (row.smsc_password or "").strip()),
+    return SmsGoldSettingsView(
+        user=(row.smsgold_user or ""),
+        sender=(row.smsgold_sender or ""),
+        configured=bool((row.smsgold_user or "").strip() and (row.smsgold_password or "").strip()),
     )
 
 
-@router.put("/settings", response_model=SmscSettingsView)
+@router.put("/settings", response_model=SmsGoldSettingsView)
 def put_sms_settings(
-    payload: SmscSettingsUpdate,
+    payload: SmsGoldSettingsUpdate,
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
     row = get_or_create_site_settings(db)
-    row.smsc_login = payload.login.strip() or None
+    row.smsgold_user = payload.user.strip() or None
+    row.smsgold_sender = (payload.sender or "").strip() or None
     if payload.password and payload.password.strip():
-        row.smsc_password = payload.password.strip()
-    if not row.smsc_login:
-        row.smsc_password = None
+        row.smsgold_password = payload.password.strip()
+    if not row.smsgold_user:
+        row.smsgold_password = None
     db.commit()
     log_audit(
         db,
         event_type="sms_settings_updated",
         category="settings",
-        summary="Настройки SMSC обновлены",
+        summary="Настройки SMS Gold обновлены",
         user=current_user,
-        details={"login": row.smsc_login},
+        details={"user": row.smsgold_user, "sender": row.smsgold_sender},
     )
-    return SmscSettingsView(
-        login=(row.smsc_login or ""),
-        configured=bool(row.smsc_login and row.smsc_password),
+    return SmsGoldSettingsView(
+        user=(row.smsgold_user or ""),
+        sender=(row.smsgold_sender or ""),
+        configured=bool(row.smsgold_user and row.smsgold_password),
     )
 
 

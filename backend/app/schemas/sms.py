@@ -5,14 +5,16 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class SmscSettingsView(BaseModel):
-    login: str = ""
+class SmsGoldSettingsView(BaseModel):
+    user: str = ""
+    sender: str = ""
     configured: bool = False
 
 
-class SmscSettingsUpdate(BaseModel):
-    login: str = Field(default="", max_length=64)
+class SmsGoldSettingsUpdate(BaseModel):
+    user: str = Field(default="", max_length=64)
     password: Optional[str] = Field(default=None, max_length=200)
+    sender: Optional[str] = Field(default=None, max_length=16)
 
 
 class SmsMessageView(BaseModel):

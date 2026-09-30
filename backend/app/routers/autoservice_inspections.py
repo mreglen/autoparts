@@ -13,7 +13,7 @@ from app.models.inspection_booking import InspectionBooking
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.sms import SmsSendResult
-from app.services.smsc_client import send_smsc_sms
+from app.services.smsgold_client import send_smsgold_sms
 from app.schemas.inspection_booking import (
     InspectionBookingClientCreate,
     InspectionBookingPatch,
@@ -668,7 +668,7 @@ def send_inspection_booking_sms(
         f"Здравствуйте, {row.name}! Вы записаны в автосервис \"{org_name}\" на {when}."
     )
 
-    message = send_smsc_sms(
+    message = send_smsgold_sms(
         db,
         row.phone,
         text,

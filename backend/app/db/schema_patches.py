@@ -7118,6 +7118,12 @@ def ensure_site_settings_smsc_columns() -> None:
         statements.append("ALTER TABLE site_settings ADD COLUMN smsc_login VARCHAR(64)")
     if "smsc_password" not in columns:
         statements.append("ALTER TABLE site_settings ADD COLUMN smsc_password VARCHAR(200)")
+    if "smsgold_user" not in columns:
+        statements.append("ALTER TABLE site_settings ADD COLUMN smsgold_user VARCHAR(64)")
+    if "smsgold_password" not in columns:
+        statements.append("ALTER TABLE site_settings ADD COLUMN smsgold_password VARCHAR(200)")
+    if "smsgold_sender" not in columns:
+        statements.append("ALTER TABLE site_settings ADD COLUMN smsgold_sender VARCHAR(16)")
     if not statements:
         return
 

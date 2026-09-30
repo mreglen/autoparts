@@ -19,3 +19,6 @@ class SiteSettings(Base):
     show_autoservice = Column(Boolean, nullable=False, default=False)
     smsc_login = Column(String(64), nullable=True)
     smsc_password = Column(String(200), nullable=True)
+    smsgold_user = Column(String(64), nullable=True)
+    smsgold_password = Column(String(200), nullable=True)
+    smsgold_sender = Column(String(16), nullable=True)

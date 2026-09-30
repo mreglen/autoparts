@@ -50,7 +50,8 @@ function today() {
 }
 
 function SettingsTab() {
-  const [login, setLogin] = useState('');
+  const [user, setUser] = useState('');
+  const [sender, setSender] = useState('');
   const [password, setPassword] = useState('');
   const [configured, setConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -60,7 +61,8 @@ function SettingsTab() {
   useEffect(() => {
     apiRequest('/admin/sms/settings')
       .then((data) => {
-        setLogin(data?.login || '');
+        setUser(data?.user || '');
+        setSender(data?.sender || '');
         setConfigured(Boolean(data?.configured));
       })
       .catch(() => setToast({ variant: 'error', message: 'Не удалось загрузить настройки' }))
@@ -73,9 +75,10 @@ function SettingsTab() {
     try {
       const data = await apiRequest('/admin/sms/settings', {
         method: 'PUT',
-        body: JSON.stringify({ login, password: password || undefined }),
+        body: JSON.stringify({ user, sender, password: password || undefined }),
       });
-      setLogin(data?.login || '');
+      setUser(data?.user || '');
+      setSender(data?.sender || '');
       setConfigured(Boolean(data?.configured));
       setPassword('');
       setToast({ variant: 'success', message: 'Настройки сохранены' });
@@ -93,35 +96,45 @@ function SettingsTab() {
   return (
     <form onSubmit={save} className="mx-auto max-w-md space-y-4">
       <div>
-        <label className="block text-sm font-medium text-ink-soft">Логин SMSC</label>
+        <label className="block text-sm font-medium text-ink-soft">ID пользователя SMS Gold</label>
         <input
           className={inputClass}
-          value={login}
-          onChange={(e) => setLogin(e.target.value)}
-          placeholder="Логин от smsc.ru"
+          value={user}
+          onChange={(e) => setUser(e.target.value)}
+          placeholder="XXXXX или ХХХХХ.X"
           autoComplete="username"
           maxLength={64}
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-ink-soft">Пароль SMSC</label>
+        <label className="block text-sm font-medium text-ink-soft">Пароль SMS Gold</label>
         <input
           type="password"
           className={inputClass}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder={configured ? '•••••••• (оставить без изменений)' : 'Пароль от smsc.ru'}
+          placeholder={configured ? '•••••••• (оставить без изменений)' : 'Пароль от smsgold.ru'}
           autoComplete="new-password"
           maxLength={200}
         />
       </div>
+      <div>
+        <label className="block text-sm font-medium text-ink-soft">Имя отправителя</label>
+        <input
+          className={inputClass}
+          value={sender}
+          onChange={(e) => setSender(e.target.value)}
+          placeholder="Пусто — имя по умолчанию из кабинета"
+          maxLength={16}
+        />
+      </div>
       <p className="text-xs text-ink-faint">
-        Ключи берутся из аккаунта на smsc.ru. СМС оплачиваются с баланса аккаунта — цена каждой
-        отправки сохраняется в истории.
+        ID и пароль берутся из аккаунта на smsgold.ru (Личный кабинет → Настройки → API).
+        СМС оплачиваются с баланса аккаунта — цена каждой отправки сохраняется в истории.
       </p>
       <button
         type="submit"
-        disabled={saving || !login.trim()}
+        disabled={saving || !user.trim()}
         className="min-h-11 w-full rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
       >
         {saving ? 'Сохранение…' : 'Сохранить'}
