@@ -7124,6 +7124,9 @@ def ensure_site_settings_smsc_columns() -> None:
         statements.append("ALTER TABLE site_settings ADD COLUMN smsgold_password VARCHAR(200)")
     if "smsgold_sender" not in columns:
         statements.append("ALTER TABLE site_settings ADD COLUMN smsgold_sender VARCHAR(16)")
+    if "sms_provider" not in columns:
+        statements.append("ALTER TABLE site_settings ADD COLUMN sms_provider VARCHAR(16)")
+        statements.append("UPDATE site_settings SET sms_provider = 'smsgold' WHERE sms_provider IS NULL")
     if not statements:
         return
 
@@ -7132,3 +7135,19 @@ def ensure_site_settings_smsc_columns() -> None:
             conn.execute(text(stmt))
 
     logger.info("Applied site_settings SMSC columns patch: %s", statements)
+
+
+def ensure_sms_messages_provider_column() -> None:
+    """sms_messages.provider — каким шлюзом отправлено (smsc/smsgold)."""
+    inspector = inspect(engine)
+    if "sms_messages" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("sms_messages")}
+    if "provider" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE sms_messages ADD COLUMN provider VARCHAR(16)"))
+        conn.execute(text("UPDATE sms_messages SET provider = 'smsc' WHERE provider IS NULL"))
+
+    logger.info("Applied sms_messages.provider patch")

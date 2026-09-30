@@ -11,6 +11,7 @@ class SmsMessage(Base):
     inspection_booking_id = Column(Integer, nullable=True, index=True)
     phone = Column(String(40), nullable=False)
     text = Column(Text, nullable=False)
+    provider = Column(String(16), nullable=False, default="smsgold")
     status = Column(String(16), nullable=False, default="sent", index=True)
     cost = Column(Numeric(12, 4), nullable=True)
     error_message = Column(Text, nullable=True)

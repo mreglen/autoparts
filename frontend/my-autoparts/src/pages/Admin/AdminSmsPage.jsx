@@ -49,11 +49,31 @@ function today() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const PROVIDERS = [
+  { id: 'smsgold', label: 'SMS Gold' },
+  { id: 'smsc', label: 'SMS Центр' },
+];
+
+const PROVIDER_LABELS = { smsgold: 'SMS Gold', smsc: 'SMS Центр' };
+
+function ProviderField({ label, children }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-ink-soft">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 function SettingsTab() {
-  const [user, setUser] = useState('');
-  const [sender, setSender] = useState('');
-  const [password, setPassword] = useState('');
-  const [configured, setConfigured] = useState(false);
+  const [provider, setProvider] = useState('smsgold');
+  const [smscLogin, setSmscLogin] = useState('');
+  const [smscPassword, setSmscPassword] = useState('');
+  const [smscConfigured, setSmscConfigured] = useState(false);
+  const [smsgoldUser, setSmsgoldUser] = useState('');
+  const [smsgoldPassword, setSmsgoldPassword] = useState('');
+  const [smsgoldSender, setSmsgoldSender] = useState('');
+  const [smsgoldConfigured, setSmsgoldConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -61,9 +81,12 @@ function SettingsTab() {
   useEffect(() => {
     apiRequest('/admin/sms/settings')
       .then((data) => {
-        setUser(data?.user || '');
-        setSender(data?.sender || '');
-        setConfigured(Boolean(data?.configured));
+        setProvider(data?.provider || 'smsgold');
+        setSmscLogin(data?.smsc_login || '');
+        setSmscConfigured(Boolean(data?.smsc_configured));
+        setSmsgoldUser(data?.smsgold_user || '');
+        setSmsgoldSender(data?.smsgold_sender || '');
+        setSmsgoldConfigured(Boolean(data?.smsgold_configured));
       })
       .catch(() => setToast({ variant: 'error', message: 'Не удалось загрузить настройки' }))
       .finally(() => setLoading(false));
@@ -75,12 +98,23 @@ function SettingsTab() {
     try {
       const data = await apiRequest('/admin/sms/settings', {
         method: 'PUT',
-        body: JSON.stringify({ user, sender, password: password || undefined }),
+        body: JSON.stringify({
+          provider,
+          smsc_login: smscLogin,
+          smsc_password: smscPassword || undefined,
+          smsgold_user: smsgoldUser,
+          smsgold_password: smsgoldPassword || undefined,
+          smsgold_sender: smsgoldSender,
+        }),
       });
-      setUser(data?.user || '');
-      setSender(data?.sender || '');
-      setConfigured(Boolean(data?.configured));
-      setPassword('');
+      setProvider(data?.provider || provider);
+      setSmscLogin(data?.smsc_login || '');
+      setSmscConfigured(Boolean(data?.smsc_configured));
+      setSmsgoldUser(data?.smsgold_user || '');
+      setSmsgoldSender(data?.smsgold_sender || '');
+      setSmsgoldConfigured(Boolean(data?.smsgold_configured));
+      setSmscPassword('');
+      setSmsgoldPassword('');
       setToast({ variant: 'success', message: 'Настройки сохранены' });
     } catch (err) {
       setToast({ variant: 'error', message: err?.message || 'Не удалось сохранить' });
@@ -93,48 +127,99 @@ function SettingsTab() {
     return <p className="py-10 text-center text-sm text-ink-muted">Загрузка…</p>;
   }
 
+  const passwordHint = (isSet) =>
+    isSet ? '•••••••• (оставить без изменений)' : undefined;
+
   return (
     <form onSubmit={save} className="mx-auto max-w-md space-y-4">
       <div>
-        <label className="block text-sm font-medium text-ink-soft">ID пользователя SMS Gold</label>
-        <input
-          className={inputClass}
-          value={user}
-          onChange={(e) => setUser(e.target.value)}
-          placeholder="XXXXX или ХХХХХ.X"
-          autoComplete="username"
-          maxLength={64}
-        />
+        <label className="block text-sm font-medium text-ink-soft">Активный шлюз</label>
+        <div className="mt-1 flex gap-1 rounded-sg-sm border border-line bg-surface p-1">
+          {PROVIDERS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setProvider(p.id)}
+              className={`flex-1 rounded-sg-sm px-3 py-2 text-sm font-medium transition ${
+                provider === p.id
+                  ? 'bg-brand-600 text-white'
+                  : 'text-ink-muted hover:bg-surface-subtle hover:text-ink'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-ink-soft">Пароль SMS Gold</label>
-        <input
-          type="password"
-          className={inputClass}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder={configured ? '•••••••• (оставить без изменений)' : 'Пароль от smsgold.ru'}
-          autoComplete="new-password"
-          maxLength={200}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-ink-soft">Имя отправителя</label>
-        <input
-          className={inputClass}
-          value={sender}
-          onChange={(e) => setSender(e.target.value)}
-          placeholder="Пусто — имя по умолчанию из кабинета"
-          maxLength={16}
-        />
-      </div>
-      <p className="text-xs text-ink-faint">
-        ID и пароль берутся из аккаунта на smsgold.ru (Личный кабинет → Настройки → API).
-        СМС оплачиваются с баланса аккаунта — цена каждой отправки сохраняется в истории.
-      </p>
+
+      {provider === 'smsgold' ? (
+        <>
+          <ProviderField label="ID пользователя SMS Gold">
+            <input
+              className={inputClass}
+              value={smsgoldUser}
+              onChange={(e) => setSmsgoldUser(e.target.value)}
+              placeholder="XXXXX или ХХХХХ.X"
+              autoComplete="username"
+              maxLength={64}
+            />
+          </ProviderField>
+          <ProviderField label="Пароль SMS Gold">
+            <input
+              type="password"
+              className={inputClass}
+              value={smsgoldPassword}
+              onChange={(e) => setSmsgoldPassword(e.target.value)}
+              placeholder={passwordHint(smsgoldConfigured) || 'Пароль от smsgold.ru'}
+              autoComplete="new-password"
+              maxLength={200}
+            />
+          </ProviderField>
+          <ProviderField label="Имя отправителя">
+            <input
+              className={inputClass}
+              value={smsgoldSender}
+              onChange={(e) => setSmsgoldSender(e.target.value)}
+              placeholder="Пусто — имя по умолчанию из кабинета"
+              maxLength={16}
+            />
+          </ProviderField>
+          <p className="text-xs text-ink-faint">
+            ID и пароль берутся из аккаунта на smsgold.ru (Личный кабинет → Настройки → API).
+          </p>
+        </>
+      ) : (
+        <>
+          <ProviderField label="Логин SMS Центр">
+            <input
+              className={inputClass}
+              value={smscLogin}
+              onChange={(e) => setSmscLogin(e.target.value)}
+              placeholder="Логин от smsc.ru"
+              autoComplete="username"
+              maxLength={64}
+            />
+          </ProviderField>
+          <ProviderField label="Пароль SMS Центр">
+            <input
+              type="password"
+              className={inputClass}
+              value={smscPassword}
+              onChange={(e) => setSmscPassword(e.target.value)}
+              placeholder={passwordHint(smscConfigured) || 'Пароль от smsc.ru'}
+              autoComplete="new-password"
+              maxLength={200}
+            />
+          </ProviderField>
+          <p className="text-xs text-ink-faint">
+            Логин и пароль от smsc.ru. Не забудьте добавить IP сервера в разрешённые в их кабинете.
+          </p>
+        </>
+      )}
+
       <button
         type="submit"
-        disabled={saving || !user.trim()}
+        disabled={saving}
         className="min-h-11 w-full rounded-sg-sm bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
       >
         {saving ? 'Сохранение…' : 'Сохранить'}
@@ -227,6 +312,7 @@ function HistoryTab() {
                   <th className={`w-36 ${autoserviceListThClass}`}>Дата</th>
                   <th className={`w-40 ${autoserviceListThClass}`}>Телефон</th>
                   <th className={autoserviceListThClass}>Текст</th>
+                  <th className={`w-24 ${autoserviceListThClass}`}>Шлюз</th>
                   <th className={`w-28 ${autoserviceListThClass}`}>Статус</th>
                   <th className={`w-20 ${autoserviceListThClass} text-right`}>Цена</th>
                 </tr>
@@ -248,6 +334,9 @@ function HistoryTab() {
                             ? item.error_message
                             : item.text}
                         </span>
+                      </td>
+                      <td className={`whitespace-nowrap ${autoserviceListTdClass}`}>
+                        {PROVIDER_LABELS[item.provider] || item.provider || '—'}
                       </td>
                       <td className={autoserviceListTdClass}>
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${meta.className}`}>
@@ -278,7 +367,10 @@ function HistoryTab() {
                     {item.status === 'error' && item.error_message ? item.error_message : item.text}
                   </div>
                   <div className="mt-1 flex items-center justify-between text-xs text-ink-faint">
-                    <span>{formatDateTime(item.created_at)}</span>
+                    <span>
+                      {formatDateTime(item.created_at)}
+                      <span className="ml-2">{PROVIDER_LABELS[item.provider] || item.provider || ''}</span>
+                    </span>
                     <span className="font-semibold text-ink">
                       {item.status === 'sent' ? formatMoney(item.cost) : '—'}
                     </span>

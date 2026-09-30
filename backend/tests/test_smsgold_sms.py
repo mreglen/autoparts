@@ -131,5 +131,47 @@ class SendSmsgoldSmsTests(unittest.TestCase):
         self.assertEqual(log.status, "sent")
 
 
+class SmsGatewayDispatchTests(unittest.TestCase):
+    def _db(self, provider):
+        db = MagicMock()
+        settings = MagicMock()
+        settings.sms_provider = provider
+        return db, settings
+
+    def _send(self, provider):
+        from app.services import sms_gateway
+
+        db, settings = self._db(provider)
+        with patch.object(sms_gateway, "get_or_create_site_settings", return_value=settings):
+            return sms_gateway.send_sms(db, "79991234567", "Тест")
+
+    def test_smsgold_dispatched_by_default(self):
+        with patch(
+            "app.services.smsgold_client.send_smsgold_sms", return_value=MagicMock()
+        ) as gold, patch(
+            "app.services.smsc_client.send_smsc_sms", return_value=MagicMock()
+        ) as smsc:
+            self._send(None)
+        gold.assert_called_once()
+        smsc.assert_not_called()
+
+    def test_smsc_dispatched_when_selected(self):
+        with patch(
+            "app.services.smsgold_client.send_smsgold_sms", return_value=MagicMock()
+        ) as gold, patch(
+            "app.services.smsc_client.send_smsc_sms", return_value=MagicMock()
+        ) as smsc:
+            self._send("smsc")
+        smsc.assert_called_once()
+        gold.assert_not_called()
+
+    def test_unknown_provider_falls_back_to_smsgold(self):
+        with patch(
+            "app.services.smsgold_client.send_smsgold_sms", return_value=MagicMock()
+        ) as gold:
+            self._send("unknown-provider")
+        gold.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

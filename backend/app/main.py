@@ -81,6 +81,7 @@ from app.db.schema_patches import (
     ensure_repair_orders_discount_column,
     ensure_autoservice_clients_discount_column,
     ensure_sms_messages_table,
+    ensure_sms_messages_provider_column,
     ensure_site_settings_smsc_columns,
     ensure_repair_order_status_timestamps,
     ensure_repair_orders_shipping_date,
@@ -326,6 +327,7 @@ try:
     ensure_repair_orders_discount_column()
     ensure_autoservice_clients_discount_column()
     ensure_sms_messages_table()
+    ensure_sms_messages_provider_column()
     ensure_site_settings_smsc_columns()
     ensure_repair_order_status_timestamps()
     ensure_repair_orders_shipping_date()

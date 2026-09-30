@@ -103,6 +103,7 @@ def send_smsgold_sms(
         inspection_booking_id=inspection_booking_id,
         phone=phone_digits or (phone or "")[:40],
         text=text[:2000],
+        provider="smsgold",
         status="error",
         created_by_user_id=user_id,
     )

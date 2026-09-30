@@ -5,16 +5,22 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class SmsGoldSettingsView(BaseModel):
-    user: str = ""
-    sender: str = ""
-    configured: bool = False
+class SmsSettingsView(BaseModel):
+    provider: str = "smsgold"
+    smsc_login: str = ""
+    smsc_configured: bool = False
+    smsgold_user: str = ""
+    smsgold_sender: str = ""
+    smsgold_configured: bool = False
 
 
-class SmsGoldSettingsUpdate(BaseModel):
-    user: str = Field(default="", max_length=64)
-    password: Optional[str] = Field(default=None, max_length=200)
-    sender: Optional[str] = Field(default=None, max_length=16)
+class SmsSettingsUpdate(BaseModel):
+    provider: Optional[str] = Field(default=None, max_length=16)
+    smsc_login: Optional[str] = Field(default=None, max_length=64)
+    smsc_password: Optional[str] = Field(default=None, max_length=200)
+    smsgold_user: Optional[str] = Field(default=None, max_length=64)
+    smsgold_password: Optional[str] = Field(default=None, max_length=200)
+    smsgold_sender: Optional[str] = Field(default=None, max_length=16)
 
 
 class SmsMessageView(BaseModel):
@@ -23,6 +29,7 @@ class SmsMessageView(BaseModel):
     phone: str
     text: str
     status: str
+    provider: str = "smsgold"
     cost: Optional[Decimal] = None
     error_message: Optional[str] = None
     organization_id: Optional[str] = None

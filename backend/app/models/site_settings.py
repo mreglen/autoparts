@@ -22,3 +22,4 @@ class SiteSettings(Base):
     smsgold_user = Column(String(64), nullable=True)
     smsgold_password = Column(String(200), nullable=True)
     smsgold_sender = Column(String(16), nullable=True)
+    sms_provider = Column(String(16), nullable=False, default="smsgold")
