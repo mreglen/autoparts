@@ -660,13 +660,13 @@ def send_inspection_booking_sms(
         )
 
     org = db.query(Organization).filter(Organization.id == org_id).first()
-    org_name = (org.name if org else None) or "Свой Гараж"
+    org_address = (org.address or "").strip() if org else ""
     date_label = row.preferred_date.strftime("%d.%m.%Y") if row.preferred_date else ""
     time_label = row.preferred_time.strftime("%H:%M") if row.preferred_time else ""
     when = " ".join(part for part in (date_label, f"в {time_label}" if time_label else "") if part)
-    text = (
-        f"Здравствуйте, {row.name}! Вы записаны в автосервис \"{org_name}\" на {when}."
-    )
+    text = f"Здравствуйте! Вы записаны в автосервис на {when}."
+    if org_address:
+        text += f" По адресу: {org_address}."
 
     message = send_sms(
         db,
