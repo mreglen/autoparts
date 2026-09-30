@@ -48,23 +48,25 @@ class EventIcsTests(unittest.TestCase):
         self.assertIn("BEGIN:VEVENT", ics)
         self.assertIn("UID:booking-7-event@svoygarage", ics)
         self.assertIn("DTSTART;TZID=Asia/Yekaterinburg:20261005T110000", ics)
-        self.assertIn("DURATION:PT1H", ics)
+        self.assertIn("DTEND;TZID=Asia/Yekaterinburg:20261005T120000", ics)
         self.assertIn("SUMMARY:Осмотр: Иван Петров — BMW X5", ics)
         self.assertIn("LOCATION:ул Фруктовая\\, д 17", ics)
         self.assertIn("TRIGGER:-PT15M", ics)
         self.assertIn("TRIGGER:-PT1H", ics)
-        # накануне 20:00 ЕКБ = 15:00 UTC
-        self.assertIn("TRIGGER;VALUE=DATE-TIME:20261004T150000Z", ics)
+        # накануне 20:00 — за 15 часов до начала 11:00
+        self.assertIn("TRIGGER:-PT15H", ics)
+        self.assertNotIn("VALUE=DATE-TIME", ics)
         self.assertEqual(ics.count("BEGIN:VALARM"), 3)
 
     def test_allday_event_without_time(self):
         ics = caldav.build_event_ics(_booking(preferred_time=None), _org())
         self.assertIn("DTSTART;VALUE=DATE:20261005", ics)
         self.assertIn("DTEND;VALUE=DATE:20261006", ics)
-        self.assertNotIn("DURATION", ics)
-        self.assertIn("TRIGGER;VALUE=DATE-TIME:20261004T150000Z", ics)
-        # утро записи 09:00 ЕКБ = 04:00 UTC
-        self.assertIn("TRIGGER;VALUE=DATE-TIME:20261005T040000Z", ics)
+        # накануне 20:00 — за 4 часа до полуночи
+        self.assertIn("TRIGGER:-PT4H", ics)
+        # утро записи 9:00 — через 9 часов после полуночи
+        self.assertIn("TRIGGER:PT9H", ics)
+        self.assertNotIn("VALUE=DATE-TIME", ics)
 
     def test_escaping(self):
         ics = caldav.build_event_ics(_booking(name="Пётр; Иван, жжёт"), _org())

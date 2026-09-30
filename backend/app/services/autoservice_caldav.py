@@ -28,7 +28,6 @@ from app.models.user import User
 logger = logging.getLogger(__name__)
 
 TZ_ID = "Asia/Yekaterinburg"
-EKB_OFFSET = timedelta(hours=5)
 EVENTS_COLLECTION = "inspection-events"
 TASKS_COLLECTION = "inspection-tasks"
 COLLECTION_TITLE = "Записи на осмотр"
@@ -82,21 +81,33 @@ def _local_dt(booking: InspectionBooking) -> datetime:
     )
 
 
-def _utc_trigger(dt_local: datetime) -> str:
-    return (dt_local - EKB_OFFSET).strftime("%Y%m%dT%H%M%SZ")
+def _rel_dur(delta: timedelta) -> str:
+    """Относительный триггер VALARM из timedelta (например '-PT19H')."""
+    total = int(delta.total_seconds())
+    sign = "-" if total < 0 else ""
+    total = abs(total)
+    hours, rem = divmod(total, 3600)
+    minutes = rem // 60
+    if hours and minutes:
+        body = f"{hours}H{minutes}M"
+    elif hours:
+        body = f"{hours}H"
+    else:
+        body = f"{minutes}M"
+    return f"{sign}PT{body}"
 
 
-def _evening_before_trigger(booking: InspectionBooking) -> str:
-    return _utc_trigger(
-        datetime.combine(booking.preferred_date - timedelta(days=1), datetime.min.time())
-        + timedelta(hours=20)
-    )
+def _eve_rel_trigger(booking: InspectionBooking) -> str:
+    """Накануне записи в 20:00 — относительно её начала (локальное время)."""
+    eve = datetime.combine(booking.preferred_date, datetime.min.time()) + timedelta(hours=20)
+    eve -= timedelta(days=1)
+    return _rel_dur(eve - _local_dt(booking))
 
 
-def _morning_trigger(booking: InspectionBooking) -> str:
-    return _utc_trigger(
-        datetime.combine(booking.preferred_date, datetime.min.time()) + timedelta(hours=9)
-    )
+def _morning_rel_trigger(booking: InspectionBooking) -> str:
+    """В день записи в 9:00 — для событий без времени (начало = полночь)."""
+    morning = datetime.combine(booking.preferred_date, datetime.min.time()) + timedelta(hours=9)
+    return _rel_dur(morning - _local_dt(booking))
 
 
 def _summary(booking: InspectionBooking) -> str:
@@ -134,14 +145,15 @@ def _valarm_rel(trigger: str, text: str) -> list[str]:
     ]
 
 
-def _valarm_abs(trigger_utc: str, text: str) -> list[str]:
-    return [
-        "BEGIN:VALARM",
-        "ACTION:DISPLAY",
-        f"TRIGGER;VALUE=DATE-TIME:{trigger_utc}",
-        f"DESCRIPTION:{_esc(text)}",
-        "END:VALARM",
-    ]
+def _alarms(booking: InspectionBooking, timed: bool, text: str) -> list[str]:
+    if timed:
+        triggers = ["-PT15M", "-PT1H", _eve_rel_trigger(booking)]
+    else:
+        triggers = [_eve_rel_trigger(booking), _morning_rel_trigger(booking)]
+    lines: list[str] = []
+    for trig in triggers:
+        lines += _valarm_rel(trig, text)
+    return lines
 
 
 def build_event_ics(booking: InspectionBooking, org: Organization | None) -> str:
@@ -157,8 +169,9 @@ def build_event_ics(booking: InspectionBooking, org: Organization | None) -> str
     ]
     if timed:
         start = _local_dt(booking)
+        end = start + timedelta(minutes=EVENT_DURATION_MINUTES)
         lines.append(f"DTSTART;TZID={TZ_ID}:{start.strftime('%Y%m%dT%H%M%S')}")
-        lines.append("DURATION:PT1H")
+        lines.append(f"DTEND;TZID={TZ_ID}:{end.strftime('%Y%m%dT%H%M%S')}")
     else:
         lines.append(f"DTSTART;VALUE=DATE:{booking.preferred_date.strftime('%Y%m%d')}")
         lines.append(
@@ -170,13 +183,7 @@ def build_event_ics(booking: InspectionBooking, org: Organization | None) -> str
         lines.append(f"LOCATION:{_esc(address)}")
     lines.append(f"DESCRIPTION:{_esc(_description(booking))}")
     status_label = _STATUS_LABELS.get(booking.status, booking.status)
-    if timed:
-        lines += _valarm_rel("-PT15M", status_label)
-        lines += _valarm_rel("-PT1H", status_label)
-        lines += _valarm_abs(_evening_before_trigger(booking), status_label)
-    else:
-        lines += _valarm_abs(_evening_before_trigger(booking), status_label)
-        lines += _valarm_abs(_morning_trigger(booking), status_label)
+    lines += _alarms(booking, timed, status_label)
     lines += ["END:VEVENT", "END:VCALENDAR"]
     return _ics(lines)
 
@@ -205,13 +212,7 @@ def build_todo_ics(booking: InspectionBooking, org: Organization | None) -> str:
     if completed:
         lines.append(f"COMPLETED:{_dtstamp()}")
     status_label = _STATUS_LABELS.get(booking.status, booking.status)
-    if timed:
-        lines += _valarm_rel("-PT15M", status_label)
-        lines += _valarm_rel("-PT1H", status_label)
-        lines += _valarm_abs(_evening_before_trigger(booking), status_label)
-    else:
-        lines += _valarm_abs(_evening_before_trigger(booking), status_label)
-        lines += _valarm_abs(_morning_trigger(booking), status_label)
+    lines += _alarms(booking, timed, status_label)
     lines += ["END:VTODO", "END:VCALENDAR"]
     return _ics(lines)
 
