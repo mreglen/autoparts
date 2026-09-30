@@ -49,11 +49,6 @@ function today() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-const PROVIDERS = [
-  { id: 'smsgold', label: 'SMS Gold' },
-  { id: 'smsc', label: 'SMS Центр' },
-];
-
 const PROVIDER_LABELS = { smsgold: 'SMS Gold', smsc: 'SMS Центр' };
 
 function ProviderField({ label, children }) {
@@ -130,29 +125,58 @@ function SettingsTab() {
   const passwordHint = (isSet) =>
     isSet ? '•••••••• (оставить без изменений)' : undefined;
 
-  return (
-    <form onSubmit={save} className="mx-auto max-w-md space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-ink-soft">Активный шлюз</label>
-        <div className="mt-1 flex gap-1 rounded-sg-sm border border-line bg-surface p-1">
-          {PROVIDERS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setProvider(p.id)}
-              className={`flex-1 rounded-sg-sm px-3 py-2 text-sm font-medium transition ${
-                provider === p.id
-                  ? 'bg-brand-600 text-white'
-                  : 'text-ink-muted hover:bg-surface-subtle hover:text-ink'
+  const providerCard = (id, title, children) => {
+    const active = provider === id;
+    return (
+      <div
+        role="radio"
+        aria-checked={active}
+        tabIndex={0}
+        onClick={() => setProvider(id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setProvider(id);
+          }
+        }}
+        className={`cursor-pointer rounded-sg-sm border bg-surface p-4 transition ${
+          active ? 'border-brand-500 ring-2 ring-brand-200' : 'border-line hover:border-line-strong'
+        }`}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+            <span
+              className={`inline-flex h-4 w-4 items-center justify-center rounded-full border ${
+                active ? 'border-brand-600' : 'border-line-strong'
               }`}
             >
-              {p.label}
-            </button>
-          ))}
+              {active ? <span className="h-2 w-2 rounded-full bg-brand-600" /> : null}
+            </span>
+            {title}
+          </span>
+          {active ? (
+            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+              Активен
+            </span>
+          ) : null}
+        </div>
+        <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+          {children}
         </div>
       </div>
+    );
+  };
 
-      {provider === 'smsgold' ? (
+  return (
+    <form onSubmit={save} className="mx-auto max-w-md space-y-4">
+      <p className="text-xs text-ink-faint">
+        Выберите, через какой сервис отправлять SMS. Данные обоих сервисов можно заполнить заранее —
+        активным будет только отмеченный.
+      </p>
+
+      {providerCard(
+        'smsgold',
+        'SMS Gold',
         <>
           <ProviderField label="ID пользователя SMS Gold">
             <input
@@ -187,8 +211,12 @@ function SettingsTab() {
           <p className="text-xs text-ink-faint">
             ID и пароль берутся из аккаунта на smsgold.ru (Личный кабинет → Настройки → API).
           </p>
-        </>
-      ) : (
+        </>,
+      )}
+
+      {providerCard(
+        'smsc',
+        'SMS Центр',
         <>
           <ProviderField label="Логин SMS Центр">
             <input
@@ -214,7 +242,7 @@ function SettingsTab() {
           <p className="text-xs text-ink-faint">
             Логин и пароль от smsc.ru. Не забудьте добавить IP сервера в разрешённые в их кабинете.
           </p>
-        </>
+        </>,
       )}
 
       <button
