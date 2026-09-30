@@ -118,18 +118,10 @@ def _summary(booking: InspectionBooking) -> str:
     return f"{base} — {vehicle}" if vehicle else base
 
 
-_STATUS_LABELS = {
-    "new": "Новая заявка",
-    "confirmed": "Подтверждена",
-    "processed": "Обработана",
-}
-
-
 def _description(booking: InspectionBooking) -> str:
     parts = []
     if (booking.phone or "").strip():
         parts.append(f"Телефон: {booking.phone.strip()}")
-    parts.append(f"Статус: {_STATUS_LABELS.get(booking.status, booking.status)}")
     if (booking.notes or "").strip():
         parts.append(booking.notes.strip())
     return "\n".join(parts)
@@ -182,8 +174,7 @@ def build_event_ics(booking: InspectionBooking, org: Organization | None) -> str
     if address:
         lines.append(f"LOCATION:{_esc(address)}")
     lines.append(f"DESCRIPTION:{_esc(_description(booking))}")
-    status_label = _STATUS_LABELS.get(booking.status, booking.status)
-    lines += _alarms(booking, timed, status_label)
+    lines += _alarms(booking, timed, _summary(booking))
     lines += ["END:VEVENT", "END:VCALENDAR"]
     return _ics(lines)
 
@@ -211,8 +202,7 @@ def build_todo_ics(booking: InspectionBooking, org: Organization | None) -> str:
     lines.append(f"STATUS:{'COMPLETED' if completed else 'NEEDS-ACTION'}")
     if completed:
         lines.append(f"COMPLETED:{_dtstamp()}")
-    status_label = _STATUS_LABELS.get(booking.status, booking.status)
-    lines += _alarms(booking, timed, status_label)
+    lines += _alarms(booking, timed, _summary(booking))
     lines += ["END:VTODO", "END:VCALENDAR"]
     return _ics(lines)
 
