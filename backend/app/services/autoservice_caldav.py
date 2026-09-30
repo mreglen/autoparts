@@ -202,7 +202,8 @@ def build_todo_ics(booking: InspectionBooking, org: Organization | None) -> str:
     lines.append(f"STATUS:{'COMPLETED' if completed else 'NEEDS-ACTION'}")
     if completed:
         lines.append(f"COMPLETED:{_dtstamp()}")
-    lines += _alarms(booking, timed, _summary(booking))
+    # Без VALARM: iOS Напоминания показывают время будильника вместо DUE,
+    # а уведомления уже приходят от VEVENT (накануне 20:00, -1ч, -15мин).
     lines += ["END:VTODO", "END:VCALENDAR"]
     return _ics(lines)
 

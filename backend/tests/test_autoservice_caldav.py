@@ -80,7 +80,8 @@ class TodoIcsTests(unittest.TestCase):
         self.assertIn("UID:booking-7-todo@svoygarage", ics)
         self.assertIn("DUE;TZID=Asia/Yekaterinburg:20261005T110000", ics)
         self.assertIn("STATUS:NEEDS-ACTION", ics)
-        self.assertIn("TRIGGER:-PT15M", ics)
+        # будильников в VTODO нет — иначе iOS показывает время алерта вместо DUE
+        self.assertNotIn("VALARM", ics)
 
     def test_todo_completed(self):
         ics = caldav.build_todo_ics(_booking(status="processed"), _org())
