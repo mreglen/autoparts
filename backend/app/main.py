@@ -605,6 +605,13 @@ async def startup_event():
         name="Backfill storage location coordinates via DaData",
         replace_existing=True,
     )
+    scheduler.add_job(
+        func=run_caldav_sync_tick,
+        trigger=IntervalTrigger(minutes=5),
+        id="autoservice_caldav_reconcile",
+        name="CalDAV reconcile: sync inspection bookings to Radicale",
+        replace_existing=True,
+    )
     
     scheduler.start()
     set_apscheduler(scheduler)
@@ -822,6 +829,16 @@ async def run_autoservice_planner_digest_tick():
         logger.info("Autoservice planner daily digest dispatched to Celery")
     except Exception as e:
         logger.error("Ошибка постановки autoservice planner digest в Celery: %s", e)
+
+
+async def run_caldav_sync_tick():
+    try:
+        from app.tasks.autoservice_caldav_tasks import sync_caldav_all_task
+
+        await enqueue_celery_task(sync_caldav_all_task)
+        logger.info("CalDAV reconcile dispatched to Celery")
+    except Exception as e:
+        logger.error("Ошибка отправки CalDAV reconcile в Celery: %s", e)
 
 
 async def run_storage_location_geocode_backfill():
