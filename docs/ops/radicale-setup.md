@@ -53,6 +53,7 @@ systemctl restart kroan.service celery.service
   `inspection-tasks` (VTODO → Напоминания) — права Radicale `owner_only`.
 - Синк: точечный Celery-таск при create/patch/delete записи
   (`autoservice.sync_caldav_org`) + reconcile каждые 5 мин
-  (`autoservice.sync_caldav_all`). Удалённые/отменённые записи стираются
+  (`autoservice.sync_caldav_all`). В ленте только статус `confirmed`
+  (как в планировщике); удалённые/отменённые записи стираются
   из коллекций — пропадают и на телефоне.
 - Таймзона событий — Europe/Yekaterinburg; без времени — событие на весь день.

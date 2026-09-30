@@ -34,7 +34,7 @@ TASKS_COLLECTION = "inspection-tasks"
 COLLECTION_TITLE = "Записи на осмотр"
 PAST_DAYS = 30
 EVENT_DURATION_MINUTES = 60
-_SYNC_STATUSES = ("new", "confirmed", "processed")
+_SYNC_STATUSES = ("confirmed",)
 
 
 def _storage_dir(storage_dir: str | None = None) -> Path:
@@ -217,6 +217,8 @@ def build_todo_ics(booking: InspectionBooking, org: Organization | None) -> str:
 
 
 def _target_bookings(db: Session, organization_id: str) -> list[InspectionBooking]:
+    """Только подтверждённые записи — как в планировщике. Отменённые,
+    удалённые и необработанные заявки в календарь не попадают."""
     return (
         db.query(InspectionBooking)
         .filter(
