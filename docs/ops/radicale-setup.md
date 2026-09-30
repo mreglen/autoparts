@@ -56,4 +56,5 @@ systemctl restart kroan.service celery.service
   (`autoservice.sync_caldav_all`). В ленте только статус `confirmed`
   (как в планировщике); удалённые/отменённые записи стираются
   из коллекций — пропадают и на телефоне.
-- Таймзона событий — Europe/Yekaterinburg; без времени — событие на весь день.
+- Таймзона событий — Asia/Yekaterinburg (IANA-имя! `Europe/Yekaterinburg`
+  не существует — iOS сдвигает такие события); без времени — на весь день.

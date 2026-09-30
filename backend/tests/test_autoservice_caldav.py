@@ -47,7 +47,7 @@ class EventIcsTests(unittest.TestCase):
         ics = caldav.build_event_ics(_booking(), _org())
         self.assertIn("BEGIN:VEVENT", ics)
         self.assertIn("UID:booking-7-event@svoygarage", ics)
-        self.assertIn("DTSTART;TZID=Europe/Yekaterinburg:20261005T110000", ics)
+        self.assertIn("DTSTART;TZID=Asia/Yekaterinburg:20261005T110000", ics)
         self.assertIn("DURATION:PT1H", ics)
         self.assertIn("SUMMARY:Осмотр: Иван Петров — BMW X5", ics)
         self.assertIn("LOCATION:ул Фруктовая\\, д 17", ics)
@@ -76,7 +76,7 @@ class TodoIcsTests(unittest.TestCase):
         ics = caldav.build_todo_ics(_booking(), _org())
         self.assertIn("BEGIN:VTODO", ics)
         self.assertIn("UID:booking-7-todo@svoygarage", ics)
-        self.assertIn("DUE;TZID=Europe/Yekaterinburg:20261005T110000", ics)
+        self.assertIn("DUE;TZID=Asia/Yekaterinburg:20261005T110000", ics)
         self.assertIn("STATUS:NEEDS-ACTION", ics)
         self.assertIn("TRIGGER:-PT15M", ics)
 

@@ -27,7 +27,7 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
-TZ_ID = "Europe/Yekaterinburg"
+TZ_ID = "Asia/Yekaterinburg"
 EKB_OFFSET = timedelta(hours=5)
 EVENTS_COLLECTION = "inspection-events"
 TASKS_COLLECTION = "inspection-tasks"
