@@ -12,6 +12,7 @@ from app.models.autoservice_client import AutoserviceClient
 from app.models.garage_vehicle import GarageVehicle
 from app.models.inspection_booking import InspectionBooking
 from app.models.user import User
+from app.services.autoservice_caldav import request_org_sync
 from app.schemas.repair_booking import (
     REPAIR_BOOKING_STATUSES,
     RepairBookingCreate,
@@ -140,6 +141,7 @@ def create_repair_booking(
     db.refresh(row)
     if vehicle:
         row.vehicle = vehicle
+    request_org_sync(row.organization_id)
     return _inspection_to_repair_view(row)
 
 
@@ -200,6 +202,7 @@ def create_repair_booking_staff(
     db.refresh(row)
     if vehicle:
         row.vehicle = vehicle
+    request_org_sync(row.organization_id)
     return _inspection_to_repair_view(row)
 
 

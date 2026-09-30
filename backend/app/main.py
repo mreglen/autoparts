@@ -80,6 +80,7 @@ from app.db.schema_patches import (
     ensure_payroll_accruals_employee_not_null,
     ensure_repair_orders_discount_column,
     ensure_autoservice_clients_discount_column,
+    ensure_caldav_accounts_table,
     ensure_sms_messages_table,
     ensure_sms_messages_provider_column,
     ensure_site_settings_smsc_columns,
@@ -328,6 +329,7 @@ try:
     ensure_autoservice_clients_discount_column()
     ensure_sms_messages_table()
     ensure_sms_messages_provider_column()
+    ensure_caldav_accounts_table()
     ensure_site_settings_smsc_columns()
     ensure_repair_order_status_timestamps()
     ensure_repair_orders_shipping_date()

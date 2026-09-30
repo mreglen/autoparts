@@ -7151,3 +7151,30 @@ def ensure_sms_messages_provider_column() -> None:
         conn.execute(text("UPDATE sms_messages SET provider = 'smsc' WHERE provider IS NULL"))
 
     logger.info("Applied sms_messages.provider patch")
+
+
+def ensure_caldav_accounts_table() -> None:
+    """caldav_accounts — CalDAV-аккаунты сотрудников (Radicale, iPhone)."""
+    inspector = inspect(engine)
+    if "caldav_accounts" in inspector.get_table_names():
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE caldav_accounts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL UNIQUE REFERENCES users(id),
+                organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                caldav_username VARCHAR(64) NOT NULL UNIQUE,
+                last_synced_at TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT now()
+            )
+        """))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_caldav_accounts_user_id ON caldav_accounts (user_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_caldav_accounts_organization_id ON caldav_accounts (organization_id)"
+        ))
+
+    logger.info("Applied caldav_accounts table patch")

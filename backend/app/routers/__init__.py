@@ -88,6 +88,7 @@ from app.routers.public_new_parts_cards import router as public_new_parts_cards_
 from app.routers.seo_landing_pages import router as seo_landing_pages_router
 from app.routers.user_engagement import router as user_engagement_router
 from app.routers.admin_sms import router as admin_sms_router
+from app.routers.autoservice_caldav import router as autoservice_caldav_router
 
 
 
@@ -157,6 +158,7 @@ api_router.include_router(site_quick_links_router)
 api_router.include_router(site_payments_router)
 api_router.include_router(site_reviews_router)
 api_router.include_router(autoservice_inspections_router)
+api_router.include_router(autoservice_caldav_router)
 api_router.include_router(autoservice_clients_router)
 api_router.include_router(autoservice_garage_router)
 api_router.include_router(autoservice_settings_router)

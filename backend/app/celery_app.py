@@ -23,6 +23,7 @@ celery_app = Celery(
         'app.tasks.notification_tasks',
         'app.tasks.search_subscription_tasks',
         'app.tasks.autoservice_notification_tasks',
+        'app.tasks.autoservice_caldav_tasks',
         'app.tasks.geocode_tasks',
         'app.tasks.marzvpn_tasks',
     ]
@@ -64,6 +65,11 @@ celery_app.conf.update(
         "autoservice-booking-reminders": {
             "task": "autoservice.send_booking_reminders",
             "schedule": crontab(hour=7, minute=0),
+        },
+        # CalDAV: reconcile коллекций Radicale со списком записей — каждые 5 минут
+        "autoservice-caldav-sync-all": {
+            "task": "autoservice.sync_caldav_all",
+            "schedule": crontab(minute="*/5"),
         },
         # marzvpn.verify_keys_authenticity — отдельный beat бота (redis db/2),
         # чтобы не дублировать с marzban-vpn-bot-celerybeat.

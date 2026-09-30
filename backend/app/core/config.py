@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     # DaData (подсказки адреса)
     DADATA_API_KEY: Optional[str] = None
 
+    # CalDAV (Radicale): синхронизация записей на осмотр → Календарь/Напоминания iPhone
+    CALDAV_STORAGE_DIR: str = "/var/lib/radicale/collections/collection-root"
+    RADICALE_HTUSER_FILE: str = "/etc/radicale/users"
+    CALDAV_PUBLIC_URL: str = "https://svoygarage.ru/caldav/"
+    CALDAV_SYNC_ENABLED: bool = False
+
     # SEO sitemap: lastmod статического sitemap-pages.xml (обновлять при правке файла)
     SITEMAP_PAGES_LASTMOD: str = "2026-05-29"
     SITEMAP_REBUILD_HOUR_UTC: int = 3

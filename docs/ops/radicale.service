@@ -1,0 +1,15 @@
+[Unit]
+Description=Radicale CalDAV server (autoservice iPhone sync)
+After=network.target
+
+[Service]
+Type=simple
+User=fast
+Group=fast
+WorkingDirectory=/var/lib/radicale
+ExecStart=/home/fast/radicale/venv/bin/radicale --config /etc/radicale/config
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+# /etc/radicale/config — Radicale CalDAV для «Свой Гараж»
+# Backend пишет .ics напрямую в storage_folder; iPhone ходит через
+# nginx https://svoygarage.ru/caldav/ -> 127.0.0.1:5232
+
+[server]
+hosts = 127.0.0.1:5232
+max_connections = 20
+timeout = 30
+
+[auth]
+type = htpasswd
+htpasswd_filename = /etc/radicale/users
+htpasswd_encryption = autodetect
+
+[rights]
+type = owner_only
+
+[storage]
+filesystem_folder = /var/lib/radicale/collections
+
+[web]
+type = none

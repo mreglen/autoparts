@@ -14,6 +14,7 @@ from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.sms import SmsSendResult
 from app.services.sms_gateway import send_sms
+from app.services.autoservice_caldav import request_org_sync
 from app.schemas.inspection_booking import (
     InspectionBookingClientCreate,
     InspectionBookingPatch,
@@ -159,6 +160,7 @@ def create_public_inspection_booking(
     db.refresh(row)
     notify_new_inspection_booking(db, row)
     notify_inspection_booking_client(db, row, "accepted")
+    request_org_sync(org_id)
     return _booking_to_view(row)
 
 
@@ -252,6 +254,7 @@ def create_client_inspection_booking(
         row.vehicle = vehicle
     notify_new_inspection_booking(db, row)
     notify_inspection_booking_client(db, row, "accepted")
+    request_org_sync(row.organization_id)
     return _booking_to_view(row)
 
 
@@ -395,6 +398,7 @@ def _create_staff_inspection_booking(
         row.vehicle = vehicle
     if row.status == "confirmed":
         notify_inspection_booking_client(db, row, "confirmed")
+    request_org_sync(row.organization_id)
     return _booking_to_view(row)
 
 
@@ -545,6 +549,7 @@ def patch_inspection_booking(
         notify_inspection_booking_client(db, row, "confirmed")
     elif row.status == "cancelled" and previous_status != "cancelled":
         notify_inspection_booking_client(db, row, "cancelled")
+    request_org_sync(row.organization_id)
     return _booking_to_view(row)
 
 
@@ -599,6 +604,7 @@ def cancel_my_inspection_booking(
     db.commit()
     db.refresh(row)
     notify_booking_cancelled_by_client(db, row)
+    request_org_sync(row.organization_id)
     return _booking_to_view(row)
 
 
@@ -625,8 +631,10 @@ def delete_inspection_booking(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Заявка не найдена",
         )
+    org_id_for_sync = row.organization_id
     db.delete(row)
     db.commit()
+    request_org_sync(org_id_for_sync)
 
 
 @router.post(
