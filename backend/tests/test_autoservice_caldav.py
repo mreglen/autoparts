@@ -80,7 +80,7 @@ class TodoIcsTests(unittest.TestCase):
         self.assertIn("UID:booking-7-todo@svoygarage", ics)
         self.assertIn("DUE;TZID=Asia/Yekaterinburg:20261005T110000", ics)
         self.assertIn("STATUS:NEEDS-ACTION", ics)
-        # будильников в VTODO нет — иначе iOS показывает время алерта вместо DUE
+        # VALARM нет: iOS Reminders иначе показывает время будильника вместо DUE
         self.assertNotIn("VALARM", ics)
 
     def test_todo_completed(self):
