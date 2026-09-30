@@ -12,9 +12,11 @@ const VARIANTS = {
   success: {
     container: 'bg-success-600 shadow-success-600/25',
     icon: (
-      <svg className="h-6 w-6 shrink-0 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-        <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-4.573a.75.75 0 00-1.22-.964l-3.236 4.09-1.615-1.615a.75.75 0 10-1.06 1.06l2.25 2.25a.75.75 0 001.144-.094l3.737-4.727z" clipRule="evenodd" />
-      </svg>
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-success-600" aria-hidden>
+        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </span>
     ),
   },
 };
