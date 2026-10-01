@@ -29,6 +29,11 @@
   }
 }
 
+/* Печать документа в overlay внутри страницы: нижняя навигация выше слоя модалок — скрываем её. */
+html.sg-print-doc-open .sg-mobile-bottom-nav {
+  display: none !important;
+}
+
 html.sg-yandex-badge-on {
   --sg-yandex-badge-h: 2.125rem;
 }

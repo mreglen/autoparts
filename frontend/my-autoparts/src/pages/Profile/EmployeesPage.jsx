@@ -8,6 +8,7 @@ import {
   createEmployeeAccount,
 } from '../../redux/slices/OrganizationSlice';
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
+import CalendarSyncSection from '../../components/Autoservice/CalendarSyncSection';
 import Toast from '../../components/UI/Toast';
 import {
   Button,
@@ -216,6 +217,7 @@ export default function EmployeesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [creatingAccountId, setCreatingAccountId] = useState(null);
+  const [caldavEmployee, setCaldavEmployee] = useState(null);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -527,6 +529,17 @@ export default function EmployeesPage() {
                     Создать аккаунт
                   </Button>
                 ) : null}
+                {showAutoserviceToggle ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setCaldavEmployee(detailsEmployee)}
+                    disabled={!detailsEmployee.user_id}
+                    title={detailsEmployee.user_id ? undefined : 'Сначала создайте аккаунт'}
+                  >
+                    Подключить iPhone
+                  </Button>
+                ) : null}
                 <Button type="button" onClick={actions.onEdit}>
                   Редактировать
                 </Button>
@@ -542,6 +555,19 @@ export default function EmployeesPage() {
         orgId={orgId}
         onClose={() => { setShowPermissionModal(false); setSelectedEmployee(null); }}
       />
+
+      <Modal
+        open={Boolean(caldavEmployee)}
+        onClose={() => setCaldavEmployee(null)}
+        title={caldavEmployee ? `iPhone — ${getEmployeeFullName(caldavEmployee) || 'Сотрудник'}` : 'iPhone'}
+        size="md"
+      >
+        {caldavEmployee && orgId ? (
+          <CalendarSyncSection
+            basePath={`/organizations/${orgId}/employee-cards/${caldavEmployee.id}/calendar-sync`}
+          />
+        ) : null}
+      </Modal>
 
       <Modal open={showAddForm} onClose={() => { setShowAddForm(false); resetForm(); }} title="Добавить сотрудника" size="md"
         footer={<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button type="button" variant="secondary" onClick={() => { setShowAddForm(false); resetForm(); }} disabled={isCreating}>Отмена</Button><Button type="submit" form="employee-add-form" loading={isCreating}>Добавить</Button></div>}>

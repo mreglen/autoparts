@@ -66,6 +66,20 @@ def _get_card_or_404(db: Session, org_id: str, card_id: int) -> OrganizationEmpl
     return row
 
 
+def get_employee_card(db: Session, org_id: str, card_id: int) -> OrganizationEmployee:
+    return _get_card_or_404(db, org_id, card_id)
+
+
+def get_card_user_or_409(db: Session, org_id: str, card_id: int) -> User:
+    card = _get_card_or_404(db, org_id, card_id)
+    if not card.user_id:
+        raise HTTPException(status_code=409, detail="Сначала создайте аккаунт сотруднику")
+    user = db.query(User).filter(User.id == card.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Аккаунт сотрудника не найден")
+    return user
+
+
 def _current_payroll(card: OrganizationEmployee) -> OrganizationEmployeePayrollTerm | None:
     terms = card.payroll_terms or []
     if not terms:

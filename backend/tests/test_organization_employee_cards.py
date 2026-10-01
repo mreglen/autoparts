@@ -19,6 +19,7 @@ from app.services.organization_employee_service import (
     card_to_view,
     create_employee_account,
     create_employee_card,
+    get_card_user_or_409,
     set_card_permissions,
 )
 from app.services.organization_employee_sync import _ensure_payroll_from_legacy, link_service_employee_card
@@ -288,6 +289,52 @@ class OrganizationEmployeeCardViewTests(unittest.TestCase):
         card.user = MagicMock(is_director=False)
         view = card_to_view(MagicMock(), card)
         self.assertEqual(view["account_status"], "linked")
+
+
+class GetCardUserTests(unittest.TestCase):
+    def test_card_without_account_raises_409(self):
+        db = MagicMock()
+        card = OrganizationEmployee(
+            id=1,
+            organization_id="ORG001",
+            last_name="Без",
+            first_name="Аккаунта",
+            user_id=None,
+        )
+        db.query.return_value.filter.return_value.first.return_value = card
+
+        with self.assertRaises(HTTPException) as ctx:
+            get_card_user_or_409(db, "ORG001", 1)
+        self.assertEqual(ctx.exception.status_code, 409)
+
+    def test_returns_linked_user(self):
+        db = MagicMock()
+        card = OrganizationEmployee(
+            id=1,
+            organization_id="ORG001",
+            last_name="С",
+            first_name="Аккаунтом",
+            user_id=42,
+        )
+        user = SimpleNamespace(id=42)
+        db.query.return_value.filter.return_value.first.side_effect = [card, user]
+
+        self.assertIs(get_card_user_or_409(db, "ORG001", 1), user)
+
+    def test_missing_user_raises_404(self):
+        db = MagicMock()
+        card = OrganizationEmployee(
+            id=1,
+            organization_id="ORG001",
+            last_name="Битая",
+            first_name="Ссылка",
+            user_id=42,
+        )
+        db.query.return_value.filter.return_value.first.side_effect = [card, None]
+
+        with self.assertRaises(HTTPException) as ctx:
+            get_card_user_or_409(db, "ORG001", 1)
+        self.assertEqual(ctx.exception.status_code, 404)
 
 
 class SetCardPermissionsTests(unittest.TestCase):

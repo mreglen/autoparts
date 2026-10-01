@@ -1,5 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import Modal from '../UI/Modal';
 import { ActionsDropdownItem } from '../ActionsDropdown/ActionsDropdown';
 import { formatServerDateTime, formatServerDate, formatWallClockDateTime } from '../../utils/serverDate';
@@ -28,6 +30,9 @@ const LazyAddGuestVehicleModal = lazy(() =>
 const LazyEditGuestVehicleModal = lazy(() =>
   import('./ClientProfileModals').then((m) => ({ default: m.EditGuestVehicleModal })),
 );
+const LazyRepairOrderPrintPage = lazy(() => import('../../pages/Autoservice/RepairOrderPrintPage'));
+const LazyRepairOrderUpdPrintPage = lazy(() => import('../../pages/Autoservice/RepairOrderUpdPrintPage'));
+const LazyRepairOrderInvoicePrintPage = lazy(() => import('../../pages/Autoservice/RepairOrderInvoicePrintPage'));
 
 export const REPAIR_ORDER_STATUS_LABELS = {
   pending: 'Ожидание',
@@ -583,6 +588,8 @@ export default function RepairOrderViewModal({
   const [completeError, setCompleteError] = useState('');
   const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
   const [printPickerOpen, setPrintPickerOpen] = useState(false);
+  const [printDoc, setPrintDoc] = useState(null);
+  const printOverlayRef = useRef(null);
   const [receiptPickerOpen, setReceiptPickerOpen] = useState(false);
   const [orderPayments, setOrderPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
@@ -609,6 +616,7 @@ export default function RepairOrderViewModal({
     setCompleteError('');
     setCompleteConfirmOpen(false);
     setPrintPickerOpen(false);
+    setPrintDoc(null);
     setReceiptPickerOpen(false);
     setOrderPayments([]);
     setPaymentsError('');
@@ -624,6 +632,25 @@ export default function RepairOrderViewModal({
   }, [order?.id]);
 
   const clientCardId = order?.client?.id || null;
+  const printOpen = Boolean(printDoc && order?.id);
+
+  useFocusTrap(printOverlayRef, {
+    active: printOpen,
+    onEscape: () => setPrintDoc(null),
+  });
+
+  useEffect(() => {
+    if (!printOpen) return undefined;
+    document.documentElement.classList.add('sg-print-doc-open');
+    return () => {
+      document.documentElement.classList.remove('sg-print-doc-open');
+    };
+  }, [printOpen]);
+
+  const openPrintDoc = useCallback((doc) => {
+    setPrintPickerOpen(false);
+    setPrintDoc(doc);
+  }, []);
 
   const loadClientVehicles = useCallback(async (clientId) => {
     if (!clientId) return;
@@ -1175,36 +1202,30 @@ export default function RepairOrderViewModal({
       wrapperClassName="z-[120]"
     >
       <div className="flex flex-col gap-2">
-        <a
-          href={order?.id ? `/autoservice/orders/${order.id}/print` : '#'}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
           className={`${secondaryBtnClass} w-full`}
-          onClick={() => setPrintPickerOpen(false)}
+          onClick={() => openPrintDoc('order')}
         >
           Заказ-наряд
-        </a>
-        <a
-          href={order?.id ? `/autoservice/orders/${order.id}/print/upd` : '#'}
-          target="_blank"
-          rel="noopener noreferrer"
+        </button>
+        <button
+          type="button"
           className={`${secondaryBtnClass} w-full`}
-          onClick={() => setPrintPickerOpen(false)}
+          onClick={() => openPrintDoc('upd')}
         >
           УПД
-        </a>
+        </button>
         <button type="button" disabled className={`${secondaryBtnClass} w-full cursor-not-allowed opacity-50`}>
           ТОРГ-12
         </button>
-        <a
-          href={order?.id ? `/autoservice/orders/${order.id}/print/invoice` : '#'}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
           className={`${secondaryBtnClass} w-full`}
-          onClick={() => setPrintPickerOpen(false)}
+          onClick={() => openPrintDoc('invoice')}
         >
           Счёт на оплату
-        </a>
+        </button>
       </div>
     </Modal>
     <Modal
@@ -1358,6 +1379,34 @@ export default function RepairOrderViewModal({
         }}
       />
     </Suspense>
+    {printOpen
+      ? createPortal(
+          <div
+            ref={printOverlayRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Печать документа"
+            tabIndex={-1}
+            className="fixed inset-0 overflow-y-auto overscroll-contain bg-gray-100 text-black"
+            style={{ zIndex: 'var(--sg-z-modal-shell)' }}
+          >
+            <Suspense
+              fallback={<p className="p-6 text-sm text-ink-muted">Загрузка документа…</p>}
+            >
+              {printDoc === 'order' ? (
+                <LazyRepairOrderPrintPage orderId={order.id} onClose={() => setPrintDoc(null)} />
+              ) : null}
+              {printDoc === 'upd' ? (
+                <LazyRepairOrderUpdPrintPage orderId={order.id} onClose={() => setPrintDoc(null)} />
+              ) : null}
+              {printDoc === 'invoice' ? (
+                <LazyRepairOrderInvoicePrintPage orderId={order.id} onClose={() => setPrintDoc(null)} />
+              ) : null}
+            </Suspense>
+          </div>,
+          document.body,
+        )
+      : null}
     </>
   );
 }

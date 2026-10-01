@@ -327,8 +327,9 @@ function buildAutoForm(order, org, client) {
   };
 }
 
-export default function RepairOrderUpdPrintPage() {
-  const { orderId } = useParams();
+export default function RepairOrderUpdPrintPage({ orderId: orderIdProp = null, onClose = null }) {
+  const { orderId: routeOrderId } = useParams();
+  const orderId = orderIdProp || routeOrderId;
   const [searchParams] = useSearchParams();
   const buyerId = searchParams.get('buyerId');
   const dispatch = useDispatch();
@@ -576,9 +577,15 @@ export default function RepairOrderUpdPrintPage() {
           description={error || 'Документ не найден'}
         />
         <div className="mt-4 flex justify-center">
-          <Button as={Link} to="/autoservice/orders" variant="secondary">
-            К заказ-нарядам
-          </Button>
+          {onClose ? (
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Назад
+            </Button>
+          ) : (
+            <Button as={Link} to="/autoservice/orders" variant="secondary">
+              К заказ-нарядам
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -590,9 +597,15 @@ export default function RepairOrderUpdPrintPage() {
         <div className="mx-auto flex max-w-[297mm] flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-ink">УПД №{order.order_number}</p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
-              Закрыть
-            </Button>
+            {onClose ? (
+              <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+                Назад
+              </Button>
+            ) : (
+              <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
+                Закрыть
+              </Button>
+            )}
             <Button type="button" variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
               Редактировать
             </Button>

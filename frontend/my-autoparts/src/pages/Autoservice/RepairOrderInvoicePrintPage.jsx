@@ -176,8 +176,9 @@ function buildAutoForm(order, org, client) {
   };
 }
 
-export default function RepairOrderInvoicePrintPage() {
-  const { orderId } = useParams();
+export default function RepairOrderInvoicePrintPage({ orderId: orderIdProp = null, onClose = null }) {
+  const { orderId: routeOrderId } = useParams();
+  const orderId = orderIdProp || routeOrderId;
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
   const org = useSelector((state) => state.organization.data);
@@ -397,9 +398,15 @@ export default function RepairOrderInvoicePrintPage() {
           description={error || 'Документ не найден'}
         />
         <div className="mt-4 flex justify-center">
-          <Button as={Link} to="/autoservice/orders" variant="secondary">
-            К заказ-нарядам
-          </Button>
+          {onClose ? (
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Назад
+            </Button>
+          ) : (
+            <Button as={Link} to="/autoservice/orders" variant="secondary">
+              К заказ-нарядам
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -414,9 +421,15 @@ export default function RepairOrderInvoicePrintPage() {
         <div className="mx-auto flex max-w-[210mm] flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-ink">Счёт на оплату №{order.order_number}</p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
-              Закрыть
-            </Button>
+            {onClose ? (
+              <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+                Назад
+              </Button>
+            ) : (
+              <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
+                Закрыть
+              </Button>
+            )}
             <Button type="button" variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
               Редактировать
             </Button>

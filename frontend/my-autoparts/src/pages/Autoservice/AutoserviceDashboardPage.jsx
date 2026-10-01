@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { withBackTo } from '../../hooks/useHistoryBack';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import {
   EmptyState,
@@ -12,6 +13,7 @@ import {
 import RepairOrderViewModal, {
   OrderStatusBadge,
 } from '../../components/Autoservice/RepairOrderViewModal';
+import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
 import { apiRequest } from '../../utils/apiClient';
 import { getGreeting, getFirstName, MetricCard, PrimaryAction, QuickAction } from '../Dashboard/dashboardUi';
 import { formatFinanceCurrency } from '../Finance/financeDisplay';
@@ -74,6 +76,7 @@ function todayItemTimeLabel(item) {
 
 export default function AutoserviceDashboardPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isReady, user } = useAuthReady();
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const [loading, setLoading] = useState(true);
@@ -81,6 +84,9 @@ export default function AutoserviceDashboardPage() {
   const [summary, setSummary] = useState(null);
   const [viewOrder, setViewOrder] = useState(null);
   const [viewOrderLoading, setViewOrderLoading] = useState(false);
+  const [viewBooking, setViewBooking] = useState(null);
+  const [zones, setZones] = useState([]);
+  const zonesRequestedRef = useRef(false);
 
   const can = useCallback(
     (code) => hasAutoservicePermission(user, permissionCodes, code),
@@ -124,6 +130,30 @@ export default function AutoserviceDashboardPage() {
       setError('Не удалось загрузить заказ-наряд');
     } finally {
       setViewOrderLoading(false);
+    }
+  }, []);
+
+  const openInspection = useCallback((item) => {
+    if (!item?.id) return;
+    setViewBooking({
+      id: item.id,
+      name: item.client_name || '',
+      phone: item.client_phone || '',
+      client_id: item.client_id ?? null,
+      garage_vehicle_id: item.garage_vehicle_id ?? null,
+      preferred_date: String(item.scheduled_at || '').slice(0, 10) || null,
+      preferred_time: item.preferred_time || null,
+      vehicle_make: item.vehicle_make || null,
+      vehicle_model: item.vehicle_model || null,
+      work_zone_id: item.work_zone_id ?? null,
+      notes: item.notes || null,
+      status: item.status,
+    });
+    if (!zonesRequestedRef.current) {
+      zonesRequestedRef.current = true;
+      apiRequest('/autoservice/work-zones')
+        .then((data) => setZones(Array.isArray(data) ? data : []))
+        .catch(() => setZones([]));
     }
   }, []);
 
@@ -355,7 +385,7 @@ export default function AutoserviceDashboardPage() {
                 type="button"
                 onClick={() => {
                   if (item.kind === 'inspection') {
-                    navigate('/autoservice/inspections');
+                    openInspection(item);
                   } else {
                     openOrder(item.id);
                   }
@@ -429,6 +459,36 @@ export default function AutoserviceDashboardPage() {
         onEdit={(order) => {
           setViewOrder(null);
           navigate(`/autoservice/orders/${order.id}/edit`);
+        }}
+      />
+      <InspectionBookingAddModal
+        open={Boolean(viewBooking)}
+        onClose={() => setViewBooking(null)}
+        zones={zones}
+        initialBooking={viewBooking}
+        onSaved={() => {
+          setViewBooking(null);
+          load();
+        }}
+        onDeleted={() => {
+          setViewBooking(null);
+          load();
+        }}
+        onCreateOrder={(booking) => {
+          setViewBooking(null);
+          navigate('/autoservice/orders/new', {
+            state: withBackTo(location, {
+              scheduledAtLocal: `${booking.preferred_date}T${booking.preferred_time?.slice(0, 5) || '10:00'}`,
+              workZoneId: booking.work_zone_id,
+              clientId: booking.client_id,
+              vehicleId: booking.garage_vehicle_id,
+              clientName: booking.name,
+              clientPhone: booking.phone,
+              vehicleMake: booking.vehicle_make || booking.vehicle?.make,
+              vehicleModel: booking.vehicle_model || booking.vehicle?.model,
+              inspectionBookingId: booking.id,
+            }),
+          });
         }}
       />
     </div>

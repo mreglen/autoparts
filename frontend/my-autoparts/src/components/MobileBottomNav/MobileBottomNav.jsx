@@ -206,7 +206,7 @@ export default function MobileBottomNav() {
 
     return (
         <nav
-            className="lg:hidden fixed bottom-0 left-0 right-0 overflow-visible border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 pb-safe"
+            className="sg-mobile-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 overflow-visible border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 pb-safe"
             style={{ zIndex: Z_MOBILE_BOTTOM_NAV }}
             aria-label="Основная навигация"
         >

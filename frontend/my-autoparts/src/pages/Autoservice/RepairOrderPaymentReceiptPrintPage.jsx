@@ -40,8 +40,9 @@ function Cell({ children, className = '', align = 'left', ...props }) {
   );
 }
 
-export default function RepairOrderPaymentReceiptPrintPage() {
-  const { orderId } = useParams();
+export default function RepairOrderPaymentReceiptPrintPage({ orderId: orderIdProp = null, onClose = null }) {
+  const { orderId: routeOrderId } = useParams();
+  const orderId = orderIdProp || routeOrderId;
   const [searchParams] = useSearchParams();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
@@ -174,14 +175,20 @@ export default function RepairOrderPaymentReceiptPrintPage() {
     );
   }
 
+  const backButton = onClose ? (
+    <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+      Назад
+    </Button>
+  ) : (
+    <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
+      К списку заказов
+    </Button>
+  );
+
   if (error || !order) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
-        <EmptyState title={error || 'Заказ-наряд не найден'}>
-          <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
-            К списку заказов
-          </Button>
-        </EmptyState>
+        <EmptyState title={error || 'Заказ-наряд не найден'}>{backButton}</EmptyState>
       </div>
     );
   }
@@ -189,11 +196,7 @@ export default function RepairOrderPaymentReceiptPrintPage() {
   if (!lines.length) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
-        <EmptyState title="Не выбраны операции оплаты для печати чека">
-          <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
-            К списку заказов
-          </Button>
-        </EmptyState>
+        <EmptyState title="Не выбраны операции оплаты для печати чека">{backButton}</EmptyState>
       </div>
     );
   }
@@ -206,9 +209,15 @@ export default function RepairOrderPaymentReceiptPrintPage() {
             {receiptTitle} · заказ-наряд {repairOrderNumberLabel(order)}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
-              Закрыть
-            </Button>
+            {onClose ? (
+              <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+                Назад
+              </Button>
+            ) : (
+              <Button as={Link} to="/autoservice/orders" variant="secondary" size="sm">
+                Закрыть
+              </Button>
+            )}
             <Button type="button" size="sm" disabled={!canPrint} onClick={handlePrint}>
               Печать
             </Button>
