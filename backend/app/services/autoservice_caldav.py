@@ -14,6 +14,7 @@ import secrets
 import shutil
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
 from passlib.hash import apr_md5_crypt
@@ -28,6 +29,7 @@ from app.models.user import User
 logger = logging.getLogger(__name__)
 
 TZ_ID = "Asia/Yekaterinburg"
+LOCAL_TZ = ZoneInfo(TZ_ID)
 EVENTS_COLLECTION = "inspection-events"
 TASKS_COLLECTION = "inspection-tasks"
 COLLECTION_TITLE = "Записи на осмотр"
@@ -137,6 +139,25 @@ def _valarm_rel(trigger: str, text: str) -> list[str]:
     ]
 
 
+def _due_utc(booking: InspectionBooking) -> str:
+    return (
+        _local_dt(booking)
+        .replace(tzinfo=LOCAL_TZ)
+        .astimezone(timezone.utc)
+        .strftime("%Y%m%dT%H%M%SZ")
+    )
+
+
+def _valarm_at(utc_dt: str, text: str) -> list[str]:
+    return [
+        "BEGIN:VALARM",
+        "ACTION:DISPLAY",
+        f"TRIGGER;VALUE=DATE-TIME:{utc_dt}",
+        f"DESCRIPTION:{_esc(text)}",
+        "END:VALARM",
+    ]
+
+
 def _alarms(booking: InspectionBooking, timed: bool, text: str) -> list[str]:
     if timed:
         triggers = ["-PT15M", "-PT1H", _eve_rel_trigger(booking)]
@@ -202,8 +223,10 @@ def build_todo_ics(booking: InspectionBooking, org: Organization | None) -> str:
     lines.append(f"STATUS:{'COMPLETED' if completed else 'NEEDS-ACTION'}")
     if completed:
         lines.append(f"COMPLETED:{_dtstamp()}")
-    # Без VALARM: iOS Reminders показывает время самого раннего будильника
-    # вместо DUE. Оповещения и так приходят от события в Календаре.
+    # Один абсолютный будильник ровно в DUE: при нескольких/ранних VALARM
+    # iOS Reminders подменяет дату задачи временем самого раннего будильника.
+    if timed and not completed:
+        lines += _valarm_at(_due_utc(booking), _summary(booking))
     lines += ["END:VTODO", "END:VCALENDAR"]
     return _ics(lines)
 

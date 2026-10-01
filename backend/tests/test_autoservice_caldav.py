@@ -80,13 +80,22 @@ class TodoIcsTests(unittest.TestCase):
         self.assertIn("UID:booking-7-todo@svoygarage", ics)
         self.assertIn("DUE;TZID=Asia/Yekaterinburg:20261005T110000", ics)
         self.assertIn("STATUS:NEEDS-ACTION", ics)
-        # VALARM нет: iOS Reminders иначе показывает время будильника вместо DUE
+        # Один абсолютный будильник ровно в DUE: 11:00 ЕКБ = 06:00 UTC.
+        # Ранние/несколько VALARM нельзя — iOS Reminders подменяет DUE
+        # временем самого раннего будильника.
+        self.assertIn("TRIGGER;VALUE=DATE-TIME:20261005T060000Z", ics)
+        self.assertEqual(ics.count("BEGIN:VALARM"), 1)
+
+    def test_todo_allday_no_alarm(self):
+        ics = caldav.build_todo_ics(_booking(preferred_time=None), _org())
+        self.assertIn("DUE;VALUE=DATE:20261005", ics)
         self.assertNotIn("VALARM", ics)
 
     def test_todo_completed(self):
         ics = caldav.build_todo_ics(_booking(status="processed"), _org())
         self.assertIn("STATUS:COMPLETED", ics)
         self.assertIn("COMPLETED:", ics)
+        self.assertNotIn("VALARM", ics)
 
 
 def _db(bookings, org=None):
