@@ -181,7 +181,7 @@ def get_employee_card_calendar_sync(
 
 
 @router.post(
-    "/{org_id}/employee-cards/{card_id}/calendar-sync",
+    "/{org_id}/employee-cards/{card_id}/calendar-sync/connect",
     response_model=CaldavCredentialsView,
 )
 def connect_employee_card_calendar_sync(
