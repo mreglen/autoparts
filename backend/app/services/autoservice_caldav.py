@@ -12,6 +12,7 @@ import json
 import logging
 import secrets
 import shutil
+import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -340,24 +341,23 @@ def sync_all(db: Session, *, storage_dir: str | None = None) -> dict:
 
 
 def request_org_sync(organization_id: str) -> None:
-    """Точечный синк после мутации записи: Celery, при недоступности — inline."""
+    """Точечный синк после мутации записи — фоновый поток, без Celery:
+    брокерская очередь перегружена чужими задачами и синк терялся."""
     if not settings.CALDAV_SYNC_ENABLED:
         return
-    try:
-        from app.tasks.autoservice_caldav_tasks import sync_caldav_org_task
 
-        sync_caldav_org_task.apply_async(args=[organization_id])
-    except Exception:  # noqa: BLE001
-        logger.exception("CalDAV org sync dispatch failed, falling back to inline")
+    def _run() -> None:
         from app.db.database import SessionLocal
 
         db = SessionLocal()
         try:
             sync_org(db, organization_id)
         except Exception:  # noqa: BLE001
-            logger.exception("CalDAV inline sync failed for org %s", organization_id)
+            logger.exception("CalDAV sync failed for org %s", organization_id)
         finally:
             db.close()
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def _read_htpasswd(path: Path) -> dict[str, str]:

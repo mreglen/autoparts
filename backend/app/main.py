@@ -833,12 +833,21 @@ async def run_autoservice_planner_digest_tick():
 
 async def run_caldav_sync_tick():
     try:
-        from app.tasks.autoservice_caldav_tasks import sync_caldav_all_task
+        from app.db.database import SessionLocal
+        from app.services.autoservice_caldav import sync_all
 
-        await enqueue_celery_task(sync_caldav_all_task)
-        logger.info("CalDAV reconcile dispatched to Celery")
+        def _run() -> dict:
+            db = SessionLocal()
+            try:
+                return sync_all(db)
+            finally:
+                db.close()
+
+        result = await asyncio.to_thread(_run)
+        if result.get("errors"):
+            logger.error("CalDAV reconcile finished with errors: %s", result)
     except Exception as e:
-        logger.error("Ошибка отправки CalDAV reconcile в Celery: %s", e)
+        logger.error("Ошибка CalDAV reconcile: %s", e)
 
 
 async def run_storage_location_geocode_backfill():
