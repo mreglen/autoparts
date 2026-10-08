@@ -50,8 +50,28 @@ export default function Modal({
     if (!open) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const rootEl = document.getElementById('root');
+    let prevRootOverflow = '';
+    let prevRootPaddingRight = '';
+    if (rootEl) {
+      const style = getComputedStyle(rootEl);
+      if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+        prevRootOverflow = rootEl.style.overflow;
+        prevRootPaddingRight = rootEl.style.paddingRight;
+        const scrollbarWidth = rootEl.offsetWidth - rootEl.clientWidth;
+        rootEl.style.overflow = 'hidden';
+        if (scrollbarWidth > 0) {
+          const base = parseFloat(style.paddingRight) || 0;
+          rootEl.style.paddingRight = `${base + scrollbarWidth}px`;
+        }
+      }
+    }
     return () => {
       document.body.style.overflow = prev;
+      if (rootEl) {
+        rootEl.style.overflow = prevRootOverflow;
+        rootEl.style.paddingRight = prevRootPaddingRight;
+      }
     };
   }, [open]);
 
