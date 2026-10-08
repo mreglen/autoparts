@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 function valuesEqual(a, b) {
@@ -13,19 +13,21 @@ export function usePageFilters(defaultFilters, { syncWithUrl = false, prefix = '
     [prefix],
   );
 
-  const initialFilters = useMemo(() => {
+  const [filters, setFiltersState] = useState(defaultFilters);
+  const didReadFromUrl = useRef(false);
+
+  useEffect(() => {
+    if (!syncWithUrl || didReadFromUrl.current) return;
+    didReadFromUrl.current = true;
     const next = { ...defaultFilters };
-    if (!syncWithUrl) return next;
     Object.keys(defaultFilters).forEach((key) => {
       const value = searchParams.get(prefixed(key));
       if (value !== null) {
         next[key] = value;
       }
     });
-    return next;
-  }, [defaultFilters, syncWithUrl, searchParams, prefixed]);
-
-  const [filters, setFiltersState] = useState(initialFilters);
+    setFiltersState(next);
+  }, [syncWithUrl, defaultFilters, searchParams, prefixed]);
 
   const setFilters = useCallback((updater) => {
     setFiltersState((prev) => {
@@ -44,18 +46,22 @@ export function usePageFilters(defaultFilters, { syncWithUrl = false, prefix = '
 
   useEffect(() => {
     if (!syncWithUrl) return;
-    const next = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(window.location.search);
     Object.entries(filters).forEach(([key, value]) => {
       const paramKey = prefixed(key);
       const defaultValue = defaultFilters[key];
       if (value !== undefined && value !== '' && value !== null && !valuesEqual(value, defaultValue)) {
-        next.set(paramKey, String(value));
+        params.set(paramKey, String(value));
       } else {
-        next.delete(paramKey);
+        params.delete(paramKey);
       }
     });
-    setSearchParams(next, { replace: true });
-  }, [filters, syncWithUrl, searchParams, setSearchParams, prefixed, defaultFilters]);
+    const nextSearch = params.toString();
+    const currentSearch = window.location.search.slice(1);
+    if (nextSearch !== currentSearch) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [filters, syncWithUrl, setSearchParams, prefixed, defaultFilters]);
 
   const activeKeys = useMemo(
     () => Object.keys(filters).filter((key) => !valuesEqual(filters[key], defaultFilters[key])),
