@@ -5,6 +5,8 @@ import MediaModal from '../../components/MediaModal/MediaModal';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import StockInEmptyState from '../../components/StockIn/StockInEmptyState';
 import SellerStockMovementModal from '../../components/SellerWarehouse/SellerStockMovementModal';
+import PageFiltersPanel from '../../components/PageFiltersPanel/PageFiltersPanel';
+import { usePageFilters } from '../../hooks/usePageFilters';
 import {
   warehousePageClass,
   warehousePillControlClass,
@@ -29,6 +31,8 @@ import {
   formatStockInMoney,
   getStockInLineTotal,
   matchesStockInSearch,
+  sortStockInDocs,
+  STOCK_IN_SORT_OPTIONS,
 } from '../../utils/stockInUi';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
@@ -42,6 +46,18 @@ const StockInList = () => {
   const [authChecked, setAuthChecked] = useState(false);
   const [viewStockIn, setViewStockIn] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const DEFAULT_FILTERS = {
+    date_from: '',
+    date_to: '',
+    storage: '',
+    creator: '',
+    min_sum: '',
+    max_sum: '',
+    sort: 'date_desc',
+  };
+
+  const { filters, updateFilter, activeCount } = usePageFilters(DEFAULT_FILTERS, { syncWithUrl: true });
 
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
@@ -87,10 +103,60 @@ const StockInList = () => {
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
   }, [loadStockIns]);
 
-  const displayStockIns = useMemo(
-    () => stockIns.filter((doc) => matchesStockInSearch(doc, searchQuery)),
-    [stockIns, searchQuery]
-  );
+  const isDateInRange = useCallback((value) => {
+    const date = value ? value.slice(0, 10) : '';
+    if (filters.date_from && date < filters.date_from) return false;
+    if (filters.date_to && date > filters.date_to) return false;
+    return true;
+  }, [filters.date_from, filters.date_to]);
+
+  const isSumInRange = useCallback((doc) => {
+    const total = getStockInLineTotal(doc);
+    if (filters.min_sum && total < Number(filters.min_sum)) return false;
+    if (filters.max_sum && total > Number(filters.max_sum)) return false;
+    return true;
+  }, [filters.min_sum, filters.max_sum]);
+
+  const { storageOptions, creatorOptions } = useMemo(() => {
+    const storages = new Map();
+    const creators = new Map();
+    (stockIns || []).forEach((doc) => {
+      const location = doc.storage_location;
+      if (location?.id) {
+        storages.set(String(location.id), location.address || `Склад #${location.id}`);
+      }
+      if (doc.creator_name) {
+        creators.set(doc.creator_name, doc.creator_name);
+      }
+    });
+    return {
+      storageOptions: [
+        { value: '', label: 'Все склады' },
+        ...Array.from(storages.entries())
+          .sort((a, b) => a[1].localeCompare(b[1], 'ru'))
+          .map(([value, label]) => ({ value, label })),
+      ],
+      creatorOptions: [
+        { value: '', label: 'Все сотрудники' },
+        ...Array.from(creators.entries())
+          .sort((a, b) => a[1].localeCompare(b[1], 'ru'))
+          .map(([value, label]) => ({ value, label })),
+      ],
+    };
+  }, [stockIns]);
+
+  const displayStockIns = useMemo(() => {
+    const list = (stockIns || [])
+      .filter((doc) => matchesStockInSearch(doc, searchQuery))
+      .filter((doc) => {
+        if (!isDateInRange(doc.created_at)) return false;
+        if (filters.storage && String(doc.storage_location?.id) !== String(filters.storage)) return false;
+        if (filters.creator && doc.creator_name !== filters.creator) return false;
+        if (!isSumInRange(doc)) return false;
+        return true;
+      });
+    return sortStockInDocs(list, filters.sort);
+  }, [stockIns, searchQuery, filters, isDateInRange, isSumInRange]);
 
   const stats = useMemo(() => {
     let totalQty = 0;
@@ -120,7 +186,7 @@ const StockInList = () => {
     setMediaModalOpen(true);
   };
 
-  const hasSearch = Boolean(searchQuery.trim());
+  const hasSearch = Boolean(searchQuery.trim()) || activeCount > 0;
 
   if (!authChecked) {
     return <AuthLoadingScreen />;
@@ -183,42 +249,84 @@ const StockInList = () => {
         </div>
       </div>
 
-      <div className="mb-4 space-y-3">
-        <div className="relative min-w-0 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Бренд, артикул, название, ответственный…"
-            className={`${warehousePillControlClass} pr-10`}
-          />
-          {searchQuery ? (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
-              aria-label="Очистить поиск"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          ) : null}
-        </div>
-
-        {hasSearch && (
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:underline"
-            >
-              <span aria-hidden>×</span>
-              Сбросить поиск
-            </button>
+      <PageFiltersPanel
+        activeFilterCount={activeCount + (searchQuery.trim() ? 1 : 0)}
+        searchComponent={
+          <div className="relative min-w-0 flex-1 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Бренд, артикул, название, ответственный…"
+              className={`${warehousePillControlClass} pr-10`}
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
+                aria-label="Очистить поиск"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            ) : null}
           </div>
-        )}
-      </div>
+        }
+        filters={[
+          {
+            key: 'storage',
+            label: 'Склад',
+            placeholder: 'Все склады',
+            value: filters.storage,
+            options: storageOptions,
+            onChange: (value) => updateFilter('storage', value),
+          },
+          {
+            key: 'creator',
+            label: 'Ответственный',
+            placeholder: 'Все сотрудники',
+            value: filters.creator,
+            options: creatorOptions,
+            onChange: (value) => updateFilter('creator', value),
+          },
+        ]}
+        sortOptions={STOCK_IN_SORT_OPTIONS.map((o) => ({ value: o.id, label: o.label }))}
+        sortValue={filters.sort}
+        onSortChange={(value) => updateFilter('sort', value)}
+      >
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <input
+            type="date"
+            value={filters.date_from}
+            onChange={(e) => updateFilter('date_from', e.target.value)}
+            placeholder="Дата с"
+            className={warehousePillControlClass}
+          />
+          <input
+            type="date"
+            value={filters.date_to}
+            onChange={(e) => updateFilter('date_to', e.target.value)}
+            placeholder="Дата по"
+            className={warehousePillControlClass}
+          />
+          <input
+            type="number"
+            value={filters.min_sum}
+            onChange={(e) => updateFilter('min_sum', e.target.value)}
+            placeholder="Сумма от"
+            className={warehousePillControlClass}
+          />
+          <input
+            type="number"
+            value={filters.max_sum}
+            onChange={(e) => updateFilter('max_sum', e.target.value)}
+            placeholder="Сумма до"
+            className={warehousePillControlClass}
+          />
+        </div>
+      </PageFiltersPanel>
 
       {loading && (
         <div className="rounded-xl border border-gray-200 bg-white py-16 text-center">

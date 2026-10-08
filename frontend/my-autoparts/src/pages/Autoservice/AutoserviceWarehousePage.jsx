@@ -4,6 +4,8 @@ import { useSelector } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
+import { usePageFilters } from '../../hooks/usePageFilters';
+import PageFiltersPanel from '../../components/PageFiltersPanel/PageFiltersPanel';
 
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import Modal from '../../components/UI/Modal';
@@ -51,9 +53,6 @@ import {
   warehouseSecondaryButtonClass,
 } from '../../utils/warehouseListUi';
 
-const pillButtonClass =
-  'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
-
 function formatReservationQty(qty, unit = 'pcs') {
   return `${formatShopPartQty(qty, unit)} ${formatShopPartUnit(unit)}`;
 }
@@ -92,14 +91,19 @@ export default function AutoserviceWarehousePage() {
   const [items, setItems] = useState([]);
   const [purchaseLots, setPurchaseLots] = useState([]);
   const [activeTab, setActiveTab] = useState('stock');
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [supplierFilter, setSupplierFilter] = useState('');
-  const [supplierCustom, setSupplierCustom] = useState('');
   const [supplierDocs, setSupplierDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [detailsItem, setDetailsItem] = useState(null);
+
+  const DEFAULT_FILTERS = {
+    supplier: '',
+    availability: 'all',
+    sort: 'name_asc',
+  };
+
+  const { filters, updateFilter, activeCount } = usePageFilters(DEFAULT_FILTERS, { syncWithUrl: true });
   const [detailsMovements, setDetailsMovements] = useState(null);
   const [detailsMovementsLoading, setDetailsMovementsLoading] = useState(false);
   const [detailsMovementsError, setDetailsMovementsError] = useState('');
@@ -120,7 +124,7 @@ export default function AutoserviceWarehousePage() {
   const [viewRepairOrder, setViewRepairOrder] = useState(null);
   const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
 
-  const supplierTerm = (supplierFilter || supplierCustom).trim();
+  const supplierTerm = filters.supplier.trim();
 
   const tabSwipeStartRef = useRef({ x: 0, y: 0 });
   const handleTabSwipeStart = useCallback((event) => {
@@ -254,6 +258,49 @@ export default function AutoserviceWarehousePage() {
     () => items.filter((item) => matchesAutoserviceWarehouseSearch(item, searchQuery)),
     [items, searchQuery],
   );
+
+  const availabilityOptions = [
+    { value: 'all', label: 'Все' },
+    { value: 'in_stock', label: 'В наличии' },
+    { value: 'out_of_stock', label: 'Закончилось' },
+  ];
+
+  const sortOptions = [
+    { value: 'name_asc', label: 'Название А–Я' },
+    { value: 'name_desc', label: 'Название Я–А' },
+    { value: 'qty_asc', label: 'Количество ↑' },
+    { value: 'qty_desc', label: 'Количество ↓' },
+    { value: 'price_asc', label: 'Цена ↑' },
+    { value: 'price_desc', label: 'Цена ↓' },
+    { value: 'sum_asc', label: 'Сумма ↑' },
+    { value: 'sum_desc', label: 'Сумма ↓' },
+  ];
+
+  const displayItems = useMemo(() => {
+    const list = filteredItems.filter((item) => {
+      if (filters.availability === 'in_stock') return Number(item.available_qty ?? 0) > 0;
+      if (filters.availability === 'out_of_stock') return Number(item.available_qty ?? 0) <= 0;
+      return true;
+    });
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      const getName = (item) => (item.name || item.brand || item.article || String(item.id)).toLowerCase();
+      const getQty = (item) => Number(item.available_qty ?? 0);
+      const getPrice = (item) => Number(item.unit_price || 0);
+      const getSum = (item) => getQty(item) * getPrice(item);
+      const key = filters.sort;
+      if (key === 'name_asc') return getName(a).localeCompare(getName(b), 'ru');
+      if (key === 'name_desc') return getName(b).localeCompare(getName(a), 'ru');
+      if (key === 'qty_asc') return getQty(a) - getQty(b);
+      if (key === 'qty_desc') return getQty(b) - getQty(a);
+      if (key === 'price_asc') return getPrice(a) - getPrice(b);
+      if (key === 'price_desc') return getPrice(b) - getPrice(a);
+      if (key === 'sum_asc') return getSum(a) - getSum(b);
+      if (key === 'sum_desc') return getSum(b) - getSum(a);
+      return 0;
+    });
+    return sorted;
+  }, [filteredItems, filters.availability, filters.sort]);
 
   const supplierOptions = useMemo(() => {
     const names = new Map();
@@ -403,7 +450,7 @@ export default function AutoserviceWarehousePage() {
   };
 
   const listCountLabel = activeTab === 'stock'
-    ? `${filteredItems.length} позиций`
+    ? `${displayItems.length} позиций`
     : activeTab === 'receipts'
       ? 'История поступлений'
       : 'История списаний';
@@ -456,50 +503,46 @@ export default function AutoserviceWarehousePage() {
       <div onTouchStart={handleTabSwipeStart} onTouchEnd={handleTabSwipeEnd}>
       {activeTab === 'stock' ? (
         <>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <AutoserviceLiveSearchField
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Поиск по бренду, артикулу, названию"
-              ariaLabel="Поиск по складу автосервиса"
-            />
-            <button
-              type="button"
-              onClick={() => setFiltersOpen((v) => !v)}
-              className={`${pillButtonClass} shrink-0 ${filtersOpen ? 'bg-white ring-2 ring-indigo-400/70' : ''}`}
-              aria-expanded={filtersOpen}
-            >
-              Фильтры
-              <svg
-                className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-
-          </div>
-
-          {filtersOpen ? (
-            <div className="mb-4 grid grid-cols-1 gap-3 sm:w-72">
-              <label className="block min-w-0">
-                <span className="mb-1.5 block text-xs font-medium text-ink-muted">Поставщик</span>
-                <SearchablePillSelect
-                  value={supplierFilter}
-                  onChange={setSupplierFilter}
-                  options={supplierOptions}
-                  placeholder="Все поставщики"
-                  emptyOptionLabel="Все поставщики"
-                  ariaLabel="Фильтр по поставщику"
-                  allowCustomValue
-                  customValue={supplierCustom}
-                  onCustomValueChange={setSupplierCustom}
-                />
-              </label>
-            </div>
-          ) : null}
+          <PageFiltersPanel
+            activeFilterCount={activeCount}
+            searchComponent={
+              <AutoserviceLiveSearchField
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Поиск по бренду, артикулу, названию"
+                ariaLabel="Поиск по складу автосервиса"
+              />
+            }
+            filters={[
+              {
+                key: 'availability',
+                label: 'Наличие',
+                placeholder: 'Все',
+                value: filters.availability,
+                options: availabilityOptions,
+                onChange: (value) => updateFilter('availability', value),
+              },
+            ]}
+            sortOptions={sortOptions}
+            sortValue={filters.sort}
+            onSortChange={(value) => updateFilter('sort', value)}
+            sortPlaceholder="Сортировка"
+          >
+            <label className="block min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-ink-muted">Поставщик</span>
+              <SearchablePillSelect
+                value={filters.supplier}
+                onChange={(value) => updateFilter('supplier', value)}
+                options={supplierOptions}
+                placeholder="Все поставщики"
+                emptyOptionLabel="Все поставщики"
+                ariaLabel="Фильтр по поставщику"
+                allowCustomValue
+                customValue={filters.supplier}
+                onCustomValueChange={(value) => updateFilter('supplier', value)}
+              />
+            </label>
+          </PageFiltersPanel>
 
           <Toast message={error} variant="error" onClose={() => setError('')} />
         </>
@@ -540,14 +583,14 @@ export default function AutoserviceWarehousePage() {
                       <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-16" /></td>
                     </tr>
                   ))
-                ) : filteredItems.length === 0 ? (
+                ) : displayItems.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-12 text-center text-ink-muted">
                       На складе автосервиса пока нет позиций
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map((item) => {
+                  displayItems.map((item) => {
                     const displayPrice = Number(item.unit_price || 0);
                     return (
                       <tr
@@ -588,12 +631,12 @@ export default function AutoserviceWarehousePage() {
                   </div>
                 ))}
               </div>
-            ) : filteredItems.length === 0 ? (
+            ) : displayItems.length === 0 ? (
               <p className="py-10 text-center text-sm text-ink-muted">
                 На складе автосервиса пока нет позиций
               </p>
             ) : (
-              filteredItems.map((item) => {
+              displayItems.map((item) => {
                 const displayPrice = Number(item.unit_price || 0);
                 return (
                   <WarehouseItemMobileCard

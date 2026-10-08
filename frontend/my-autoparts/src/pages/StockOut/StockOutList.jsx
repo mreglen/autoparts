@@ -9,6 +9,8 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import StockOutEmptyState from '../../components/StockOut/StockOutEmptyState';
 import SellerStockMovementModal from '../../components/SellerWarehouse/SellerStockMovementModal';
 import MediaModal from '../../components/MediaModal/MediaModal';
+import PageFiltersPanel from '../../components/PageFiltersPanel/PageFiltersPanel';
+import { usePageFilters } from '../../hooks/usePageFilters';
 import ReturnModal from './ReturnModal';
 import {
   warehousePageClass,
@@ -32,6 +34,11 @@ import {
   formatStockOutMoney,
   getStockOutLineTotal,
   matchesStockOutSearch,
+  sortStockOutItems,
+  matchesStockOutTypeFilter,
+  STOCK_OUT_SORT_OPTIONS,
+  STOCK_OUT_TYPE_FILTERS,
+  getStockOutUserName,
 } from '../../utils/stockOutUi';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
@@ -48,6 +55,19 @@ export const StockOutList = () => {
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [itemsToReturn, setItemsToReturn] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const DEFAULT_FILTERS = {
+    date_from: '',
+    date_to: '',
+    type: 'all',
+    storage: '',
+    responsible: '',
+    min_sum: '',
+    max_sum: '',
+    sort: 'date_desc',
+  };
+
+  const { filters, updateFilter, activeCount } = usePageFilters(DEFAULT_FILTERS, { syncWithUrl: true });
 
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
@@ -94,21 +114,66 @@ export const StockOutList = () => {
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
   }, [loadStockOuts]);
 
-  const displayStockOuts = useMemo(
-    () => stockOuts.filter((item) => matchesStockOutSearch(item, searchQuery)),
-    [stockOuts, searchQuery]
-  );
+  const isDateInRange = useCallback((value) => {
+    const date = value ? value.slice(0, 10) : '';
+    if (filters.date_from && date < filters.date_from) return false;
+    if (filters.date_to && date > filters.date_to) return false;
+    return true;
+  }, [filters.date_from, filters.date_to]);
+
+  const isSumInRange = useCallback((item) => {
+    const total = getStockOutLineTotal(item);
+    if (filters.min_sum && total < Number(filters.min_sum)) return false;
+    if (filters.max_sum && total > Number(filters.max_sum)) return false;
+    return true;
+  }, [filters.min_sum, filters.max_sum]);
+
+  const { storageOptions, responsibleOptions } = useMemo(() => {
+    const storages = new Map();
+    const responsibles = new Map();
+    (stockOuts || []).forEach((item) => {
+      const locationId = item.storage_location_id;
+      if (locationId) {
+        const loc = storageLocations.find((l) => String(l.id) === String(locationId));
+        const label = loc ? loc.address || `Склад #${locationId}` : `Склад #${locationId}`;
+        storages.set(String(locationId), label);
+      }
+      const name = getStockOutUserName(item);
+      if (name && name !== '—') {
+        responsibles.set(name, name);
+      }
+    });
+    return {
+      storageOptions: [
+        { value: '', label: 'Все склады' },
+        ...Array.from(storages.entries())
+          .sort((a, b) => a[1].localeCompare(b[1], 'ru'))
+          .map(([value, label]) => ({ value, label })),
+      ],
+      responsibleOptions: [
+        { value: '', label: 'Все сотрудники' },
+        ...Array.from(responsibles.entries())
+          .sort((a, b) => a[1].localeCompare(b[1], 'ru'))
+          .map(([value, label]) => ({ value, label })),
+      ],
+    };
+  }, [stockOuts, storageLocations]);
+
+  const displayStockOuts = useMemo(() => {
+    const list = (stockOuts || [])
+      .filter((item) => matchesStockOutSearch(item, searchQuery))
+      .filter((item) => {
+        if (!matchesStockOutTypeFilter(item, filters.type)) return false;
+        if (!isDateInRange(item.movement_date)) return false;
+        if (filters.storage && String(item.storage_location_id) !== String(filters.storage)) return false;
+        if (filters.responsible && getStockOutUserName(item) !== filters.responsible) return false;
+        if (!isSumInRange(item)) return false;
+        return true;
+      });
+    return sortStockOutItems(list, filters.sort);
+  }, [stockOuts, searchQuery, filters, isDateInRange, isSumInRange]);
 
   const totalInList = stockOuts.length;
-
-  const getStorageAddress = useCallback(
-    (locationId) => {
-      if (!locationId) return '—';
-      const loc = storageLocations.find((l) => l.id === locationId);
-      return loc ? loc.address || `Склад #${locationId}` : `Склад #${locationId}`;
-    },
-    [storageLocations]
-  );
 
   const handleReturnItem = (item) => {
     setItemsToReturn([item]);
@@ -151,7 +216,7 @@ export const StockOutList = () => {
   };
 
 
-  const hasSearch = Boolean(searchQuery.trim());
+  const hasSearch = Boolean(searchQuery.trim()) || activeCount > 0;
 
   if (!authChecked) {
     return <AuthLoadingScreen />;
@@ -186,42 +251,92 @@ export const StockOutList = () => {
         </div>
       </div>
 
-      <div className="mb-4 space-y-3">
-        <div className="relative min-w-0 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Бренд, артикул, причина, ответственный…"
-            className={`${warehousePillControlClass} pr-10`}
-          />
-          {searchQuery ? (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
-              aria-label="Очистить поиск"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          ) : null}
-        </div>
-
-        {hasSearch && (
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:underline"
-            >
-              <span aria-hidden>×</span>
-              Сбросить поиск
-            </button>
+      <PageFiltersPanel
+        activeFilterCount={activeCount + (searchQuery.trim() ? 1 : 0)}
+        searchComponent={
+          <div className="relative min-w-0 flex-1 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Бренд, артикул, причина, ответственный…"
+              className={`${warehousePillControlClass} pr-10`}
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 hover:text-gray-600"
+                aria-label="Очистить поиск"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            ) : null}
           </div>
-        )}
-      </div>
+        }
+        filters={[
+          {
+            key: 'type',
+            label: 'Тип',
+            placeholder: 'Все типы',
+            value: filters.type,
+            options: STOCK_OUT_TYPE_FILTERS.map((o) => ({ value: o.id, label: o.label })),
+            onChange: (value) => updateFilter('type', value),
+          },
+          {
+            key: 'storage',
+            label: 'Склад',
+            placeholder: 'Все склады',
+            value: filters.storage,
+            options: storageOptions,
+            onChange: (value) => updateFilter('storage', value),
+          },
+          {
+            key: 'responsible',
+            label: 'Ответственный',
+            placeholder: 'Все сотрудники',
+            value: filters.responsible,
+            options: responsibleOptions,
+            onChange: (value) => updateFilter('responsible', value),
+          },
+        ]}
+        sortOptions={STOCK_OUT_SORT_OPTIONS.map((o) => ({ value: o.id, label: o.label }))}
+        sortValue={filters.sort}
+        onSortChange={(value) => updateFilter('sort', value)}
+      >
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <input
+            type="date"
+            value={filters.date_from}
+            onChange={(e) => updateFilter('date_from', e.target.value)}
+            placeholder="Дата с"
+            className={warehousePillControlClass}
+          />
+          <input
+            type="date"
+            value={filters.date_to}
+            onChange={(e) => updateFilter('date_to', e.target.value)}
+            placeholder="Дата по"
+            className={warehousePillControlClass}
+          />
+          <input
+            type="number"
+            value={filters.min_sum}
+            onChange={(e) => updateFilter('min_sum', e.target.value)}
+            placeholder="Сумма от"
+            className={warehousePillControlClass}
+          />
+          <input
+            type="number"
+            value={filters.max_sum}
+            onChange={(e) => updateFilter('max_sum', e.target.value)}
+            placeholder="Сумма до"
+            className={warehousePillControlClass}
+          />
+        </div>
+      </PageFiltersPanel>
 
       {loading && (
         <div className="rounded-xl border border-gray-200 bg-white py-16 text-center">
