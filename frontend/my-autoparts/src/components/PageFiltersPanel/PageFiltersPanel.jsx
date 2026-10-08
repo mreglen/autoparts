@@ -78,17 +78,25 @@ export default function PageFiltersPanel({
         <div className="space-y-3">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {filters.map((filter) => (
-              <PillDropdown
-                key={filter.key}
-                ariaLabel={filter.label}
-                placeholder={filter.placeholder || filter.label}
-                value={filter.value ?? ''}
-                options={filter.options}
-                disabled={filter.disabled}
-                isOpen={openDropdown === filter.key}
-                onOpenChange={handleDropdownOpen(filter.key)}
-                onChange={(value) => filter.onChange(value, filter.key)}
-              />
+              <div key={filter.key} className="min-w-0">
+                {filter.render ? (
+                  filter.render({
+                    value: filter.value ?? '',
+                    onChange: (value) => filter.onChange(value, filter.key),
+                  })
+                ) : (
+                  <PillDropdown
+                    ariaLabel={filter.label}
+                    placeholder={filter.placeholder || filter.label}
+                    value={filter.value ?? ''}
+                    options={filter.options}
+                    disabled={filter.disabled}
+                    isOpen={openDropdown === filter.key}
+                    onOpenChange={handleDropdownOpen(filter.key)}
+                    onChange={(value) => filter.onChange(value, filter.key)}
+                  />
+                )}
+              </div>
             ))}
           </div>
           {children}

@@ -522,27 +522,34 @@ export default function AutoserviceWarehousePage() {
                 options: availabilityOptions,
                 onChange: (value) => updateFilter('availability', value),
               },
+              {
+                key: 'supplier',
+                label: 'Поставщик',
+                value: filters.supplier,
+                onChange: (value) => updateFilter('supplier', value),
+                render: ({ value, onChange }) => (
+                  <label className="block min-w-0">
+                    <span className="mb-1.5 block text-xs font-medium text-ink-muted">Поставщик</span>
+                    <SearchablePillSelect
+                      value={value}
+                      onChange={onChange}
+                      options={supplierOptions}
+                      placeholder="Все поставщики"
+                      emptyOptionLabel="Все поставщики"
+                      ariaLabel="Фильтр по поставщику"
+                      allowCustomValue
+                      customValue={value}
+                      onCustomValueChange={onChange}
+                    />
+                  </label>
+                ),
+              },
             ]}
             sortOptions={sortOptions}
             sortValue={filters.sort}
             onSortChange={(value) => updateFilter('sort', value)}
             sortPlaceholder="Сортировка"
-          >
-            <label className="block min-w-0">
-              <span className="mb-1.5 block text-xs font-medium text-ink-muted">Поставщик</span>
-              <SearchablePillSelect
-                value={filters.supplier}
-                onChange={(value) => updateFilter('supplier', value)}
-                options={supplierOptions}
-                placeholder="Все поставщики"
-                emptyOptionLabel="Все поставщики"
-                ariaLabel="Фильтр по поставщику"
-                allowCustomValue
-                customValue={filters.supplier}
-                onCustomValueChange={(value) => updateFilter('supplier', value)}
-              />
-            </label>
-          </PageFiltersPanel>
+          />
 
           <Toast message={error} variant="error" onClose={() => setError('')} />
         </>
