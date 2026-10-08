@@ -89,6 +89,7 @@ from app.db.schema_patches import (
     ensure_repair_orders_mileage_km,
     ensure_garage_vehicle_mileage_history,
     ensure_repair_orders_review_flow,
+    ensure_repair_order_deliveries_table,
     ensure_organization_employees_tables,
     ensure_autoservice_warehouse_items_unit,
     ensure_group_chat_columns,
@@ -337,6 +338,7 @@ try:
     ensure_repair_orders_vehicle_nullable()
     ensure_garage_vehicle_mileage_history()
     ensure_repair_orders_review_flow()
+    ensure_repair_order_deliveries_table()
     ensure_organization_employees_tables()
     from app.db.database import SessionLocal
     from app.services.organization_employee_sync import backfill_organization_employee_cards

@@ -6418,6 +6418,30 @@ def ensure_repair_orders_review_flow() -> None:
     logger.info("Applied repair_orders review-flow patch")
 
 
+def ensure_repair_order_deliveries_table() -> None:
+    """Add repair_order_deliveries table."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "repair_orders" not in tables or "repair_order_deliveries" in tables:
+        return
+    is_pg = engine.dialect.name == "postgresql"
+    numeric = "NUMERIC(12, 2)" if is_pg else "NUMERIC"
+    ddl = f"""
+    CREATE TABLE repair_order_deliveries (
+        id {"SERIAL" if is_pg else "INTEGER"} PRIMARY KEY{" AUTOINCREMENT" if not is_pg else ""},
+        order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 1,
+        title VARCHAR(255) NOT NULL,
+        price {numeric} NOT NULL DEFAULT 0
+    )
+    """
+    index = "CREATE INDEX IF NOT EXISTS ix_repair_order_deliveries_order_id ON repair_order_deliveries (order_id)"
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        conn.execute(text(index))
+    logger.info("Applied repair_order_deliveries table patch")
+
+
 def ensure_user_session_refresh_columns() -> None:
     """Add refresh token columns to user_sessions if missing."""
     inspector = inspect(engine)

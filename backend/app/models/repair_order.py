@@ -145,6 +145,13 @@ class RepairOrder(Base):
         order_by="RepairOrderShopPart.position",
         lazy="selectin",
     )
+    deliveries = relationship(
+        "RepairOrderDelivery",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        order_by="RepairOrderDelivery.position",
+        lazy="selectin",
+    )
     payments = relationship(
         "AutoservicePayment",
         foreign_keys="AutoservicePayment.repair_order_id",
@@ -286,3 +293,20 @@ class RepairOrderShopPart(Base):
         "AutoserviceWarehouseItem",
         foreign_keys=[autoservice_stock_item_id],
     )
+
+
+class RepairOrderDelivery(Base):
+    __tablename__ = "repair_order_deliveries"
+
+    id = Column(Integer, primary_key=True)
+    order_id = Column(
+        Integer,
+        ForeignKey("repair_orders.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    position = Column(Integer, nullable=False, default=1)
+    title = Column(String(255), nullable=False)
+    price = Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+
+    order = relationship("RepairOrder", back_populates="deliveries")

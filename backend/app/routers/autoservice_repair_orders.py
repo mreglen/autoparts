@@ -20,6 +20,7 @@ from app.models.inspection_booking import InspectionBooking
 from app.models.repair_order import (
     RepairOrder,
     RepairOrderClientPart,
+    RepairOrderDelivery,
     RepairOrderShopPart,
     RepairOrderWork,
     RepairOrderWorkExecutor,
@@ -42,6 +43,8 @@ from app.schemas.repair_order import (
     RepairOrderClientShopPartView,
     RepairOrderClientView,
     RepairOrderClientWorkView,
+    RepairOrderDeliveryIn,
+    RepairOrderDeliveryView,
     RepairOrderPurchaseImportIn,
     RepairOrderCartImportIn,
     RepairOrderCreate,
@@ -213,6 +216,19 @@ def _sorted_shop_parts(row: RepairOrder) -> list[RepairOrderShopPart]:
     return sorted(row.shop_parts or [], key=lambda p: (p.position, p.id))
 
 
+def _sorted_deliveries(row: RepairOrder) -> list[RepairOrderDelivery]:
+    return sorted(getattr(row, "deliveries", None) or [], key=lambda d: (d.position, d.id))
+
+
+def _delivery_view(delivery: RepairOrderDelivery) -> RepairOrderDeliveryView:
+    return RepairOrderDeliveryView(
+        id=delivery.id,
+        position=delivery.position,
+        title=delivery.title,
+        price=_money(delivery.price),
+    )
+
+
 def _employee_brief(employee: AutoserviceServiceEmployee) -> RepairOrderEmployeeBrief:
     return RepairOrderEmployeeBrief(id=employee.id, name=employee.name)
 
@@ -367,9 +383,11 @@ def _discount_factor(row: RepairOrder) -> Decimal:
 def _order_grand_total(row: RepairOrder) -> Decimal:
     works = [_work_view(w) for w in _sorted_works(row)]
     shop = [_shop_part_view(p) for p in _sorted_shop_parts(row)]
+    deliveries = [_delivery_view(d) for d in _sorted_deliveries(row)]
     works_total = _money(sum((w.line_sum for w in works), Decimal("0.00")))
     shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
-    return _money((works_total + shop_total) * _discount_factor(row))
+    deliveries_total = _money(sum((d.price for d in deliveries), Decimal("0.00")))
+    return _money((works_total + shop_total + deliveries_total) * _discount_factor(row))
 
 
 def _to_staff_view(
@@ -388,9 +406,11 @@ def _to_staff_view(
         ]
     else:
         shop = [_shop_part_view(p) for p in _sorted_shop_parts(row)]
+    deliveries = [_delivery_view(d) for d in _sorted_deliveries(row)]
     works_total = _money(sum((w.line_sum for w in works), Decimal("0.00")))
     shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
-    grand_total = _money((works_total + shop_total) * _discount_factor(row))
+    deliveries_total = _money(sum((d.price for d in deliveries), Decimal("0.00")))
+    grand_total = _money((works_total + shop_total + deliveries_total) * _discount_factor(row))
     if paid_amount is None:
         paid, remaining, is_paid = order_payment_summary(db, row, grand_total)
     else:
@@ -424,10 +444,12 @@ def _to_staff_view(
         works=works,
         client_parts=parts,
         shop_parts=shop,
+        deliveries=deliveries,
         vat_rate=row.vat_rate if row.vat_rate is not None else DEFAULT_VAT_RATE,
         discount_percent=_money(getattr(row, "discount_percent", None) or 0),
         works_total=works_total,
         shop_parts_total=shop_total,
+        deliveries_total=deliveries_total,
         grand_total=grand_total,
         paid_amount=paid,
         remaining_amount=remaining,
@@ -439,8 +461,10 @@ def _to_client_view(row: RepairOrder) -> RepairOrderClientView:
     works = [_client_work_view(w) for w in _sorted_works(row)]
     parts = [_client_part_view(p) for p in _sorted_client_parts(row)]
     shop = [_client_shop_part_view(p) for p in _sorted_shop_parts(row)]
+    deliveries = [_delivery_view(d) for d in _sorted_deliveries(row)]
     works_total = _money(sum((w.line_sum for w in works), Decimal("0.00")))
     shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
+    deliveries_total = _money(sum((d.price for d in deliveries), Decimal("0.00")))
     return RepairOrderClientView(
         id=row.id,
         order_number=row.order_number,
@@ -456,11 +480,13 @@ def _to_client_view(row: RepairOrder) -> RepairOrderClientView:
         works=works,
         client_parts=parts,
         shop_parts=shop,
+        deliveries=deliveries,
         vat_rate=row.vat_rate if row.vat_rate is not None else DEFAULT_VAT_RATE,
         discount_percent=_money(getattr(row, "discount_percent", None) or 0),
         works_total=works_total,
         shop_parts_total=shop_total,
-        grand_total=_money((works_total + shop_total) * _discount_factor(row)),
+        deliveries_total=deliveries_total,
+        grand_total=_money((works_total + shop_total + deliveries_total) * _discount_factor(row)),
     )
 
 
@@ -478,6 +504,7 @@ def _order_query(db: Session):
         .joinedload(RepairOrderWorkExecutor.employee),
         selectinload(RepairOrder.client_parts),
         selectinload(RepairOrder.shop_parts),
+        selectinload(RepairOrder.deliveries),
     )
 
 
@@ -1025,6 +1052,27 @@ def _replace_client_parts(
                 title=title[:255],
                 qty=item.qty,
                 unit=item.unit if item.unit in ("pcs", "l", "kg") else "pcs",
+            )
+        )
+
+
+def _replace_deliveries(
+    order: RepairOrder,
+    items: list[RepairOrderDeliveryIn],
+) -> None:
+    order.deliveries.clear()
+    for idx, item in enumerate(items, start=1):
+        title = item.title.strip()
+        if not title:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Название доставки не может быть пустым",
+            )
+        order.deliveries.append(
+            RepairOrderDelivery(
+                position=idx,
+                title=title[:255],
+                price=_money(item.price),
             )
         )
 
@@ -1641,6 +1689,7 @@ def create_repair_order(
     _replace_client_parts(row, payload.client_parts)
     if not is_own:
         _replace_shop_parts(db, row, org_id, shop_parts, current_user.id)
+    _replace_deliveries(row, payload.deliveries)
     _sync_order_mileage_to_vehicle(
         db,
         order=row,
@@ -1756,6 +1805,9 @@ def update_repair_order(
 
     if not is_own and "shop_parts" in payload.model_fields_set and payload.shop_parts is not None:
         _replace_shop_parts(db, row, org_id, payload.shop_parts, current_user.id)
+
+    if "deliveries" in payload.model_fields_set and payload.deliveries is not None:
+        _replace_deliveries(row, payload.deliveries)
 
     if "mileage_km" in payload.model_fields_set:
         _sync_order_mileage_to_vehicle(

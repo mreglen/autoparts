@@ -14,6 +14,7 @@ from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import (
     RepairOrder,
+    RepairOrderDelivery,
     RepairOrderShopPart,
     RepairOrderWork,
     RepairOrderWorkExecutor,
@@ -134,6 +135,7 @@ def _order_economics_query(db: Session):
         .selectinload(RepairOrderWork.executors)
         .joinedload(RepairOrderWorkExecutor.employee),
         selectinload(RepairOrder.shop_parts),
+        selectinload(RepairOrder.deliveries),
     )
 
 
@@ -165,6 +167,10 @@ def _sorted_shop_parts(order: RepairOrder) -> list[RepairOrderShopPart]:
     return sorted(order.shop_parts or [], key=lambda part: (part.position, part.id))
 
 
+def _sorted_deliveries(order: RepairOrder) -> list[RepairOrderDelivery]:
+    return sorted(getattr(order, "deliveries", None) or [], key=lambda delivery: (delivery.position, delivery.id))
+
+
 def _order_discount_factor(order: RepairOrder) -> Decimal:
     pct = _money(getattr(order, "discount_percent", None) or 0)
     if pct <= Decimal("0"):
@@ -190,7 +196,13 @@ def _order_grand_total(order: RepairOrder) -> Decimal:
             Decimal("0.00"),
         )
     )
-    return _money((works_total + shop_total) * _order_discount_factor(order))
+    deliveries_total = _money(
+        sum(
+            (_money(delivery.price) for delivery in _sorted_deliveries(order)),
+            Decimal("0.00"),
+        )
+    )
+    return _money((works_total + shop_total + deliveries_total) * _order_discount_factor(order))
 
 
 def _order_parts_cost(order: RepairOrder) -> Decimal:

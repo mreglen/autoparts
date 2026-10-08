@@ -88,6 +88,11 @@ class RepairOrderClientPartIn(BaseModel):
     unit: Literal["pcs", "l", "kg"] = "pcs"
 
 
+class RepairOrderDeliveryIn(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    price: Decimal = Field(ge=0)
+
+
 class RepairOrderShopPartIn(BaseModel):
     id: Optional[int] = None
     title: str = Field(min_length=1, max_length=255)
@@ -165,6 +170,13 @@ class RepairOrderClientPartView(BaseModel):
     unit: str = "pcs"
 
 
+class RepairOrderDeliveryView(BaseModel):
+    id: int
+    position: int
+    title: str
+    price: Decimal
+
+
 class RepairOrderShopPartView(BaseModel):
     id: int
     position: int
@@ -224,6 +236,7 @@ class RepairOrderCreate(BaseModel):
     works: list[RepairOrderWorkIn] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartIn] = Field(default_factory=list)
     shop_parts: list[RepairOrderShopPartIn] = Field(default_factory=list)
+    deliveries: list[RepairOrderDeliveryIn] = Field(default_factory=list)
 
 
 class RepairOrderUpdate(BaseModel):
@@ -241,6 +254,7 @@ class RepairOrderUpdate(BaseModel):
     works: Optional[list[RepairOrderWorkIn]] = None
     client_parts: Optional[list[RepairOrderClientPartIn]] = None
     shop_parts: Optional[list[RepairOrderShopPartIn]] = None
+    deliveries: Optional[list[RepairOrderDeliveryIn]] = None
 
 
 class RepairOrderStatusPatch(BaseModel):
@@ -284,10 +298,12 @@ class RepairOrderStaffView(BaseModel):
     works: list[RepairOrderWorkView] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartView] = Field(default_factory=list)
     shop_parts: list[RepairOrderShopPartView] = Field(default_factory=list)
+    deliveries: list[RepairOrderDeliveryView] = Field(default_factory=list)
     vat_rate: Decimal = Decimal("22")
     discount_percent: Decimal = Decimal("0")
     works_total: Decimal = Decimal("0.00")
     shop_parts_total: Decimal = Decimal("0.00")
+    deliveries_total: Decimal = Decimal("0.00")
     grand_total: Decimal = Decimal("0.00")
     paid_amount: Decimal = Decimal("0.00")
     remaining_amount: Decimal = Decimal("0.00")
@@ -315,10 +331,12 @@ class RepairOrderClientView(BaseModel):
     works: list[RepairOrderClientWorkView] = Field(default_factory=list)
     client_parts: list[RepairOrderClientPartView] = Field(default_factory=list)
     shop_parts: list[RepairOrderClientShopPartView] = Field(default_factory=list)
+    deliveries: list[RepairOrderDeliveryView] = Field(default_factory=list)
     vat_rate: Decimal = Decimal("22")
     discount_percent: Decimal = Decimal("0")
     works_total: Decimal = Decimal("0.00")
     shop_parts_total: Decimal = Decimal("0.00")
+    deliveries_total: Decimal = Decimal("0.00")
     grand_total: Decimal = Decimal("0.00")
 
 

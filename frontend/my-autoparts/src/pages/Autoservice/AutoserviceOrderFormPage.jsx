@@ -19,6 +19,7 @@ import NumericInput from '../../components/UI/NumericInput';
 import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItemsPickerModal';
 import RepairOrderStockPickerModal from '../../components/Autoservice/RepairOrderStockPickerModal';
 import RepairOrderFieldDetailModal from '../../components/Autoservice/RepairOrderFieldDetailModal';
+import RepairOrderDeliveryModal from '../../components/Autoservice/RepairOrderDeliveryModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
@@ -653,6 +654,13 @@ function mapOrderToFormState(order) {
     mileageKm: order?.mileage_km != null && order?.mileage_km !== ''
       ? String(order.mileage_km)
       : '',
+    deliveries: (order?.deliveries || []).length
+      ? order.deliveries.map((d) => ({
+          id: d.id,
+          title: d.title || '',
+          price: String(d.price ?? '0'),
+        }))
+      : [],
     works: (order?.works || []).length
       ? order.works.map((w) => ({
           title: w.title || '',
@@ -763,6 +771,8 @@ export default function AutoserviceOrderFormPage() {
   const [shippingDate, setShippingDate] = useState(todayDateInputValue);
   const [mileageKm, setMileageKm] = useState('');
   const [workZoneId, setWorkZoneId] = useState('');
+  const [deliveries, setDeliveries] = useState([]);
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [works, setWorks] = useState([]);
   const [clientParts, setClientParts] = useState([]);
   const [shopParts, setShopParts] = useState([]);
@@ -831,6 +841,7 @@ export default function AutoserviceOrderFormPage() {
     setShippingDate(state.shippingDate || todayDateInputValue());
     setMileageKm(state.mileageKm || '');
     mileageTouchedRef.current = Boolean(state.mileageKm);
+    setDeliveries(state.deliveries || []);
     if (state.discountPercent != null) {
       setDiscountPercent(Number(state.discountPercent) || 0);
     }
@@ -857,6 +868,7 @@ export default function AutoserviceOrderFormPage() {
     scheduledEndAt,
     shippingDate,
     mileageKm,
+    deliveries,
     discountPercent,
     works,
     clientParts,
@@ -876,6 +888,7 @@ export default function AutoserviceOrderFormPage() {
     scheduledEndAt,
     shippingDate,
     mileageKm,
+    deliveries,
     discountPercent,
     works,
     clientParts,
@@ -1232,8 +1245,14 @@ export default function AutoserviceOrderFormPage() {
     [shopParts],
   );
 
-  const grandTotal = Math.round((worksTotal + shopPartsTotal) * (1 - discountPercent / 100) * 100) / 100;
-  const discountAmount = Math.round((worksTotal + shopPartsTotal) * (discountPercent / 100) * 100) / 100;
+  const deliveriesTotal = useMemo(
+    () => deliveries.reduce((sum, d) => sum + (Number(d.price) || 0), 0),
+    [deliveries],
+  );
+
+  const lineItemsTotal = worksTotal + shopPartsTotal + deliveriesTotal;
+  const grandTotal = Math.round(lineItemsTotal * (1 - discountPercent / 100) * 100) / 100;
+  const discountAmount = Math.round(lineItemsTotal * (discountPercent / 100) * 100) / 100;
   const vatRate = orderVatRateState ?? metaVatRate;
   const grandVat = splitVatInclusive(grandTotal, vatRate).vat;
 
@@ -1599,6 +1618,10 @@ export default function AutoserviceOrderFormPage() {
       scheduled_end_at: scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null,
       shipping_date: shippingDate || null,
       mileage_km: mileageKm === '' || mileageKm == null ? null : Number(mileageKm),
+      deliveries: deliveries.map((d) => ({
+        title: d.title.trim(),
+        price: d.price === '' || d.price == null ? 0 : Number(d.price),
+      })),
       client_comment: comment.trim() || null,
       staff_comment: staffComment.trim() || null,
       work_zone_id: workZoneId ? Number(workZoneId) : null,
@@ -2170,7 +2193,7 @@ export default function AutoserviceOrderFormPage() {
                 <p className="mt-1 text-xs text-danger-600" role="alert">{vehiclesError}</p>
               ) : null}
             </div>
-            <div className="min-w-0 lg:col-span-2">
+            <div className="min-w-0 lg:col-span-1">
               <FieldLabel optional>Пробег, км</FieldLabel>
               <NumericInput
                 mode="numeric"
@@ -2189,6 +2212,19 @@ export default function AutoserviceOrderFormPage() {
                   {Number(selectedVehicle.mileage_km).toLocaleString('ru-RU')} км
                 </p>
               ) : null}
+            </div>
+            <div className="min-w-0 lg:col-span-1">
+              <FieldLabel optional>Доставка</FieldLabel>
+              <button
+                type="button"
+                onClick={() => setDeliveryModalOpen(true)}
+                className={`${pillInputClass} flex w-full items-center justify-between text-left`}
+              >
+                <span>{deliveriesTotal > 0 ? `${deliveries.length} доставок` : 'Добавить доставку'}</span>
+                {deliveriesTotal > 0 ? (
+                  <span className="font-medium tabular-nums">{formatMoney(deliveriesTotal)} ₽</span>
+                ) : null}
+              </button>
             </div>
             {ownMode ? null : (
               <>
@@ -2615,8 +2651,9 @@ export default function AutoserviceOrderFormPage() {
                 </p>
                 {ownMode ? null : (
                   <p className="text-[11px] leading-snug text-ink-muted sm:text-xs">
-                    работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)} · НДС{' '}
-                    {formatVatRate(vatRate)}% {formatMoney(grandVat)}
+                    работы {formatMoney(worksTotal)} · ЗЧ {formatRubles(shopPartsTotal)}
+                    {deliveriesTotal > 0 ? ` · доставка ${formatMoney(deliveriesTotal)}` : ''}
+                    {' · '}НДС {formatVatRate(vatRate)}% {formatMoney(grandVat)}
                     {discountPercent > 0 ? ` · скидка ${discountPercent}% −${formatMoney(discountAmount)}` : ''}
                   </p>
                 )}
@@ -2868,6 +2905,13 @@ export default function AutoserviceOrderFormPage() {
             ? null
             : manualShopPartFormValues(shopParts[shopPartEditIndex])
         }
+      />
+
+      <RepairOrderDeliveryModal
+        open={deliveryModalOpen}
+        deliveries={deliveries}
+        onClose={() => setDeliveryModalOpen(false)}
+        onSave={(items) => setDeliveries(items)}
       />
 
       <ConfirmDialog
