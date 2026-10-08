@@ -18,6 +18,7 @@ import WorkCatalogInput from '../../components/Autoservice/WorkCatalogInput';
 import NumericInput from '../../components/UI/NumericInput';
 import PurchaseItemsPickerModal from '../../components/Autoservice/PurchaseItemsPickerModal';
 import RepairOrderStockPickerModal from '../../components/Autoservice/RepairOrderStockPickerModal';
+import RepairOrderFieldDetailModal from '../../components/Autoservice/RepairOrderFieldDetailModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
@@ -66,6 +67,30 @@ const pillTextareaClass = 'sg-pill-textarea mt-1';
 const pillDateInputClass = 'sg-pill-input sg-native-date-input mt-1';
 
 const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700';
+
+function MoreActionButton({ onClick, title = 'Подробнее', disabled }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+      title={title}
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-muted transition hover:bg-surface-muted hover:text-ink disabled:opacity-40"
+    >
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+        />
+      </svg>
+    </button>
+  );
+}
 
 function SectionAddLink({ onClick, label = '+ Добавить' }) {
   return (
@@ -316,42 +341,53 @@ function ShopPartNameField({
   isNameLocked,
   onEdit,
   onChange,
+  action,
 }) {
   const { primary, secondary } = shopPartNameParts(part);
   const label = [primary, secondary].filter(Boolean).join(' ') || shopPartDisplayName(part) || '—';
+  const boxClass = action ? `${shopPartNameBoxClass} pr-8` : shopPartNameBoxClass;
 
   if (isManualEditable) {
     return (
-      <button
-        type="button"
-        className={`${shopPartNameBoxClass} text-left hover:bg-surface-muted/80`}
-        onClick={onEdit}
-        title={label}
-      >
-        <span className="block min-w-0 font-medium max-lg:whitespace-normal max-lg:break-words max-lg:line-clamp-2 lg:truncate">{label}</span>
-      </button>
+      <div className="relative min-w-0">
+        <button
+          type="button"
+          className={`${boxClass} text-left hover:bg-surface-muted/80`}
+          onClick={onEdit}
+          title={label}
+        >
+          <span className="block min-w-0 font-medium max-lg:whitespace-normal max-lg:break-words max-lg:line-clamp-2 lg:truncate">{label}</span>
+        </button>
+        {action ? <div className="absolute right-2 top-1/2 -translate-y-1/2">{action}</div> : null}
+      </div>
     );
   }
 
   if (isNameLocked) {
     return (
-      <div
-        className={`${shopPartNameBoxClass} cursor-default bg-surface-muted/80 opacity-90`}
-        title={label}
-      >
-        <span className="block min-w-0 font-medium max-lg:whitespace-normal max-lg:break-words max-lg:line-clamp-2 lg:truncate">{label}</span>
+      <div className="relative min-w-0">
+        <div
+          className={`${boxClass} cursor-default bg-surface-muted/80 opacity-90`}
+          title={label}
+        >
+          <span className="block min-w-0 font-medium max-lg:whitespace-normal max-lg:break-words max-lg:line-clamp-2 lg:truncate">{label}</span>
+        </div>
+        {action ? <div className="absolute right-2 top-1/2 -translate-y-1/2">{action}</div> : null}
       </div>
     );
   }
 
   return (
-    <input
-      className={`${shopPartNameBoxClass} focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0`}
-      placeholder="Бренд, артикул, наименование"
-      value={shopPartLineValue(part)}
-      onChange={onChange}
-      title={shopPartLineValue(part)}
-    />
+    <div className="relative min-w-0">
+      <input
+        className={`${boxClass} focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-0`}
+        placeholder="Бренд, артикул, наименование"
+        value={shopPartLineValue(part)}
+        onChange={onChange}
+        title={shopPartLineValue(part)}
+      />
+      {action ? <div className="absolute right-2 top-1/2 -translate-y-1/2">{action}</div> : null}
+    </div>
   );
 }
 
@@ -371,8 +407,12 @@ const clientPartControlInputClass = `${compactControlInputClass} w-12 px-1.5 tex
 
 const clientPartControlSelectClass = `${compactControlSelectClass} w-[3.75rem] px-1.5`;
 
-const workExecutorBtnClass =
-  'inline-flex h-9 min-w-0 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-sm text-ink transition hover:bg-surface-muted max-lg:flex-1 lg:h-8 lg:w-44';
+const workExecutorGroupClass =
+  'inline-flex h-9 min-w-0 shrink-0 items-center overflow-hidden rounded-full border border-line bg-surface max-lg:flex-1 lg:h-8 lg:w-44';
+const workExecutorLabelBtnClass =
+  'flex min-w-0 flex-1 items-center gap-1.5 px-3 text-sm text-ink transition hover:bg-surface-muted';
+const workExecutorActionBtnClass =
+  'flex h-full w-7 shrink-0 items-center justify-center text-ink-muted transition hover:bg-surface-muted';
 
 function WorkExecutorPicker({ employees, work, onToggle, onPercentChange, onAddEmployee }) {
   const [query, setQuery] = useState('');
@@ -756,6 +796,7 @@ export default function AutoserviceOrderFormPage() {
   const [autoSaveStatus, setAutoSaveStatus] = useState('idle');
   const [detachingShopPartId, setDetachingShopPartId] = useState(null);
   const [shopPartRemoveConfirm, setShopPartRemoveConfirm] = useState(null);
+  const [fieldDetailModal, setFieldDetailModal] = useState(null);
   const [lineDeleteConfirm, setLineDeleteConfirm] = useState(null);
   const plannerPrefillRef = useRef(location.state);
   const vehiclePrefillRef = useRef({
@@ -2086,6 +2127,12 @@ export default function AutoserviceOrderFormPage() {
                 remoteSearch
                 onQueryChange={handleClientSearchQuery}
                 onInputChange={handleClientSearchInput}
+                action={clientId ? (
+                  <MoreActionButton
+                    onClick={() => setFieldDetailModal({ type: 'client', data: { clientId } })}
+                    title="Карточка клиента"
+                  />
+                ) : null}
               />
             </div>
             <div className="min-w-0">
@@ -2112,6 +2159,12 @@ export default function AutoserviceOrderFormPage() {
                 loading={vehiclesLoading}
                 emptyMessage={vehiclesError || (clientId || pendingClientName ? 'Нет автомобилей' : 'Сначала выберите клиента')}
                 noResultsMessage="Нет совпадений"
+                action={vehicleId ? (
+                  <MoreActionButton
+                    onClick={() => setFieldDetailModal({ type: 'vehicle', data: { vehicleId } })}
+                    title="Карточка автомобиля"
+                  />
+                ) : null}
               />
               {vehiclesError ? (
                 <p className="mt-1 text-xs text-danger-600" role="alert">{vehiclesError}</p>
@@ -2243,6 +2296,12 @@ export default function AutoserviceOrderFormPage() {
                           options={workCatalog}
                           onChange={(patch) => updateWork(index, patch)}
                           onCreate={ownMode ? undefined : (name) => createCatalogWork(name, index)}
+                          action={(
+                            <MoreActionButton
+                              onClick={() => setFieldDetailModal({ type: 'work', data: { work: w } })}
+                              title="Детали работы"
+                            />
+                          )}
                         />
                       </div>
                       <button
@@ -2271,19 +2330,36 @@ export default function AutoserviceOrderFormPage() {
                       value={w.unit_price ?? ''}
                       onChange={(e) => updateWork(index, { unit_price: e.target.value })}
                     />
-                    <button
-                      type="button"
-                      className={workExecutorBtnClass}
-                      onClick={() => setWorkExecutorEditIndex(index)}
-                      title="Сотрудник и процент оплаты"
-                    >
-                      <span className={`min-w-0 truncate ${executors.length ? '' : 'text-ink-faint'}`}>
-                        {executorLabel}
-                      </span>
-                      {executors.length === 1 && firstExec?.percent !== '' && firstExec?.percent != null ? (
-                        <span className="shrink-0 text-xs tabular-nums text-ink-muted">{firstExec.percent}%</span>
-                      ) : null}
-                    </button>
+                    <div className={workExecutorGroupClass}>
+                      <button
+                        type="button"
+                        className={workExecutorLabelBtnClass}
+                        onClick={() => setWorkExecutorEditIndex(index)}
+                        title="Сотрудник и процент оплаты"
+                      >
+                        <span className={`min-w-0 truncate ${executors.length ? '' : 'text-ink-faint'}`}>
+                          {executorLabel}
+                        </span>
+                        {executors.length === 1 && firstExec?.percent !== '' && firstExec?.percent != null ? (
+                          <span className="shrink-0 text-xs tabular-nums text-ink-muted">{firstExec.percent}%</span>
+                        ) : null}
+                      </button>
+                      <button
+                        type="button"
+                        className={workExecutorActionBtnClass}
+                        title="Исполнители"
+                        onClick={() => setFieldDetailModal({ type: 'executors', data: { work: w } })}
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
                     <span className="ml-auto shrink-0 text-right text-sm font-medium tabular-nums text-ink lg:ml-0 lg:w-[4.75rem]">
                       {formatMoney(lineSum(w.qty, w.unit_price))} ₽
                     </span>
@@ -2427,6 +2503,12 @@ export default function AutoserviceOrderFormPage() {
                               rossko_brand: '',
                               rossko_partnumber: '',
                             })}
+                            action={(
+                              <MoreActionButton
+                                onClick={() => setFieldDetailModal({ type: 'shopPart', data: { part: p } })}
+                                title="Детали запчасти"
+                              />
+                            )}
                           />
                           {p.is_in_cart || p.pending_cart_import ? (
                             <span className="mt-0.5 inline-flex rounded-full bg-warning-100 px-2 py-0.5 text-[10px] font-medium text-warning-700">
@@ -2711,6 +2793,23 @@ export default function AutoserviceOrderFormPage() {
           />
         ) : null}
       </Modal>
+
+      <RepairOrderFieldDetailModal
+        open={Boolean(fieldDetailModal)}
+        item={fieldDetailModal}
+        clients={clients}
+        vehicles={vehicles}
+        serviceEmployees={serviceEmployees}
+        onClose={() => setFieldDetailModal(null)}
+        onClientSaved={(updated) => {
+          if (!updated?.id) return;
+          setClients((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+        }}
+        onVehicleSaved={(updated) => {
+          if (!updated?.id) return;
+          setVehicles((prev) => prev.map((v) => (v.id === updated.id ? { ...v, ...updated } : v)));
+        }}
+      />
 
       <PurchaseItemsPickerModal
         open={purchasePickerOpen}

@@ -20,6 +20,7 @@ export default function AutoserviceSearchableSelect({
   remoteSearch = false,
   onQueryChange,
   onInputChange,
+  action,
 }) {
   const rootRef = useRef(null);
   const listRef = useRef(null);
@@ -89,7 +90,7 @@ export default function AutoserviceSearchableSelect({
     <div ref={rootRef} className={`relative min-w-0 ${className}`}>
       <input
         type="text"
-        className={inputClassName}
+        className={action ? `${inputClassName} pr-8` : inputClassName}
         disabled={disabled || loading}
         placeholder={loading ? 'Загрузка…' : placeholder}
         value={displayValue}
@@ -106,6 +107,9 @@ export default function AutoserviceSearchableSelect({
         }}
         autoComplete="off"
       />
+      {action ? (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">{action}</div>
+      ) : null}
       {open && !disabled && !loading && listPos ? createPortal(
         <ul
           ref={listRef}

@@ -8,7 +8,7 @@ function formatMoney(value) {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
-export default function WorkCatalogInput({ value, catalogWorkId, options, onChange, onCreate, disabled }) {
+export default function WorkCatalogInput({ value, catalogWorkId, options, onChange, onCreate, disabled, action }) {
   const rootRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -44,12 +44,13 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
   };
 
   const display = open ? query : value || selected?.name || '';
+  const inputClass = action ? `${pillInputSmClass} pr-8` : pillInputSmClass;
 
   return (
     <div ref={rootRef} className="relative min-w-0">
       <input
         type="text"
-        className={pillInputSmClass}
+        className={inputClass}
         disabled={disabled}
         placeholder="Работа"
         value={display}
@@ -65,6 +66,9 @@ export default function WorkCatalogInput({ value, catalogWorkId, options, onChan
         }}
         autoComplete="off"
       />
+      {action ? (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2">{action}</div>
+      ) : null}
       {open && !disabled ? (
         <ul className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-sg-lg border border-line bg-surface py-1 shadow-sg-md">
           {filtered.map((item) => (
