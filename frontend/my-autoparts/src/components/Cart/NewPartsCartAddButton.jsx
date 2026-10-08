@@ -2,7 +2,7 @@ import NewPartsBasketHoverMenu from './NewPartsBasketHoverMenu';
 import { useDispatch } from 'react-redux';
 import { useState } from 'react';
 import { addNewPartsToCart } from '../../redux/slices/CartSlice';
-import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
+import { reachMetrikaGoal, METRIKA_GOALS } from '../../utils/metrikaGoals';
 
 /**
  * Legacy wrapper around hover basket menu for new-parts add.
@@ -27,7 +27,7 @@ export default function NewPartsCartAddButton({
           basket_id: basketId || undefined,
         })
       ).unwrap();
-      trackConversion(CONVERSION_EVENTS.ADD_TO_CART, {
+      reachMetrikaGoal(METRIKA_GOALS.ADD_TO_CART, {
         path: window.location.pathname + window.location.search,
         section: analyticsSection,
       });

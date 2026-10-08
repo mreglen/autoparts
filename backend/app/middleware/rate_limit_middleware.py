@@ -26,7 +26,6 @@ DEFAULT_RATE_LIMIT_RULES: tuple[RateLimitRule, ...] = (
     RateLimitRule(prefix="/api/auth/password", max_requests=5, window_seconds=3600),
     RateLimitRule(prefix="/api/auth/seller/register", max_requests=10, window_seconds=3600),
     RateLimitRule(prefix="/api/public/autoservice/inspection-bookings", max_requests=10, window_seconds=900),
-    RateLimitRule(prefix="/api/public/analytics/events", max_requests=180, window_seconds=60),
     RateLimitRule(prefix="/api/public/part-reference-fitment", max_requests=90, window_seconds=60),
     RateLimitRule(prefix="/api/public/laximo/oem/applicable-vehicles", max_requests=60, window_seconds=60),
     RateLimitRule(prefix="/api/public/laximo/oem/applicability", max_requests=60, window_seconds=60),

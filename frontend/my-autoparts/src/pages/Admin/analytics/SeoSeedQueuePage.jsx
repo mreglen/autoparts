@@ -7,7 +7,7 @@ import { formatNumber } from './analyticsFormatters';
 import { ErrorBanner, LoadingState } from './AnalyticsUi';
 import { STATUS_LABELS, STATUS_ORDER, sourceLabel, statusLabel } from './seoSourceLabels';
 
-const ANALYTICS_SEO_URL = '/admin/analytics?tab=seo';
+const SEO_PAGE_URL = '/admin/seo';
 
 function formatDateTime(value) {
   if (!value) return '—';
@@ -56,7 +56,7 @@ function SourceOverview({ overview, loading }) {
       {sources.map((row) => (
         <Link
           key={row.source}
-          to={`/admin/analytics/seo/queue/${encodeURIComponent(row.source)}`}
+          to={`/admin/seo/queue/${encodeURIComponent(row.source)}`}
           className="rounded-lg border border-gray-200 bg-white p-4 transition hover:border-gray-400 hover:shadow-sm"
         >
           <div className="flex items-start justify-between gap-2">
@@ -283,13 +283,13 @@ export default function SeoSeedQueuePage() {
   return (
     <div className="mx-auto max-w-7xl space-y-4">
       <header className="flex flex-wrap items-center gap-3 border-b border-gray-100 pb-4">
-        <Link to={ANALYTICS_SEO_URL} className="text-sm text-gray-500 hover:text-gray-800">
+        <Link to={SEO_PAGE_URL} className="text-sm text-gray-500 hover:text-gray-800">
           ← SEO
         </Link>
         <span className="text-gray-300">/</span>
         {decodedSource ? (
           <>
-            <Link to="/admin/analytics/seo/queue" className="text-sm text-gray-500 hover:text-gray-800">
+            <Link to="/admin/seo/queue" className="text-sm text-gray-500 hover:text-gray-800">
               Очередь Rossko
             </Link>
             <span className="text-gray-300">/</span>

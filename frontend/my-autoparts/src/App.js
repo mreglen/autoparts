@@ -35,7 +35,7 @@ import {
   getDefaultPathForCabinetMode,
 } from './utils/cabinetMode';
 import { buildAutopartsRedirectSeo, PageSeoHelmet } from './utils/pageSeo';
-import useSiteAnalytics from './hooks/useSiteAnalytics';
+
 import { isPwaStandalone, PWA_START_PATH } from './utils/pwaStandalone';
 import { markAppPaintReady } from './utils/appSplash';
 
@@ -158,7 +158,7 @@ const AdminSmsPage = lazy(() => import('./pages/Admin/AdminSmsPage'));
 const RosskoSettingsPage = lazy(() => import('./pages/Admin/RosskoSettingsPage'));
 const SitePaymentsPage = lazy(() => import('./pages/Admin/SitePaymentsPage'));
 const SitePaymentsHistoryPage = lazy(() => import('./pages/Admin/SitePaymentsHistoryPage'));
-const AnalyticsPage = lazy(() => import('./pages/Admin/AnalyticsPage'));
+const SeoPage = lazy(() => import('./pages/Admin/SeoPage'));
 const SeoSeedQueuePage = lazy(() => import('./pages/Admin/analytics/SeoSeedQueuePage'));
 
 function LazyRoute({ children }) {
@@ -208,11 +208,6 @@ function ServiceWorkerNavigationHandler() {
     };
   }, [navigate]);
 
-  return null;
-}
-
-function SiteAnalyticsTracker() {
-  useSiteAnalytics();
   return null;
 }
 
@@ -506,7 +501,6 @@ function App() {
         <PullToRefresh />
       <CookieBanner />
       <ServiceWorkerNavigationHandler />
-      <SiteAnalyticsTracker />
       <Routes>
         <Route path="/auth" element={<Authorization />} />
         <Route path="/auth/password-reset" element={<PasswordReset />} />
@@ -1034,15 +1028,15 @@ function App() {
             )}
           />
           <Route
-            path="/admin/analytics"
+            path="/admin/seo"
             element={(
               <LazyRoute>
-                <AnalyticsPage />
+                <SeoPage />
               </LazyRoute>
             )}
           />
           <Route
-            path="/admin/analytics/seo/queue/:source"
+            path="/admin/seo/queue/:source"
             element={(
               <LazyRoute>
                 <SeoSeedQueuePage />
@@ -1050,7 +1044,7 @@ function App() {
             )}
           />
           <Route
-            path="/admin/analytics/seo/queue"
+            path="/admin/seo/queue"
             element={(
               <LazyRoute>
                 <SeoSeedQueuePage />

@@ -41,7 +41,7 @@ function SeedQueuePanel({ quota }) {
           </p>
         </div>
         <Link
-          to="/admin/analytics/seo/queue"
+          to="/admin/seo/queue"
           className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
         >
           Смотреть очередь
@@ -94,7 +94,7 @@ function SeedQueuePanel({ quota }) {
                 <tr key={source} className="border-b border-gray-100">
                   <td className="py-2 pr-4">
                     <Link
-                      to={`/admin/analytics/seo/queue/${encodeURIComponent(source)}`}
+                      to={`/admin/seo/queue/${encodeURIComponent(source)}`}
                       className="text-gray-900 hover:underline"
                     >
                       {sourceLabel(source)}

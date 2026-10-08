@@ -308,7 +308,7 @@ export function getPageTitle(pathname) {
         '/admin/users': 'Пользователи',
         '/admin/vpn': 'VPN',
         '/admin/rossko': 'Rossko',
-        '/admin/analytics': 'Аналитика',
+        '/admin/seo': 'SEO',
         '/autoservice/welcome': 'Автосервис',
         '/autoservice/repair-booking': 'Запись на ремонт',
         '/autoservice/planner': 'Планировщик',
@@ -334,7 +334,7 @@ export function getPageTitle(pathname) {
     if (pathname.startsWith('/my-parts')) return 'Мои запчасти';
     if (pathname.startsWith('/settings')) return 'Настройки';
     if (pathname.startsWith('/moderation')) return 'Модерация';
-    if (pathname.startsWith('/admin/analytics')) return 'Аналитика';
+    if (pathname.startsWith('/admin/seo')) return 'SEO';
     if (pathname.startsWith('/admin/')) return exact[pathname] || 'Админ';
     if (pathname.startsWith('/sales')) return 'Продажи';
     if (pathname.startsWith('/purchases')) return 'Покупки';
