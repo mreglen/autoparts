@@ -20,6 +20,7 @@ export function repairOrderFormSnapshotHasContent(snapshot) {
   if ((snapshot.works || []).length > 0) return true;
   if ((snapshot.clientParts || []).length > 0) return true;
   if ((snapshot.shopParts || []).length > 0) return true;
+  if ((snapshot.deliveries || []).length > 0) return true;
   return false;
 }
 

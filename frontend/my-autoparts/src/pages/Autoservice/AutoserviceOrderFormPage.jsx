@@ -853,29 +853,54 @@ export default function AutoserviceOrderFormPage() {
     setShopParts(state.shopParts);
   }, []);
 
-  const captureFormSnapshot = useCallback(() => ({
+  const captureFormSnapshot = useCallback(() => {
+    const selectedClient = clientId
+      ? clients.find((c) => String(c.id) === String(clientId))
+      : null;
+    const selectedVehicle = vehicleId
+      ? vehicles.find((v) => String(v.id) === String(vehicleId))
+      : null;
+    const clientName = selectedClient?.name || pendingClientName || null;
+    const vehicleName = selectedVehicle
+      ? vehicleLabel(selectedVehicle)
+      : [pendingVehicleMake, pendingVehicleModel].filter(Boolean).join(' ') || null;
+    const worksTotal = works.reduce((sum, w) => sum + lineSum(w.qty, w.unit_price), 0);
+    const shopPartsTotal = shopParts.reduce(
+      (sum, p) => sum + shopLineSum(p.qty, p.unit_price, p.markup_percent, shopPartPricingOptions(p)),
+      0,
+    );
+    const deliveriesTotal = deliveries.reduce((sum, d) => sum + (Number(d.price) || 0), 0);
+    const lineItemsTotal = worksTotal + shopPartsTotal + deliveriesTotal;
+    const draftTotal = Math.round(lineItemsTotal * (1 - discountPercent / 100) * 100) / 100;
+    return {
+      clientId,
+      vehicleId,
+      clientName,
+      vehicleName,
+      pendingClientName,
+      pendingClientPhone,
+      pendingVehicleMake,
+      pendingVehicleModel,
+      inspectionBookingId,
+      scheduledAt,
+      comment,
+      staffComment,
+      workZoneId,
+      scheduledEndAt,
+      shippingDate,
+      mileageKm,
+      deliveries,
+      discountPercent,
+      works,
+      clientParts,
+      shopParts,
+      draftTotal,
+    };
+  }, [
     clientId,
     vehicleId,
-    pendingClientName,
-    pendingClientPhone,
-    pendingVehicleMake,
-    pendingVehicleModel,
-    inspectionBookingId,
-    scheduledAt,
-    comment,
-    staffComment,
-    workZoneId,
-    scheduledEndAt,
-    shippingDate,
-    mileageKm,
-    deliveries,
-    discountPercent,
-    works,
-    clientParts,
-    shopParts,
-  }), [
-    clientId,
-    vehicleId,
+    clients,
+    vehicles,
     pendingClientName,
     pendingClientPhone,
     pendingVehicleMake,

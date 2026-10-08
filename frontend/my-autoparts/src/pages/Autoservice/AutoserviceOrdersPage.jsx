@@ -349,9 +349,12 @@ export default function AutoserviceOrdersPage() {
     return drafts.filter((draft) => {
       const title = draft.mode === 'create'
         ? 'новый заказ-наряд'
-        : `заказ-наряд #${draft.orderId}`;
+        : `заказ-наряд ${draft.orderId}`;
       const text = [
         title,
+        draft.orderId,
+        draft.form?.clientName,
+        draft.form?.vehicleName,
         draft.form?.pendingClientName,
         draft.form?.pendingClientPhone,
         draft.form?.pendingVehicleMake,
@@ -580,7 +583,9 @@ export default function AutoserviceOrdersPage() {
           <thead>
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-28 ${autoserviceListThClass}`}>Заказ</th>
-              <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
+              {!viewDrafts ? (
+                <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
+              ) : null}
               <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
               <th className={`w-32 ${autoserviceListThClass}`}>Сумма</th>
@@ -592,7 +597,9 @@ export default function AutoserviceOrdersPage() {
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={`sk-${i}`}>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                  {!viewDrafts ? (
+                    <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                  ) : null}
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-28" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
@@ -602,40 +609,44 @@ export default function AutoserviceOrdersPage() {
             ) : viewDrafts ? (
               filteredDrafts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-ink-muted">
+                  <td colSpan={5} className="py-12 text-center text-ink-muted">
                     {emptyMessage}
                   </td>
                 </tr>
               ) : (
-                filteredDrafts.map((draft) => (
-                  <tr
-                    key={draft.key}
-                    className={autoserviceListTrClickableClass}
-                    onClick={() => openDraft(draft)}
-                  >
-                    <td className={autoserviceListTdClass}>
-                      <span className="font-medium text-ink-muted">
-                        {draft.mode === 'create' ? 'Новый' : `#${draft.orderId}`}
-                      </span>
-                    </td>
-                    <td className={autoserviceListTdClass}>
-                      <span className="tabular-nums text-ink-muted">
-                        {draft.savedAt ? new Date(draft.savedAt).toLocaleString('ru-RU') : '—'}
-                      </span>
-                    </td>
-                    <td className={`${autoserviceListTdClass} font-semibold text-ink`}>
-                      {[draft.form?.pendingVehicleMake, draft.form?.pendingVehicleModel]
-                        .filter(Boolean)
-                        .join(' ') || '—'}
-                    </td>
-                    <td className={autoserviceListTdClass}>
-                      <div className="font-semibold text-ink">
-                        {draft.form?.pendingClientName || '—'}
-                      </div>
-                    </td>
-                    <td className={autoserviceListTdClass}>
-                      <span className="text-ink-muted">—</span>
-                    </td>
+                filteredDrafts.map((draft) => {
+                  const form = draft.form || {};
+                  const clientName = form.clientName || form.pendingClientName || '—';
+                  const vehicleName = form.vehicleName
+                    || [form.pendingVehicleMake, form.pendingVehicleModel].filter(Boolean).join(' ')
+                    || '—';
+                  const draftTotal = form.draftTotal != null && !Number.isNaN(Number(form.draftTotal))
+                    ? Number(form.draftTotal)
+                    : null;
+                  return (
+                    <tr
+                      key={draft.key}
+                      className={autoserviceListTrClickableClass}
+                      onClick={() => openDraft(draft)}
+                    >
+                      <td className={autoserviceListTdClass}>
+                        <span className="font-medium tabular-nums text-ink-muted">
+                          {draft.mode === 'create' ? 'Новый' : `№ ${draft.orderId}`}
+                        </span>
+                      </td>
+                      <td className={`${autoserviceListTdClass} font-semibold text-ink`}>
+                        {vehicleName}
+                      </td>
+                      <td className={autoserviceListTdClass}>
+                        <div className="font-semibold text-ink">
+                          {clientName}
+                        </div>
+                      </td>
+                      <td className={autoserviceListTdClass}>
+                        <span className="tabular-nums font-semibold text-ink">
+                          {draftTotal != null ? `${formatMoney(draftTotal)} ₽` : '—'}
+                        </span>
+                      </td>
                     <td className={autoserviceListTdClass}>
                       <div className="flex items-center justify-between gap-2">
                         <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
@@ -647,7 +658,7 @@ export default function AutoserviceOrdersPage() {
                             e.stopPropagation();
                             setDeleteConfirmDraft(draft);
                           }}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-red-50 hover:text-red-600"
                           title="Удалить черновик"
                           aria-label="Удалить черновик"
                         >
@@ -658,7 +669,7 @@ export default function AutoserviceOrdersPage() {
                       </div>
                     </td>
                   </tr>
-                ))
+                )})
               )
             ) : rows.length === 0 ? (
               <tr>

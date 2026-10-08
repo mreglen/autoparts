@@ -10,18 +10,26 @@ import Toast from '../../components/UI/Toast';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { formatServerDate } from '../../utils/serverDate';
 
+function formatMoney(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return '0,00';
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function DraftMobileRow({ draft, onOpen }) {
+  const form = draft.form || {};
   const title = draft.mode === 'create'
     ? 'Новый заказ-наряд'
-    : `Заказ-наряд #${draft.orderId}`;
-  const client = draft.form?.pendingClientName?.trim();
-  const vehicle = [draft.form?.pendingVehicleMake, draft.form?.pendingVehicleModel]
-    .filter(Boolean)
-    .join(' ')
+    : `Заказ-наряд №${draft.orderId}`;
+  const client = form.clientName || form.pendingClientName?.trim();
+  const vehicle = (form.vehicleName
+    || [form.pendingVehicleMake, form.pendingVehicleModel]
+      .filter(Boolean)
+      .join(' '))
     .trim();
-  const savedAt = draft.savedAt
-    ? new Date(draft.savedAt).toLocaleString('ru-RU')
-    : '';
+  const draftTotal = form.draftTotal != null && !Number.isNaN(Number(form.draftTotal))
+    ? Number(form.draftTotal)
+    : null;
 
   return (
     <div className="py-3">
@@ -40,7 +48,11 @@ function DraftMobileRow({ draft, onOpen }) {
             <p className="mt-1 line-clamp-2 text-sm font-medium text-gray-800">{vehicle}</p>
           ) : null}
           {client ? <p className="mt-0.5 truncate text-sm text-gray-800">{client}</p> : null}
-          <p className="mt-1 text-xs text-gray-500">Сохранён {savedAt}</p>
+          {draftTotal != null ? (
+            <p className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+              {formatMoney(draftTotal)} ₽
+            </p>
+          ) : null}
         </span>
       </button>
     </div>
