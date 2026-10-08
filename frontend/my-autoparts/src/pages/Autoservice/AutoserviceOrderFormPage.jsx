@@ -2505,8 +2505,14 @@ export default function AutoserviceOrderFormPage() {
                             })}
                             action={(
                               <MoreActionButton
-                                onClick={() => setFieldDetailModal({ type: 'shopPart', data: { part: p } })}
-                                title="Детали запчасти"
+                                onClick={() => {
+                                  if (isManualEditable) {
+                                    setShopPartEditIndex(index);
+                                  } else {
+                                    setFieldDetailModal({ type: 'shopPart', data: { part: p } });
+                                  }
+                                }}
+                                title={isManualEditable ? 'Редактировать запчасть' : 'Детали запчасти'}
                               />
                             )}
                           />

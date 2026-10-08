@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import Modal from '../UI/Modal';
 import {
   formatShopPartUnit,
+  isManualEditableShopPart,
   priceWithMarkup,
   shopLineSum,
   shopPartDisplayName,
@@ -87,8 +88,17 @@ function ShopPartDetail({ part }) {
     ? part.client_unit_price_override
     : automaticClientUnit;
   const lineTotal = shopLineSum(part?.qty, part?.unit_price, part?.markup_percent, pricingOptions);
+  const isEditable = isManualEditableShopPart(part);
+  const lockedMessage = part?.is_imported || part?.source === 'rossko'
+    ? 'Данную запчасть нельзя отредактировать, так как она куплена из заказов.'
+    : 'Данную запчасть нельзя отредактировать.';
   return (
     <div className="space-y-4">
+      {!isEditable ? (
+        <div className="rounded-sg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
+          {lockedMessage}
+        </div>
+      ) : null}
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Наименование</p>
         <p className="text-sm font-medium text-ink">{shopPartDisplayName(part) || part?.title || '—'}</p>
