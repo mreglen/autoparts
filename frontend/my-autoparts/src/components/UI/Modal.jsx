@@ -53,6 +53,7 @@ export default function Modal({
     const rootEl = document.getElementById('root');
     let prevRootOverflow = '';
     let prevRootPaddingRight = '';
+    let rootLocked = false;
     if (rootEl) {
       const style = getComputedStyle(rootEl);
       if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
@@ -60,6 +61,7 @@ export default function Modal({
         prevRootPaddingRight = rootEl.style.paddingRight;
         const scrollbarWidth = rootEl.offsetWidth - rootEl.clientWidth;
         rootEl.style.overflow = 'hidden';
+        rootLocked = true;
         if (scrollbarWidth > 0) {
           const base = parseFloat(style.paddingRight) || 0;
           rootEl.style.paddingRight = `${base + scrollbarWidth}px`;
@@ -68,7 +70,7 @@ export default function Modal({
     }
     return () => {
       document.body.style.overflow = prev;
-      if (rootEl) {
+      if (rootEl && rootLocked) {
         rootEl.style.overflow = prevRootOverflow;
         rootEl.style.paddingRight = prevRootPaddingRight;
       }

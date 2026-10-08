@@ -499,6 +499,7 @@ export default function AutoserviceDashboardPage() {
         type={attentionModal}
         summary={summary}
         onClose={() => setAttentionModal(null)}
+        onChanged={load}
       />
     </div>
   );
