@@ -524,7 +524,7 @@ export default function AutoserviceOrdersPage() {
 
         {filtersOpen ? (
           <div className="mb-4 flex flex-wrap items-end gap-3">
-            <label className="block min-w-0">
+            <label className="block min-w-0 flex-1">
               <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
               <input
                 type="date"
@@ -534,7 +534,7 @@ export default function AutoserviceOrdersPage() {
                 className="h-10 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
               />
             </label>
-            <label className="block min-w-0">
+            <label className="block min-w-0 flex-1">
               <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
               <input
                 type="date"

@@ -300,20 +300,20 @@ function HistoryTab() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <label className="block text-xs font-medium text-ink-soft">Период с</label>
           <input
             type="date"
-            className="sg-pill-input mt-1"
+            className="sg-pill-input mt-1 w-full"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
           />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <label className="block text-xs font-medium text-ink-soft">по</label>
           <input
             type="date"
-            className="sg-pill-input mt-1"
+            className="sg-pill-input mt-1 w-full"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
           />

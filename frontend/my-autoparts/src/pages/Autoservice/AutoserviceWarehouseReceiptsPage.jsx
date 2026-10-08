@@ -276,7 +276,7 @@ export default function AutoserviceWarehouseReceiptsPage({ embedded = false }) {
       {filtersOpen ? (
         <div className="mb-4">
           <div className="flex flex-wrap items-end gap-3">
-            <label className="block w-36 min-w-0">
+            <label className="block min-w-0 flex-1">
               <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
               <input
                 type="date"
@@ -286,7 +286,7 @@ export default function AutoserviceWarehouseReceiptsPage({ embedded = false }) {
                 className={warehousePillControlClass}
               />
             </label>
-            <label className="block w-36 min-w-0">
+            <label className="block min-w-0 flex-1">
               <span className="mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
               <input
                 type="date"
