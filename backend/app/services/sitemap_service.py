@@ -39,6 +39,8 @@ NEW_PARTS_SITEMAP_CACHE_KEY = "new_parts"
 NEW_PARTS_SITEMAP_PAGE_CACHE_PREFIX = "new_parts_p"
 # Keep child files small (~1MB) so crawlers/browsers do not time out on 10MB+ XML.
 NEW_PARTS_SITEMAP_MAX_URLS = 5000
+PRODUCTS_SITEMAP_MAX_URLS = 5000
+PRODUCTS_SITEMAP_PAGE_CACHE_PREFIX = "products_org_"
 NEW_BRANDS_SITEMAP_CACHE_KEY = "new_brands"
 NEW_CATEGORIES_SITEMAP_CACHE_KEY = "new_categories"
 USED_BRANDS_SITEMAP_CACHE_KEY = "used_brands"
@@ -51,6 +53,10 @@ logger = logging.getLogger(__name__)
 
 def _new_parts_page_cache_key(page: int) -> str:
     return f"{NEW_PARTS_SITEMAP_PAGE_CACHE_PREFIX}{page}"
+
+
+def _products_page_cache_key(organization_id: str, page: int) -> str:
+    return f"{PRODUCTS_SITEMAP_PAGE_CACHE_PREFIX}{organization_id}_{page}"
 
 
 _SITEMAP_URL_BLOCK_RE = re.compile(r"  <url>.*?</url>", re.DOTALL)
@@ -898,13 +904,12 @@ def _product_sitemap_url_block(
     return "\n".join(url_lines)
 
 
-def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
+def _collect_products_sitemap_url_blocks(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> tuple[str, dict[str, list[str]], int]:
     site_origin = _resolve_origin(db, preferred_host_url)
-    lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ]
-    url_count = 0
     working_products: list = []
     article_counts: dict[str, int] = {}
     name_counts: dict[str, int] = {}
@@ -921,16 +926,18 @@ def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = 
             name_counts[name_key] = name_counts.get(name_key, 0) + 1
 
     seen_urls: set[str] = set()
+    entries_by_org: dict[str, list[str]] = {}
 
     for product in working_products:
+        organization_id = str(getattr(product, "organization_id", "") or "unknown")
+        blocks = entries_by_org.setdefault(organization_id, [])
         lastmod = _product_lastmod_date(product)
         part_priority = "0.8" if product.is_new else "0.85"
-        lines.append(_product_sitemap_url_block(
+        blocks.append(_product_sitemap_url_block(
             build_product_page_url(product, site_origin),
             lastmod=lastmod,
             priority=part_priority,
         ))
-        url_count += 1
 
         article_key = normalize_partnumber(product.article)
         has_unique_article = bool(article_key and article_counts.get(article_key) == 1)
@@ -940,39 +947,90 @@ def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = 
             article_url = build_used_catalog_url_for_query(site_origin, article_key)
             if article_url not in seen_urls:
                 seen_urls.add(article_url)
-                lines.append(_product_sitemap_url_block(
+                blocks.append(_product_sitemap_url_block(
                     article_url,
                     lastmod=lastmod,
                     priority="0.75",
                 ))
-                url_count += 1
                 added_search_url = True
 
         if not added_search_url:
             canonical_used_url = build_product_used_catalog_url(product, site_origin)
             if canonical_used_url not in seen_urls:
                 seen_urls.add(canonical_used_url)
-                lines.append(_product_sitemap_url_block(
+                blocks.append(_product_sitemap_url_block(
                     canonical_used_url,
                     lastmod=lastmod,
                     priority="0.75",
                 ))
-                url_count += 1
 
         name_key = str(product.name or "").strip().casefold()
         if name_key and name_counts.get(name_key) == 1:
             name_url = build_used_catalog_url_for_query(site_origin, str(product.name or "").strip())
             if name_url not in seen_urls:
                 seen_urls.add(name_url)
-                lines.append(_product_sitemap_url_block(
+                blocks.append(_product_sitemap_url_block(
                     name_url,
                     lastmod=lastmod,
                     priority="0.7",
                 ))
-                url_count += 1
 
-    lines.append("</urlset>")
-    return "\n".join(lines) + "\n", url_count
+    all_entries = [block for blocks in entries_by_org.values() for block in blocks]
+    return site_origin, entries_by_org, len(all_entries)
+
+
+def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
+    site_origin, entries_by_org, url_count = _collect_products_sitemap_url_blocks(
+        db, preferred_host_url=preferred_host_url
+    )
+    all_entries = [block for blocks in entries_by_org.values() for block in blocks]
+    return _build_urlset_xml(all_entries), url_count
+
+
+def _build_products_sitemap_index_xml(
+    site_origin: str,
+    page_map: list[tuple[str, int]],
+    generated_at: datetime | None = None,
+) -> str:
+    origin = site_origin.rstrip("/")
+    lastmod = _sitemap_index_lastmod_line(generated_at)
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for organization_id, page_count in page_map:
+        for page in range(1, page_count + 1):
+            lines.extend(
+                [
+                    "  <sitemap>",
+                    f"    <loc>{origin}/api/feeds/sitemap-products/{organization_id}/{page}.xml</loc>",
+                    lastmod.rstrip("\n") if lastmod else "",
+                    "  </sitemap>",
+                ]
+            )
+    lines.append("</sitemapindex>")
+    return "\n".join(line for line in lines if line) + "\n"
+
+
+def build_products_sitemap_pages(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> tuple[list[tuple[str, int, str, int]], list[tuple[str, int]], int]:
+    site_origin, entries_by_org, total_url_count = _collect_products_sitemap_url_blocks(
+        db, preferred_host_url=preferred_host_url
+    )
+    pages: list[tuple[str, int, str, int]] = []
+    page_map: list[tuple[str, int]] = []
+    for organization_id, entries in entries_by_org.items():
+        org_page_count = 0
+        for start in range(0, len(entries), PRODUCTS_SITEMAP_MAX_URLS):
+            chunk = entries[start:start + PRODUCTS_SITEMAP_MAX_URLS]
+            page_num = (start // PRODUCTS_SITEMAP_MAX_URLS) + 1
+            pages.append((organization_id, page_num, _build_urlset_xml(chunk), len(chunk)))
+            org_page_count += 1
+        page_map.append((organization_id, org_page_count))
+    return pages, page_map, total_url_count
 
 
 def _new_part_card_lastmod(card: NewPartsSeoCard) -> str | None:
@@ -1301,17 +1359,64 @@ def _persist_sitemap_cache(
     return _snapshot_from_cache_row(row)
 
 
+def _delete_products_page_caches(db: Session, *, keep_keys: set[str]) -> None:
+    prefix = f"{PRODUCTS_SITEMAP_PAGE_CACHE_PREFIX}%"
+    rows = (
+        db.query(SeoSitemapCache)
+        .filter(SeoSitemapCache.cache_key.like(prefix))
+        .all()
+    )
+    changed = False
+    for row in rows:
+        if row.cache_key not in keep_keys:
+            db.delete(row)
+            changed = True
+    if changed:
+        db.commit()
+
+
 def rebuild_products_sitemap_cache(
     db: Session,
     *,
     preferred_host_url: str | None = None,
 ) -> ProductsSitemapSnapshot:
-    xml_content, url_count = build_products_sitemap_xml(db, preferred_host_url=preferred_host_url)
+    site_origin = _resolve_origin(db, preferred_host_url)
+    pages, page_map, total_url_count = build_products_sitemap_pages(
+        db, preferred_host_url=preferred_host_url
+    )
+    generated_at = datetime.now(timezone.utc)
+
+    if not pages:
+        _delete_products_page_caches(db, keep_keys=set())
+        return _persist_sitemap_cache(
+            db,
+            cache_key=PRODUCTS_SITEMAP_CACHE_KEY,
+            xml_content=_empty_urlset_xml(),
+            url_count=0,
+        )
+
+    keep_keys: set[str] = set()
+    for organization_id, page_num, xml_content, url_count in pages:
+        cache_key = _products_page_cache_key(organization_id, page_num)
+        _persist_sitemap_cache(
+            db,
+            cache_key=cache_key,
+            xml_content=xml_content,
+            url_count=url_count,
+        )
+        keep_keys.add(cache_key)
+
+    _delete_products_page_caches(db, keep_keys=keep_keys)
+    index_xml = _build_products_sitemap_index_xml(
+        site_origin,
+        page_map=page_map,
+        generated_at=generated_at,
+    )
     return _persist_sitemap_cache(
         db,
         cache_key=PRODUCTS_SITEMAP_CACHE_KEY,
-        xml_content=xml_content,
-        url_count=url_count,
+        xml_content=index_xml,
+        url_count=total_url_count,
     )
 
 
@@ -1477,6 +1582,24 @@ def get_products_sitemap_snapshot(
     if row is not None and row.xml_content:
         return _snapshot_from_cache_row(row)
     return rebuild_products_sitemap_cache(db, preferred_host_url=preferred_host_url)
+
+
+def get_products_sitemap_page_snapshot(
+    db: Session,
+    organization_id: str,
+    page: int,
+    *,
+    preferred_host_url: str | None = None,
+) -> ProductsSitemapSnapshot:
+    if page < 1:
+        raise ValueError("page must be >= 1")
+
+    cache_key = _products_page_cache_key(organization_id, page)
+    row = _get_sitemap_cache_row(db, cache_key)
+    if row is not None and row.xml_content:
+        return _snapshot_from_cache_row(row)
+
+    raise ValueError(f"products sitemap page {page} not found for organization {organization_id}")
 
 
 def get_new_parts_sitemap_snapshot(

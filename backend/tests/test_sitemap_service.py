@@ -416,10 +416,11 @@ class SitemapCacheTests(unittest.TestCase):
         fresh = datetime.now(timezone.utc)
         self.assertFalse(is_sitemap_cache_stale(fresh))
 
+    @patch("app.services.sitemap_service._delete_products_page_caches")
     @patch("app.services.sitemap_service.SeoSitemapCache")
-    @patch("app.services.sitemap_service.build_products_sitemap_xml")
-    def test_rebuild_products_sitemap_cache_persists_row(self, mock_build, mock_cache_cls):
-        mock_build.return_value = ("<urlset></urlset>", 3)
+    @patch("app.services.sitemap_service.build_products_sitemap_pages")
+    def test_rebuild_products_sitemap_cache_persists_row(self, mock_build, mock_cache_cls, _delete_pages):
+        mock_build.return_value = ([("org1", 1, "<urlset></urlset>", 3)], [("org1", 1)], 3)
         db = MagicMock()
         db.query.return_value.filter.return_value.first.return_value = None
         row = MagicMock(cache_key=PRODUCTS_SITEMAP_CACHE_KEY, xml_content="<urlset></urlset>", url_count=3)
@@ -429,11 +430,8 @@ class SitemapCacheTests(unittest.TestCase):
         snapshot = rebuild_products_sitemap_cache(db)
 
         self.assertEqual(snapshot.url_count, 3)
-        mock_cache_cls.assert_called_once()
         self.assertEqual(mock_cache_cls.call_args.kwargs["cache_key"], PRODUCTS_SITEMAP_CACHE_KEY)
         self.assertEqual(mock_cache_cls.call_args.kwargs["url_count"], 3)
-        db.add.assert_called_once_with(row)
-        db.commit.assert_called_once()
 
     @patch("app.services.sitemap_service.rebuild_products_sitemap_cache")
     def test_get_products_sitemap_snapshot_rebuilds_when_cache_empty(self, mock_rebuild):

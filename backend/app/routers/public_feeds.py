@@ -14,6 +14,7 @@ from app.services.sitemap_service import (
     get_new_categories_sitemap_snapshot,
     get_new_parts_sitemap_page_snapshot,
     get_new_parts_sitemap_snapshot,
+    get_products_sitemap_page_snapshot,
     get_products_sitemap_snapshot,
     get_used_brands_sitemap_snapshot,
     get_used_categories_sitemap_snapshot,
@@ -63,6 +64,34 @@ def public_products_sitemap(db: Session = Depends(get_db)):
             site_origin = _resolve_site_origin(row.host_url)
         except Exception:
             pass
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            "</urlset>\n"
+        )
+        return _xml_response(xml)
+
+
+@router.api_route("/sitemap-products/{organization_id}/{page}.xml", methods=["GET", "HEAD"])
+def public_products_sitemap_page(organization_id: str, page: int, db: Session = Depends(get_db)):
+    try:
+        row = get_or_create_yandex_integration(db)
+        snapshot = get_products_sitemap_page_snapshot(
+            db,
+            organization_id,
+            page,
+            preferred_host_url=row.host_url,
+        )
+        return _xml_response(snapshot.xml_content, last_modified=snapshot.generated_at)
+    except ValueError:
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            "</urlset>\n"
+        )
+        return _xml_response(xml)
+    except Exception as exc:
+        logger.exception("Failed to serve products sitemap page org=%s page=%s: %s", organization_id, page, exc)
         xml = (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
