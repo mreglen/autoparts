@@ -15,6 +15,7 @@ import RequireAuth from './components/auth/RequireAuth';
 import AuthLoadingScreen from './components/AuthLoadingScreen/AuthLoadingScreen';
 import CookieBanner from './components/Legal/CookieBanner';
 import PullToRefresh from './components/PullToRefresh/PullToRefresh';
+import useRouteManifest from './hooks/useRouteManifest';
 import MainLayout from './layouts/MainLayout';
 import ProfileWithMenuLayout from './layouts/ProfileWithMenuLayout';
 import { useShowSiteReviews, useShowWarehouseInventory } from './utils/siteReviewsPublic';
@@ -163,6 +164,11 @@ const SeoSeedQueuePage = lazy(() => import('./pages/Admin/analytics/SeoSeedQueue
 
 function LazyRoute({ children }) {
   return <Suspense fallback={<RouteFallback />}>{children}</Suspense>;
+}
+
+function RouteManifestSwitcher() {
+  useRouteManifest();
+  return null;
 }
 
 // Component to handle Service Worker navigation messages
@@ -500,6 +506,7 @@ function App() {
         <AuthSessionRenew />
         <PullToRefresh />
       <CookieBanner />
+      <RouteManifestSwitcher />
       <ServiceWorkerNavigationHandler />
       <Routes>
         <Route path="/auth" element={<Authorization />} />
