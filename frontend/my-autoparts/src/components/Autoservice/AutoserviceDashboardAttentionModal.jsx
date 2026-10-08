@@ -129,7 +129,7 @@ export default function AutoserviceDashboardAttentionModal({ open, type, summary
         ) : rows.length === 0 ? (
           <EmptyList>Нет записей</EmptyList>
         ) : (
-          <div className="max-h-[60vh] space-y-1 overflow-y-auto">
+          <div className="space-y-1">
             {type === 'debt' && rows.map((row) => (
               <div key={row.id} className="flex items-center justify-between rounded-sg border border-line-soft bg-surface p-3">
                 <span className="min-w-0 text-sm font-medium text-ink truncate">{row.name || '—'}</span>
