@@ -14,6 +14,7 @@ import RepairOrderViewModal, {
   OrderStatusBadge,
 } from '../../components/Autoservice/RepairOrderViewModal';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
+import AutoserviceDashboardAttentionModal from '../../components/Autoservice/AutoserviceDashboardAttentionModal';
 import { apiRequest } from '../../utils/apiClient';
 import { getGreeting, getFirstName, MetricCard, PrimaryAction, QuickAction } from '../Dashboard/dashboardUi';
 import { formatFinanceCurrency } from '../Finance/financeDisplay';
@@ -85,6 +86,7 @@ export default function AutoserviceDashboardPage() {
   const [viewOrder, setViewOrder] = useState(null);
   const [viewOrderLoading, setViewOrderLoading] = useState(false);
   const [viewBooking, setViewBooking] = useState(null);
+  const [attentionModal, setAttentionModal] = useState(null);
   const [zones, setZones] = useState([]);
   const zonesRequestedRef = useRef(false);
 
@@ -179,7 +181,7 @@ export default function AutoserviceDashboardPage() {
         label: 'На проверке',
         value: summary.review_orders,
         hint: textForReviewHint(summary.review_orders),
-        href: '/autoservice/orders?view=review',
+        type: 'review',
         accent: 'warning',
       });
     }
@@ -188,7 +190,7 @@ export default function AutoserviceDashboardPage() {
         label: 'Новые записи на осмотр',
         value: summary.new_bookings,
         hint: 'Требуют подтверждения',
-        href: '/autoservice/inspections',
+        type: 'new_bookings',
         accent: 'warning',
       });
     }
@@ -197,7 +199,7 @@ export default function AutoserviceDashboardPage() {
         label: 'Долги клиентов',
         value: formatFinanceCurrency(summary.debt_total),
         hint: `${summary.debtors_count} ${plural(summary.debtors_count, 'клиент', 'клиента', 'клиентов')}`,
-        href: '/autoservice/clients',
+        type: 'debt',
         accent: 'warning',
       });
     }
@@ -206,7 +208,7 @@ export default function AutoserviceDashboardPage() {
         label: 'В работе',
         value: summary.in_progress_orders,
         hint: isOwnLevel ? 'Мои заказы' : `${summary.active_orders ?? 0} активных`,
-        href: '/autoservice/orders',
+        type: 'in_progress',
         accent: 'brand',
       });
     }
@@ -215,7 +217,7 @@ export default function AutoserviceDashboardPage() {
         label: 'Выручка за 30 дней',
         value: formatFinanceCurrency(summary.revenue_30d),
         hint: 'Платежи по заказ-нарядам',
-        href: '/autoservice/finance',
+        type: 'revenue_30d',
         accent: 'success',
       });
     }
@@ -360,7 +362,7 @@ export default function AutoserviceDashboardPage() {
           <SectionHeader title="Требует внимания" />
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
             {attentionTiles.map((tile) => (
-              <MetricCard key={tile.label} {...tile} />
+              <MetricCard key={tile.label} {...tile} onClick={() => setAttentionModal(tile.type)} />
             ))}
           </div>
         </section>
@@ -490,6 +492,13 @@ export default function AutoserviceDashboardPage() {
             }),
           });
         }}
+      />
+
+      <AutoserviceDashboardAttentionModal
+        open={Boolean(attentionModal)}
+        type={attentionModal}
+        summary={summary}
+        onClose={() => setAttentionModal(null)}
       />
     </div>
   );

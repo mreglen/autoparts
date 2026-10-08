@@ -15,7 +15,7 @@ export function getFirstName(user) {
   return raw.split(/\s+/)[0];
 }
 
-export function MetricCard({ label, value, hint, href, accent = 'brand', className = '' }) {
+export function MetricCard({ label, value, hint, href, onClick, accent = 'brand', className = '' }) {
   const accents = {
     brand: {
       card: 'border-brand-100 bg-brand-50/50',
@@ -41,6 +41,14 @@ export function MetricCard({ label, value, hint, href, accent = 'brand', classNa
       {hint ? <p className="mt-1.5 text-xs text-ink-faint sm:mt-2 sm:text-sm">{hint}</p> : null}
     </>
   );
+
+  if (onClick) {
+    return (
+      <Card as="button" type="button" onClick={onClick} hover padding="none" className={`block w-full p-4 text-left sm:p-5 lg:p-6 ${tone.card} ${className}`}>
+        {content}
+      </Card>
+    );
+  }
 
   if (href) {
     return (
