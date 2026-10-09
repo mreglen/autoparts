@@ -234,8 +234,8 @@ export default function AutoserviceDashboardAttentionModal({ open, type, summary
       setClientOrdersLoading(false);
       return;
     }
-    const clientId = detail.row?.id;
-    if (!clientId) return;
+    const clientId = Number(detail.row?.id);
+    if (!clientId || Number.isNaN(clientId)) return;
     let cancelled = false;
     const loadOrders = async () => {
       setClientOrdersLoading(true);
@@ -268,11 +268,12 @@ export default function AutoserviceDashboardAttentionModal({ open, type, summary
   }, [summary, type]);
 
   const openOrderById = useCallback(async (orderId) => {
-    if (!orderId) return;
+    const id = Number(orderId);
+    if (!id || Number.isNaN(id)) return;
     setViewOrderLoading(true);
     setOrderError('');
     try {
-      const data = await apiRequest(`/autoservice/repair-orders/${orderId}`);
+      const data = await apiRequest(`/autoservice/repair-orders/${id}`);
       setViewOrder(data);
     } catch (e) {
       setOrderError(e?.message || 'Не удалось открыть заказ-наряд');
