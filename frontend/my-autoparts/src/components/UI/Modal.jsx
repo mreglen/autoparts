@@ -242,7 +242,7 @@ export default function Modal({
         aria-labelledby={hasStringTitle ? titleId : undefined}
         aria-label={!hasStringTitle && typeof title === 'string' ? title : undefined}
         className={cx(
-          'pointer-events-auto relative z-10 flex w-full max-h-full flex-col overflow-hidden rounded-t-sg-lg border border-line bg-surface shadow-sg-lg sm:max-h-[85vh] sm:rounded-sg-lg max-sm:animate-slide-in-up',
+          'pointer-events-auto relative z-10 flex w-full max-h-full flex-col overflow-hidden border border-line bg-surface shadow-sg-lg sm:max-h-[85vh] sm:rounded-sg-lg max-sm:animate-slide-in-up max-sm:rounded-none',
           width,
           className,
         )}
