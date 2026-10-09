@@ -81,20 +81,54 @@ function DetailField({ label, value, tone, wide = false }) {
   );
 }
 
-function ClientDetail({ client }) {
+function ClientDetail({ client, orders, ordersLoading, onOrderClick }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <DetailField label="Клиент" value={client?.name} wide />
-      <DetailField label="Телефон" value={client?.phone} />
-      <DetailField label="Email" value={client?.email} />
-      <DetailField label="Долг" value={`${formatMoney(client?.debt_amount)} ₽`} tone="danger" />
-      <DetailField label="Заказов" value={client?.orders_count != null ? String(client.orders_count) : ''} />
-      <DetailField label="Сумма заказов" value={`${formatMoney(client?.orders_total)} ₽`} />
-      <DetailField label="Оплачено" value={`${formatMoney(client?.paid_total)} ₽`} />
-      <DetailField label="Скидка" value={client?.discount_percent ? `${client.discount_percent}%` : ''} />
-      <DetailField label="Авто" value={client?.matched_vehicle_label} />
-      <DetailField label="Последний визит" value={client?.last_visit_at ? formatServerDateTime(client.last_visit_at) : ''} />
-      <DetailField label="Адрес" value={client?.address} wide />
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <DetailField label="Клиент" value={client?.name} wide />
+        <DetailField label="Телефон" value={client?.phone} />
+        <DetailField label="Email" value={client?.email} />
+        <DetailField label="Долг" value={`${formatMoney(client?.debt_amount)} ₽`} tone="danger" />
+        <DetailField label="Заказов" value={client?.orders_count != null ? String(client.orders_count) : ''} />
+        <DetailField label="Сумма заказов" value={`${formatMoney(client?.orders_total)} ₽`} />
+        <DetailField label="Оплачено" value={`${formatMoney(client?.paid_total)} ₽`} />
+        <DetailField label="Скидка" value={client?.discount_percent ? `${client.discount_percent}%` : ''} />
+        <DetailField label="Авто" value={client?.matched_vehicle_label} />
+        <DetailField label="Последний визит" value={client?.last_visit_at ? formatServerDateTime(client.last_visit_at) : ''} />
+        <DetailField label="Адрес" value={client?.address} wide />
+      </div>
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">Заказы с долгом</p>
+        {ordersLoading ? (
+          <p className="py-2 text-sm text-ink-muted">Загрузка…</p>
+        ) : orders.length === 0 ? (
+          <p className="py-2 text-sm text-ink-muted">Нет долгов по заказам</p>
+        ) : (
+          <div className="space-y-1">
+            {orders.map((order) => (
+              <button
+                key={order.id}
+                type="button"
+                onClick={() => onOrderClick(order)}
+                className="block w-full cursor-pointer rounded-sg border border-line-soft bg-surface p-2 text-left transition hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`min-w-0 truncate text-sm ${ORDER_LINK_CLASS}`}>
+                    {orderRefLabel(order)}
+                  </span>
+                  <span className="shrink-0 text-xs tabular-nums text-ink-muted">{formatOrderClockRange(order)}</span>
+                </div>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  {vehicleLabel(order.vehicle)} · {formatMoney(order.grand_total)} ₽
+                </p>
+                <p className="mt-0.5 text-xs font-medium text-danger-600">
+                  Долг: {formatMoney(order.remaining_amount)} ₽
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -129,6 +163,8 @@ export default function AutoserviceDashboardAttentionModal({ open, type, summary
   const [error, setError] = useState('');
   const [rows, setRows] = useState([]);
   const [detail, setDetail] = useState(null);
+  const [clientOrders, setClientOrders] = useState([]);
+  const [clientOrdersLoading, setClientOrdersLoading] = useState(false);
   const [viewOrder, setViewOrder] = useState(null);
   const [viewOrderLoading, setViewOrderLoading] = useState(false);
   const [orderError, setOrderError] = useState('');
@@ -184,11 +220,40 @@ export default function AutoserviceDashboardAttentionModal({ open, type, summary
   useEffect(() => {
     if (!open) {
       setDetail(null);
+      setClientOrders([]);
+      setClientOrdersLoading(false);
       setViewOrder(null);
       setViewOrderLoading(false);
       setOrderError('');
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!detail || detail.kind !== 'client') {
+      setClientOrders([]);
+      setClientOrdersLoading(false);
+      return;
+    }
+    const clientId = detail.row?.id;
+    if (!clientId) return;
+    let cancelled = false;
+    const loadOrders = async () => {
+      setClientOrdersLoading(true);
+      try {
+        const data = await apiRequest(`/autoservice/repair-orders?client_id=${clientId}&scope=all&limit=50`);
+        if (!cancelled) {
+          const list = Array.isArray(data?.items) ? data.items : [];
+          setClientOrders(list.filter((o) => Number(o?.remaining_amount) > 0));
+        }
+      } catch (e) {
+        if (!cancelled) console.error('Failed to load client orders:', e);
+      } finally {
+        if (!cancelled) setClientOrdersLoading(false);
+      }
+    };
+    loadOrders();
+    return () => { cancelled = true; };
+  }, [detail]);
 
   const summaryValue = useMemo(() => {
     if (!summary || !type) return null;
@@ -279,7 +344,12 @@ export default function AutoserviceDashboardAttentionModal({ open, type, summary
           ) : null}
 
           {detail?.kind === 'client' ? (
-            <ClientDetail client={detail.row} />
+            <ClientDetail
+              client={detail.row}
+              orders={clientOrders}
+              ordersLoading={clientOrdersLoading}
+              onOrderClick={openOrderById}
+            />
           ) : detail?.kind === 'booking' ? (
             <BookingDetail booking={detail.row} />
           ) : loading ? (
@@ -296,6 +366,11 @@ export default function AutoserviceDashboardAttentionModal({ open, type, summary
                     <span className="min-w-0 truncate text-sm font-medium text-ink">{row.name || '—'}</span>
                     <span className="shrink-0 text-sm font-medium tabular-nums text-danger-600">{formatMoney(row.debt_amount)} ₽</span>
                   </div>
+                  {row.orders_count > 0 ? (
+                    <p className="mt-1 text-xs text-ink-muted">
+                      {row.orders_count} {row.orders_count === 1 ? 'заказ с долгом' : 'заказа с долгами'} · нажмите для деталей
+                    </p>
+                  ) : null}
                 </RowButton>
               ))}
 
