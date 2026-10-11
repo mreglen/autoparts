@@ -7202,3 +7202,34 @@ def ensure_caldav_accounts_table() -> None:
         ))
 
     logger.info("Applied caldav_accounts table patch")
+
+def ensure_inspection_permissions() -> None:
+    """Add new inspection-related permissions (own bookings, zone assignment, calendar creation)."""
+    inspector = inspect(engine)
+    if "permissions" not in inspector.get_table_names():
+        return
+
+    new_permissions = [
+        ("autoservice.inspections.own", "Записи на осмотр: только свои"),
+        ("autoservice.inspections.assign_zones", "Рабочие зоны: назначение сотрудникам"),
+        ("autoservice.inspections.calendar_create", "Записи на осмотр: создание из календаря"),
+    ]
+
+    inserted: list[str] = []
+    with engine.begin() as conn:
+        for code, name in new_permissions:
+            result = conn.execute(
+                text(
+                    "INSERT INTO permissions (code, name) "
+                    "SELECT :code, :name "
+                    "WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code = :code)"
+                ),
+                {"code": code, "name": name},
+            )
+            if result.rowcount:  # type: ignore[attr-defined]
+                inserted.append(code)
+
+    if inserted:
+        logger.info("Applied new inspection permissions: %s", inserted)
+    else:
+        logger.info("Inspection permissions already up to date")
