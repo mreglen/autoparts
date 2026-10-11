@@ -1,0 +1,21 @@
+name: SvoyGarage Project
+version: 1.0.0
+schema: v1
+
+models:
+  - name: Qwen 2.5 Coder 7B
+    provider: ollama
+    model: qwen2.5-coder:7b
+    systemMessage: "You are an expert developer working on the 'SvoyGarage' autoparts project. ALWAYS adhere to the architectural rules, code style, and constraints defined in AGENTS.md located in the project root. Project: FastAPI + SQLAlchemy 2.0 + Pydantic v2 + React 19 + Redux Toolkit. Rules: no comments unless asked, compact code, follow existing patterns, filter by organization_id, use model_validate() not parse_obj(), use .filter() not .filter_by()."
+    roles:
+      - chat
+      - edit
+      - apply
+      - autocomplete
+
+defaultCompletionOptions:
+  contextLength: 32768
+  maxTokens: 2048
+
+capabilities:
+  - tool_use

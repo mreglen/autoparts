@@ -454,3 +454,66 @@ def disconnect_account(
     if user_dir.exists():
         shutil.rmtree(user_dir)
     db.delete(account)
+
+
+def parse_ics_for_bookings(ics_content: str, organization_id: str) -> list[dict]:
+    """Парсит .ics файл и возвращает события с тегом для создания записей."""
+    from icalendar import Calendar
+    from datetime import datetime
+
+    bookings = []
+    try:
+        cal = Calendar.from_ical(ics_content)
+        tag = settings.CALDAV_CREATE_TAG
+
+        for component in cal.walk():
+            if component.name == "VEVENT":
+                summary = component.get("summary", "")
+                if tag not in summary:
+                    continue
+
+                dtstart = component.get("dtstart")
+                dtend = component.get("dtend")
+                description = component.get("description", "")
+
+                if not dtstart:
+                    continue
+
+                if hasattr(dtstart.dt, "date"):
+                    preferred_date = (
+                        dtstart.dt.date() if hasattr(dtstart.dt, "date") else dtstart.dt
+                    )
+                    preferred_time = (
+                        dtstart.dt.time()
+                        if hasattr(dtstart.dt, "time") and dtstart.dt.time() != datetime.min.time()
+                        else None
+                    )
+                else:
+                    preferred_date = dtstart.dt
+                    preferred_time = None
+
+                name = summary.replace(tag, "").strip()
+                phone = None
+                notes = description
+
+                for line in description.split("\n"):
+                    line = line.strip().lower()
+                    if "телефон:" in line or "phone:" in line:
+                        phone = line.split(":")[1].strip()
+                        break
+
+                bookings.append(
+                    {
+                        "name": name,
+                        "phone": phone,
+                        "preferred_date": preferred_date,
+                        "preferred_time": preferred_time,
+                        "notes": notes,
+                        "uid": component.get("uid", ""),
+                    }
+                )
+    except Exception as e:
+        logger.exception("Failed to parse ICS: %s", e)
+
+    return bookings
+

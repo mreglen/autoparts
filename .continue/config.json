@@ -1,0 +1,57 @@
+{
+  "models": [
+    {
+      "title": "Qwen2.5-Coder 7B (SvoyGarage)",
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "apiKey": "ollama",
+      "contextLength": 32768,
+      "temperature": 0.2,
+      "systemPrompt": "You are an expert developer working on the 'SvoyGarage' autoparts project. ALWAYS adhere to the architectural rules, code style, and constraints defined in AGENTS.md located in the project root.\n\nPROJECT STRUCTURE:\n- Backend: FastAPI + SQLAlchemy 2.0 + Pydantic v2 + Alembic\n- Frontend: React 19 + Redux Toolkit + React Router 7 + Tailwind\n- Database: PostgreSQL + Redis + Celery\n\nCRITICAL RULES:\n1. NEVER add or remove comments unless explicitly asked\n2. Write compact code - collapse duplicate else branches, avoid unnecessary nesting\n3. Follow existing code patterns - read surrounding context before editing\n4. SQLAlchemy 2.0 style: use .filter() not .filter_by()\n5. Pydantic v2: use model_validate() not parse_obj()\n6. All organization-bound entities MUST filter by organization_id\n7. Frontend tables: use autoserviceList*Class from utils/warehouseListUi.js\n8. Toast notifications only for success/error messages (inline only for field errors)\n9. Never commit secrets, API keys, or passwords\n10. Test infrastructure: Vitest for frontend, unittest for backend\n\nWhen making changes:\n1. Read the file first to understand the context\n2. Follow existing patterns (imports, style, conventions)\n3. Make minimal, focused changes\n4. Don't guess library availability - check package.json/requirements.txt\n5. Verify changes work (compile, import check, migration check)\n\nRefer to AGENTS.md for detailed project rules, business logic, and conventions."
+    },
+    {
+      "title": "Qwen2.5-Coder 7B (Autocomplete)",
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "apiKey": "ollama",
+      "contextLength": 8192,
+      "temperature": 0.1,
+      "systemPrompt": "You are a code completion assistant for the SvoyGarage project. Follow the project conventions from AGENTS.md. Provide concise, contextually appropriate completions."
+    }
+  ],
+  "tabAutocompleteModel": {
+    "title": "Qwen2.5-Coder 7B (Autocomplete)",
+    "provider": "ollama",
+    "model": "qwen2.5-coder:7b",
+    "apiKey": "ollama"
+  },
+  "contextProviders": {
+    "open": true,
+    "directory": true,
+    "githubIssues": false,
+    "googleSearch": false
+  },
+  "allowAnonymousTelemetry": false,
+  "slashCommands": [
+    {
+      "name": "test",
+      "description": "Generate unit tests for the selected code"
+    },
+    {
+      "name": "explain",
+      "description": "Explain the selected code"
+    },
+    {
+      "name": "refactor",
+      "description": "Refactor the selected code"
+    },
+    {
+      "name": "doc",
+      "description": "Generate documentation for the selected code"
+    },
+    {
+      "name": "fix",
+      "description": "Fix the selected code based on the error"
+    }
+  ]
+}

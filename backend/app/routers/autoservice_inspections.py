@@ -268,7 +268,15 @@ def list_inspection_bookings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from app.utils.autoservice_access import (
+        AUTOSERVICE_PERMISSION_INSPECTIONS_OWN,
+        get_employee_work_zone_ids,
+    )
+
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
+
+    show_own_only = has_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_OWN)
+
     q = (
         db.query(InspectionBooking)
         .options(
@@ -277,6 +285,20 @@ def list_inspection_bookings(
         )
         .filter(InspectionBooking.organization_id == org_id)
     )
+
+    if show_own_only:
+        assigned_zone_ids = get_employee_work_zone_ids(db, current_user, org_id)
+
+        if assigned_zone_ids:
+            q = q.filter(
+                or_(
+                    InspectionBooking.created_by_user_id == current_user.id,
+                    InspectionBooking.work_zone_id.in_(assigned_zone_ids),
+                )
+            )
+        else:
+            q = q.filter(InspectionBooking.created_by_user_id == current_user.id)
+
     if client_id is not None:
         client = (
             db.query(AutoserviceClient)

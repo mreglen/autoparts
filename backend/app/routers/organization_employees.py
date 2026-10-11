@@ -6,10 +6,13 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.db.database import get_db
+from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.caldav_account import CaldavAccount
+from app.models.employee_work_zone import EmployeeWorkZone
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.caldav import CaldavCredentialsView, CaldavStatusView
+from app.schemas.employee_work_zone import EmployeeWorkZoneAssign, EmployeeWorkZoneView
 from app.schemas.organization_employee import (
     OrganizationEmployeeCardCreate,
     OrganizationEmployeeCardPermissionsRequest,
@@ -34,6 +37,7 @@ from app.services.organization_employee_service import (
     update_employee_card,
 )
 from app.utils.org_access import org_has_admin_director, ADMIN_AUDIT_PERMISSION_CODE
+from app.utils.autoservice_access import AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES, require_autoservice_permission
 from app.models.permission import Permission
 
 router = APIRouter(prefix="/organizations", tags=["Organization employee cards"])
@@ -271,3 +275,106 @@ def put_employee_card_permissions(
             )
     set_card_permissions(db, org_id, card_id, payload.permission_ids)
     return {"message": "Permissions assigned successfully"}
+
+
+@router.get("/{org_id}/employee-cards/{card_id}/work-zones", response_model=list[EmployeeWorkZoneView])
+def list_employee_work_zones(
+    org_id: str,
+    card_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES)
+    employee = get_employee_card(db, org_id, card_id)
+    rows = (
+        db.query(EmployeeWorkZone)
+        .join(AutoserviceWorkZone, EmployeeWorkZone.work_zone_id == AutoserviceWorkZone.id)
+        .filter(EmployeeWorkZone.organization_employee_id == employee.id)
+        .all()
+    )
+    return [
+        EmployeeWorkZoneView(
+            id=row.id,
+            work_zone_id=row.work_zone_id,
+            work_zone_name=row.work_zone.name,
+            created_at=row.created_at.isoformat(),
+        )
+        for row in rows
+    ]
+
+
+@router.post("/{org_id}/employee-cards/{card_id}/work-zones", response_model=EmployeeWorkZoneView, status_code=201)
+def assign_work_zone_to_employee(
+    org_id: str,
+    card_id: int,
+    payload: EmployeeWorkZoneAssign,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES)
+    employee = get_employee_card(db, org_id, card_id)
+
+    zone = (
+        db.query(AutoserviceWorkZone)
+        .filter(
+            AutoserviceWorkZone.id == payload.work_zone_id,
+            AutoserviceWorkZone.organization_id == org_id,
+            AutoserviceWorkZone.is_active.is_(True),
+        )
+        .first()
+    )
+    if not zone:
+        raise HTTPException(status_code=404, detail="Рабочая зона не найдена")
+
+    existing = (
+        db.query(EmployeeWorkZone)
+        .filter(
+            EmployeeWorkZone.organization_employee_id == employee.id,
+            EmployeeWorkZone.work_zone_id == payload.work_zone_id,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Зона уже назначена сотруднику")
+
+    row = EmployeeWorkZone(
+        organization_employee_id=employee.id,
+        work_zone_id=payload.work_zone_id,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    return EmployeeWorkZoneView(
+        id=row.id,
+        work_zone_id=row.work_zone_id,
+        work_zone_name=zone.name,
+        created_at=row.created_at.isoformat(),
+    )
+
+
+@router.delete("/{org_id}/employee-cards/{card_id}/work-zones/{assignment_id}", status_code=204)
+def remove_work_zone_from_employee(
+    org_id: str,
+    card_id: int,
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES)
+    employee = get_employee_card(db, org_id, card_id)
+
+    assignment = (
+        db.query(EmployeeWorkZone)
+        .filter(
+            EmployeeWorkZone.id == assignment_id,
+            EmployeeWorkZone.organization_employee_id == employee.id,
+        )
+        .first()
+    )
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Назначение не найдено")
+
+    db.delete(assignment)
+    db.commit()
+

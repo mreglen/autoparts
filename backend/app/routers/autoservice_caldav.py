@@ -12,8 +12,10 @@ from app.services.autoservice_caldav import (
     provision_account,
     regenerate_password,
 )
+from app.tasks.autoservice_caldav_tasks import sync_calendar_to_bookings
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_PLANNER,
+    AUTOSERVICE_PERMISSION_INSPECTIONS_CALENDAR_CREATE,
     require_autoservice_permission,
 )
 
@@ -101,3 +103,14 @@ def disconnect_calendar_sync(
     disconnect_account(db, account)
     db.commit()
     return CaldavStatusView(enabled=False, configured=settings.CALDAV_SYNC_ENABLED)
+
+
+@router.post("/autoservice/calendar-sync/sync-from-calendar")
+def sync_from_calendar(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_CALENDAR_CREATE)
+    task = sync_calendar_to_bookings.delay(current_user.id, org_id)
+    return {"task_id": task.id, "message": "Синхронизация запущена"}
+

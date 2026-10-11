@@ -94,6 +94,7 @@ class Settings(BaseSettings):
     RADICALE_HTUSER_FILE: str = "/etc/radicale/users"
     CALDAV_PUBLIC_URL: str = "https://svoygarage.ru/caldav/"
     CALDAV_SYNC_ENABLED: bool = False
+    CALDAV_CREATE_TAG: str = "#svoygarage"
 
     # SEO sitemap: lastmod статического sitemap-pages.xml (обновлять при правке файла)
     SITEMAP_PAGES_LASTMOD: str = "2026-05-29"

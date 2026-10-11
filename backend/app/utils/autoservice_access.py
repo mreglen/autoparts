@@ -26,6 +26,9 @@ AUTOSERVICE_PERMISSION_REPORTS = "autoservice.reports"
 AUTOSERVICE_PERMISSION_CLIENTS = "autoservice.clients"
 AUTOSERVICE_PERMISSION_INSPECTIONS = "autoservice.inspections"
 AUTOSERVICE_PERMISSION_INSPECTIONS_CONFIRM = "autoservice.inspections.confirm"
+AUTOSERVICE_PERMISSION_INSPECTIONS_OWN = "autoservice.inspections.own"
+AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES = "autoservice.inspections.assign_zones"
+AUTOSERVICE_PERMISSION_INSPECTIONS_CALENDAR_CREATE = "autoservice.inspections.calendar_create"
 AUTOSERVICE_PERMISSION_SETTINGS = "autoservice.settings"
 AUTOSERVICE_PERMISSION_MARKUP = "autoservice.markup"
 
@@ -39,6 +42,9 @@ AUTOSERVICE_PERMISSION_CODES = (
     AUTOSERVICE_PERMISSION_CLIENTS,
     AUTOSERVICE_PERMISSION_INSPECTIONS,
     AUTOSERVICE_PERMISSION_INSPECTIONS_CONFIRM,
+    AUTOSERVICE_PERMISSION_INSPECTIONS_OWN,
+    AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES,
+    AUTOSERVICE_PERMISSION_INSPECTIONS_CALENDAR_CREATE,
     AUTOSERVICE_PERMISSION_SETTINGS,
     AUTOSERVICE_PERMISSION_MARKUP,
 )
@@ -429,3 +435,29 @@ def list_my_autoservice_client_orgs(db: Session, user: User) -> list[dict]:
         }
         for client, org in rows
     ]
+
+
+def get_employee_work_zone_ids(db: Session, user: User, org_id: str) -> list[int]:
+    """Получить список ID рабочих зон, назначенных сотруднику."""
+    from app.models.organization_employee import OrganizationEmployee
+    from app.models.employee_work_zone import EmployeeWorkZone
+
+    employee = (
+        db.query(OrganizationEmployee)
+        .filter(
+            OrganizationEmployee.organization_id == org_id,
+            OrganizationEmployee.user_id == user.id,
+            OrganizationEmployee.is_active.is_(True),
+        )
+        .first()
+    )
+    if not employee:
+        return []
+
+    zone_ids = (
+        db.query(EmployeeWorkZone.work_zone_id)
+        .filter(EmployeeWorkZone.organization_employee_id == employee.id)
+        .all()
+    )
+    return [zone_id for (zone_id,) in zone_ids]
+
