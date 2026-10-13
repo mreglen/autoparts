@@ -8,6 +8,7 @@ import {
   createEmployeeAccount,
 } from '../../redux/slices/OrganizationSlice';
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
+import WorkZoneAssignmentModal from '../../components/Employees/WorkZoneAssignmentModal';
 import CalendarSyncSection from '../../components/Autoservice/CalendarSyncSection';
 import Toast from '../../components/UI/Toast';
 import {
@@ -206,6 +207,7 @@ export default function EmployeesPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [showWorkZoneModal, setShowWorkZoneModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [detailsEmployee, setDetailsEmployee] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -519,6 +521,17 @@ export default function EmployeesPage() {
                 <Button type="button" variant="secondary" onClick={actions.onPermissions}>
                   Назначить права
                 </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setDetailsEmployee(null);
+                    setSelectedEmployee(detailsEmployee);
+                    setShowWorkZoneModal(true);
+                  }}
+                >
+                  Рабочие зоны
+                </Button>
                 {canCreateAccount ? (
                   <Button
                     type="button"
@@ -554,6 +567,13 @@ export default function EmployeesPage() {
         employee={selectedEmployee}
         orgId={orgId}
         onClose={() => { setShowPermissionModal(false); setSelectedEmployee(null); }}
+      />
+
+      <WorkZoneAssignmentModal
+        show={showWorkZoneModal}
+        employee={selectedEmployee}
+        orgId={orgId}
+        onClose={() => { setShowWorkZoneModal(false); setSelectedEmployee(null); }}
       />
 
       <Modal

@@ -128,12 +128,33 @@ export default function CalendarSyncSection({ basePath }) {
       )}
 
       {status?.enabled && !credentials ? (
-        <p className="text-sm text-ink-muted">
-          Подключено: <span className="font-mono">{status.username}</span>
-          {status.last_synced_at
-            ? ` · последняя синхронизация ${new Date(status.last_synced_at).toLocaleString('ru-RU')}`
-            : ''}
-        </p>
+        <div className="space-y-2">
+          <p className="text-sm text-ink-muted">
+            Подключено: <span className="font-mono">{status.username}</span>
+            {status.last_synced_at
+              ? ` · последняя синхронизация ${new Date(status.last_synced_at).toLocaleString('ru-RU')}`
+              : ''}
+          </p>
+          <button
+            type="button"
+            className={btnPrimary}
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await apiRequest('/server/api/autoservice/calendar-sync/sync-from-calendar', { method: 'POST' });
+                setToast({ variant: 'success', message: 'Синхронизация запущена' });
+                load();
+              } catch (e) {
+                setToast({ variant: 'error', message: e?.message || 'Не удалось запустить синхронизацию' });
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? 'Синхронизация…' : 'Синхронизировать из календаря'}
+          </button>
+        </div>
       ) : null}
 
       {credentials ? (

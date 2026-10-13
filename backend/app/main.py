@@ -78,9 +78,11 @@ from app.db.schema_patches import (
     ensure_autoservice_warehouse_items_nonnegative,
     ensure_autoservice_payments_audit_columns,
     ensure_payroll_accruals_employee_not_null,
+    ensure_employee_work_zones_table,
     ensure_repair_orders_discount_column,
     ensure_autoservice_clients_discount_column,
     ensure_caldav_accounts_table,
+    ensure_employee_work_zones_table,
     ensure_sms_messages_table,
     ensure_sms_messages_provider_column,
     ensure_site_settings_smsc_columns,
@@ -331,6 +333,7 @@ try:
     ensure_sms_messages_table()
     ensure_sms_messages_provider_column()
     ensure_caldav_accounts_table()
+    ensure_employee_work_zones_table()
     ensure_site_settings_smsc_columns()
     ensure_repair_order_status_timestamps()
     ensure_repair_orders_shipping_date()
