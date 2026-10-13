@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, UniqueConstraint, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -29,6 +29,9 @@ class EmployeeWorkZone(Base):
         nullable=False,
         index=True,
     )
+    can_view = Column(Boolean, nullable=False, default=True)
+    can_edit = Column(Boolean, nullable=False, default=False)
+    can_caldav = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     employee = relationship("OrganizationEmployee", foreign_keys=[organization_employee_id])
