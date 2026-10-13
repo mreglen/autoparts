@@ -142,7 +142,7 @@ export default function CalendarSyncSection({ basePath }) {
             onClick={async () => {
               setBusy(true);
               try {
-                await apiRequest('/server/api/autoservice/calendar-sync/sync-from-calendar', { method: 'POST' });
+                await apiRequest('/autoservice/calendar-sync/sync-from-calendar', { method: 'POST' });
                 setToast({ variant: 'success', message: 'Синхронизация запущена' });
                 load();
               } catch (e) {

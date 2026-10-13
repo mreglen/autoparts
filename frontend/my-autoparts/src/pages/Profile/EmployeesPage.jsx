@@ -566,19 +566,36 @@ export default function EmployeesPage() {
         show={showPermissionModal}
         employee={selectedEmployee}
         orgId={orgId}
-        onClose={() => { setShowPermissionModal(false); setSelectedEmployee(null); }}
+        onClose={() => {
+          setShowPermissionModal(false);
+          if (selectedEmployee) {
+            setDetailsEmployee(selectedEmployee);
+            setSelectedEmployee(null);
+          }
+        }}
       />
 
       <WorkZoneAssignmentModal
         show={showWorkZoneModal}
         employee={selectedEmployee}
         orgId={orgId}
-        onClose={() => { setShowWorkZoneModal(false); setSelectedEmployee(null); }}
+        onClose={() => {
+          setShowWorkZoneModal(false);
+          if (selectedEmployee) {
+            setDetailsEmployee(selectedEmployee);
+            setSelectedEmployee(null);
+          }
+        }}
       />
 
       <Modal
         open={Boolean(caldavEmployee)}
-        onClose={() => setCaldavEmployee(null)}
+        onClose={() => {
+          if (caldavEmployee) {
+            setDetailsEmployee(caldavEmployee);
+            setCaldavEmployee(null);
+          }
+        }}
         title={caldavEmployee ? `iPhone — ${getEmployeeFullName(caldavEmployee) || 'Сотрудник'}` : 'iPhone'}
         size="md"
       >

@@ -25,7 +25,7 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiRequest('/server/api/autoservice/work-zones');
+      const data = await apiRequest('/autoservice/work-zones');
       setWorkZones(data);
     } catch (err) {
       setError(err.message || 'Ошибка загрузки');
@@ -39,7 +39,7 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiRequest(`/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
+      const data = await apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
       setAssignedZones(data.map((z) => z.work_zone_id));
     } catch (err) {
       setError(err.message || 'Ошибка загрузки');
@@ -60,14 +60,14 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
     setError('');
 
     try {
-      const currentData = await apiRequest(`/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
+      const currentData = await apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
       const currentIds = currentData.map((z) => z.work_zone_id);
 
       const toAdd = assignedZones.filter((id) => !currentIds.includes(id));
       const toRemove = currentIds.filter((id) => !assignedZones.includes(id));
 
       for (const zoneId of toAdd) {
-        await apiRequest(`/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones`, {
+        await apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`, {
           method: 'POST',
           body: { work_zone_id: zoneId },
         });
@@ -76,7 +76,7 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
       for (const assignment of currentData) {
         if (toRemove.includes(assignment.work_zone_id)) {
           await apiRequest(
-            `/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones/${assignment.id}`,
+            `/organizations/${orgId}/employee-cards/${employee.id}/work-zones/${assignment.id}`,
             { method: 'DELETE' }
           );
         }
