@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiRequest } from '../../utils/apiClient';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import Badge from '../UI/Badge';
@@ -24,9 +25,7 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`/server/api/autoservice/work-zones`);
-      if (!response.ok) throw new Error('Не удалось загрузить зоны');
-      const data = await response.json();
+      const data = await apiRequest('/server/api/autoservice/work-zones');
       setWorkZones(data);
     } catch (err) {
       setError(err.message || 'Ошибка загрузки');
@@ -40,9 +39,7 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
-      if (!response.ok) throw new Error('Не удалось загрузить зоны');
-      const data = await response.json();
+      const data = await apiRequest(`/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
       setAssignedZones(data.map((z) => z.work_zone_id));
     } catch (err) {
       setError(err.message || 'Ошибка загрузки');
@@ -63,29 +60,25 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
     setError('');
 
     try {
-      const current = await fetch(`/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
-      const currentData = await current.json();
+      const currentData = await apiRequest(`/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
       const currentIds = currentData.map((z) => z.work_zone_id);
 
       const toAdd = assignedZones.filter((id) => !currentIds.includes(id));
       const toRemove = currentIds.filter((id) => !assignedZones.includes(id));
 
       for (const zoneId of toAdd) {
-        const response = await fetch(`/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones`, {
+        await apiRequest(`/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ work_zone_id: zoneId }),
+          body: { work_zone_id: zoneId },
         });
-        if (!response.ok) throw new Error('Не удалось назначить зону');
       }
 
       for (const assignment of currentData) {
         if (toRemove.includes(assignment.work_zone_id)) {
-          const response = await fetch(
+          await apiRequest(
             `/server/api/organizations/${orgId}/employee-cards/${employee.id}/work-zones/${assignment.id}`,
             { method: 'DELETE' }
           );
-          if (!response.ok) throw new Error('Не удалось удалить зону');
         }
       }
 
