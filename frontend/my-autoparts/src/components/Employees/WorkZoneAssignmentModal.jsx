@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchWorkZones } from '../../redux/slices/AutoserviceSlice';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import Badge from '../UI/Badge';
@@ -8,20 +6,34 @@ import EmptyState from '../UI/EmptyState';
 import Toast from '../UI/Toast';
 
 const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
-  const dispatch = useDispatch();
   const [assignedZones, setAssignedZones] = useState([]);
+  const [workZones, setWorkZones] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const { workZones } = useSelector((state) => state.autoservice);
-
   useEffect(() => {
     if (show && orgId) {
-      dispatch(fetchWorkZones({ orgId }));
+      fetchWorkZones();
       fetchAssignedZones();
     }
-  }, [show, orgId, dispatch]);
+  }, [show, orgId]);
+
+  const fetchWorkZones = async () => {
+    if (!orgId) return;
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(`/server/api/autoservice/work-zones`);
+      if (!response.ok) throw new Error('Не удалось загрузить зоны');
+      const data = await response.json();
+      setWorkZones(data);
+    } catch (err) {
+      setError(err.message || 'Ошибка загрузки');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchAssignedZones = async () => {
     if (!employee || !orgId) return;
