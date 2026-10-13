@@ -69,7 +69,7 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
       for (const zoneId of toAdd) {
         await apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`, {
           method: 'POST',
-          body: { work_zone_id: zoneId },
+          body: JSON.stringify({ work_zone_id: zoneId }),
         });
       }
 
