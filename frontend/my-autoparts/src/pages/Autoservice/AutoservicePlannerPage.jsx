@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { usePlannerWorkZonePermissions } from '../../hooks/usePlannerWorkZonePermissions';
 import { withBackTo } from '../../hooks/useHistoryBack';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import RepairOrderViewModal, { OrderStatusBadge, normalizeRepairOrderStatus } from '../../components/Autoservice/RepairOrderViewModal';
@@ -259,6 +260,7 @@ function MobileDayPlanner({
   onItemClick,
   onCellContextMenu,
   onAddInZone,
+  canEditZone,
   loading,
 }) {
   return (
@@ -324,7 +326,7 @@ function MobileDayPlanner({
               >
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="text-base font-semibold text-ink">{zone.name}</h2>
-                  {onAddInZone ? (
+                  {onAddInZone && (canEditZone ? canEditZone(zone.id ?? null) : true) ? (
                     <button
                       type="button"
                       onClick={() => onAddInZone({ dayIso: selectedDayIso, zoneId: zone.id ?? null })}
@@ -391,6 +393,11 @@ export default function AutoservicePlannerPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isReady, isAuthenticated } = useAuthReady();
+  const {
+    loaded: permissionsLoaded,
+    canEditZone,
+    anyEditable,
+  } = usePlannerWorkZonePermissions(isReady && isAuthenticated);
   const today = useMemo(() => new Date(), []);
   const todayIso = toIsoDate(today);
   const [weekStart, setWeekStart] = useState(() => getWeekStart(today));
@@ -537,7 +544,13 @@ export default function AutoservicePlannerPage() {
           <button
             type="button"
             onClick={handleOpenCreate}
-            className="inline-flex h-11 w-full items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-base font-semibold text-white transition hover:bg-brand-700 md:h-10 md:w-auto md:text-sm"
+            disabled={permissionsLoaded && !anyEditable}
+            title={
+              permissionsLoaded && !anyEditable
+                ? 'Нет рабочих зон с правом редактирования'
+                : undefined
+            }
+            className="inline-flex h-11 w-full items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-base font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60 md:h-10 md:w-auto md:text-sm"
           >
             Создать
           </button>
@@ -566,6 +579,7 @@ export default function AutoservicePlannerPage() {
         onItemClick={handlePlannerItemClick}
         onCellContextMenu={handleCellContextMenu}
         onAddInZone={openCreateChoice}
+        canEditZone={canEditZone}
         loading={loading}
       />
 
@@ -641,15 +655,20 @@ export default function AutoservicePlannerPage() {
           setViewOrder(null);
           setViewOrderLoading(false);
         }}
-        onEdit={(order) => {
-          setViewOrder(null);
-          navigate(`/autoservice/orders/${order.id}/edit`, { state: withBackTo(location) });
-        }}
+        onEdit={
+          viewOrder && canEditZone(viewOrder.work_zone_id)
+            ? (order) => {
+                setViewOrder(null);
+                navigate(`/autoservice/orders/${order.id}/edit`, { state: withBackTo(location) });
+              }
+            : undefined
+        }
       />
 
       <PlannerCreateChoiceModal
         open={createChoiceOpen}
         onClose={() => setCreateChoiceOpen(false)}
+        canEdit={canEditZone(resolvedCreateContext.zoneId)}
         onChooseOrder={() => {
           setCreateChoiceOpen(false);
           beginCreateOrder(resolvedCreateContext);
@@ -663,6 +682,7 @@ export default function AutoservicePlannerPage() {
       <PlannerCellContextMenu
         position={contextMenu ? { x: contextMenu.x, y: contextMenu.y } : null}
         onClose={() => setContextMenu(null)}
+        canEdit={contextMenu ? canEditZone(contextMenu.zoneId) : true}
         onCreateInspection={() => beginCreateInspection(contextMenuContext)}
       />
 
@@ -672,6 +692,7 @@ export default function AutoservicePlannerPage() {
         initialPreferredDate={inspectionPrefillDate}
         workZoneId={inspectionPrefillZoneId}
         zones={zones}
+        canEdit={anyEditable}
         onCreated={() => {
           setInspectionModalOpen(false);
           load();
@@ -682,6 +703,7 @@ export default function AutoservicePlannerPage() {
         open={Boolean(viewInspection)}
         onClose={() => setViewInspection(null)}
         zones={zones}
+        canEdit={canEditZone(viewInspection?.work_zone_id)}
         onCreateOrder={(booking) => {
           setViewInspection(null);
           navigate('/autoservice/orders/new', {

@@ -1,6 +1,7 @@
 """Idempotent schema patches for columns added after initial deploy."""
 import logging
 import uuid
+from pathlib import Path
 
 from sqlalchemy import inspect, text
 
@@ -7216,6 +7217,9 @@ def ensure_employee_work_zones_table() -> None:
                 id SERIAL PRIMARY KEY,
                 organization_employee_id INTEGER NOT NULL REFERENCES organization_employees(id) ON DELETE CASCADE,
                 work_zone_id INTEGER NOT NULL REFERENCES autoservice_work_zones(id) ON DELETE CASCADE,
+                can_view BOOLEAN NOT NULL DEFAULT TRUE,
+                can_edit BOOLEAN NOT NULL DEFAULT FALSE,
+                can_caldav BOOLEAN NOT NULL DEFAULT FALSE,
                 created_at TIMESTAMP NOT NULL DEFAULT now(),
                 CONSTRAINT uq_employee_work_zone_employee_zone UNIQUE (organization_employee_id, work_zone_id)
             )
@@ -7228,6 +7232,28 @@ def ensure_employee_work_zones_table() -> None:
         ))
 
     logger.info("Applied employee_work_zones table patch")
+
+
+def ensure_employee_work_zones_mode_columns() -> None:
+    """Добавить колонки прав планировщика в существующую employee_work_zones."""
+    inspector = inspect(engine)
+    if "employee_work_zones" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("employee_work_zones")}
+    statements = []
+    if "can_view" not in columns:
+        statements.append("ALTER TABLE employee_work_zones ADD COLUMN can_view BOOLEAN NOT NULL DEFAULT TRUE")
+    if "can_edit" not in columns:
+        statements.append("ALTER TABLE employee_work_zones ADD COLUMN can_edit BOOLEAN NOT NULL DEFAULT FALSE")
+    if "can_caldav" not in columns:
+        statements.append("ALTER TABLE employee_work_zones ADD COLUMN can_caldav BOOLEAN NOT NULL DEFAULT FALSE")
+
+    if statements:
+        with engine.begin() as conn:
+            for stmt in statements:
+                conn.execute(text(stmt))
+        logger.info("Applied employee_work_zones mode columns patch")
 
 
 def ensure_inspection_permissions() -> None:
@@ -7260,3 +7286,23 @@ def ensure_inspection_permissions() -> None:
         logger.info("Applied new inspection permissions: %s", inserted)
     else:
         logger.info("Inspection permissions already up to date")
+
+
+def ensure_planner_mode_permissions() -> None:
+    """Добавить права детальных режимов планировщика (view/edit/caldav)."""
+    inspector = inspect(engine)
+    if "permissions" not in inspector.get_table_names():
+        return
+
+    migration_path = Path(__file__).resolve().parent.parent.parent / "migrations" / "add_planner_mode_permissions.sql"
+    if not migration_path.exists():
+        logger.warning("Migration file not found: %s", migration_path)
+        return
+
+    sql = migration_path.read_text(encoding="utf-8")
+    statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied planner mode permissions migration")

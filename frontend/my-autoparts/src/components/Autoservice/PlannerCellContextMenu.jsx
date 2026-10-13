@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-function MenuButton({ children, onClick }) {
+function MenuButton({ children, onClick, disabled = false, title }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-1.5 rounded-sg-sm px-2.5 py-1.5 text-left text-xs font-medium text-ink transition hover:bg-surface-muted"
+      disabled={disabled}
+      title={title}
+      className="flex w-full items-center gap-1.5 rounded-sg-sm px-2.5 py-1.5 text-left text-xs font-medium text-ink transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
     >
       <span className="text-base font-semibold leading-none text-ink-soft">+</span>
       {children}
@@ -18,6 +20,7 @@ export default function PlannerCellContextMenu({
   position,
   onClose,
   onCreateInspection,
+  canEdit = true,
 }) {
   const menuRef = useRef(null);
 
@@ -61,6 +64,8 @@ export default function PlannerCellContextMenu({
       role="menu"
     >
       <MenuButton
+        disabled={!canEdit}
+        title={canEdit ? undefined : 'Нет права редактирования этой зоны'}
         onClick={() => {
           onCreateInspection?.();
           onClose?.();

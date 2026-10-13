@@ -44,6 +44,7 @@ export default function InspectionBookingAddModal({
   zones = [],
   title = 'Запись на осмотр',
   initialBooking = null,
+  canEdit = true,
 }) {
   const user = useSelector((state) => state.auth.user);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
@@ -448,7 +449,7 @@ export default function InspectionBookingAddModal({
       <button
         type="submit"
         form="add-inspection-booking"
-        disabled={saving}
+        disabled={saving || !canEdit}
         className="min-h-12 w-full rounded-sg-sm bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:min-h-11 sm:w-auto"
       >
         {saving ? 'Сохранение…' : 'Сохранить'}
@@ -469,7 +470,7 @@ export default function InspectionBookingAddModal({
           {confirming ? 'Подтверждение…' : 'Подтвердить'}
         </button>
       ) : null}
-      {isEdit && onCreateOrder ? (
+      {isEdit && canEdit && onCreateOrder ? (
         <button
           type="button"
           onClick={(e) => {
@@ -493,23 +494,25 @@ export default function InspectionBookingAddModal({
           Создать заказ-наряд
         </button>
       ) : null}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          editStartedAtRef.current = Date.now();
-          setIsEditing(true);
-        }}
-        aria-label="Редактировать запись"
-        title="Редактировать запись"
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm border border-brand-300 text-brand-600 transition hover:bg-brand-50"
-      >
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-        </svg>
-      </button>
-      {isEdit ? (
+      {canEdit ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            editStartedAtRef.current = Date.now();
+            setIsEditing(true);
+          }}
+          aria-label="Редактировать запись"
+          title="Редактировать запись"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm border border-brand-300 text-brand-600 transition hover:bg-brand-50"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+          </svg>
+        </button>
+      ) : null}
+      {isEdit && canEdit ? (
         <button
           type="button"
           onClick={(e) => {

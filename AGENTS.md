@@ -225,6 +225,7 @@ sudo update
 - `discount_percent` (Decimal 0–100) хранится на заказе и на клиенте (`autoservice_clients.discount_percent`); при создании заказа без явной скидки подставляется скидка клиента. `grand_total` везде считается через `_discount_factor` (router) / `_order_grand_total` (economics) — не дублировать логику.
 - Мёртвые эндпоинты `GET /repair-orders/staff-options` и `POST /repair-orders/{id}/approve` удалены (P3): статус `review` выходит только через PATCH status → cancelled, либо через правку заявки собственником.
 - Конфликты планировщика: `GET /autoservice/planner/conflicts?work_zone_id&start&end&exclude_order_id|exclude_booking_id` — фронт спрашивает перед сохранением заказа/записи и показывает ConfirmDialog.
+- Детальные права на рабочие зоны (`employee_work_zones.can_view/can_edit/can_caldav`, модалка «Рабочие зоны» карточки сотрудника; включение edit/caldav автоматически включает view): admin/директор/продавец и сотрудники с трио глобальных прав `autoservice.planner.view/edit/caldav` видят все зоны и строку «Без рабочей зоны»; остальные — только назначенные зоны (`planner_zone_rights` в `app/utils/autoservice_access.py`). `/autoservice/planner/week` фильтрует зоны по `can_view` на бэкенде; фронт берёт права из `GET /autoservice/planner/employee-work-zones` (хук `usePlannerWorkZonePermissions`), кнопки создания/редактирования в планировщике отключены без `can_edit` зоны. CalDAV экспортирует только записи из зон с `can_caldav` (`_caldav_visible_bookings`), задача `sync_calendar_to_bookings` требует хотя бы один `can_caldav`. Права назначения меняются `PATCH /organizations/{org_id}/employee-cards/{card_id}/work-zones/{assignment_id}`.
 - Платежи имеют soft-delete (`cancelled_at`) — во всех агрегатах долга/оплат исключать их (`AutoservicePayment.cancelled_at.is_(None)`).
 - Рабочий стол сотрудника — `GET /autoservice/dashboard/summary` (один запрос, блоки по правам, `own` не видит `review_orders`/`debt`). Статистика клиентов — `services/autoservice_client_stats.py`, сериализаторы планировщика — `services/autoservice_planner_items.py` (переиспользуются планировщиком и дашбордом).
 - Публичная `/autoservice` (визитка) скрыта из роутера — файл `AutoservicePublicPage.jsx` оставлен нетронутым; моб. вкладка «Сервис» ведёт на `/dashboard/autoservice` и видна только сотрудникам автосервис-организации/админу.
@@ -318,4 +319,4 @@ systemctl restart kroan.service
 
 ---
 
-Последнее обновление: 2026-09-15
+Последнее обновление: 2026-10-13

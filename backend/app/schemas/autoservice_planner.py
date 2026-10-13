@@ -48,3 +48,16 @@ class PlannerWeekResponse(BaseModel):
     week_end: date
     days: list[PlannerWeekDayHeader] = Field(default_factory=list)
     zones: list[PlannerWeekZoneRow] = Field(default_factory=list)
+
+
+class PlannerEmployeeWorkZoneView(BaseModel):
+    work_zone_id: int
+    work_zone_name: str
+    can_view: bool
+    can_edit: bool
+    can_caldav: bool
+
+
+class PlannerEmployeeWorkZonesResponse(BaseModel):
+    full_access: bool
+    zones: list[PlannerEmployeeWorkZoneView] = Field(default_factory=list)

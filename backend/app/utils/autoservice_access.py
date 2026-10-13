@@ -18,6 +18,9 @@ from app.utils.site_settings_db import autoservice_enabled
 
 
 AUTOSERVICE_PERMISSION_PLANNER = "autoservice.planner"
+AUTOSERVICE_PERMISSION_PLANNER_VIEW = "autoservice.planner.view"
+AUTOSERVICE_PERMISSION_PLANNER_EDIT = "autoservice.planner.edit"
+AUTOSERVICE_PERMISSION_PLANNER_CALDAV = "autoservice.planner.caldav"
 AUTOSERVICE_PERMISSION_ORDERS = "autoservice.orders"
 AUTOSERVICE_PERMISSION_ORDERS_OWN = "autoservice.orders.own"
 AUTOSERVICE_PERMISSION_WAREHOUSE = "autoservice.warehouse"
@@ -34,6 +37,9 @@ AUTOSERVICE_PERMISSION_MARKUP = "autoservice.markup"
 
 AUTOSERVICE_PERMISSION_CODES = (
     AUTOSERVICE_PERMISSION_PLANNER,
+    AUTOSERVICE_PERMISSION_PLANNER_VIEW,
+    AUTOSERVICE_PERMISSION_PLANNER_EDIT,
+    AUTOSERVICE_PERMISSION_PLANNER_CALDAV,
     AUTOSERVICE_PERMISSION_ORDERS,
     AUTOSERVICE_PERMISSION_ORDERS_OWN,
     AUTOSERVICE_PERMISSION_WAREHOUSE,
@@ -460,4 +466,68 @@ def get_employee_work_zone_ids(db: Session, user: User, org_id: str) -> list[int
         .all()
     )
     return [zone_id for (zone_id,) in zone_ids]
+
+
+def planner_zone_rights(
+    db: Session, user: User, org_id: str
+) -> tuple[bool, dict[int, dict[str, bool]]]:
+    """Права на рабочие зоны в планировщике.
+
+    Возвращает (full_access, {zone_id: {can_view, can_edit, can_caldav}}).
+    full_access — админ/директор/продавец или сотрудник со всеми глобальными
+    правами planner.view/edit/caldav: видны все зоны. Для остальных права
+    складываются из глобальных разрешений и назначенных зон сотрудника.
+    """
+    from app.models.autoservice_work_zone import AutoserviceWorkZone
+    from app.models.employee_work_zone import EmployeeWorkZone
+    from app.models.organization_employee import OrganizationEmployee
+
+    global_view = has_autoservice_permission(db, user, AUTOSERVICE_PERMISSION_PLANNER_VIEW)
+    global_edit = has_autoservice_permission(db, user, AUTOSERVICE_PERMISSION_PLANNER_EDIT)
+    global_caldav = has_autoservice_permission(db, user, AUTOSERVICE_PERMISSION_PLANNER_CALDAV)
+
+    zones = (
+        db.query(AutoserviceWorkZone)
+        .filter(
+            AutoserviceWorkZone.organization_id == org_id,
+            AutoserviceWorkZone.is_active.is_(True),
+        )
+        .all()
+    )
+    rights: dict[int, dict[str, bool]] = {
+        zone.id: {
+            "can_view": global_view,
+            "can_edit": global_edit,
+            "can_caldav": global_caldav,
+        }
+        for zone in zones
+    }
+    full_access = global_view and global_edit and global_caldav
+    if full_access:
+        return True, rights
+
+    employee = (
+        db.query(OrganizationEmployee)
+        .filter(
+            OrganizationEmployee.organization_id == org_id,
+            OrganizationEmployee.user_id == user.id,
+            OrganizationEmployee.is_active.is_(True),
+        )
+        .first()
+    )
+    if employee:
+        zone_ids = {zone.id for zone in zones}
+        rows = (
+            db.query(EmployeeWorkZone)
+            .filter(EmployeeWorkZone.organization_employee_id == employee.id)
+            .all()
+        )
+        for row in rows:
+            if row.work_zone_id not in zone_ids:
+                continue
+            entry = rights[row.work_zone_id]
+            entry["can_view"] = entry["can_view"] or bool(row.can_view)
+            entry["can_edit"] = entry["can_edit"] or bool(row.can_edit)
+            entry["can_caldav"] = entry["can_caldav"] or bool(row.can_caldav)
+    return False, rights
 

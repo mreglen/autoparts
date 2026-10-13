@@ -6,27 +6,66 @@ import Badge from '../UI/Badge';
 import EmptyState from '../UI/EmptyState';
 import Toast from '../UI/Toast';
 
+const NO_RIGHTS = { can_view: false, can_edit: false, can_caldav: false };
+
+const RIGHT_LABELS = [
+  { key: 'can_view', label: 'Просмотр' },
+  { key: 'can_edit', label: 'Редактирование' },
+  { key: 'can_caldav', label: 'CalDAV' },
+];
+
+function RightCheckbox({ label, checked, onChange }) {
+  return (
+    <label className="inline-flex cursor-pointer select-none items-center gap-1.5 text-xs font-medium text-ink-soft">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
+      />
+      {label}
+    </label>
+  );
+}
+
 const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
-  const [assignedZones, setAssignedZones] = useState([]);
   const [workZones, setWorkZones] = useState([]);
+  const [zoneStates, setZoneStates] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (show && orgId) {
-      fetchWorkZones();
-      fetchAssignedZones();
+    if (show && orgId && employee) {
+      reload();
     }
-  }, [show, orgId]);
+  }, [show, orgId, employee]);
 
-  const fetchWorkZones = async () => {
-    if (!orgId) return;
+  const reload = async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiRequest('/autoservice/work-zones');
-      setWorkZones(data);
+      const [zones, assigned] = await Promise.all([
+        apiRequest('/autoservice/work-zones'),
+        apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`),
+      ]);
+      const assignedMap = {};
+      (assigned || []).forEach((a) => {
+        assignedMap[a.work_zone_id] = a;
+      });
+      const next = {};
+      (zones || []).forEach((zone) => {
+        const a = assignedMap[zone.id];
+        next[zone.id] = a
+          ? {
+              can_view: Boolean(a.can_view),
+              can_edit: Boolean(a.can_edit),
+              can_caldav: Boolean(a.can_caldav),
+            }
+          : { ...NO_RIGHTS };
+      });
+      setWorkZones(zones || []);
+      setZoneStates(next);
     } catch (err) {
       setError(err.message || 'Ошибка загрузки');
     } finally {
@@ -34,24 +73,19 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
     }
   };
 
-  const fetchAssignedZones = async () => {
-    if (!employee || !orgId) return;
-    setLoading(true);
-    setError('');
-    try {
-      const data = await apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
-      setAssignedZones(data.map((z) => z.work_zone_id));
-    } catch (err) {
-      setError(err.message || 'Ошибка загрузки');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleZone = (zoneId) => {
-    setAssignedZones((prev) =>
-      prev.includes(zoneId) ? prev.filter((id) => id !== zoneId) : [...prev, zoneId]
-    );
+  const setRight = (zoneId, right, value) => {
+    setZoneStates((prev) => {
+      const zone = prev[zoneId] || { ...NO_RIGHTS };
+      const next = { ...zone, [right]: value };
+      if (right === 'can_view' && !value) {
+        next.can_edit = false;
+        next.can_caldav = false;
+      }
+      if ((right === 'can_edit' || right === 'can_caldav') && value) {
+        next.can_view = true;
+      }
+      return { ...prev, [zoneId]: next };
+    });
   };
 
   const handleSave = async () => {
@@ -60,24 +94,39 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
     setError('');
 
     try {
-      const currentData = await apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`);
-      const currentIds = currentData.map((z) => z.work_zone_id);
+      const currentData = await apiRequest(
+        `/organizations/${orgId}/employee-cards/${employee.id}/work-zones`,
+      );
+      const assignedMap = {};
+      (currentData || []).forEach((a) => {
+        assignedMap[a.work_zone_id] = a;
+      });
 
-      const toAdd = assignedZones.filter((id) => !currentIds.includes(id));
-      const toRemove = currentIds.filter((id) => !assignedZones.includes(id));
+      for (const zone of workZones) {
+        const state = zoneStates[zone.id] || { ...NO_RIGHTS };
+        const anyRight = state.can_view || state.can_edit || state.can_caldav;
+        const assignment = assignedMap[zone.id];
 
-      for (const zoneId of toAdd) {
-        await apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`, {
-          method: 'POST',
-          body: JSON.stringify({ work_zone_id: zoneId }),
-        });
-      }
-
-      for (const assignment of currentData) {
-        if (toRemove.includes(assignment.work_zone_id)) {
+        if (anyRight && !assignment) {
+          await apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`, {
+            method: 'POST',
+            body: JSON.stringify({ work_zone_id: zone.id, ...state }),
+          });
+        } else if (anyRight && assignment) {
+          const changed =
+            Boolean(assignment.can_view) !== state.can_view ||
+            Boolean(assignment.can_edit) !== state.can_edit ||
+            Boolean(assignment.can_caldav) !== state.can_caldav;
+          if (changed) {
+            await apiRequest(
+              `/organizations/${orgId}/employee-cards/${employee.id}/work-zones/${assignment.id}`,
+              { method: 'PATCH', body: JSON.stringify(state) },
+            );
+          }
+        } else if (!anyRight && assignment) {
           await apiRequest(
             `/organizations/${orgId}/employee-cards/${employee.id}/work-zones/${assignment.id}`,
-            { method: 'DELETE' }
+            { method: 'DELETE' },
           );
         }
       }
@@ -93,6 +142,10 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
   if (!show || !employee) return null;
 
   const employeeName = [employee.last_name, employee.first_name].filter(Boolean).join(' ');
+  const assignedCount = workZones.filter((zone) => {
+    const state = zoneStates[zone.id];
+    return state && (state.can_view || state.can_edit || state.can_caldav);
+  }).length;
 
   return (
     <>
@@ -125,30 +178,40 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
           />
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {workZones.map((zone) => (
-              <label
-                key={zone.id}
-                className={`flex items-center justify-between rounded-sg border p-3 cursor-pointer transition-colors ${
-                  assignedZones.includes(zone.id)
-                    ? 'border-brand-400 bg-brand-50/70'
-                    : 'border-line bg-surface hover:border-brand-200 hover:bg-surface-subtle'
-                }`}
-              >
-                <span className="text-sm font-medium text-ink">{zone.name}</span>
-                <input
-                  type="checkbox"
-                  checked={assignedZones.includes(zone.id)}
-                  onChange={() => toggleZone(zone.id)}
-                  className="h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
-                />
-              </label>
-            ))}
+            {workZones.map((zone) => {
+              const state = zoneStates[zone.id] || NO_RIGHTS;
+              const anyRight = state.can_view || state.can_edit || state.can_caldav;
+              return (
+                <div
+                  key={zone.id}
+                  className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-sg border p-3 transition-colors ${
+                    anyRight
+                      ? 'border-brand-400 bg-brand-50/70'
+                      : 'border-line bg-surface hover:border-brand-200 hover:bg-surface-subtle'
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 basis-40 break-words text-sm font-medium text-ink">
+                    {zone.name}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    {RIGHT_LABELS.map(({ key, label }) => (
+                      <RightCheckbox
+                        key={key}
+                        label={label}
+                        checked={Boolean(state[key])}
+                        onChange={(e) => setRight(zone.id, key, e.target.checked)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {assignedZones.length > 0 && (
+        {assignedCount > 0 && (
           <div className="mt-4 flex items-center gap-2 text-sm text-ink-muted">
-            <Badge tone="brand">{assignedZones.length} назначено</Badge>
+            <Badge tone="brand">{assignedCount} назначено</Badge>
           </div>
         )}
       </Modal>

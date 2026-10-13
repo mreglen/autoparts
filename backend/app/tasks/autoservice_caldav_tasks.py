@@ -7,6 +7,8 @@ from app.db.database import SessionLocal
 from app.services.autoservice_caldav import sync_all, sync_org, parse_ics_for_bookings, _storage_dir
 from app.models.caldav_account import CaldavAccount
 from app.models.inspection_booking import InspectionBooking
+from app.models.user import User
+from app.utils.autoservice_access import planner_zone_rights
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -49,6 +51,15 @@ def sync_calendar_to_bookings(user_id: int, organization_id: str) -> dict:
         )
         if not account:
             return {"error": "CalDAV account not found"}
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is not None:
+            full_access, rights = planner_zone_rights(db, user, organization_id)
+            has_caldav = full_access or any(entry["can_caldav"] for entry in rights.values())
+        else:
+            has_caldav = False
+        if not has_caldav:
+            return {"error": "Нет права CalDAV на рабочие зоны"}
 
         storage_dir = _storage_dir()
         user_dir = storage_dir / account.caldav_username / "inspection-events"

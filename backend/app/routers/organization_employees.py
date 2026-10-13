@@ -12,7 +12,11 @@ from app.models.employee_work_zone import EmployeeWorkZone
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.caldav import CaldavCredentialsView, CaldavStatusView
-from app.schemas.employee_work_zone import EmployeeWorkZoneAssign, EmployeeWorkZoneView
+from app.schemas.employee_work_zone import (
+    EmployeeWorkZoneAssign,
+    EmployeeWorkZoneUpdate,
+    EmployeeWorkZoneView,
+)
 from app.schemas.organization_employee import (
     OrganizationEmployeeCardCreate,
     OrganizationEmployeeCardPermissionsRequest,
@@ -297,6 +301,9 @@ def list_employee_work_zones(
             id=row.id,
             work_zone_id=row.work_zone_id,
             work_zone_name=row.work_zone.name,
+            can_view=bool(row.can_view),
+            can_edit=bool(row.can_edit),
+            can_caldav=bool(row.can_caldav),
             created_at=row.created_at.isoformat(),
         )
         for row in rows
@@ -340,6 +347,9 @@ def assign_work_zone_to_employee(
     row = EmployeeWorkZone(
         organization_employee_id=employee.id,
         work_zone_id=payload.work_zone_id,
+        can_view=payload.can_view,
+        can_edit=payload.can_edit,
+        can_caldav=payload.can_caldav,
     )
     db.add(row)
     db.commit()
@@ -349,7 +359,56 @@ def assign_work_zone_to_employee(
         id=row.id,
         work_zone_id=row.work_zone_id,
         work_zone_name=zone.name,
+        can_view=bool(row.can_view),
+        can_edit=bool(row.can_edit),
+        can_caldav=bool(row.can_caldav),
         created_at=row.created_at.isoformat(),
+    )
+
+
+@router.patch(
+    "/{org_id}/employee-cards/{card_id}/work-zones/{assignment_id}",
+    response_model=EmployeeWorkZoneView,
+)
+def update_employee_work_zone(
+    org_id: str,
+    card_id: int,
+    assignment_id: int,
+    payload: EmployeeWorkZoneUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES)
+    employee = get_employee_card(db, org_id, card_id)
+
+    assignment = (
+        db.query(EmployeeWorkZone)
+        .filter(
+            EmployeeWorkZone.id == assignment_id,
+            EmployeeWorkZone.organization_employee_id == employee.id,
+        )
+        .first()
+    )
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Назначение не найдено")
+
+    if payload.can_view is not None:
+        assignment.can_view = payload.can_view
+    if payload.can_edit is not None:
+        assignment.can_edit = payload.can_edit
+    if payload.can_caldav is not None:
+        assignment.can_caldav = payload.can_caldav
+    db.commit()
+    db.refresh(assignment)
+
+    return EmployeeWorkZoneView(
+        id=assignment.id,
+        work_zone_id=assignment.work_zone_id,
+        work_zone_name=assignment.work_zone.name,
+        can_view=bool(assignment.can_view),
+        can_edit=bool(assignment.can_edit),
+        can_caldav=bool(assignment.can_caldav),
+        created_at=assignment.created_at.isoformat(),
     )
 
 

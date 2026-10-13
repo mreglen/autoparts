@@ -13,6 +13,8 @@ from app.models.inspection_booking import InspectionBooking
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_planner import (
+    PlannerEmployeeWorkZoneView,
+    PlannerEmployeeWorkZonesResponse,
     PlannerRepairOrder,
     PlannerWeekDayHeader,
     PlannerWeekResponse,
@@ -25,6 +27,7 @@ from app.services.autoservice_planner_items import (
 )
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_PLANNER,
+    planner_zone_rights,
     require_autoservice_permission,
 )
 router = APIRouter(tags=["Autoservice planner"])
@@ -121,20 +124,17 @@ def get_planner_conflicts(
     return items
 
 
-@router.get("/autoservice/planner/week", response_model=PlannerWeekResponse)
-def get_planner_week(
-    week_start: date = Query(..., alias="week_start"),
+@router.get(
+    "/autoservice/planner/employee-work-zones",
+    response_model=PlannerEmployeeWorkZonesResponse,
+)
+def get_planner_employee_work_zones(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Зоны планировщика с правами текущего пользователя."""
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
-    start = _week_start(week_start)
-    day_dates = [start + timedelta(days=offset) for offset in range(7)]
-    week_end = day_dates[-1]
-
-    range_start = datetime.combine(day_dates[0], time.min)
-    range_end = datetime.combine(day_dates[-1] + timedelta(days=1), time.min)
-
+    full_access, rights = planner_zone_rights(db, current_user, org_id)
     zones = (
         db.query(AutoserviceWorkZone)
         .filter(
@@ -144,6 +144,50 @@ def get_planner_week(
         .order_by(AutoserviceWorkZone.sort_order.asc(), AutoserviceWorkZone.id.asc())
         .all()
     )
+    return PlannerEmployeeWorkZonesResponse(
+        full_access=full_access,
+        zones=[
+            PlannerEmployeeWorkZoneView(
+                work_zone_id=zone.id,
+                work_zone_name=zone.name,
+                can_view=entry["can_view"],
+                can_edit=entry["can_edit"],
+                can_caldav=entry["can_caldav"],
+            )
+            for zone in zones
+            if (entry := rights.get(zone.id)) and entry["can_view"]
+        ],
+    )
+
+
+@router.get("/autoservice/planner/week", response_model=PlannerWeekResponse)
+def get_planner_week(
+    week_start: date = Query(..., alias="week_start"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
+    full_access, zone_rights = planner_zone_rights(db, current_user, org_id)
+    start = _week_start(week_start)
+    day_dates = [start + timedelta(days=offset) for offset in range(7)]
+    week_end = day_dates[-1]
+
+    range_start = datetime.combine(day_dates[0], time.min)
+    range_end = datetime.combine(day_dates[-1] + timedelta(days=1), time.min)
+
+    zones = [
+        zone
+        for zone in (
+            db.query(AutoserviceWorkZone)
+            .filter(
+                AutoserviceWorkZone.organization_id == org_id,
+                AutoserviceWorkZone.is_active.is_(True),
+            )
+            .order_by(AutoserviceWorkZone.sort_order.asc(), AutoserviceWorkZone.id.asc())
+            .all()
+        )
+        if zone_rights.get(zone.id, {}).get("can_view")
+    ]
 
     orders = (
         db.query(RepairOrder)
@@ -222,18 +266,19 @@ def get_planner_week(
         for zone in zones
     ]
 
-    zone_rows.append(
-        PlannerWeekZoneRow(
-            id=None,
-            name=UNASSIGNED_ZONE_NAME,
-            sort_order=UNASSIGNED_SORT_ORDER,
-            is_unassigned=True,
-            days=[
-                PlannerWeekZoneDay(date=day, orders=unassigned_days[day])
-                for day in day_dates
-            ],
+    if full_access:
+        zone_rows.append(
+            PlannerWeekZoneRow(
+                id=None,
+                name=UNASSIGNED_ZONE_NAME,
+                sort_order=UNASSIGNED_SORT_ORDER,
+                is_unassigned=True,
+                days=[
+                    PlannerWeekZoneDay(date=day, orders=unassigned_days[day])
+                    for day in day_dates
+                ],
+            )
         )
-    )
 
     return PlannerWeekResponse(
         week_start=day_dates[0],

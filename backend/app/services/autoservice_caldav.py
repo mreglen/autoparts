@@ -246,6 +246,22 @@ def _target_bookings(db: Session, organization_id: str) -> list[InspectionBookin
     )
 
 
+def _caldav_visible_bookings(
+    db: Session, account: CaldavAccount, bookings: list[InspectionBooking]
+) -> list[InspectionBooking]:
+    """Записи из зон, на которые у сотрудника есть право can_caldav."""
+    from app.utils.autoservice_access import planner_zone_rights
+
+    user = db.query(User).filter(User.id == account.user_id).first()
+    if user is None:
+        return []
+    full_access, rights = planner_zone_rights(db, user, account.organization_id)
+    if full_access:
+        return bookings
+    zone_ids = {zid for zid, entry in rights.items() if entry["can_caldav"]}
+    return [b for b in bookings if b.work_zone_id in zone_ids]
+
+
 def _ensure_collection(user_dir: Path, name: str, components: str) -> Path:
     coll_dir = user_dir / name
     coll_dir.mkdir(parents=True, exist_ok=True)
@@ -286,7 +302,7 @@ def sync_account(
     tasks_dir = _ensure_collection(user_dir, TASKS_COLLECTION, "VTODO")
 
     org = db.query(Organization).filter(Organization.id == account.organization_id).first()
-    bookings = _target_bookings(db, account.organization_id)
+    bookings = _caldav_visible_bookings(db, account, _target_bookings(db, account.organization_id))
 
     events = {
         f"b{b.id}-event.ics": build_event_ics(b, org) for b in bookings
