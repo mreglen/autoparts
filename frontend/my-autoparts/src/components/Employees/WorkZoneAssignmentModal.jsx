@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchWorkZones } from '../../redux/slices/AutoserviceSlice';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
-import Badge from '../UI/Tags';
+import Badge from '../UI/Badge';
 import EmptyState from '../UI/EmptyState';
 import Toast from '../UI/Toast';
 

@@ -7203,6 +7203,33 @@ def ensure_caldav_accounts_table() -> None:
 
     logger.info("Applied caldav_accounts table patch")
 
+
+def ensure_employee_work_zones_table() -> None:
+    """employee_work_zones — связь сотрудников с рабочими зонами."""
+    inspector = inspect(engine)
+    if "employee_work_zones" in inspector.get_table_names():
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE employee_work_zones (
+                id SERIAL PRIMARY KEY,
+                organization_employee_id INTEGER NOT NULL REFERENCES organization_employees(id) ON DELETE CASCADE,
+                work_zone_id INTEGER NOT NULL REFERENCES autoservice_work_zones(id) ON DELETE CASCADE,
+                created_at TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT uq_employee_work_zone_employee_zone UNIQUE (organization_employee_id, work_zone_id)
+            )
+        """))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_employee_work_zones_organization_employee_id ON employee_work_zones (organization_employee_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_employee_work_zones_work_zone_id ON employee_work_zones (work_zone_id)"
+        ))
+
+    logger.info("Applied employee_work_zones table patch")
+
+
 def ensure_inspection_permissions() -> None:
     """Add new inspection-related permissions (own bookings, zone assignment, calendar creation)."""
     inspector = inspect(engine)
