@@ -1,12 +1,11 @@
-import { useCallback, useRef, useState } from 'react';
+import { useState } from 'react';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
 import PillMultiSelect from '../../components/PillDropdown/PillMultiSelect';
 import {
   RepairOrderStatusPicker,
-  REPAIR_ORDER_STATUS_LABELS,
   vehicleMakeModelLabel,
 } from '../../components/Autoservice/RepairOrderViewModal';
-import { Skeleton, UnderlineTabs } from '../../components/UI';
+import { Skeleton } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { formatServerDate } from '../../utils/serverDate';
@@ -103,14 +102,8 @@ function OrderMobileRow({
  */
 export default function AutoserviceOrdersMobileView({
   onCreate,
-  orderTabs,
-  tabValue,
-  onTabChange,
   q,
   onSearchChange,
-  viewHistory,
-  historyStatus,
-  onHistoryStatusChange,
   loading,
   error,
   onErrorClose,
@@ -119,7 +112,7 @@ export default function AutoserviceOrdersMobileView({
   loadingMore = false,
   sentinelRef,
   emptyMessage,
-  statusActionsForRow,
+  statusActions,
   onStatusChange,
   statusSavingId,
   onView,
@@ -129,35 +122,17 @@ export default function AutoserviceOrdersMobileView({
   dateTo = '',
   onDateFromChange,
   onDateToChange,
-  statusFilter = '',
+  statusOptions = [],
+  statusFilter = [],
   onStatusFilterChange,
   workZones = [],
   zoneFilter = [],
   onZoneFilterChange,
+  filtersActive = false,
+  onResetFilters,
 }) {
   const isDrafts = Array.isArray(drafts);
   const [filtersOpen, setFiltersOpen] = useState(false);
-
-  const swipeStartRef = useRef({ x: 0, y: 0 });
-  const handleSwipeStart = useCallback((event) => {
-    const touch = event.targetTouches[0];
-    swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
-  }, []);
-  const handleSwipeEnd = useCallback((event) => {
-    const { x, y } = swipeStartRef.current;
-    swipeStartRef.current = { x: 0, y: 0 };
-    if (!x && !y) return;
-    const touch = event.changedTouches[0];
-    const dx = touch.clientX - x;
-    const dy = touch.clientY - y;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    const order = (orderTabs || []).map((tab) => tab.id);
-    const index = order.indexOf(tabValue);
-    const next = dx < 0 ? index + 1 : index - 1;
-    if (index >= 0 && next >= 0 && next < order.length) {
-      onTabChange?.(order[next]);
-    }
-  }, [orderTabs, tabValue, onTabChange]);
 
   return (
     <div className="-mx-3 min-w-0 px-1.5">
@@ -168,16 +143,6 @@ export default function AutoserviceOrdersMobileView({
       >
         Новый заказ-наряд
       </button>
-
-      <UnderlineTabs
-        className="mt-4"
-        ariaLabel="Разделы заказ-нарядов"
-        gapClassName="gap-4"
-        tabClassName="min-h-11 pb-3 pt-2 text-sm font-medium"
-        tabs={orderTabs}
-        value={tabValue}
-        onChange={onTabChange}
-      />
 
       <div className="mt-4 flex min-w-0 flex-col gap-2">
         <div className="flex items-center gap-2">
@@ -204,18 +169,6 @@ export default function AutoserviceOrdersMobileView({
             </svg>
           </button>
         </div>
-        {viewHistory ? (
-          <select
-            className="h-11 w-full rounded-full border-0 bg-gray-100 px-4 text-base text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
-            value={historyStatus}
-            onChange={(e) => onHistoryStatusChange(e.target.value)}
-            aria-label="Фильтр по статусу"
-          >
-            <option value="">Все статусы</option>
-            <option value="completed">Завершён</option>
-            <option value="cancelled">Отменён</option>
-          </select>
-        ) : null}
         {filtersOpen ? (
           <div className="flex flex-wrap items-end gap-3">
             <label className="block w-36 min-w-0 flex-1">
@@ -240,17 +193,14 @@ export default function AutoserviceOrdersMobileView({
             </label>
             <label className="block w-full min-w-0">
               <span className="mb-1.5 block text-xs font-medium text-gray-500">Статус</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => onStatusFilterChange?.(e.target.value)}
-                className="h-11 w-full rounded-full border-0 bg-gray-100 px-4 text-base text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
-                aria-label="Фильтр по статусу"
-              >
-                <option value="">Все статусы</option>
-                {['pending', 'in_progress', 'done', 'completed', 'cancelled', 'review'].map((value) => (
-                  <option key={value} value={value}>{REPAIR_ORDER_STATUS_LABELS[value]}</option>
-                ))}
-              </select>
+              <PillMultiSelect
+                values={statusFilter}
+                onChange={onStatusFilterChange}
+                options={statusOptions}
+                placeholder="Все статусы"
+                ariaLabel="Фильтр по статусу"
+                triggerClassName="h-11 text-base"
+              />
             </label>
             <label className="block w-full min-w-0">
               <span className="mb-1.5 block text-xs font-medium text-gray-500">Рабочая зона</span>
@@ -263,15 +213,10 @@ export default function AutoserviceOrdersMobileView({
                 triggerClassName="h-11 text-base"
               />
             </label>
-            {dateFrom || dateTo || statusFilter || zoneFilter.length ? (
+            {filtersActive ? (
               <button
                 type="button"
-                onClick={() => {
-                  onDateFromChange?.('');
-                  onDateToChange?.('');
-                  onStatusFilterChange?.('');
-                  onZoneFilterChange?.([]);
-                }}
+                onClick={onResetFilters}
                 className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-500 transition hover:bg-gray-200"
               >
                 Сбросить
@@ -283,11 +228,7 @@ export default function AutoserviceOrdersMobileView({
 
       <Toast message={error} variant="error" onClose={onErrorClose} />
 
-      <div
-        className="mt-4 border-t border-gray-100"
-        onTouchStart={handleSwipeStart}
-        onTouchEnd={handleSwipeEnd}
-      >
+      <div className="mt-4 border-t border-gray-100">
         {loading ? (
           <div className="divide-y divide-gray-100">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -323,7 +264,7 @@ export default function AutoserviceOrdersMobileView({
               <OrderMobileRow
                 key={row.id}
                 row={row}
-                statusActions={statusActionsForRow(row)}
+                statusActions={statusActions}
                 onStatusChange={onStatusChange}
                 statusSavingId={statusSavingId}
                 onView={() => onView(row)}

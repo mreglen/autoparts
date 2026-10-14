@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { withBackTo } from '../../hooks/useHistoryBack';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
@@ -13,13 +12,12 @@ import RepairOrderViewModal, {
   REPAIR_ORDER_STATUS_LABELS,
   vehicleMakeModelLabel,
 } from '../../components/Autoservice/RepairOrderViewModal';
-import { Skeleton, UnderlineTabs } from '../../components/UI';
+import { Skeleton } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
 import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDate } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
-import { canReviewRepairOrders } from '../../utils/autoservicePermissions';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   clearRepairOrderFormDraft,
@@ -40,43 +38,46 @@ const PAGE_SIZE = 50;
 const pillButtonClass =
   'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
 
+const DRAFT_STATUS = 'draft';
+const ORDER_STATUS_VALUES = ['pending', 'in_progress', 'done', 'review', 'completed', 'cancelled'];
+const DEFAULT_STATUS_FILTER = ['pending', 'in_progress', 'done', 'review'];
+const STATUS_OPTIONS = [
+  ...ORDER_STATUS_VALUES.map((value) => ({ value, label: REPAIR_ORDER_STATUS_LABELS[value] })),
+  { value: DRAFT_STATUS, label: 'Черновик' },
+];
+
+const STATUS_ACTIONS = [
+  { value: 'pending', label: 'Ожидание' },
+  { value: 'in_progress', label: 'В работу' },
+  { value: 'done', label: 'Выполнен' },
+  { value: 'completed', label: 'Закрыт' },
+  { value: 'cancelled', label: 'Отменить' },
+];
+
+function isDefaultStatusFilter(values) {
+  return (
+    values.length === DEFAULT_STATUS_FILTER.length &&
+    DEFAULT_STATUS_FILTER.every((value) => values.includes(value))
+  );
+}
+
 function formatMoney(value) {
   const n = Number(value);
   if (Number.isNaN(n)) return '0,00';
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function orderMatchesList(order, { scope, historyStatus, includeReviewInActive }) {
-  const status = order?.status;
-  if (scope === 'all') return true;
-  if (scope === 'review') return status === 'review';
-  if (scope === 'history') {
-    if (historyStatus) return status === historyStatus;
-    return status === 'completed' || status === 'cancelled';
-  }
-  if (status === 'pending' || status === 'in_progress' || status === 'done') return true;
-  return Boolean(includeReviewInActive && status === 'review');
-}
-
 export default function AutoserviceOrdersPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
-  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
-  const canReview = canReviewRepairOrders(user, permissionCodes || []);
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const viewParam = searchParams.get('view');
-  const viewHistory = viewParam === 'history';
-  const viewReview = viewParam === 'review';
-  const viewDrafts = viewParam === 'drafts';
-  const viewAll = viewParam === 'all';
+  const [searchParams] = useSearchParams();
   const [drafts, setDrafts] = useState(() => listRepairOrderFormDrafts());
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [reviewCount, setReviewCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
@@ -84,33 +85,53 @@ export default function AutoserviceOrdersPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const raw = searchParams.get('status');
+    return raw
+      ? raw.split(',').map((value) => value.trim()).filter(Boolean)
+      : DEFAULT_STATUS_FILTER;
+  });
   const [zoneFilter, setZoneFilter] = useState([]);
   const [workZones, setWorkZones] = useState([]);
-  const [historyStatus, setHistoryStatus] = useState('');
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
   const [deleteConfirmOrder, setDeleteConfirmOrder] = useState(null);
   const [deleteConfirmDraft, setDeleteConfirmDraft] = useState(null);
   const [closeConfirmOrder, setCloseConfirmOrder] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const prevScopeKeyRef = useRef(null);
+  const prevStatusKeyRef = useRef(null);
   const offsetRef = useRef(0);
   const loadSeqRef = useRef(0);
   const sentinelRef = useRef(null);
 
-  const scope = viewReview ? 'review' : viewHistory ? 'history' : viewAll ? 'all' : 'active';
+  const viewDrafts = statusFilter.includes(DRAFT_STATUS);
+
+  const handleStatusFilterChange = useCallback(
+    (next) => {
+      if (!next.includes(DRAFT_STATUS)) {
+        setStatusFilter(next);
+        return;
+      }
+      setStatusFilter(
+        statusFilter.includes(DRAFT_STATUS)
+          ? next.filter((value) => value !== DRAFT_STATUS)
+          : [DRAFT_STATUS],
+      );
+    },
+    [statusFilter],
+  );
 
   const buildParams = useCallback(
     (offset) => {
       const params = new URLSearchParams({
-        scope,
+        scope: 'all',
         limit: String(PAGE_SIZE),
         offset: String(offset),
       });
       if (qApplied.trim()) params.set('q', qApplied.trim());
-      const statusParam = viewHistory ? historyStatus || statusFilter : statusFilter;
-      if (statusParam) params.set('status', statusParam);
+      statusFilter
+        .filter((value) => value !== DRAFT_STATUS)
+        .forEach((value) => params.append('status', value));
       if (dateFrom) params.set('date_from', dateFrom);
       if (dateTo) params.set('date_to', dateTo);
       if (zoneFilter.length) {
@@ -118,7 +139,7 @@ export default function AutoserviceOrdersPage() {
       }
       return params;
     },
-    [scope, qApplied, viewHistory, historyStatus, statusFilter, dateFrom, dateTo, zoneFilter],
+    [qApplied, statusFilter, dateFrom, dateTo, zoneFilter],
   );
 
   const load = useCallback(async ({ silent = false } = {}) => {
@@ -141,15 +162,6 @@ export default function AutoserviceOrdersPage() {
       setTotal(Number(data?.total) || items.length);
       setHasMore(Boolean(data?.has_more));
       offsetRef.current = items.length;
-      if (scope === 'review') {
-        setReviewCount(Number(data?.total) || items.length);
-      } else if (canReview) {
-        apiRequest('/autoservice/repair-orders?scope=review&limit=1')
-          .then((d) => {
-            if (loadSeqRef.current === seq) setReviewCount(Number(d?.total) || 0);
-          })
-          .catch(() => {});
-      }
     } catch (e) {
       if (seq !== loadSeqRef.current) return;
       setError(e?.message || 'Не удалось загрузить записи');
@@ -158,7 +170,7 @@ export default function AutoserviceOrdersPage() {
     } finally {
       if (seq === loadSeqRef.current && !silent) setLoading(false);
     }
-  }, [viewDrafts, buildParams, scope, canReview]);
+  }, [viewDrafts, buildParams]);
 
   const loadMore = useCallback(async () => {
     if (viewDrafts || loading || loadingMore || !hasMore) return;
@@ -199,11 +211,11 @@ export default function AutoserviceOrdersPage() {
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
-    const scopeKey = `${scope}|${historyStatus}`;
-    const silent = prevScopeKeyRef.current === scopeKey;
-    prevScopeKeyRef.current = scopeKey;
+    const statusKey = viewDrafts ? 'drafts' : statusFilter.join(',');
+    const silent = prevStatusKeyRef.current === statusKey;
+    prevStatusKeyRef.current = statusKey;
     load({ silent });
-  }, [isReady, isAuthenticated, load, scope, historyStatus, qApplied]);
+  }, [isReady, isAuthenticated, load, statusFilter, viewDrafts, qApplied]);
 
   useEffect(() => {
     const onPullRefresh = (event) => {
@@ -218,8 +230,20 @@ export default function AutoserviceOrdersPage() {
   }, [load]);
 
   useEffect(() => {
-    if (viewDrafts) setDrafts(listRepairOrderFormDrafts());
-  }, [viewDrafts]);
+    if (isReady && viewDrafts) setDrafts(listRepairOrderFormDrafts());
+  }, [isReady, viewDrafts]);
+
+  const applyOrderToList = useCallback(
+    (updated) => {
+      const belongs = statusFilter.includes(updated.status);
+      setRows((prev) => {
+        if (!belongs) return prev.filter((row) => row.id !== updated.id);
+        return prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row));
+      });
+      if (viewOrder?.id === updated.id) setViewOrder(updated);
+    },
+    [statusFilter, viewOrder?.id],
+  );
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
@@ -233,41 +257,6 @@ export default function AutoserviceOrdersPage() {
       cancelled = true;
     };
   }, [isReady, isAuthenticated]);
-
-  useEffect(() => {
-    if (isReady && viewReview && !canReview) {
-      setSearchParams({});
-    }
-  }, [isReady, viewReview, canReview, setSearchParams]);
-
-  const setListView = (id) => {
-    if (id === 'history') setSearchParams({ view: 'history' });
-    else if (id === 'review') setSearchParams({ view: 'review' });
-    else if (id === 'drafts') setSearchParams({ view: 'drafts' });
-    else if (id === 'all') setSearchParams({ view: 'all' });
-    else setSearchParams({});
-    setViewOrder(null);
-    setDrafts(listRepairOrderFormDrafts());
-  };
-
-  const applyOrderToList = useCallback(
-    (updated) => {
-      const belongs = orderMatchesList(updated, {
-        scope,
-        historyStatus,
-        includeReviewInActive: !canReview,
-      });
-      setRows((prev) => {
-        if (!belongs) return prev.filter((row) => row.id !== updated.id);
-        return prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row));
-      });
-      if (viewOrder?.id === updated.id) setViewOrder(updated);
-      if (scope === 'review' && updated.status !== 'review') {
-        setReviewCount((count) => Math.max(0, count - 1));
-      }
-    },
-    [scope, historyStatus, canReview, viewOrder?.id],
-  );
 
   const updateOrderStatus = async (id, nextStatus) => {
     setStatusSavingId(id);
@@ -293,28 +282,6 @@ export default function AutoserviceOrdersPage() {
     }
     await updateOrderStatus(id, nextStatus);
   };
-
-  const statusActions = useMemo(
-    () =>
-      viewReview
-        ? [{ value: 'cancelled', label: 'Отклонить' }]
-        : viewHistory
-        ? [
-            { value: 'pending', label: 'Ожидание' },
-            { value: 'in_progress', label: 'В работу' },
-            { value: 'done', label: 'Выполнен' },
-          ]
-        : [
-            { value: 'pending', label: 'Ожидание' },
-            { value: 'in_progress', label: 'В работу' },
-            { value: 'done', label: 'Выполнен' },
-            { value: 'completed', label: 'Закрыт' },
-            { value: 'cancelled', label: 'Отменить' },
-          ],
-    [viewHistory, viewReview],
-  );
-
-  const statusActionsForRow = useCallback(() => statusActions, [statusActions]);
 
   const openDraft = useCallback(
     (draft) => {
@@ -389,69 +356,29 @@ export default function AutoserviceOrdersPage() {
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !user) return null;
 
-  const pageTitle = viewHistory
-    ? 'История заказ-нарядов'
-    : viewReview
-      ? 'На проверке'
-      : viewDrafts
-        ? 'Черновики'
-        : viewAll
-          ? 'Все заказ-наряды'
-          : 'Заказ-наряды';
+  const pageTitle = viewDrafts ? 'Черновики' : 'Заказ-наряды';
   const pageSubtitle = loading
     ? 'Загрузка…'
     : viewDrafts
       ? `${drafts.length} черновиков`
-      : viewAll
-        ? `${total} всего`
-        : viewHistory
-      ? canReview
-        ? `${total} завершённых и отменённых`
-        : `${total} ваших завершённых и отменённых`
-      : viewReview
-        ? `${total} заявок от сотрудников`
-        : canReview
-          ? `${total} активных`
-          : `${total} ваших активных`;
-  const orderTabs = [
-    { id: 'active', label: 'Активные' },
-    { id: 'all', label: 'Все' },
-    { id: 'drafts', label: 'Черновики', count: drafts.length || undefined },
-    ...(canReview ? [{ id: 'review', label: 'На проверке', shortLabel: 'Проверка', count: reviewCount }] : []),
-    { id: 'history', label: 'История' },
-  ];
-  const tabValue = viewReview
-    ? 'review'
-    : viewHistory
-      ? 'history'
-      : viewDrafts
-        ? 'drafts'
-        : viewAll
-          ? 'all'
-          : 'active';
-  const emptyMessage = viewDrafts
-    ? 'Черновиков пока нет'
-    : viewHistory
-    ? 'В истории пока нет заказ-нарядов'
-    : viewReview
-      ? 'Заявок на проверке нет'
-      : viewAll
-        ? 'Заказ-нарядов нет'
-        : 'Активных заказ-нарядов нет';
+      : `${total} заказ-нарядов`;
+  const emptyMessage = viewDrafts ? 'Черновиков пока нет' : 'Заказ-нарядов нет';
+  const filtersActive =
+    Boolean(dateFrom || dateTo) || zoneFilter.length > 0 || !isDefaultStatusFilter(statusFilter);
+  const resetFilters = () => {
+    setDateFrom('');
+    setDateTo('');
+    setStatusFilter(DEFAULT_STATUS_FILTER);
+    setZoneFilter([]);
+  };
 
   return (
     <div className="w-full min-w-0">
       <div className="lg:hidden">
         <AutoserviceOrdersMobileView
           onCreate={() => navigate('/autoservice/orders/new', { state: withBackTo(location) })}
-          orderTabs={orderTabs}
-          tabValue={tabValue}
-          onTabChange={setListView}
           q={q}
           onSearchChange={setQ}
-          viewHistory={viewHistory}
-          historyStatus={historyStatus}
-          onHistoryStatusChange={setHistoryStatus}
           loading={loading}
           error={error}
           onErrorClose={() => setError('')}
@@ -460,7 +387,7 @@ export default function AutoserviceOrdersPage() {
           loadingMore={loadingMore}
           sentinelRef={sentinelRef}
           emptyMessage={emptyMessage}
-          statusActionsForRow={statusActionsForRow}
+          statusActions={STATUS_ACTIONS}
           onStatusChange={handleStatus}
           statusSavingId={statusSavingId}
           onView={setViewOrder}
@@ -470,11 +397,14 @@ export default function AutoserviceOrdersPage() {
           dateTo={dateTo}
           onDateFromChange={setDateFrom}
           onDateToChange={setDateTo}
+          statusOptions={STATUS_OPTIONS}
           statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
           workZones={workZones}
           zoneFilter={zoneFilter}
           onZoneFilterChange={setZoneFilter}
+          filtersActive={filtersActive}
+          onResetFilters={resetFilters}
         />
       </div>
 
@@ -485,27 +415,15 @@ export default function AutoserviceOrdersPage() {
             <p className="mt-0.5 text-sm text-gray-500">{pageSubtitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {!viewHistory && !viewReview ? (
-              <button
-                type="button"
-                onClick={() => navigate('/autoservice/orders/new', { state: withBackTo(location) })}
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:w-auto"
-              >
-                Новый заказ-наряд
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => navigate('/autoservice/orders/new', { state: withBackTo(location) })}
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 sm:w-auto"
+            >
+              Новый заказ-наряд
+            </button>
           </div>
         </div>
-
-        <UnderlineTabs
-          className="mb-4"
-          ariaLabel="Разделы заказ-нарядов"
-          gapClassName="gap-4"
-          tabClassName="pb-3 pt-1 text-sm font-medium sm:text-[15px]"
-          tabs={orderTabs}
-          value={tabValue}
-          onChange={setListView}
-        />
 
         <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
           <AutoserviceLiveSearchField
@@ -531,20 +449,6 @@ export default function AutoserviceOrdersPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-
-          {viewHistory ? (
-            <select
-              className="h-10 min-w-0 shrink-0 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
-              value={historyStatus}
-              onChange={(e) => setHistoryStatus(e.target.value)}
-              aria-label="Фильтр по статусу"
-            >
-              <option value="">Все статусы</option>
-              <option value="completed">Завершён</option>
-              <option value="cancelled">Отменён</option>
-            </select>
-          ) : null}
-
         </div>
 
         {filtersOpen ? (
@@ -569,20 +473,16 @@ export default function AutoserviceOrdersPage() {
                 className="h-10 rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
               />
             </label>
-            <label className="block w-40 min-w-0">
+            <div className="w-44 min-w-0">
               <span className="mb-1.5 block text-xs font-medium text-ink-muted">Статус</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 w-full rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
-                aria-label="Фильтр по статусу"
-              >
-                <option value="">Все статусы</option>
-                {['pending', 'in_progress', 'done', 'completed', 'cancelled', 'review'].map((value) => (
-                  <option key={value} value={value}>{REPAIR_ORDER_STATUS_LABELS[value]}</option>
-                ))}
-              </select>
-            </label>
+              <PillMultiSelect
+                values={statusFilter}
+                onChange={handleStatusFilterChange}
+                options={STATUS_OPTIONS}
+                placeholder="Все статусы"
+                ariaLabel="Фильтр по статусу"
+              />
+            </div>
             <div className="w-44 min-w-0">
               <span className="mb-1.5 block text-xs font-medium text-ink-muted">Рабочая зона</span>
               <PillMultiSelect
@@ -593,15 +493,10 @@ export default function AutoserviceOrdersPage() {
                 ariaLabel="Фильтр по рабочей зоне"
               />
             </div>
-            {dateFrom || dateTo || statusFilter || zoneFilter.length ? (
+            {filtersActive ? (
               <button
                 type="button"
-                onClick={() => {
-                  setDateFrom('');
-                  setDateTo('');
-                  setStatusFilter('');
-                  setZoneFilter([]);
-                }}
+                onClick={resetFilters}
                 className={`${pillButtonClass} shrink-0 text-gray-500`}
               >
                 Сбросить
@@ -738,7 +633,7 @@ export default function AutoserviceOrdersPage() {
                   <td className={`${autoserviceListTdClass} [&_span]:ring-0`}>
                     <RepairOrderStatusPicker
                       status={row.status}
-                      options={statusActionsForRow(row)}
+                      options={STATUS_ACTIONS}
                       saving={statusSavingId === row.id}
                       disabled={statusSavingId === row.id}
                       onChange={(nextStatus) => handleStatus(row.id, nextStatus)}
@@ -758,7 +653,7 @@ export default function AutoserviceOrdersPage() {
 
       <RepairOrderViewModal
         order={viewOrder}
-        enablePayment={!viewReview && viewOrder?.status !== 'review'}
+        enablePayment={viewOrder?.status !== 'review'}
         onOrderChange={handleOrderUpdated}
         onClose={() => setViewOrder(null)}
         onEdit={(order) => {

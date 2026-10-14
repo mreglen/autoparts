@@ -84,7 +84,7 @@ class ListRepairOrdersPaginationTests(unittest.TestCase):
     def test_status_filter_applied_for_all_scope(self):
         query = _query(rows=[], total=0)
 
-        _call(query, scope="all", status_filter="completed")
+        _call(query, scope="all", status_filter=["completed"])
 
         self.assertGreater(query.filter.call_count, 1)
 
@@ -115,7 +115,7 @@ class ListRepairOrdersPaginationTests(unittest.TestCase):
     def test_bad_status_rejected_for_history(self):
         query = _query()
         with self.assertRaises(HTTPException) as ctx:
-            _call(query, scope="history", status_filter="pending")
+            _call(query, scope="history", status_filter=["pending"])
         self.assertEqual(ctx.exception.status_code, 400)
 
 

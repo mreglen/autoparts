@@ -1503,7 +1503,7 @@ def get_my_repair_order(
 def list_repair_orders(
     scope: str = Query("active"),
     q: str | None = Query(None),
-    status_filter: str | None = Query(None, alias="status"),
+    status_filter: list[str] | None = Query(None, alias="status"),
     client_id: int | None = Query(None),
     work_zone_id: list[int] | None = Query(None),
     date_from: date | None = Query(None),
@@ -1559,21 +1559,21 @@ def list_repair_orders(
         query = query.filter(RepairOrder.status.in_(REVIEW_STATUSES))
     elif scope == "history":
         if status_filter:
-            if status_filter not in HISTORY_STATUSES:
+            if any(value not in HISTORY_STATUSES for value in status_filter):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Для истории status: completed или cancelled",
                 )
-            query = query.filter(RepairOrder.status == status_filter)
+            query = query.filter(RepairOrder.status.in_(status_filter))
         else:
             query = query.filter(RepairOrder.status.in_(HISTORY_STATUSES))
     if status_filter and scope != "history":
-        if status_filter not in ALL_STATUSES + REVIEW_STATUSES:
+        if any(value not in ALL_STATUSES + REVIEW_STATUSES for value in status_filter):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Недопустимый статус",
             )
-        query = query.filter(RepairOrder.status == status_filter)
+        query = query.filter(RepairOrder.status.in_(status_filter))
     if date_from:
         query = query.filter(func.date(RepairOrder.scheduled_at) >= date_from)
     if date_to:

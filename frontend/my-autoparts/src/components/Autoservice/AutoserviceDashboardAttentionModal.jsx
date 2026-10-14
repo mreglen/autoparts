@@ -44,7 +44,7 @@ const BOOKING_SOURCE_LABELS = {
 };
 
 const TILE_META = {
-  review: { title: 'На проверке', url: '/autoservice/orders?view=review' },
+  review: { title: 'На проверке', url: '/autoservice/orders?status=review' },
   new_bookings: { title: 'Новые записи на осмотр', url: '/autoservice/inspections' },
   debt: { title: 'Долги клиентов', url: '/autoservice/clients' },
   in_progress: { title: 'В работе', url: '/autoservice/orders' },
