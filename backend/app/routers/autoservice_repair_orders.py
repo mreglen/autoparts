@@ -1338,21 +1338,25 @@ def _replace_shop_parts(
 def _apply_search_filter(query, q: str | None):
     if not q or not q.strip():
         return query
-    term = f"%{q.strip()}%"
-    return query.filter(
-        or_(
-            RepairOrder.order_number.ilike(term),
-            RepairOrder.client.has(AutoserviceClient.name.ilike(term)),
-            RepairOrder.vehicle.has(
-                or_(
-                    GarageVehicle.make.ilike(term),
-                    GarageVehicle.model.ilike(term),
-                    GarageVehicle.vin.ilike(term),
-                    GarageVehicle.plate.ilike(term),
-                )
-            ),
+    # Each word must match somewhere; make+model are searched as one phrase so
+    # "ДЖИЛИ EMGRAND" finds a vehicle stored as make="ДЖИЛИ", model="EMGRAND".
+    vehicle_text = func.concat_ws(" ", GarageVehicle.make, GarageVehicle.model)
+    for token in q.split():
+        term = f"%{token}%"
+        query = query.filter(
+            or_(
+                RepairOrder.order_number.ilike(term),
+                RepairOrder.client.has(AutoserviceClient.name.ilike(term)),
+                RepairOrder.vehicle.has(
+                    or_(
+                        vehicle_text.ilike(term),
+                        GarageVehicle.vin.ilike(term),
+                        GarageVehicle.plate.ilike(term),
+                    )
+                ),
+            )
         )
-    )
+    return query
 
 
 def _list_active_work_zones(db: Session, org_id: str) -> list[AutoserviceWorkZone]:

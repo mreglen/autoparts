@@ -196,7 +196,7 @@ export default function AutoserviceDashboardPage() {
     }
     if (Number(summary.debt_total) > 0) {
       tiles.push({
-        label: 'Долги клиентов',
+        label: 'Дебит клиентов',
         value: formatFinanceCurrency(summary.debt_total),
         hint: `${summary.debtors_count} ${plural(summary.debtors_count, 'клиент', 'клиента', 'клиентов')}`,
         type: 'debt',

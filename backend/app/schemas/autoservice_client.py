@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 AutoserviceClientSource = Literal["self", "staff"]
@@ -25,6 +25,13 @@ class AutoserviceClientStaffUpdate(BaseModel):
     kpp: Optional[str] = Field(default=None, max_length=20)
     ogrn: Optional[str] = Field(default=None, max_length=20)
     discount_percent: Optional[Decimal] = Field(default=None, ge=0, le=100)
+
+    @field_validator("name", "phone", "email", mode="before")
+    @classmethod
+    def _blank_str_to_none(cls, value):
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 class AutoserviceClientView(BaseModel):

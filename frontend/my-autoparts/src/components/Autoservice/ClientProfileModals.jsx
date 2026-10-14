@@ -732,7 +732,7 @@ function ClientProfileModal({
                     <p className="mt-0.5 text-sm font-semibold text-ink">{formatMoney(client.paid_total)} ₽</p>
                   </div>
                   <div className="rounded-sg-sm border border-line-soft bg-surface-muted px-3 py-2">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Долг</p>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Дебит</p>
                     <p className={`mt-0.5 text-sm font-semibold ${Number(client.debt_amount) > 0 ? 'text-danger-600' : 'text-ink'}`}>
                       {formatMoney(client.debt_amount)} ₽
                     </p>

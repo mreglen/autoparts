@@ -28,7 +28,7 @@ PAYMENT_LABELS = {
     "all": "Все",
     "paid": "Оплачено",
     "partial": "Частично",
-    "unpaid": "Долг",
+    "unpaid": "Дебит",
 }
 
 
@@ -67,7 +67,7 @@ def _sheet_summary(wb: Workbook, report: dict, filters: OrderEconomicsFilters) -
         ("Зарплата, ₽", summary["payroll_total"]),
         ("Чистая прибыль, ₽", summary["net_profit"]),
         ("Оплачено, ₽", summary["paid_amount"]),
-        ("Долг, ₽", summary["debt_amount"]),
+        ("Дебит, ₽", summary["debt_amount"]),
         ("Неоплаченных заказов", summary["unpaid_count"]),
     ]
     for label, value in metrics:
@@ -89,7 +89,7 @@ def _sheet_orders(wb: Workbook, items: list[dict]) -> None:
         "Зарплата",
         "Чистая прибыль",
         "Оплачено",
-        "Долг",
+        "Дебит",
         "Оплата",
         "Статус",
         "Предварительный расчёт",

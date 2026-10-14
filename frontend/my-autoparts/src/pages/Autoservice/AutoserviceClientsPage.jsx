@@ -219,7 +219,7 @@ export default function AutoserviceClientsPage() {
               <th className={`w-56 ${autoserviceListThClass}`}>Имя</th>
               <th className={`w-36 ${autoserviceListThClass}`}>Телефон</th>
               <th className={`w-28 ${autoserviceListThClass}`}>Аккаунт</th>
-              <th className={`w-28 ${autoserviceListThClass} text-right`}>Долг</th>
+              <th className={`w-28 ${autoserviceListThClass} text-right`}>Дебит</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>

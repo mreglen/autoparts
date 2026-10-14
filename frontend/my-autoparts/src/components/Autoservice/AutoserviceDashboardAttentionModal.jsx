@@ -46,7 +46,7 @@ const BOOKING_SOURCE_LABELS = {
 const TILE_META = {
   review: { title: 'На проверке', url: '/autoservice/orders?status=review' },
   new_bookings: { title: 'Новые записи на осмотр', url: '/autoservice/inspections' },
-  debt: { title: 'Долги клиентов', url: '/autoservice/clients' },
+  debt: { title: 'Дебит клиентов', url: '/autoservice/clients' },
   in_progress: { title: 'В работе', url: '/autoservice/orders' },
   revenue_30d: { title: 'Выручка за 30 дней', url: '/autoservice/finance' },
 };
@@ -88,7 +88,7 @@ function ClientDetail({ client, orders, ordersLoading, onOrderClick }) {
         <DetailField label="Клиент" value={client?.name} wide />
         <DetailField label="Телефон" value={client?.phone} />
         <DetailField label="Email" value={client?.email} />
-        <DetailField label="Долг" value={`${formatMoney(client?.debt_amount)} ₽`} tone="danger" />
+        <DetailField label="Дебит" value={`${formatMoney(client?.debt_amount)} ₽`} tone="danger" />
         <DetailField label="Заказов" value={client?.orders_count != null ? String(client.orders_count) : ''} />
         <DetailField label="Сумма заказов" value={`${formatMoney(client?.orders_total)} ₽`} />
         <DetailField label="Оплачено" value={`${formatMoney(client?.paid_total)} ₽`} />
@@ -98,11 +98,11 @@ function ClientDetail({ client, orders, ordersLoading, onOrderClick }) {
         <DetailField label="Адрес" value={client?.address} wide />
       </div>
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">Заказы с долгом</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">Заказы с дебитом</p>
         {ordersLoading ? (
           <p className="py-2 text-sm text-ink-muted">Загрузка…</p>
         ) : orders.length === 0 ? (
-          <p className="py-2 text-sm text-ink-muted">Нет долгов по заказам</p>
+          <p className="py-2 text-sm text-ink-muted">Нет заказов с дебитом</p>
         ) : (
           <div className="space-y-1">
             {orders.map((order) => (
@@ -122,7 +122,7 @@ function ClientDetail({ client, orders, ordersLoading, onOrderClick }) {
                   {vehicleLabel(order.vehicle)} · {formatMoney(order.grand_total)} ₽
                 </p>
                 <p className="mt-0.5 text-xs font-medium text-danger-600">
-                  Долг: {formatMoney(order.remaining_amount)} ₽
+                  Дебит: {formatMoney(order.remaining_amount)} ₽
                 </p>
               </button>
             ))}
@@ -369,7 +369,7 @@ export default function AutoserviceDashboardAttentionModal({ open, type, summary
                   </div>
                   {row.orders_count > 0 ? (
                     <p className="mt-1 text-xs text-ink-muted">
-                      {row.orders_count} {row.orders_count === 1 ? 'заказ с долгом' : 'заказа с долгами'} · нажмите для деталей
+                      {row.orders_count} {row.orders_count === 1 ? 'заказ с дебитом' : 'заказа с дебитом'} · нажмите для деталей
                     </p>
                   ) : null}
                 </RowButton>

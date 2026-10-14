@@ -103,7 +103,7 @@ def _payment_status_label(payment_status: str) -> str:
     return {
         "paid": "Оплачено",
         "partial": "Частично",
-        "unpaid": "Долг",
+        "unpaid": "Дебит",
     }.get(payment_status, payment_status)
 
 
@@ -142,21 +142,23 @@ def _order_economics_query(db: Session):
 def _apply_search_filter(query, q: str | None):
     if not q or not q.strip():
         return query
-    term = f"%{q.strip()}%"
-    return query.filter(
-        or_(
-            RepairOrder.order_number.ilike(term),
-            RepairOrder.client.has(AutoserviceClient.name.ilike(term)),
-            RepairOrder.vehicle.has(
-                or_(
-                    GarageVehicle.make.ilike(term),
-                    GarageVehicle.model.ilike(term),
-                    GarageVehicle.vin.ilike(term),
-                    GarageVehicle.plate.ilike(term),
-                )
-            ),
+    vehicle_text = func.concat_ws(" ", GarageVehicle.make, GarageVehicle.model)
+    for token in q.split():
+        term = f"%{token}%"
+        query = query.filter(
+            or_(
+                RepairOrder.order_number.ilike(term),
+                RepairOrder.client.has(AutoserviceClient.name.ilike(term)),
+                RepairOrder.vehicle.has(
+                    or_(
+                        vehicle_text.ilike(term),
+                        GarageVehicle.vin.ilike(term),
+                        GarageVehicle.plate.ilike(term),
+                    )
+                ),
+            )
         )
-    )
+    return query
 
 
 def _sorted_works(order: RepairOrder) -> list[RepairOrderWork]:

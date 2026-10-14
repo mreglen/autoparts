@@ -62,13 +62,21 @@ const ECONOMICS_PAYMENT_FILTERS = [
   { id: 'all', label: 'Все' },
   { id: 'paid', label: 'Оплачено' },
   { id: 'partial', label: 'Частично' },
-  { id: 'unpaid', label: 'Долг' },
+  { id: 'unpaid', label: 'Дебит' },
 ];
 
 const PAYMENT_STATUS_LABELS = {
   paid: 'Оплачено',
   partial: 'Частично',
-  unpaid: 'Долг',
+  unpaid: 'Дебит',
+};
+
+const SUMMARY_TONES = {
+  brand: 'bg-brand-50 text-brand-700',
+  accent: 'bg-accent-50 text-accent-700',
+  warning: 'bg-warning-50 text-warning-700',
+  success: 'bg-success-50 text-success-700',
+  danger: 'bg-danger-50 text-danger-700',
 };
 
 const tabFilterButtonClass = (active) =>
@@ -1020,18 +1028,18 @@ export default function AutoserviceReportsPage() {
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {[
-              { label: 'Выручка', value: economicsSummary.revenue },
-              { label: 'Себестоимость', value: economicsSummary.parts_cost },
-              { label: 'Зарплата', value: economicsSummary.payroll_total },
-              { label: 'Чистая прибыль', value: economicsSummary.net_profit },
-              { label: 'Долг', value: economicsSummary.debt_amount },
+              { label: 'Выручка', value: economicsSummary.revenue, tone: 'brand' },
+              { label: 'Себестоимость', value: economicsSummary.parts_cost, tone: 'accent' },
+              { label: 'Зарплата', value: economicsSummary.payroll_total, tone: 'warning' },
+              { label: 'Чистая прибыль', value: economicsSummary.net_profit, tone: 'success' },
+              { label: 'Дебит', value: economicsSummary.debt_amount, tone: 'danger' },
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80"
+                className={`rounded-sg-lg p-4 ring-1 ring-line/80 ${SUMMARY_TONES[item.tone]}`}
               >
-                <p className="text-xs text-ink-muted">{item.label}</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
+                <p className="text-xs font-medium opacity-80">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums">
                   {economicsLoading ? '…' : formatFinanceCurrency(item.value)}
                 </p>
               </div>
@@ -1120,7 +1128,7 @@ export default function AutoserviceReportsPage() {
                         <ReportField label="Зарплата мастеру">{formatFinanceCurrency(row.payroll_total)}</ReportField>
                         <ReportField label="Чистая прибыль">{formatFinanceCurrency(row.net_profit)}</ReportField>
                         <ReportField label="Оплачено">{formatFinanceCurrency(row.paid_amount)}</ReportField>
-                        <ReportField label="Долг">{formatFinanceCurrency(row.remaining_amount)}</ReportField>
+                        <ReportField label="Дебит">{formatFinanceCurrency(row.remaining_amount)}</ReportField>
                         <ReportField label="Статус">
                           {REPAIR_ORDER_STATUS_LABELS[row.status] || row.status}
                         </ReportField>
@@ -1343,17 +1351,17 @@ export default function AutoserviceReportsPage() {
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             {[
-              { label: 'Продажа', value: rosskoSalesSummary.sale_total },
-              { label: 'Закупка', value: rosskoSalesSummary.supplier_total },
-              { label: 'Эквайринг', value: rosskoSalesSummary.acquiring_fee },
-              { label: 'Возвраты', value: rosskoSalesSummary.refund_total },
-              { label: 'Маржа', value: rosskoSalesSummary.margin },
-              { label: 'Сайт 7%', value: rosskoSalesSummary.site_income },
-              { label: 'Организация', value: rosskoSalesSummary.organization_income },
+              { label: 'Продажа', value: rosskoSalesSummary.sale_total, tone: 'brand' },
+              { label: 'Закупка', value: rosskoSalesSummary.supplier_total, tone: 'accent' },
+              { label: 'Эквайринг', value: rosskoSalesSummary.acquiring_fee, tone: 'warning' },
+              { label: 'Возвраты', value: rosskoSalesSummary.refund_total, tone: 'danger' },
+              { label: 'Маржа', value: rosskoSalesSummary.margin, tone: 'success' },
+              { label: 'Сайт 7%', value: rosskoSalesSummary.site_income, tone: 'accent' },
+              { label: 'Организация', value: rosskoSalesSummary.organization_income, tone: 'success' },
             ].map((item) => (
-              <div key={item.label} className="rounded-sg-lg bg-surface p-4 ring-1 ring-line/80">
-                <p className="text-xs text-ink-muted">{item.label}</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-ink">
+              <div key={item.label} className={`rounded-sg-lg p-4 ring-1 ring-line/80 ${SUMMARY_TONES[item.tone]}`}>
+                <p className="text-xs font-medium opacity-80">{item.label}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums">
                   {rosskoSalesLoading ? '…' : formatFinanceCurrency(item.value)}
                 </p>
               </div>
