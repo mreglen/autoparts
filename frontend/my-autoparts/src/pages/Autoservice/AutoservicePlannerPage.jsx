@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { usePlannerWorkZonePermissions } from '../../hooks/usePlannerWorkZonePermissions';
@@ -257,14 +257,40 @@ function MobileDayPlanner({
   todayIso,
   selectedDayIso,
   onSelectDay,
+  onSwipeDay,
   onItemClick,
   onCellContextMenu,
   onAddInZone,
   canEditZone,
   loading,
 }) {
+  const touchStartRef = useRef(null);
+
+  const handleTouchStart = (event) => {
+    const touch = event.touches[0];
+    touchStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+
+  const handleTouchEnd = (event) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    onSwipeDay?.(dx < 0 ? 1 : -1);
+  };
+
   return (
-    <div className="md:hidden">
+    <div
+      className="md:hidden touch-pan-y"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={() => {
+        touchStartRef.current = null;
+      }}
+    >
       <div className="grid grid-cols-7 gap-1">
         {dayHeaders.map((day, index) => {
           const iso = String(day.date).slice(0, 10);
@@ -530,6 +556,17 @@ export default function AutoservicePlannerPage() {
     beginCreateInspection({ dayIso: activeDayIso, zoneId: null });
   };
 
+  const shiftDay = (delta) => {
+    const [y, m, d] = String(activeDayIso).split('-').map(Number);
+    if (!y || !m || !d) return;
+    const next = addDays(new Date(y, m - 1, d), delta);
+    const nextIso = toIsoDate(next);
+    if (dayIsos.length === 7 && (nextIso < dayIsos[0] || nextIso > dayIsos[6])) {
+      setWeekStart(getWeekStart(next));
+    }
+    setSelectedDayIso(nextIso);
+  };
+
   const resolvedCreateContext = createContext || { dayIso: activeDayIso, zoneId: null };
   const contextMenuContext = contextMenu
     ? { dayIso: contextMenu.dayIso, zoneId: contextMenu.zoneId }
@@ -576,6 +613,7 @@ export default function AutoservicePlannerPage() {
         todayIso={todayIso}
         selectedDayIso={activeDayIso}
         onSelectDay={setSelectedDayIso}
+        onSwipeDay={shiftDay}
         onItemClick={handlePlannerItemClick}
         onCellContextMenu={handleCellContextMenu}
         onAddInZone={openCreateChoice}
