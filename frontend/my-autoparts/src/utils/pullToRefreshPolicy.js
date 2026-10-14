@@ -13,6 +13,7 @@ export function isPullToRefreshDisabled(pathname, search = '') {
 
   return (
     path === '/warehouse/scan' ||
+    path === '/autoservice/planner' ||
     AUTOSERVICE_DOCUMENT_PATH_RE.test(path) ||
     NEW_PARTS_PAYMENT_RE.test(path)
   );

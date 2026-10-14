@@ -21,7 +21,6 @@ import {
   sortDayOrders,
   toIsoDate,
 } from '../../utils/autoservicePlannerLayout';
-import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
@@ -464,16 +463,6 @@ export default function AutoservicePlannerPage() {
   useEffect(() => {
     if (isReady && isAuthenticated) load();
   }, [isReady, isAuthenticated, load]);
-
-  useEffect(() => {
-    const onPullRefresh = (event) => {
-      if (event.detail?.pathname === '/autoservice/planner') {
-        load();
-      }
-    };
-    window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
-    return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
-  }, [load]);
 
   const handlePlannerItemClick = (item) => {
     if (item?.kind === 'inspection') {

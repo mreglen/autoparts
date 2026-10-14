@@ -14,3 +14,10 @@ describe('pullToRefreshPolicy camera routes', () => {
     expect(isPullToRefreshDisabled('/my-parts')).toBe(false);
   });
 });
+
+describe('pullToRefreshPolicy planner route', () => {
+  it('disables PTR in the autoservice planner', () => {
+    expect(isPullToRefreshDisabled('/autoservice/planner')).toBe(true);
+    expect(isPullToRefreshDisabled('/autoservice/orders')).toBe(false);
+  });
+});
