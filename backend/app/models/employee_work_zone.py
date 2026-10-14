@@ -5,7 +5,10 @@ from app.db.database import Base
 
 
 class EmployeeWorkZone(Base):
-    """Связь сотрудника организации с рабочими зонами автосервиса."""
+    """Связь сотрудника организации с рабочими зонами автосервиса.
+
+    work_zone_id IS NULL — псевдозона «Без рабочей зоны» из планировщика.
+    """
 
     __tablename__ = "employee_work_zones"
     __table_args__ = (
@@ -26,7 +29,7 @@ class EmployeeWorkZone(Base):
     work_zone_id = Column(
         Integer,
         ForeignKey("autoservice_work_zones.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     can_view = Column(Boolean, nullable=False, default=True)

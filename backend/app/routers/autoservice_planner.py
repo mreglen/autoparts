@@ -27,12 +27,12 @@ from app.services.autoservice_planner_items import (
 )
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_PLANNER,
+    UNASSIGNED_ZONE_NAME,
     planner_zone_rights,
     require_autoservice_permission,
 )
 router = APIRouter(tags=["Autoservice planner"])
 
-UNASSIGNED_ZONE_NAME = "Без рабочей зоны"
 UNASSIGNED_SORT_ORDER = 1_000_000
 
 
@@ -47,13 +47,17 @@ def _place_item(
     zone_day_map: dict[int | None, dict[date, list[PlannerRepairOrder]]],
     unassigned_days: dict[date, list[PlannerRepairOrder]],
     active_zone_ids: set[int],
+    known_zone_ids: set[int],
 ) -> None:
     if day_key not in unassigned_days:
         return
-    if item.work_zone_id and item.work_zone_id in active_zone_ids:
-        zone_day_map[item.work_zone_id][day_key].append(item)
-    else:
-        unassigned_days[day_key].append(item)
+    zone_id = item.work_zone_id
+    if zone_id in active_zone_ids:
+        zone_day_map[zone_id][day_key].append(item)
+        return
+    if zone_id and zone_id in known_zone_ids:
+        return
+    unassigned_days[day_key].append(item)
 
 
 @router.get(
@@ -144,20 +148,29 @@ def get_planner_employee_work_zones(
         .order_by(AutoserviceWorkZone.sort_order.asc(), AutoserviceWorkZone.id.asc())
         .all()
     )
-    return PlannerEmployeeWorkZonesResponse(
-        full_access=full_access,
-        zones=[
+    items = [
+        PlannerEmployeeWorkZoneView(
+            work_zone_id=zone.id,
+            work_zone_name=zone.name,
+            can_view=entry["can_view"],
+            can_edit=entry["can_edit"],
+            can_caldav=entry["can_caldav"],
+        )
+        for zone in zones
+        if (entry := rights.get(zone.id)) and entry["can_view"]
+    ]
+    unassigned = rights.get(None)
+    if unassigned and unassigned["can_view"]:
+        items.append(
             PlannerEmployeeWorkZoneView(
-                work_zone_id=zone.id,
-                work_zone_name=zone.name,
-                can_view=entry["can_view"],
-                can_edit=entry["can_edit"],
-                can_caldav=entry["can_caldav"],
+                work_zone_id=None,
+                work_zone_name=UNASSIGNED_ZONE_NAME,
+                can_view=True,
+                can_edit=unassigned["can_edit"],
+                can_caldav=unassigned["can_caldav"],
             )
-            for zone in zones
-            if (entry := rights.get(zone.id)) and entry["can_view"]
-        ],
-    )
+        )
+    return PlannerEmployeeWorkZonesResponse(full_access=full_access, zones=items)
 
 
 @router.get("/autoservice/planner/week", response_model=PlannerWeekResponse)
@@ -235,6 +248,7 @@ def get_planner_week(
     unassigned_days = {day: [] for day in day_dates}
 
     active_zone_ids = {zone.id for zone in zones}
+    known_zone_ids = {zone_id for zone_id in zone_rights if zone_id is not None}
     for row in orders:
         item_day = row.scheduled_at.date()
         _place_item(
@@ -243,6 +257,7 @@ def get_planner_week(
             zone_day_map=zone_day_map,
             unassigned_days=unassigned_days,
             active_zone_ids=active_zone_ids,
+            known_zone_ids=known_zone_ids,
         )
     for row in inspections:
         _place_item(
@@ -251,6 +266,7 @@ def get_planner_week(
             zone_day_map=zone_day_map,
             unassigned_days=unassigned_days,
             active_zone_ids=active_zone_ids,
+            known_zone_ids=known_zone_ids,
         )
 
     zone_rows: list[PlannerWeekZoneRow] = [
@@ -266,7 +282,7 @@ def get_planner_week(
         for zone in zones
     ]
 
-    if full_access:
+    if full_access or (zone_rights.get(None) or {}).get("can_view"):
         zone_rows.append(
             PlannerWeekZoneRow(
                 id=None,

@@ -51,7 +51,7 @@ class PlannerWeekResponse(BaseModel):
 
 
 class PlannerEmployeeWorkZoneView(BaseModel):
-    work_zone_id: int
+    work_zone_id: Optional[int] = None
     work_zone_name: str
     can_view: bool
     can_edit: bool

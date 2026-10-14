@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
@@ -8,11 +8,19 @@ import Toast from '../UI/Toast';
 
 const NO_RIGHTS = { can_view: false, can_edit: false, can_caldav: false };
 
+const UNASSIGNED_KEY = 'none';
+
+const UNASSIGNED_ROW = { id: UNASSIGNED_KEY, name: 'Без рабочей зоны' };
+
 const RIGHT_LABELS = [
   { key: 'can_view', label: 'Просмотр' },
   { key: 'can_edit', label: 'Редактирование' },
   { key: 'can_caldav', label: 'CalDAV' },
 ];
+
+function assignmentKey(assignment) {
+  return assignment.work_zone_id ?? UNASSIGNED_KEY;
+}
 
 function RightCheckbox({ label, checked, onChange }) {
   return (
@@ -34,6 +42,7 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const rows = useMemo(() => [UNASSIGNED_ROW, ...workZones], [workZones]);
 
   useEffect(() => {
     if (show && orgId && employee) {
@@ -51,12 +60,12 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
       ]);
       const assignedMap = {};
       (assigned || []).forEach((a) => {
-        assignedMap[a.work_zone_id] = a;
+        assignedMap[assignmentKey(a)] = a;
       });
       const next = {};
-      (zones || []).forEach((zone) => {
-        const a = assignedMap[zone.id];
-        next[zone.id] = a
+      [UNASSIGNED_ROW, ...(zones || [])].forEach((row) => {
+        const a = assignedMap[row.id];
+        next[row.id] = a
           ? {
               can_view: Boolean(a.can_view),
               can_edit: Boolean(a.can_edit),
@@ -99,18 +108,21 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
       );
       const assignedMap = {};
       (currentData || []).forEach((a) => {
-        assignedMap[a.work_zone_id] = a;
+        assignedMap[assignmentKey(a)] = a;
       });
 
-      for (const zone of workZones) {
-        const state = zoneStates[zone.id] || { ...NO_RIGHTS };
+      for (const row of rows) {
+        const state = zoneStates[row.id] || { ...NO_RIGHTS };
         const anyRight = state.can_view || state.can_edit || state.can_caldav;
-        const assignment = assignedMap[zone.id];
+        const assignment = assignedMap[row.id];
 
         if (anyRight && !assignment) {
           await apiRequest(`/organizations/${orgId}/employee-cards/${employee.id}/work-zones`, {
             method: 'POST',
-            body: JSON.stringify({ work_zone_id: zone.id, ...state }),
+            body: JSON.stringify({
+              work_zone_id: row.id === UNASSIGNED_KEY ? null : row.id,
+              ...state,
+            }),
           });
         } else if (anyRight && assignment) {
           const changed =
@@ -142,8 +154,8 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
   if (!show || !employee) return null;
 
   const employeeName = [employee.last_name, employee.first_name].filter(Boolean).join(' ');
-  const assignedCount = workZones.filter((zone) => {
-    const state = zoneStates[zone.id];
+  const assignedCount = rows.filter((row) => {
+    const state = zoneStates[row.id];
     return state && (state.can_view || state.can_edit || state.can_caldav);
   }).length;
 
@@ -171,42 +183,44 @@ const WorkZoneAssignmentModal = ({ show, employee, orgId, onClose }) => {
           <div className="text-center py-8 text-sm text-ink-muted">Загрузка...</div>
         ) : error ? (
           <EmptyState illustration="error" title="Ошибка" description={error} />
-        ) : !workZones || workZones.length === 0 ? (
-          <EmptyState
-            title="Нет рабочих зон"
-            description="Сначала создайте рабочие зоны в настройках автосервиса"
-          />
         ) : (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {workZones.map((zone) => {
-              const state = zoneStates[zone.id] || NO_RIGHTS;
-              const anyRight = state.can_view || state.can_edit || state.can_caldav;
-              return (
-                <div
-                  key={zone.id}
-                  className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-sg border p-3 transition-colors ${
-                    anyRight
-                      ? 'border-brand-400 bg-brand-50/70'
-                      : 'border-line bg-surface hover:border-brand-200 hover:bg-surface-subtle'
-                  }`}
-                >
-                  <span className="min-w-0 flex-1 basis-40 break-words text-sm font-medium text-ink">
-                    {zone.name}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                    {RIGHT_LABELS.map(({ key, label }) => (
-                      <RightCheckbox
-                        key={key}
-                        label={label}
-                        checked={Boolean(state[key])}
-                        onChange={(e) => setRight(zone.id, key, e.target.checked)}
-                      />
-                    ))}
+          <>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {rows.map((row) => {
+                const state = zoneStates[row.id] || NO_RIGHTS;
+                const anyRight = state.can_view || state.can_edit || state.can_caldav;
+                return (
+                  <div
+                    key={row.id}
+                    className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-sg border p-3 transition-colors ${
+                      anyRight
+                        ? 'border-brand-400 bg-brand-50/70'
+                        : 'border-line bg-surface hover:border-brand-200 hover:bg-surface-subtle'
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 basis-40 break-words text-sm font-medium text-ink">
+                      {row.name}
+                    </span>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                      {RIGHT_LABELS.map(({ key, label }) => (
+                        <RightCheckbox
+                          key={key}
+                          label={label}
+                          checked={Boolean(state[key])}
+                          onChange={(e) => setRight(row.id, key, e.target.checked)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            {workZones.length === 0 ? (
+              <p className="mt-3 text-sm text-ink-muted">
+                Рабочие зоны пока не созданы — создайте их в настройках автосервиса
+              </p>
+            ) : null}
+          </>
         )}
 
         {assignedCount > 0 && (

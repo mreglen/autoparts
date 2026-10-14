@@ -7216,7 +7216,7 @@ def ensure_employee_work_zones_table() -> None:
             CREATE TABLE employee_work_zones (
                 id SERIAL PRIMARY KEY,
                 organization_employee_id INTEGER NOT NULL REFERENCES organization_employees(id) ON DELETE CASCADE,
-                work_zone_id INTEGER NOT NULL REFERENCES autoservice_work_zones(id) ON DELETE CASCADE,
+                work_zone_id INTEGER REFERENCES autoservice_work_zones(id) ON DELETE CASCADE,
                 can_view BOOLEAN NOT NULL DEFAULT TRUE,
                 can_edit BOOLEAN NOT NULL DEFAULT FALSE,
                 can_caldav BOOLEAN NOT NULL DEFAULT FALSE,
@@ -7230,8 +7230,37 @@ def ensure_employee_work_zones_table() -> None:
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_employee_work_zones_work_zone_id ON employee_work_zones (work_zone_id)"
         ))
+        _create_employee_work_zones_unassigned_index(conn)
 
     logger.info("Applied employee_work_zones table patch")
+
+
+def _create_employee_work_zones_unassigned_index(conn) -> None:
+    conn.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_employee_work_zone_employee_unassigned "
+        "ON employee_work_zones (organization_employee_id) WHERE work_zone_id IS NULL"
+    ))
+
+
+def ensure_employee_work_zones_unassigned_zone() -> None:
+    """Разрешить work_zone_id IS NULL — права на псевдозону «Без рабочей зоны»."""
+    inspector = inspect(engine)
+    if "employee_work_zones" not in inspector.get_table_names():
+        return
+
+    column = next(
+        (col for col in inspector.get_columns("employee_work_zones") if col["name"] == "work_zone_id"),
+        None,
+    )
+    if column is not None and not column.get("nullable", True):
+        with engine.begin() as conn:
+            conn.execute(text(
+                "ALTER TABLE employee_work_zones ALTER COLUMN work_zone_id DROP NOT NULL"
+            ))
+        logger.info("Applied employee_work_zones nullable work_zone_id patch")
+
+    with engine.begin() as conn:
+        _create_employee_work_zones_unassigned_index(conn)
 
 
 def ensure_employee_work_zones_mode_columns() -> None:

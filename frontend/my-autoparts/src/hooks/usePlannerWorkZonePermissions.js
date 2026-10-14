@@ -38,10 +38,7 @@ export function usePlannerWorkZonePermissions(enabled = true) {
   }, [data]);
 
   const canEditZone = useCallback(
-    (zoneId) => {
-      if (zoneId == null) return fullAccess;
-      return Boolean(zonePermissions[zoneId]?.can_edit);
-    },
+    (zoneId) => fullAccess || Boolean(zonePermissions[zoneId ?? null]?.can_edit),
     [fullAccess, zonePermissions],
   );
 

@@ -17,6 +17,8 @@ from app.utils.phone import normalize_to_storage_format
 from app.utils.site_settings_db import autoservice_enabled
 
 
+UNASSIGNED_ZONE_NAME = "Без рабочей зоны"
+
 AUTOSERVICE_PERMISSION_PLANNER = "autoservice.planner"
 AUTOSERVICE_PERMISSION_PLANNER_VIEW = "autoservice.planner.view"
 AUTOSERVICE_PERMISSION_PLANNER_EDIT = "autoservice.planner.edit"
@@ -465,15 +467,16 @@ def get_employee_work_zone_ids(db: Session, user: User, org_id: str) -> list[int
         .filter(EmployeeWorkZone.organization_employee_id == employee.id)
         .all()
     )
-    return [zone_id for (zone_id,) in zone_ids]
+    return [zone_id for (zone_id,) in zone_ids if zone_id is not None]
 
 
 def planner_zone_rights(
     db: Session, user: User, org_id: str
-) -> tuple[bool, dict[int, dict[str, bool]]]:
+) -> tuple[bool, dict[int | None, dict[str, bool]]]:
     """Права на рабочие зоны в планировщике.
 
     Возвращает (full_access, {zone_id: {can_view, can_edit, can_caldav}}).
+    Ключ None — псевдозона «Без рабочей зоны».
     full_access — админ/директор/продавец или сотрудник со всеми глобальными
     правами planner.view/edit/caldav: видны все зоны. Для остальных права
     складываются из глобальных разрешений и назначенных зон сотрудника.
@@ -494,14 +497,15 @@ def planner_zone_rights(
         )
         .all()
     )
-    rights: dict[int, dict[str, bool]] = {
-        zone.id: {
-            "can_view": global_view,
-            "can_edit": global_edit,
-            "can_caldav": global_caldav,
-        }
-        for zone in zones
+    global_entry = {
+        "can_view": global_view,
+        "can_edit": global_edit,
+        "can_caldav": global_caldav,
     }
+    rights: dict[int | None, dict[str, bool]] = {
+        zone.id: dict(global_entry) for zone in zones
+    }
+    rights[None] = dict(global_entry)
     full_access = global_view and global_edit and global_caldav
     if full_access:
         return True, rights
@@ -516,16 +520,15 @@ def planner_zone_rights(
         .first()
     )
     if employee:
-        zone_ids = {zone.id for zone in zones}
         rows = (
             db.query(EmployeeWorkZone)
             .filter(EmployeeWorkZone.organization_employee_id == employee.id)
             .all()
         )
         for row in rows:
-            if row.work_zone_id not in zone_ids:
+            entry = rights.get(row.work_zone_id)
+            if entry is None:
                 continue
-            entry = rights[row.work_zone_id]
             entry["can_view"] = entry["can_view"] or bool(row.can_view)
             entry["can_edit"] = entry["can_edit"] or bool(row.can_edit)
             entry["can_caldav"] = entry["can_caldav"] or bool(row.can_caldav)

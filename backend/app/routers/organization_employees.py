@@ -41,7 +41,11 @@ from app.services.organization_employee_service import (
     update_employee_card,
 )
 from app.utils.org_access import org_has_admin_director, ADMIN_AUDIT_PERMISSION_CODE
-from app.utils.autoservice_access import AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES, require_autoservice_permission
+from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES,
+    UNASSIGNED_ZONE_NAME,
+    require_autoservice_permission,
+)
 from app.models.permission import Permission
 
 router = APIRouter(prefix="/organizations", tags=["Organization employee cards"])
@@ -281,6 +285,18 @@ def put_employee_card_permissions(
     return {"message": "Permissions assigned successfully"}
 
 
+def _employee_work_zone_view(row: EmployeeWorkZone) -> EmployeeWorkZoneView:
+    return EmployeeWorkZoneView(
+        id=row.id,
+        work_zone_id=row.work_zone_id,
+        work_zone_name=row.work_zone.name if row.work_zone else UNASSIGNED_ZONE_NAME,
+        can_view=bool(row.can_view),
+        can_edit=bool(row.can_edit),
+        can_caldav=bool(row.can_caldav),
+        created_at=row.created_at.isoformat(),
+    )
+
+
 @router.get("/{org_id}/employee-cards/{card_id}/work-zones", response_model=list[EmployeeWorkZoneView])
 def list_employee_work_zones(
     org_id: str,
@@ -292,22 +308,10 @@ def list_employee_work_zones(
     employee = get_employee_card(db, org_id, card_id)
     rows = (
         db.query(EmployeeWorkZone)
-        .join(AutoserviceWorkZone, EmployeeWorkZone.work_zone_id == AutoserviceWorkZone.id)
         .filter(EmployeeWorkZone.organization_employee_id == employee.id)
         .all()
     )
-    return [
-        EmployeeWorkZoneView(
-            id=row.id,
-            work_zone_id=row.work_zone_id,
-            work_zone_name=row.work_zone.name,
-            can_view=bool(row.can_view),
-            can_edit=bool(row.can_edit),
-            can_caldav=bool(row.can_caldav),
-            created_at=row.created_at.isoformat(),
-        )
-        for row in rows
-    ]
+    return [_employee_work_zone_view(row) for row in rows]
 
 
 @router.post("/{org_id}/employee-cards/{card_id}/work-zones", response_model=EmployeeWorkZoneView, status_code=201)
@@ -321,23 +325,27 @@ def assign_work_zone_to_employee(
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES)
     employee = get_employee_card(db, org_id, card_id)
 
-    zone = (
-        db.query(AutoserviceWorkZone)
-        .filter(
-            AutoserviceWorkZone.id == payload.work_zone_id,
-            AutoserviceWorkZone.organization_id == org_id,
-            AutoserviceWorkZone.is_active.is_(True),
+    zone_filter = EmployeeWorkZone.work_zone_id == payload.work_zone_id
+    if payload.work_zone_id is not None:
+        zone = (
+            db.query(AutoserviceWorkZone)
+            .filter(
+                AutoserviceWorkZone.id == payload.work_zone_id,
+                AutoserviceWorkZone.organization_id == org_id,
+                AutoserviceWorkZone.is_active.is_(True),
+            )
+            .first()
         )
-        .first()
-    )
-    if not zone:
-        raise HTTPException(status_code=404, detail="Рабочая зона не найдена")
+        if not zone:
+            raise HTTPException(status_code=404, detail="Рабочая зона не найдена")
+    else:
+        zone_filter = EmployeeWorkZone.work_zone_id.is_(None)
 
     existing = (
         db.query(EmployeeWorkZone)
         .filter(
             EmployeeWorkZone.organization_employee_id == employee.id,
-            EmployeeWorkZone.work_zone_id == payload.work_zone_id,
+            zone_filter,
         )
         .first()
     )
@@ -355,15 +363,7 @@ def assign_work_zone_to_employee(
     db.commit()
     db.refresh(row)
 
-    return EmployeeWorkZoneView(
-        id=row.id,
-        work_zone_id=row.work_zone_id,
-        work_zone_name=zone.name,
-        can_view=bool(row.can_view),
-        can_edit=bool(row.can_edit),
-        can_caldav=bool(row.can_caldav),
-        created_at=row.created_at.isoformat(),
-    )
+    return _employee_work_zone_view(row)
 
 
 @router.patch(
@@ -401,15 +401,7 @@ def update_employee_work_zone(
     db.commit()
     db.refresh(assignment)
 
-    return EmployeeWorkZoneView(
-        id=assignment.id,
-        work_zone_id=assignment.work_zone_id,
-        work_zone_name=assignment.work_zone.name,
-        can_view=bool(assignment.can_view),
-        can_edit=bool(assignment.can_edit),
-        can_caldav=bool(assignment.can_caldav),
-        created_at=assignment.created_at.isoformat(),
-    )
+    return _employee_work_zone_view(assignment)
 
 
 @router.delete("/{org_id}/employee-cards/{card_id}/work-zones/{assignment_id}", status_code=204)
