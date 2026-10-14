@@ -67,6 +67,38 @@ function formatMoney(value) {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function SortableDateTh({ label, column, sort, onSort, className = 'w-28' }) {
+  const active = sort.by === column;
+  return (
+    <th
+      className={`${className} ${autoserviceListThClass}`}
+      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={`inline-flex items-center gap-1 transition hover:text-ink ${
+          active ? 'text-ink' : 'text-ink-muted'
+        }`}
+      >
+        {label}
+        <svg
+          className={`h-3 w-3 shrink-0 transition-transform ${active ? 'opacity-100' : 'opacity-40'} ${
+            active && sort.dir === 'asc' ? 'rotate-180' : ''
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+    </th>
+  );
+}
+
 export default function AutoserviceOrdersPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const navigate = useNavigate();
@@ -92,6 +124,7 @@ export default function AutoserviceOrdersPage() {
       : DEFAULT_STATUS_FILTER;
   });
   const [zoneFilter, setZoneFilter] = useState([]);
+  const [sort, setSort] = useState({ by: 'scheduled_at', dir: 'desc' });
   const [workZones, setWorkZones] = useState([]);
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
@@ -121,12 +154,20 @@ export default function AutoserviceOrdersPage() {
     [statusFilter],
   );
 
+  const handleSort = useCallback((column) => {
+    setSort((prev) => (prev.by === column
+      ? { by: column, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
+      : { by: column, dir: 'desc' }));
+  }, []);
+
   const buildParams = useCallback(
     (offset) => {
       const params = new URLSearchParams({
         scope: 'all',
         limit: String(PAGE_SIZE),
         offset: String(offset),
+        sort_by: sort.by,
+        sort_dir: sort.dir,
       });
       if (qApplied.trim()) params.set('q', qApplied.trim());
       statusFilter
@@ -139,7 +180,7 @@ export default function AutoserviceOrdersPage() {
       }
       return params;
     },
-    [qApplied, statusFilter, dateFrom, dateTo, zoneFilter],
+    [qApplied, statusFilter, dateFrom, dateTo, zoneFilter, sort],
   );
 
   const load = useCallback(async ({ silent = false } = {}) => {
@@ -512,7 +553,21 @@ export default function AutoserviceOrdersPage() {
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-28 ${autoserviceListThClass}`}>Заказ</th>
               {!viewDrafts ? (
-                <th className={`w-28 ${autoserviceListThClass}`}>Дата</th>
+                <>
+                  <SortableDateTh
+                    label="Дата начала"
+                    column="scheduled_at"
+                    sort={sort}
+                    onSort={handleSort}
+                  />
+                  <SortableDateTh
+                    label="Дата окончания"
+                    column="scheduled_end_at"
+                    sort={sort}
+                    onSort={handleSort}
+                    className="w-32"
+                  />
+                </>
               ) : null}
               <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
@@ -526,7 +581,10 @@ export default function AutoserviceOrdersPage() {
                 <tr key={`sk-${i}`}>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
                   {!viewDrafts ? (
-                    <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                    <>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                    </>
                   ) : null}
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-28" /></td>
@@ -601,7 +659,7 @@ export default function AutoserviceOrdersPage() {
               )
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-ink-muted">
+                <td colSpan={7} className="py-12 text-center text-ink-muted">
                   {emptyMessage}
                 </td>
               </tr>
@@ -622,6 +680,11 @@ export default function AutoserviceOrdersPage() {
                   </td>
                   <td className={autoserviceListTdClass}>
                     <span className="tabular-nums text-ink-muted">{formatServerDate(row.scheduled_at)}</span>
+                  </td>
+                  <td className={autoserviceListTdClass}>
+                    <span className="tabular-nums text-ink-muted">
+                      {row.scheduled_end_at ? formatServerDate(row.scheduled_end_at) : '—'}
+                    </span>
                   </td>
                   <td className={`${autoserviceListTdClass} font-semibold text-ink`}>{vehicleMakeModelLabel(row.vehicle)}</td>
                   <td className={autoserviceListTdClass}>

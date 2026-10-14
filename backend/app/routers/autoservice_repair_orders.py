@@ -1514,6 +1514,8 @@ def list_repair_orders(
     date_to: date | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    sort_by: str = Query("scheduled_at", pattern="^(scheduled_at|scheduled_end_at)$"),
+    sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -1584,8 +1586,14 @@ def list_repair_orders(
         query = query.filter(func.date(RepairOrder.scheduled_at) <= date_to)
     query = _apply_search_filter(query, q)
     total = query.order_by(None).count()
+    sort_column = (
+        RepairOrder.scheduled_end_at
+        if sort_by == "scheduled_end_at"
+        else RepairOrder.scheduled_at
+    )
+    direction = sort_column.desc() if sort_dir == "desc" else sort_column.asc()
     rows = (
-        query.order_by(RepairOrder.scheduled_at.desc(), RepairOrder.id.desc())
+        query.order_by(direction.nulls_last(), RepairOrder.id.desc())
         .offset(offset)
         .limit(limit)
         .all()

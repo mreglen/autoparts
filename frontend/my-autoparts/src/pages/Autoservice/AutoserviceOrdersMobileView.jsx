@@ -68,6 +68,7 @@ function OrderMobileRow({
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
   const when = formatServerDate(row.scheduled_at);
+  const until = row.scheduled_end_at ? formatServerDate(row.scheduled_end_at) : '';
 
   return (
     <div className={`py-3 ${statusOpen ? 'relative z-30' : ''}`}>
@@ -80,7 +81,9 @@ function OrderMobileRow({
           <p className="mt-0.5 truncate text-sm text-gray-800">{row.client?.name || '—'}</p>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1 self-center">
-          <span className="text-xs tabular-nums text-gray-500">{when}</span>
+          <span className="text-xs tabular-nums text-gray-500">
+            {when}{until ? ` → ${until}` : ''}
+          </span>
           <RepairOrderStatusPicker
             status={row.status}
             options={statusActions}
