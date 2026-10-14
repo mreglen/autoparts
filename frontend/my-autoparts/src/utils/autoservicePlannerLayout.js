@@ -34,11 +34,9 @@ export function plannerItemEndDate(item, now = new Date()) {
   if (!item || item.kind === 'inspection') return null;
   const start = parseWallClockDate(item.scheduled_at);
   const end = parseWallClockDate(item.scheduled_end_at);
-  if (item.status === 'in_progress') {
-    return end && end > now ? end : now;
-  }
-  if (end && (!start || end > start)) return end;
-  return null;
+  const valid = Boolean(end) && (!start || end > start);
+  if (item.status === 'in_progress') return valid ? end : now;
+  return valid ? end : null;
 }
 
 export function plannerItemCoversDay(item, isoDate, now = new Date()) {
