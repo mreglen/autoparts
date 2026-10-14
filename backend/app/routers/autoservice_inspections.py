@@ -15,6 +15,11 @@ from app.models.user import User
 from app.schemas.sms import SmsSendResult
 from app.services.sms_gateway import send_sms
 from app.services.autoservice_caldav import request_org_sync
+from app.services.autoservice_audit import (
+    booking_status_label,
+    inspection_booking_label,
+    log_autoservice,
+)
 from app.schemas.inspection_booking import (
     InspectionBookingClientCreate,
     InspectionBookingPatch,
@@ -161,6 +166,16 @@ def create_public_inspection_booking(
     notify_new_inspection_booking(db, row)
     notify_inspection_booking_client(db, row, "accepted")
     request_org_sync(org_id)
+    log_autoservice(
+        db,
+        event_type="inspection_booking_created",
+        summary=f"Заявка на осмотр с сайта: {inspection_booking_label(row)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="inspection_booking",
+        entity_id=row.id,
+        details={"source": "site", "status": row.status, "phone": row.phone},
+    )
     return _booking_to_view(row)
 
 
@@ -255,6 +270,16 @@ def create_client_inspection_booking(
     notify_new_inspection_booking(db, row)
     notify_inspection_booking_client(db, row, "accepted")
     request_org_sync(row.organization_id)
+    log_autoservice(
+        db,
+        event_type="inspection_booking_created",
+        summary=f"Заявка на осмотр от клиента: {inspection_booking_label(row)}",
+        user=current_user,
+        organization_id=row.organization_id,
+        entity_type="inspection_booking",
+        entity_id=row.id,
+        details={"source": "client", "status": row.status, "phone": row.phone},
+    )
     return _booking_to_view(row)
 
 
@@ -421,6 +446,16 @@ def _create_staff_inspection_booking(
     if row.status == "confirmed":
         notify_inspection_booking_client(db, row, "confirmed")
     request_org_sync(row.organization_id)
+    log_autoservice(
+        db,
+        event_type="inspection_booking_created",
+        summary=f"Создана запись на осмотр: {inspection_booking_label(row)}",
+        user=current_user,
+        organization_id=row.organization_id,
+        entity_type="inspection_booking",
+        entity_id=row.id,
+        details={"source": "staff", "status": row.status, "phone": row.phone},
+    )
     return _booking_to_view(row)
 
 
@@ -572,6 +607,26 @@ def patch_inspection_booking(
     elif row.status == "cancelled" and previous_status != "cancelled":
         notify_inspection_booking_client(db, row, "cancelled")
     request_org_sync(row.organization_id)
+    status_changed = row.status != previous_status
+    log_autoservice(
+        db,
+        event_type="inspection_booking_status_changed" if status_changed else "inspection_booking_updated",
+        summary=(
+            f"Статус записи на осмотр {inspection_booking_label(row)}: "
+            f"{booking_status_label(previous_status)} → {booking_status_label(row.status)}"
+            if status_changed
+            else f"Изменена запись на осмотр: {inspection_booking_label(row)}"
+        ),
+        user=current_user,
+        organization_id=org_id,
+        entity_type="inspection_booking",
+        entity_id=row.id,
+        details={
+            "changed_fields": sorted(data),
+            "status": row.status,
+            "previous_status": previous_status,
+        },
+    )
     return _booking_to_view(row)
 
 
@@ -627,6 +682,16 @@ def cancel_my_inspection_booking(
     db.refresh(row)
     notify_booking_cancelled_by_client(db, row)
     request_org_sync(row.organization_id)
+    log_autoservice(
+        db,
+        event_type="inspection_booking_status_changed",
+        summary=f"Клиент отменил запись на осмотр: {inspection_booking_label(row)}",
+        user=current_user,
+        organization_id=row.organization_id,
+        entity_type="inspection_booking",
+        entity_id=row.id,
+        details={"status": row.status, "by": "client"},
+    )
     return _booking_to_view(row)
 
 
@@ -654,9 +719,21 @@ def delete_inspection_booking(
             detail="Заявка не найдена",
         )
     org_id_for_sync = row.organization_id
+    label = inspection_booking_label(row)
+    booking_status = row.status
     db.delete(row)
     db.commit()
     request_org_sync(org_id_for_sync)
+    log_autoservice(
+        db,
+        event_type="inspection_booking_deleted",
+        summary=f"Удалена запись на осмотр: {label}",
+        user=current_user,
+        organization_id=org_id_for_sync,
+        entity_type="inspection_booking",
+        entity_id=booking_id,
+        details={"status": booking_status},
+    )
 
 
 @router.post(
@@ -707,6 +784,16 @@ def send_inspection_booking_sms(
         user_id=current_user.id,
     )
     db.commit()
+    log_autoservice(
+        db,
+        event_type="inspection_booking_sms_sent",
+        summary=f"SMS по записи на осмотр {inspection_booking_label(row)}: {row.phone} ({message.status})",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="inspection_booking",
+        entity_id=row.id,
+        details={"phone": row.phone, "status": message.status, "cost": str(message.cost)},
+    )
     return SmsSendResult(
         status=message.status,
         cost=message.cost,

@@ -44,6 +44,11 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseReturnView,
     PurchaseWarehouseImportIn,
 )
+from app.services.autoservice_audit import (
+    log_autoservice,
+    receipt_doc_label,
+    warehouse_item_label,
+)
 from app.services.autoservice_warehouse_service import (
     autoservice_item_available_qty,
     create_autoservice_expense,
@@ -286,6 +291,20 @@ def create_autoservice_warehouse_return(
             order_id=row.source_order_id,
             reason_label=RETURN_REASON_LABELS.get(row.reason, row.reason),
         )
+    log_autoservice(
+        db,
+        event_type="warehouse_return_created",
+        summary=f"Оформлен возврат на склад: {warehouse_item_label(row.item)} ×{row.quantity}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_return",
+        entity_id=row.id,
+        details={
+            "receipt_id": row.receipt_id,
+            "quantity": row.quantity,
+            "reason": RETURN_REASON_LABELS.get(row.reason, row.reason),
+        },
+    )
     return serialize_warehouse_return(row)
 
 
@@ -326,6 +345,16 @@ def update_own_autoservice_warehouse_return(
         new_status=payload.status_code,
         seller_note=payload.seller_note,
         buyer_org_id=org_id,
+    )
+    log_autoservice(
+        db,
+        event_type="warehouse_return_status_changed",
+        summary=f"Отменён возврат на склад: {warehouse_item_label(row.item)} ×{row.quantity}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_return",
+        entity_id=row.id,
+        details={"status": row.status_code},
     )
     return serialize_warehouse_return(row)
 
@@ -631,6 +660,16 @@ def patch_autoservice_warehouse_item(
         unit_price=payload.unit_price,
     )
     db.commit()
+    log_autoservice(
+        db,
+        event_type="warehouse_item_updated",
+        summary=f"Изменена позиция склада: {warehouse_item_label(item)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_item",
+        entity_id=item.id,
+        details={"unit_price": str(item.unit_price), "changed_fields": sorted(payload.model_fields_set)},
+    )
     return _item_view(item)
 
 
@@ -835,6 +874,16 @@ def update_autoservice_warehouse_receipt_doc(
     )
     db.commit()
     doc = _load_receipt_doc_detail(db, org_id=org_id, doc_id=doc_id)
+    log_autoservice(
+        db,
+        event_type="warehouse_receipt_updated",
+        summary=f"Изменён документ поступления {receipt_doc_label(doc)}: дата {payload.doc_date}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_receipt_doc",
+        entity_id=doc_id,
+        details={"doc_date": str(payload.doc_date)},
+    )
     return _doc_detail_view(db, doc)
 
 
@@ -848,8 +897,26 @@ def delete_autoservice_warehouse_receipt_doc(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    doc = (
+        db.query(AutoserviceWarehouseReceiptDoc)
+        .filter(
+            AutoserviceWarehouseReceiptDoc.id == doc_id,
+            AutoserviceWarehouseReceiptDoc.organization_id == org_id,
+        )
+        .first()
+    )
+    label = receipt_doc_label(doc) if doc else f"id {doc_id}"
     delete_receipt_document(db, org_id=org_id, doc_id=doc_id)
     db.commit()
+    log_autoservice(
+        db,
+        event_type="warehouse_receipt_deleted",
+        summary=f"Удалён документ поступления {label}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_receipt_doc",
+        entity_id=doc_id,
+    )
 
 
 @router.patch(
@@ -897,6 +964,16 @@ def update_autoservice_warehouse_receipt_line(
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Документ поступления не найден")
+    log_autoservice(
+        db,
+        event_type="warehouse_receipt_line_updated",
+        summary=f"Изменена строка поступления {receipt_doc_label(doc)}: {payload.name} ×{payload.quantity}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_receipt",
+        entity_id=line_id,
+        details={"quantity": str(payload.quantity), "unit_price": str(payload.unit_price)},
+    )
     return _doc_detail_view(db, doc)
 
 
@@ -947,6 +1024,16 @@ def update_autoservice_warehouse_receipt_line_price(
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Документ поступления не найден")
+    log_autoservice(
+        db,
+        event_type="warehouse_receipt_line_prices_updated",
+        summary=f"Изменены цены строки поступления {receipt_doc_label(doc)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_receipt",
+        entity_id=line_id,
+        details=payload.model_dump(mode="json"),
+    )
     return _doc_detail_view(db, doc)
 
 
@@ -1068,8 +1155,27 @@ def delete_autoservice_warehouse_expense(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    expense = (
+        db.query(AutoserviceWarehouseExpense)
+        .options(joinedload(AutoserviceWarehouseExpense.item))
+        .filter(
+            AutoserviceWarehouseExpense.id == expense_id,
+            AutoserviceWarehouseExpense.organization_id == org_id,
+        )
+        .first()
+    )
+    item_label = warehouse_item_label(expense.item) if expense else f"id {expense_id}"
     delete_autoservice_expense(db, org_id=org_id, expense_id=expense_id)
     db.commit()
+    log_autoservice(
+        db,
+        event_type="warehouse_expense_deleted",
+        summary=f"Удалён расход со склада: {item_label}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_expense",
+        entity_id=expense_id,
+    )
 
 
 @router.post(
@@ -1089,6 +1195,15 @@ def import_purchases_to_autoservice_warehouse(
         groups=payload.groups,
     )
     db.commit()
+    log_autoservice(
+        db,
+        event_type="warehouse_import_from_purchases",
+        summary=f"Склад пополнен из закупок: добавлено {added}, пропущено {skipped}, не найдено {not_found}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse",
+        details={"added": added, "skipped": skipped, "not_found": not_found},
+    )
     return AutoserviceWarehouseImportResult(
         added_items=added,
         skipped_items=skipped,
@@ -1155,6 +1270,19 @@ def create_autoservice_warehouse_receipt(
     )
     if not doc:
         raise HTTPException(status_code=500, detail="Документ поступления не найден")
+    log_autoservice(
+        db,
+        event_type="warehouse_receipt_created",
+        summary=(
+            f"Создано поступление {receipt_doc_label(doc)}: "
+            f"{warehouse_item_label(receipt.item)} ×{receipt.quantity}"
+        ),
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_receipt_doc",
+        entity_id=doc.id,
+        details={"quantity": receipt.quantity, "unit_price": str(receipt.unit_price)},
+    )
     return _doc_detail_view(db, doc)
 
 
@@ -1179,6 +1307,16 @@ def create_autoservice_warehouse_expense(
     db.commit()
     db.refresh(expense)
     item = expense.item or db.query(AutoserviceWarehouseItem).get(expense.item_id)
+    log_autoservice(
+        db,
+        event_type="warehouse_expense_created",
+        summary=f"Списано со склада: {warehouse_item_label(item)} ×{int(expense.quantity or 0)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_warehouse_expense",
+        entity_id=expense.id,
+        details={"quantity": int(expense.quantity or 0), "reason": expense.reason},
+    )
     return AutoserviceWarehouseExpenseView(
         id=expense.id,
         item_id=expense.item_id,

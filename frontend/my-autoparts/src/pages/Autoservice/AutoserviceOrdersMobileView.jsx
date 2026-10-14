@@ -120,6 +120,7 @@ export default function AutoserviceOrdersMobileView({
   statusSavingId,
   onView,
   drafts,
+  draftsOnly = false,
   onDraftOpen,
   dateFrom = '',
   dateTo = '',
@@ -134,7 +135,9 @@ export default function AutoserviceOrdersMobileView({
   filtersActive = false,
   onResetFilters,
 }) {
-  const isDrafts = Array.isArray(drafts);
+  const showDrafts = Array.isArray(drafts);
+  const showOrders = !draftsOnly;
+  const noResults = (showDrafts ? drafts.length === 0 : true) && (showOrders ? rows.length === 0 : true);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   return (
@@ -245,37 +248,39 @@ export default function AutoserviceOrdersMobileView({
               </div>
             ))}
           </div>
-        ) : isDrafts ? (
-          drafts.length === 0 ? (
-            <p className="py-10 text-center text-sm text-gray-500">{emptyMessage}</p>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {drafts.map((draft) => (
-                <DraftMobileRow
-                  key={draft.key}
-                  draft={draft}
-                  onOpen={() => onDraftOpen?.(draft)}
-                />
-              ))}
-            </div>
-          )
-        ) : rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">{emptyMessage}</p>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {rows.map((row) => (
-              <OrderMobileRow
-                key={row.id}
-                row={row}
-                statusActions={statusActions}
-                onStatusChange={onStatusChange}
-                statusSavingId={statusSavingId}
-                onView={() => onView(row)}
-              />
-            ))}
-          </div>
+          <>
+            {showDrafts && drafts.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {drafts.map((draft) => (
+                  <DraftMobileRow
+                    key={draft.key}
+                    draft={draft}
+                    onOpen={() => onDraftOpen?.(draft)}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {showOrders && rows.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {rows.map((row) => (
+                  <OrderMobileRow
+                    key={row.id}
+                    row={row}
+                    statusActions={statusActions}
+                    onStatusChange={onStatusChange}
+                    statusSavingId={statusSavingId}
+                    onView={() => onView(row)}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {noResults ? (
+              <p className="py-10 text-center text-sm text-gray-500">{emptyMessage}</p>
+            ) : null}
+          </>
         )}
-        {!loading && !isDrafts && hasMore ? (
+        {!loading && showOrders && hasMore ? (
           <div ref={sentinelRef} className="flex justify-center py-3" aria-hidden="true">
             {loadingMore ? <Skeleton className="h-4 w-40" /> : null}
           </div>

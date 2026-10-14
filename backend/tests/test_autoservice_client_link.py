@@ -133,7 +133,7 @@ class LinkAccountEndpointTests(unittest.TestCase):
         ), patch(
             "app.routers.autoservice_clients._get_org_client_or_404",
             return_value=client,
-        ):
+        ), patch("app.routers.autoservice_clients.log_autoservice"):
             return link_autoservice_client_account(
                 client.id, payload, db=db, current_user=MagicMock()
             )

@@ -4,10 +4,12 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
+from app.models.autoservice_payment import AutoservicePayment
+from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_finance import (
     AutoserviceFinanceReceiptRow,
@@ -28,6 +30,7 @@ from app.schemas.autoservice_warehouse import (
     WarehouseStockReportSummary,
 )
 from app.services.autoservice_finance_receipts_xlsx import build_finance_receipts_workbook_bytes
+from app.services.autoservice_audit import log_autoservice, repair_order_label
 from app.services.autoservice_order_economics import (
     OrderEconomicsFilters,
     build_order_economics_report,
@@ -54,6 +57,24 @@ from app.utils.autoservice_access import (
 )
 
 router = APIRouter(tags=["Autoservice finance"])
+
+
+def _log_report_export(
+    db: Session,
+    current_user: User,
+    org_id: str,
+    report: str,
+    period: str,
+) -> None:
+    log_autoservice(
+        db,
+        event_type="autoservice_report_exported",
+        summary=f"Экспорт отчёта «{report}» ({period})",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_report",
+        details={"report": report, "period": period},
+    )
 
 
 @router.get(
@@ -93,6 +114,19 @@ def patch_autoservice_finance_receipt_date(
         paid_at=payload.paid_at,
     )
     db.commit()
+    log_autoservice(
+        db,
+        event_type="finance_payment_date_changed",
+        summary=(
+            f"Изменена дата поступления №{row.sequential_number} "
+            f"({row.amount} ₽) по заказ-наряду №{row.repair_order_number}: {payload.paid_at}"
+        ),
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_payment",
+        entity_id=row.id,
+        details={"paid_at": str(payload.paid_at), "amount": str(row.amount)},
+    )
     return row
 
 
@@ -106,10 +140,35 @@ def delete_autoservice_finance_receipt(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_FINANCE)
+    payment = (
+        db.query(AutoservicePayment)
+        .options(joinedload(AutoservicePayment.order).joinedload(RepairOrder.client))
+        .filter(
+            AutoservicePayment.id == payment_id,
+            AutoservicePayment.organization_id == org_id,
+        )
+        .first()
+    )
+    label = (
+        f"№{payment.sequential_number} ({payment.amount} ₽)"
+        if payment
+        else f"id {payment_id}"
+    )
+    order_label = repair_order_label(payment.order) if payment and payment.order else ""
     delete_autoservice_payment(
         db, org_id=org_id, payment_id=payment_id, user_id=current_user.id
     )
     db.commit()
+    log_autoservice(
+        db,
+        event_type="finance_payment_cancelled",
+        summary=f"Отменено поступление {label}"
+        + (f" по заказ-наряду {order_label}" if order_label else ""),
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_payment",
+        entity_id=payment_id,
+    )
 
 
 @router.get("/autoservice/finance/receipts.xlsx")
@@ -126,6 +185,9 @@ def export_autoservice_finance_receipts_xlsx(
         AUTOSERVICE_PERMISSION_REPORTS,
     )
     content = build_finance_receipts_workbook_bytes(db, org_id, date_from, date_to)
+    _log_report_export(
+        db, current_user, org_id, "Поступления", f"{date_from.isoformat()}—{date_to.isoformat()}"
+    )
     filename = f"autoservice_payments_{date_from.isoformat()}_{date_to.isoformat()}.xlsx"
     return Response(
         content=content,
@@ -163,6 +225,7 @@ def export_autoservice_payroll_report_xlsx(
 ):
     org_id = require_autoservice_director(db, current_user)
     content = build_payroll_report_workbook_bytes(db, org_id, year, month)
+    _log_report_export(db, current_user, org_id, "Зарплата", f"{year}-{month:02d}")
     filename = f"payroll_{year}_{month:02d}.xlsx"
     return Response(
         content=content,
@@ -220,6 +283,13 @@ def export_autoservice_order_economics_xlsx(
         q=q,
     )
     content = build_order_economics_workbook_bytes(db, org_id, filters)
+    _log_report_export(
+        db,
+        current_user,
+        org_id,
+        "Экономика заказ-нарядов",
+        f"{date_from.isoformat()}—{date_to.isoformat()}",
+    )
     filename = f"order_economics_{date_from.isoformat()}_{date_to.isoformat()}.xlsx"
     return Response(
         content=content,
@@ -275,6 +345,7 @@ def export_autoservice_warehouse_stock_xlsx(
         hide_zero=hide_zero,
     )
     content = build_warehouse_stock_workbook_bytes(db, org_id, filters)
+    _log_report_export(db, current_user, org_id, "Остатки склада", f"{year}-{month:02d}")
     filename = f"warehouse_stock_{year}_{month:02d}.xlsx"
     return Response(
         content=content,
@@ -316,6 +387,13 @@ def export_autoservice_rossko_sales_xlsx(
     org_id = require_rossko_sales_report_access(db, current_user)
     filters = RosskoSalesReportFilters(date_from=date_from, date_to=date_to, q=q)
     content = build_rossko_sales_workbook_bytes(db, org_id, filters)
+    _log_report_export(
+        db,
+        current_user,
+        org_id,
+        "Продажи Rossko",
+        f"{date_from.isoformat()}—{date_to.isoformat()}",
+    )
     filename = f"rossko_sales_{date_from.isoformat()}_{date_to.isoformat()}.xlsx"
     return Response(
         content=content,

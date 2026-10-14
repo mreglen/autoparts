@@ -43,7 +43,7 @@ class StaffBookingCreateTests(unittest.TestCase):
             f"{MOD}.notify_inspection_booking_client"
         ) as notify, patch(
             f"{MOD}._booking_to_view", side_effect=lambda r: r
-        ):
+        ), patch(f"{MOD}.log_autoservice"):
             row = inspections_router._create_staff_inspection_booking(
                 _payload(), db, user, "ORG1"
             )
@@ -111,7 +111,7 @@ class PatchConfirmGuardTests(unittest.TestCase):
             f"{MOD}.has_autoservice_permission", return_value=can_confirm
         ), patch(
             f"{MOD}._booking_to_view", side_effect=lambda r: r
-        ), patch(f"{MOD}.notify_inspection_booking_client"):
+        ), patch(f"{MOD}.notify_inspection_booking_client"), patch(f"{MOD}.log_autoservice"):
             return inspections_router.patch_inspection_booking(
                 booking_id=10,
                 payload=InspectionBookingPatch(status="confirmed"),

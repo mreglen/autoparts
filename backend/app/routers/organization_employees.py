@@ -41,6 +41,11 @@ from app.services.organization_employee_service import (
     update_employee_card,
 )
 from app.utils.org_access import org_has_admin_director, ADMIN_AUDIT_PERMISSION_CODE
+from app.services.autoservice_audit import (
+    employee_label,
+    log_autoservice,
+    zone_rights_label,
+)
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS_ASSIGN_ZONES,
     UNASSIGNED_ZONE_NAME,
@@ -362,6 +367,25 @@ def assign_work_zone_to_employee(
     db.add(row)
     db.commit()
     db.refresh(row)
+    log_autoservice(
+        db,
+        event_type="autoservice_employee_work_zone_assigned",
+        summary=(
+            f"Сотруднику {employee_label(employee)} назначена зона "
+            f"«{row.work_zone.name if row.work_zone else UNASSIGNED_ZONE_NAME}» ({zone_rights_label(row)})"
+        ),
+        user=current_user,
+        organization_id=org_id,
+        entity_type="employee_work_zone",
+        entity_id=row.id,
+        details={
+            "employee_card_id": card_id,
+            "work_zone_id": row.work_zone_id,
+            "can_view": row.can_view,
+            "can_edit": row.can_edit,
+            "can_caldav": row.can_caldav,
+        },
+    )
 
     return _employee_work_zone_view(row)
 
@@ -400,6 +424,25 @@ def update_employee_work_zone(
         assignment.can_caldav = payload.can_caldav
     db.commit()
     db.refresh(assignment)
+    log_autoservice(
+        db,
+        event_type="autoservice_employee_work_zone_rights_updated",
+        summary=(
+            f"Права по зоне «{assignment.work_zone.name if assignment.work_zone else UNASSIGNED_ZONE_NAME}» "
+            f"для {employee_label(employee)}: {zone_rights_label(assignment)}"
+        ),
+        user=current_user,
+        organization_id=org_id,
+        entity_type="employee_work_zone",
+        entity_id=assignment.id,
+        details={
+            "employee_card_id": card_id,
+            "work_zone_id": assignment.work_zone_id,
+            "can_view": assignment.can_view,
+            "can_edit": assignment.can_edit,
+            "can_caldav": assignment.can_caldav,
+        },
+    )
 
     return _employee_work_zone_view(assignment)
 
@@ -426,6 +469,20 @@ def remove_work_zone_from_employee(
     if not assignment:
         raise HTTPException(status_code=404, detail="Назначение не найдено")
 
+    zone_name = assignment.work_zone.name if assignment.work_zone else UNASSIGNED_ZONE_NAME
+    work_zone_id = assignment.work_zone_id
     db.delete(assignment)
     db.commit()
+    log_autoservice(
+        db,
+        event_type="autoservice_employee_work_zone_removed",
+        summary=(
+            f"У {employee_label(employee)} снята зона «{zone_name}»"
+        ),
+        user=current_user,
+        organization_id=org_id,
+        entity_type="employee_work_zone",
+        entity_id=assignment_id,
+        details={"employee_card_id": card_id, "work_zone_id": work_zone_id},
+    )
 

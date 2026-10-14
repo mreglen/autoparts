@@ -138,21 +138,7 @@ export default function AutoserviceOrdersPage() {
   const sentinelRef = useRef(null);
 
   const viewDrafts = statusFilter.includes(DRAFT_STATUS);
-
-  const handleStatusFilterChange = useCallback(
-    (next) => {
-      if (!next.includes(DRAFT_STATUS)) {
-        setStatusFilter(next);
-        return;
-      }
-      setStatusFilter(
-        statusFilter.includes(DRAFT_STATUS)
-          ? next.filter((value) => value !== DRAFT_STATUS)
-          : [DRAFT_STATUS],
-      );
-    },
-    [statusFilter],
-  );
+  const draftOnly = viewDrafts && statusFilter.length === 1;
 
   const handleSort = useCallback((column) => {
     setSort((prev) => (prev.by === column
@@ -184,7 +170,7 @@ export default function AutoserviceOrdersPage() {
   );
 
   const load = useCallback(async ({ silent = false } = {}) => {
-    if (viewDrafts) {
+    if (draftOnly) {
       setRows([]);
       setTotal(0);
       setHasMore(false);
@@ -211,10 +197,10 @@ export default function AutoserviceOrdersPage() {
     } finally {
       if (seq === loadSeqRef.current && !silent) setLoading(false);
     }
-  }, [viewDrafts, buildParams]);
+  }, [draftOnly, buildParams]);
 
   const loadMore = useCallback(async () => {
-    if (viewDrafts || loading || loadingMore || !hasMore) return;
+    if (draftOnly || loading || loadingMore || !hasMore) return;
     const seq = loadSeqRef.current;
     setLoadingMore(true);
     try {
@@ -235,11 +221,11 @@ export default function AutoserviceOrdersPage() {
     } finally {
       if (seq === loadSeqRef.current) setLoadingMore(false);
     }
-  }, [viewDrafts, loading, loadingMore, hasMore, buildParams]);
+  }, [draftOnly, loading, loadingMore, hasMore, buildParams]);
 
   useEffect(() => {
     const node = sentinelRef.current;
-    if (!node || viewDrafts || !hasMore) return undefined;
+    if (!node || draftOnly || !hasMore) return undefined;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) loadMore();
@@ -248,15 +234,15 @@ export default function AutoserviceOrdersPage() {
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, viewDrafts]);
+  }, [hasMore, loadMore, draftOnly]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
-    const statusKey = viewDrafts ? 'drafts' : statusFilter.join(',');
+    const statusKey = statusFilter.join(',');
     const silent = prevStatusKeyRef.current === statusKey;
     prevStatusKeyRef.current = statusKey;
     load({ silent });
-  }, [isReady, isAuthenticated, load, statusFilter, viewDrafts, qApplied]);
+  }, [isReady, isAuthenticated, load, statusFilter, qApplied]);
 
   useEffect(() => {
     const onPullRefresh = (event) => {
@@ -397,13 +383,19 @@ export default function AutoserviceOrdersPage() {
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated || !user) return null;
 
-  const pageTitle = viewDrafts ? 'Черновики' : 'Заказ-наряды';
+  const pageTitle = draftOnly ? 'Черновики' : 'Заказ-наряды';
   const pageSubtitle = loading
     ? 'Загрузка…'
-    : viewDrafts
+    : draftOnly
       ? `${drafts.length} черновиков`
-      : `${total} заказ-нарядов`;
-  const emptyMessage = viewDrafts ? 'Черновиков пока нет' : 'Заказ-нарядов нет';
+      : viewDrafts
+        ? `${total} заказ-нарядов · ${drafts.length} черновиков`
+        : `${total} заказ-нарядов`;
+  const emptyMessage = draftOnly
+    ? 'Черновиков пока нет'
+    : viewDrafts
+      ? 'Ничего не найдено'
+      : 'Заказ-нарядов нет';
   const filtersActive =
     Boolean(dateFrom || dateTo) || zoneFilter.length > 0 || !isDefaultStatusFilter(statusFilter);
   const resetFilters = () => {
@@ -433,6 +425,7 @@ export default function AutoserviceOrdersPage() {
           statusSavingId={statusSavingId}
           onView={setViewOrder}
           drafts={viewDrafts ? filteredDrafts : undefined}
+          draftsOnly={draftOnly}
           onDraftOpen={openDraft}
           dateFrom={dateFrom}
           dateTo={dateTo}
@@ -440,7 +433,7 @@ export default function AutoserviceOrdersPage() {
           onDateToChange={setDateTo}
           statusOptions={STATUS_OPTIONS}
           statusFilter={statusFilter}
-          onStatusFilterChange={handleStatusFilterChange}
+          onStatusFilterChange={setStatusFilter}
           workZones={workZones}
           zoneFilter={zoneFilter}
           onZoneFilterChange={setZoneFilter}
@@ -518,7 +511,7 @@ export default function AutoserviceOrdersPage() {
               <span className="mb-1.5 block text-xs font-medium text-ink-muted">Статус</span>
               <PillMultiSelect
                 values={statusFilter}
-                onChange={handleStatusFilterChange}
+                onChange={setStatusFilter}
                 options={STATUS_OPTIONS}
                 placeholder="Все статусы"
                 ariaLabel="Фильтр по статусу"
@@ -552,7 +545,7 @@ export default function AutoserviceOrdersPage() {
           <thead>
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-28 ${autoserviceListThClass}`}>Заказ</th>
-              {!viewDrafts ? (
+              {!draftOnly ? (
                 <>
                   <SortableDateTh
                     label="Дата начала"
@@ -580,7 +573,7 @@ export default function AutoserviceOrdersPage() {
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={`sk-${i}`}>
                   <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
-                  {!viewDrafts ? (
+                  {!draftOnly ? (
                     <>
                       <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
                       <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
@@ -592,15 +585,9 @@ export default function AutoserviceOrdersPage() {
                   <td className={autoserviceListTdClass}><Skeleton className="h-6 w-20 rounded-full" /></td>
                 </tr>
               ))
-            ) : viewDrafts ? (
-              filteredDrafts.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-12 text-center text-ink-muted">
-                    {emptyMessage}
-                  </td>
-                </tr>
-              ) : (
-                filteredDrafts.map((draft) => {
+            ) : (
+              <>
+                {viewDrafts ? filteredDrafts.map((draft) => {
                   const form = draft.form || {};
                   const clientName = form.clientName || form.pendingClientName || '—';
                   const vehicleName = form.vehicleName
@@ -620,6 +607,20 @@ export default function AutoserviceOrdersPage() {
                           {draft.mode === 'create' ? 'Новый' : `№ ${draft.orderId}`}
                         </span>
                       </td>
+                      {!draftOnly ? (
+                        <>
+                          <td className={autoserviceListTdClass}>
+                            <span className="tabular-nums text-ink-muted">
+                              {form.scheduledAt ? formatServerDate(form.scheduledAt) : '—'}
+                            </span>
+                          </td>
+                          <td className={autoserviceListTdClass}>
+                            <span className="tabular-nums text-ink-muted">
+                              {form.scheduledEndAt ? formatServerDate(form.scheduledEndAt) : '—'}
+                            </span>
+                          </td>
+                        </>
+                      ) : null}
                       <td className={`${autoserviceListTdClass} font-semibold text-ink`}>
                         {vehicleName}
                       </td>
@@ -633,81 +634,82 @@ export default function AutoserviceOrdersPage() {
                           {draftTotal != null ? `${formatMoney(draftTotal)} ₽` : '—'}
                         </span>
                       </td>
+                      <td className={autoserviceListTdClass}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                            Черновик
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirmDraft(draft);
+                            }}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                            title="Удалить черновик"
+                            aria-label="Удалить черновик"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3m-9 0h10" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }) : null}
+                {!draftOnly ? rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className={autoserviceListTrClickableClass}
+                    onClick={(e) => {
+                      if (e.target.closest('.actions-dropdown') || e.target.closest('.status-picker')) {
+                        return;
+                      }
+                      setViewOrder(row);
+                    }}
+                  >
                     <td className={autoserviceListTdClass}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                          Черновик
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirmDraft(draft);
-                          }}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-red-50 hover:text-red-600"
-                          title="Удалить черновик"
-                          aria-label="Удалить черновик"
-                        >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3m-9 0h10" />
-                          </svg>
-                        </button>
-                      </div>
+                      <span className="font-medium tabular-nums text-ink-muted">{repairOrderNumberLabel(row)}</span>
+                    </td>
+                    <td className={autoserviceListTdClass}>
+                      <span className="tabular-nums text-ink-muted">{formatServerDate(row.scheduled_at)}</span>
+                    </td>
+                    <td className={autoserviceListTdClass}>
+                      <span className="tabular-nums text-ink-muted">
+                        {row.scheduled_end_at ? formatServerDate(row.scheduled_end_at) : '—'}
+                      </span>
+                    </td>
+                    <td className={`${autoserviceListTdClass} font-semibold text-ink`}>{vehicleMakeModelLabel(row.vehicle)}</td>
+                    <td className={autoserviceListTdClass}>
+                      <div className="font-semibold text-ink">{row.client?.name || '—'}</div>
+                    </td>
+                    <td className={autoserviceListTdClass}>
+                      <div className="tabular-nums font-semibold text-ink">{formatMoney(row.grand_total)} ₽</div>
+                    </td>
+                    <td className={`${autoserviceListTdClass} [&_span]:ring-0`}>
+                      <RepairOrderStatusPicker
+                        status={row.status}
+                        options={STATUS_ACTIONS}
+                        saving={statusSavingId === row.id}
+                        disabled={statusSavingId === row.id}
+                        onChange={(nextStatus) => handleStatus(row.id, nextStatus)}
+                      />
                     </td>
                   </tr>
-                )})
-              )
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="py-12 text-center text-ink-muted">
-                  {emptyMessage}
-                </td>
-              </tr>
-            ) : (
-              rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className={autoserviceListTrClickableClass}
-                  onClick={(e) => {
-                    if (e.target.closest('.actions-dropdown') || e.target.closest('.status-picker')) {
-                      return;
-                    }
-                    setViewOrder(row);
-                  }}
-                >
-                  <td className={autoserviceListTdClass}>
-                    <span className="font-medium tabular-nums text-ink-muted">{repairOrderNumberLabel(row)}</span>
-                  </td>
-                  <td className={autoserviceListTdClass}>
-                    <span className="tabular-nums text-ink-muted">{formatServerDate(row.scheduled_at)}</span>
-                  </td>
-                  <td className={autoserviceListTdClass}>
-                    <span className="tabular-nums text-ink-muted">
-                      {row.scheduled_end_at ? formatServerDate(row.scheduled_end_at) : '—'}
-                    </span>
-                  </td>
-                  <td className={`${autoserviceListTdClass} font-semibold text-ink`}>{vehicleMakeModelLabel(row.vehicle)}</td>
-                  <td className={autoserviceListTdClass}>
-                    <div className="font-semibold text-ink">{row.client?.name || '—'}</div>
-                  </td>
-                  <td className={autoserviceListTdClass}>
-                    <div className="tabular-nums font-semibold text-ink">{formatMoney(row.grand_total)} ₽</div>
-                  </td>
-                  <td className={`${autoserviceListTdClass} [&_span]:ring-0`}>
-                    <RepairOrderStatusPicker
-                      status={row.status}
-                      options={STATUS_ACTIONS}
-                      saving={statusSavingId === row.id}
-                      disabled={statusSavingId === row.id}
-                      onChange={(nextStatus) => handleStatus(row.id, nextStatus)}
-                    />
-                  </td>
-                </tr>
-              ))
+                )) : null}
+                {(viewDrafts ? filteredDrafts.length === 0 : true) && (draftOnly || rows.length === 0) ? (
+                  <tr>
+                    <td colSpan={draftOnly ? 5 : 7} className="py-12 text-center text-ink-muted">
+                      {emptyMessage}
+                    </td>
+                  </tr>
+                ) : null}
+              </>
             )}
           </tbody>
         </table>
-        {!loading && !viewDrafts && hasMore ? (
+        {!loading && !draftOnly && hasMore ? (
           <div ref={sentinelRef} className="flex justify-center py-3" aria-hidden="true">
             {loadingMore ? <Skeleton className="h-4 w-40" /> : null}
           </div>

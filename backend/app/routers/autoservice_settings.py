@@ -15,6 +15,7 @@ from app.schemas.autoservice_settings import (
     AutoserviceSettingsView,
 )
 from app.services.autoservice_vat import apply_vat_rate_to_open_orders
+from app.services.autoservice_audit import log_autoservice
 from app.utils.autoservice_access import require_autoservice_settings
 from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.site_settings_db import autoservice_enabled
@@ -117,4 +118,17 @@ def update_autoservice_settings(
             apply_vat_rate_to_open_orders(db, org_id, payload.vat_rate)
     db.commit()
     db.refresh(row)
+    log_autoservice(
+        db,
+        event_type="autoservice_settings_updated",
+        summary="Обновлены настройки автосервиса",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_settings",
+        entity_id=row.id,
+        details={
+            "changed_fields": sorted(payload.model_fields_set),
+            "vat_rate": str(row.vat_rate) if row.vat_rate is not None else None,
+        },
+    )
     return AutoserviceSettingsView.model_validate(row)

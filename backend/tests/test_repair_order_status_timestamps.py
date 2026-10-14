@@ -24,7 +24,7 @@ class RepairOrderStatusTimestampTests(unittest.TestCase):
 
         self.assertEqual(order.status_in_progress_at, fixed_at)
 
-    def test_completed_sets_scheduled_end_at(self):
+    def test_completed_keeps_manually_set_end_date(self):
         order = MagicMock()
         order.status_completed_at = None
         order.scheduled_end_at = datetime(2026, 8, 1, 10, 0, 0)
@@ -33,6 +33,16 @@ class RepairOrderStatusTimestampTests(unittest.TestCase):
         record_repair_order_status_timestamp(order, "completed", at=fixed_at)
 
         self.assertEqual(order.status_completed_at, fixed_at)
+        self.assertEqual(order.scheduled_end_at, datetime(2026, 8, 1, 10, 0, 0))
+
+    def test_completed_fills_missing_end_date(self):
+        order = MagicMock()
+        order.status_completed_at = None
+        order.scheduled_end_at = None
+        fixed_at = datetime(2026, 8, 19, 16, 45, 0)
+
+        record_repair_order_status_timestamp(order, "completed", at=fixed_at)
+
         self.assertEqual(order.scheduled_end_at, fixed_at)
 
     def test_record_ignores_unknown_status(self):

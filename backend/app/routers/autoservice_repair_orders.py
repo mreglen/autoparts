@@ -77,6 +77,12 @@ from app.utils.autoservice_access import (
 )
 from app.utils.phone import normalize_to_storage_format
 from app.utils.repair_order_number import allocate_repair_order_number
+from app.services.autoservice_audit import (
+    log_autoservice,
+    payment_method_label,
+    repair_order_label,
+    status_label,
+)
 from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
 from app.services.autoservice_vat import DEFAULT_VAT_RATE, get_org_vat_rate
 from app.services.autoservice_payment_service import (
@@ -1729,6 +1735,24 @@ def create_repair_order(
         booking.status = "processed"
     db.commit()
     row = _get_org_order_or_404(db, org_id, row.id)
+    log_autoservice(
+        db,
+        event_type="repair_order_created",
+        summary=f"Создан заказ-наряд: {repair_order_label(row)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order",
+        entity_id=row.id,
+        details={
+            "order_number": row.order_number,
+            "status": row.status,
+            "scheduled_at": row.scheduled_at.isoformat() if row.scheduled_at else None,
+            "scheduled_end_at": row.scheduled_end_at.isoformat() if row.scheduled_end_at else None,
+            "work_zone_id": row.work_zone_id,
+            "client_id": row.client_id,
+            "vehicle_id": row.vehicle_id,
+        },
+    )
     return _to_staff_view(db, row)
 
 
@@ -1845,6 +1869,20 @@ def update_repair_order(
 
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
+    log_autoservice(
+        db,
+        event_type="repair_order_updated",
+        summary=f"Изменён заказ-наряд: {repair_order_label(row)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order",
+        entity_id=row.id,
+        details={
+            "order_number": row.order_number,
+            "changed_fields": sorted(payload.model_fields_set),
+            "level": level,
+        },
+    )
     return _to_staff_view(db, row)
 
 
@@ -1880,6 +1918,16 @@ def update_manual_repair_order_shop_part(
         receipt_date=payload.receipt_date,
     )
     db.commit()
+    log_autoservice(
+        db,
+        event_type="repair_order_part_updated",
+        summary=f"Изменена запчасть заказ-наряда {repair_order_label(order_row)}: {part.name}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order_shop_part",
+        entity_id=part.id,
+        details={"quantity": str(part.quantity), "unit_price": str(part.unit_price)},
+    )
     return _shop_part_view(part, db=db, org_id=org_id)
 
 
@@ -1902,6 +1950,15 @@ def detach_imported_repair_order_shop_part(
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
+    log_autoservice(
+        db,
+        event_type="repair_order_part_updated",
+        summary=f"Изменена запчасть заказ-наряда {repair_order_label(row)}: убрана импортная позиция",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order_shop_part",
+        entity_id=part_id,
+    )
     return _to_staff_view(db, row)
 
 
@@ -1926,6 +1983,16 @@ def import_repair_order_cart_items(
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
+    log_autoservice(
+        db,
+        event_type="repair_order_parts_imported",
+        summary=f"В заказ-наряд {repair_order_label(row)} добавлены запчасти из заказа ({len(payload.items)} поз.)",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order",
+        entity_id=order_id,
+        details={"source": "cart", "count": len(payload.items), "markup_percent": str(payload.markup_percent)},
+    )
     return _to_staff_view(db, row)
 
 
@@ -1950,6 +2017,16 @@ def import_repair_order_purchase_items(
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
+    log_autoservice(
+        db,
+        event_type="repair_order_parts_imported",
+        summary=f"В заказ-наряд {repair_order_label(row)} добавлены запчасти из закупки ({len(payload.item_ids)} поз.)",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order",
+        entity_id=order_id,
+        details={"source": "purchase", "order_type": payload.order_type, "count": len(payload.item_ids), "markup_percent": str(payload.markup_percent)},
+    )
     return _to_staff_view(db, row)
 
 
@@ -1979,6 +2056,16 @@ def import_autoservice_stock_to_repair_order(
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
+    log_autoservice(
+        db,
+        event_type="repair_order_parts_imported",
+        summary=f"В заказ-наряд {repair_order_label(row)} добавлены запчасти со склада ({len(payload.items)} поз.)",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order",
+        entity_id=order_id,
+        details={"source": "autoservice_stock", "count": len(payload.items), "markup_percent": str(payload.markup_percent)},
+    )
     return _to_staff_view(db, row)
 
 
@@ -1998,8 +2085,20 @@ def remove_repair_order(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="После одобрения заявку может удалить только приёмщик",
         )
+    label = repair_order_label(row)
+    order_status = row.status
     delete_repair_order(db, org_id=org_id, order_id=order_id)
     db.commit()
+    log_autoservice(
+        db,
+        event_type="repair_order_deleted",
+        summary=f"Удалён заказ-наряд: {label}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order",
+        entity_id=order_id,
+        details={"status": order_status},
+    )
 
 
 @router.patch(
@@ -2044,6 +2143,20 @@ def patch_repair_order_status(
         )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
+    if prev_status != payload.status:
+        log_autoservice(
+            db,
+            event_type="repair_order_status_changed",
+            summary=(
+                f"Статус заказ-наряда {repair_order_label(row)}: "
+                f"{status_label(prev_status)} → {status_label(payload.status)}"
+            ),
+            user=current_user,
+            organization_id=org_id,
+            entity_type="repair_order",
+            entity_id=order_id,
+            details={"from": prev_status, "to": payload.status},
+        )
     return _to_staff_view(db, row)
 
 
@@ -2074,7 +2187,7 @@ def post_repair_order_payment(
     org_id = _require_full_orders(db, current_user)
     row = _get_org_order_or_404(db, org_id, order_id)
     grand_total = _order_grand_total(row)
-    create_repair_order_payment(
+    payment = create_repair_order_payment(
         db,
         order=row,
         org_id=org_id,
@@ -2086,4 +2199,17 @@ def post_repair_order_payment(
     )
     db.commit()
     row = _get_org_order_or_404(db, org_id, order_id)
+    log_autoservice(
+        db,
+        event_type="repair_order_payment_created",
+        summary=(
+            f"Поступление {payment.amount} ₽ ({payment_method_label(payment.method)}) "
+            f"по заказ-наряду {repair_order_label(row)}"
+        ),
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_payment",
+        entity_id=payment.id,
+        details={"amount": str(payment.amount), "method": payment.method, "order_id": order_id},
+    )
     return _to_staff_view(db, row)

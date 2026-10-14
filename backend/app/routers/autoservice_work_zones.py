@@ -17,6 +17,7 @@ from app.schemas.autoservice_work_zone import (
     AutoserviceWorkZoneView,
 )
 from app.services.autoservice_work_zone_helpers import next_work_zone_name, reorder_work_zones
+from app.services.autoservice_audit import log_autoservice
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS,
     AUTOSERVICE_PERMISSION_ORDERS,
@@ -104,6 +105,15 @@ def create_autoservice_work_zone(
     db.add(row)
     db.commit()
     db.refresh(row)
+    log_autoservice(
+        db,
+        event_type="autoservice_work_zone_created",
+        summary=f"Создана рабочая зона: {row.name}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_work_zone",
+        entity_id=row.id,
+    )
     return AutoserviceWorkZoneView.model_validate(row)
 
 
@@ -147,9 +157,20 @@ def update_autoservice_work_zone(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Рабочая зона с таким названием уже существует",
         )
+    previous_name = row.name
     row.name = name
     db.commit()
     db.refresh(row)
+    log_autoservice(
+        db,
+        event_type="autoservice_work_zone_updated",
+        summary=f"Рабочая зона переименована: {previous_name} → {row.name}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_work_zone",
+        entity_id=row.id,
+        details={"previous_name": previous_name, "name": row.name},
+    )
     return AutoserviceWorkZoneView.model_validate(row)
 
 
@@ -170,7 +191,26 @@ def delete_autoservice_work_zone(
         row.is_active = False
         row.archived_at = datetime.utcnow()
         db.commit()
+        log_autoservice(
+            db,
+            event_type="autoservice_work_zone_archived",
+            summary=f"Рабочая зона архивирована (используется в заказ-нарядах): {row.name}",
+            user=current_user,
+            organization_id=org_id,
+            entity_type="autoservice_work_zone",
+            entity_id=zone_id,
+        )
         return None
+    zone_name = row.name
     db.delete(row)
     db.commit()
+    log_autoservice(
+        db,
+        event_type="autoservice_work_zone_deleted",
+        summary=f"Удалена рабочая зона: {zone_name}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_work_zone",
+        entity_id=zone_id,
+    )
     return None

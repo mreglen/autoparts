@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.models.autoservice_work import AutoserviceWork
 from app.models.user import User
 from app.schemas.autoservice_work import AutoserviceWorkCreate, AutoserviceWorkUpdate, AutoserviceWorkView
+from app.services.autoservice_audit import log_autoservice
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_ORDERS,
     AUTOSERVICE_PERMISSION_ORDERS_OWN,
@@ -105,6 +106,16 @@ def create_autoservice_work(
     db.add(row)
     db.commit()
     db.refresh(row)
+    log_autoservice(
+        db,
+        event_type="autoservice_work_created",
+        summary=f"Добавлена работа в каталог: {row.name}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_work",
+        entity_id=row.id,
+        details={"default_unit_price": str(row.default_unit_price)},
+    )
     return AutoserviceWorkView.model_validate(row)
 
 
@@ -139,6 +150,20 @@ def update_autoservice_work(
         row.is_active = payload.is_active
     db.commit()
     db.refresh(row)
+    log_autoservice(
+        db,
+        event_type="autoservice_work_updated",
+        summary=f"Изменена работа в каталоге: {row.name}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_work",
+        entity_id=row.id,
+        details={
+            "default_unit_price": str(row.default_unit_price),
+            "is_active": row.is_active,
+            "changed_fields": sorted(payload.model_fields_set),
+        },
+    )
     return AutoserviceWorkView.model_validate(row)
 
 
@@ -150,5 +175,15 @@ def delete_autoservice_work(
 ):
     org_id = require_autoservice_settings(db, current_user)
     row = _get_org_work_or_404(db, org_id, work_id)
+    work_name = row.name
     row.is_active = False
     db.commit()
+    log_autoservice(
+        db,
+        event_type="autoservice_work_deactivated",
+        summary=f"Работа убрана из каталога: {work_name}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_work",
+        entity_id=work_id,
+    )

@@ -49,6 +49,7 @@ from app.utils.autoservice_access import (
     user_display_name,
 )
 from app.services.autoservice_client_stats import client_stats_map
+from app.services.autoservice_audit import client_label, log_autoservice
 from app.utils.email import send_autoservice_guest_account_email
 from app.utils.user_avatar import resolve_user_by_contact
 from app.utils.user_public_code import assign_public_code
@@ -544,6 +545,16 @@ def create_autoservice_client_staff(
     db.add(row)
     db.commit()
     db.refresh(row)
+    log_autoservice(
+        db,
+        event_type="autoservice_client_created",
+        summary=f"Создан клиент автосервиса: {client_label(row.name, row.phone)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_client",
+        entity_id=row.id,
+        details={"phone": row.phone, "source": "staff", "is_guest": True},
+    )
     return _client_view_with_account_email(db, row)
 
 
@@ -609,6 +620,20 @@ def update_autoservice_client_staff(
     _apply_person_type_defaults(row)
     db.commit()
     db.refresh(row)
+    log_autoservice(
+        db,
+        event_type="autoservice_client_updated",
+        summary=f"Изменён клиент автосервиса: {client_label(row.name, row.phone)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_client",
+        entity_id=row.id,
+        details={
+            "changed_fields": sorted(data),
+            "is_guest": is_guest,
+            "discount_percent": str(row.discount_percent) if row.discount_percent is not None else None,
+        },
+    )
     return _client_view_with_account_email(db, row)
 
 
@@ -690,6 +715,17 @@ def create_autoservice_client_account(
         full_name=row.name,
         password=password,
         organization_name=org_name,
+    )
+
+    log_autoservice(
+        db,
+        event_type="autoservice_client_account_created",
+        summary=f"Гостевому клиенту создан аккаунт: {client_label(row.name, row.phone)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_client",
+        entity_id=row.id,
+        details={"user_id": user.id, "email": email, "email_sent": email_sent},
     )
 
     return AutoserviceClientCreateAccountResponse(
@@ -811,4 +847,14 @@ def link_autoservice_client_account(
     _link_orphan_bookings(db, org_id, row)
     db.commit()
     db.refresh(row)
+    log_autoservice(
+        db,
+        event_type="autoservice_client_account_linked",
+        summary=f"К карточке клиента привязан аккаунт: {client_label(row.name, row.phone)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_client",
+        entity_id=row.id,
+        details={"user_id": user.id, "user_email": user.email},
+    )
     return _client_view_with_account_email(db, row)

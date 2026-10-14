@@ -8,6 +8,7 @@ export const CATEGORY_LABELS = {
   finance: 'Финансы',
   moderation: 'Модерация',
   orders: 'Заказы',
+  autoservice: 'Автосервис',
   settings: 'Настройки',
   system: 'Система',
 };
