@@ -92,7 +92,7 @@ export default function PillMultiSelect({
           role="listbox"
           aria-multiselectable
           aria-label={ariaLabel}
-          className="absolute left-0 z-40 mt-1.5 max-h-64 w-max min-w-full max-w-[min(100vw-2rem,22rem)] overflow-auto rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg"
+          className="absolute left-0 z-40 mt-1.5 max-h-[min(24rem,70dvh)] w-max min-w-full max-w-[min(100vw-2rem,22rem)] overflow-auto rounded-xl border border-gray-200 bg-white py-1.5 shadow-lg"
         >
           {options.length === 0 ? (
             <div className="px-4 py-2.5 text-sm text-gray-500">Нет вариантов</div>
