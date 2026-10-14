@@ -84,6 +84,10 @@ export default function AutoserviceOrdersPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [zoneFilter, setZoneFilter] = useState('');
+  const [employeeFilter, setEmployeeFilter] = useState('');
+  const [workZones, setWorkZones] = useState([]);
+  const [serviceEmployees, setServiceEmployees] = useState([]);
   const [historyStatus, setHistoryStatus] = useState('');
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
@@ -110,9 +114,11 @@ export default function AutoserviceOrdersPage() {
       if (statusParam) params.set('status', statusParam);
       if (dateFrom) params.set('date_from', dateFrom);
       if (dateTo) params.set('date_to', dateTo);
+      if (zoneFilter) params.set('work_zone_id', zoneFilter);
+      if (employeeFilter) params.set('employee_id', employeeFilter);
       return params;
     },
-    [scope, qApplied, viewHistory, historyStatus, statusFilter, dateFrom, dateTo],
+    [scope, qApplied, viewHistory, historyStatus, statusFilter, dateFrom, dateTo, zoneFilter, employeeFilter],
   );
 
   const load = useCallback(async ({ silent = false } = {}) => {
@@ -214,6 +220,24 @@ export default function AutoserviceOrdersPage() {
   useEffect(() => {
     if (viewDrafts) setDrafts(listRepairOrderFormDrafts());
   }, [viewDrafts]);
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated) return;
+    let cancelled = false;
+    Promise.all([
+      apiRequest('/autoservice/repair-orders/work-zones-meta'),
+      apiRequest('/autoservice/repair-orders/service-employees-options'),
+    ])
+      .then(([zonesData, employeesData]) => {
+        if (cancelled) return;
+        setWorkZones(Array.isArray(zonesData?.work_zones) ? zonesData.work_zones : []);
+        setServiceEmployees(Array.isArray(employeesData) ? employeesData : []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isReady, isAuthenticated]);
 
   useEffect(() => {
     if (isReady && viewReview && !canReview) {
@@ -453,6 +477,12 @@ export default function AutoserviceOrdersPage() {
           onDateToChange={setDateTo}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
+          workZones={workZones}
+          serviceEmployees={serviceEmployees}
+          zoneFilter={zoneFilter}
+          onZoneFilterChange={setZoneFilter}
+          employeeFilter={employeeFilter}
+          onEmployeeFilterChange={setEmployeeFilter}
         />
       </div>
 
@@ -561,13 +591,43 @@ export default function AutoserviceOrdersPage() {
                 ))}
               </select>
             </label>
-            {dateFrom || dateTo || statusFilter ? (
+            <label className="block w-40 min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-ink-muted">Рабочая зона</span>
+              <select
+                value={zoneFilter}
+                onChange={(e) => setZoneFilter(e.target.value)}
+                className="h-10 w-full rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+                aria-label="Фильтр по рабочей зоне"
+              >
+                <option value="">Все зоны</option>
+                {workZones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>{zone.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block w-40 min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-ink-muted">Сотрудник</span>
+              <select
+                value={employeeFilter}
+                onChange={(e) => setEmployeeFilter(e.target.value)}
+                className="h-10 w-full rounded-full border-0 bg-gray-100 px-4 text-sm text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+                aria-label="Фильтр по сотруднику"
+              >
+                <option value="">Все сотрудники</option>
+                {serviceEmployees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>{employee.name}</option>
+                ))}
+              </select>
+            </label>
+            {dateFrom || dateTo || statusFilter || zoneFilter || employeeFilter ? (
               <button
                 type="button"
                 onClick={() => {
                   setDateFrom('');
                   setDateTo('');
                   setStatusFilter('');
+                  setZoneFilter('');
+                  setEmployeeFilter('');
                 }}
                 className={`${pillButtonClass} shrink-0 text-gray-500`}
               >

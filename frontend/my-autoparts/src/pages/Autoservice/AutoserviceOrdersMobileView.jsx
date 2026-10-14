@@ -130,6 +130,12 @@ export default function AutoserviceOrdersMobileView({
   onDateToChange,
   statusFilter = '',
   onStatusFilterChange,
+  workZones = [],
+  serviceEmployees = [],
+  zoneFilter = '',
+  onZoneFilterChange,
+  employeeFilter = '',
+  onEmployeeFilterChange,
 }) {
   const isDrafts = Array.isArray(drafts);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -248,13 +254,43 @@ export default function AutoserviceOrdersMobileView({
                 ))}
               </select>
             </label>
-            {dateFrom || dateTo || statusFilter ? (
+            <label className="block w-full min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-gray-500">Рабочая зона</span>
+              <select
+                value={zoneFilter}
+                onChange={(e) => onZoneFilterChange?.(e.target.value)}
+                className="h-11 w-full rounded-full border-0 bg-gray-100 px-4 text-base text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+                aria-label="Фильтр по рабочей зоне"
+              >
+                <option value="">Все зоны</option>
+                {workZones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>{zone.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block w-full min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-gray-500">Сотрудник</span>
+              <select
+                value={employeeFilter}
+                onChange={(e) => onEmployeeFilterChange?.(e.target.value)}
+                className="h-11 w-full rounded-full border-0 bg-gray-100 px-4 text-base text-gray-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-400/70"
+                aria-label="Фильтр по сотруднику"
+              >
+                <option value="">Все сотрудники</option>
+                {serviceEmployees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>{employee.name}</option>
+                ))}
+              </select>
+            </label>
+            {dateFrom || dateTo || statusFilter || zoneFilter || employeeFilter ? (
               <button
                 type="button"
                 onClick={() => {
                   onDateFromChange?.('');
                   onDateToChange?.('');
                   onStatusFilterChange?.('');
+                  onZoneFilterChange?.('');
+                  onEmployeeFilterChange?.('');
                 }}
                 className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-500 transition hover:bg-gray-200"
               >

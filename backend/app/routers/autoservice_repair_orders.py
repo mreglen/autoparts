@@ -1505,6 +1505,8 @@ def list_repair_orders(
     q: str | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
     client_id: int | None = Query(None),
+    work_zone_id: int | None = Query(None),
+    employee_id: int | None = Query(None),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
@@ -1538,6 +1540,36 @@ def list_repair_orders(
         if not client:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Клиент не найден")
         query = query.filter(RepairOrder.client_id.in_(related_autoservice_client_ids(db, client)))
+    if work_zone_id is not None:
+        zone = (
+            db.query(AutoserviceWorkZone)
+            .filter(
+                AutoserviceWorkZone.id == work_zone_id,
+                AutoserviceWorkZone.organization_id == org_id,
+            )
+            .first()
+        )
+        if not zone:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рабочая зона не найдена")
+        query = query.filter(RepairOrder.work_zone_id == work_zone_id)
+    if employee_id is not None:
+        employee = (
+            db.query(AutoserviceServiceEmployee)
+            .filter(
+                AutoserviceServiceEmployee.id == employee_id,
+                AutoserviceServiceEmployee.organization_id == org_id,
+            )
+            .first()
+        )
+        if not employee:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сотрудник не найден")
+        query = query.filter(
+            exists().where(
+                (RepairOrderWork.order_id == RepairOrder.id)
+                & (RepairOrderWorkExecutor.work_id == RepairOrderWork.id)
+                & (RepairOrderWorkExecutor.employee_id == employee_id)
+            )
+        )
     if scope == "active":
         own_active = ACTIVE_STATUSES + REVIEW_STATUSES if level == "own" else ACTIVE_STATUSES
         query = query.filter(RepairOrder.status.in_(own_active))
