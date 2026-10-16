@@ -219,7 +219,7 @@ def _planner_zone_rows(
             RepairOrder.scheduled_at < range_end,
             (
                 (RepairOrder.scheduled_end_at > range_start)
-                | (RepairOrder.status == "in_progress")
+                | RepairOrder.status.in_(("in_progress", "pending"))
                 | (
                     RepairOrder.scheduled_end_at.is_(None)
                     & (RepairOrder.scheduled_at >= range_start)

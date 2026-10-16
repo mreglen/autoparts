@@ -30,12 +30,14 @@ export function sortDayOrders(orders) {
   });
 }
 
+const OPEN_ORDER_STATUSES = new Set(['pending', 'in_progress']);
+
 export function plannerItemEndDate(item, now = new Date()) {
   if (!item || item.kind === 'inspection') return null;
   const start = parseWallClockDate(item.scheduled_at);
   const end = parseWallClockDate(item.scheduled_end_at);
   const valid = Boolean(end) && (!start || end > start);
-  if (item.status === 'in_progress') return valid ? end : now;
+  if (OPEN_ORDER_STATUSES.has(item.status)) return valid ? end : now;
   return valid ? end : null;
 }
 
