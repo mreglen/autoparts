@@ -1034,6 +1034,7 @@ export default function AutoserviceOrderFormPage() {
     initial.inspectionBookingId = prefill.inspectionBookingId || null;
     if (initial.inspectionBookingId) {
       initial.inspectionScheduledAt = initial.scheduledAt;
+      initial.scheduledAt = toLocalInputValue(new Date());
     }
     const draft = readRepairOrderPurchaseDraft();
     if (draft?.groups?.length) {
