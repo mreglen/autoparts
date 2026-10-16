@@ -1,0 +1,14 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = true
+	symlinks = false
+	ignorecase = true
+	autocrlf = false
+	safecrlf = false
+	quotepath = false
+[user]
+	name = aide-checkpoints
+	email = aide@local
+[commit]
+	gpgsign = false

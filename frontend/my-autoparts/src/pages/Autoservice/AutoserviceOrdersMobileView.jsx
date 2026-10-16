@@ -8,6 +8,7 @@ import {
 import { Skeleton } from '../../components/UI';
 import Toast from '../../components/UI/Toast';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
+import { buildOrderZoneFilterOptions } from '../../utils/autoserviceOrderZoneFilter';
 import { formatServerDate } from '../../utils/serverDate';
 
 function formatMoney(value) {
@@ -213,7 +214,7 @@ export default function AutoserviceOrdersMobileView({
               <PillMultiSelect
                 values={zoneFilter}
                 onChange={onZoneFilterChange}
-                options={workZones.map((zone) => ({ value: zone.id, label: zone.name }))}
+                options={buildOrderZoneFilterOptions(workZones)}
                 placeholder="Все зоны"
                 ariaLabel="Фильтр по рабочей зоне"
                 triggerClassName="h-11 text-base"

@@ -1513,7 +1513,7 @@ def list_repair_orders(
     q: str | None = Query(None),
     status_filter: list[str] | None = Query(None, alias="status"),
     client_id: int | None = Query(None),
-    work_zone_id: list[int] | None = Query(None),
+    work_zone_id: list[str] | None = Query(None),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
@@ -1550,18 +1550,32 @@ def list_repair_orders(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Клиент не найден")
         query = query.filter(RepairOrder.client_id.in_(related_autoservice_client_ids(db, client)))
     if work_zone_id:
-        zone_ids = list({*work_zone_id})
-        matched = (
-            db.query(AutoserviceWorkZone.id)
-            .filter(
-                AutoserviceWorkZone.id.in_(zone_ids),
-                AutoserviceWorkZone.organization_id == org_id,
+        zone_ids: list[int] = []
+        zone_clauses = []
+        for raw_zone in work_zone_id:
+            if raw_zone == "none":
+                zone_clauses.append(RepairOrder.work_zone_id.is_(None))
+                continue
+            if not raw_zone.isdigit():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Недопустимый идентификатор рабочей зоны",
+                )
+            zone_ids.append(int(raw_zone))
+        if zone_ids:
+            zone_ids = list({*zone_ids})
+            matched = (
+                db.query(AutoserviceWorkZone.id)
+                .filter(
+                    AutoserviceWorkZone.id.in_(zone_ids),
+                    AutoserviceWorkZone.organization_id == org_id,
+                )
+                .count()
             )
-            .count()
-        )
-        if matched != len(zone_ids):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рабочая зона не найдена")
-        query = query.filter(RepairOrder.work_zone_id.in_(zone_ids))
+            if matched != len(zone_ids):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Рабочая зона не найдена")
+            zone_clauses.append(RepairOrder.work_zone_id.in_(zone_ids))
+        query = query.filter(or_(*zone_clauses))
     if scope == "active":
         own_active = ACTIVE_STATUSES + REVIEW_STATUSES if level == "own" else ACTIVE_STATUSES
         query = query.filter(RepairOrder.status.in_(own_active))

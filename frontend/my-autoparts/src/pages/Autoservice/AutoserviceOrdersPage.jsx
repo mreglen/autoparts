@@ -18,6 +18,7 @@ import { ConfirmDialog } from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDate } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
+import { buildOrderZoneFilterOptions } from '../../utils/autoserviceOrderZoneFilter';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   clearRepairOrderFormDraft,
@@ -520,7 +521,7 @@ export default function AutoserviceOrdersPage() {
               <PillMultiSelect
                 values={zoneFilter}
                 onChange={setZoneFilter}
-                options={workZones.map((zone) => ({ value: zone.id, label: zone.name }))}
+                options={buildOrderZoneFilterOptions(workZones)}
                 placeholder="Все зоны"
                 ariaLabel="Фильтр по рабочей зоне"
               />
