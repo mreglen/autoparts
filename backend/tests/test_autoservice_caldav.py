@@ -72,6 +72,19 @@ class EventIcsTests(unittest.TestCase):
         ics = caldav.build_event_ics(_booking(name="Пётр; Иван, жжёт"), _org())
         self.assertIn(r"Пётр\; Иван\, жжёт", ics)
 
+    def test_work_zone_last_line_of_description(self):
+        ics = caldav.build_event_ics(_booking(work_zone=SimpleNamespace(name="Пост 1")), _org())
+        self.assertIn(r"Осмотр подвески\nРабочая зона: Пост 1", ics)
+        self.assertIn("SUMMARY:Осмотр: Иван Петров — BMW X5", ics)
+
+    def test_work_zone_unassigned(self):
+        # «не назначено» попадает в конец DESCRIPTION и для событий, и для задач
+        self.assertEqual(
+            caldav._description(_booking(work_zone=None)).splitlines()[-1],
+            "Рабочая зона: не назначено",
+        )
+        self.assertIn("Рабочая зона", caldav.build_todo_ics(_booking(work_zone=None), _org()))
+
 
 class TodoIcsTests(unittest.TestCase):
     def test_todo_needs_action(self):
@@ -102,6 +115,7 @@ def _db(bookings, org=None):
     db = MagicMock()
     q = MagicMock()
     q.filter.return_value = q
+    q.options.return_value = q
     q.all.return_value = bookings
     q.first.return_value = org
     db.query.return_value = q
@@ -118,7 +132,9 @@ def _account():
 
 class SyncAccountTests(unittest.TestCase):
     def test_writes_and_deletes_files(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            f"{MOD}._caldav_visible_bookings", side_effect=lambda db, acc, bs: bs
+        ):
             acc = _account()
             db = _db([_booking()], _org())
             result = caldav.sync_account(db, acc, storage_dir=tmp)
@@ -138,7 +154,9 @@ class SyncAccountTests(unittest.TestCase):
             self.assertFalse((tasks_dir / "b7-todo.ics").exists())
 
     def test_cancelled_not_synced(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            f"{MOD}._caldav_visible_bookings", side_effect=lambda db, acc, bs: bs
+        ):
             db = _db([], _org())
             result = caldav.sync_account(db, _account(), storage_dir=tmp)
             self.assertEqual(result["bookings"], 0)

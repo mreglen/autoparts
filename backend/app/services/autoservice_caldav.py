@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
 from passlib.hash import apr_md5_crypt
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
 from app.models.caldav_account import CaldavAccount
@@ -127,6 +127,9 @@ def _description(booking: InspectionBooking) -> str:
         parts.append(f"Телефон: {booking.phone.strip()}")
     if (booking.notes or "").strip():
         parts.append(booking.notes.strip())
+    zone = getattr(booking, "work_zone", None)
+    zone_name = (getattr(zone, "name", "") or "").strip()
+    parts.append(f"Рабочая зона: {zone_name or 'не назначено'}")
     return "\n".join(parts)
 
 
@@ -237,6 +240,7 @@ def _target_bookings(db: Session, organization_id: str) -> list[InspectionBookin
     удалённые и необработанные заявки в календарь не попадают."""
     return (
         db.query(InspectionBooking)
+        .options(joinedload(InspectionBooking.work_zone))
         .filter(
             InspectionBooking.organization_id == organization_id,
             InspectionBooking.status.in_(_SYNC_STATUSES),
