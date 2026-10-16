@@ -53,6 +53,15 @@ function plannerItemTimeLabel(item) {
   return formatOrderClockRange(item);
 }
 
+function plannerClientFirstName(name) {
+  return String(name || '').trim().split(/\s+/)[0] || '—';
+}
+
+function plannerInspectionClockLabel(item) {
+  const date = parseWallClockDate(item?.inspection_scheduled_at);
+  return date ? date.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
+}
+
 function plannerItemStartTimeLabel(item) {
   if (item?.kind === 'inspection') return item.preferred_time?.slice(0, 5) || '—';
   const start = parseWallClockDate(item?.scheduled_at);
@@ -161,7 +170,7 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
               const styleClass = plannerItemStyle(item);
               const clientName = item.client_name || '—';
               const vehicleLabel = item.vehicle_make || '';
-              const nameWithVehicle = [clientName, vehicleLabel].filter(Boolean).join(' ');
+              const nameWithVehicle = [plannerClientFirstName(clientName), vehicleLabel].filter(Boolean).join(' ');
               const titleVehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ');
               const itemTitle = [
                 item.kind === 'inspection' ? 'Осмотр' : `№ ${item.order_number}`,
@@ -183,15 +192,17 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                   }}
                   title={itemTitle}
                 >
-                  {segment ? (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-y-0 bg-success-600"
-                      style={{ left: `${segment.leftPercent}%`, width: `${segment.widthPercent}%` }}
-                    />
-                  ) : null}
                   <span className="relative block truncate tabular-nums">{plannerBarTimeLabel(entry, dayIsos)}</span>
                   <span className="relative mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
+                  {segment ? (
+                    <span
+                      className="absolute inset-y-0 bg-success-600 px-1.5 py-1.5 text-white"
+                      style={{ left: `${segment.leftPercent}%`, width: `${segment.widthPercent}%` }}
+                    >
+                      <span className="block truncate tabular-nums">{plannerInspectionClockLabel(item)}</span>
+                      <span className="mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
