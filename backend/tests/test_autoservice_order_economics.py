@@ -226,7 +226,7 @@ class AutoserviceOrderEconomicsTests(unittest.TestCase):
 
     def test_labels(self):
         self.assertEqual(order_economics_status_label("completed"), "Закрыт")
-        self.assertEqual(order_economics_payment_label("unpaid"), "Долг")
+        self.assertEqual(order_economics_payment_label("unpaid"), "Дебит")
 
     def test_xlsx_workbook_has_summary_and_orders_sheets(self):
         order = _order()

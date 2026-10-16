@@ -51,6 +51,24 @@ class PlannerWeekResponse(BaseModel):
     zones: list[PlannerWeekZoneRow] = Field(default_factory=list)
 
 
+class PlannerMonthDay(BaseModel):
+    date: date
+    orders: list[PlannerRepairOrder] = Field(default_factory=list)
+
+
+class PlannerZoneRef(BaseModel):
+    id: Optional[int] = None
+    name: str
+
+
+class PlannerMonthResponse(BaseModel):
+    month_start: date
+    grid_start: date
+    grid_end: date
+    days: list[PlannerMonthDay] = Field(default_factory=list)
+    zones: list[PlannerZoneRef] = Field(default_factory=list)
+
+
 class PlannerEmployeeWorkZoneView(BaseModel):
     work_zone_id: Optional[int] = None
     work_zone_name: str

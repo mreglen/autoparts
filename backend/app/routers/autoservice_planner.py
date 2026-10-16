@@ -15,11 +15,14 @@ from app.models.user import User
 from app.schemas.autoservice_planner import (
     PlannerEmployeeWorkZoneView,
     PlannerEmployeeWorkZonesResponse,
+    PlannerMonthDay,
+    PlannerMonthResponse,
     PlannerRepairOrder,
     PlannerWeekDayHeader,
     PlannerWeekResponse,
     PlannerWeekZoneDay,
     PlannerWeekZoneRow,
+    PlannerZoneRef,
 )
 from app.services.autoservice_planner_items import (
     planner_inspection_item as _planner_inspection,
@@ -38,6 +41,10 @@ UNASSIGNED_SORT_ORDER = 1_000_000
 
 def _week_start(value: date) -> date:
     return value - timedelta(days=value.weekday())
+
+
+def _month_last_day(value: date) -> date:
+    return (value.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
 
 
 def _place_item(
@@ -173,20 +180,18 @@ def get_planner_employee_work_zones(
     return PlannerEmployeeWorkZonesResponse(full_access=full_access, zones=items)
 
 
-@router.get("/autoservice/planner/week", response_model=PlannerWeekResponse)
-def get_planner_week(
-    week_start: date = Query(..., alias="week_start"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
-    full_access, zone_rights = planner_zone_rights(db, current_user, org_id)
-    start = _week_start(week_start)
-    day_dates = [start + timedelta(days=offset) for offset in range(7)]
-    week_end = day_dates[-1]
+def _planner_zone_rows(
+    db: Session,
+    org_id: str,
+    day_dates: list[date],
+    full_access: bool,
+    zone_rights: dict[int | None, dict[str, bool]],
+) -> list[PlannerWeekZoneRow]:
+    start_day = day_dates[0]
+    end_day = day_dates[-1]
 
-    range_start = datetime.combine(day_dates[0], time.min)
-    range_end = datetime.combine(day_dates[-1] + timedelta(days=1), time.min)
+    range_start = datetime.combine(start_day, time.min)
+    range_end = datetime.combine(end_day + timedelta(days=1), time.min)
 
     zones = [
         zone
@@ -234,9 +239,9 @@ def get_planner_week(
         )
         .filter(
             InspectionBooking.organization_id == org_id,
-            InspectionBooking.preferred_date >= day_dates[0],
-            InspectionBooking.preferred_date <= week_end,
-            InspectionBooking.status == "confirmed",
+            InspectionBooking.preferred_date >= start_day,
+            InspectionBooking.preferred_date <= end_day,
+            InspectionBooking.status.in_(("confirmed", "processed")),
         )
         .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
         .all()
@@ -296,9 +301,54 @@ def get_planner_week(
             )
         )
 
+    return zone_rows
+
+
+@router.get("/autoservice/planner/week", response_model=PlannerWeekResponse)
+def get_planner_week(
+    week_start: date = Query(..., alias="week_start"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
+    full_access, zone_rights = planner_zone_rights(db, current_user, org_id)
+    start = _week_start(week_start)
+    day_dates = [start + timedelta(days=offset) for offset in range(7)]
+    zone_rows = _planner_zone_rows(db, org_id, day_dates, full_access, zone_rights)
     return PlannerWeekResponse(
         week_start=day_dates[0],
-        week_end=week_end,
+        week_end=day_dates[-1],
         days=[PlannerWeekDayHeader(date=day) for day in day_dates],
         zones=zone_rows,
+    )
+
+
+@router.get("/autoservice/planner/month", response_model=PlannerMonthResponse)
+def get_planner_month(
+    month_start: date = Query(..., alias="month_start"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Календарь на месяц: Monday-выровненная сетка дней без строк рабочих зон."""
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
+    full_access, zone_rights = planner_zone_rights(db, current_user, org_id)
+    first = month_start.replace(day=1)
+    last = _month_last_day(first)
+    grid_start = _week_start(first)
+    grid_end = last + timedelta(days=6 - last.weekday())
+    day_count = (grid_end - grid_start).days + 1
+    day_dates = [grid_start + timedelta(days=offset) for offset in range(day_count)]
+    zone_rows = _planner_zone_rows(db, org_id, day_dates, full_access, zone_rights)
+
+    items_by_day: dict[date, list[PlannerRepairOrder]] = {day: [] for day in day_dates}
+    for row in zone_rows:
+        for row_day in row.days:
+            items_by_day[row_day.date].extend(row_day.orders)
+
+    return PlannerMonthResponse(
+        month_start=first,
+        grid_start=grid_start,
+        grid_end=grid_end,
+        days=[PlannerMonthDay(date=day, orders=items_by_day[day]) for day in day_dates],
+        zones=[PlannerZoneRef(id=row.id, name=row.name) for row in zone_rows],
     )

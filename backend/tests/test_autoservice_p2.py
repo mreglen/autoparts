@@ -114,6 +114,7 @@ class PlannerConflictsTests(unittest.TestCase):
             status="pending",
             scheduled_at=start,
             scheduled_end_at=end,
+            inspection_scheduled_at=None,
             work_zone_id=5,
             work_zone=SimpleNamespace(id=5, name="Подъёмник"),
         )

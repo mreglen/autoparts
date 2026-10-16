@@ -29,7 +29,7 @@ const PLANNER_VIEW_STORAGE_KEY = 'plannerViewMode';
 
 function readPlannerViewMode() {
   if (typeof localStorage === 'undefined') return 'week';
-  return localStorage.getItem(PLANNER_VIEW_STORAGE_KEY) === 'compact' ? 'compact' : 'week';
+  return localStorage.getItem(PLANNER_VIEW_STORAGE_KEY) === 'month' ? 'month' : 'week';
 }
 
 const ORDER_STATUS_STYLES = {
@@ -138,6 +138,26 @@ function formatLongDay(isoDate) {
     day: 'numeric',
     month: 'long',
   });
+}
+
+function getMonthStart(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function formatMonthLabel(date) {
+  const label = date.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+}
+
+function buildMonthGridIsos(monthStartDate) {
+  const first = getMonthStart(monthStartDate);
+  const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+  const gridEnd = addDays(last, (6 - last.getDay() + 7) % 7);
+  const isos = [];
+  for (let cursor = getWeekStart(first); cursor <= gridEnd; cursor = addDays(cursor, 1)) {
+    isos.push(toIsoDate(cursor));
+  }
+  return isos;
 }
 
 function plannerBarTimeLabel(entry, dayIsos) {
@@ -250,7 +270,8 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
   );
 }
 
-const COMPACT_MAX_BARS = 6;
+const MONTH_MAX_BARS = 5;
+const UNASSIGNED_ZONE_LABEL = 'Без рабочей зоны';
 
 function PlannerWeekGrid({
   zones,
@@ -323,115 +344,100 @@ function formatDayModalTitle(isoDate) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function PlannerCompactZoneRow({ zone, dayIsos, todayIso, onDayOpen }) {
+function PlannerMonthCalendar({ dayIsos, itemsByDay, monthIso, todayIso, onDayOpen }) {
   return (
-    <div className="contents">
-      <div className="sticky left-0 z-10 border-b border-r border-line bg-surface px-3 py-2 text-sm font-medium leading-snug text-ink">
-        {zone.name}
-      </div>
-      {dayIsos.map((iso, index) => {
-        const items = plannerZoneDayItems(zone, iso);
-        const bars = items.slice(0, COMPACT_MAX_BARS);
-        const hiddenCount = items.length - bars.length;
-        const isToday = iso === todayIso;
-        const isWeekend = index >= 5;
-        return (
-          <button
-            key={iso}
-            type="button"
-            onClick={() => onDayOpen(iso)}
-            title={`${zone.name} · ${formatDayHeader(iso)} · ${items.length || 'свободно'}`}
-            className={`flex min-h-11 flex-col gap-1 border-b border-line-soft px-1.5 py-1.5 transition-colors hover:bg-surface-subtle/70 ${
-              isToday ? 'bg-brand-50/40' : isWeekend ? 'bg-danger-50/40' : 'bg-surface'
+    <div className="overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
+      <div className="grid grid-cols-7 border-b border-line bg-surface-muted">
+        {WEEKDAYS.map((label, index) => (
+          <div
+            key={label}
+            className={`py-2 text-center text-xs font-semibold uppercase tracking-wide ${
+              index >= 5 ? 'text-danger-700' : 'text-ink-muted'
             }`}
           >
-            <span className={`text-[11px] font-semibold leading-none tabular-nums ${isToday ? 'text-brand-800' : 'text-ink-faint'}`}>
-              {iso.slice(8)}
-            </span>
-            <span className="flex flex-col gap-[3px]">
-              {bars.map((item) => (
-                <span key={plannerItemKey(item)} className={`h-[3px] w-full rounded-full ${plannerItemBarColor(item)}`} />
-              ))}
-              {hiddenCount > 0 ? (
-                <span className="text-[10px] leading-none text-ink-faint">+{hiddenCount}</span>
-              ) : null}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function PlannerCompactWeek({ zones, dayHeaders, todayIso, loading, onDayOpen }) {
-  const dayIsos = dayHeaders.map((day) => String(day.date).slice(0, 10));
-  return (
-    <div className="hidden overflow-x-auto md:block">
-      <div className="min-w-[42rem] overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
-        <div
-          className="grid w-full"
-          style={{ gridTemplateColumns: 'minmax(5rem, 7.3rem) repeat(7, minmax(3.25rem, 1fr))' }}
-        >
-          <div className="sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Зона
+            {label}
           </div>
-          {dayHeaders.map((day, index) => {
-            const iso = String(day.date).slice(0, 10);
-            const isToday = iso === todayIso;
-            const isWeekend = index >= 5;
-            return (
-              <div
-                key={iso}
-                className={`border-b border-r border-line py-2 text-center text-xs font-semibold uppercase tracking-wide ${
-                  isToday
-                    ? 'bg-brand-50 text-brand-800'
-                    : isWeekend
-                      ? 'bg-danger-50/60 text-ink-muted'
-                      : 'bg-surface-muted text-ink-muted'
+        ))}
+      </div>
+      <div className="grid grid-cols-7">
+        {dayIsos.map((iso, index) => {
+          const items = itemsByDay[iso] || [];
+          const bars = items.slice(0, MONTH_MAX_BARS);
+          const hiddenCount = items.length - bars.length;
+          const isToday = iso === todayIso;
+          const inMonth = iso.slice(0, 7) === monthIso;
+          const isWeekend = index % 7 >= 5;
+          const background = isToday
+            ? 'bg-brand-50/60'
+            : !inMonth
+              ? 'bg-surface-muted/50'
+              : isWeekend
+                ? 'bg-danger-50/40'
+                : 'bg-surface';
+          return (
+            <button
+              key={iso}
+              type="button"
+              onClick={() => onDayOpen(iso)}
+              title={`${formatDayModalTitle(iso)} · ${items.length ? `${items.length} на этот день` : 'свободно'}`}
+              className={`flex min-h-16 flex-col gap-1 border-b border-r border-line-soft p-1.5 text-left transition-colors hover:bg-surface-subtle/70 md:min-h-20 ${background}`}
+            >
+              <span
+                className={`text-xs font-semibold leading-none tabular-nums ${
+                  isToday ? 'text-brand-800' : inMonth ? 'text-ink-soft' : 'text-ink-faint'
                 }`}
               >
-                {WEEKDAYS[index]}
-              </div>
-            );
-          })}
-
-          {zones.length === 0 && !loading ? (
-            <div className="col-span-8 px-4 py-8 text-center text-sm text-ink-muted">
-              Нет рабочих зон. Добавьте их в настройках автосервиса.
-            </div>
-          ) : (
-            zones.map((zone) => (
-              <PlannerCompactZoneRow
-                key={zone.id ?? 'unassigned'}
-                zone={zone}
-                dayIsos={dayIsos}
-                todayIso={todayIso}
-                onDayOpen={onDayOpen}
-              />
-            ))
-          )}
-        </div>
+                {Number(iso.slice(8, 10))}
+              </span>
+              <span className="flex flex-col gap-[3px]">
+                {bars.map((item) => (
+                  <span
+                    key={plannerItemKey(item)}
+                    className={`h-[3px] w-full rounded-full ${plannerItemBarColor(item)}`}
+                  />
+                ))}
+                {hiddenCount > 0 ? (
+                  <span className="text-[10px] leading-none text-ink-faint">+{hiddenCount}</span>
+                ) : null}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function PlannerDayModal({ open, dayIso, zones, onClose, onItemClick }) {
-  const sections = (zones || [])
-    .map((zone) => ({ zone, items: plannerZoneDayItems(zone, dayIso) }))
-    .filter((section) => section.items.length > 0);
+function plannerMonthZoneSections(items) {
+  const sections = new Map();
+  items.forEach((item) => {
+    const key = item.work_zone_id ?? 'unassigned';
+    if (!sections.has(key)) {
+      sections.set(key, {
+        key,
+        name: item.work_zone_name || UNASSIGNED_ZONE_LABEL,
+        items: [],
+      });
+    }
+    sections.get(key).items.push(item);
+  });
+  return [...sections.values()];
+}
+
+function PlannerDayModal({ open, dayIso, sections, onClose, onItemClick }) {
+  const visibleSections = (sections || []).filter((section) => section.items.length > 0);
 
   return (
     <Modal open={open} onClose={onClose} title={dayIso ? formatDayModalTitle(dayIso) : ''} size="md">
-      {sections.length === 0 ? (
+      {visibleSections.length === 0 ? (
         <p className="rounded-sg border border-dashed border-line-strong bg-surface px-4 py-8 text-center text-sm text-ink-muted">
           На этот день ничего нет
         </p>
       ) : (
         <div className="space-y-4">
-          {sections.map(({ zone, items }) => (
-            <section key={zone.id ?? 'unassigned'}>
-              <h3 className="text-sm font-semibold text-ink">{zone.name}</h3>
+          {visibleSections.map(({ key, name, items }) => (
+            <section key={key}>
+              <h3 className="text-sm font-semibold text-ink">{name}</h3>
               <ul className="mt-1.5 space-y-1.5">
                 {items.map((item) => {
                   const vehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ')
@@ -493,8 +499,8 @@ function PlannerViewModeSwitch({ viewMode, onChange }) {
       ),
     },
     {
-      id: 'compact',
-      label: 'Календарь',
+      id: 'month',
+      label: 'Календарь на месяц',
       icon: (
         <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden>
           <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
@@ -508,14 +514,14 @@ function PlannerViewModeSwitch({ viewMode, onChange }) {
 
   return (
     <div
-      className="relative ml-1 hidden shrink-0 items-center rounded-sg-sm bg-surface p-0.5 ring-1 ring-line/80 md:inline-flex"
+      className="relative ml-0.5 inline-flex shrink-0 items-center rounded-sg-sm bg-surface p-0.5 ring-1 ring-line/80"
       role="group"
       aria-label="Вид планировщика"
     >
       <span
         aria-hidden="true"
         className="pointer-events-none absolute left-0.5 top-0.5 h-7 w-7 rounded-sg-sm bg-brand-600 shadow-sg-sm transition-transform duration-200"
-        style={{ transform: viewMode === 'compact' ? 'translateX(100%)' : 'translateX(0)' }}
+        style={{ transform: viewMode === 'month' ? 'translateX(100%)' : 'translateX(0)' }}
       />
       {modes.map((mode) => {
         const active = viewMode === mode.id;
@@ -540,7 +546,7 @@ function PlannerViewModeSwitch({ viewMode, onChange }) {
 }
 
 function WeekToolbar({
-  weekRangeLabel,
+  periodLabel,
   selectedDateIso,
   viewMode,
   onViewModeChange,
@@ -549,13 +555,14 @@ function WeekToolbar({
   onToday,
   onJumpDate,
 }) {
+  const periodWord = viewMode === 'month' ? 'месяц' : 'неделя';
   return (
     <div className="inline-flex w-full items-center gap-1 rounded-sg bg-surface-subtle p-1 md:w-auto">
       <button
         type="button"
         onClick={onPrev}
         className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm text-ink-muted transition hover:bg-surface hover:text-ink md:h-9 md:w-9"
-        aria-label="Предыдущая неделя"
+        aria-label={`Предыдущий ${periodWord}`}
       >
         ←
       </button>
@@ -567,16 +574,16 @@ function WeekToolbar({
         Сегодня
       </button>
       <span className="min-w-0 flex-1 truncate px-1 text-center text-sm font-semibold text-ink md:hidden">
-        {weekRangeLabel}
+        {periodLabel}
       </span>
       <span className="hidden min-w-[9rem] px-2 text-center text-sm font-medium text-ink md:inline">
-        {weekRangeLabel}
+        {periodLabel}
       </span>
       <button
         type="button"
         onClick={onNext}
         className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm text-ink-muted transition hover:bg-surface hover:text-ink md:h-9 md:w-9"
-        aria-label="Следующая неделя"
+        aria-label={`Следующий ${periodWord}`}
       >
         →
       </button>
@@ -590,7 +597,7 @@ function WeekToolbar({
           value={selectedDateIso}
           onChange={(e) => onJumpDate(e.target.value)}
           className="absolute inset-0 cursor-pointer opacity-0"
-          aria-label="Перейти к неделе по дате"
+          aria-label={`Перейти к ${periodWord === 'месяц' ? 'месяцу' : 'неделе'} по дате`}
         />
       </label>
       <PlannerViewModeSwitch viewMode={viewMode} onChange={onViewModeChange} />
@@ -770,7 +777,9 @@ export default function AutoservicePlannerPage() {
   const today = useMemo(() => new Date(), []);
   const todayIso = toIsoDate(today);
   const [weekStart, setWeekStart] = useState(() => getWeekStart(today));
+  const [monthStart, setMonthStart] = useState(() => getMonthStart(today));
   const [plannerData, setPlannerData] = useState(null);
+  const [monthData, setMonthData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [viewOrder, setViewOrder] = useState(null);
@@ -788,12 +797,14 @@ export default function AutoservicePlannerPage() {
 
   const changeViewMode = (next) => {
     setViewMode(next);
+    setDayModalIso(null);
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(PLANNER_VIEW_STORAGE_KEY, next);
     }
   };
 
   const weekStartIso = toIsoDate(weekStart);
+  const monthStartIso = toIsoDate(monthStart);
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
     [weekStart],
@@ -803,15 +814,21 @@ export default function AutoservicePlannerPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await apiRequest(`/autoservice/planner/week?week_start=${weekStartIso}`);
-      setPlannerData(data);
+      if (viewMode === 'month') {
+        const data = await apiRequest(`/autoservice/planner/month?month_start=${monthStartIso}`);
+        setMonthData(data);
+      } else {
+        const data = await apiRequest(`/autoservice/planner/week?week_start=${weekStartIso}`);
+        setPlannerData(data);
+      }
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить планировщик');
-      setPlannerData(null);
+      if (viewMode === 'month') setMonthData(null);
+      else setPlannerData(null);
     } finally {
       setLoading(false);
     }
-  }, [weekStartIso]);
+  }, [viewMode, weekStartIso, monthStartIso]);
 
   useEffect(() => {
     if (isReady && isAuthenticated) load();
@@ -848,12 +865,35 @@ export default function AutoservicePlannerPage() {
     setSelectedDayIso(todayIso >= startIso && todayIso <= endIso ? todayIso : startIso);
   };
 
+  const shiftMonth = (delta) => {
+    setDayModalIso(null);
+    const nextMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + delta, 1);
+    setMonthStart(nextMonthStart);
+    const firstIso = toIsoDate(nextMonthStart);
+    const lastIso = toIsoDate(new Date(nextMonthStart.getFullYear(), nextMonthStart.getMonth() + 1, 0));
+    setSelectedDayIso(todayIso >= firstIso && todayIso <= lastIso ? todayIso : firstIso);
+  };
+
+  const shiftPeriod = (delta) => {
+    if (viewMode === 'month') shiftMonth(delta);
+    else shiftWeek(delta);
+  };
+
+  const goToday = () => {
+    setDayModalIso(null);
+    setWeekStart(getWeekStart(today));
+    setMonthStart(getMonthStart(today));
+    setSelectedDayIso(todayIso);
+  };
+
   const jumpToDate = (isoDate) => {
     if (!isoDate) return;
     setDayModalIso(null);
     const [y, m, d] = String(isoDate).split('-').map(Number);
     if (!y || !m || !d) return;
-    setWeekStart(getWeekStart(new Date(y, m - 1, d)));
+    const target = new Date(y, m - 1, d);
+    setWeekStart(getWeekStart(target));
+    setMonthStart(getMonthStart(target));
     setSelectedDayIso(isoDate);
   };
 
@@ -890,11 +930,44 @@ export default function AutoservicePlannerPage() {
     ? plannerData.days
     : weekDays.map((day) => ({ date: toIsoDate(day) }));
   const weekRangeLabel = formatWeekRange(dayHeaders[0]?.date, dayHeaders[6]?.date);
-  const selectedDateIso = toIsoDate(weekStart);
   const dayIsos = dayHeaders.map((day) => String(day.date).slice(0, 10));
-  const activeDayIso = dayIsos.includes(selectedDayIso)
+
+  const monthGrid = monthData?.days || [];
+  const monthDayIsos = monthGrid.length
+    ? monthGrid.map((day) => String(day.date).slice(0, 10))
+    : buildMonthGridIsos(monthStart);
+  const monthItems = monthGrid.flatMap((day) => day.orders || []);
+  const monthItemsByDay = {};
+  monthDayIsos.forEach((iso) => {
+    monthItemsByDay[iso] = sortDayOrders(
+      monthItems.filter((item) => plannerItemCoversDay(item, iso)),
+    );
+  });
+
+  const visibleDayIsos = viewMode === 'month' ? monthDayIsos : dayIsos;
+  const activeDayIso = visibleDayIsos.includes(selectedDayIso)
     ? selectedDayIso
-    : (dayIsos.includes(todayIso) ? todayIso : dayIsos[0]);
+    : (visibleDayIsos.includes(todayIso) ? todayIso : visibleDayIsos[0]);
+  const selectedDateIso = viewMode === 'month' ? activeDayIso : toIsoDate(weekStart);
+  const periodLabel = viewMode === 'month' ? formatMonthLabel(monthStart) : weekRangeLabel;
+  const zonesForForms = viewMode === 'month'
+    ? (monthData?.zones || []).map((zone) => ({ id: zone.id, name: zone.name }))
+    : zones;
+
+  const dayModalSections = !dayModalIso
+    ? []
+    : viewMode === 'month'
+      ? plannerMonthZoneSections(monthItemsByDay[dayModalIso] || [])
+      : zones.map((zone) => ({
+          key: zone.id ?? 'unassigned',
+          name: zone.name,
+          items: plannerZoneDayItems(zone, dayModalIso),
+        }));
+
+  const openMonthDay = (iso) => {
+    setSelectedDayIso(iso);
+    setDayModalIso(iso);
+  };
 
   const handleOpenCreate = () => {
     beginCreateInspection({ dayIso: activeDayIso, zoneId: null });
@@ -936,16 +1009,13 @@ export default function AutoservicePlannerPage() {
             Создать
           </button>
           <WeekToolbar
-            weekRangeLabel={weekRangeLabel}
+            periodLabel={periodLabel}
             selectedDateIso={selectedDateIso}
             viewMode={viewMode}
             onViewModeChange={changeViewMode}
-            onPrev={() => shiftWeek(-1)}
-            onNext={() => shiftWeek(1)}
-            onToday={() => {
-              setWeekStart(getWeekStart(today));
-              setSelectedDayIso(todayIso);
-            }}
+            onPrev={() => shiftPeriod(-1)}
+            onNext={() => shiftPeriod(1)}
+            onToday={goToday}
             onJumpDate={jumpToDate}
           />
         </div>
@@ -953,45 +1023,54 @@ export default function AutoservicePlannerPage() {
 
       <Toast message={error} variant="error" onClose={() => setError('')} />
 
-      <MobileDayPlanner
-        dayHeaders={dayHeaders}
-        zones={zones}
-        todayIso={todayIso}
-        selectedDayIso={activeDayIso}
-        onSelectDay={setSelectedDayIso}
-        onSwipeDay={shiftDay}
-        onItemClick={handlePlannerItemClick}
-        onCellContextMenu={handleCellContextMenu}
-        onAddInZone={openCreateChoice}
-        canEditZone={canEditZone}
-        loading={loading}
-      />
-
-      {viewMode === 'compact' ? (
-        <PlannerCompactWeek
-          zones={zones}
-          dayHeaders={dayHeaders}
-          todayIso={todayIso}
-          loading={loading}
-          onDayOpen={setDayModalIso}
-        />
+      {viewMode === 'month' ? (
+        <>
+          <PlannerMonthCalendar
+            dayIsos={monthDayIsos}
+            itemsByDay={monthItemsByDay}
+            monthIso={monthStartIso}
+            todayIso={todayIso}
+            onDayOpen={openMonthDay}
+          />
+          {loading ? (
+            <p className="mt-3 text-sm text-ink-muted" aria-live="polite">
+              Загрузка…
+            </p>
+          ) : null}
+        </>
       ) : (
-        <PlannerWeekGrid
-          zones={zones}
-          dayHeaders={dayHeaders}
-          dayIsos={dayIsos}
-          todayIso={todayIso}
-          loading={loading}
-          onItemClick={handlePlannerItemClick}
-          onCellContextMenu={handleCellContextMenu}
-        />
-      )}
+        <>
+          <MobileDayPlanner
+            dayHeaders={dayHeaders}
+            zones={zones}
+            todayIso={todayIso}
+            selectedDayIso={activeDayIso}
+            onSelectDay={setSelectedDayIso}
+            onSwipeDay={shiftDay}
+            onItemClick={handlePlannerItemClick}
+            onCellContextMenu={handleCellContextMenu}
+            onAddInZone={openCreateChoice}
+            canEditZone={canEditZone}
+            loading={loading}
+          />
 
-      {loading ? (
-        <p className="mt-3 hidden text-sm text-ink-muted md:block" aria-live="polite">
-          Загрузка…
-        </p>
-      ) : null}
+          <PlannerWeekGrid
+            zones={zones}
+            dayHeaders={dayHeaders}
+            dayIsos={dayIsos}
+            todayIso={todayIso}
+            loading={loading}
+            onItemClick={handlePlannerItemClick}
+            onCellContextMenu={handleCellContextMenu}
+          />
+
+          {loading ? (
+            <p className="mt-3 hidden text-sm text-ink-muted md:block" aria-live="polite">
+              Загрузка…
+            </p>
+          ) : null}
+        </>
+      )}
 
       <RepairOrderViewModal
         order={viewOrder}
@@ -1039,7 +1118,7 @@ export default function AutoservicePlannerPage() {
       <PlannerDayModal
         open={Boolean(dayModalIso)}
         dayIso={dayModalIso}
-        zones={zones}
+        sections={dayModalSections}
         onClose={() => setDayModalIso(null)}
         onItemClick={handlePlannerItemClick}
       />
@@ -1049,7 +1128,7 @@ export default function AutoservicePlannerPage() {
         onClose={() => setInspectionModalOpen(false)}
         initialPreferredDate={inspectionPrefillDate}
         workZoneId={inspectionPrefillZoneId}
-        zones={zones}
+        zones={zonesForForms}
         canEdit={anyEditable}
         onCreated={() => {
           setInspectionModalOpen(false);
@@ -1060,7 +1139,7 @@ export default function AutoservicePlannerPage() {
       <InspectionBookingAddModal
         open={Boolean(viewInspection)}
         onClose={() => setViewInspection(null)}
-        zones={zones}
+        zones={zonesForForms}
         canEdit={canEditZone(viewInspection?.work_zone_id)}
         onCreateOrder={(booking) => {
           setViewInspection(null);
