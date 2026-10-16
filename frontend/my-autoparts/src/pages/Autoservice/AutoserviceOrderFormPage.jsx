@@ -180,20 +180,6 @@ function fromLocalInputValue(local) {
   return local.length === 16 ? `${local}:00` : local;
 }
 
-function toDateInputValue(iso) {
-  if (!iso) return '';
-  const d = parseWallClockDate(iso);
-  if (!d || Number.isNaN(d.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function todayDateInputValue() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 function emptyWork() {
   return { title: '', catalog_work_id: '', qty: 1, unit_price: '', executors: [] };
 }
@@ -648,9 +634,9 @@ function mapOrderToFormState(order) {
     scheduledEndAt: order?.scheduled_end_at
       ? toLocalInputValue(order.scheduled_end_at)
       : '',
-    shippingDate: order?.shipping_date
-      ? toDateInputValue(order.shipping_date)
-      : todayDateInputValue(),
+    inspectionScheduledAt: order?.inspection_scheduled_at
+      ? toLocalInputValue(order.inspection_scheduled_at)
+      : '',
     mileageKm: order?.mileage_km != null && order?.mileage_km !== ''
       ? String(order.mileage_km)
       : '',
@@ -768,7 +754,7 @@ export default function AutoserviceOrderFormPage() {
   const [comment, setComment] = useState('');
   const [staffComment, setStaffComment] = useState('');
   const [scheduledEndAt, setScheduledEndAt] = useState('');
-  const [shippingDate, setShippingDate] = useState(todayDateInputValue);
+  const [inspectionScheduledAt, setInspectionScheduledAt] = useState('');
   const [mileageKm, setMileageKm] = useState('');
   const [workZoneId, setWorkZoneId] = useState('');
   const [deliveries, setDeliveries] = useState([]);
@@ -838,7 +824,7 @@ export default function AutoserviceOrderFormPage() {
     setStaffComment(state.staffComment);
     setWorkZoneId(state.workZoneId);
     setScheduledEndAt(state.scheduledEndAt);
-    setShippingDate(state.shippingDate || todayDateInputValue());
+    setInspectionScheduledAt(state.inspectionScheduledAt || '');
     setMileageKm(state.mileageKm || '');
     mileageTouchedRef.current = Boolean(state.mileageKm);
     setDeliveries(state.deliveries || []);
@@ -887,7 +873,7 @@ export default function AutoserviceOrderFormPage() {
       staffComment,
       workZoneId,
       scheduledEndAt,
-      shippingDate,
+      inspectionScheduledAt,
       mileageKm,
       deliveries,
       discountPercent,
@@ -911,7 +897,7 @@ export default function AutoserviceOrderFormPage() {
     staffComment,
     workZoneId,
     scheduledEndAt,
-    shippingDate,
+    inspectionScheduledAt,
     mileageKm,
     deliveries,
     discountPercent,
@@ -1046,6 +1032,9 @@ export default function AutoserviceOrderFormPage() {
     initial.pendingVehicleMake = prefill.vehicleMake || '';
     initial.pendingVehicleModel = prefill.vehicleModel || '';
     initial.inspectionBookingId = prefill.inspectionBookingId || null;
+    if (initial.inspectionBookingId) {
+      initial.inspectionScheduledAt = initial.scheduledAt;
+    }
     const draft = readRepairOrderPurchaseDraft();
     if (draft?.groups?.length) {
       setPendingPurchaseGroups(draft.groups);
@@ -1641,7 +1630,7 @@ export default function AutoserviceOrderFormPage() {
       inspection_booking_id: inspectionBookingId,
       scheduled_at: fromLocalInputValue(scheduledAt),
       scheduled_end_at: scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null,
-      shipping_date: shippingDate || null,
+      inspection_scheduled_at: inspectionScheduledAt ? fromLocalInputValue(inspectionScheduledAt) : null,
       mileage_km: mileageKm === '' || mileageKm == null ? null : Number(mileageKm),
       deliveries: deliveries.map((d) => ({
         title: d.title.trim(),
@@ -1764,7 +1753,7 @@ export default function AutoserviceOrderFormPage() {
     if (!ownMode && !iso) return 'Некорректная дата записи';
     const endIso = scheduledEndAt ? fromLocalInputValue(scheduledEndAt) : null;
     if (endIso && iso && new Date(endIso) <= new Date(iso)) {
-      return 'Время окончания должно быть позже времени начала';
+      return 'Дата конца должна быть позже даты начала';
     }
     if (mileageKm !== '' && mileageKm != null) {
       const mileage = Number(mileageKm);
@@ -1972,7 +1961,7 @@ export default function AutoserviceOrderFormPage() {
     staffComment,
     workZoneId,
     scheduledEndAt,
-    shippingDate,
+    inspectionScheduledAt,
     mileageKm,
     works,
     clientParts,
@@ -2254,7 +2243,7 @@ export default function AutoserviceOrderFormPage() {
             {ownMode ? null : (
               <>
                 <div className="min-w-0">
-                  <FieldLabel>Дата записи</FieldLabel>
+                  <FieldLabel>Дата начала</FieldLabel>
                   <input
                     type="datetime-local"
                     step={60}
@@ -2265,13 +2254,23 @@ export default function AutoserviceOrderFormPage() {
                   />
                 </div>
                 <div className="min-w-0">
-                  <FieldLabel optional>Окончание</FieldLabel>
+                  <FieldLabel optional>Дата конца</FieldLabel>
                   <input
                     type="datetime-local"
                     step={60}
                     className={pillDateInputClass}
                     value={scheduledEndAt}
                     onChange={(e) => setScheduledEndAt(e.target.value)}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <FieldLabel optional>Дата записи на осмотр</FieldLabel>
+                  <input
+                    type="datetime-local"
+                    step={60}
+                    className={pillDateInputClass}
+                    value={inspectionScheduledAt}
+                    onChange={(e) => setInspectionScheduledAt(e.target.value)}
                   />
                 </div>
                 <div className="min-w-0">
@@ -2289,15 +2288,6 @@ export default function AutoserviceOrderFormPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="min-w-0">
-                  <FieldLabel>Дата поступления запчастей</FieldLabel>
-                  <input
-                    type="date"
-                    className={pillDateInputClass}
-                    value={shippingDate}
-                    onChange={(e) => setShippingDate(e.target.value)}
-                  />
                 </div>
               </>
             )}

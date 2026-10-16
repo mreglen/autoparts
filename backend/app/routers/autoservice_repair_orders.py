@@ -118,7 +118,6 @@ from app.services.autoservice_warehouse_service import (
     manual_receipt_for_shop_part,
     product_available_qty,
     ReceiptDocumentBatch,
-    repair_order_receipt_doc_date,
     shop_part_is_manual_editable,
     update_manual_shop_part,
 )
@@ -435,7 +434,7 @@ def _to_staff_view(
         work_zone=_work_zone_brief(row.work_zone),
         scheduled_at=row.scheduled_at,
         scheduled_end_at=row.scheduled_end_at,
-        shipping_date=row.shipping_date,
+        inspection_scheduled_at=row.inspection_scheduled_at,
         mileage_km=row.mileage_km,
         accepted_by_user_id=row.accepted_by_user_id,
         created_by_user_id=row.created_by_user_id,
@@ -1230,7 +1229,6 @@ def _replace_shop_parts(
         org_id=org_id,
         user_id=user_id,
         repair_order_id=order.id,
-        receipt_doc_date=repair_order_receipt_doc_date(order),
     )
 
     for item in manual_items:
@@ -1672,6 +1670,7 @@ def create_repair_order(
     if is_own:
         scheduled_at = _normalize_dt(payload.scheduled_at) or datetime.utcnow()
         scheduled_end_at = None
+        inspection_scheduled_at = None
         work_zone_id = None
         assignees = _own_assignees(db, org_id, current_user)
         works = _prepare_own_works(db, org_id, current_user, payload.works)
@@ -1682,10 +1681,16 @@ def create_repair_order(
         if payload.scheduled_at is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Укажите дату записи",
+                detail="Укажите дату начала",
             )
         scheduled_at = _normalize_dt(payload.scheduled_at)
         scheduled_end_at = _validate_schedule_end(scheduled_at, payload.scheduled_end_at)
+        inspection_scheduled_at = _normalize_dt(payload.inspection_scheduled_at)
+        if inspection_scheduled_at is None and booking is not None and booking.preferred_date:
+            inspection_scheduled_at = datetime.combine(
+                booking.preferred_date,
+                booking.preferred_time or datetime.min.time(),
+            )
         work_zone_id = _validate_work_zone_id(db, org_id, payload.work_zone_id)
         assignees = _resolve_assignees(db, org_id, payload.assignee_user_ids)
         works = payload.works
@@ -1705,7 +1710,7 @@ def create_repair_order(
         work_zone_id=work_zone_id,
         scheduled_at=scheduled_at,
         scheduled_end_at=scheduled_end_at,
-        shipping_date=None if is_own else payload.shipping_date,
+        inspection_scheduled_at=inspection_scheduled_at,
         mileage_km=payload.mileage_km,
         accepted_by_user_id=current_user.id,
         created_by_user_id=current_user.id,
@@ -1812,8 +1817,8 @@ def update_repair_order(
         end_at = payload.scheduled_end_at
         row.scheduled_end_at = _validate_schedule_end(row.scheduled_at, end_at)
 
-    if not is_own and "shipping_date" in payload.model_fields_set:
-        row.shipping_date = payload.shipping_date
+    if not is_own and "inspection_scheduled_at" in payload.model_fields_set:
+        row.inspection_scheduled_at = _normalize_dt(payload.inspection_scheduled_at)
 
     if "mileage_km" in payload.model_fields_set:
         row.mileage_km = payload.mileage_km

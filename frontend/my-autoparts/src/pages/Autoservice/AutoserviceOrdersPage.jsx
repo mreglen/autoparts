@@ -554,7 +554,7 @@ export default function AutoserviceOrdersPage() {
                     onSort={handleSort}
                   />
                   <SortableDateTh
-                    label="Дата окончания"
+                    label="Дата конца"
                     column="scheduled_end_at"
                     sort={sort}
                     onSort={handleSort}

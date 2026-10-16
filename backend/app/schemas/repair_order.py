@@ -226,7 +226,7 @@ class RepairOrderCreate(BaseModel):
     inspection_booking_id: Optional[int] = Field(None, ge=1)
     scheduled_at: Optional[datetime] = None
     scheduled_end_at: Optional[datetime] = None
-    shipping_date: Optional[date] = None
+    inspection_scheduled_at: Optional[datetime] = None
     mileage_km: Optional[int] = Field(None, ge=0, le=9_999_999)
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
@@ -244,7 +244,7 @@ class RepairOrderUpdate(BaseModel):
     vehicle_id: Optional[int] = None
     scheduled_at: Optional[datetime] = None
     scheduled_end_at: Optional[datetime] = None
-    shipping_date: Optional[date] = None
+    inspection_scheduled_at: Optional[datetime] = None
     mileage_km: Optional[int] = Field(None, ge=0, le=9_999_999)
     client_comment: Optional[str] = Field(None, max_length=4000)
     staff_comment: Optional[str] = Field(None, max_length=4000)
@@ -283,7 +283,7 @@ class RepairOrderStaffView(BaseModel):
     work_zone: Optional[RepairOrderWorkZoneBrief] = None
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
-    shipping_date: Optional[date] = None
+    inspection_scheduled_at: Optional[datetime] = None
     mileage_km: Optional[int] = None
     accepted_by_user_id: int
     created_by_user_id: Optional[int] = None

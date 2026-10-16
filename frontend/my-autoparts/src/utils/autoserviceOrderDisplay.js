@@ -6,7 +6,7 @@ export function formatOrderTimeRange(order) {
     const end = formatWallClockDateTime(order.scheduled_end_at);
     return `${start} — ${end}`;
   }
-  return `${start} · Окончание не указано`;
+  return `${start} · Дата конца не указана`;
 }
 
 export function formatOrderClockRange(order) {

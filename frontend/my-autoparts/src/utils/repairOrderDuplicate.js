@@ -5,7 +5,7 @@ export function buildRepairOrderDuplicatePayload(order) {
     vehicle_id: order.vehicle_id,
     scheduled_at: order.scheduled_at,
     scheduled_end_at: order.scheduled_end_at ?? null,
-    shipping_date: order.shipping_date ?? null,
+    inspection_scheduled_at: order.inspection_scheduled_at ?? null,
     mileage_km: order.mileage_km ?? null,
     client_comment: order.client_comment ?? null,
     staff_comment: order.staff_comment ?? null,

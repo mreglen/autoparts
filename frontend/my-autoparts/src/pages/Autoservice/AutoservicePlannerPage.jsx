@@ -18,6 +18,7 @@ import {
   getWeekStart,
   plannerItemCoversDay,
   plannerItemEndDate,
+  plannerInspectionSegment,
   sortDayOrders,
   toIsoDate,
 } from '../../utils/autoservicePlannerLayout';
@@ -168,12 +169,13 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                 clientName,
                 titleVehicle,
               ].filter(Boolean).join(' · ');
+              const segment = plannerInspectionSegment(entry);
               return (
                 <button
                   key={plannerItemKey(item)}
                   type="button"
                   onClick={() => onItemClick(item)}
-                  className={`pointer-events-auto mx-0.5 my-px min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:mx-1 sm:my-0.5 sm:text-xs ${styleClass} ${
+                  className={`pointer-events-auto relative mx-0.5 my-px min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:mx-1 sm:my-0.5 sm:text-xs ${styleClass} ${
                     entry.continuesPastWeek ? 'rounded-r-none' : ''
                   } ${entry.continuesFromPrevWeek ? 'rounded-l-none' : ''}`}
                   style={{
@@ -182,8 +184,15 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                   }}
                   title={itemTitle}
                 >
-                  <span className="block truncate tabular-nums">{plannerBarTimeLabel(entry, dayIsos)}</span>
-                  <span className="mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
+                  {segment ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 bg-success-600/85"
+                      style={{ left: `${segment.leftPercent}%`, width: `${segment.widthPercent}%` }}
+                    />
+                  ) : null}
+                  <span className="relative block truncate tabular-nums">{plannerBarTimeLabel(entry, dayIsos)}</span>
+                  <span className="relative mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
                 </button>
               );
             })}

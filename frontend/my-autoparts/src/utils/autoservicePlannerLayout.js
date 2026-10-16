@@ -49,6 +49,15 @@ export function plannerItemCoversDay(item, isoDate, now = new Date()) {
   return isoDate <= toIsoDate(end);
 }
 
+export function plannerInspectionSegment(entry) {
+  if (!entry || !(entry.inspectionIdx >= 0)) return null;
+  const spanDays = entry.endIdx - entry.startIdx + 1;
+  return {
+    leftPercent: ((entry.inspectionIdx - entry.startIdx) / spanDays) * 100,
+    widthPercent: 100 / spanDays,
+  };
+}
+
 export function assignPlannerLanes(items, dayIsos, now = new Date()) {
   const weekEnd = dayIsos.length
     ? new Date(`${dayIsos[dayIsos.length - 1]}T23:59:59.999`)
@@ -76,7 +85,20 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
         continuesPastWeek = true;
       }
     }
-    placed.push({ item, startIdx, endIdx, continuesPastWeek, continuesFromPrevWeek });
+    let inspectionIdx = -1;
+    const inspection = parseWallClockDate(item.inspection_scheduled_at);
+    if (inspection) {
+      const idx = dayIsos.indexOf(toIsoDate(inspection));
+      if (idx >= startIdx && idx <= endIdx) inspectionIdx = idx;
+    }
+    placed.push({
+      item,
+      startIdx,
+      endIdx,
+      inspectionIdx,
+      continuesPastWeek,
+      continuesFromPrevWeek,
+    });
   }
   const subCount = dayIsos.length * 2;
   placed.sort((a, b) => {

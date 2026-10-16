@@ -5657,17 +5657,38 @@ def ensure_repair_order_status_timestamps() -> None:
     logger.info("Applied repair_orders status timestamp columns patch")
 
 
-def ensure_repair_orders_shipping_date() -> None:
-    """Add shipping_date to repair_orders for warehouse receipt dating."""
+def drop_repair_orders_shipping_date() -> None:
+    """Remove the obsolete shipping_date («дата поступления запчастей»)."""
     inspector = inspect(engine)
     if "repair_orders" not in inspector.get_table_names():
         return
     columns = {col["name"] for col in inspector.get_columns("repair_orders")}
-    if "shipping_date" in columns:
+    if "shipping_date" not in columns:
         return
     with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE repair_orders ADD COLUMN shipping_date DATE"))
-    logger.info("Applied repair_orders.shipping_date patch")
+        conn.execute(text("ALTER TABLE repair_orders DROP COLUMN shipping_date"))
+    logger.info("Dropped repair_orders.shipping_date")
+
+
+def ensure_repair_orders_inspection_scheduled_at() -> None:
+    """Add inspection_scheduled_at — дата и время записи на осмотр заказ-наряда."""
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+    if "inspection_scheduled_at" in columns:
+        return
+    with engine.begin() as conn:
+        column_type = (
+            "TIMESTAMPTZ" if engine.dialect.name == "postgresql" else "DATETIME"
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE repair_orders "
+                f"ADD COLUMN inspection_scheduled_at {column_type}"
+            )
+        )
+    logger.info("Applied repair_orders.inspection_scheduled_at patch")
 
 
 def ensure_repair_orders_mileage_km() -> None:

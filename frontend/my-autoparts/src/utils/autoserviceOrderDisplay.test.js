@@ -14,6 +14,6 @@ describe('autoserviceOrderDisplay', () => {
       scheduled_at: '2026-08-11T10:00:00',
       scheduled_end_at: null,
     });
-    expect(text).toContain('Окончание не указано');
+    expect(text).toContain('Дата конца не указана');
   });
 });

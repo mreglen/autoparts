@@ -31,6 +31,7 @@ def planner_order_item(row: RepairOrder) -> PlannerRepairOrder:
         status=row.status,
         scheduled_at=row.scheduled_at,
         scheduled_end_at=row.scheduled_end_at,
+        inspection_scheduled_at=row.inspection_scheduled_at,
         vehicle_make=row.vehicle.make if row.vehicle else None,
         vehicle_model=row.vehicle.model if row.vehicle else None,
         work_zone_id=row.work_zone_id,

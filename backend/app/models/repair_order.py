@@ -3,7 +3,6 @@ from decimal import Decimal
 from sqlalchemy import (
     Boolean,
     Column,
-    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -96,7 +95,7 @@ class RepairOrder(Base):
         index=True,
     )
     scheduled_end_at = Column(DateTime, nullable=True)
-    shipping_date = Column(Date, nullable=True)
+    inspection_scheduled_at = Column(DateTime, nullable=True)
     mileage_km = Column(Integer, nullable=True)
     vat_rate = Column(Numeric(5, 2), nullable=False, default=Decimal("22"))
     discount_percent = Column(Numeric(5, 2), nullable=False, default=Decimal("0"))

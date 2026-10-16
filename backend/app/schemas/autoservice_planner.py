@@ -18,6 +18,7 @@ class PlannerRepairOrder(BaseModel):
     status: str
     scheduled_at: datetime
     scheduled_end_at: Optional[datetime] = None
+    inspection_scheduled_at: Optional[datetime] = None
     preferred_time: Optional[time] = None
     vehicle_make: Optional[str] = None
     vehicle_model: Optional[str] = None

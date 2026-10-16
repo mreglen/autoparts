@@ -229,13 +229,6 @@ def _purchase_order_id_for_cart_item(
     return int(row[0]) if row else None
 
 
-def repair_order_receipt_doc_date(order) -> date:
-    shipped = getattr(order, "shipping_date", None)
-    if shipped:
-        return shipped
-    return date.today()
-
-
 @dataclass
 class _PendingReceiptLine:
     receipt: AutoserviceWarehouseReceipt

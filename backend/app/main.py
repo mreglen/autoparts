@@ -89,7 +89,8 @@ from app.db.schema_patches import (
     ensure_sms_messages_provider_column,
     ensure_site_settings_smsc_columns,
     ensure_repair_order_status_timestamps,
-    ensure_repair_orders_shipping_date,
+    drop_repair_orders_shipping_date,
+    ensure_repair_orders_inspection_scheduled_at,
     ensure_repair_orders_mileage_km,
     ensure_garage_vehicle_mileage_history,
     ensure_repair_orders_review_flow,
@@ -341,7 +342,8 @@ try:
     ensure_planner_mode_permissions()
     ensure_site_settings_smsc_columns()
     ensure_repair_order_status_timestamps()
-    ensure_repair_orders_shipping_date()
+    drop_repair_orders_shipping_date()
+    ensure_repair_orders_inspection_scheduled_at()
     ensure_repair_orders_mileage_km()
     ensure_repair_orders_vehicle_nullable()
     ensure_garage_vehicle_mileage_history()

@@ -91,6 +91,6 @@ def validate_schedule_end(
     if start and end <= start:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Время окончания должно быть позже времени начала",
+            detail="Дата конца должна быть позже даты начала",
         )
     return end

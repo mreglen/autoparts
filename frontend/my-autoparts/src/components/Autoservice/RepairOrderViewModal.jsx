@@ -1125,7 +1125,10 @@ export default function RepairOrderViewModal({
                 vehicleLabel(order.vehicle)
               )}
             </MetaItem>
-            <MetaItem label="Дата">{formatDateTime(order.scheduled_at) || '—'}</MetaItem>
+            <MetaItem label="Дата начала">{formatDateTime(order.scheduled_at) || '—'}</MetaItem>
+            {order.inspection_scheduled_at ? (
+              <MetaItem label="Дата записи на осмотр">{formatDateTime(order.inspection_scheduled_at)}</MetaItem>
+            ) : null}
             <MetaItem label="Пробег">
               {order.mileage_km != null && order.mileage_km !== ''
                 ? `${Number(order.mileage_km).toLocaleString('ru-RU')} км`
