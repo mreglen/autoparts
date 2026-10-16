@@ -28,14 +28,3 @@ export function repairOrderNumberLabel(order) {
   if (order?.id) return `Заявка #${order.id}`;
   return 'Заявка';
 }
-
-export function formatPersonNameWithInitials(name) {
-  const text = String(name || '').trim();
-  if (!text || text === '—') return '—';
-  const parts = text.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0];
-  const lastName = parts[0];
-  const firstName = parts[1];
-  const lastInitial = lastName.charAt(0).toUpperCase();
-  return `${firstName} ${lastInitial}.`;
-}

@@ -10,7 +10,7 @@ import PlannerCellContextMenu from '../../components/Autoservice/PlannerCellCont
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
 import Toast from '../../components/UI/Toast';
 import { apiRequest } from '../../utils/apiClient';
-import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
+import { formatOrderClockRange } from '../../utils/autoserviceOrderDisplay';
 import { parseWallClockDate, toDateInputValue } from '../../utils/serverDate';
 import {
   addDays,
@@ -160,9 +160,8 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
               const { item } = entry;
               const styleClass = plannerItemStyle(item);
               const clientName = item.client_name || '—';
-              const clientLabel = formatPersonNameWithInitials(clientName);
               const vehicleLabel = item.vehicle_make || '';
-              const nameWithVehicle = [clientLabel, vehicleLabel].filter(Boolean).join(' ');
+              const nameWithVehicle = [clientName, vehicleLabel].filter(Boolean).join(' ');
               const titleVehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ');
               const itemTitle = [
                 item.kind === 'inspection' ? 'Осмотр' : `№ ${item.order_number}`,
@@ -187,7 +186,7 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                   {segment ? (
                     <span
                       aria-hidden="true"
-                      className="absolute inset-y-0 bg-success-600/85"
+                      className="absolute inset-y-0 bg-success-600"
                       style={{ left: `${segment.leftPercent}%`, width: `${segment.widthPercent}%` }}
                     />
                   ) : null}
@@ -389,7 +388,7 @@ function MobileDayPlanner({
                           {order.kind === 'inspection' ? (
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-medium">
-                                {formatPersonNameWithInitials(order.client_name)}
+                                {order.client_name || '—'}
                               </span>
                               <span className="mt-0.5 block truncate text-sm opacity-80">
                                 {order.client_phone || '—'}
@@ -404,7 +403,7 @@ function MobileDayPlanner({
                                 <OrderStatusBadge status={order.status} className="shrink-0" noRing />
                               </span>
                               <span className="mt-0.5 block truncate text-sm opacity-80">
-                                {formatPersonNameWithInitials(order.client_name)}
+                                {order.client_name || '—'}
                                 {order.client_phone ? ` · ${order.client_phone}` : ''}
                               </span>
                             </span>

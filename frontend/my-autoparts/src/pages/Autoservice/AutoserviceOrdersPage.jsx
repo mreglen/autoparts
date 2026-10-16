@@ -77,7 +77,7 @@ function SortableDateTh({ label, column, sort, onSort, className = 'w-28' }) {
       <button
         type="button"
         onClick={() => onSort(column)}
-        className={`inline-flex items-center gap-1 transition hover:text-ink ${
+        className={`inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition hover:text-ink ${
           active ? 'text-ink' : 'text-ink-muted'
         }`}
       >

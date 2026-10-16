@@ -5,10 +5,7 @@ import Toast from '../UI/Toast';
 import RepairOrderViewModal from './RepairOrderViewModal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatFinanceCurrency } from '../../pages/Finance/financeDisplay';
-import {
-  formatOrderClockRange,
-  formatPersonNameWithInitials,
-} from '../../utils/autoserviceOrderDisplay';
+import { formatOrderClockRange } from '../../utils/autoserviceOrderDisplay';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 import { AUTOSERVICE_PAYMENT_METHOD_LABELS } from '../../utils/autoservicePaymentReceipt';
 
@@ -378,7 +375,7 @@ export default function AutoserviceDashboardAttentionModal({ open, type, summary
               {type === 'new_bookings' && rows.map((row) => (
                 <RowButton key={row.id} onClick={() => handleRowClick(row)}>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-ink">{formatPersonNameWithInitials(row.name) || '—'}</span>
+                    <span className="text-sm font-medium text-ink">{row.name || '—'}</span>
                     <span className="text-xs text-warning-700">Новая заявка</span>
                   </div>
                   <p className="mt-1 text-xs text-ink-muted">

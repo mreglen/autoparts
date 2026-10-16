@@ -18,7 +18,7 @@ import AutoserviceDashboardAttentionModal from '../../components/Autoservice/Aut
 import { apiRequest } from '../../utils/apiClient';
 import { getGreeting, getFirstName, MetricCard, PrimaryAction, QuickAction } from '../Dashboard/dashboardUi';
 import { formatFinanceCurrency } from '../Finance/financeDisplay';
-import { formatOrderClockRange, formatPersonNameWithInitials } from '../../utils/autoserviceOrderDisplay';
+import { formatOrderClockRange } from '../../utils/autoserviceOrderDisplay';
 import {
   AUTOSERVICE_PERMISSION,
   hasAutoservicePermission,
@@ -400,13 +400,13 @@ export default function AutoserviceDashboardPage() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-ink">
                     {item.kind === 'inspection'
-                      ? formatPersonNameWithInitials(item.client_name) || 'Осмотр'
+                      ? item.client_name || 'Осмотр'
                       : (item.vehicle && item.vehicle !== '—' ? item.vehicle : 'Авто')}
                   </span>
                   <span className="mt-0.5 block truncate text-sm text-ink-muted">
                     {item.kind === 'inspection'
                       ? `Осмотр${item.client_phone ? ` · ${item.client_phone}` : ''}`
-                      : formatPersonNameWithInitials(item.client_name)}
+                      : item.client_name}
                     {item.work_zone_name ? ` · ${item.work_zone_name}` : ''}
                   </span>
                 </span>
