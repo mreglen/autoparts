@@ -67,7 +67,7 @@ function formatMoney(value) {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function SortableDateTh({ label, column, sort, onSort, className = 'w-28' }) {
+function SortableDateTh({ label, column, sort, onSort, className = 'w-36' }) {
   const active = sort.by === column;
   return (
     <th
@@ -77,13 +77,11 @@ function SortableDateTh({ label, column, sort, onSort, className = 'w-28' }) {
       <button
         type="button"
         onClick={() => onSort(column)}
-        className={`inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition hover:text-ink ${
-          active ? 'text-ink' : 'text-ink-muted'
-        }`}
+        className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-bold uppercase tracking-wide text-ink-muted transition hover:text-ink"
       >
         {label}
         <svg
-          className={`h-3 w-3 shrink-0 transition-transform ${active ? 'opacity-100' : 'opacity-40'} ${
+          className={`h-3 w-3 shrink-0 transition-transform ${
             active && sort.dir === 'asc' ? 'rotate-180' : ''
           }`}
           fill="none"
@@ -558,7 +556,6 @@ export default function AutoserviceOrdersPage() {
                     column="scheduled_end_at"
                     sort={sort}
                     onSort={handleSort}
-                    className="w-32"
                   />
                 </>
               ) : null}
