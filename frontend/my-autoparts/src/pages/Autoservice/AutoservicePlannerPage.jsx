@@ -9,6 +9,7 @@ import PlannerCreateChoiceModal from '../../components/Autoservice/PlannerCreate
 import PlannerCellContextMenu from '../../components/Autoservice/PlannerCellContextMenu';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
 import Toast from '../../components/UI/Toast';
+import Modal from '../../components/UI/Modal';
 import { apiRequest } from '../../utils/apiClient';
 import { formatOrderClockRange } from '../../utils/autoserviceOrderDisplay';
 import { parseWallClockDate, toDateInputValue } from '../../utils/serverDate';
@@ -24,6 +25,12 @@ import {
 } from '../../utils/autoservicePlannerLayout';
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const PLANNER_VIEW_STORAGE_KEY = 'plannerViewMode';
+
+function readPlannerViewMode() {
+  if (typeof localStorage === 'undefined') return 'week';
+  return localStorage.getItem(PLANNER_VIEW_STORAGE_KEY) === 'compact' ? 'compact' : 'week';
+}
 
 const ORDER_STATUS_STYLES = {
   pending: 'bg-warning-100 text-warning-700 hover:bg-warning-50',
@@ -46,6 +53,36 @@ function plannerItemStyle(item) {
   }
   const status = normalizeRepairOrderStatus(item?.status);
   return ORDER_STATUS_STYLES[status] || ORDER_STATUS_STYLES.pending;
+}
+
+const ORDER_BAR_COLORS = {
+  pending: 'bg-warning-600',
+  in_progress: 'bg-brand-400',
+  done: 'bg-brand-500',
+  completed: 'bg-ink-muted',
+  cancelled: 'bg-line-strong',
+};
+
+const INSPECTION_BAR_COLORS = {
+  new: 'bg-success-600',
+  confirmed: 'bg-success-600',
+  processed: 'bg-success-700',
+  cancelled: 'bg-line-strong',
+};
+
+function plannerItemBarColor(item) {
+  if (item?.kind === 'inspection') {
+    return INSPECTION_BAR_COLORS[item.status] || INSPECTION_BAR_COLORS.new;
+  }
+  return ORDER_BAR_COLORS[normalizeRepairOrderStatus(item?.status)] || ORDER_BAR_COLORS.pending;
+}
+
+function plannerZoneDayItems(zone, dayIso) {
+  return sortDayOrders(
+    (zone?.days || [])
+      .flatMap((day) => day.orders || [])
+      .filter((item) => plannerItemCoversDay(item, dayIso)),
+  );
 }
 
 function plannerItemTimeLabel(item) {
@@ -213,9 +250,300 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
   );
 }
 
+const COMPACT_MAX_BARS = 6;
+
+function PlannerWeekGrid({
+  zones,
+  dayHeaders,
+  dayIsos,
+  todayIso,
+  loading,
+  onItemClick,
+  onCellContextMenu,
+}) {
+  return (
+    <div className="hidden overflow-x-auto md:block">
+      <div className="min-w-[52rem] overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
+        <div
+          className="grid w-full"
+          style={{ gridTemplateColumns: 'minmax(5rem, 7.3rem) repeat(7, minmax(6.5rem, 1fr))' }}
+        >
+          <div className="sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            Зона
+          </div>
+          {dayHeaders.map((day, index) => {
+            const iso = String(day.date).slice(0, 10);
+            const isToday = iso === todayIso;
+            const isWeekend = index >= 5;
+            return (
+              <div
+                key={iso}
+                className={`border-b border-r border-line px-2 py-2 text-center ${
+                  isToday
+                    ? 'bg-brand-50 text-brand-800'
+                    : isWeekend
+                      ? 'bg-danger-50/60 text-ink-muted'
+                      : 'bg-surface-muted text-ink-muted'
+                }`}
+              >
+                <div className="text-xs font-semibold uppercase tracking-wide sm:text-sm">
+                  <span>{WEEKDAYS[index]}</span>{' '}
+                  <span className={`normal-case tracking-normal ${isToday ? 'text-brand-900' : 'text-ink'}`}>
+                    {formatDayHeader(iso)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+
+          {zones.length === 0 && !loading ? (
+            <div className="col-span-8 px-4 py-8 text-center text-sm text-ink-muted">
+              Нет рабочих зон. Добавьте их в настройках автосервиса.
+            </div>
+          ) : (
+            zones.map((zone) => (
+              <PlannerZoneWeekRow
+                key={zone.id ?? 'unassigned'}
+                zone={zone}
+                dayIsos={dayIsos}
+                todayIso={todayIso}
+                onItemClick={onItemClick}
+                onCellContextMenu={onCellContextMenu}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatDayModalTitle(isoDate) {
+  const label = formatLongDay(isoDate);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function PlannerCompactZoneRow({ zone, dayIsos, todayIso, onDayOpen }) {
+  return (
+    <div className="contents">
+      <div className="sticky left-0 z-10 border-b border-r border-line bg-surface px-3 py-2 text-sm font-medium leading-snug text-ink">
+        {zone.name}
+      </div>
+      {dayIsos.map((iso, index) => {
+        const items = plannerZoneDayItems(zone, iso);
+        const bars = items.slice(0, COMPACT_MAX_BARS);
+        const hiddenCount = items.length - bars.length;
+        const isToday = iso === todayIso;
+        const isWeekend = index >= 5;
+        return (
+          <button
+            key={iso}
+            type="button"
+            onClick={() => onDayOpen(iso)}
+            title={`${zone.name} · ${formatDayHeader(iso)} · ${items.length || 'свободно'}`}
+            className={`flex min-h-11 flex-col gap-1 border-b border-line-soft px-1.5 py-1.5 transition-colors hover:bg-surface-subtle/70 ${
+              isToday ? 'bg-brand-50/40' : isWeekend ? 'bg-danger-50/40' : 'bg-surface'
+            }`}
+          >
+            <span className={`text-[11px] font-semibold leading-none tabular-nums ${isToday ? 'text-brand-800' : 'text-ink-faint'}`}>
+              {iso.slice(8)}
+            </span>
+            <span className="flex flex-col gap-[3px]">
+              {bars.map((item) => (
+                <span key={plannerItemKey(item)} className={`h-[3px] w-full rounded-full ${plannerItemBarColor(item)}`} />
+              ))}
+              {hiddenCount > 0 ? (
+                <span className="text-[10px] leading-none text-ink-faint">+{hiddenCount}</span>
+              ) : null}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlannerCompactWeek({ zones, dayHeaders, todayIso, loading, onDayOpen }) {
+  const dayIsos = dayHeaders.map((day) => String(day.date).slice(0, 10));
+  return (
+    <div className="hidden overflow-x-auto md:block">
+      <div className="min-w-[42rem] overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
+        <div
+          className="grid w-full"
+          style={{ gridTemplateColumns: 'minmax(5rem, 7.3rem) repeat(7, minmax(3.25rem, 1fr))' }}
+        >
+          <div className="sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            Зона
+          </div>
+          {dayHeaders.map((day, index) => {
+            const iso = String(day.date).slice(0, 10);
+            const isToday = iso === todayIso;
+            const isWeekend = index >= 5;
+            return (
+              <div
+                key={iso}
+                className={`border-b border-r border-line py-2 text-center text-xs font-semibold uppercase tracking-wide ${
+                  isToday
+                    ? 'bg-brand-50 text-brand-800'
+                    : isWeekend
+                      ? 'bg-danger-50/60 text-ink-muted'
+                      : 'bg-surface-muted text-ink-muted'
+                }`}
+              >
+                {WEEKDAYS[index]}
+              </div>
+            );
+          })}
+
+          {zones.length === 0 && !loading ? (
+            <div className="col-span-8 px-4 py-8 text-center text-sm text-ink-muted">
+              Нет рабочих зон. Добавьте их в настройках автосервиса.
+            </div>
+          ) : (
+            zones.map((zone) => (
+              <PlannerCompactZoneRow
+                key={zone.id ?? 'unassigned'}
+                zone={zone}
+                dayIsos={dayIsos}
+                todayIso={todayIso}
+                onDayOpen={onDayOpen}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlannerDayModal({ open, dayIso, zones, onClose, onItemClick }) {
+  const sections = (zones || [])
+    .map((zone) => ({ zone, items: plannerZoneDayItems(zone, dayIso) }))
+    .filter((section) => section.items.length > 0);
+
+  return (
+    <Modal open={open} onClose={onClose} title={dayIso ? formatDayModalTitle(dayIso) : ''} size="md">
+      {sections.length === 0 ? (
+        <p className="rounded-sg border border-dashed border-line-strong bg-surface px-4 py-8 text-center text-sm text-ink-muted">
+          На этот день ничего нет
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {sections.map(({ zone, items }) => (
+            <section key={zone.id ?? 'unassigned'}>
+              <h3 className="text-sm font-semibold text-ink">{zone.name}</h3>
+              <ul className="mt-1.5 space-y-1.5">
+                {items.map((item) => {
+                  const vehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ')
+                    || (item.vehicle && item.vehicle !== '—' ? item.vehicle : '');
+                  return (
+                    <li key={plannerItemKey(item)}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onItemClick(item);
+                        }}
+                        className="flex w-full items-start gap-3 rounded-sg border border-line bg-surface px-3 py-2.5 text-left transition hover:border-brand-300 hover:bg-brand-50/40"
+                      >
+                        <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${plannerItemBarColor(item)}`} />
+                        <span className="w-16 shrink-0 pt-0.5 text-sm font-semibold tabular-nums text-ink-soft">
+                          {plannerItemMobileTimeLabel(item, dayIso)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-1.5">
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+                              {item.client_name || '—'}
+                            </span>
+                            {item.kind === 'inspection' ? (
+                              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-success-700">
+                                Осмотр
+                              </span>
+                            ) : (
+                              <OrderStatusBadge status={item.status} className="shrink-0" noRing />
+                            )}
+                          </span>
+                          <span className="mt-0.5 block truncate text-sm text-ink-muted">
+                            {vehicle || '—'}
+                            {item.kind === 'inspection' && item.client_phone ? ` · ${item.client_phone}` : ''}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function PlannerViewModeSwitch({ viewMode, onChange }) {
+  const modes = [
+    {
+      id: 'week',
+      label: 'Недельная сетка',
+      icon: (
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+          <path strokeLinecap="round" d="M4 7h9M4 12h16M4 17h6" />
+        </svg>
+      ),
+    },
+    {
+      id: 'compact',
+      label: 'Календарь',
+      icon: (
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden>
+          <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+          <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+          <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+          <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div
+      className="relative ml-1 hidden shrink-0 items-center rounded-sg-sm bg-surface p-0.5 ring-1 ring-line/80 md:inline-flex"
+      role="group"
+      aria-label="Вид планировщика"
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-0.5 top-0.5 h-7 w-7 rounded-sg-sm bg-brand-600 shadow-sg-sm transition-transform duration-200"
+        style={{ transform: viewMode === 'compact' ? 'translateX(100%)' : 'translateX(0)' }}
+      />
+      {modes.map((mode) => {
+        const active = viewMode === mode.id;
+        return (
+          <button
+            key={mode.id}
+            type="button"
+            onClick={() => onChange(mode.id)}
+            aria-pressed={active}
+            aria-label={mode.label}
+            title={mode.label}
+            className={`relative z-10 inline-flex h-7 w-7 items-center justify-center rounded-sg-sm transition-colors ${
+              active ? 'text-white' : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            {mode.icon}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function WeekToolbar({
   weekRangeLabel,
   selectedDateIso,
+  viewMode,
+  onViewModeChange,
   onPrev,
   onNext,
   onToday,
@@ -265,6 +593,7 @@ function WeekToolbar({
           aria-label="Перейти к неделе по дате"
         />
       </label>
+      <PlannerViewModeSwitch viewMode={viewMode} onChange={onViewModeChange} />
     </div>
   );
 }
@@ -349,11 +678,7 @@ function MobileDayPlanner({
       ) : (
         <div className="mt-3 space-y-3">
           {zones.map((zone) => {
-            const orders = sortDayOrders(
-              (zone.days || [])
-                .flatMap((day) => day.orders || [])
-                .filter((order) => plannerItemCoversDay(order, selectedDayIso)),
-            );
+            const orders = plannerZoneDayItems(zone, selectedDayIso);
             return (
               <section
                 key={zone.id ?? 'unassigned'}
@@ -458,6 +783,15 @@ export default function AutoservicePlannerPage() {
   const [inspectionPrefillDate, setInspectionPrefillDate] = useState(null);
   const [inspectionPrefillZoneId, setInspectionPrefillZoneId] = useState(null);
   const [viewInspection, setViewInspection] = useState(null);
+  const [viewMode, setViewMode] = useState(readPlannerViewMode);
+  const [dayModalIso, setDayModalIso] = useState(null);
+
+  const changeViewMode = (next) => {
+    setViewMode(next);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PLANNER_VIEW_STORAGE_KEY, next);
+    }
+  };
 
   const weekStartIso = toIsoDate(weekStart);
   const weekDays = useMemo(
@@ -506,6 +840,7 @@ export default function AutoservicePlannerPage() {
   };
 
   const shiftWeek = (delta) => {
+    setDayModalIso(null);
     const nextWeekStart = addDays(weekStart, delta * 7);
     setWeekStart(nextWeekStart);
     const startIso = toIsoDate(nextWeekStart);
@@ -515,6 +850,7 @@ export default function AutoservicePlannerPage() {
 
   const jumpToDate = (isoDate) => {
     if (!isoDate) return;
+    setDayModalIso(null);
     const [y, m, d] = String(isoDate).split('-').map(Number);
     if (!y || !m || !d) return;
     setWeekStart(getWeekStart(new Date(y, m - 1, d)));
@@ -602,6 +938,8 @@ export default function AutoservicePlannerPage() {
           <WeekToolbar
             weekRangeLabel={weekRangeLabel}
             selectedDateIso={selectedDateIso}
+            viewMode={viewMode}
+            onViewModeChange={changeViewMode}
             onPrev={() => shiftWeek(-1)}
             onNext={() => shiftWeek(1)}
             onToday={() => {
@@ -629,59 +967,25 @@ export default function AutoservicePlannerPage() {
         loading={loading}
       />
 
-      <div className="hidden overflow-x-auto md:block">
-        <div className="min-w-[52rem] overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
-          <div
-            className="grid w-full"
-            style={{ gridTemplateColumns: 'minmax(5rem, 7.3rem) repeat(7, minmax(6.5rem, 1fr))' }}
-          >
-            <div className="sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-              Зона
-            </div>
-            {dayHeaders.map((day, index) => {
-              const iso = String(day.date).slice(0, 10);
-              const isToday = iso === toIsoDate(today);
-              const isWeekend = index >= 5;
-              return (
-                <div
-                  key={iso}
-                  className={`border-b border-r border-line px-2 py-2 text-center ${
-                    isToday
-                      ? 'bg-brand-50 text-brand-800'
-                      : isWeekend
-                        ? 'bg-danger-50/60 text-ink-muted'
-                        : 'bg-surface-muted text-ink-muted'
-                  }`}
-                >
-                  <div className="text-xs font-semibold uppercase tracking-wide sm:text-sm">
-                    <span>{WEEKDAYS[index]}</span>{' '}
-                    <span className={`normal-case tracking-normal ${isToday ? 'text-brand-900' : 'text-ink'}`}>
-                      {formatDayHeader(iso)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-
-            {zones.length === 0 && !loading ? (
-              <div className="col-span-8 px-4 py-8 text-center text-sm text-ink-muted">
-                Нет рабочих зон. Добавьте их в настройках автосервиса.
-              </div>
-            ) : (
-              zones.map((zone) => (
-                <PlannerZoneWeekRow
-                  key={zone.id ?? 'unassigned'}
-                  zone={zone}
-                  dayIsos={dayHeaders.map((day) => String(day.date).slice(0, 10))}
-                  todayIso={toIsoDate(today)}
-                  onItemClick={handlePlannerItemClick}
-                  onCellContextMenu={handleCellContextMenu}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+      {viewMode === 'compact' ? (
+        <PlannerCompactWeek
+          zones={zones}
+          dayHeaders={dayHeaders}
+          todayIso={todayIso}
+          loading={loading}
+          onDayOpen={setDayModalIso}
+        />
+      ) : (
+        <PlannerWeekGrid
+          zones={zones}
+          dayHeaders={dayHeaders}
+          dayIsos={dayIsos}
+          todayIso={todayIso}
+          loading={loading}
+          onItemClick={handlePlannerItemClick}
+          onCellContextMenu={handleCellContextMenu}
+        />
+      )}
 
       {loading ? (
         <p className="mt-3 hidden text-sm text-ink-muted md:block" aria-live="polite">
@@ -730,6 +1034,14 @@ export default function AutoservicePlannerPage() {
         onClose={() => setContextMenu(null)}
         canEdit={contextMenu ? canEditZone(contextMenu.zoneId) : true}
         onCreateInspection={() => beginCreateInspection(contextMenuContext)}
+      />
+
+      <PlannerDayModal
+        open={Boolean(dayModalIso)}
+        dayIso={dayModalIso}
+        zones={zones}
+        onClose={() => setDayModalIso(null)}
+        onItemClick={handlePlannerItemClick}
       />
 
       <InspectionBookingAddModal
