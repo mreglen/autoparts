@@ -44,6 +44,7 @@ export default function DromNomenclaturePage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [selectedKeys, setSelectedKeys] = useState([]);
@@ -131,6 +132,36 @@ export default function DromNomenclaturePage() {
     }
   };
 
+  const handleReconcile = async () => {
+    if (!orgId) return;
+
+    setReconciling(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await apiRequest(`/organizations/${orgId}/drom/autoload/reconcile`, { method: 'POST' });
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setSelectedKeys([]);
+      let msg = `Проверено ${data.rows ?? 0} поз. `;
+      msg += data.removed ? `Убрано выписанных: ${data.removed}.` : 'Выписанных позиций в файле нет.';
+      if (data.refreshed) msg += ` Обновлено остатков и цен: ${data.refreshed}.`;
+      if (data.unknown_rows) msg += ` ${data.unknown_rows} поз. без товара в базе — не тронуты.`;
+      if (data.skipped) msg += ` ${data.skipped}.`;
+      if (data?.sync?.skipped) {
+        msg += ' API-синхронизация пропущена (выключена или нет ключей).';
+      } else if (data?.sync && data.sync.ok === false) {
+        msg += ` API: ${data.sync.error_message || 'ошибка синхронизации'}.`;
+      } else if (data?.sync) {
+        msg += ' Снятие позиций отправлено в API Drom.';
+      }
+      setNotice(msg);
+    } catch (e) {
+      setError(formatErrorMessage(e));
+    } finally {
+      setReconciling(false);
+    }
+  };
+
   if (!orgId) {
     return (
       <div className={`${warehousePageClass} min-w-0`}>
@@ -163,16 +194,28 @@ export default function DromNomenclaturePage() {
             className="mb-0"
           />
         </div>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={loadData}
-          disabled={loading}
-          loading={loading}
-        >
-          {loading ? 'Загрузка…' : 'Обновить'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={handleReconcile}
+            disabled={loading || reconciling}
+            loading={reconciling}
+          >
+            {reconciling ? 'Сверка…' : 'Сверить с остатками'}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={loadData}
+            disabled={loading}
+            loading={loading}
+          >
+            {loading ? 'Загрузка…' : 'Обновить'}
+          </Button>
+        </div>
       </div>
 
       <Toast message={error} variant="error" onClose={() => setError(null)} />

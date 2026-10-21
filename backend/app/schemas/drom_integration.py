@@ -72,6 +72,20 @@ class DromAutoloadRemoveRowsResponse(BaseModel):
     sync: Optional[dict[str, Any]] = None
 
 
+class DromReconcileResponse(BaseModel):
+    saved_path: Optional[str] = None
+    items: list = []
+    local_validation_ok: bool = False
+    local_errors: list = []
+    rows: int = 0
+    removed: int = 0
+    refreshed: int = 0
+    unknown_rows: int = 0
+    removed_articles: list[str] = []
+    skipped: Optional[str] = None
+    sync: Optional[dict[str, Any]] = None
+
+
 class DromSyncResponse(BaseModel):
     ok: bool
     status_code: int = 0

@@ -54,6 +54,18 @@ def _article_of(product: Product) -> str:
     return str(product.article or "").strip()
 
 
+def _article_key(article: Any) -> str:
+    """Ключ артикула для сверки файла с базой: без регистра и лишних пробелов."""
+    return " ".join(str(article or "").split()).casefold()
+
+
+def display_price_list_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT)).replace("\\", "/")
+    except ValueError:
+        return str(path).replace("\\", "/")
+
+
 def _quantity_of(product: Product) -> int:
     return int(product.quantity or 0)
 
@@ -164,13 +176,27 @@ def _stock_by_article(products: list[Product]) -> tuple[dict[str, Product], set[
         article = _article_of(product)
         if not article:
             continue
+        key = _article_key(article)
         if _quantity_of(product) > 0:
-            current = in_stock.get(article)
+            current = in_stock.get(key)
             if current is None or _quantity_of(current) < _quantity_of(product):
-                in_stock[article] = product
+                in_stock[key] = product
         else:
-            out_of_stock.add(article)
+            out_of_stock.add(key)
     return in_stock, out_of_stock - set(in_stock)
+
+
+def _file_articles_by_key(items: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Артикулы из файла, сгруппированные по нормализованному ключу."""
+    grouped: dict[str, list[str]] = {}
+    for item in items:
+        article = str(item.get("article") or item.get("Артикул") or "").strip()
+        if not article:
+            continue
+        values = grouped.setdefault(_article_key(article), [])
+        if article not in values:
+            values.append(article)
+    return grouped
 
 
 def reconcile_drom_price_list(db: Session, org_id: str) -> dict[str, Any]:
@@ -180,28 +206,21 @@ def reconcile_drom_price_list(db: Session, org_id: str) -> dict[str, Any]:
 
     original_bytes = path.read_bytes()
     parsed = parse_and_validate_drom_autoload(original_bytes)
-    file_articles = sorted({
-        str(item.get("article") or "").strip()
-        for item in parsed.items
-        if str(item.get("article") or "").strip()
-    })
+    file_articles = _file_articles_by_key(parsed.items)
     if not file_articles:
         return {"organization_id": org_id, "rows": 0, "removed": 0, "refreshed": 0}
 
     org = db.query(Organization).filter(Organization.id == org_id).first()
-    file_products = (
-        db.query(Product)
-        .options(selectinload(Product.photos))
-        .filter(Product.organization_id == org_id, Product.article.in_(file_articles))
-        .all()
+    in_stock, out_of_stock = _stock_by_article(
+        db.query(Product).filter(Product.organization_id == org_id).all()
     )
-    in_stock, out_of_stock = _stock_by_article(file_products)
-    stale = [article for article in file_articles if article in out_of_stock]
+    stale_keys = [key for key in file_articles if key in out_of_stock]
+    stale = [article for key in stale_keys for article in file_articles[key]]
 
-    if stale and len(stale) == len(file_articles):
+    if stale_keys and len(stale_keys) == len(file_articles):
         logger.warning(
             "Drom reconcile org %s: все %s строк без остатка — файл не изменён",
-            org_id, len(stale),
+            org_id, len(stale_keys),
         )
         return {
             "organization_id": org_id,
@@ -211,7 +230,7 @@ def reconcile_drom_price_list(db: Session, org_id: str) -> dict[str, Any]:
             "skipped": "все позиции выписаны — файл не изменён",
         }
 
-    new_bytes = remove_products_from_drom_autoload(original_bytes, stale) if stale else original_bytes
+    new_bytes = original_bytes
 
     storage_ids = {p.storage_location_id for p in in_stock.values() if p.storage_location_id}
     storage_by_id = {
@@ -222,7 +241,7 @@ def reconcile_drom_price_list(db: Session, org_id: str) -> dict[str, Any]:
             else []
         )
     }
-    items_by_article = {str(item.get("article") or "").strip(): item for item in parsed.items}
+    items_by_key = {_article_key(item.get("article") or item.get("Артикул")): item for item in parsed.items}
     linked_products = (
         db.query(Product)
         .options(selectinload(Product.photos))
@@ -235,15 +254,24 @@ def reconcile_drom_price_list(db: Session, org_id: str) -> dict[str, Any]:
         .all()
     )
     rows = []
+    renamed: list[str] = []
     for product in linked_products:
         article = _article_of(product)
         if not article:
             continue
-        row = items_by_article.get(article)
-        if row is not None and article not in out_of_stock:
+        key = _article_key(article)
+        row = items_by_key.get(key)
+        if row is not None:
             if _as_number(row.get("quantity")) == _quantity_of(product) and _as_number(row.get("price")) == _as_number(product.price):
                 continue
+            for raw in file_articles.get(key, []):
+                if raw != article and raw not in stale and raw not in renamed:
+                    renamed.append(raw)
         rows.append(_export_row(org, product, storage_by_id))
+
+    removals = stale + renamed
+    if removals:
+        new_bytes = remove_products_from_drom_autoload(original_bytes, removals)
 
     if rows:
         new_bytes = upsert_products_to_drom_autoload(new_bytes, rows, _public_base_url())
@@ -255,26 +283,34 @@ def reconcile_drom_price_list(db: Session, org_id: str) -> dict[str, Any]:
     known = set(in_stock) | out_of_stock
     return {
         "organization_id": org_id,
-        "file": str(path.relative_to(PROJECT_ROOT)),
+        "file": display_price_list_path(path),
         "rows": len(file_articles),
-        "removed": len(stale),
-        "removed_articles": stale,
+        "removed": len(removals),
+        "removed_articles": removals,
         "refreshed": len(rows),
-        "unknown_rows": len([article for article in file_articles if article not in known]),
-        "sync": _sync_removed_articles(db, org_id, stale),
+        "unknown_rows": len([key for key in file_articles if key not in known]),
+        "sync": _sync_removed_articles(db, org_id, removals),
     }
 
 
-def reconcile_all_drom_price_lists(db: Session) -> dict[str, Any]:
-    if not DROM_UPLOADS_DIR.is_dir():
-        return {"organizations": 0, "removed": 0, "refreshed": 0, "details": []}
-
-    org_ids = sorted(
+def _price_list_org_ids(db: Session) -> list[str]:
+    """Организации, у которых может быть прайс-лист: каталог uploads/drom плюс записи в БД."""
+    org_ids = {
         child.name for child in DROM_UPLOADS_DIR.iterdir()
-        if child.is_dir() and any(candidate.is_file() for candidate in price_list_candidates(child.name))
-    )
+        if child.is_dir()
+    } if DROM_UPLOADS_DIR.is_dir() else set()
+    for model in (OrganizationDromAutoloadCache, OrganizationDromIntegration, ProductDromListingLink):
+        org_ids.update(
+            row[0] for row in db.query(model.organization_id).distinct().all() if row[0]
+        )
+    return sorted(org_ids)
+
+
+def reconcile_all_drom_price_lists(db: Session) -> dict[str, Any]:
     details = []
-    for org_id in org_ids:
+    for org_id in _price_list_org_ids(db):
+        if not resolve_price_list_file(db, org_id):
+            continue
         try:
             details.append(reconcile_drom_price_list(db, org_id))
         except Exception as e:
@@ -283,7 +319,7 @@ def reconcile_all_drom_price_lists(db: Session) -> dict[str, Any]:
             details.append({"organization_id": org_id, "error": str(e)})
 
     return {
-        "organizations": len(org_ids),
+        "organizations": len(details),
         "removed": sum(int(item.get("removed") or 0) for item in details),
         "refreshed": sum(int(item.get("refreshed") or 0) for item in details),
         "details": details,

@@ -30,6 +30,7 @@ from app.schemas.drom_integration import (
     DromCredentialsResponse,
     DromCredentialsUpdate,
     DromLastAutoloadSnapshot,
+    DromReconcileResponse,
     DromSyncResponse,
 )
 from app.services.drom_api import DromSyncResult, sync_price_list_chunks, sync_price_list_chunk
@@ -40,6 +41,11 @@ from app.services.drom_autoload_xlsx import (
     remove_products_from_drom_autoload,
     upsert_products_to_drom_autoload,
     zero_quantity_rows_for_articles,
+)
+from app.services.drom_price_list import (
+    display_price_list_path,
+    reconcile_drom_price_list,
+    resolve_price_list_file,
 )
 from app.utils.avito_crypto import decrypt_secret, encrypt_secret
 
@@ -766,6 +772,59 @@ async def remove_drom_autoload_rows(
         removed_count=len(matched),
         warnings=warnings,
         sync=sync_result,
+    )
+
+
+@router.post("/{org_id}/drom/autoload/reconcile", response_model=DromReconcileResponse)
+def reconcile_drom_autoload_rows(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Сверить прайс-лист с остатками: убрать выписанные позиции, обновить и вернуть имеющиеся."""
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+
+    report = reconcile_drom_price_list(db, org_id)
+    xlsx_path = resolve_price_list_file(db, org_id)
+    if not xlsx_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Файл автозагрузки Drom не найден",
+        )
+
+    parsed = parse_and_validate_drom_autoload(xlsx_path.read_bytes())
+    display = report.get("file") or display_price_list_path(xlsx_path)
+    rel_path = display if display.startswith("/") else f"/{display}"
+
+    log_audit(
+        db,
+        event_type="drom_autoload_reconcile",
+        category="integrations",
+        summary=(
+            f"Сверка прайс-листа Drom: убрано {report.get('removed', 0)}, "
+            f"обновлено {report.get('refreshed', 0)}"
+        ),
+        user=current_user,
+        organization_id=org_id,
+        details={
+            **{key: value for key, value in report.items() if key not in ("organization_id", "removed_articles")},
+            "removed_articles": (report.get("removed_articles") or [])[:50],
+        },
+    )
+
+    return DromReconcileResponse(
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        rows=int(report.get("rows") or 0),
+        removed=int(report.get("removed") or 0),
+        refreshed=int(report.get("refreshed") or 0),
+        unknown_rows=int(report.get("unknown_rows") or 0),
+        removed_articles=list(report.get("removed_articles") or []),
+        skipped=report.get("skipped"),
+        sync=report.get("sync"),
     )
 
 

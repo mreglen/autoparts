@@ -180,6 +180,78 @@ class DromPriceListReconcileTests(unittest.TestCase):
         self.assertIsNone(result["sync"])
         sync.assert_not_called()
 
+    def test_matches_articles_ignoring_case_and_spaces(self):
+        self._set_quantity("BBB", 0)
+        self.xlsx_path.write_bytes(
+            upsert_products_to_drom_autoload(
+                None,
+                [_export_row("AAA", 5), _export_row("bbb", 3), _export_row("CCC", 1)],
+            )
+        )
+        result = drom_price_list.reconcile_drom_price_list(self.db, "ORG1")
+
+        self.assertEqual(result["removed"], 1)
+        self.assertEqual(result["removed_articles"], ["bbb"])
+        self.assertEqual(set(self._file_articles()), {"AAA", "CCC"})
+
+    def test_renamed_article_row_is_replaced_not_duplicated(self):
+        self.xlsx_path.write_bytes(
+            upsert_products_to_drom_autoload(
+                None,
+                [_export_row("aaa", 5), _export_row("bbb", 1), _export_row("ccc", 1)],
+            )
+        )
+        result = drom_price_list.reconcile_drom_price_list(self.db, "ORG1")
+
+        items = self._file_articles()
+        self.assertEqual(int(items["BBB"]["quantity"]), 3)
+        self.assertNotIn("bbb", items)
+        self.assertIn("bbb", result["removed_articles"])
+
+    def test_reconcile_all_covers_orgs_from_database_paths(self):
+        self.db.add(Organization(id="ORG2", name="Второй"))
+        for index, (article, quantity) in enumerate({"DDD": 0, "EEE": 2}.items(), start=90):
+            self.db.add(
+                Product(
+                    id=index,
+                    article=article,
+                    name=f"Товар {article}",
+                    brand="Bosch",
+                    internal_code=f"INT-{article}",
+                    description="",
+                    is_new=True,
+                    price=100,
+                    quantity=quantity,
+                    organization_id="ORG2",
+                    created_by=1,
+                    part_type_id=1,
+                )
+            )
+        self.db.commit()
+
+        custom_dir = drom_price_list.PROJECT_ROOT / "custom" / "org2"
+        custom_dir.mkdir(parents=True)
+        custom_path = custom_dir / "price.xlsx"
+        custom_path.write_bytes(
+            upsert_products_to_drom_autoload(None, [_export_row("DDD", 1), _export_row("EEE", 1)])
+        )
+        self.db.add(
+            OrganizationDromAutoloadCache(
+                organization_id="ORG2",
+                saved_path="custom/org2/price.xlsx",
+                items_json="[]",
+                local_validation_ok=True,
+                local_errors_json="[]",
+            )
+        )
+        self.db.commit()
+
+        result = drom_price_list.reconcile_all_drom_price_lists(self.db)
+
+        self.assertEqual({item["organization_id"] for item in result["details"]}, {"ORG1", "ORG2"})
+        remaining = parse_and_validate_drom_autoload(custom_path.read_bytes()).items
+        self.assertEqual([str(item["article"]) for item in remaining], ["EEE"])
+
     def test_reconcile_all_walks_price_list_directories(self):
         self._set_quantity("AAA", 0)
         result = drom_price_list.reconcile_all_drom_price_lists(self.db)
