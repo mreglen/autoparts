@@ -2,6 +2,7 @@ import React from 'react';
 import Modal from '../UI/Modal';
 import PhotoThumbnail from '../PhotoGallery/PhotoThumbnail';
 import { stripHtmlTags } from '../../utils/text';
+import { getStockOutUserName } from '../../utils/stockOutUi';
 
 const money = (value) => `${Number(value || 0).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₽`;
 const date = (value) => (value ? new Date(value).toLocaleDateString('ru-RU') : '—');
@@ -47,7 +48,7 @@ export default function SellerStockMovementModal({ row, type, stockIns, stockOut
   const total = Number(row.quantity || 0) * Number(row.sale_price || 0);
 
   return (
-    <Modal open={Boolean(row)} onClose={onClose} title={`${type === 'in' ? 'Поступление' : 'Расход'} · ${product.name || '—'}`} size="lg">
+    <Modal open={Boolean(row)} onClose={onClose} title={`${type === 'in' ? 'Поступление' : 'Расход'} · ${product.name || '—'}`} size="lg" draggable>
       <div className="space-y-4 text-xs">
         {(product.photos?.length || product.videos?.length) ? (
           <PhotoThumbnail photos={product.photos || []} videos={product.videos || []} onImageClick={onImageClick} />
@@ -60,6 +61,9 @@ export default function SellerStockMovementModal({ row, type, stockIns, stockOut
           <p><span className="text-ink-muted">Бренд:</span> {product.brand || '—'}</p>
           <p><span className="text-ink-muted">Артикул:</span> {product.article || '—'}</p>
           <p className="col-span-2"><span className="text-ink-muted">Адресное хранение:</span> {storage(row)}</p>
+          {type === 'out' ? (
+            <p className="col-span-2"><span className="text-ink-muted">Ответственный:</span> {getStockOutUserName(row)}</p>
+          ) : null}
           <p className="col-span-2"><span className="text-ink-muted">Остаток товара:</span> {Number(product.quantity || 0)} шт.</p>
           {type === 'out' && row.reason ? <p className="col-span-2"><span className="text-ink-muted">Причина:</span> {row.reason}</p> : null}
           {product.description ? <p className="col-span-2"><span className="text-ink-muted">Описание:</span> {stripHtmlTags(product.description)}</p> : null}

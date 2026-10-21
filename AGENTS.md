@@ -263,6 +263,12 @@ sudo update
 - Закрытые заказы (`completed`/`cancelled`) редактировать нельзя: PATCH `repair-orders/{id}` и `.../shop-parts/{id}/manual` отвечают 400. Ветка пересчёта начислений при правке работ завершённого заказа в коде осталась, но сейчас недостижима — при возврате такой правки начисления пересчитываются с `accrued_at = status_completed_at`.
 - Изменение работ заказа идёт только через `_replace_works` в PATCH — других путей нет.
 
+### 7.7 Прайс-лист Drom
+
+- Файл `backend/uploads/drom/<organization_id>/export.xlsx` (публично `https://svoygarage.ru/server/uploads/drom/<org>/export.xlsx`) — **накапливаемый upsert по артикулу**: `POST /organizations/{org}/drom/autoload/export` только добавляет/обновляет строки, сам он ничего не удаляет. Отсюда «в прайс попадают позиции, выписанные через /stock-out» — строка остаётся с тем количеством, которое было на момент выгрузки.
+- Выписанные позиции убирает `app/services/drom_price_list.py::reconcile_drom_price_list` (артикул совпал с товаром этой организации при `quantity <= 0` → строка удаляется из файла, при включённой `auto_sync_enabled` отправляется `quantity=0` в Drom API); строки с артикулами, которых нет в базе, не трогаются; товары со ссылкой `product_drom_listing_link` и остатком > 0 дописываются/обновляются — так вернувшаяся на склад позиция (возврат из расхода) снова попадает в прайс. Если под **все** строки файла нашлись выписанные товары, файл не меняется.
+- Запуск: Celery beat `drom-reconcile-price-lists` каждые 15 минут (`app/tasks/drom_tasks.py`) и `backend/scripts/reconcile_drom_price_lists.py` (шаг `reconcile_drom_price_lists` в `scripts/deploy/update.sh`, `--org <id>` для одной организации).
+
 ## 8. Типичные ошибки
 
 ### 8.1 Заказ-наряды
@@ -323,4 +329,4 @@ systemctl restart kroan.service
 
 ---
 
-Последнее обновление: 2026-10-16
+Последнее обновление: 2026-10-21

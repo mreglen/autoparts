@@ -340,6 +340,17 @@ restart_backend() {
   systemctl is-active --quiet kroan.service || die "kroan не запустился"
 }
 
+reconcile_drom_price_lists() {
+  local script="$BACKEND/scripts/reconcile_drom_price_lists.py"
+  [[ -f "$script" ]] || return 0
+  log "Сверка прайс-листов Drom (выписанные позиции)..."
+  if ( cd "$BACKEND" && sudo -u fast "$VENV/bin/python" scripts/reconcile_drom_price_lists.py ) >>"$LOG" 2>&1; then
+    log "Прайс-листы Drom сверены"
+  else
+    log "WARN: сверка прайс-листов Drom не удалась — подробности в $LOG"
+  fi
+}
+
 install_kroan_unit() {
   local src="$ROOT/docs/ops/kroan.service"
   local dst="/etc/systemd/system/kroan.service"
@@ -861,6 +872,8 @@ main() {
   if [[ $SKIP_BACKEND -eq 0 ]]; then
     restart_backend
   fi
+
+  reconcile_drom_price_lists
 
   if [[ $RELOAD_NGINX -eq 1 ]]; then
     apply_nginx_configs

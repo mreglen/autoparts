@@ -256,7 +256,8 @@ export const StockOutList = () => {
         searchComponent={
           <div className="relative min-w-0 flex-1 rounded-full transition focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-400/70">
             <input
-              type="search"
+              type="text"
+              inputMode="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Бренд, артикул, причина, ответственный…"
