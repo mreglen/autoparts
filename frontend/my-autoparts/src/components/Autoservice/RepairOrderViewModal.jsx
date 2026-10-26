@@ -7,6 +7,7 @@ import { ActionsDropdownItem } from '../ActionsDropdown/ActionsDropdown';
 import { formatServerDateTime, formatServerDate, formatWallClockDateTime } from '../../utils/serverDate';
 import { apiRequest } from '../../utils/apiClient';
 import { NumericInput, Skeleton } from '../UI';
+import Toast from '../UI/Toast';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 import {
   formatShopPartQty,
@@ -99,6 +100,89 @@ function todayDateInputValue() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function paymentReceiptLabel(payment) {
+  const dateTime = formatServerDateTime(payment.paid_at || payment.created_at);
+  return dateTime === '—' ? `Чек № ${payment.sequential_number}` : `Чек № ${payment.sequential_number} · ${dateTime}`;
+}
+
+function PaymentHistoryList({
+  rows,
+  loading = false,
+  error = '',
+  emptyText = 'Оплат по этому заказ-наряду пока нет.',
+  onCancel,
+  cancelDisabled = false,
+}) {
+  const groups = useMemo(() => {
+    const buckets = new Map();
+    rows.forEach((payment) => {
+      const dateKey = formatServerDate(payment.paid_at || payment.created_at) || '—';
+      const bucket = buckets.get(dateKey);
+      if (bucket) bucket.push(payment);
+      else buckets.set(dateKey, [payment]);
+    });
+    return [...buckets.entries()];
+  }, [rows]);
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-10 w-full rounded-sg-sm" />
+        <Skeleton className="h-10 w-full rounded-sg-sm" />
+      </div>
+    );
+  }
+  if (error) return <p className="text-sm text-danger-600">{error}</p>;
+  if (rows.length === 0) return <p className="text-sm text-ink-muted">{emptyText}</p>;
+
+  return (
+    <div className="max-h-[50vh] space-y-4 overflow-y-auto pr-1 lg:max-h-[26rem]">
+      {groups.map(([dateLabel, items]) => (
+        <section key={dateLabel} className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{dateLabel}</h4>
+          <div className="space-y-2">
+            {items.map((payment) => {
+              const cancelled = Boolean(payment.is_cancelled);
+              return (
+                <div
+                  key={payment.id}
+                  className={`flex items-start gap-2 rounded-sg-sm border border-line px-3 py-2.5 ${cancelled ? 'opacity-60' : ''}`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-sm font-medium text-ink ${cancelled ? 'line-through' : ''}`}>
+                      {AUTOSERVICE_PAYMENT_METHOD_LABELS[payment.method] || payment.method}
+                      {' · '}
+                      <span className="tabular-nums">{formatMoney(payment.amount)} ₽</span>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-ink-muted">
+                      {cancelled ? 'Отменено · ' : ''}
+                      {paymentReceiptLabel(payment)}
+                    </span>
+                  </span>
+                  {cancelled || !onCancel ? null : (
+                    <button
+                      type="button"
+                      onClick={() => onCancel(payment)}
+                      disabled={cancelDisabled}
+                      aria-label="Отменить операцию"
+                      title="Отменить операцию"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-sg-sm text-danger-600 transition hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function PaymentWizard({
   remaining,
   method,
@@ -114,141 +198,144 @@ function PaymentWizard({
   onSubmit,
   onPayMore,
   onBackToDetails,
-  onPrintReceipt,
+  payments,
+  paymentsLoading,
+  paymentsError,
+  onCancelPayment,
+  cancelDisabled,
 }) {
-  if (success) {
-    const fullyPaid = remaining <= 0.005;
-    return (
-      <div className="flex min-h-[22rem] flex-col justify-center">
-        <div className="mx-auto w-full max-w-md space-y-5 text-center">
-          <div className="rounded-sg border border-success-100 bg-success-50 px-4 py-5">
-            <p className="text-base font-semibold text-success-700">Оплата прошла успешно</p>
-            <p className="mt-2 text-sm text-success-700">
-              Принято: <span className="font-semibold tabular-nums">{formatMoney(paidAmount)} ₽</span>
-            </p>
-            {fullyPaid ? (
-              <p className="mt-1 text-sm text-success-700">Заказ-наряд оплачен полностью</p>
-            ) : (
-              <p className="mt-1 text-sm text-success-700">
-                Осталось к оплате:{' '}
-                <span className="font-semibold tabular-nums">{formatMoney(remaining)} ₽</span>
-              </p>
-            )}
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            {onPrintReceipt ? (
-              <button
-                type="button"
-                onClick={onPrintReceipt}
-                className="inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
-              >
-                История
-              </button>
-            ) : null}
-            {fullyPaid ? (
-              <button
-                type="button"
-                onClick={onBackToDetails}
-                className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
-              >
-                К заказ-наряду
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={onPayMore}
-                  className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Оплатить ещё
-                </button>
-                <button
-                  type="button"
-                  onClick={onBackToDetails}
-                  className="inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
-                >
-                  К заказ-наряду
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const payAmount = Number(amount) || 0;
   const afterPay = Math.max(0, Math.round((remaining - payAmount) * 100) / 100);
   const canSubmit = Boolean(method) && Boolean(payDate) && payAmount > 0 && payAmount <= remaining + 0.005;
+  const fullyPaid = remaining <= 0.005;
+
+  const panel = success ? (
+    <div className="space-y-5">
+      <div className="rounded-sg border border-success-100 bg-success-50 px-4 py-5 text-center">
+        <p className="text-base font-semibold text-success-700">Оплата прошла успешно</p>
+        <p className="mt-2 text-sm text-success-700">
+          Принято: <span className="font-semibold tabular-nums">{formatMoney(paidAmount)} ₽</span>
+        </p>
+        {fullyPaid ? (
+          <p className="mt-1 text-sm text-success-700">Заказ-наряд оплачен полностью</p>
+        ) : (
+          <p className="mt-1 text-sm text-success-700">
+            Осталось к оплате:{' '}
+            <span className="font-semibold tabular-nums">{formatMoney(remaining)} ₽</span>
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        {fullyPaid ? (
+          <button
+            type="button"
+            onClick={onBackToDetails}
+            className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
+          >
+            К заказ-наряду
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onPayMore}
+              className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              Оплатить ещё
+            </button>
+            <button
+              type="button"
+              onClick={onBackToDetails}
+              className="inline-flex h-11 items-center justify-center rounded-sg-sm border border-line-strong bg-surface px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted"
+            >
+              К заказ-наряду
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  ) : (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-sm font-semibold text-ink">Оплата заказ-наряда</h3>
+        <p className="mt-1 text-sm text-ink-muted">
+          К оплате: <span className="font-semibold tabular-nums text-ink">{formatMoney(remaining)} ₽</span>
+        </p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        {PAYMENT_METHODS.map((option) => {
+          const active = method === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              disabled={saving}
+              onClick={() => onMethodChange(option.value)}
+              className={`inline-flex h-11 items-center justify-center rounded-sg-sm border px-3 text-sm font-medium transition disabled:opacity-50 ${
+                active
+                  ? 'border-brand-500 bg-brand-50 text-brand-800 ring-1 ring-brand-200'
+                  : 'border-line bg-surface text-ink hover:border-brand-300 hover:bg-brand-50'
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <label className="block text-xs font-medium text-ink-soft">
+        Дата оплаты
+        <input
+          type="date"
+          value={payDate}
+          onChange={(e) => onPayDateChange(e.target.value)}
+          disabled={saving}
+          className="sg-pill-input sg-native-date-input mt-1 w-full"
+        />
+      </label>
+
+      <label className="block text-xs font-medium text-ink-soft">
+        Сумма, ₽
+        <NumericInput
+          mode="decimal"
+          min="0.01"
+          max={remaining}
+          value={amount}
+          onChange={(e) => onAmountChange(e.target.value)}
+          disabled={saving}
+          className="sg-pill-input mt-1 w-full"
+        />
+      </label>
+      <p className="text-sm text-ink-muted">
+        Останется после оплаты:{' '}
+        <span className="font-semibold tabular-nums text-ink">{formatMoney(afterPay)} ₽</span>
+      </p>
+      {error ? <p className="text-sm text-danger-600">{error}</p> : null}
+      <button
+        type="button"
+        onClick={onSubmit}
+        disabled={saving || !canSubmit}
+        className="inline-flex h-11 w-full items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {saving ? 'Оплата…' : 'Оплатить'}
+      </button>
+    </div>
+  );
 
   return (
-    <div className="flex min-h-[22rem] flex-col justify-center">
-      <div className="mx-auto w-full max-w-md space-y-5">
-        <div>
-          <h3 className="text-sm font-semibold text-ink">Оплата заказ-наряда</h3>
-          <p className="mt-1 text-sm text-ink-muted">
-            К оплате: <span className="font-semibold tabular-nums text-ink">{formatMoney(remaining)} ₽</span>
-          </p>
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-3">
-          {PAYMENT_METHODS.map((option) => {
-            const active = method === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                disabled={saving}
-                onClick={() => onMethodChange(option.value)}
-                className={`inline-flex h-11 items-center justify-center rounded-sg-sm border px-3 text-sm font-medium transition disabled:opacity-50 ${
-                  active
-                    ? 'border-brand-500 bg-brand-50 text-brand-800 ring-1 ring-brand-200'
-                    : 'border-line bg-surface text-ink hover:border-brand-300 hover:bg-brand-50'
-                }`}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <label className="block text-xs font-medium text-ink-soft">
-          Дата оплаты
-          <input
-            type="date"
-            value={payDate}
-            onChange={(e) => onPayDateChange(e.target.value)}
-            disabled={saving}
-            className="sg-pill-input sg-native-date-input mt-1 w-full"
-          />
-        </label>
-
-        <label className="block text-xs font-medium text-ink-soft">
-          Сумма, ₽
-          <NumericInput
-            mode="decimal"
-            min="0.01"
-            max={remaining}
-            value={amount}
-            onChange={(e) => onAmountChange(e.target.value)}
-            disabled={saving}
-            className="sg-pill-input mt-1 w-full"
-          />
-        </label>
-        <p className="text-sm text-ink-muted">
-          Останется после оплаты:{' '}
-          <span className="font-semibold tabular-nums text-ink">{formatMoney(afterPay)} ₽</span>
-        </p>
-        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={saving || !canSubmit}
-          className="inline-flex h-11 w-full items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saving ? 'Оплата…' : 'Оплатить'}
-        </button>
-      </div>
+    <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+      <div className="min-w-0">{panel}</div>
+      <section className="min-w-0 space-y-3 border-t border-line pt-5 lg:border-l lg:border-t-0 lg:pt-0 lg:pl-8">
+        <h3 className="text-sm font-semibold text-ink">История оплат</h3>
+        <PaymentHistoryList
+          rows={payments}
+          loading={paymentsLoading}
+          error={paymentsError}
+          onCancel={onCancelPayment}
+          cancelDisabled={cancelDisabled}
+        />
+      </section>
     </div>
   );
 }
@@ -594,7 +681,8 @@ export default function RepairOrderViewModal({
   const [orderPayments, setOrderPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsError, setPaymentsError] = useState('');
-  const [selectedPaymentId, setSelectedPaymentId] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelError, setCancelError] = useState('');
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
@@ -620,7 +708,8 @@ export default function RepairOrderViewModal({
     setReceiptPickerOpen(false);
     setOrderPayments([]);
     setPaymentsError('');
-    setSelectedPaymentId(null);
+    setCancelTarget(null);
+    setCancelError('');
     setCancelConfirmOpen(false);
     setCancelSaving(false);
     setStatusPickerOpen(false);
@@ -740,9 +829,12 @@ export default function RepairOrderViewModal({
 
   const openPaymentHistory = useCallback(async () => {
     setReceiptPickerOpen(true);
-    setSelectedPaymentId(null);
     await loadOrderPayments();
   }, [loadOrderPayments]);
+
+  useEffect(() => {
+    if (payOpen && enablePayment && order?.id) loadOrderPayments();
+  }, [payOpen, enablePayment, order?.id, loadOrderPayments]);
 
   const reloadOrder = useCallback(async () => {
     if (!order?.id) return null;
@@ -755,34 +847,27 @@ export default function RepairOrderViewModal({
     }
   }, [order?.id, onOrderChange]);
 
+  const askCancelPayment = useCallback((payment) => {
+    setCancelTarget(payment);
+    setCancelError('');
+    setCancelConfirmOpen(true);
+  }, []);
+
   const handleCancelPayment = useCallback(async () => {
-    if (!selectedPaymentId) return;
+    if (!cancelTarget?.id) return;
     setCancelSaving(true);
-    setPaymentsError('');
     try {
-      await apiRequest(`/autoservice/finance/receipts/${selectedPaymentId}`, { method: 'DELETE' });
+      await apiRequest(`/autoservice/finance/receipts/${cancelTarget.id}`, { method: 'DELETE' });
       setCancelConfirmOpen(false);
-      setReceiptPickerOpen(false);
-      setSelectedPaymentId(null);
+      setCancelTarget(null);
       await loadOrderPayments();
       await reloadOrder();
     } catch (e) {
-      setPaymentsError(e?.message || 'Не удалось отменить операцию');
+      setCancelError(e?.message || 'Не удалось отменить операцию');
     } finally {
       setCancelSaving(false);
     }
-  }, [selectedPaymentId, loadOrderPayments, reloadOrder]);
-
-  const paymentsByDate = useMemo(() => {
-    const groups = new Map();
-    orderPayments.forEach((payment) => {
-      const dateKey = formatServerDate(payment.paid_at || payment.created_at) || '—';
-      const bucket = groups.get(dateKey) || [];
-      bucket.push(payment);
-      groups.set(dateKey, bucket);
-    });
-    return [...groups.entries()];
-  }, [orderPayments]);
+  }, [cancelTarget, loadOrderPayments, reloadOrder]);
 
   const statusOptions = useMemo(
     () => buildRepairOrderStatusOptions({
@@ -875,12 +960,13 @@ export default function RepairOrderViewModal({
       setPayMethod(null);
       setPayAmount('');
       setPayError('');
+      await loadOrderPayments();
     } catch (e) {
       setPayError(e?.message || 'Не удалось провести оплату');
     } finally {
       setPaySaving(false);
     }
-  }, [order?.id, payMethod, payAmount, payDate, onOrderChange]);
+  }, [order?.id, payMethod, payAmount, payDate, onOrderChange, loadOrderPayments]);
 
   const handlePayMore = useCallback(() => {
     setPaySuccess(false);
@@ -1092,7 +1178,11 @@ export default function RepairOrderViewModal({
           onSubmit={handleSubmitPayment}
           onPayMore={handlePayMore}
           onBackToDetails={resetPaymentWizard}
-          onPrintReceipt={openPaymentHistory}
+          payments={orderPayments}
+          paymentsLoading={paymentsLoading}
+          paymentsError={paymentsError}
+          onCancelPayment={askCancelPayment}
+          cancelDisabled={cancelSaving}
         />
       ) : (
         <div className="space-y-5">
@@ -1239,70 +1329,14 @@ export default function RepairOrderViewModal({
       wrapperClassName="z-[120]"
     >
       <div className="space-y-4">
-        {paymentsLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full rounded-sg-sm" />
-            <Skeleton className="h-10 w-full rounded-sg-sm" />
-          </div>
-        ) : paymentsError ? (
-          <p className="text-sm text-danger-600">{paymentsError}</p>
-        ) : orderPayments.length === 0 ? (
-          <p className="text-sm text-ink-muted">Оплат по этому заказ-наряду пока нет.</p>
-        ) : (
-          <div className="max-h-[50vh] space-y-4 overflow-y-auto pr-1">
-            {paymentsByDate.map(([dateLabel, rows]) => (
-              <section key={dateLabel} className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                  {dateLabel}
-                </h3>
-                <div className="space-y-2">
-                  {rows.map((payment) => {
-                    const selected = selectedPaymentId === payment.id;
-                    const cancelled = Boolean(payment.is_cancelled);
-                    return (
-                      <button
-                        key={payment.id}
-                        type="button"
-                        aria-pressed={selected}
-                        disabled={cancelled}
-                        onClick={() => setSelectedPaymentId(selected ? null : payment.id)}
-                        className={`flex w-full items-start gap-3 rounded-sg-sm border px-3 py-2.5 text-left transition ${
-                          cancelled
-                            ? 'border-line opacity-60'
-                            : `hover:bg-surface-muted ${selected ? 'border-brand-500 ring-1 ring-brand-500' : 'border-line'}`
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className={`block text-sm font-medium text-ink ${cancelled ? 'line-through' : ''}`}>
-                            {AUTOSERVICE_PAYMENT_METHOD_LABELS[payment.method] || payment.method}
-                            {' · '}
-                            <span className="tabular-nums">{formatMoney(payment.amount)} ₽</span>
-                          </span>
-                          <span className="mt-0.5 block text-xs text-ink-muted">
-                            {cancelled ? 'Отменено · ' : ''}
-                            Чек № {payment.sequential_number}
-                            {formatServerDateTime(payment.paid_at || payment.created_at) !== '—'
-                              ? ` · ${formatServerDateTime(payment.paid_at || payment.created_at)}`
-                              : ''}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
+        <PaymentHistoryList
+          rows={orderPayments}
+          loading={paymentsLoading}
+          error={paymentsError}
+          onCancel={askCancelPayment}
+          cancelDisabled={cancelSaving}
+        />
         <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => (selectedPaymentId ? setCancelConfirmOpen(true) : setReceiptPickerOpen(false))}
-            disabled={paymentsLoading || cancelSaving}
-            className={secondaryBtnClass}
-          >
-            {selectedPaymentId ? 'Отменить операцию' : 'Закрыть'}
-          </button>
           <button
             type="button"
             onClick={() => setReceiptPickerOpen(false)}
@@ -1322,7 +1356,15 @@ export default function RepairOrderViewModal({
       wrapperClassName="z-[130]"
     >
       <div className="space-y-4">
-        <p className="text-sm text-ink">Точно хотите отменить?</p>
+        <p className="text-sm text-ink">
+          Отменить оплату{' '}
+          <span className="font-semibold tabular-nums">{formatMoney(cancelTarget?.amount)} ₽</span>
+          {cancelTarget?.sequential_number ? (
+            <span className="text-ink-muted"> · Чек № {cancelTarget.sequential_number}</span>
+          ) : null}
+          ?
+        </p>
+        <p className="text-sm text-ink-muted">Она перестанет учитываться в оплаченной сумме заказ-наряда.</p>
         <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
@@ -1336,13 +1378,14 @@ export default function RepairOrderViewModal({
             type="button"
             onClick={handleCancelPayment}
             disabled={cancelSaving}
-            className={primaryBtnClass}
+            className="inline-flex h-11 items-center justify-center rounded-sg-sm bg-danger-600 px-4 text-sm font-semibold text-white transition hover:bg-danger-700 disabled:cursor-not-allowed disabled:opacity-60 md:h-10"
           >
             {cancelSaving ? 'Отмена…' : 'Да, отменить'}
           </button>
         </div>
       </div>
     </Modal>
+    <Toast message={cancelError} variant="error" onClose={() => setCancelError('')} />
 
     <Suspense fallback={null}>
       <LazyClientProfileModal
