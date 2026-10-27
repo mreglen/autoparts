@@ -110,8 +110,9 @@ function PaymentHistoryList({
   loading = false,
   error = '',
   emptyText = 'Оплат по этому заказ-наряду пока нет.',
+  onEdit,
   onCancel,
-  cancelDisabled = false,
+  actionsDisabled = false,
 }) {
   const groups = useMemo(() => {
     const buckets = new Map();
@@ -159,19 +160,37 @@ function PaymentHistoryList({
                       {paymentReceiptLabel(payment)}
                     </span>
                   </span>
-                  {cancelled || !onCancel ? null : (
-                    <button
-                      type="button"
-                      onClick={() => onCancel(payment)}
-                      disabled={cancelDisabled}
-                      aria-label="Отменить операцию"
-                      title="Отменить операцию"
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-sg-sm text-danger-600 transition hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                  {cancelled ? null : (
+                    <span className="flex shrink-0 items-center gap-1">
+                      {onEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(payment)}
+                          disabled={actionsDisabled}
+                          aria-label="Редактировать оплату"
+                          title="Редактировать оплату"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-sg-sm text-brand-600 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                          </svg>
+                        </button>
+                      ) : null}
+                      {onCancel ? (
+                        <button
+                          type="button"
+                          onClick={() => onCancel(payment)}
+                          disabled={actionsDisabled}
+                          aria-label="Отменить операцию"
+                          title="Отменить операцию"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-sg-sm text-danger-600 transition hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      ) : null}
+                    </span>
                   )}
                 </div>
               );
@@ -202,7 +221,8 @@ function PaymentWizard({
   paymentsLoading,
   paymentsError,
   onCancelPayment,
-  cancelDisabled,
+  onEditPayment,
+  actionsDisabled,
 }) {
   const payAmount = Number(amount) || 0;
   const afterPay = Math.max(0, Math.round((remaining - payAmount) * 100) / 100);
@@ -332,8 +352,9 @@ function PaymentWizard({
           rows={payments}
           loading={paymentsLoading}
           error={paymentsError}
+          onEdit={onEditPayment}
           onCancel={onCancelPayment}
-          cancelDisabled={cancelDisabled}
+          actionsDisabled={actionsDisabled}
         />
       </section>
     </div>
@@ -677,7 +698,6 @@ export default function RepairOrderViewModal({
   const [printPickerOpen, setPrintPickerOpen] = useState(false);
   const [printDoc, setPrintDoc] = useState(null);
   const printOverlayRef = useRef(null);
-  const [receiptPickerOpen, setReceiptPickerOpen] = useState(false);
   const [orderPayments, setOrderPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsError, setPaymentsError] = useState('');
@@ -685,6 +705,12 @@ export default function RepairOrderViewModal({
   const [cancelError, setCancelError] = useState('');
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [editMethod, setEditMethod] = useState(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const [clientCardOpen, setClientCardOpen] = useState(false);
   const [clientVehicles, setClientVehicles] = useState([]);
@@ -705,13 +731,15 @@ export default function RepairOrderViewModal({
     setCompleteConfirmOpen(false);
     setPrintPickerOpen(false);
     setPrintDoc(null);
-    setReceiptPickerOpen(false);
     setOrderPayments([]);
     setPaymentsError('');
     setCancelTarget(null);
     setCancelError('');
     setCancelConfirmOpen(false);
     setCancelSaving(false);
+    setEditTarget(null);
+    setEditError('');
+    setEditSaving(false);
     setStatusPickerOpen(false);
     setClientCardOpen(false);
     setClientVehicles([]);
@@ -797,7 +825,6 @@ export default function RepairOrderViewModal({
   const totals = order ? orderTotals(order) : null;
   const payment = order && totals ? paymentSummary(order, totals.grand) : null;
   const showPayButton = enablePayment && payment;
-  const hasPayments = enablePayment && payment && payment.paid > 0.005;
 
   const resetPaymentWizard = useCallback(() => {
     setPayOpen(false);
@@ -826,11 +853,6 @@ export default function RepairOrderViewModal({
       setPaymentsLoading(false);
     }
   }, [order?.id]);
-
-  const openPaymentHistory = useCallback(async () => {
-    setReceiptPickerOpen(true);
-    await loadOrderPayments();
-  }, [loadOrderPayments]);
 
   useEffect(() => {
     if (payOpen && enablePayment && order?.id) loadOrderPayments();
@@ -868,6 +890,44 @@ export default function RepairOrderViewModal({
       setCancelSaving(false);
     }
   }, [cancelTarget, loadOrderPayments, reloadOrder]);
+
+  const askEditPayment = useCallback((payment) => {
+    setEditTarget(payment);
+    setEditMethod(payment.method);
+    setEditAmount(String(payment.amount));
+    const raw = String(payment.paid_at || payment.created_at || '').slice(0, 10);
+    setEditDate(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : todayDateInputValue());
+    setEditError('');
+    setEditSaving(false);
+  }, []);
+
+  const closeEditPayment = useCallback(() => {
+    setEditTarget(null);
+    setEditError('');
+  }, []);
+
+  const handleEditPayment = useCallback(async () => {
+    if (!editTarget?.id) return;
+    const nextAmount = Number(editAmount);
+    if (!editMethod || !editDate || !(nextAmount > 0)) {
+      setEditError('Заполните способ, дату и сумму оплаты');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await apiRequest(`/autoservice/finance/receipts/${editTarget.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paid_at: editDate, amount: nextAmount, method: editMethod }),
+      });
+      closeEditPayment();
+      await loadOrderPayments();
+      await reloadOrder();
+    } catch (e) {
+      setEditError(e?.message || 'Не удалось изменить оплату');
+    } finally {
+      setEditSaving(false);
+    }
+  }, [editTarget, editMethod, editAmount, editDate, closeEditPayment, loadOrderPayments, reloadOrder]);
 
   const statusOptions = useMemo(
     () => buildRepairOrderStatusOptions({
@@ -1088,16 +1148,6 @@ export default function RepairOrderViewModal({
                     Оплата
                   </button>
                 ) : null}
-                {hasPayments && !payOpen ? (
-                  <button
-                    type="button"
-                    onClick={openPaymentHistory}
-                    disabled={paymentsLoading}
-                    className={secondaryBtnClass}
-                  >
-                    История
-                  </button>
-                ) : null}
               </div>
               <div className="grid w-full grid-cols-2 gap-2 sm:w-auto md:flex md:flex-wrap md:justify-end">
               {order?.id && showExecutors && !payOpen ? (
@@ -1182,7 +1232,8 @@ export default function RepairOrderViewModal({
           paymentsLoading={paymentsLoading}
           paymentsError={paymentsError}
           onCancelPayment={askCancelPayment}
-          cancelDisabled={cancelSaving}
+          onEditPayment={askEditPayment}
+          actionsDisabled={cancelSaving || editSaving}
         />
       ) : (
         <div className="space-y-5">
@@ -1322,28 +1373,73 @@ export default function RepairOrderViewModal({
       </div>
     </Modal>
     <Modal
-      open={receiptPickerOpen && Boolean(order?.id)}
-      onClose={() => setReceiptPickerOpen(false)}
-      title="История"
+      open={Boolean(editTarget)}
+      onClose={editSaving ? () => {} : closeEditPayment}
+      title="Редактирование оплаты"
       size="sm"
       wrapperClassName="z-[120]"
     >
-      <div className="space-y-4">
-        <PaymentHistoryList
-          rows={orderPayments}
-          loading={paymentsLoading}
-          error={paymentsError}
-          onCancel={askCancelPayment}
-          cancelDisabled={cancelSaving}
-        />
+      <div className="space-y-5">
+        <div className="grid gap-2 sm:grid-cols-3">
+          {PAYMENT_METHODS.map((option) => {
+            const active = editMethod === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                disabled={editSaving}
+                onClick={() => setEditMethod(option.value)}
+                className={`inline-flex h-11 items-center justify-center rounded-sg-sm border px-3 text-sm font-medium transition disabled:opacity-50 ${
+                  active
+                    ? 'border-brand-500 bg-brand-50 text-brand-800 ring-1 ring-brand-200'
+                    : 'border-line bg-surface text-ink hover:border-brand-300 hover:bg-brand-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <label className="block text-xs font-medium text-ink-soft">
+          Дата оплаты
+          <input
+            type="date"
+            value={editDate}
+            onChange={(e) => setEditDate(e.target.value)}
+            disabled={editSaving}
+            className="sg-pill-input sg-native-date-input mt-1 w-full"
+          />
+        </label>
+
+        <label className="block text-xs font-medium text-ink-soft">
+          Сумма, ₽
+          <NumericInput
+            mode="decimal"
+            min="0.01"
+            value={editAmount}
+            onChange={(e) => setEditAmount(e.target.value)}
+            disabled={editSaving}
+            className="sg-pill-input mt-1 w-full"
+          />
+        </label>
+        {editError ? <p className="text-sm text-danger-600">{editError}</p> : null}
         <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            onClick={() => setReceiptPickerOpen(false)}
-            disabled={paymentsLoading || cancelSaving}
+            onClick={closeEditPayment}
+            disabled={editSaving}
+            className={secondaryBtnClass}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={handleEditPayment}
+            disabled={editSaving}
             className={primaryBtnClass}
           >
-            Закрыть
+            {editSaving ? 'Сохранение…' : 'Сохранить'}
           </button>
         </div>
       </div>

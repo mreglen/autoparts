@@ -16,7 +16,7 @@ from app.services.autoservice_payment_service import (
     ensure_order_fully_paid,
     list_finance_receipts,
     order_payment_summary,
-    update_autoservice_payment_date,
+    update_autoservice_payment,
 )
 
 
@@ -186,7 +186,7 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
         row = _finance_receipt_row(payment)
         self.assertEqual(row.client_name, "Ivan Petrov")
 
-    def test_update_autoservice_payment_date(self):
+    def test_update_autoservice_payment(self):
         db = MagicMock()
         order = self._order()
         payment = MagicMock(
@@ -203,7 +203,7 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
         db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
 
         with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
-            result = update_autoservice_payment_date(
+            result = update_autoservice_payment(
                 db,
                 org_id="ORG1",
                 payment_id=15,
@@ -215,19 +215,78 @@ class AutoservicePaymentServiceTests(unittest.TestCase):
         self.assertEqual(payment.created_at, datetime(2026, 8, 5, 12, 0, 0))
         db.flush.assert_called_once()
 
-    def test_update_payment_date_rejects_cancelled(self):
+    def test_update_payment_rejects_cancelled(self):
         db = MagicMock()
         payment = MagicMock(id=15, cancelled_at=datetime(2026, 8, 20))
         db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
 
         with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
             with self.assertRaises(HTTPException) as ctx:
-                update_autoservice_payment_date(
+                update_autoservice_payment(
                     db,
                     org_id="ORG1",
                     payment_id=15,
                     paid_at=date(2026, 8, 19),
                 )
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    def _payment_for_update(self, db, **kwargs):
+        payment = MagicMock(
+            id=15,
+            sequential_number=4,
+            repair_order_id=1,
+            amount=Decimal("80.00"),
+            method="bank",
+            created_at=datetime(2026, 8, 5, 12, 0, 0),
+            paid_at=datetime(2026, 8, 5, 12, 0, 0),
+            cancelled_at=None,
+            order=self._order(),
+        )
+        db.query.return_value.options.return_value.filter.return_value.first.return_value = payment
+        return payment
+
+    def test_update_autoservice_payment_amount(self):
+        db = MagicMock()
+        payment = self._payment_for_update(db)
+
+        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
+            with patch(
+                "app.services.autoservice_payment_service.sum_order_payments",
+                return_value=Decimal("80.00"),
+            ):
+                with patch(
+                    "app.services.autoservice_order_economics._order_grand_total",
+                    return_value=Decimal("150.00"),
+                ):
+                    update_autoservice_payment(db, org_id="ORG1", payment_id=15, amount=Decimal("120.00"), method="card")
+
+        self.assertEqual(payment.amount, Decimal("120.00"))
+        self.assertEqual(payment.method, "card")
+
+    def test_update_autoservice_payment_rejects_overpay(self):
+        db = MagicMock()
+        self._payment_for_update(db)
+
+        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
+            with patch(
+                "app.services.autoservice_payment_service.sum_order_payments",
+                return_value=Decimal("80.00"),
+            ):
+                with patch(
+                    "app.services.autoservice_order_economics._order_grand_total",
+                    return_value=Decimal("100.00"),
+                ):
+                    with self.assertRaises(HTTPException) as ctx:
+                        update_autoservice_payment(db, org_id="ORG1", payment_id=15, amount=Decimal("120.00"))
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    def test_update_autoservice_payment_rejects_bad_method(self):
+        db = MagicMock()
+        self._payment_for_update(db)
+
+        with patch("app.services.autoservice_payment_service.joinedload", return_value=MagicMock()):
+            with self.assertRaises(HTTPException) as ctx:
+                update_autoservice_payment(db, org_id="ORG1", payment_id=15, method="crypto")
         self.assertEqual(ctx.exception.status_code, 400)
 
     def test_delete_autoservice_payment_soft_deletes_keeps_order(self):

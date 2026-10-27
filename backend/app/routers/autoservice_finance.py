@@ -17,7 +17,7 @@ from app.schemas.autoservice_finance import (
     AutoserviceOrderEconomicsResponse,
     AutoserviceOrderEconomicsRow,
     AutoserviceOrderEconomicsSummary,
-    AutoservicePaymentDateUpdate,
+    AutoservicePaymentUpdate,
     AutoservicePayrollReportEmployeeRow,
     AutoservicePayrollReportResponse,
     RosskoSalesReportResponse,
@@ -41,7 +41,7 @@ from app.services.autoservice_warehouse_stock_report_xlsx import build_warehouse
 from app.services.autoservice_payment_service import (
     delete_autoservice_payment,
     list_finance_receipts,
-    update_autoservice_payment_date,
+    update_autoservice_payment,
 )
 from app.services.autoservice_payroll import compute_org_monthly_payroll
 from app.services.autoservice_payroll_report_xlsx import build_payroll_report_workbook_bytes
@@ -49,6 +49,7 @@ from app.services.autoservice_rossko_sales_report import RosskoSalesReportFilter
 from app.services.autoservice_rossko_sales_report_xlsx import build_rossko_sales_workbook_bytes
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_FINANCE,
+    AUTOSERVICE_PERMISSION_ORDERS,
     AUTOSERVICE_PERMISSION_REPORTS,
     require_any_autoservice_permission,
     require_autoservice_director,
@@ -100,32 +101,43 @@ def get_autoservice_finance_receipts(
     "/autoservice/finance/receipts/{payment_id}",
     response_model=AutoserviceFinanceReceiptRow,
 )
-def patch_autoservice_finance_receipt_date(
+def patch_autoservice_finance_receipt(
     payment_id: int,
-    payload: AutoservicePaymentDateUpdate,
+    payload: AutoservicePaymentUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_FINANCE)
-    row = update_autoservice_payment_date(
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_FINANCE,
+        AUTOSERVICE_PERMISSION_ORDERS,
+    )
+    row = update_autoservice_payment(
         db,
         org_id=org_id,
         payment_id=payment_id,
         paid_at=payload.paid_at,
+        amount=payload.amount,
+        method=payload.method,
     )
     db.commit()
     log_autoservice(
         db,
-        event_type="finance_payment_date_changed",
+        event_type="finance_payment_updated",
         summary=(
-            f"Изменена дата поступления №{row.sequential_number} "
-            f"({row.amount} ₽) по заказ-наряду №{row.repair_order_number}: {payload.paid_at}"
+            f"Изменено поступление №{row.sequential_number}: {row.method} {row.amount} ₽ "
+            f"от {row.paid_at} по заказ-наряду №{row.repair_order_number}"
         ),
         user=current_user,
         organization_id=org_id,
         entity_type="autoservice_payment",
         entity_id=row.id,
-        details={"paid_at": str(payload.paid_at), "amount": str(row.amount)},
+        details={
+            "paid_at": str(payload.paid_at) if payload.paid_at else None,
+            "amount": str(payload.amount) if payload.amount is not None else None,
+            "method": payload.method,
+        },
     )
     return row
 
@@ -139,7 +151,12 @@ def delete_autoservice_finance_receipt(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_FINANCE)
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_FINANCE,
+        AUTOSERVICE_PERMISSION_ORDERS,
+    )
     payment = (
         db.query(AutoservicePayment)
         .options(joinedload(AutoservicePayment.order).joinedload(RepairOrder.client))

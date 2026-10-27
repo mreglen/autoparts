@@ -249,13 +249,17 @@ def list_finance_receipts(
     )
 
 
-def update_autoservice_payment_date(
+def update_autoservice_payment(
     db: Session,
     *,
     org_id: str,
     payment_id: int,
-    paid_at: date,
+    paid_at: date | None = None,
+    amount: Decimal | None = None,
+    method: str | None = None,
 ) -> AutoserviceFinanceReceiptRow:
+    from app.services.autoservice_order_economics import _order_grand_total
+
     payment = (
         db.query(AutoservicePayment)
         .options(
@@ -277,7 +281,35 @@ def update_autoservice_payment_date(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Поступление отменено",
         )
-    payment.paid_at = _created_at_for_payment_date(paid_at)
+    if method is not None and method not in _VALID_METHODS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Недопустимый способ оплаты",
+        )
+    if amount is not None:
+        new_amount = _money(amount)
+        if new_amount <= Decimal("0.00"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Сумма оплаты должна быть больше нуля",
+            )
+        if not payment.order:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Заказ-наряд по поступлению не найден",
+            )
+        paid = sum_order_payments(db, payment.repair_order_id)
+        rest = _money(paid - _money(payment.amount))
+        if _money(rest + new_amount) > _order_grand_total(payment.order):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Сумма оплаты превышает остаток к оплате",
+            )
+        payment.amount = new_amount
+    if paid_at is not None:
+        payment.paid_at = _created_at_for_payment_date(paid_at)
+    if method is not None:
+        payment.method = method
     db.flush()
     return _finance_receipt_row(payment)
 

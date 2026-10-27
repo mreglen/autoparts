@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 AutoservicePaymentMethod = Literal["card", "cash", "bank"]
 
@@ -46,8 +46,16 @@ class RepairOrderPaymentsListResponse(BaseModel):
     items: list[RepairOrderPaymentView] = Field(default_factory=list)
 
 
-class AutoservicePaymentDateUpdate(BaseModel):
-    paid_at: date
+class AutoservicePaymentUpdate(BaseModel):
+    paid_at: Optional[date] = None
+    amount: Optional[Decimal] = Field(default=None, gt=0)
+    method: Optional[AutoservicePaymentMethod] = None
+
+    @model_validator(mode="after")
+    def _require_any_field(self):
+        if self.paid_at is None and self.amount is None and self.method is None:
+            raise ValueError("Не передано ни одного изменения")
+        return self
 
 
 class AutoserviceFinanceReceiptsResponse(BaseModel):

@@ -97,6 +97,7 @@ EVENT_TYPE_LABELS: dict[str, str] = {
     "warehouse_item_updated": "Позиция склада изменена",
     "warehouse_return_created": "Возврат на склад оформлен",
     "warehouse_return_status_changed": "Статус возврата на склад изменён",
+    "finance_payment_updated": "Поступление изменено",
     "finance_payment_date_changed": "Дата поступления изменена",
     "finance_payment_cancelled": "Поступление отменено",
     "autoservice_report_exported": "Экспорт отчёта автосервиса",
