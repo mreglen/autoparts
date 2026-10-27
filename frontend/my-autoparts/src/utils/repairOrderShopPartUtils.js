@@ -6,6 +6,11 @@ export const SHOP_PART_UNIT_LABELS = {
   kg: 'кг',
 };
 
+export function priceInputValue(value, fallback = '') {
+  if (value == null || value === '') return fallback;
+  return String(value).replace(/\.0+$/, '');
+}
+
 export function shopPartDisplayName(part) {
   if (part?.display_name) return part.display_name;
   const chunks = [
@@ -101,7 +106,7 @@ export function applyManualShopPartFormValues(part, values) {
     partnumber: values.article || '',
     qty: values.quantity,
     unit: values.unit || 'pcs',
-    unit_price: String(values.unit_price ?? 0),
+    unit_price: priceInputValue(values.unit_price, '0'),
     source: isRossko
       ? 'rossko'
       : (part?.source === 'autoservice_stock' ? part.source : 'manual'),

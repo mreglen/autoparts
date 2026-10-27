@@ -4,6 +4,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiRequest } from '../../utils/apiClient';
+import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
+
+const SITE_PAYMENTS_FILTERS_KEY = 'admin-site-payments';
 
 const inputClass =
   'block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -936,7 +939,15 @@ export default function SitePaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [period, setPeriod] = useState(() => getPeriodPreset('all'));
+  const [period, setPeriod] = useState(() => {
+    const stored = readPageFilters(SITE_PAYMENTS_FILTERS_KEY).period;
+    if (stored?.preset === 'custom') {
+      return { preset: 'custom', dateFrom: stored.dateFrom || '', dateTo: stored.dateTo || '' };
+    }
+    return getPeriodPreset(stored?.preset === 'month' || stored?.preset === 'year' ? stored.preset : 'all');
+  });
+
+  usePersistedPageFilters(SITE_PAYMENTS_FILTERS_KEY, { period });
 
   const load = useCallback(async () => {
     setLoading(true);

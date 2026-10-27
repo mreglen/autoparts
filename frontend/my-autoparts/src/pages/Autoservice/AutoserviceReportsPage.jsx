@@ -48,6 +48,9 @@ import {
   formatAutoserviceWarehouseMoney,
 } from '../../utils/autoserviceWarehouseUi';
 import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
+import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
+
+const REPORTS_FILTERS_KEY = 'autoservice-reports';
 
 const ECONOMICS_STATUS_FILTERS = [
   { id: 'all', label: 'Все' },
@@ -259,9 +262,14 @@ export default function AutoserviceReportsPage() {
 
   const defaults = useMemo(() => getMonthRangeDefaults(), []);
   const todayDate = useMemo(() => getFinanceTodayDate(), []);
-  const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
-  const [dateTo, setDateTo] = useState(defaults.dateTo);
-  const [monthValue, setMonthValue] = useState(currentMonthValue);
+  const [storedFilters] = useState(() => readPageFilters(REPORTS_FILTERS_KEY));
+  const [dateFrom, setDateFrom] = useState(() => (
+    clampFinanceDate(storedFilters.dateFrom || defaults.dateFrom, todayDate)
+  ));
+  const [dateTo, setDateTo] = useState(() => (
+    clampFinanceDate(storedFilters.dateTo || defaults.dateTo, todayDate)
+  ));
+  const [monthValue, setMonthValue] = useState(storedFilters.monthValue || currentMonthValue());
 
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [payrollError, setPayrollError] = useState('');
@@ -276,8 +284,16 @@ export default function AutoserviceReportsPage() {
   const [economicsLoading, setEconomicsLoading] = useState(false);
   const [economicsError, setEconomicsError] = useState('');
   const [economics, setEconomics] = useState(EMPTY_ECONOMICS);
-  const [economicsStatus, setEconomicsStatus] = useState('all');
-  const [economicsPayment, setEconomicsPayment] = useState('all');
+  const [economicsStatus, setEconomicsStatus] = useState(() => (
+    ECONOMICS_STATUS_FILTERS.some((item) => item.id === storedFilters.economicsStatus)
+      ? storedFilters.economicsStatus
+      : 'all'
+  ));
+  const [economicsPayment, setEconomicsPayment] = useState(() => (
+    ECONOMICS_PAYMENT_FILTERS.some((item) => item.id === storedFilters.economicsPayment)
+      ? storedFilters.economicsPayment
+      : 'all'
+  ));
   const [economicsSearchInput, setEconomicsSearchInput] = useState('');
   const [economicsSearch, setEconomicsSearch] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState(null);
@@ -288,7 +304,7 @@ export default function AutoserviceReportsPage() {
   const [warehouseStock, setWarehouseStock] = useState(EMPTY_WAREHOUSE_STOCK);
   const [warehouseStockSearchInput, setWarehouseStockSearchInput] = useState('');
   const [warehouseStockSearch, setWarehouseStockSearch] = useState('');
-  const [warehouseStockHideZero, setWarehouseStockHideZero] = useState(true);
+  const [warehouseStockHideZero, setWarehouseStockHideZero] = useState(storedFilters.warehouseStockHideZero !== false);
   const [warehouseStockExporting, setWarehouseStockExporting] = useState(false);
 
   const [rosskoSalesLoading, setRosskoSalesLoading] = useState(false);
@@ -302,6 +318,15 @@ export default function AutoserviceReportsPage() {
   const [viewOrder, setViewOrder] = useState(null);
   const [viewOrderLoading, setViewOrderLoading] = useState(false);
   const [viewOrderError, setViewOrderError] = useState('');
+
+  usePersistedPageFilters(REPORTS_FILTERS_KEY, {
+    dateFrom,
+    dateTo,
+    monthValue,
+    economicsStatus,
+    economicsPayment,
+    warehouseStockHideZero,
+  });
 
   const tabs = useMemo(() => {
     const items = [

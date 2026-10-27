@@ -12,6 +12,7 @@ import { Button, ConfirmDialog, Modal, Skeleton } from '../../components/UI';
 import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
 import Toast from '../../components/UI/Toast';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
 import {
   FINANCE_METHOD_LABELS,
 } from '../../utils/financeReceiptSearch';
@@ -29,6 +30,8 @@ import {
   warehousePillControlClass,
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
+
+const FINANCE_FILTERS_KEY = 'autoservice-finance';
 
 const ALL_METHODS = [
   { id: 'all', label: 'Все' },
@@ -273,12 +276,21 @@ function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет п�
 export default function AutoserviceFinancePage() {
   const defaults = useMemo(() => getMonthRangeDefaults(), []);
   const todayDate = useMemo(() => getFinanceTodayDate(), []);
-  const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
-  const [dateTo, setDateTo] = useState(defaults.dateTo);
+  const [storedFilters] = useState(() => readPageFilters(FINANCE_FILTERS_KEY));
+  const [dateFrom, setDateFrom] = useState(() => (
+    clampFinanceDate(storedFilters.dateFrom || defaults.dateFrom, todayDate)
+  ));
+  const [dateTo, setDateTo] = useState(() => (
+    clampFinanceDate(storedFilters.dateTo || defaults.dateTo, todayDate)
+  ));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState({ totals: {}, total_amount: 0, count: 0, items: [] });
-  const [selectedMethod, setSelectedMethod] = useState('all');
+  const [selectedMethod, setSelectedMethod] = useState(() => (
+    ALL_METHODS.some((option) => option.id === storedFilters.selectedMethod)
+      ? storedFilters.selectedMethod
+      : 'all'
+  ));
   const [savingPaymentId, setSavingPaymentId] = useState(null);
   const [detailsPayment, setDetailsPayment] = useState(null);
   const [deletePayment, setDeletePayment] = useState(null);
@@ -288,6 +300,8 @@ export default function AutoserviceFinancePage() {
   const [filterSwitching, setFilterSwitching] = useState(false);
   const [exporting, setExporting] = useState(false);
   const filterSwitchTimerRef = useRef(null);
+
+  usePersistedPageFilters(FINANCE_FILTERS_KEY, { dateFrom, dateTo, selectedMethod });
 
   const handleMethodChange = useCallback((methodId) => {
     setSelectedMethod(methodId);

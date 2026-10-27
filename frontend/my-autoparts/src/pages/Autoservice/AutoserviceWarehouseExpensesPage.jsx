@@ -27,6 +27,9 @@ import {
   autoserviceListTrClickableClass,
   warehousePillControlClass,
 } from '../../utils/warehouseListUi';
+import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
+
+const EXPENSES_FILTERS_KEY = 'autoservice-warehouse-expenses';
 
 const pillButtonClass =
   'inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gray-100 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30';
@@ -70,9 +73,10 @@ export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [supplierFilter, setSupplierFilter] = useState('');
+  const [storedFilters] = useState(() => readPageFilters(EXPENSES_FILTERS_KEY));
+  const [dateFrom, setDateFrom] = useState(storedFilters.dateFrom || '');
+  const [dateTo, setDateTo] = useState(storedFilters.dateTo || '');
+  const [supplierFilter, setSupplierFilter] = useState(storedFilters.supplierFilter || '');
   const [supplierCustom, setSupplierCustom] = useState('');
   const [supplierDocs, setSupplierDocs] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -84,6 +88,8 @@ export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [viewRepairOrder, setViewRepairOrder] = useState(null);
   const [viewRepairOrderLoading, setViewRepairOrderLoading] = useState(false);
+
+  usePersistedPageFilters(EXPENSES_FILTERS_KEY, { dateFrom, dateTo, supplierFilter });
 
   const supplierTerm = (supplierFilter || supplierCustom).trim();
 

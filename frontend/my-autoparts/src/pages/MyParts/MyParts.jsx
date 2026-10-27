@@ -22,6 +22,7 @@ import MyPartsRowSkeleton from '../../components/skeletons/MyPartsRowSkeleton';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { formatDromExportMessage } from '../../utils/dromExport';
+import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
 import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopButton';
 import PillDropdown from '../../components/PillDropdown/PillDropdown';
 import { UnderlineTabs } from '../../components/UI';
@@ -859,6 +860,8 @@ const DraftCard = ({ draft, onContinue, onSubmit, onDelete }) => {
   );
 };
 
+const MYPARTS_INSTOCK_FILTERS_KEY = 'myparts-in-stock';
+const MYPARTS_MODERATION_FILTERS_KEY = 'myparts-moderation';
 const DEFAULT_IN_STOCK_FILTERS = { storage: '', cell: '', cellValue: '', responsible: '', sort: 'date_desc' };
 const DEFAULT_MODERATION_FILTERS = { storage: '', cell: '', cellValue: '', responsible: '', sort: 'date_desc', hideRejected: false };
 const MY_PARTS_SORT_OPTIONS = [
@@ -966,20 +969,24 @@ function MyParts() {
   );
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock');
   const initialUrlSearch = searchParams.get('q') || '';
+  const [storedInStockFilters] = useState(() => readPageFilters(MYPARTS_INSTOCK_FILTERS_KEY));
+  const [storedModerationFilters] = useState(() => readPageFilters(MYPARTS_MODERATION_FILTERS_KEY));
   const [inStockFilters, setInStockFilters] = useState(() => ({
     ...DEFAULT_IN_STOCK_FILTERS,
-    storage: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('storage') || ''),
-    cell: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('cell') || ''),
-    cellValue: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('cell_value') || ''),
-    responsible: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('responsible') || ''),
+    storage: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('storage') || storedInStockFilters.storage || ''),
+    cell: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('cell') || storedInStockFilters.cell || ''),
+    cellValue: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('cell_value') || storedInStockFilters.cellValue || ''),
+    responsible: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('responsible') || storedInStockFilters.responsible || ''),
   }));
   const [moderationFilters, setModerationFilters] = useState(() => ({
     ...DEFAULT_MODERATION_FILTERS,
-    storage: searchParams.get('tab') === 'pending' ? (searchParams.get('storage') || '') : '',
-    cell: searchParams.get('tab') === 'pending' ? (searchParams.get('cell') || '') : '',
-    cellValue: searchParams.get('tab') === 'pending' ? (searchParams.get('cell_value') || '') : '',
-    responsible: searchParams.get('tab') === 'pending' ? (searchParams.get('responsible') || '') : '',
-    hideRejected: searchParams.get('hide_rejected') === '1',
+    storage: searchParams.get('tab') === 'pending' ? (searchParams.get('storage') || storedModerationFilters.storage || '') : '',
+    cell: searchParams.get('tab') === 'pending' ? (searchParams.get('cell') || storedModerationFilters.cell || '') : '',
+    cellValue: searchParams.get('tab') === 'pending' ? (searchParams.get('cell_value') || storedModerationFilters.cellValue || '') : '',
+    responsible: searchParams.get('tab') === 'pending' ? (searchParams.get('responsible') || storedModerationFilters.responsible || '') : '',
+    hideRejected: searchParams.get('tab') === 'pending'
+      ? (searchParams.get('hide_rejected') === '1' || storedModerationFilters.hideRejected === true)
+      : false,
   }));
   const [cellValueOptions, setCellValueOptions] = useState([]);
   const [cellValueOptionsLoading, setCellValueOptionsLoading] = useState(false);
@@ -989,6 +996,9 @@ function MyParts() {
   const [moderationSearchDraft, setModerationSearchDraft] = useState(
     searchParams.get('tab') === 'pending' ? initialUrlSearch : '',
   );
+
+  usePersistedPageFilters(MYPARTS_INSTOCK_FILTERS_KEY, inStockFilters);
+  usePersistedPageFilters(MYPARTS_MODERATION_FILTERS_KEY, moderationFilters);
 
   useEffect(() => {
     const tab = searchParams.get('tab');

@@ -11,6 +11,7 @@ import {
   getFinanceTodayDate,
   getMonthRangeDefaults,
 } from './financeDisplay';
+import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import { Skeleton } from '../../components/UI';
 import {
@@ -30,6 +31,8 @@ import {
   warehouseToolbarClass,
 } from '../../utils/warehouseListUi';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+
+const FINANCE_FILTERS_KEY = 'finance';
 
 const TABS = [
   { id: 'summary', label: 'Сводка' },
@@ -144,11 +147,20 @@ export default function FinancePage() {
     user?.is_seller ||
     (user?.is_employee && permissionCodes?.includes('finance.reports'));
 
-  const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
-  const [dateTo, setDateTo] = useState(defaults.dateTo);
+  const [storedFilters] = useState(() => readPageFilters(FINANCE_FILTERS_KEY));
+  const [dateFrom, setDateFrom] = useState(() => (
+    clampFinanceDate(storedFilters.dateFrom || defaults.dateFrom, todayDate)
+  ));
+  const [dateTo, setDateTo] = useState(() => (
+    clampFinanceDate(storedFilters.dateTo || defaults.dateTo, todayDate)
+  ));
   const [asOfDate, setAsOfDate] = useState(defaults.asOfDate);
-  const [channel, setChannel] = useState('all');
+  const [channel, setChannel] = useState(() => (
+    CHANNEL_OPTIONS.some((item) => item.value === storedFilters.channel) ? storedFilters.channel : 'all'
+  ));
   const [activeTab, setActiveTab] = useState('summary');
+
+  usePersistedPageFilters(FINANCE_FILTERS_KEY, { dateFrom, dateTo, channel });
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);

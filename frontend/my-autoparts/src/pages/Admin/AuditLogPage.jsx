@@ -17,6 +17,9 @@ import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/
 import Modal from '../../components/UI/Modal';
 import Button from '../../components/UI/Button';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
+import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
+
+const AUDIT_FILTERS_KEY = 'admin-audit';
 
 function AuditDetailModal({ event, meta, onClose }) {
   if (!event) return null;
@@ -121,17 +124,29 @@ export default function AuditLogPage() {
     user?.is_admin ||
     (user?.is_employee && permissionCodes?.includes('admin.audit'));
 
-  const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
-  const [dateTo, setDateTo] = useState(defaults.dateTo);
-  const [category, setCategory] = useState('all');
-  const [eventType, setEventType] = useState('all');
-  const [organizationId, setOrganizationId] = useState('');
-  const [orgDisplay, setOrgDisplay] = useState('');
-  const [userQuery, setUserQuery] = useState('');
-  const [userDisplay, setUserDisplay] = useState('');
+  const [storedFilters] = useState(() => readPageFilters(AUDIT_FILTERS_KEY));
+  const [dateFrom, setDateFrom] = useState(storedFilters.dateFrom || defaults.dateFrom);
+  const [dateTo, setDateTo] = useState(storedFilters.dateTo || defaults.dateTo);
+  const [category, setCategory] = useState(storedFilters.category || 'all');
+  const [eventType, setEventType] = useState(storedFilters.eventType || 'all');
+  const [organizationId, setOrganizationId] = useState(storedFilters.organizationId || '');
+  const [orgDisplay, setOrgDisplay] = useState(storedFilters.orgDisplay || '');
+  const [userQuery, setUserQuery] = useState(storedFilters.userQuery || '');
+  const [userDisplay, setUserDisplay] = useState(storedFilters.userDisplay || '');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [limit] = useState(50);
+
+  usePersistedPageFilters(AUDIT_FILTERS_KEY, {
+    dateFrom,
+    dateTo,
+    category,
+    eventType,
+    organizationId,
+    orgDisplay,
+    userQuery,
+    userDisplay,
+  });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

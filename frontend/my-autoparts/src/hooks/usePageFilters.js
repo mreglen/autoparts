@@ -1,11 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { readPageFilters, usePersistedPageFilters } from '../utils/pageFilterStorage';
 
 function valuesEqual(a, b) {
   return String(a ?? '') === String(b ?? '');
 }
 
-export function usePageFilters(defaultFilters, { syncWithUrl = false, prefix = '' } = {}) {
+function hydrateFromStorage(defaultFilters, storageKey) {
+  const stored = readPageFilters(storageKey);
+  const next = { ...defaultFilters };
+  Object.keys(defaultFilters).forEach((key) => {
+    if (stored[key] !== undefined) next[key] = stored[key];
+  });
+  return next;
+}
+
+export function usePageFilters(
+  defaultFilters,
+  { syncWithUrl = false, prefix = '', storageKey = '' } = {},
+) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const prefixed = useCallback(
@@ -13,20 +26,24 @@ export function usePageFilters(defaultFilters, { syncWithUrl = false, prefix = '
     [prefix],
   );
 
-  const [filters, setFiltersState] = useState(defaultFilters);
+  const [filters, setFiltersState] = useState(() => hydrateFromStorage(defaultFilters, storageKey));
   const didReadFromUrl = useRef(false);
+
+  usePersistedPageFilters(storageKey, filters);
 
   useEffect(() => {
     if (!syncWithUrl || didReadFromUrl.current) return;
     didReadFromUrl.current = true;
-    const next = { ...defaultFilters };
-    Object.keys(defaultFilters).forEach((key) => {
-      const value = searchParams.get(prefixed(key));
-      if (value !== null) {
-        next[key] = value;
-      }
+    setFiltersState((prev) => {
+      const next = { ...prev };
+      Object.keys(defaultFilters).forEach((key) => {
+        const value = searchParams.get(prefixed(key));
+        if (value !== null) {
+          next[key] = value;
+        }
+      });
+      return next;
     });
-    setFiltersState(next);
   }, [syncWithUrl, defaultFilters, searchParams, prefixed]);
 
   const setFilters = useCallback((updater) => {

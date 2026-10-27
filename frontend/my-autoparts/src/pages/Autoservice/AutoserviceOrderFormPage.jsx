@@ -53,6 +53,7 @@ import {
   isValidShopPartQty,
   isWarehouseLinkedShopPart,
   manualShopPartFormValues,
+  priceInputValue,
   priceWithMarkup,
   shopLineSum,
   shopPartDisplayName,
@@ -188,7 +189,7 @@ function workUnitPriceFromApi(value) {
   if (value == null || value === '') return '';
   const amount = Number(value);
   if (Number.isNaN(amount) || amount === 0) return '';
-  return String(value);
+  return priceInputValue(value);
 }
 
 function workUnitPriceToPayload(value) {
@@ -395,9 +396,9 @@ const clientPartControlInputClass = `${compactControlInputClass} w-12 px-1.5 tex
 const clientPartControlSelectClass = `${compactControlSelectClass} w-[3.75rem] px-1.5`;
 
 const workExecutorGroupClass =
-  'inline-flex h-9 min-w-0 shrink-0 items-center overflow-hidden rounded-full border border-line bg-surface max-lg:flex-1 lg:h-8 lg:w-44';
+  'inline-flex min-h-9 min-w-0 shrink-0 items-stretch overflow-hidden rounded-full border border-line bg-surface max-lg:flex-1 lg:min-h-8 lg:w-44';
 const workExecutorLabelBtnClass =
-  'flex min-w-0 flex-1 items-center gap-1.5 px-3 text-sm text-ink transition hover:bg-surface-muted';
+  'flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-3 py-1 text-left text-sm text-ink transition hover:bg-surface-muted';
 const workExecutorActionBtnClass =
   'flex h-full w-7 shrink-0 items-center justify-center text-ink-muted transition hover:bg-surface-muted';
 
@@ -489,11 +490,9 @@ function mapShopPartFromApiView(p, defaultMarkupPercent = 0) {
       return (p.unit || 'pcs') === 'pcs' ? Math.round(n) : Number(n);
     })(),
     unit: p.unit || 'pcs',
-    unit_price: String(p.unit_price ?? '0'),
+    unit_price: priceInputValue(p.unit_price, '0'),
     markup_percent: String(p.markup_percent ?? defaultMarkupPercent),
-    client_unit_price_override: p.client_unit_price_override == null
-      ? ''
-      : String(p.client_unit_price_override),
+    client_unit_price_override: priceInputValue(p.client_unit_price_override),
     source: p.source || 'manual',
     product_id: p.product_id || null,
     autoservice_stock_item_id: p.autoservice_stock_item_id || null,
@@ -678,11 +677,9 @@ function mapOrderToFormState(order) {
             return (p.unit || 'pcs') === 'pcs' ? Math.round(n) : Number(n);
           })(),
           unit: p.unit || 'pcs',
-          unit_price: String(p.unit_price ?? '0'),
+          unit_price: priceInputValue(p.unit_price, '0'),
           markup_percent: String(p.markup_percent ?? 0),
-          client_unit_price_override: p.client_unit_price_override == null
-            ? ''
-            : String(p.client_unit_price_override),
+          client_unit_price_override: priceInputValue(p.client_unit_price_override),
           source: p.source || 'manual',
           product_id: p.product_id || null,
           autoservice_stock_item_id: p.autoservice_stock_item_id || null,
@@ -1454,7 +1451,7 @@ export default function AutoserviceOrderFormPage() {
       partnumber: values.article || '',
       qty: values.quantity,
       unit: values.unit || 'pcs',
-      unit_price: String(values.unit_price ?? 0),
+      unit_price: priceInputValue(values.unit_price, '0'),
       source: isRossko ? 'rossko' : 'manual',
       rossko_brand: isRossko ? (values.brand || '') : '',
       rossko_partnumber: isRossko ? (values.article || '') : '',
@@ -1523,7 +1520,7 @@ export default function AutoserviceOrderFormPage() {
         partnumber: item.article || item.internal_code || '',
         qty,
         unit: 'pcs',
-        unit_price: String(item.price ?? 0),
+        unit_price: priceInputValue(item.price, '0'),
         source: 'warehouse',
         product_id: item.id,
         stock_max_qty: available,
@@ -1547,7 +1544,7 @@ export default function AutoserviceOrderFormPage() {
         partnumber: item.article || '',
         qty,
         unit,
-        unit_price: String(item.unit_price ?? 0),
+        unit_price: priceInputValue(item.unit_price, '0'),
         source: 'autoservice_stock',
         autoservice_stock_item_id: item.id,
         stock_max_qty: available,
@@ -2327,15 +2324,10 @@ export default function AutoserviceOrderFormPage() {
             <div className="space-y-1">
               {works.map((w, index) => {
                 const executors = ownMode ? [] : (w.executors || []);
-                const firstExec = executors[0];
-                const firstEmp = firstExec
-                  ? serviceEmployees.find((e) => String(e.id) === String(firstExec.employee_id))
-                  : null;
-                const executorLabel = !executors.length
-                  ? 'Сотрудник'
-                  : executors.length > 1
-                    ? `${firstEmp?.name || 'Сотрудник'} +${executors.length - 1}`
-                    : firstEmp?.name || 'Сотрудник';
+                const executorNames = executors.map(
+                  (ex) => serviceEmployees.find((e) => String(e.id) === String(ex.employee_id))?.name
+                    || 'Сотрудник',
+                );
                 return (
                 <div key={index} className="min-w-0">
                   <div className={lineItemRowClass}>
@@ -2389,12 +2381,11 @@ export default function AutoserviceOrderFormPage() {
                         onClick={() => setWorkExecutorEditIndex(index)}
                         title="Сотрудник и процент оплаты"
                       >
-                        <span className={`min-w-0 truncate ${executors.length ? '' : 'text-ink-faint'}`}>
-                          {executorLabel}
+                        <span className={`flex min-w-0 flex-col ${executors.length ? '' : 'text-ink-faint'}`}>
+                          {executorNames.length ? executorNames.map((name, i) => (
+                            <span key={`${name}-${i}`} className="truncate leading-tight">{name}</span>
+                          )) : <span className="truncate">Сотрудник</span>}
                         </span>
-                        {executors.length === 1 && firstExec?.percent !== '' && firstExec?.percent != null ? (
-                          <span className="shrink-0 text-xs tabular-nums text-ink-muted">{firstExec.percent}%</span>
-                        ) : null}
                       </button>
                       <button
                         type="button"

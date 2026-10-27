@@ -19,6 +19,7 @@ import { apiRequest } from '../../utils/apiClient';
 import { formatServerDate } from '../../utils/serverDate';
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { buildOrderZoneFilterOptions } from '../../utils/autoserviceOrderZoneFilter';
+import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   clearRepairOrderFormDraft,
@@ -42,6 +43,7 @@ const pillButtonClass =
 const DRAFT_STATUS = 'draft';
 const ORDER_STATUS_VALUES = ['pending', 'in_progress', 'done', 'review', 'completed', 'cancelled'];
 const DEFAULT_STATUS_FILTER = ['pending', 'in_progress', 'done', 'review'];
+const ORDERS_FILTERS_KEY = 'autoservice-orders';
 const STATUS_OPTIONS = [
   ...ORDER_STATUS_VALUES.map((value) => ({ value, label: REPAIR_ORDER_STATUS_LABELS[value] })),
   { value: DRAFT_STATUS, label: 'Черновик' },
@@ -113,17 +115,26 @@ export default function AutoserviceOrdersPage() {
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
   const qApplied = useDebouncedValue(q);
+  const [storedFilters] = useState(() => readPageFilters(ORDERS_FILTERS_KEY));
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(storedFilters.dateFrom || '');
+  const [dateTo, setDateTo] = useState(storedFilters.dateTo || '');
   const [statusFilter, setStatusFilter] = useState(() => {
     const raw = searchParams.get('status');
-    return raw
-      ? raw.split(',').map((value) => value.trim()).filter(Boolean)
+    if (raw) {
+      return raw.split(',').map((value) => value.trim()).filter(Boolean);
+    }
+    return Array.isArray(storedFilters.statusFilter) && storedFilters.statusFilter.length > 0
+      ? storedFilters.statusFilter
       : DEFAULT_STATUS_FILTER;
   });
-  const [zoneFilter, setZoneFilter] = useState([]);
-  const [sort, setSort] = useState({ by: 'scheduled_at', dir: 'desc' });
+  const [zoneFilter, setZoneFilter] = useState(
+    () => (Array.isArray(storedFilters.zoneFilter) ? storedFilters.zoneFilter : []),
+  );
+  const [sort, setSort] = useState(() => ({
+    by: storedFilters.sort?.by === 'scheduled_end_at' ? 'scheduled_end_at' : 'scheduled_at',
+    dir: storedFilters.sort?.dir === 'asc' ? 'asc' : 'desc',
+  }));
   const [workZones, setWorkZones] = useState([]);
   const [viewOrder, setViewOrder] = useState(null);
   const [statusSavingId, setStatusSavingId] = useState(null);
@@ -138,6 +149,8 @@ export default function AutoserviceOrdersPage() {
 
   const viewDrafts = statusFilter.includes(DRAFT_STATUS);
   const draftOnly = viewDrafts && statusFilter.length === 1;
+
+  usePersistedPageFilters(ORDERS_FILTERS_KEY, { dateFrom, dateTo, statusFilter, zoneFilter, sort });
 
   const handleSort = useCallback((column) => {
     setSort((prev) => (prev.by === column

@@ -103,7 +103,7 @@ export default function AutoserviceWarehousePage() {
     sort: 'name_asc',
   };
 
-  const { filters, updateFilter, activeCount } = usePageFilters(DEFAULT_FILTERS, { syncWithUrl: true });
+  const { filters, updateFilter, activeCount } = usePageFilters(DEFAULT_FILTERS, { syncWithUrl: true, storageKey: 'autoservice-warehouse' });
   const [detailsMovements, setDetailsMovements] = useState(null);
   const [detailsMovementsLoading, setDetailsMovementsLoading] = useState(false);
   const [detailsMovementsError, setDetailsMovementsError] = useState('');
