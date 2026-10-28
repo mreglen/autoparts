@@ -92,7 +92,19 @@ const searchHit = {
   work_zone_name: 'Подъёмник 1',
 };
 
-describe('поиск в планировщике', () => {
+const renderPage = () => render(
+  <Provider
+    store={configureStore({
+      reducer: { auth: (state = { user: { is_employee: true }, permissionCodes: [] }) => state },
+    })}
+  >
+    <MemoryRouter>
+      <AutoservicePlannerPage />
+    </MemoryRouter>
+  </Provider>,
+);
+
+describe('планировщик: поиск по клиенту и автомобилю', () => {
   beforeEach(() => {
     apiRequest.mockReset();
     apiRequest.mockImplementation((url) => {
@@ -101,18 +113,6 @@ describe('поиск в планировщике', () => {
       return Promise.resolve([]);
     });
   });
-
-  const renderPage = () => render(
-    <Provider
-      store={configureStore({
-        reducer: { auth: (state = { user: { is_employee: true }, permissionCodes: [] }) => state },
-      })}
-    >
-      <MemoryRouter>
-        <AutoservicePlannerPage />
-      </MemoryRouter>
-    </Provider>,
-  );
 
   it('нет заголовка, есть поле поиска', async () => {
     renderPage();
@@ -188,5 +188,104 @@ describe('поиск в планировщике', () => {
       expect(screen.getByLabelText('Поиск по планировщику').value).toBe('');
     });
     expect(screen.queryByText('Запись на осмотр')).toBeNull();
+  });
+});
+
+describe('планировщик: день записи на осмотр внутри полосы заказа', () => {
+  beforeEach(() => {
+    apiRequest.mockReset();
+    apiRequest.mockImplementation(() => Promise.resolve({
+      ...weekResponse,
+      zones: [
+        {
+          ...weekResponse.zones[0],
+          days: [
+            {
+              date: '2026-10-28',
+              orders: [
+                {
+                  ...weekResponse.zones[0].days[0].orders[0],
+                  scheduled_end_at: '2026-10-30T12:00:00',
+                  inspection_scheduled_at: '2026-10-29T14:00:00',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+  });
+
+  it('зелёный сегмент не дублирует текст полосы, дата осмотра — в подсказке', async () => {
+    renderPage();
+    const bar = await screen.findByTitle(/Осмотр 29\.10 14:00/);
+    expect(within(bar).getAllByText(/Иван/)).toHaveLength(1);
+    expect(within(bar).getByText(/09:00/)).toBeTruthy();
+  });
+});
+
+describe('планировщик: прокрутка к выбранному результату поиска', () => {
+  const heightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+  const readRect = Element.prototype.getBoundingClientRect;
+  const scroll = Element.prototype.scrollIntoView;
+
+  beforeEach(() => {
+    apiRequest.mockReset();
+    apiRequest.mockImplementation((url) => {
+      if (url.startsWith('/autoservice/planner/week')) return Promise.resolve(weekResponse);
+      if (url.startsWith('/autoservice/planner/search')) return Promise.resolve([searchHit]);
+      return Promise.resolve([]);
+    });
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get: () => 40,
+    });
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', heightDescriptor);
+    Element.prototype.getBoundingClientRect = readRect;
+    Element.prototype.scrollIntoView = scroll;
+  });
+
+  const pickFromSearch = async () => {
+    renderPage();
+    await screen.findByTitle(/Иван Петров/);
+    fireEvent.change(screen.getByLabelText('Поиск по планировщику'), { target: { value: 'сидор' } });
+    fireEvent.click(await screen.findByText('Пётр Сидоров'));
+  };
+
+  it('листает страницу к полосе и не трогает выпадающий список', async () => {
+    await pickFromSearch();
+    await waitFor(() => {
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+        block: 'center',
+        inline: 'nearest',
+      });
+    });
+    expect(screen.getByText('Пётр Сидоров')).toBeTruthy();
+  });
+
+  it('скрывает выпадающий список, если полоса оказалась под ним', async () => {
+    Element.prototype.getBoundingClientRect = function rect() {
+      const result = {
+        left: 0,
+        right: 300,
+        top: 60,
+        bottom: 300,
+        width: 300,
+        height: 240,
+      };
+      if (this.getAttribute && this.getAttribute('data-planner-key')) {
+        return { ...result, top: 100, bottom: 140, height: 40 };
+      }
+      return result;
+    };
+    await pickFromSearch();
+    await waitFor(() => {
+      expect(screen.queryByText('Пётр Сидоров')).toBeNull();
+    });
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 });

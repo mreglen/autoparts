@@ -327,7 +327,7 @@ export default function AutoserviceOrdersPage() {
       if (draft.mode === 'edit' && draft.orderId) {
         navigate(`/autoservice/orders/${draft.orderId}/edit`, { state: withBackTo(location) });
       } else {
-        navigate('/autoservice/orders/new', { state: withBackTo(location) });
+        navigate('/autoservice/orders/new', { state: withBackTo(location, { draftToken: draft.createToken || '' }) });
       }
     },
     [navigate, location],
@@ -335,7 +335,7 @@ export default function AutoserviceOrdersPage() {
 
   const handleDeleteDraftConfirm = useCallback(() => {
     if (!deleteConfirmDraft) return;
-    clearRepairOrderFormDraft(deleteConfirmDraft.mode, deleteConfirmDraft.orderId);
+    clearRepairOrderFormDraft(deleteConfirmDraft.mode, deleteConfirmDraft.orderId, deleteConfirmDraft.createToken);
     setDeleteConfirmDraft(null);
     setDrafts(listRepairOrderFormDrafts());
   }, [deleteConfirmDraft]);

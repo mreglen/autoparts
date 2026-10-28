@@ -54,10 +54,17 @@ export function plannerItemCoversDay(item, isoDate, now = new Date()) {
 export function plannerInspectionSegment(entry) {
   if (!entry || !(entry.inspectionIdx >= 0)) return null;
   const spanDays = entry.endIdx - entry.startIdx + 1;
+  // Однодневная полоса: слева остаётся цвет статуса заказа, зелёным красим правую половину.
+  if (spanDays <= 1) return { leftPercent: 50, widthPercent: 50 };
   return {
     leftPercent: ((entry.inspectionIdx - entry.startIdx) / spanDays) * 100,
     widthPercent: 100 / spanDays,
   };
+}
+
+/** Смещение шапки недели: прижать под шапку приложения, но не выпускать за нижний край сетки. */
+export function plannerHeadShift({ chromeHeight, gridTop, gridHeight, headHeight }) {
+  return Math.min(Math.max(chromeHeight - gridTop, 0), gridHeight - headHeight);
 }
 
 export function assignPlannerLanes(items, dayIsos, now = new Date()) {

@@ -26,6 +26,7 @@ import Modal, { ConfirmDialog } from '../../components/UI/Modal';
 import { Z_MOBILE_STICKY_FOOTER } from '../../constants/mobileTokens';
 import {
   clearRepairOrderFormDraft,
+  newRepairOrderDraftToken,
   readRepairOrderFormDraft,
   repairOrderFormSnapshotHasContent,
   writeRepairOrderFormDraft,
@@ -796,7 +797,8 @@ export default function AutoserviceOrderFormPage() {
     make: location.state?.vehicleMake || '',
     model: location.state?.vehicleModel || '',
   });
-  const createInitRef = useRef(false);
+  const createInitKeyRef = useRef(null);
+  const createSlotRef = useRef(null);
   const clientChoiceShownRef = useRef(false);
   const autoSaveTimerRef = useRef(null);
   const autoSaveResumeTimerRef = useRef(null);
@@ -1010,9 +1012,22 @@ export default function AutoserviceOrderFormPage() {
   }, [isReady, isAuthenticated, isEdit, orderId, loadOrder, pauseAutoSave]);
 
   useEffect(() => {
-    if (!isReady || !isAuthenticated || !isCreate || createInitRef.current) return;
-    createInitRef.current = true;
-    const prefill = plannerPrefillRef.current || {};
+    if (!isReady || !isAuthenticated || !isCreate) return;
+    if (createInitKeyRef.current === location.key) return;
+    createInitKeyRef.current = location.key;
+    const prefill = location.state || {};
+    createSlotRef.current = prefill.draftToken === undefined
+      ? newRepairOrderDraftToken()
+      : (prefill.draftToken || null);
+    plannerPrefillRef.current = prefill;
+    vehiclePrefillRef.current = {
+      make: prefill.vehicleMake || '',
+      model: prefill.vehicleModel || '',
+    };
+    setOrderNumber(null);
+    setOrderStatus(null);
+    setOrderVatRateState(null);
+    setOrderError('');
     const initial = emptyFormState();
     if (prefill.scheduledAtLocal) {
       initial.scheduledAt = prefill.scheduledAtLocal;
@@ -1034,25 +1049,23 @@ export default function AutoserviceOrderFormPage() {
       initial.scheduledAt = toLocalInputValue(new Date());
       initial.staffComment = prefill.staffComment || '';
     }
-    const draft = readRepairOrderPurchaseDraft();
-    if (draft?.groups?.length) {
-      setPendingPurchaseGroups(draft.groups);
-      initial.shopParts = draft.groups.flatMap((group) => (
+    const purchaseDraft = prefill.fromPurchaseImport ? readRepairOrderPurchaseDraft() : null;
+    const cartDraft = prefill.fromCartImport ? readRepairOrderCartDraft() : null;
+    if (purchaseDraft?.groups?.length) {
+      setPendingPurchaseGroups(purchaseDraft.groups);
+      initial.shopParts = purchaseDraft.groups.flatMap((group) => (
         mapPurchaseItemsToShopParts(group.items, clientMarkupPercent)
       ));
-    } else {
-      const cartDraft = readRepairOrderCartDraft();
-      if (cartDraft?.items?.length) {
-        setPendingCartItems(cartDraft.items);
-        initial.shopParts = mapCartItemsToShopParts(cartDraft.items, clientMarkupPercent);
-      }
+    } else if (cartDraft?.items?.length) {
+      setPendingCartItems(cartDraft.items);
+      initial.shopParts = mapCartItemsToShopParts(cartDraft.items, clientMarkupPercent);
     }
-    const formDraft = readRepairOrderFormDraft('create');
+    const formDraft = readRepairOrderFormDraft('create', null, createSlotRef.current);
     if (!prefill.inspectionBookingId && formDraft?.form && repairOrderFormSnapshotHasContent(formDraft.form)) {
       const { shopParts: draftShopParts, ...restDraft } = formDraft.form;
       Object.assign(initial, restDraft);
-      const hasImportShopParts = Boolean(draft?.groups?.length)
-        || Boolean(readRepairOrderCartDraft()?.items?.length);
+      const hasImportShopParts = Boolean(purchaseDraft?.groups?.length)
+        || Boolean(cartDraft?.items?.length);
       if (!hasImportShopParts && draftShopParts?.length) {
         initial.shopParts = draftShopParts;
       }
@@ -1060,26 +1073,25 @@ export default function AutoserviceOrderFormPage() {
     applyFormState(initial);
     pauseAutoSave();
     setFormInitialized(true);
-  }, [isReady, isAuthenticated, isCreate, applyFormState, clientMarkupPercent, pauseAutoSave]);
+  }, [isReady, isAuthenticated, isCreate, location, applyFormState, clientMarkupPercent, pauseAutoSave]);
 
   useEffect(() => {
     if (!formInitialized || (!isCreate && !isEdit)) return undefined;
+    if (isCreate && createInitKeyRef.current !== location.key) return undefined;
     const mode = isEdit ? 'edit' : 'create';
     const draftOrderId = isEdit ? orderId : null;
-    const timer = setTimeout(() => {
-      writeRepairOrderFormDraft(mode, draftOrderId, captureFormSnapshot());
-    }, 400);
-    const flushDraft = () => {
-      writeRepairOrderFormDraft(mode, draftOrderId, captureFormSnapshot());
+    const persistDraft = () => {
+      writeRepairOrderFormDraft(mode, draftOrderId, createSlotRef.current, captureFormSnapshot());
     };
-    window.addEventListener('pagehide', flushDraft);
-    document.addEventListener('visibilitychange', flushDraft);
+    const timer = setTimeout(persistDraft, 400);
+    window.addEventListener('pagehide', persistDraft);
+    document.addEventListener('visibilitychange', persistDraft);
     return () => {
       clearTimeout(timer);
-      window.removeEventListener('pagehide', flushDraft);
-      document.removeEventListener('visibilitychange', flushDraft);
+      window.removeEventListener('pagehide', persistDraft);
+      document.removeEventListener('visibilitychange', persistDraft);
     };
-  }, [formInitialized, isCreate, isEdit, orderId, captureFormSnapshot]);
+  }, [formInitialized, isCreate, isEdit, orderId, location, captureFormSnapshot]);
 
   useEffect(() => {
     if (!isCreate || !formInitialized || metaLoading || clients.length === 0) return;
@@ -1892,7 +1904,7 @@ export default function AutoserviceOrderFormPage() {
         clearRepairOrderCartDraft();
       }
 
-      clearRepairOrderFormDraft('create', null);
+      clearRepairOrderFormDraft('create', null, createSlotRef.current);
       if (afterCreate === 'edit') {
         setOrderNumber(saved?.order_number ?? null);
         applyFormState(mapOrderToFormState(saved));
@@ -1978,7 +1990,7 @@ export default function AutoserviceOrderFormPage() {
     }
 
     if (isCreate) {
-      writeRepairOrderFormDraft('create', null, captureFormSnapshot());
+      writeRepairOrderFormDraft('create', null, createSlotRef.current, captureFormSnapshot());
       goBack();
       return;
     }
@@ -2038,7 +2050,7 @@ export default function AutoserviceOrderFormPage() {
       return;
     }
     lastSavedSnapshotRef.current = JSON.stringify(snapshot);
-    clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null);
+    clearRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null, createSlotRef.current);
     goBack();
   };
 
@@ -2055,7 +2067,7 @@ export default function AutoserviceOrderFormPage() {
     const snapshot = captureFormSnapshot();
     const validationError = validateForAutoSave();
     if (!canAttemptAutoSave() || validationError) {
-      writeRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null, snapshot);
+      writeRepairOrderFormDraft(isEdit ? 'edit' : 'create', isEdit ? orderId : null, createSlotRef.current, snapshot);
       setError(validationError || 'Заполните клиента и дату записи');
       return;
     }

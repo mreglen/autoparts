@@ -1,6 +1,7 @@
 import {
   assignPlannerLanes,
   getWeekStart,
+  plannerHeadShift,
   plannerInspectionSegment,
   sortDayOrders,
   toIsoDate,
@@ -163,6 +164,24 @@ describe('autoservicePlannerLayout', () => {
     expect(plannerInspectionSegment(entries[0])).toEqual({ leftPercent: 25, widthPercent: 25 });
   });
 
+  it('keeps the status color on the left of a single-day bar', () => {
+    const dayIsos = [
+      '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+    ];
+    const entries = assignPlannerLanes([
+      {
+        id: 1,
+        status: 'done',
+        scheduled_at: '2026-09-21T11:00:00',
+        scheduled_end_at: '2026-09-21T18:00:00',
+        inspection_scheduled_at: '2026-09-21T09:30:00',
+      },
+    ], dayIsos, new Date('2026-09-26T12:00:00'));
+    expect(entries[0].inspectionIdx).toBe(0);
+    expect(plannerInspectionSegment(entries[0])).toEqual({ leftPercent: 50, widthPercent: 50 });
+  });
+
   it('ignores an inspection date outside the order bar', () => {
     const dayIsos = [
       '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
@@ -178,5 +197,11 @@ describe('autoservicePlannerLayout', () => {
       },
     ], dayIsos, new Date('2026-09-26T12:00:00'));
     expect(plannerInspectionSegment(entries[0])).toBeNull();
+  });
+
+  it('pins the week header under the app chrome without loosing it below the grid', () => {
+    expect(plannerHeadShift({ chromeHeight: 120, gridTop: 200, gridHeight: 900, headHeight: 44 })).toBe(0);
+    expect(plannerHeadShift({ chromeHeight: 120, gridTop: -60, gridHeight: 900, headHeight: 44 })).toBe(180);
+    expect(plannerHeadShift({ chromeHeight: 120, gridTop: -800, gridHeight: 900, headHeight: 44 })).toBe(856);
   });
 });

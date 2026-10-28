@@ -26,6 +26,10 @@ from app.schemas.autoservice_planner import (
     PlannerWeekZoneRow,
     PlannerZoneRef,
 )
+from app.services.autoservice_inspection_duplicates import (
+    covered_inspection_slots,
+    filter_covered_bookings,
+)
 from app.services.autoservice_planner_items import (
     planner_inspection_item as _planner_inspection,
     planner_order_item as _planner_order,
@@ -270,7 +274,13 @@ def search_planner_items(
     )
 
     items = [_planner_order(row) for row in orders]
-    items.extend(_planner_inspection(row) for row in bookings)
+    items.extend(
+        _planner_inspection(row)
+        for row in filter_covered_bookings(
+            bookings,
+            covered_inspection_slots(db, org_id, range_start.date(), range_end.date()),
+        )
+    )
     visible = [item for item in items if _search_zone_visible(item, full_access, zone_rights)]
     visible.sort(key=lambda item: abs((item.scheduled_at - now).total_seconds()))
     return visible[:SEARCH_RESULT_LIMIT]
@@ -341,6 +351,11 @@ def _planner_zone_rows(
         )
         .order_by(InspectionBooking.preferred_date.asc(), InspectionBooking.id.asc())
         .all()
+    )
+
+    inspections = filter_covered_bookings(
+        inspections,
+        covered_inspection_slots(db, org_id, start_day, end_day),
     )
 
     zone_day_map: dict[int | None, dict[date, list[PlannerRepairOrder]]] = {

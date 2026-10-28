@@ -1,10 +1,16 @@
 const PREFIX = 'sg:repair-order-form';
 
-export function repairOrderFormCacheKey(mode, orderId = null) {
+export function newRepairOrderDraftToken() {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Token разделяет черновики «нового заказ-наряда»: без него каждый новый заказ
+// подхватывал бы последний брошенный черновик вместо пустой формы.
+export function repairOrderFormCacheKey(mode, orderId = null, token = null) {
   if (mode === 'edit' && orderId != null) {
     return `${PREFIX}:edit:${orderId}`;
   }
-  return `${PREFIX}:create`;
+  return token ? `${PREFIX}:create:${token}` : `${PREFIX}:create`;
 }
 
 export function repairOrderFormSnapshotHasContent(snapshot) {
@@ -24,9 +30,9 @@ export function repairOrderFormSnapshotHasContent(snapshot) {
   return false;
 }
 
-export function writeRepairOrderFormDraft(mode, orderId, formSnapshot) {
+export function writeRepairOrderFormDraft(mode, orderId, token, formSnapshot) {
   try {
-    const key = repairOrderFormCacheKey(mode, orderId);
+    const key = repairOrderFormCacheKey(mode, orderId, token);
     if (!repairOrderFormSnapshotHasContent(formSnapshot)) {
       sessionStorage.removeItem(key);
       return;
@@ -40,9 +46,9 @@ export function writeRepairOrderFormDraft(mode, orderId, formSnapshot) {
   }
 }
 
-export function readRepairOrderFormDraft(mode, orderId = null) {
+export function readRepairOrderFormDraft(mode, orderId = null, token = null) {
   try {
-    const raw = sessionStorage.getItem(repairOrderFormCacheKey(mode, orderId));
+    const raw = sessionStorage.getItem(repairOrderFormCacheKey(mode, orderId, token));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.form || typeof parsed.form !== 'object') return null;
@@ -67,6 +73,7 @@ export function listRepairOrderFormDrafts() {
           key,
           mode,
           orderId: mode === 'edit' ? Number(idRaw) || null : null,
+          createToken: mode === 'edit' ? '' : (idRaw || ''),
           form: parsed.form,
           savedAt: Number(parsed.savedAt) || 0,
         });
@@ -81,9 +88,9 @@ export function listRepairOrderFormDrafts() {
   return drafts;
 }
 
-export function clearRepairOrderFormDraft(mode, orderId = null) {
+export function clearRepairOrderFormDraft(mode, orderId = null, token = null) {
   try {
-    sessionStorage.removeItem(repairOrderFormCacheKey(mode, orderId));
+    sessionStorage.removeItem(repairOrderFormCacheKey(mode, orderId, token));
   } catch {
     /* ignore */
   }

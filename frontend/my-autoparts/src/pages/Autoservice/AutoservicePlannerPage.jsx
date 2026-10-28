@@ -19,6 +19,7 @@ import {
   getWeekStart,
   plannerItemCoversDay,
   plannerItemEndDate,
+  plannerHeadShift,
   plannerInspectionSegment,
   sortDayOrders,
   toIsoDate,
@@ -96,9 +97,13 @@ function plannerClientFirstName(name) {
   return String(name || '').trim().split(/\s+/)[0] || '—';
 }
 
-function plannerInspectionClockLabel(item) {
+function plannerInspectionTitleLabel(item) {
   const date = parseWallClockDate(item?.inspection_scheduled_at);
-  return date ? date.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
+  if (!date) return '';
+  const clock = date.getHours() || date.getMinutes()
+    ? date.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    : '';
+  return `Осмотр ${[formatDayHeader(toIsoDate(date)), clock].filter(Boolean).join(' ')}`;
 }
 
 function plannerItemStartTimeLabel(item) {
@@ -252,17 +257,19 @@ function PlannerZoneWeekRow({
               const vehicleLabel = item.vehicle_make || '';
               const nameWithVehicle = [plannerClientFirstName(clientName), vehicleLabel].filter(Boolean).join(' ');
               const titleVehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ');
+              const segment = plannerInspectionSegment(entry);
               const itemTitle = [
                 item.kind === 'inspection' ? 'Осмотр' : `№ ${item.order_number}`,
                 clientName,
                 titleVehicle,
+                segment ? plannerInspectionTitleLabel(item) : '',
               ].filter(Boolean).join(' · ');
-              const segment = plannerInspectionSegment(entry);
               const isHighlighted = dimmed && plannerItemKey(item) === highlightKey;
               const isFaded = dimmed && !isHighlighted;
               return (
                 <button
                   key={plannerItemKey(item)}
+                  data-planner-key={plannerItemKey(item)}
                   type="button"
                   onClick={() => {
                     if (isFaded) {
@@ -282,17 +289,15 @@ function PlannerZoneWeekRow({
                   }}
                   title={itemTitle}
                 >
-                  <span className="relative block truncate tabular-nums">{plannerBarTimeLabel(entry, dayIsos)}</span>
-                  <span className="relative mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
                   {segment ? (
                     <span
-                      className="absolute inset-y-0 bg-success-600 px-1.5 py-1.5 text-white"
+                      aria-hidden
+                      className="absolute inset-y-0 bg-success-600/55"
                       style={{ left: `${segment.leftPercent}%`, width: `${segment.widthPercent}%` }}
-                    >
-                      <span className="block truncate tabular-nums">{plannerInspectionClockLabel(item)}</span>
-                      <span className="mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
-                    </span>
+                    />
                   ) : null}
+                  <span className="relative block truncate tabular-nums">{plannerBarTimeLabel(entry, dayIsos)}</span>
+                  <span className="relative mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
                 </button>
               );
             })}
@@ -317,15 +322,59 @@ function PlannerWeekGrid({
   highlightKey,
   onClearHighlight,
 }) {
+  const gridRef = useRef(null);
+  const zoneHeadRef = useRef(null);
+  const chromeRef = useRef(null);
+
+  // Горизонтальный скролл-контейнер ниже блокировал бы CSS sticky, поэтому шапку сдвигает transform.
+  useEffect(() => {
+    const grid = gridRef.current;
+    const zoneHead = zoneHeadRef.current;
+    const chrome = chromeRef.current;
+    if (!grid || !zoneHead || !chrome) return undefined;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const shift = plannerHeadShift({
+        chromeHeight: chrome.offsetHeight,
+        gridTop: grid.getBoundingClientRect().top,
+        gridHeight: grid.offsetHeight,
+        headHeight: zoneHead.offsetHeight,
+      });
+      grid.style.setProperty('--sg-planner-head-shift', `${shift}px`);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', schedule, true);
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule, true);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [dayIsos, zones]);
+
+  const headTransform = 'translateY(var(--sg-planner-head-shift, 0px))';
+
   return (
     <div className="hidden overflow-x-auto md:block">
+      <div
+        ref={chromeRef}
+        aria-hidden
+        className="pointer-events-none fixed left-0 top-0 h-[var(--sg-mobile-header-h)] w-0 lg:h-[var(--sg-desktop-header-h)]"
+      />
       <div className="min-w-[52rem] overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
         <div
+          ref={gridRef}
           className="grid w-full"
           style={{ gridTemplateColumns: 'minmax(5rem, 7.3rem) repeat(7, minmax(6.5rem, 1fr))' }}
         >
           <div
-            className={`sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted transition-opacity ${
+            ref={zoneHeadRef}
+            style={{ transform: headTransform }}
+            className={`sticky left-0 z-30 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted transition-opacity ${
               highlightKey ? 'opacity-45' : ''
             }`}
           >
@@ -338,13 +387,14 @@ function PlannerWeekGrid({
             return (
               <div
                 key={iso}
-                className={`border-b border-r border-line px-2 py-2 text-center transition-opacity ${
+                style={{ transform: headTransform }}
+                className={`z-20 border-b border-r border-line px-2 py-2 text-center transition-opacity ${
                   highlightKey ? 'opacity-45' : ''
                 } ${
                   isToday
                     ? 'bg-brand-50 text-brand-800'
                     : isWeekend
-                      ? 'bg-danger-50/60 text-ink-muted'
+                      ? 'bg-danger-50 text-ink-muted'
                       : 'bg-surface-muted text-ink-muted'
                 }`}
               >
@@ -628,10 +678,9 @@ function plannerSearchDateLabel(item) {
   return clock ? `${day} · ${clock}` : day;
 }
 
-function PlannerSearchBox({ query, onQueryChange, onPick, highlightKey }) {
+function PlannerSearchBox({ query, onQueryChange, onPick, highlightKey, open, setOpen }) {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [open, setOpen] = useState(false);
   const boxRef = useRef(null);
   const requestIdRef = useRef(0);
   const term = query.trim();
@@ -658,7 +707,7 @@ function PlannerSearchBox({ query, onQueryChange, onPick, highlightKey }) {
       setSearching(false);
     }, PLANNER_SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [term]);
+  }, [setOpen, term]);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -666,7 +715,7 @@ function PlannerSearchBox({ query, onQueryChange, onPick, highlightKey }) {
     };
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, []);
+  }, [setOpen]);
 
   const showDropdown = open && term.length >= PLANNER_SEARCH_MIN_CHARS;
 
@@ -700,7 +749,10 @@ function PlannerSearchBox({ query, onQueryChange, onPick, highlightKey }) {
       </div>
 
       {showDropdown ? (
-        <div className="absolute left-0 right-0 top-full z-40 mt-1 overflow-hidden rounded-sg-lg border border-line bg-surface shadow-lg">
+        <div
+          data-planner-search="dropdown"
+          className="absolute left-0 right-0 top-full z-40 mt-1 overflow-hidden rounded-sg-lg border border-line bg-surface shadow-lg"
+        >
           {!searching && results.length === 0 ? (
             <p className="px-3 py-3 text-sm text-ink-muted">Ничего не найдено</p>
           ) : null}
@@ -935,6 +987,7 @@ function MobileDayPlanner({
                       <li key={plannerItemKey(order)}>
                         <button
                           type="button"
+                          data-planner-key={plannerItemKey(order)}
                           onClick={() => {
                             if (highlightKey && plannerItemKey(order) !== highlightKey) {
                               onClearHighlight?.();
@@ -1021,6 +1074,8 @@ export default function AutoservicePlannerPage() {
   const [dayModalIso, setDayModalIso] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [highlight, setHighlight] = useState(null);
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
+  const [pendingFocusKey, setPendingFocusKey] = useState(null);
 
   const changeViewMode = (next) => {
     setViewMode(next);
@@ -1060,6 +1115,27 @@ export default function AutoservicePlannerPage() {
   useEffect(() => {
     if (isReady && isAuthenticated) load();
   }, [isReady, isAuthenticated, load]);
+
+  // Выбор из поиска: подстраиваем страницу под нужную полосу, а выпадающий список
+  // закрываем только когда он оказывается прямо над подсвеченной позицией.
+  useEffect(() => {
+    if (!pendingFocusKey || loading || highlight?.key !== pendingFocusKey) return undefined;
+    const bars = Array.from(document.querySelectorAll(`[data-planner-key="${pendingFocusKey}"]`));
+    const bar = bars.find((el) => el.offsetHeight > 0);
+    if (!bar) return undefined;
+    setPendingFocusKey(null);
+    bar.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const dropdown = document.querySelector('[data-planner-search="dropdown"]');
+    if (!dropdown) return undefined;
+    const overlay = dropdown.getBoundingClientRect();
+    const target = bar.getBoundingClientRect();
+    const covered = target.left < overlay.right
+      && target.right > overlay.left
+      && target.top < overlay.bottom
+      && target.bottom > overlay.top;
+    if (covered) setSearchDropdownOpen(false);
+    return undefined;
+  }, [pendingFocusKey, loading, highlight]);
 
   const handlePlannerItemClick = (item) => {
     if (item?.kind === 'inspection') {
@@ -1141,7 +1217,9 @@ export default function AutoservicePlannerPage() {
   const handleSearchPick = (item) => {
     const iso = String(item.scheduled_at).slice(0, 10);
     jumpToDate(iso);
-    setHighlight({ key: plannerItemKey(item), dayIso: iso });
+    const key = plannerItemKey(item);
+    setHighlight({ key, dayIso: iso });
+    setPendingFocusKey(key);
   };
 
   const beginCreateOrder = useCallback((ctx) => {
@@ -1250,6 +1328,8 @@ export default function AutoservicePlannerPage() {
           onQueryChange={handleSearchQueryChange}
           onPick={handleSearchPick}
           highlightKey={activeHighlight?.key || null}
+          open={searchDropdownOpen}
+          setOpen={setSearchDropdownOpen}
         />
 
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
