@@ -317,6 +317,7 @@ export default function AutoserviceInspectionsPage() {
               vehicleMake: booking.vehicle_make || booking.vehicle?.make,
               vehicleModel: booking.vehicle_model || booking.vehicle?.model,
               inspectionBookingId: booking.id,
+              staffComment: booking.notes || '',
             }),
           });
         }}

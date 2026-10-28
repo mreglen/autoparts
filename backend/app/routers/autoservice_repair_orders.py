@@ -78,11 +78,13 @@ from app.utils.autoservice_access import (
 from app.utils.phone import normalize_to_storage_format
 from app.utils.repair_order_number import allocate_repair_order_number
 from app.services.autoservice_audit import (
+    inspection_booking_label,
     log_autoservice,
     payment_method_label,
     repair_order_label,
     status_label,
 )
+from app.services.autoservice_caldav import request_org_sync
 from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
 from app.services.autoservice_vat import DEFAULT_VAT_RATE, get_org_vat_rate
 from app.services.autoservice_payment_service import (
@@ -1747,11 +1749,10 @@ def create_repair_order(
         mileage_km=payload.mileage_km,
         user_id=current_user.id,
     )
+    booking_label = inspection_booking_label(booking) if booking is not None else None
+    booking_id = booking.id if booking is not None else None
     if booking is not None:
-        booking.client_id = client.id
-        if vehicle is not None:
-            booking.garage_vehicle_id = vehicle.id
-        booking.status = "processed"
+        db.delete(booking)
     db.commit()
     row = _get_org_order_or_404(db, org_id, row.id)
     log_autoservice(
@@ -1772,6 +1773,20 @@ def create_repair_order(
             "vehicle_id": row.vehicle_id,
         },
     )
+    if booking_id is not None:
+        request_org_sync(org_id)
+        log_autoservice(
+            db,
+            event_type="inspection_booking_deleted",
+            summary=(
+                f"Удалена запись на осмотр после создания заказ-наряда: {booking_label}"
+            ),
+            user=current_user,
+            organization_id=org_id,
+            entity_type="inspection_booking",
+            entity_id=booking_id,
+            details={"repair_order_id": row.id},
+        )
     return _to_staff_view(db, row)
 
 

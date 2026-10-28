@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
+from app.models.autoservice_client import AutoserviceClient
 from app.models.autoservice_work_zone import AutoserviceWorkZone
+from app.models.garage_vehicle import GarageVehicle
 from app.models.inspection_booking import InspectionBooking
 from app.models.repair_order import RepairOrder
 from app.models.user import User
@@ -178,6 +180,100 @@ def get_planner_employee_work_zones(
             )
         )
     return PlannerEmployeeWorkZonesResponse(full_access=full_access, zones=items)
+
+
+SEARCH_BACK_DAYS = 90
+SEARCH_FORWARD_DAYS = 270
+SEARCH_SQL_LIMIT = 100
+SEARCH_RESULT_LIMIT = 20
+
+
+def _search_zone_visible(
+    item: PlannerRepairOrder,
+    full_access: bool,
+    zone_rights: dict[int | None, dict[str, bool]],
+) -> bool:
+    """Та же логика видимости, что у `_place_item`: зона без права — скрыта,
+    удалённая зона считается «без рабочей зоны»."""
+    if item.work_zone_id is None:
+        return full_access or bool((zone_rights.get(None) or {}).get("can_view"))
+    entry = zone_rights.get(item.work_zone_id)
+    if entry is None:
+        return full_access or bool((zone_rights.get(None) or {}).get("can_view"))
+    return bool(entry.get("can_view"))
+
+
+@router.get("/autoservice/planner/search", response_model=list[PlannerRepairOrder])
+def search_planner_items(
+    q: str = Query(..., min_length=2, max_length=80),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Заказ-наряды и записи на осмотр по клиенту или автомобилю — поиск в планировщике."""
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_PLANNER)
+    full_access, zone_rights = planner_zone_rights(db, current_user, org_id)
+
+    raw = q.strip()
+    term = f"%{raw}%"
+    now = datetime.now()
+    range_start = now - timedelta(days=SEARCH_BACK_DAYS)
+    range_end = now + timedelta(days=SEARCH_FORWARD_DAYS)
+
+    orders = (
+        db.query(RepairOrder)
+        .options(
+            joinedload(RepairOrder.client),
+            joinedload(RepairOrder.vehicle),
+            joinedload(RepairOrder.work_zone),
+        )
+        .outerjoin(AutoserviceClient, RepairOrder.client_id == AutoserviceClient.id)
+        .outerjoin(GarageVehicle, RepairOrder.vehicle_id == GarageVehicle.id)
+        .filter(
+            RepairOrder.organization_id == org_id,
+            RepairOrder.status.notin_(("cancelled", "review")),
+            RepairOrder.scheduled_at >= range_start,
+            RepairOrder.scheduled_at <= range_end,
+            or_(
+                AutoserviceClient.name.ilike(term),
+                GarageVehicle.make.ilike(term),
+                GarageVehicle.model.ilike(term),
+                GarageVehicle.plate.ilike(term),
+            ),
+        )
+        .limit(SEARCH_SQL_LIMIT)
+        .all()
+    )
+
+    bookings = (
+        db.query(InspectionBooking)
+        .options(
+            joinedload(InspectionBooking.vehicle),
+            joinedload(InspectionBooking.work_zone),
+        )
+        .outerjoin(GarageVehicle, InspectionBooking.garage_vehicle_id == GarageVehicle.id)
+        .filter(
+            InspectionBooking.organization_id == org_id,
+            InspectionBooking.status.in_(("confirmed", "processed")),
+            InspectionBooking.preferred_date >= range_start.date(),
+            InspectionBooking.preferred_date <= range_end.date(),
+            or_(
+                InspectionBooking.name.ilike(term),
+                InspectionBooking.vehicle_make.ilike(term),
+                InspectionBooking.vehicle_model.ilike(term),
+                GarageVehicle.make.ilike(term),
+                GarageVehicle.model.ilike(term),
+                GarageVehicle.plate.ilike(term),
+            ),
+        )
+        .limit(SEARCH_SQL_LIMIT)
+        .all()
+    )
+
+    items = [_planner_order(row) for row in orders]
+    items.extend(_planner_inspection(row) for row in bookings)
+    visible = [item for item in items if _search_zone_visible(item, full_access, zone_rights)]
+    visible.sort(key=lambda item: abs((item.scheduled_at - now).total_seconds()))
+    return visible[:SEARCH_RESULT_LIMIT]
 
 
 def _planner_zone_rows(

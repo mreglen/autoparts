@@ -26,9 +26,11 @@ import {
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const PLANNER_VIEW_STORAGE_KEY = 'plannerViewMode';
+// Календарь на месяц скрыт по просьбе заказчика — переключатель и месячный режим возвращаются этим флагом.
+const PLANNER_MONTH_VIEW_ENABLED = false;
 
 function readPlannerViewMode() {
-  if (typeof localStorage === 'undefined') return 'week';
+  if (typeof localStorage === 'undefined' || !PLANNER_MONTH_VIEW_ENABLED) return 'week';
   return localStorage.getItem(PLANNER_VIEW_STORAGE_KEY) === 'month' ? 'month' : 'week';
 }
 
@@ -176,18 +178,35 @@ function plannerBarTimeLabel(entry, dayIsos) {
   return `${startClock} → ${formatDayHeader(dayIsos[endIdx])} ${endClock}`;
 }
 
-function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContextMenu }) {
+function PlannerZoneWeekRow({
+  zone,
+  dayIsos,
+  todayIso,
+  onItemClick,
+  onCellContextMenu,
+  highlightKey,
+  onClearHighlight,
+}) {
   const entries = useMemo(
     () => assignPlannerLanes((zone.days || []).flatMap((day) => day.orders || []), dayIsos),
     [zone.days, dayIsos],
   );
+  const dimmed = Boolean(highlightKey);
 
   const handleCellContextMenu = (dayIso) => (event) => {
     event.preventDefault();
+    if (dimmed) {
+      onClearHighlight?.();
+      return;
+    }
     onCellContextMenu?.({ x: event.clientX, y: event.clientY, dayIso, zoneId: zone.id ?? null });
   };
 
   const handleCellClick = (dayIso) => (event) => {
+    if (dimmed) {
+      onClearHighlight?.();
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     onCellContextMenu?.({
       x: rect.left,
@@ -199,7 +218,11 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
 
   return (
     <div className="contents">
-      <div className="sticky left-0 z-10 border-b border-r border-line bg-surface px-3 py-2.5 text-sm font-medium leading-snug text-ink">
+      <div
+        className={`sticky left-0 z-10 border-b border-r border-line bg-surface px-3 py-2.5 text-sm font-medium leading-snug text-ink transition-opacity ${
+          dimmed ? 'opacity-45' : ''
+        }`}
+      >
         {zone.name}
       </div>
       <div className="relative col-span-7 min-h-[3rem] border-b border-line-soft">
@@ -213,7 +236,7 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                 key={iso}
                 className={`border-r border-line-soft transition-colors hover:bg-surface-subtle/45 ${
                   iso === todayIso ? 'bg-brand-50/30' : isWeekend ? 'bg-danger-50/40' : 'bg-surface'
-                }`}
+                } ${dimmed ? 'opacity-45' : ''}`}
                 onContextMenu={handleCellContextMenu(iso)}
                 onClick={handleCellClick(iso)}
               />
@@ -235,14 +258,24 @@ function PlannerZoneWeekRow({ zone, dayIsos, todayIso, onItemClick, onCellContex
                 titleVehicle,
               ].filter(Boolean).join(' · ');
               const segment = plannerInspectionSegment(entry);
+              const isHighlighted = dimmed && plannerItemKey(item) === highlightKey;
+              const isFaded = dimmed && !isHighlighted;
               return (
                 <button
                   key={plannerItemKey(item)}
                   type="button"
-                  onClick={() => onItemClick(item)}
+                  onClick={() => {
+                    if (isFaded) {
+                      onClearHighlight?.();
+                      return;
+                    }
+                    onItemClick(item);
+                  }}
                   className={`pointer-events-auto relative mx-0.5 my-px min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:mx-1 sm:my-0.5 sm:text-xs ${styleClass} ${
                     entry.continuesPastWeek ? 'rounded-r-none' : ''
-                  } ${entry.continuesFromPrevWeek ? 'rounded-l-none' : ''}`}
+                  } ${entry.continuesFromPrevWeek ? 'rounded-l-none' : ''} ${
+                    isFaded ? 'opacity-30' : ''
+                  } ${isHighlighted ? 'z-10 ring-2 ring-ink' : ''}`}
                   style={{
                     gridColumn: `${entry.subStart + 1} / ${entry.subEnd + 2}`,
                     gridRow: entry.lane + 1,
@@ -281,6 +314,8 @@ function PlannerWeekGrid({
   loading,
   onItemClick,
   onCellContextMenu,
+  highlightKey,
+  onClearHighlight,
 }) {
   return (
     <div className="hidden overflow-x-auto md:block">
@@ -289,7 +324,11 @@ function PlannerWeekGrid({
           className="grid w-full"
           style={{ gridTemplateColumns: 'minmax(5rem, 7.3rem) repeat(7, minmax(6.5rem, 1fr))' }}
         >
-          <div className="sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+          <div
+            className={`sticky left-0 z-10 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted transition-opacity ${
+              highlightKey ? 'opacity-45' : ''
+            }`}
+          >
             Зона
           </div>
           {dayHeaders.map((day, index) => {
@@ -299,7 +338,9 @@ function PlannerWeekGrid({
             return (
               <div
                 key={iso}
-                className={`border-b border-r border-line px-2 py-2 text-center ${
+                className={`border-b border-r border-line px-2 py-2 text-center transition-opacity ${
+                  highlightKey ? 'opacity-45' : ''
+                } ${
                   isToday
                     ? 'bg-brand-50 text-brand-800'
                     : isWeekend
@@ -330,6 +371,8 @@ function PlannerWeekGrid({
                 todayIso={todayIso}
                 onItemClick={onItemClick}
                 onCellContextMenu={onCellContextMenu}
+                highlightKey={highlightKey}
+                onClearHighlight={onClearHighlight}
               />
             ))
           )}
@@ -344,7 +387,16 @@ function formatDayModalTitle(isoDate) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function PlannerMonthCalendar({ dayIsos, itemsByDay, monthIso, todayIso, onDayOpen }) {
+function PlannerMonthCalendar({
+  dayIsos,
+  itemsByDay,
+  monthIso,
+  todayIso,
+  onDayOpen,
+  highlightKey,
+  highlightDayIso,
+  onClearHighlight,
+}) {
   return (
     <div className="overflow-hidden rounded-sg-lg border border-line bg-surface shadow-sm">
       <div className="grid grid-cols-7 border-b border-line bg-surface-muted">
@@ -367,6 +419,8 @@ function PlannerMonthCalendar({ dayIsos, itemsByDay, monthIso, todayIso, onDayOp
           const isToday = iso === todayIso;
           const inMonth = iso.slice(0, 7) === monthIso;
           const isWeekend = index % 7 >= 5;
+          const isHighlightDay = Boolean(highlightKey) && highlightDayIso === iso;
+          const isFadedDay = Boolean(highlightKey) && !isHighlightDay;
           const background = isToday
             ? 'bg-brand-50/60'
             : !inMonth
@@ -378,9 +432,17 @@ function PlannerMonthCalendar({ dayIsos, itemsByDay, monthIso, todayIso, onDayOp
             <button
               key={iso}
               type="button"
-              onClick={() => onDayOpen(iso)}
+              onClick={() => {
+                if (isFadedDay) {
+                  onClearHighlight?.();
+                  return;
+                }
+                onDayOpen(iso);
+              }}
               title={`${formatDayModalTitle(iso)} · ${items.length ? `${items.length} на этот день` : 'свободно'}`}
-              className={`flex min-h-16 flex-col gap-1 border-b border-r border-line-soft p-1.5 text-left transition-colors hover:bg-surface-subtle/70 md:min-h-20 ${background}`}
+              className={`flex min-h-16 flex-col gap-1 border-b border-r border-line-soft p-1.5 text-left transition hover:bg-surface-subtle/70 md:min-h-20 ${background} ${
+                isFadedDay ? 'opacity-40' : ''
+              } ${isHighlightDay ? 'bg-brand-50/70 ring-2 ring-inset ring-ink' : ''}`}
             >
               <span
                 className={`text-xs font-semibold leading-none tabular-nums ${
@@ -393,7 +455,9 @@ function PlannerMonthCalendar({ dayIsos, itemsByDay, monthIso, todayIso, onDayOp
                 {bars.map((item) => (
                   <span
                     key={plannerItemKey(item)}
-                    className={`h-[3px] w-full rounded-full ${plannerItemBarColor(item)}`}
+                    className={`h-[3px] w-full rounded-full transition-opacity ${plannerItemBarColor(item)} ${
+                      highlightKey && plannerItemKey(item) !== highlightKey ? 'opacity-25' : ''
+                    }`}
                   />
                 ))}
                 {hiddenCount > 0 ? (
@@ -545,6 +609,151 @@ function PlannerViewModeSwitch({ viewMode, onChange }) {
   );
 }
 
+const PLANNER_SEARCH_MIN_CHARS = 2;
+const PLANNER_SEARCH_DEBOUNCE_MS = 250;
+
+function plannerItemVehicleLabel(item) {
+  const fromParts = [item?.vehicle_make, item?.vehicle_model].filter(Boolean).join(' ');
+  if (fromParts) return fromParts;
+  return item?.vehicle && item.vehicle !== '—' ? item.vehicle : '';
+}
+
+function plannerSearchDateLabel(item) {
+  const start = parseWallClockDate(item?.scheduled_at);
+  if (!start) return '—';
+  const day = start.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+  const clock = item.kind === 'inspection'
+    ? item.preferred_time?.slice(0, 5)
+    : start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return clock ? `${day} · ${clock}` : day;
+}
+
+function PlannerSearchBox({ query, onQueryChange, onPick, highlightKey }) {
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+  const requestIdRef = useRef(0);
+  const term = query.trim();
+
+  useEffect(() => {
+    if (term.length < PLANNER_SEARCH_MIN_CHARS) {
+      setResults([]);
+      setSearching(false);
+      return undefined;
+    }
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
+    setSearching(true);
+    setOpen(true);
+    const timer = setTimeout(async () => {
+      let data = [];
+      try {
+        data = await apiRequest(`/autoservice/planner/search?q=${encodeURIComponent(term)}`);
+      } catch {
+        data = [];
+      }
+      if (requestIdRef.current !== requestId) return;
+      setResults(data || []);
+      setSearching(false);
+    }, PLANNER_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [term]);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (boxRef.current && !boxRef.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, []);
+
+  const showDropdown = open && term.length >= PLANNER_SEARCH_MIN_CHARS;
+
+  return (
+    <div ref={boxRef} className="relative min-w-0 flex-1 md:max-w-sm">
+      <div className="flex h-11 items-center gap-2 rounded-sg bg-surface px-3 shadow-sm ring-1 ring-line/80 transition focus-within:ring-brand md:h-10">
+        <svg className="h-4 w-4 shrink-0 text-ink-faint" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+          <circle cx="11" cy="11" r="7" />
+          <path strokeLinecap="round" d="M20 20l-3.5-3.5" />
+        </svg>
+        <input
+          type="text"
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          onFocus={() => setOpen(true)}
+          placeholder="Поиск по клиенту или автомобилю"
+          aria-label="Поиск по планировщику"
+          className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
+        />
+        {searching ? <span className="shrink-0 text-xs text-ink-faint">…</span> : null}
+        {query ? (
+          <button
+            type="button"
+            onClick={() => onQueryChange('')}
+            aria-label="Очистить поиск"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-faint transition hover:bg-surface-subtle hover:text-ink"
+          >
+            ×
+          </button>
+        ) : null}
+      </div>
+
+      {showDropdown ? (
+        <div className="absolute left-0 right-0 top-full z-40 mt-1 overflow-hidden rounded-sg-lg border border-line bg-surface shadow-lg">
+          {!searching && results.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-ink-muted">Ничего не найдено</p>
+          ) : null}
+          {searching && results.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-ink-muted" aria-live="polite">Поиск…</p>
+          ) : null}
+          {results.length > 0 ? (
+            <ul className="max-h-80 overflow-y-auto py-1">
+              {results.map((item) => {
+                const key = plannerItemKey(item);
+                const vehicle = plannerItemVehicleLabel(item);
+                return (
+                  <li key={key}>
+                    <button
+                      type="button"
+                      onClick={() => onPick(item)}
+                      className={`flex w-full items-start gap-2.5 px-3 py-2 text-left transition hover:bg-brand-50/60 ${
+                        key === highlightKey ? 'bg-brand-50/70' : ''
+                      }`}
+                    >
+                      <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${plannerItemBarColor(item)}`} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
+                            {item.client_name || '—'}
+                          </span>
+                          {item.kind === 'inspection' ? (
+                            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-success-700">
+                              Осмотр
+                            </span>
+                          ) : (
+                            <OrderStatusBadge status={item.status} className="shrink-0" noRing />
+                          )}
+                        </span>
+                        <span className="mt-0.5 block truncate text-sm text-ink-muted">
+                          {[vehicle, item.work_zone_name].filter(Boolean).join(' · ') || '—'}
+                        </span>
+                      </span>
+                      <span className="shrink-0 pt-0.5 text-xs font-medium tabular-nums text-ink-soft">
+                        {plannerSearchDateLabel(item)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function WeekToolbar({
   periodLabel,
   selectedDateIso,
@@ -600,7 +809,9 @@ function WeekToolbar({
           aria-label={`Перейти к ${periodWord === 'месяц' ? 'месяцу' : 'неделе'} по дате`}
         />
       </label>
-      <PlannerViewModeSwitch viewMode={viewMode} onChange={onViewModeChange} />
+      {PLANNER_MONTH_VIEW_ENABLED ? (
+        <PlannerViewModeSwitch viewMode={viewMode} onChange={onViewModeChange} />
+      ) : null}
     </div>
   );
 }
@@ -617,6 +828,8 @@ function MobileDayPlanner({
   onAddInZone,
   canEditZone,
   loading,
+  highlightKey,
+  onClearHighlight,
 }) {
   const touchStartRef = useRef(null);
 
@@ -722,8 +935,20 @@ function MobileDayPlanner({
                       <li key={plannerItemKey(order)}>
                         <button
                           type="button"
-                          onClick={() => onItemClick(order)}
-                          className={`flex w-full min-h-11 items-start gap-3 rounded-sg px-3 py-2.5 text-left transition ${plannerItemStyle(order)}`}
+                          onClick={() => {
+                            if (highlightKey && plannerItemKey(order) !== highlightKey) {
+                              onClearHighlight?.();
+                              return;
+                            }
+                            onItemClick(order);
+                          }}
+                          className={`flex w-full min-h-11 items-start gap-3 rounded-sg px-3 py-2.5 text-left transition ${plannerItemStyle(order)} ${
+                            highlightKey && plannerItemKey(order) !== highlightKey ? 'opacity-40' : ''
+                          } ${
+                            highlightKey && plannerItemKey(order) === highlightKey
+                              ? 'ring-2 ring-ink ring-offset-1 ring-offset-surface'
+                              : ''
+                          }`}
                         >
                           <span className="w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums">
                             {plannerItemMobileTimeLabel(order, selectedDayIso)}
@@ -794,6 +1019,8 @@ export default function AutoservicePlannerPage() {
   const [viewInspection, setViewInspection] = useState(null);
   const [viewMode, setViewMode] = useState(readPlannerViewMode);
   const [dayModalIso, setDayModalIso] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [highlight, setHighlight] = useState(null);
 
   const changeViewMode = (next) => {
     setViewMode(next);
@@ -858,6 +1085,7 @@ export default function AutoservicePlannerPage() {
 
   const shiftWeek = (delta) => {
     setDayModalIso(null);
+    setHighlight(null);
     const nextWeekStart = addDays(weekStart, delta * 7);
     setWeekStart(nextWeekStart);
     const startIso = toIsoDate(nextWeekStart);
@@ -867,6 +1095,7 @@ export default function AutoservicePlannerPage() {
 
   const shiftMonth = (delta) => {
     setDayModalIso(null);
+    setHighlight(null);
     const nextMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() + delta, 1);
     setMonthStart(nextMonthStart);
     const firstIso = toIsoDate(nextMonthStart);
@@ -881,6 +1110,7 @@ export default function AutoservicePlannerPage() {
 
   const goToday = () => {
     setDayModalIso(null);
+    setHighlight(null);
     setWeekStart(getWeekStart(today));
     setMonthStart(getMonthStart(today));
     setSelectedDayIso(todayIso);
@@ -889,12 +1119,29 @@ export default function AutoservicePlannerPage() {
   const jumpToDate = (isoDate) => {
     if (!isoDate) return;
     setDayModalIso(null);
+    setHighlight(null);
     const [y, m, d] = String(isoDate).split('-').map(Number);
     if (!y || !m || !d) return;
     const target = new Date(y, m - 1, d);
     setWeekStart(getWeekStart(target));
     setMonthStart(getMonthStart(target));
     setSelectedDayIso(isoDate);
+  };
+
+  const handleSearchQueryChange = (value) => {
+    setSearchQuery(value);
+    setHighlight(null);
+  };
+
+  const clearPlannerHighlight = () => {
+    setSearchQuery('');
+    setHighlight(null);
+  };
+
+  const handleSearchPick = (item) => {
+    const iso = String(item.scheduled_at).slice(0, 10);
+    jumpToDate(iso);
+    setHighlight({ key: plannerItemKey(item), dayIso: iso });
   };
 
   const beginCreateOrder = useCallback((ctx) => {
@@ -944,6 +1191,12 @@ export default function AutoservicePlannerPage() {
     );
   });
 
+  const highlightExists = viewMode === 'month'
+    ? monthItems.some((item) => plannerItemKey(item) === highlight?.key)
+    : zones.some((zone) => (zone.days || []).some((day) => (day.orders || [])
+      .some((item) => plannerItemKey(item) === highlight?.key)));
+  const activeHighlight = highlight && highlightExists ? highlight : null;
+
   const visibleDayIsos = viewMode === 'month' ? monthDayIsos : dayIsos;
   const activeDayIso = visibleDayIsos.includes(selectedDayIso)
     ? selectedDayIso
@@ -992,7 +1245,12 @@ export default function AutoservicePlannerPage() {
   return (
     <div className="min-w-0 lg:-mr-6">
       <div className="mb-3 flex flex-col gap-3 md:mb-5 md:flex-row md:items-center md:justify-between">
-        <h1 className="max-md:hidden text-xl font-bold text-ink sm:text-2xl">Планировщик</h1>
+        <PlannerSearchBox
+          query={searchQuery}
+          onQueryChange={handleSearchQueryChange}
+          onPick={handleSearchPick}
+          highlightKey={activeHighlight?.key || null}
+        />
 
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
           <button
@@ -1031,6 +1289,9 @@ export default function AutoservicePlannerPage() {
             monthIso={monthStartIso}
             todayIso={todayIso}
             onDayOpen={openMonthDay}
+            highlightKey={activeHighlight?.key || null}
+            highlightDayIso={activeHighlight?.dayIso || null}
+            onClearHighlight={clearPlannerHighlight}
           />
           {loading ? (
             <p className="mt-3 text-sm text-ink-muted" aria-live="polite">
@@ -1052,6 +1313,8 @@ export default function AutoservicePlannerPage() {
             onAddInZone={openCreateChoice}
             canEditZone={canEditZone}
             loading={loading}
+            highlightKey={activeHighlight?.key || null}
+            onClearHighlight={clearPlannerHighlight}
           />
 
           <PlannerWeekGrid
@@ -1062,6 +1325,8 @@ export default function AutoservicePlannerPage() {
             loading={loading}
             onItemClick={handlePlannerItemClick}
             onCellContextMenu={handleCellContextMenu}
+            highlightKey={activeHighlight?.key || null}
+            onClearHighlight={clearPlannerHighlight}
           />
 
           {loading ? (
@@ -1153,6 +1418,7 @@ export default function AutoservicePlannerPage() {
               clientPhone: booking.phone,
               vehicleMake: booking.vehicle_make,
               inspectionBookingId: booking.id,
+              staffComment: booking.notes || '',
             }),
           });
         }}
