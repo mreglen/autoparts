@@ -253,7 +253,10 @@ describe('планировщик: день записи на осмотр вну
     expect(within(bar).getAllByText(/Иван/)).toHaveLength(1);
     expect(within(bar).getByText(/09:00/)).toBeTruthy();
     // eslint-disable-next-line testing-library/no-node-access
-    expect(bar.querySelector('span[aria-hidden]')).toBeTruthy();
+    const segment = bar.querySelector('span[aria-hidden]');
+    expect(segment).toBeTruthy();
+    // Сегмент обязан совпадать с зелёным полос записей, а не подмешиваться полупрозрачностью к цвету заказа.
+    expect(segment.className.split(' ')).toContain('bg-success-600');
   });
 
   it('у закрытого заказа зелёная метка записи не показывается', async () => {

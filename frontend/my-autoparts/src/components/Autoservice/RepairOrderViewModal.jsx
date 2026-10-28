@@ -1268,7 +1268,9 @@ export default function RepairOrderViewModal({
             </MetaItem>
             <MetaItem label="Дата начала">{formatDateTime(order.scheduled_at) || '—'}</MetaItem>
             {order.inspection_scheduled_at ? (
-              <MetaItem label="Дата записи на осмотр">{formatDateTime(order.inspection_scheduled_at)}</MetaItem>
+              <MetaItem label="Дата записи на осмотр">
+                <span className="text-success-700">{formatDateTime(order.inspection_scheduled_at)}</span>
+              </MetaItem>
             ) : null}
             <MetaItem label="Пробег">
               {order.mileage_km != null && order.mileage_km !== ''

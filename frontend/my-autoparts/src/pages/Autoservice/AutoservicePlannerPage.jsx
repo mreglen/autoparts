@@ -303,7 +303,7 @@ function PlannerZoneWeekRow({
                   {segment ? (
                     <span
                       aria-hidden
-                      className="absolute inset-y-0 bg-success-600/55"
+                      className="absolute inset-y-0 bg-success-600"
                       style={{ left: `${segment.leftPercent}%`, width: `${segment.widthPercent}%` }}
                     />
                   ) : null}
