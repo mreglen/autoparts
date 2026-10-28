@@ -4,6 +4,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import { withBackTo } from '../../hooks/useHistoryBack';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
+import SortableDateTh from '../../components/Autoservice/SortableDateTh';
 import PillMultiSelect from '../../components/PillDropdown/PillMultiSelect';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
@@ -68,36 +69,6 @@ function formatMoney(value) {
   const n = Number(value);
   if (Number.isNaN(n)) return '0,00';
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function SortableDateTh({ label, column, sort, onSort, className = 'w-36' }) {
-  const active = sort.by === column;
-  return (
-    <th
-      className={`${className} ${autoserviceListThClass}`}
-      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(column)}
-        className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-bold uppercase tracking-wide text-ink-muted transition hover:text-ink"
-      >
-        {label}
-        <svg
-          className={`h-3 w-3 shrink-0 transition-transform ${
-            active && sort.dir === 'asc' ? 'rotate-180' : ''
-          }`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-    </th>
-  );
 }
 
 export default function AutoserviceOrdersPage() {

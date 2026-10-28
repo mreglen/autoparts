@@ -290,6 +290,8 @@ def create_client_inspection_booking(
 def list_inspection_bookings(
     status_filter: str | None = Query(None, alias="status"),
     client_id: int | None = Query(None),
+    sort_by: str = Query("created_at", pattern="^(created_at|preferred_date)$"),
+    sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -348,8 +350,26 @@ def list_inspection_bookings(
                 detail="Недопустимый статус",
             )
         q = q.filter(InspectionBooking.status == status_filter)
-    rows = q.order_by(InspectionBooking.created_at.desc(), InspectionBooking.id.desc()).all()
+    rows = q.order_by(*_booking_order_by(sort_by, sort_dir)).all()
     return [_booking_to_view(row) for row in rows]
+
+
+def _booking_order_by(sort_by: str, sort_dir: str):
+    if sort_by == "preferred_date":
+        date_column = InspectionBooking.preferred_date
+        time_column = InspectionBooking.preferred_time
+        if sort_dir == "desc":
+            return (
+                date_column.desc(),
+                time_column.desc().nulls_last(),
+                InspectionBooking.id.desc(),
+            )
+        return (
+            date_column.asc(),
+            time_column.asc().nulls_last(),
+            InspectionBooking.id.desc(),
+        )
+    return (InspectionBooking.created_at.desc(), InspectionBooking.id.desc())
 
 
 def _create_staff_inspection_booking(

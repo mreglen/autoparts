@@ -80,6 +80,17 @@ function plannerItemBarColor(item) {
   return ORDER_BAR_COLORS[normalizeRepairOrderStatus(item?.status)] || ORDER_BAR_COLORS.pending;
 }
 
+// «Дата записи на осмотр» — метка планирования: у закрытого заказа она уже отработана.
+const CLOSED_ORDER_STATUSES = new Set(['completed', 'cancelled']);
+
+function plannerInspectionSegmentFor(entry) {
+  const item = entry?.item;
+  if (item && item.kind !== 'inspection' && CLOSED_ORDER_STATUSES.has(normalizeRepairOrderStatus(item.status))) {
+    return null;
+  }
+  return plannerInspectionSegment(entry);
+}
+
 function plannerZoneDayItems(zone, dayIso) {
   return sortDayOrders(
     (zone?.days || [])
@@ -257,7 +268,7 @@ function PlannerZoneWeekRow({
               const vehicleLabel = item.vehicle_make || '';
               const nameWithVehicle = [plannerClientFirstName(clientName), vehicleLabel].filter(Boolean).join(' ');
               const titleVehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ');
-              const segment = plannerInspectionSegment(entry);
+              const segment = plannerInspectionSegmentFor(entry);
               const itemTitle = [
                 item.kind === 'inspection' ? 'Осмотр' : `№ ${item.order_number}`,
                 clientName,
@@ -327,32 +338,29 @@ function PlannerWeekGrid({
   const chromeRef = useRef(null);
 
   // Горизонтальный скролл-контейнер ниже блокировал бы CSS sticky, поэтому шапку сдвигает transform.
+  // Смещение пишется синхронно в обработчике скролла: через requestAnimationFrame шапка отстаёт на кадр,
+  // и в щель между ней и шапкой приложения успевают проехать полосы заказ-нарядов.
   useEffect(() => {
     const grid = gridRef.current;
     const zoneHead = zoneHeadRef.current;
     const chrome = chromeRef.current;
     if (!grid || !zoneHead || !chrome) return undefined;
-    let frame = 0;
     const update = () => {
-      frame = 0;
       const shift = plannerHeadShift({
         chromeHeight: chrome.offsetHeight,
         gridTop: grid.getBoundingClientRect().top,
         gridHeight: grid.offsetHeight,
         headHeight: zoneHead.offsetHeight,
       });
-      grid.style.setProperty('--sg-planner-head-shift', `${shift}px`);
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
+      // Округляем вниз: лишний пиксель перекроет прибитая шапка приложения, а щель под ней — нет.
+      grid.style.setProperty('--sg-planner-head-shift', `${Math.floor(shift)}px`);
     };
     update();
-    window.addEventListener('scroll', schedule, true);
-    window.addEventListener('resize', schedule);
+    window.addEventListener('scroll', update, { capture: true, passive: true });
+    window.addEventListener('resize', update);
     return () => {
-      if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', schedule, true);
-      window.removeEventListener('resize', schedule);
+      window.removeEventListener('scroll', update, { capture: true });
+      window.removeEventListener('resize', update);
     };
   }, [dayIsos, zones]);
 
@@ -374,9 +382,7 @@ function PlannerWeekGrid({
           <div
             ref={zoneHeadRef}
             style={{ transform: headTransform }}
-            className={`sticky left-0 z-30 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted transition-opacity ${
-              highlightKey ? 'opacity-45' : ''
-            }`}
+            className="sticky left-0 z-30 border-b border-r border-line bg-surface-muted px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted"
           >
             Зона
           </div>
@@ -388,9 +394,7 @@ function PlannerWeekGrid({
               <div
                 key={iso}
                 style={{ transform: headTransform }}
-                className={`z-20 border-b border-r border-line px-2 py-2 text-center transition-opacity ${
-                  highlightKey ? 'opacity-45' : ''
-                } ${
+                className={`z-20 border-b border-r border-line px-2 py-2 text-center ${
                   isToday
                     ? 'bg-brand-50 text-brand-800'
                     : isWeekend
@@ -834,25 +838,11 @@ function WeekToolbar({
       >
         Сегодня
       </button>
-      <span className="min-w-0 flex-1 truncate px-1 text-center text-sm font-semibold text-ink md:hidden">
-        {periodLabel}
-      </span>
-      <span className="hidden min-w-[9rem] px-2 text-center text-sm font-medium text-ink md:inline">
-        {periodLabel}
-      </span>
-      <button
-        type="button"
-        onClick={onNext}
-        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm text-ink-muted transition hover:bg-surface hover:text-ink md:h-9 md:w-9"
-        aria-label={`Следующий ${periodWord}`}
+      <label
+        className="relative inline-flex min-w-0 flex-1 cursor-pointer items-center justify-center rounded-sg-sm px-1 text-center text-sm text-ink transition hover:bg-surface md:min-w-[9rem] md:flex-none md:px-2"
+        title="Выбрать дату"
       >
-        →
-      </button>
-      <label className="relative ml-0.5 inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-sg-sm bg-surface text-ink-muted shadow-sm ring-1 ring-line/80 transition hover:text-ink md:h-9 md:w-auto md:px-2.5">
-        <span className="sr-only">Выбрать дату</span>
-        <svg className="h-5 w-5 shrink-0 md:h-4 md:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
+        <span className="truncate font-semibold md:font-medium">{periodLabel}</span>
         <input
           type="date"
           value={selectedDateIso}
@@ -861,6 +851,24 @@ function WeekToolbar({
           aria-label={`Перейти к ${periodWord === 'месяц' ? 'месяцу' : 'неделе'} по дате`}
         />
       </label>
+      <button
+        type="button"
+        onClick={onNext}
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm text-ink-muted transition hover:bg-surface hover:text-ink md:h-9 md:w-9"
+        aria-label={`Следующий ${periodWord}`}
+      >
+        →
+      </button>
+      <button
+        type="button"
+        onClick={onToday}
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sg-sm bg-surface text-ink-muted shadow-sm ring-1 ring-line/80 transition hover:text-ink md:h-9 md:w-9"
+        aria-label={viewMode === 'month' ? 'Перейти на текущий месяц' : 'Перейти на текущую неделю'}
+      >
+        <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </button>
       {PLANNER_MONTH_VIEW_ENABLED ? (
         <PlannerViewModeSwitch viewMode={viewMode} onChange={onViewModeChange} />
       ) : null}

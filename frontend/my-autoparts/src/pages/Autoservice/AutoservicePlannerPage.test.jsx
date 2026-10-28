@@ -145,6 +145,9 @@ describe('планировщик: поиск по клиенту и автомо
     expect(
       screen.getAllByText('Подъёмник 1').some((el) => el.className.includes('opacity-45')),
     ).toBe(true);
+    expect(
+      screen.getAllByText('Зона').some((el) => el.className.includes('opacity-45')),
+    ).toBe(false);
   });
 
   it('клик по затемнённой полосе сбрасывает фильтр', async () => {
@@ -189,6 +192,34 @@ describe('планировщик: поиск по клиенту и автомо
     });
     expect(screen.queryByText('Запись на осмотр')).toBeNull();
   });
+
+  it('иконка календаря в тулбаре возвращает на текущую неделю', async () => {
+    renderPage();
+    await screen.findByTitle(/Иван Петров/);
+    const weekRequests = () => apiRequest.mock.calls
+      .filter(([url]) => url.startsWith('/autoservice/planner/week'))
+      .map(([url]) => url);
+    const currentWeek = weekRequests()[0];
+
+    fireEvent.click(screen.getByRole('button', { name: 'Следующий неделя' }));
+    await waitFor(() => {
+      expect(weekRequests().at(-1)).not.toBe(currentWeek);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Перейти на текущую неделю' }));
+    await waitFor(() => {
+      expect(weekRequests().at(-1)).toBe(currentWeek);
+    });
+  });
+
+  it('выбор даты переехал на подпись периода', async () => {
+    renderPage();
+    await screen.findByTitle(/Иван Петров/);
+    const picker = screen.getByLabelText(/по дате$/);
+    const period = screen.getByTitle('Выбрать дату');
+    expect(picker.getAttribute('type')).toBe('date');
+    expect(period.textContent).toMatch(/\d/);
+  });
 });
 
 describe('планировщик: день записи на осмотр внутри полосы заказа', () => {
@@ -221,6 +252,38 @@ describe('планировщик: день записи на осмотр вну
     const bar = await screen.findByTitle(/Осмотр 29\.10 14:00/);
     expect(within(bar).getAllByText(/Иван/)).toHaveLength(1);
     expect(within(bar).getByText(/09:00/)).toBeTruthy();
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(bar.querySelector('span[aria-hidden]')).toBeTruthy();
+  });
+
+  it('у закрытого заказа зелёная метка записи не показывается', async () => {
+    apiRequest.mockImplementation(() => Promise.resolve({
+      ...weekResponse,
+      zones: [
+        {
+          ...weekResponse.zones[0],
+          days: [
+            {
+              date: '2026-10-28',
+              orders: [
+                {
+                  ...weekResponse.zones[0].days[0].orders[0],
+                  status: 'completed',
+                  scheduled_end_at: '2026-10-30T12:00:00',
+                  inspection_scheduled_at: '2026-10-29T14:00:00',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+
+    renderPage();
+    const bar = await screen.findByTitle(/Иван Петров/);
+    expect(bar.title).not.toContain('Осмотр');
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(bar.querySelector('span[aria-hidden]')).toBeNull();
   });
 });
 

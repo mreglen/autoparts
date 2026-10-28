@@ -4,11 +4,13 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import { withBackTo } from '../../hooks/useHistoryBack';
 import { useDebouncedValue } from '../../hooks/useDebouncedCallback';
 import AutoserviceLiveSearchField from '../../components/Autoservice/AutoserviceLiveSearchField';
+import SortableDateTh from '../../components/Autoservice/SortableDateTh';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import InspectionBookingAddModal from '../../components/Autoservice/InspectionBookingAddModal';
 import Toast from '../../components/UI/Toast';
 import { apiRequest } from '../../utils/apiClient';
 import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
+import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   autoserviceListTableClass,
@@ -24,6 +26,8 @@ const SOURCE_LABELS = {
   staff: 'Сотрудник',
   client: 'Клиент',
 };
+
+const INSPECTIONS_FILTERS_KEY = 'autoservice-inspections';
 
 const STATUS_META = {
   new: {
@@ -107,6 +111,19 @@ export default function AutoserviceInspectionsPage() {
   const [viewBooking, setViewBooking] = useState(null);
   const [zones, setZones] = useState([]);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [storedFilters] = useState(() => readPageFilters(INSPECTIONS_FILTERS_KEY));
+  const [sort, setSort] = useState(() => ({
+    by: storedFilters.sort?.by === 'preferred_date' ? 'preferred_date' : 'created_at',
+    dir: storedFilters.sort?.dir === 'asc' ? 'asc' : 'desc',
+  }));
+
+  usePersistedPageFilters(INSPECTIONS_FILTERS_KEY, { sort });
+
+  const handleSort = useCallback((column) => {
+    setSort((prev) => (prev.by === column
+      ? { by: column, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
+      : { by: column, dir: 'desc' }));
+  }, []);
 
   useEffect(() => {
     if (searchParams.get('new') !== '1') return;
@@ -119,7 +136,8 @@ export default function AutoserviceInspectionsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiRequest('/autoservice/inspection-bookings');
+      const params = new URLSearchParams({ sort_by: sort.by, sort_dir: sort.dir });
+      const data = await apiRequest(`/autoservice/inspection-bookings?${params.toString()}`);
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить записи');
@@ -127,7 +145,7 @@ export default function AutoserviceInspectionsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sort]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated) return;
@@ -212,7 +230,7 @@ export default function AutoserviceInspectionsPage() {
         <table className={autoserviceListTableClass}>
           <thead>
             <tr className={autoserviceListTheadRowClass}>
-              <th className={`w-36 ${autoserviceListThClass}`}>Дата</th>
+              <SortableDateTh label="Дата" column="preferred_date" sort={sort} onSort={handleSort} />
               <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
               <th className={`w-32 ${autoserviceListThClass}`}>Телефон</th>
               <th className={`w-44 ${autoserviceListThClass} hidden lg:table-cell`}>Автомобиль</th>
