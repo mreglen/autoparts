@@ -7355,4 +7355,167 @@ def ensure_planner_mode_permissions() -> None:
     with engine.begin() as conn:
         for stmt in statements:
             conn.execute(text(stmt))
+
+
+def _requisite_set_column_defs() -> list[str]:
+    """Three independent requisite sets (individual / IE / legal entity) on one row."""
+    return [
+        "person_type_default VARCHAR(16) NOT NULL DEFAULT 'individual'",
+        "ind_name VARCHAR(255)",
+        "ie_name VARCHAR(255)",
+        "legal_name VARCHAR(255)",
+        "inn_individual VARCHAR(12)",
+        "inn_ie VARCHAR(12)",
+        "inn_legal VARCHAR(12)",
+        "kpp VARCHAR(9)",
+        "ogrnip VARCHAR(15)",
+        "ogrn VARCHAR(15)",
+        "address TEXT",
+        "email VARCHAR(255)",
+    ]
+
+
+def _add_columns_if_missing(table: str, column_defs: list[str]) -> None:
+    inspector = inspect(engine)
+    if table not in inspector.get_table_names():
+        return
+    existing = {col["name"] for col in inspector.get_columns(table)}
+    statements = [
+        f"ALTER TABLE {table} ADD COLUMN {chunk}"
+        for chunk in column_defs
+        if chunk.split()[0] not in existing
+    ]
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied %s column patch: %s", table, statements)
+
+
+def ensure_autoservice_contractors_table() -> None:
+    """Contractors: outside organizations the service subcontracts works to."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "organizations" not in tables:
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    ts_type = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    now_sql = "NOW()" if is_pg else "CURRENT_TIMESTAMP"
+    bool_true = "TRUE" if is_pg else "1"
+    pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+    if "autoservice_contractors" not in tables:
+        req_cols = ",\n            ".join(_requisite_set_column_defs())
+        ddl = f"""
+        CREATE TABLE autoservice_contractors (
+            id {pk},
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            name VARCHAR(120) NOT NULL,
+            phone VARCHAR(32),
+            note TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT {bool_true},
+            {req_cols},
+            created_at {ts_type} NOT NULL DEFAULT {now_sql},
+            updated_at {ts_type} NOT NULL DEFAULT {now_sql},
+            {"CONSTRAINT uq_autoservice_contractors_org_name UNIQUE (organization_id, name)" if is_pg else "UNIQUE (organization_id, name)"}
+        )
+        """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            if is_pg:
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_autoservice_contractors_org "
+                        "ON autoservice_contractors (organization_id)"
+                    )
+                )
+        logger.info("Applied autoservice_contractors table patch")
+
+    _add_columns_if_missing("autoservice_contractors", _requisite_set_column_defs())
+
+
+def ensure_repair_order_work_contractors_table() -> None:
+    """Per-work fixed-sum assignments to contractors."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "repair_order_work_contractors" in tables:
+        return
+    if "repair_order_works" not in tables or "autoservice_contractors" not in tables:
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    numeric = "NUMERIC(12, 2)" if is_pg else "REAL"
+    ts_type = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    now_sql = "NOW()" if is_pg else "CURRENT_TIMESTAMP"
+    pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    ddl = f"""
+    CREATE TABLE repair_order_work_contractors (
+        id {pk},
+        work_id INTEGER NOT NULL REFERENCES repair_order_works(id) ON DELETE CASCADE,
+        contractor_id INTEGER NOT NULL REFERENCES autoservice_contractors(id) ON DELETE RESTRICT,
+        amount {numeric} NOT NULL DEFAULT 0 CHECK (amount >= 0),
+        created_at {ts_type} NOT NULL DEFAULT {now_sql},
+        {"CONSTRAINT uq_repair_order_work_contractors UNIQUE (work_id, contractor_id)" if is_pg else "UNIQUE (work_id, contractor_id)"}
+    )
+    """
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        if is_pg:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_repair_order_work_contractors_work_id "
+                    "ON repair_order_work_contractors (work_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_repair_order_work_contractors_contractor_id "
+                    "ON repair_order_work_contractors (contractor_id)"
+                )
+            )
+    logger.info("Applied repair_order_work_contractors table patch")
+
+
+def ensure_autoservice_contractor_payouts_table() -> None:
+    """Materialized contractor payouts, kept out of payroll accruals on purpose."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "autoservice_contractor_payouts" in tables:
+        return
+    if "organizations" not in tables or "repair_orders" not in tables:
+        return
+    if "autoservice_contractors" not in tables or "repair_order_works" not in tables:
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    numeric = "NUMERIC(12, 2)" if is_pg else "REAL"
+    ts_type = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    now_sql = "NOW()" if is_pg else "CURRENT_TIMESTAMP"
+    pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    ddl = f"""
+    CREATE TABLE autoservice_contractor_payouts (
+        id {pk},
+        organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+        contractor_id INTEGER NOT NULL REFERENCES autoservice_contractors(id) ON DELETE CASCADE,
+        order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+        work_id INTEGER REFERENCES repair_order_works(id) ON DELETE SET NULL,
+        work_title VARCHAR(255),
+        accrual_type VARCHAR(32) NOT NULL DEFAULT 'contractor_fixed',
+        amount {numeric} NOT NULL DEFAULT 0,
+        accrued_at {ts_type} NOT NULL DEFAULT {now_sql}
+    )
+    """
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        if is_pg:
+            for col in ("organization_id", "contractor_id", "order_id", "accrued_at"):
+                conn.execute(
+                    text(
+                        f"CREATE INDEX IF NOT EXISTS ix_autoservice_contractor_payouts_{col} "
+                        f"ON autoservice_contractor_payouts ({col})"
+                    )
+                )
+    logger.info("Applied autoservice_contractor_payouts table patch")
     logger.info("Applied planner mode permissions migration")

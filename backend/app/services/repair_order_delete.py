@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.repair_order import RepairOrder
 from app.services.autoservice_payroll import clear_order_accruals
+from app.services.autoservice_contractor_payouts import clear_order_contractor_payouts
 from app.services.repair_order_stock_reserve import release_order_reservations
 
 
@@ -48,5 +49,6 @@ def delete_repair_order(
         release_order_reservations(db, order)
 
     clear_order_accruals(db, order.id)
+    clear_order_contractor_payouts(db, order.id)
     db.delete(order)
     db.flush()

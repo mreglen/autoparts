@@ -73,12 +73,29 @@ class RepairOrderWorkExecutorView(BaseModel):
     pay_amount: Decimal
 
 
+class RepairOrderContractorBrief(BaseModel):
+    id: int
+    name: str
+
+
+class RepairOrderWorkContractorIn(BaseModel):
+    contractor_id: int
+    amount: Decimal = Field(ge=0)
+
+
+class RepairOrderWorkContractorView(BaseModel):
+    contractor_id: int
+    contractor: RepairOrderContractorBrief
+    amount: Decimal
+
+
 class RepairOrderWorkIn(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     catalog_work_id: Optional[int] = None
     qty: int = Field(ge=1)
     unit_price: Decimal = Field(ge=0)
     executors: list[RepairOrderWorkExecutorIn] = Field(default_factory=list)
+    contractors: list[RepairOrderWorkContractorIn] = Field(default_factory=list)
     executor_user_id: Optional[int] = None
 
 
@@ -147,6 +164,7 @@ class RepairOrderWorkView(BaseModel):
     unit_price: Decimal
     line_sum: Decimal
     executors: list[RepairOrderWorkExecutorView] = Field(default_factory=list)
+    contractors: list[RepairOrderWorkContractorView] = Field(default_factory=list)
     executor_user_id: Optional[int] = None
     executor: Optional[RepairOrderUserBrief] = None
 

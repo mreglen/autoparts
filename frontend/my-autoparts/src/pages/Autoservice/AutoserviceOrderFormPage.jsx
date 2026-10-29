@@ -183,7 +183,7 @@ function fromLocalInputValue(local) {
 }
 
 function emptyWork() {
-  return { title: '', catalog_work_id: '', qty: 1, unit_price: '', executors: [] };
+  return { title: '', catalog_work_id: '', qty: 1, unit_price: '', executors: [], contractors: [] };
 }
 
 function workUnitPriceFromApi(value) {
@@ -201,6 +201,10 @@ function workUnitPriceToPayload(value) {
 
 function emptyExecutor(employeeId = '', percent = '') {
   return { employee_id: employeeId, percent };
+}
+
+function emptyContractorAssignment(contractorId = '', amount = '') {
+  return { contractor_id: contractorId, amount };
 }
 
 function workPayAmount(qty, unitPrice, percent) {
@@ -221,6 +225,7 @@ function isEmptyWorkRow(w) {
   if (String(w?.title || '').trim()) return false;
   if (w?.catalog_work_id) return false;
   if ((w?.executors || []).some((ex) => ex.employee_id)) return false;
+  if ((w?.contractors || []).some((c) => c.contractor_id)) return false;
   if (String(w?.unit_price ?? '') !== '') return false;
   return Number(w?.qty) === 1;
 }
@@ -403,78 +408,175 @@ const workExecutorLabelBtnClass =
 const workExecutorActionBtnClass =
   'flex h-full w-7 shrink-0 items-center justify-center text-ink-muted transition hover:bg-surface-muted';
 
-function WorkExecutorPicker({ employees, work, onToggle, onPercentChange, onAddEmployee }) {
-  const [query, setQuery] = useState('');
+function AssignSection({ title, selectedCount, children }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{title}</h4>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+            selectedCount ? 'bg-brand-50 text-brand-700' : 'text-ink-faint'
+          }`}
+        >
+          {selectedCount ? `${selectedCount} выбрано` : 'не выбрано'}
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function WorkAssignPicker({
+  employees,
+  contractors,
+  work,
+  onToggle,
+  onPercentChange,
+  onAddEmployee,
+  onToggleContractor,
+  onAmountChange,
+}) {
+  const [employeeQuery, setEmployeeQuery] = useState('');
+  const [contractorQuery, setContractorQuery] = useState('');
   const executors = work?.executors || [];
+  const assignedContractors = work?.contractors || [];
   const checkedById = new Map(
     executors
       .filter((ex) => ex.employee_id)
       .map((ex) => [String(ex.employee_id), ex]),
   );
-  const q = query.trim().toLowerCase();
-  const filtered = (employees || []).filter(
-    (emp) => !q || String(emp.name || '').toLowerCase().includes(q),
+  const contractorById = new Map(
+    assignedContractors
+      .filter((c) => c.contractor_id)
+      .map((c) => [String(c.contractor_id), c]),
+  );
+  const employeesFiltered = (employees || []).filter(
+    (emp) => !employeeQuery.trim()
+      || String(emp.name || '').toLowerCase().includes(employeeQuery.trim().toLowerCase()),
+  );
+  const contractorsFiltered = (contractors || []).filter(
+    (row) => !contractorQuery.trim()
+      || String(row.name || '').toLowerCase().includes(contractorQuery.trim().toLowerCase()),
   );
   const totalPercent = executors.reduce(
     (sum, ex) => sum + (Number(ex.percent) || 0),
     0,
   );
   const overLimit = totalPercent > 100;
+  const contractorTotal = assignedContractors.reduce(
+    (sum, c) => sum + (Number(c.amount) || 0),
+    0,
+  );
 
   return (
-    <div className="space-y-3">
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Поиск сотрудника…"
-        className="sg-pill-input sg-pill-input-sm w-full"
-      />
-      {filtered.length === 0 ? (
-        <p className="text-sm text-ink-muted">{q ? 'Не найдено' : 'Нет сотрудников'}</p>
-      ) : (
-        <div className="divide-y divide-line-soft">
-          {filtered.map((emp) => {
-            const ex = checkedById.get(String(emp.id));
-            const checked = Boolean(ex);
-            return (
-              <div key={emp.id} className="flex min-w-0 items-center gap-2 py-2">
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => onToggle(emp.id)}
-                    className="h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
-                  />
-                  <span className="min-w-0 truncate text-sm text-ink">{emp.name}</span>
-                </label>
-                {checked ? (
-                  <>
-                    <NumericInput
-                      mode="numeric"
-                      className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center ${overLimit ? 'border-danger-600 text-danger-600' : ''}`}
-                      value={ex.percent}
-                      aria-label="Процент оплаты"
-                      onChange={(e) => onPercentChange(emp.id, e.target.value)}
+    <div className="space-y-4">
+      <AssignSection title="Сотрудники" selectedCount={executors.length}>
+        <input
+          type="text"
+          value={employeeQuery}
+          onChange={(e) => setEmployeeQuery(e.target.value)}
+          placeholder="Поиск сотрудника…"
+          className="sg-pill-input sg-pill-input-sm w-full"
+        />
+        {employeesFiltered.length === 0 ? (
+          <p className="text-sm text-ink-muted">{employeeQuery.trim() ? 'Не найдено' : 'Нет сотрудников'}</p>
+        ) : (
+          <div className="divide-y divide-line-soft">
+            {employeesFiltered.map((emp) => {
+              const ex = checkedById.get(String(emp.id));
+              const checked = Boolean(ex);
+              return (
+                <div key={emp.id} className="flex min-w-0 items-center gap-2 py-2">
+                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => onToggle(emp.id)}
+                      className="h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
                     />
-                    <span className="shrink-0 text-xs text-ink-muted">%</span>
-                    <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
-                      {formatMoney(workPayAmount(work?.qty, work?.unit_price, ex.percent))} ₽
-                    </span>
-                  </>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {executors.length > 0 ? (
-        <p className={`text-xs ${overLimit ? 'font-medium text-danger-600' : 'text-ink-muted'}`}>
-          Всего {formatMoney(totalPercent)}%
-          {overLimit ? ' — сумма процентов не может превышать 100%' : ` · доступно ещё ${formatMoney(Math.max(0, 100 - totalPercent))}%`}
-        </p>
-      ) : null}
-      <SectionAddLink onClick={onAddEmployee} label="+ Сотрудник" />
+                    <span className="min-w-0 truncate text-sm text-ink">{emp.name}</span>
+                  </label>
+                  {checked ? (
+                    <>
+                      <NumericInput
+                        mode="numeric"
+                        className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center ${overLimit ? 'border-danger-600 text-danger-600' : ''}`}
+                        value={ex.percent}
+                        aria-label="Процент оплаты"
+                        onChange={(e) => onPercentChange(emp.id, e.target.value)}
+                      />
+                      <span className="shrink-0 text-xs text-ink-muted">%</span>
+                      <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
+                        {formatMoney(workPayAmount(work?.qty, work?.unit_price, ex.percent))} ₽
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {executors.length > 0 ? (
+          <p className={`text-xs ${overLimit ? 'font-medium text-danger-600' : 'text-ink-muted'}`}>
+            Всего {formatMoney(totalPercent)}%
+            {overLimit ? ' — сумма процентов не может превышать 100%' : ` · доступно ещё ${formatMoney(Math.max(0, 100 - totalPercent))}%`}
+          </p>
+        ) : null}
+        <SectionAddLink onClick={onAddEmployee} label="+ Сотрудник" />
+      </AssignSection>
+
+      <AssignSection title="Подрядчики" selectedCount={assignedContractors.length}>
+        <input
+          type="text"
+          value={contractorQuery}
+          onChange={(e) => setContractorQuery(e.target.value)}
+          placeholder="Поиск подрядчика…"
+          className="sg-pill-input sg-pill-input-sm w-full"
+        />
+        {contractorsFiltered.length === 0 ? (
+          <p className="text-sm text-ink-muted">
+            {contractorQuery.trim() ? 'Не найдено' : 'Подрядчики не добавлены'}
+          </p>
+        ) : (
+          <div className="divide-y divide-line-soft">
+            {contractorsFiltered.map((row) => {
+              const assigned = contractorById.get(String(row.id));
+              const checked = Boolean(assigned);
+              return (
+                <div key={row.id} className="flex min-w-0 items-center gap-2 py-2">
+                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => onToggleContractor(row.id)}
+                      className="h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
+                    />
+                    <span className="min-w-0 truncate text-sm text-ink">{row.name}</span>
+                  </label>
+                  {checked ? (
+                    <>
+                      <NumericInput
+                        mode="decimal"
+                        className={`w-24 shrink-0 ${compactControlInputClass} px-1.5 text-right`}
+                        value={assigned.amount}
+                        placeholder="0"
+                        aria-label="Сумма подрядчику"
+                        onChange={(e) => onAmountChange(row.id, e.target.value)}
+                      />
+                      <span className="shrink-0 text-xs text-ink-muted">₽</span>
+                    </>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {assignedContractors.length > 0 ? (
+          <p className="text-xs text-ink-muted">
+            Всего подрядчикам {formatMoney(contractorTotal)} ₽ — фиксированные суммы, проценты сотрудников они не уменьшают
+          </p>
+        ) : null}
+      </AssignSection>
     </div>
   );
 }
@@ -657,6 +759,10 @@ function mapOrderToFormState(order) {
             employee_id: String(ex.employee_id),
             percent: String(ex.percent ?? '0'),
           })),
+          contractors: (w.contractors || []).map((c) => ({
+            contractor_id: String(c.contractor_id),
+            amount: String(c.amount ?? ''),
+          })),
         }))
       : [],
     clientParts: (order?.client_parts || []).length
@@ -725,6 +831,7 @@ export default function AutoserviceOrderFormPage() {
   const [clientSearchLoading, setClientSearchLoading] = useState(false);
   const [workCatalog, setWorkCatalog] = useState([]);
   const [serviceEmployees, setServiceEmployees] = useState([]);
+  const [serviceContractors, setServiceContractors] = useState([]);
   const [workZones, setWorkZones] = useState([]);
   const [metaLoading, setMetaLoading] = useState(true);
   const [metaError, setMetaError] = useState('');
@@ -960,14 +1067,16 @@ export default function AutoserviceOrderFormPage() {
     setMetaLoading(true);
     setMetaError('');
     try {
-      const [worksData, employeesData, zonesData] = await Promise.all([
+      const [worksData, employeesData, contractorsData, zonesData] = await Promise.all([
         apiRequest('/autoservice/works'),
         apiRequest('/autoservice/repair-orders/service-employees-options'),
+        apiRequest('/autoservice/repair-orders/contractors-options'),
         apiRequest('/autoservice/repair-orders/work-zones-meta'),
       ]);
       await loadClients();
       setWorkCatalog(Array.isArray(worksData) ? worksData : []);
       setServiceEmployees(Array.isArray(employeesData) ? employeesData : []);
+      setServiceContractors(Array.isArray(contractorsData) ? contractorsData : []);
       setWorkZones(Array.isArray(zonesData?.work_zones) ? zonesData.work_zones : []);
       setMetaVatRate(orderVatRate(zonesData));
     } catch (err) {
@@ -1344,8 +1453,32 @@ export default function AutoserviceOrderFormPage() {
     )));
   };
 
-  const handleEmployeeCreated = async (row) => {
-    await loadServiceEmployees();
+  const toggleWorkContractor = (workIndex, contractorId) => {
+    setWorks((prev) => prev.map((w, i) => {
+      if (i !== workIndex) return w;
+      const assigned = w.contractors || [];
+      const exists = assigned.some((c) => String(c.contractor_id) === String(contractorId));
+      if (exists) {
+        return { ...w, contractors: assigned.filter((c) => String(c.contractor_id) !== String(contractorId)) };
+      }
+      return { ...w, contractors: [...assigned, emptyContractorAssignment(String(contractorId))] };
+    }));
+  };
+
+  const updateWorkContractorAmount = (workIndex, contractorId, amount) => {
+    setWorks((prev) => prev.map((w, i) => (
+      i === workIndex
+        ? {
+            ...w,
+            contractors: (w.contractors || []).map((c) => (
+              String(c.contractor_id) === String(contractorId) ? { ...c, amount } : c
+            )),
+          }
+        : w
+    )));
+  };
+
+  const handleEmployeeCreated = async (row) => {    await loadServiceEmployees();
     if (!row?.id || !addEmployeeTarget) return;
     const { workIndex, execIndex } = addEmployeeTarget;
     setWorks((prev) => prev.map((w, i) => {
@@ -1662,6 +1795,12 @@ export default function AutoserviceOrderFormPage() {
           .map((ex) => ({
             employee_id: Number(ex.employee_id),
             percent: Number(ex.percent) || 0,
+          })),
+        contractors: (w.contractors || [])
+          .filter((c) => c.contractor_id)
+          .map((c) => ({
+            contractor_id: Number(c.contractor_id),
+            amount: Number(c.amount) || 0,
           })),
       })),
       client_parts: clientPartsSource.map((p) => ({
@@ -2341,6 +2480,14 @@ export default function AutoserviceOrderFormPage() {
                   (ex) => serviceEmployees.find((e) => String(e.id) === String(ex.employee_id))?.name
                     || 'Сотрудник',
                 );
+                const assignedContractors = ownMode ? [] : (w.contractors || []);
+                const contractorLabels = assignedContractors.map(
+                  (c) => {
+                    const name = serviceContractors.find((row) => String(row.id) === String(c.contractor_id))?.name
+                      || 'Подрядчик';
+                    return `${name} · ${formatMoney(c.amount)} ₽`;
+                  },
+                );
                 return (
                 <div key={index} className="min-w-0">
                   <div className={lineItemRowClass}>
@@ -2392,12 +2539,18 @@ export default function AutoserviceOrderFormPage() {
                         type="button"
                         className={workExecutorLabelBtnClass}
                         onClick={() => setWorkExecutorEditIndex(index)}
-                        title="Сотрудник и процент оплаты"
+                        title="Сотрудники и подрядчики по работе"
                       >
-                        <span className={`flex min-w-0 flex-col ${executors.length ? '' : 'text-ink-faint'}`}>
+                        <span className={`flex min-w-0 flex-col ${executors.length || contractorLabels.length ? '' : 'text-ink-faint'}`}>
                           {executorNames.length ? executorNames.map((name, i) => (
                             <span key={`${name}-${i}`} className="truncate leading-tight">{name}</span>
-                          )) : <span className="truncate">Сотрудник</span>}
+                          )) : null}
+                          {contractorLabels.length ? contractorLabels.map((label, i) => (
+                            <span key={`contractor-${i}`} className="truncate leading-tight text-warning-700">{label}</span>
+                          )) : null}
+                          {!executorNames.length && !contractorLabels.length ? (
+                            <span className="truncate">Сотрудник</span>
+                          ) : null}
                         </span>
                       </button>
                       <button
@@ -2828,8 +2981,8 @@ export default function AutoserviceOrderFormPage() {
       <Modal
         open={workExecutorEditIndex != null}
         onClose={() => setWorkExecutorEditIndex(null)}
-        title="Сотрудник по работе"
-        size="sm"
+        title="Исполнители по работе"
+        size="md"
         draggable
         footer={(
           <div className="flex justify-end">
@@ -2844,11 +2997,14 @@ export default function AutoserviceOrderFormPage() {
         )}
       >
         {workExecutorEditIndex != null && works[workExecutorEditIndex] ? (
-          <WorkExecutorPicker
+          <WorkAssignPicker
             employees={serviceEmployees}
+            contractors={serviceContractors}
             work={works[workExecutorEditIndex]}
             onToggle={(employeeId) => toggleWorkExecutor(workExecutorEditIndex, employeeId)}
             onPercentChange={(employeeId, percent) => updateWorkExecutorPercent(workExecutorEditIndex, employeeId, percent)}
+            onToggleContractor={(contractorId) => toggleWorkContractor(workExecutorEditIndex, contractorId)}
+            onAmountChange={(contractorId, amount) => updateWorkContractorAmount(workExecutorEditIndex, contractorId, amount)}
             onAddEmployee={() => openAddEmployeeModal(
               workExecutorEditIndex,
               (works[workExecutorEditIndex].executors || []).length,
@@ -2863,6 +3019,7 @@ export default function AutoserviceOrderFormPage() {
         clients={clients}
         vehicles={vehicles}
         serviceEmployees={serviceEmployees}
+        serviceContractors={serviceContractors}
         onClose={() => setFieldDetailModal(null)}
         onClientSaved={(updated) => {
           if (!updated?.id) return;

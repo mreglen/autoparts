@@ -84,6 +84,9 @@ from app.db.schema_patches import (
     ensure_caldav_accounts_table,
     ensure_employee_work_zones_mode_columns,
     ensure_employee_work_zones_unassigned_zone,
+    ensure_autoservice_contractors_table,
+    ensure_repair_order_work_contractors_table,
+    ensure_autoservice_contractor_payouts_table,
     ensure_planner_mode_permissions,
     ensure_sms_messages_table,
     ensure_sms_messages_provider_column,
@@ -339,6 +342,9 @@ try:
     ensure_employee_work_zones_table()
     ensure_employee_work_zones_mode_columns()
     ensure_employee_work_zones_unassigned_zone()
+    ensure_autoservice_contractors_table()
+    ensure_repair_order_work_contractors_table()
+    ensure_autoservice_contractor_payouts_table()
     ensure_planner_mode_permissions()
     ensure_site_settings_smsc_columns()
     ensure_repair_order_status_timestamps()

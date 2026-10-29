@@ -205,6 +205,7 @@ sudo update
 - Не писать табличные классы вручную — использовать общие `autoserviceList*Class` из `frontend/my-autoparts/src/utils/warehouseListUi.js` (`autoserviceListTableClass`, `autoserviceListTheadRowClass`, `autoserviceListThClass`, `autoserviceListTbodyClass`, `autoserviceListTrClass`/`autoserviceListTrClickableClass`, `autoserviceListTdClass` и т.д.).
 - Оповещения о результате действий (успех/ошибка сохранения, удаления, запуска операции и т.п.) — только через общий `Toast` (`frontend/my-autoparts/src/components/UI/Toast.jsx`, default export): выезжает сверху справа, сам скрывается через `durationMs` (default 6000), `onClose` обязан очистить message-state. Пример: `<Toast message={error} variant="error" onClose={() => setError('')} />`, для успеха `variant="success"`. Inline-баннеры для таких уведомлений не делать. Inline остаются только: ошибки полей форм, блокирующие состояния (страница не может отрендериться без данных), постоянные предупреждения и индикаторы процесса («Загрузка…», «Сохранено» в тулбаре).
 - Не коммитить source maps и build-артефакты (они в `.gitignore`).
+- Несколько значений в одной ячейке таблицы (исполнители работы) — выводить строкой через запятую в одном `<td>`, не раскладывать по `inline-block`-элементам: колонка от этого разъезжается, а в печати (`RepairOrderPrintPage`) те же значения уже идут через `', '`.
 
 ## 7. Критичная бизнес-логика
 

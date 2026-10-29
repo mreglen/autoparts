@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_client import AutoserviceClient
+from app.models.autoservice_contractor import AutoserviceContractor
 from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
@@ -26,6 +27,7 @@ from app.models.repair_order import (
     RepairOrderWorkExecutor,
     repair_order_assignees,
 )
+from app.models.repair_order_work_contractor import RepairOrderWorkContractor
 from app.models.product import Product
 from app.models.autoservice_warehouse import AutoserviceWarehouseItem
 from app.models.user import User
@@ -62,11 +64,15 @@ from app.schemas.repair_order import (
     RepairOrderVehicleBrief,
     RepairOrderWorkExecutorIn,
     RepairOrderWorkExecutorView,
+    RepairOrderWorkContractorIn,
+    RepairOrderWorkContractorView,
+    RepairOrderContractorBrief,
     RepairOrderWorkIn,
     RepairOrderWorkView,
     WarehouseProductOption,
 )
 from app.schemas.autoservice_finance import AutoservicePaymentIn, RepairOrderPaymentsListResponse
+from app.schemas.autoservice_contractor import AutoserviceContractorOption
 from app.utils.autoservice_access import (
     display_client_phone,
     missing_phone_placeholder,
@@ -86,6 +92,10 @@ from app.services.autoservice_audit import (
 )
 from app.services.autoservice_caldav import request_org_sync
 from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
+from app.services.autoservice_contractor_payouts import (
+    accrue_order_contractor_payouts,
+    clear_order_contractor_payouts,
+)
 from app.services.autoservice_vat import DEFAULT_VAT_RATE, get_org_vat_rate
 from app.services.autoservice_payment_service import (
     batch_paid_amounts,
@@ -253,6 +263,17 @@ def _work_view(work: RepairOrderWork) -> RepairOrderWorkView:
                 pay_amount=pay,
             )
         )
+    contractors = [
+        RepairOrderWorkContractorView(
+            contractor_id=row.contractor_id,
+            contractor=RepairOrderContractorBrief(
+                id=row.contractor.id,
+                name=row.contractor.name,
+            ),
+            amount=_money(row.amount),
+        )
+        for row in sorted(work.contractors or [], key=lambda c: c.id)
+    ]
     return RepairOrderWorkView(
         id=work.id,
         position=work.position,
@@ -262,6 +283,7 @@ def _work_view(work: RepairOrderWork) -> RepairOrderWorkView:
         unit_price=_money(work.unit_price),
         line_sum=line_total,
         executors=executors,
+        contractors=contractors,
         executor_user_id=work.executor_user_id,
         executor=_user_brief(work.executor) if work.executor else None,
     )
@@ -973,6 +995,37 @@ def _resolve_work_executors(
     return [(by_id[item.employee_id], _money(item.percent)) for item in executors]
 
 
+def _resolve_work_contractors(
+    db: Session,
+    org_id: str,
+    contractors: list[RepairOrderWorkContractorIn],
+) -> list[tuple[AutoserviceContractor, Decimal]]:
+    if not contractors:
+        return []
+    ids = [item.contractor_id for item in contractors]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Один и тот же подрядчик не может быть указан в работе дважды",
+        )
+    rows = (
+        db.query(AutoserviceContractor)
+        .filter(
+            AutoserviceContractor.id.in_(ids),
+            AutoserviceContractor.organization_id == org_id,
+            AutoserviceContractor.is_active.is_(True),
+        )
+        .all()
+    )
+    by_id = {row.id: row for row in rows}
+    if len(by_id) != len(set(ids)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некоторые подрядчики не найдены",
+        )
+    return [(by_id[item.contractor_id], _money(item.amount)) for item in contractors]
+
+
 def _replace_works(
     db: Session,
     order: RepairOrder,
@@ -1013,6 +1066,7 @@ def _replace_works(
                 ),
             )
         executor_rows = _resolve_work_executors(db, org_id, item.executors)
+        contractor_rows = _resolve_work_contractors(db, org_id, item.contractors)
         work = RepairOrderWork(
             position=idx,
             catalog_work_id=catalog_id,
@@ -1026,6 +1080,13 @@ def _replace_works(
                 RepairOrderWorkExecutor(
                     employee_id=employee.id,
                     percent=percent,
+                )
+            )
+        for contractor, amount in contractor_rows:
+            work.contractors.append(
+                RepairOrderWorkContractor(
+                    contractor_id=contractor.id,
+                    amount=amount,
                 )
             )
         order.works.append(work)
@@ -1465,6 +1526,30 @@ def list_repair_order_service_employee_options(
     ]
 
 
+@router.get(
+    "/autoservice/repair-orders/contractors-options",
+    response_model=list[AutoserviceContractorOption],
+)
+def list_repair_order_contractor_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id, _level = require_orders_access(db, current_user)
+    rows = (
+        db.query(AutoserviceContractor)
+        .filter(
+            AutoserviceContractor.organization_id == org_id,
+            AutoserviceContractor.is_active.is_(True),
+        )
+        .order_by(AutoserviceContractor.name.asc())
+        .all()
+    )
+    return [
+        AutoserviceContractorOption(id=row.id, name=row.name, phone=row.phone)
+        for row in rows
+    ]
+
+
 @router.get("/autoservice/repair-orders/me", response_model=list[RepairOrderClientView])
 def list_my_repair_orders(
     scope: str = Query("active"),
@@ -1883,6 +1968,11 @@ def update_repair_order(
                 row,
                 accrued_at=_order_accrual_timestamp(db, row),
             )
+            accrue_order_contractor_payouts(
+                db,
+                row,
+                accrued_at=_order_accrual_timestamp(db, row),
+            )
 
     if "client_parts" in payload.model_fields_set and payload.client_parts is not None:
         _replace_client_parts(row, payload.client_parts)
@@ -2166,9 +2256,11 @@ def patch_repair_order_status(
     row.status = payload.status
     if prev_status == "completed" and payload.status != "completed":
         clear_order_accruals(db, row.id)
+        clear_order_contractor_payouts(db, row.id)
     if payload.status == "completed" and prev_status != "completed":
         db.flush()
         accrue_order_payroll(db, row)
+        accrue_order_contractor_payouts(db, row)
         fulfill_autoservice_stock_on_order_complete(
             db,
             order=row,

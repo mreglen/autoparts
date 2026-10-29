@@ -41,6 +41,7 @@ export const TAB_PATH_MAP = {
     clients: '/clients',
     sellers: '/sellers',
     'settings-employees': '/settings/employees',
+    'settings-contractors': '/settings/contractors',
     'pending-sellers': '/moderation/pending-sellers',
     'autoservice-applications': '/moderation/autoservice-applications',
     'product-moderation': '/moderation/products',
@@ -99,6 +100,9 @@ const buildGlobalSettingsTab = (menuUser, hasPermission, options = {}) => {
             { id: 'profile', label: 'Профиль' },
             { id: 'settings-employees', label: 'Сотрудники' },
         ];
+        if (autoserviceMode) {
+            settingsSubmenu.push({ id: 'settings-contractors', label: 'Подрядчики' });
+        }
         if (!autoserviceMode) {
             settingsSubmenu.push({ id: 'settings-storage-addresses', label: 'Адресное хранение' });
         }

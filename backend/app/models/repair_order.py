@@ -190,6 +190,11 @@ class RepairOrderWork(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    contractors = relationship(
+        "RepairOrderWorkContractor",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
 
 class RepairOrderWorkExecutor(Base):

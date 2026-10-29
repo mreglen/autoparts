@@ -36,8 +36,15 @@ function executorPayAmount(qty, unitPrice, percent) {
   return workLineSum(qty, unitPrice) * (Number(percent) || 0) / 100;
 }
 
-function WorkDetail({ work }) {
+function contractorDisplayName(row, contractors) {
+  if (row?.contractor?.name) return row.contractor.name;
+  const found = (contractors || []).find((c) => String(c.id) === String(row?.contractor_id));
+  return found?.name || row?.contractor_id || '—';
+}
+
+function WorkDetail({ work, contractorOptions }) {
   const executors = work?.executors || [];
+  const assignedContractors = (work?.contractors || []).filter((c) => c.contractor_id || c.contractor);
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
@@ -68,6 +75,19 @@ function WorkDetail({ work }) {
                 <span className="tabular-nums text-ink-soft">
                   {ex.percent ?? '0'}% · {formatMoney(executorPayAmount(work?.qty, work?.unit_price, ex.percent))} ₽
                 </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {assignedContractors.length > 0 ? (
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Подрядчики</p>
+          <ul className="space-y-1">
+            {assignedContractors.map((c, i) => (
+              <li key={`${c.contractor_id || i}`} className="flex items-center justify-between text-sm">
+                <span className="text-ink">{contractorDisplayName(c, contractorOptions)}</span>
+                <span className="tabular-nums text-ink-soft">{formatMoney(c.amount)} ₽</span>
               </li>
             ))}
           </ul>
@@ -136,27 +156,39 @@ function ShopPartDetail({ part }) {
   );
 }
 
-function ExecutorsDetail({ work, employees }) {
+function ExecutorsDetail({ work, employees, contractors }) {
   const executors = work?.executors || [];
+  const assignedContractors = (work?.contractors || []).filter((c) => c.contractor_id || c.contractor);
   return (
     <div className="space-y-3">
-      {executors.length === 0 ? (
+      {executors.length === 0 && assignedContractors.length === 0 ? (
         <p className="text-sm text-ink-muted">Исполнители не назначены</p>
-      ) : (
-        executors.map((ex, i) => {
-          const employee = employees?.find((e) => String(e.id) === String(ex.employee_id));
-          const pay = executorPayAmount(work?.qty, work?.unit_price, ex.percent);
-          return (
-            <div key={`${ex.employee_id || i}`} className="rounded-sg border border-line-soft bg-surface-muted/50 p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-ink">{employee?.name || ex.employee_id || '—'}</span>
-                <span className="text-sm tabular-nums text-ink-soft">{ex.percent ?? '0'}%</span>
-              </div>
-              <p className="mt-1 text-sm text-ink-muted">Выплата: {formatMoney(pay)} ₽</p>
+      ) : null}
+      {executors.map((ex, i) => {
+        const employee = employees?.find((e) => String(e.id) === String(ex.employee_id));
+        const pay = executorPayAmount(work?.qty, work?.unit_price, ex.percent);
+        return (
+          <div key={`${ex.employee_id || i}`} className="rounded-sg border border-line-soft bg-surface-muted/50 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-ink">{employee?.name || ex.employee_id || '—'}</span>
+              <span className="text-sm tabular-nums text-ink-soft">{ex.percent ?? '0'}%</span>
             </div>
-          );
-        })
-      )}
+            <p className="mt-1 text-sm text-ink-muted">Выплата: {formatMoney(pay)} ₽</p>
+          </div>
+        );
+      })}
+      {assignedContractors.map((c, i) => (
+        <div
+          key={`contractor-${c.contractor_id || i}`}
+          className="rounded-sg border border-warning-100 bg-warning-50/60 p-3"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-ink">{contractorDisplayName(c, contractors)}</span>
+            <span className="text-sm tabular-nums text-ink-soft">подряд</span>
+          </div>
+          <p className="mt-1 text-sm text-ink-muted">Сумма: {formatMoney(c.amount)} ₽</p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -167,6 +199,7 @@ export default function RepairOrderFieldDetailModal({
   clients,
   vehicles,
   serviceEmployees,
+  serviceContractors,
   onClose,
   onClientSaved,
   onVehicleSaved,
@@ -238,9 +271,15 @@ export default function RepairOrderFieldDetailModal({
 
   return (
     <Modal open={open} onClose={onClose} title={titleByType[type] || 'Детали'} size="sm">
-      {type === 'work' ? <WorkDetail work={data?.work} /> : null}
+      {type === 'work' ? <WorkDetail work={data?.work} contractorOptions={serviceContractors} /> : null}
       {type === 'shopPart' ? <ShopPartDetail part={data?.part} /> : null}
-      {type === 'executors' ? <ExecutorsDetail work={data?.work} employees={serviceEmployees} /> : null}
+      {type === 'executors' ? (
+        <ExecutorsDetail
+          work={data?.work}
+          employees={serviceEmployees}
+          contractors={serviceContractors}
+        />
+      ) : null}
     </Modal>
   );
 }

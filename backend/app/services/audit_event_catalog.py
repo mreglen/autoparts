@@ -112,6 +112,8 @@ EVENT_TYPE_LABELS: dict[str, str] = {
     "autoservice_employee_work_zone_assigned": "Сотруднику назначена рабочая зона",
     "autoservice_employee_work_zone_rights_updated": "Права сотрудника по рабочей зоне изменены",
     "autoservice_employee_work_zone_removed": "Рабочая зона снята с сотрудника",
+    "contractor_created": "Подрядчик создан",
+    "contractor_updated": "Подрядчик изменён",
 }
 
 

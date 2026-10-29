@@ -91,13 +91,20 @@ function lineSum(qty, unitPrice) {
 }
 
 function workExecutorName(work) {
+  const names = [];
   if ((work.executors || []).length) {
-    return (work.executors || [])
+    const employees = (work.executors || [])
       .map((ex) => ex.employee?.name)
       .filter(Boolean)
       .join(', ');
+    if (employees) names.push(employees);
+  } else if (work.executor?.name) {
+    names.push(work.executor.name);
   }
-  return work.executor?.name || '';
+  (work.contractors || []).forEach((c) => {
+    if (c?.contractor?.name) names.push(`${c.contractor.name} (подряд)`);
+  });
+  return names.join('; ');
 }
 
 function rowsOrEmpty(items) {

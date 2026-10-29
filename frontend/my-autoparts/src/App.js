@@ -97,6 +97,7 @@ const FinancePage = lazy(() => import('./pages/Finance/FinancePage'));
 const DashboardPage = lazy(() => import('./pages/Dashboard/DashboardPage'));
 const DesignSystemPage = lazy(() => import('./pages/DesignSystem/DesignSystemPage'));
 const EmployeesPage = lazy(() => import('./pages/Profile/EmployeesPage'));
+const ContractorsPage = lazy(() => import('./pages/Profile/ContractorsPage'));
 const ClientsPage = lazy(() => import('./pages/Profile/ClientsPage'));
 const StorageAddressesPage = lazy(() => import('./pages/Profile/StorageAddressesPage'));
 const WmsStoragesPage = lazy(() => import('./pages/Warehouse/WmsStoragesPage'));
@@ -883,6 +884,14 @@ function App() {
             element={(
               <LazyRoute>
                 <EmployeesPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/settings/contractors"
+            element={(
+              <LazyRoute>
+                <ContractorsPage />
               </LazyRoute>
             )}
           />

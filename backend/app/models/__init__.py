@@ -52,6 +52,8 @@ from app.models.autoservice_client import AutoserviceClient
 from app.models.autoservice_work_zone import AutoserviceWorkZone
 from app.models.autoservice_work import AutoserviceWork
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
+from app.models.autoservice_contractor import AutoserviceContractor
+from app.models.autoservice_contractor_payout import AutoserviceContractorPayout
 from app.models.autoservice_payment import AutoservicePayment
 from app.models.autoservice_counter import AutoserviceCounter
 from app.models.autoservice_warehouse import AutoserviceWarehouseItem
@@ -70,6 +72,7 @@ from app.models.repair_order import (
     RepairOrderClientPart,
     RepairOrderShopPart,
 )
+from app.models.repair_order_work_contractor import RepairOrderWorkContractor
 from app.models.user_engagement import (
     UserFavorite,
     UserProductView,

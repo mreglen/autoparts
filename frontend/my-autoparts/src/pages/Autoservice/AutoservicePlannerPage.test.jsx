@@ -122,10 +122,16 @@ describe('планировщик: поиск по клиенту и автомо
   });
 
   it('выпадающий список показывает клиента, авто и дату', async () => {
-    renderPage();
+    const { container } = renderPage();
     await screen.findByTitle(/Иван Петров/);
     fireEvent.change(screen.getByLabelText('Поиск по планировщику'), { target: { value: 'сидор' } });
-    const row = await screen.findByRole('button', { name: /Пётр Сидоров/ });
+    // Мобильный планировщик открывает сегодняшний день, а он в фикстуре — 29.10 с тем же клиентом,
+    // поэтому строку ищем внутри выпадающего списка, а не по всему документу.
+    const row = await waitFor(() => {
+      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access
+      const dropdown = container.querySelector('[data-planner-search="dropdown"]');
+      return dropdown && within(dropdown).getByRole('button', { name: /Пётр Сидоров/ });
+    });
     expect(within(row).getByText(/LADA Vesta/)).toBeTruthy();
     expect(within(row).getByText(/29\.10/)).toBeTruthy();
     expect(within(row).getByText(/14:00/)).toBeTruthy();

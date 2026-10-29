@@ -580,13 +580,24 @@ export function OrderLinesExpand({ row, showExecutors = false }) {
                 </td>
                 {showExecutors ? (
                   <td className="py-1.5 pr-5">
-                    {(w.executors || []).length
-                      ? (w.executors || []).map((ex) => (
-                          <span key={ex.employee_id} className="mr-2 inline-block">
-                            {ex.employee?.name || '—'}
-                          </span>
-                        ))
-                      : w.executor?.name || '—'}
+                    <div className="flex flex-col gap-0.5">
+                      <span className="truncate">
+                        {(w.executors || []).length
+                          ? (w.executors || [])
+                              .map((ex) => ex.employee?.name)
+                              .filter(Boolean)
+                              .join(', ') || '—'
+                          : w.executor?.name || '—'}
+                      </span>
+                      {(w.contractors || []).map((c) => (
+                        <span
+                          key={`${w.id}-${c.contractor_id}`}
+                          className="truncate text-warning-700"
+                        >
+                          {c.contractor?.name || 'Подрядчик'} · {formatMoney(c.amount)} ₽
+                        </span>
+                      ))}
+                    </div>
                   </td>
                 ) : null}
               </tr>
