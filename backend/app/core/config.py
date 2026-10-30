@@ -127,6 +127,9 @@ class Settings(BaseSettings):
     NEW_PARTS_SEO_REFRESH_BATCH_SIZE: int = 100
     NEW_PARTS_SEO_REFRESH_INTERVAL_HOURS: int = 6
 
+    # Прайс-листы Drom: сверка с остатками по расписанию
+    DROM_RECONCILE_INTERVAL_MINUTES: int = 15
+
     # DDoS / rate limiting
     RATE_LIMIT_ENABLED: bool = True
     PRERENDER_INTERNAL_TOKEN: Optional[str] = None

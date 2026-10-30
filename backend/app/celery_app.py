@@ -72,11 +72,8 @@ celery_app.conf.update(
             "task": "autoservice.sync_caldav_all",
             "schedule": crontab(minute="*/5"),
         },
-        # Прайс-листы Drom: убрать выписанные позиции, обновить остатки — каждые 15 минут
-        "drom-reconcile-price-lists": {
-            "task": "drom.reconcile_price_lists",
-            "schedule": crontab(minute="*/15"),
-        },
+        # Прайс-листы Drom сверяются APScheduler'ом в gunicorn-лидере
+        # (main.py, job drom_reconcile_price_lists) — в beat не дублируем.
         # marzvpn.verify_keys_authenticity — отдельный beat бота (redis db/2),
         # чтобы не дублировать с marzban-vpn-bot-celerybeat.
     },

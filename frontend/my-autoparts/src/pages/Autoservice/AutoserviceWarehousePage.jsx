@@ -95,6 +95,7 @@ export default function AutoserviceWarehousePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [serverSearch, setServerSearch] = useState('');
   const [detailsItem, setDetailsItem] = useState(null);
 
   const DEFAULT_FILTERS = {
@@ -147,12 +148,18 @@ export default function AutoserviceWarehousePage() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setServerSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const loadItems = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams({ exclude_zero_qty: 'true' });
       if (supplierTerm) params.set('supplier', supplierTerm);
+      if (serverSearch) params.set('q', serverSearch);
       const [data, lots] = await Promise.all([
         apiRequest(`/autoservice/warehouse/items?${params.toString()}`),
         apiRequest('/autoservice/warehouse/purchase-lots'),
@@ -164,7 +171,7 @@ export default function AutoserviceWarehousePage() {
     } finally {
       setLoading(false);
     }
-  }, [supplierTerm]);
+  }, [supplierTerm, serverSearch]);
 
   const loadSupplierDocs = useCallback(async () => {
     try {

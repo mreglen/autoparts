@@ -630,7 +630,14 @@ async def startup_event():
         name="CalDAV reconcile: sync inspection bookings to Radicale",
         replace_existing=True,
     )
-    
+    scheduler.add_job(
+        func=run_drom_reconcile_price_lists,
+        trigger=IntervalTrigger(minutes=settings.DROM_RECONCILE_INTERVAL_MINUTES),
+        id="drom_reconcile_price_lists",
+        name="Drom price lists reconcile: drop written-off rows, refresh stock",
+        replace_existing=True,
+    )
+
     scheduler.start()
     set_apscheduler(scheduler)
     logger.info(
@@ -866,6 +873,33 @@ async def run_caldav_sync_tick():
             logger.error("CalDAV reconcile finished with errors: %s", result)
     except Exception as e:
         logger.error("Ошибка CalDAV reconcile: %s", e)
+
+
+async def run_drom_reconcile_price_lists():
+    try:
+        from app.db.database import SessionLocal
+        from app.services.drom_price_list import reconcile_all_drom_price_lists
+
+        def _run() -> dict:
+            db = SessionLocal()
+            try:
+                return reconcile_all_drom_price_lists(db)
+            finally:
+                db.close()
+
+        result = await asyncio.to_thread(_run)
+        if result.get("removed") or result.get("refreshed"):
+            logger.info(
+                "Drom price lists reconciled: orgs=%s removed=%s refreshed=%s",
+                result.get("organizations"),
+                result.get("removed"),
+                result.get("refreshed"),
+            )
+        for item in result.get("details") or []:
+            if item.get("error"):
+                logger.error("Drom price list reconcile error: %s", item)
+    except Exception as e:
+        logger.error("Ошибка сверки прайс-листов Drom: %s", e)
 
 
 async def run_storage_location_geocode_backfill():

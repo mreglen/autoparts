@@ -10,6 +10,7 @@ import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewMo
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
+import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import {
   autoserviceListHeaderSubtitleClass,
@@ -57,7 +58,7 @@ function ExpenseMobileCard({ row, onClick }) {
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="tabular-nums text-sm font-semibold text-ink">{row.quantity} шт.</p>
+          <p className="tabular-nums text-sm font-semibold text-ink">{row.quantity} {formatShopPartUnit(row.unit)}</p>
           <p className="mt-0.5 tabular-nums text-xs text-ink-muted">
             {formatAutoserviceWarehouseMoney(row.client_unit_price)}
           </p>
@@ -344,7 +345,7 @@ export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
                   <td className={`min-w-0 ${autoserviceListTdClass}`}>
                     <div className="w-0 min-w-full truncate font-semibold text-ink">{row.name || '—'}</div>
                   </td>
-                  <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} шт.</td>
+                  <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>{row.quantity} {formatShopPartUnit(row.unit)}</td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
                     {formatAutoserviceWarehouseMoney(row.client_unit_price)}
                   </td>
@@ -412,7 +413,7 @@ export default function AutoserviceWarehouseExpensesPage({ embedded = false }) {
               </p>
               <p>
                 <span className="text-ink-muted">Кол-во:</span>{' '}
-                <span className="text-ink">{viewExpense.quantity} шт.</span>
+                <span className="text-ink">{viewExpense.quantity} {formatShopPartUnit(viewExpense.unit)}</span>
               </p>
               <p>
                 <span className="text-ink-muted">Цена:</span>{' '}

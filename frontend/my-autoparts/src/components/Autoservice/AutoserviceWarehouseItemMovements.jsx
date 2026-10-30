@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
+import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
 
 function formatMovementDate(value) {
   if (!value) return '—';
@@ -11,8 +12,7 @@ function formatMovementDate(value) {
 }
 
 function formatMovementUnit(qty, unit) {
-  if (unit === 'pcs') return `${qty} шт.`;
-  return `${qty} ${unit}`;
+  return `${qty} ${formatShopPartUnit(unit)}`;
 }
 
 function buildFallbackEvents(movements) {

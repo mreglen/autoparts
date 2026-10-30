@@ -195,6 +195,7 @@ class AutoserviceWarehouseExpenseView(BaseModel):
     article: str
     name: str
     quantity: int
+    unit: str = "pcs"
     unit_price: Decimal
     client_unit_price: Decimal
     reason: Optional[str] = None

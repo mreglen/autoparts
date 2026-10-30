@@ -3,6 +3,7 @@ import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import NumericInput from '../UI/NumericInput';
 import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
+import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
 
 const inputClass = 'sg-pill-input mt-1 w-full';
 const selectClass = 'sg-pill-select mt-1 w-full';
@@ -131,7 +132,7 @@ export default function AutoserviceWarehouseReturnModal({
         <form onSubmit={submit} className="space-y-4">
           <div className="rounded-sg bg-surface-muted px-4 py-3 text-sm text-ink-soft">
             <p className="font-medium text-ink">{lot?.supplier_name}</p>
-            <p className="mt-1">Заказ №{lot?.source_order_id} · доступно {maxQty} шт.</p>
+            <p className="mt-1">Заказ №{lot?.source_order_id} · доступно {maxQty} {formatShopPartUnit(lot?.unit)}</p>
           </div>
           <label className="block text-sm font-medium text-ink-soft">
             Количество

@@ -401,14 +401,19 @@ def list_autoservice_warehouse_items(
             | (AutoserviceWarehouseItem.article.ilike(like))
             | (AutoserviceWarehouseItem.brand.ilike(like))
         )
+    if exclude_zero_qty:
+        query = query.filter(AutoserviceWarehouseItem.quantity > 0)
+    if available_only:
+        query = query.filter(
+            AutoserviceWarehouseItem.quantity
+            - AutoserviceWarehouseItem.reserved_qty
+            - AutoserviceWarehouseItem.return_reserved_qty
+            > 0
+        )
     rows = query.order_by(
         AutoserviceWarehouseItem.name.asc(),
         AutoserviceWarehouseItem.id.asc(),
-    ).limit(200).all()
-    if exclude_zero_qty:
-        rows = [row for row in rows if int(row.quantity or 0) > 0]
-    if available_only:
-        rows = [row for row in rows if autoservice_item_available_qty(row) > 0]
+    ).limit(500).all()
     return [_item_view(row) for row in rows]
 
 
@@ -1133,6 +1138,7 @@ def list_autoservice_warehouse_expenses(
                 article=item.article if item else "",
                 name=item.name if item else "",
                 quantity=int(row.quantity or 0),
+                unit=(item.unit if item else None) or "pcs",
                 unit_price=row.unit_price,
                 client_unit_price=(part_prices[(repair_order_id, row.item_id)] if repair_order_id and (repair_order_id, row.item_id) in part_prices and (row.client_unit_price is None or row.client_unit_price == 0) else row.client_unit_price),
                 reason=row.reason,
@@ -1324,6 +1330,7 @@ def create_autoservice_warehouse_expense(
         article=item.article if item else "",
         name=item.name if item else "",
         quantity=int(expense.quantity or 0),
+        unit=(item.unit if item else None) or "pcs",
         unit_price=expense.unit_price,
         reason=expense.reason,
         created_at=expense.created_at,

@@ -8,6 +8,7 @@ import Toast from '../../components/UI/Toast';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasAutoserviceOrganization } from '../../utils/sellerAutoserviceMode';
 import { formatAutoserviceWarehouseMoney } from '../../utils/autoserviceWarehouseUi';
+import { formatShopPartUnit } from '../../utils/repairOrderShopPartUtils';
 import AutoserviceReceiptDocumentModal from '../../components/Autoservice/AutoserviceReceiptDocumentModal';
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import AutoserviceWarehouseItemMovements from '../../components/Autoservice/AutoserviceWarehouseItemMovements';
@@ -58,7 +59,7 @@ function ReceiptMobileCard({ row, onOpen }) {
       <p className="mt-1 text-xs text-ink-muted">
         {formatDate(row.doc_date)}
         {' · '}
-        {row.quantity} {row.unit === 'pcs' ? 'шт.' : row.unit}
+        {row.quantity} {formatShopPartUnit(row.unit)}
       </p>
       <p className="mt-0.5 text-xs text-ink-muted truncate">
         {docLabel}
@@ -364,7 +365,7 @@ export default function AutoserviceWarehouseReceiptsPage({ embedded = false }) {
                     <div className="w-0 min-w-full truncate font-semibold text-ink">{row.name || '—'}</div>
                   </td>
                   <td className={`w-20 whitespace-nowrap text-ink-muted ${autoserviceListTdRightClass} tabular-nums`}>
-                    {row.quantity} {row.unit === 'pcs' ? 'шт.' : row.unit}
+                    {row.quantity} {formatShopPartUnit(row.unit)}
                   </td>
                   <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>
                     {formatAutoserviceWarehouseMoney(row.unit_price)}
@@ -474,7 +475,7 @@ export default function AutoserviceWarehouseReceiptsPage({ embedded = false }) {
               </p>
               <p>
                 <span className="text-ink-muted">Кол-во:</span>{' '}
-                <span className="text-ink">{viewReceiptLine.quantity} {viewReceiptLine.unit === 'pcs' ? 'шт.' : viewReceiptLine.unit}</span>
+                <span className="text-ink">{viewReceiptLine.quantity} {formatShopPartUnit(viewReceiptLine.unit)}</span>
               </p>
               <p>
                 <span className="text-ink-muted">Цена:</span>{' '}
