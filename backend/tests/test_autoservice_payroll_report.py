@@ -1,3 +1,4 @@
+import json
 import unittest
 from datetime import datetime
 from decimal import Decimal
@@ -8,6 +9,7 @@ from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.garage_vehicle import GarageVehicle
 from app.models.repair_order import RepairOrder, RepairOrderWork
+from app.schemas.autoservice_finance import AutoservicePayrollReportEmployeeRow
 from app.services.autoservice_payroll import (
     accrue_order_payroll,
     compute_employee_monthly_payroll,
@@ -35,36 +37,37 @@ def _order(order_id: int, order_number: str):
     )
 
 
+def _mock_db(employees, accruals, orders=None, vehicles=None, works=None):
+    db = MagicMock()
+    orders = orders or []
+    vehicles = vehicles or [_vehicle(order.id) for order in orders if getattr(order, "vehicle_id", None)]
+    works = works or []
+
+    def query_side_effect(model):
+        q = MagicMock()
+        q.filter.return_value = q
+        q.order_by.return_value = q
+        q.options.return_value = q
+        if model is AutoserviceServiceEmployee:
+            q.all.return_value = employees
+            q.first.return_value = employees[0] if employees else None
+        elif model is AutoservicePayrollAccrual:
+            q.all.return_value = accruals
+        elif model is RepairOrder:
+            q.all.return_value = orders
+        elif model is GarageVehicle:
+            q.all.return_value = vehicles
+        elif model is RepairOrderWork:
+            q.all.return_value = works
+        else:
+            q.all.return_value = []
+        return q
+
+    db.query.side_effect = query_side_effect
+    return db
+
+
 class AutoserviceMonthlyPayrollTests(unittest.TestCase):
-    def _mock_db(self, employees, accruals, orders=None, vehicles=None, works=None):
-        db = MagicMock()
-        orders = orders or []
-        vehicles = vehicles or [_vehicle(order.id) for order in orders if getattr(order, "vehicle_id", None)]
-        works = works or []
-
-        def query_side_effect(model):
-            q = MagicMock()
-            q.filter.return_value = q
-            q.order_by.return_value = q
-            q.options.return_value = q
-            if model is AutoserviceServiceEmployee:
-                q.all.return_value = employees
-                q.first.return_value = employees[0] if employees else None
-            elif model is AutoservicePayrollAccrual:
-                q.all.return_value = accruals
-            elif model is RepairOrder:
-                q.all.return_value = orders
-            elif model is GarageVehicle:
-                q.all.return_value = vehicles
-            elif model is RepairOrderWork:
-                q.all.return_value = works
-            else:
-                q.all.return_value = []
-            return q
-
-        db.query.side_effect = query_side_effect
-        return db
-
     def test_month_bounds_august(self):
         start, end = month_bounds(2026, 8)
         self.assertEqual(start, datetime(2026, 8, 1))
@@ -140,7 +143,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         ]
 
         orders = [_order(10, "RO-010"), _order(11, "RO-011")]
-        db = self._mock_db([emp_a, emp_b, emp_idle], accruals, orders, works=works)
+        db = _mock_db([emp_a, emp_b, emp_idle], accruals, orders, works=works)
 
         result = compute_org_monthly_payroll(db, "ORG1", 2026, 8)
 
@@ -221,7 +224,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 executors=[SimpleNamespace(employee_id=1, percent=Decimal("10.00"))],
             ),
         ]
-        db = self._mock_db([emp], accruals, [_order(10, "RO-010")], works=works)
+        db = _mock_db([emp], accruals, [_order(10, "RO-010")], works=works)
 
         result = compute_org_monthly_payroll(db, "ORG1", 2026, 8)
 
@@ -235,7 +238,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
 
     def test_skips_inactive_without_accruals(self):
         inactive = SimpleNamespace(id=4, name="Архив", is_active=False, organization_id="ORG1")
-        db = self._mock_db([inactive], [])
+        db = _mock_db([inactive], [])
         result = compute_org_monthly_payroll(db, "ORG1", 2026, 8)
         self.assertEqual(result["employees"], [])
         self.assertEqual(result["total"], Decimal("0.00"))
@@ -272,7 +275,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 executors=[SimpleNamespace(employee_id=1, percent=Decimal("10.00"))],
             ),
         ]
-        db = self._mock_db([emp], accruals, [_order(10, "RO-010")], works=works)
+        db = _mock_db([emp], accruals, [_order(10, "RO-010")], works=works)
 
         result = compute_employee_monthly_payroll(db, "ORG1", 1, 2026, 8)
 
@@ -347,3 +350,54 @@ class OrderAccrualTimestampTests(unittest.TestCase):
         db.query.return_value.filter.return_value.scalar.return_value = datetime(2026, 9, 1, 12, 0)
         order = SimpleNamespace(id=10, scheduled_end_at=None, status_completed_at=None)
         self.assertEqual(_order_accrual_timestamp(db, order), datetime(2026, 9, 1, 12, 0))
+
+
+class PayrollReportResponseSchemaTests(unittest.TestCase):
+    """Схема ответа молча вырезает необъявленные поля сервиса, поэтому проверяем итоговый JSON."""
+
+    def _payload(self):
+        from app.schemas.autoservice_finance import AutoservicePayrollReportResponse
+
+        emp = SimpleNamespace(id=1, name="Иванов", is_active=True, organization_id="ORG1")
+        accruals = [
+            SimpleNamespace(
+                employee_id=1,
+                order_id=10,
+                work_id=501,
+                accrual_type="work_percent",
+                amount=Decimal("4000.00"),
+                accrued_at=datetime(2026, 10, 31, 19, 55),
+            ),
+        ]
+        works = [
+            SimpleNamespace(
+                id=501,
+                order_id=10,
+                title="Ремонт",
+                qty=1,
+                unit_price=Decimal("40000.00"),
+                position=1,
+                executors=[SimpleNamespace(employee_id=1, percent=Decimal("10.00"))],
+            ),
+        ]
+        db = _mock_db([emp], accruals, [_order(10, "120")], works=works)
+        data = compute_org_monthly_payroll(db, "ORG1", 2026, 10)
+        return json.loads(
+            AutoservicePayrollReportResponse(
+                year=data["year"],
+                month=data["month"],
+                total=data["total"],
+                employees=[AutoservicePayrollReportEmployeeRow.model_validate(row) for row in data["employees"]],
+            ).model_dump_json()
+        )
+
+    def test_order_end_at_survives_api_serialization(self):
+        order_row = self._payload()["employees"][0]["orders"][0]
+        self.assertEqual(order_row["order_number"], "120")
+        self.assertEqual(order_row["end_at"], "2026-10-31")
+
+    def test_employee_payroll_response_carries_end_at(self):
+        from app.schemas.autoservice_finance import AutoserviceMyPayrollOrderRow
+
+        row = AutoserviceMyPayrollOrderRow.model_validate(self._payload()["employees"][0]["orders"][0])
+        self.assertEqual(json.loads(row.model_dump_json())["end_at"], "2026-10-31")

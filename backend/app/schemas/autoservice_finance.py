@@ -77,6 +77,7 @@ class AutoservicePayrollReportOrderVehicle(BaseModel):
 class AutoservicePayrollReportOrderRow(BaseModel):
     order_id: int
     order_number: str
+    end_at: Optional[str] = None
     vehicle: Optional[AutoservicePayrollReportOrderVehicle] = None
     amount: Decimal = Decimal("0.00")
 
