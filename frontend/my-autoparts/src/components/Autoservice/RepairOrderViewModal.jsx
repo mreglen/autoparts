@@ -1283,6 +1283,10 @@ export default function RepairOrderViewModal({
                 <span className="text-success-700">{formatDateTime(order.inspection_scheduled_at)}</span>
               </MetaItem>
             ) : null}
+            <MetaItem label="Дата конца">{formatDateTime(order.scheduled_end_at) || '—'}</MetaItem>
+            {order.status_completed_at ? (
+              <MetaItem label="Дата закрытия">{formatDateTime(order.status_completed_at)}</MetaItem>
+            ) : null}
             <MetaItem label="Пробег">
               {order.mileage_km != null && order.mileage_km !== ''
                 ? `${Number(order.mileage_km).toLocaleString('ru-RU')} км`

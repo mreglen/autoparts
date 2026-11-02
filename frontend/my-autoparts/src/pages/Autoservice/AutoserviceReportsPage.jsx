@@ -8,7 +8,7 @@ import {
   getFinanceTodayDate,
   getMonthRangeDefaults,
 } from '../Finance/financeDisplay';
-import { formatServerDateTime, formatWallClockDateTime } from '../../utils/serverDate';
+import { formatServerDate, formatServerDateTime, formatWallClockDateTime } from '../../utils/serverDate';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import Modal from '../../components/UI/Modal';
@@ -843,6 +843,7 @@ export default function AutoserviceReportsPage() {
                                         onOpen={openOrderView}
                                       />
                                     </ReportField>
+                                    <ReportField label="Дата закрытия">{formatServerDate(order.closed_at)}</ReportField>
                                     <ReportField label="Автомобиль">{vehicleLabel(order.vehicle)}</ReportField>
                                     <ReportField label="Сумма">{formatFinanceCurrency(order.amount)}</ReportField>
                                   </div>
@@ -912,6 +913,7 @@ export default function AutoserviceReportsPage() {
                                         <thead>
                                           <tr className={autoserviceListTheadRowClass}>
                                             <th className={`min-w-0 ${autoserviceListThClass}`}>Номер заказ-наряда</th>
+                                            <th className={`w-28 whitespace-nowrap ${autoserviceListThClass}`}>Дата закрытия</th>
                                             <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
                                             <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
                                           </tr>
@@ -925,6 +927,9 @@ export default function AutoserviceReportsPage() {
                                                   orderNumber={order.order_number}
                                                   onOpen={openOrderView}
                                                 />
+                                              </td>
+                                              <td className={`w-28 whitespace-nowrap ${autoserviceListTdClass} tabular-nums text-ink-muted`}>
+                                                {formatServerDate(order.closed_at)}
                                               </td>
                                               <td className={autoserviceListTdClass}>
                                                 <div className="w-0 min-w-full truncate text-ink-muted">{vehicleLabel(order.vehicle)}</div>

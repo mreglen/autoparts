@@ -306,6 +306,7 @@ class RepairOrderStaffView(BaseModel):
     accepted_by_user_id: int
     created_by_user_id: Optional[int] = None
     status: str
+    status_completed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     client: RepairOrderClientBrief

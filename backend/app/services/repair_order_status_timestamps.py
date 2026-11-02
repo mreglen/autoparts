@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.models.repair_order import RepairOrder
 from app.schemas.repair_order import LEGACY_STATUS_MAP
@@ -24,12 +24,14 @@ def record_repair_order_status_timestamp(
     *,
     at: datetime | None = None,
 ) -> None:
-    """Persist when the order entered the given status (stored only, not exposed in UI yet)."""
+    """Persist when the order entered the given status."""
     normalized = normalize_repair_order_status(status)
     field_name = STATUS_TIMESTAMP_FIELDS.get(normalized)
     if not field_name:
         return
-    timestamp = at or datetime.now(timezone.utc).replace(tzinfo=None)
+    # Колонки читаются как wall-clock (naive), а сессия БД — Europe/Moscow:
+    # UTC-значение здесь означалось бы как МСК и уехало на 3 часа назад.
+    timestamp = at or datetime.now()
     setattr(order, field_name, timestamp)
     if normalized in ("done", "completed") and order.scheduled_end_at is None:
         # Дата окончания = момент выполнения/закрытия, только если её не выставили вручную

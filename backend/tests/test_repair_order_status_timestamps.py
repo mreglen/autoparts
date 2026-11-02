@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
 from app.services.repair_order_status_timestamps import (
@@ -49,6 +49,16 @@ class RepairOrderStatusTimestampTests(unittest.TestCase):
         order = MagicMock(spec=[])
         record_repair_order_status_timestamp(order, "unknown")
         self.assertEqual(order.method_calls, [])
+
+    def test_default_timestamp_is_local_wall_clock(self):
+        order = MagicMock()
+        order.status_completed_at = None
+        order.scheduled_end_at = None
+
+        record_repair_order_status_timestamp(order, "completed")
+
+        self.assertIsNone(order.status_completed_at.tzinfo)
+        self.assertLess(abs(order.status_completed_at - datetime.now()), timedelta(minutes=1))
 
 
 if __name__ == "__main__":

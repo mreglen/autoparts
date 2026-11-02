@@ -1,6 +1,6 @@
 import React from 'react';
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { apiRequest } from '../../utils/apiClient';
@@ -54,6 +54,38 @@ const ROSSKO_REPORT = {
   ],
 };
 
+const PAYROLL_REPORT = {
+  year: 2026,
+  month: 11,
+  total: 3000,
+  employees: [
+    {
+      employee_id: 7,
+      name: 'Иванов',
+      completed_orders: 1,
+      total: 3000,
+      orders: [
+        {
+          order_id: 119,
+          order_number: '119',
+          closed_at: '2026-11-02',
+          vehicle: { make: 'Hyundai', model: 'Creta', year: 2019, plate: 'A119BC' },
+          amount: 3000,
+          works: [
+            {
+              work_id: 1,
+              title: 'Развал-схождение',
+              accrual_type: 'work_percent',
+              percent: 30,
+              amount: 3000,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 vi.mock('../../utils/apiClient', () => ({
   apiRequest: vi.fn(),
   apiAxios: {
@@ -74,7 +106,6 @@ vi.mock('../../components/Autoservice/RepairOrderViewModal', () => ({
   REPAIR_ORDER_STATUS_LABELS: {},
   vehicleLabel: () => '',
 }));
-
 vi.mock('../../hooks/useDebouncedCallback', () => ({
   useDebouncedCallback: (fn) => fn,
 }));
@@ -108,6 +139,9 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
     mockSetSearchParams.mockClear();
     mockSearchParams = new URLSearchParams('');
     apiRequest.mockImplementation((url) => {
+      if (String(url).includes('/autoservice/reports/payroll')) {
+        return Promise.resolve(PAYROLL_REPORT);
+      }
       if (String(url).includes('/autoservice/reports/rossko-sales')) {
         return Promise.resolve(ROSSKO_REPORT);
       }
@@ -147,5 +181,20 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
       expect(mockSetSearchParams).toHaveBeenCalledWith({}, { replace: true });
     });
     expect(screen.queryByText('доход организации за период')).not.toBeInTheDocument();
+  });
+
+  it('shows the repair order closing date in the payroll report', async () => {
+    mockSearchParams = new URLSearchParams('tab=payroll');
+    renderReportsPage({ is_director: true });
+
+    const toggles = await screen.findAllByRole('button', { name: /Иванов/ });
+    fireEvent.click(toggles[0]);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Дата закрытия')).toHaveLength(2);
+    });
+    await waitFor(() => {
+      expect(screen.getAllByText('02.11.2026')).toHaveLength(2);
+    });
   });
 });

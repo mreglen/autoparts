@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
 import { formatFinanceCurrency } from '../Finance/financeDisplay';
+import { formatServerDate } from '../../utils/serverDate';
 import { Skeleton } from '../../components/UI';
 import Modal from '../../components/UI/Modal';
 import Toast from '../../components/UI/Toast';
@@ -91,6 +92,7 @@ function PayrollOrderRow({ order, onOpen }) {
       </div>
       <p className="mt-0.5 truncate text-xs text-ink-muted">
         {vehicleLabel(order.vehicle) || 'Автомобиль не указан'}
+        {order.closed_at ? ` · закрыт ${formatServerDate(order.closed_at)}` : ''}
         {works.length ? ` · ${works.length} работ${works.length === 1 ? 'а' : works.length >= 2 && works.length <= 4 ? 'ы' : ''}` : ''}
       </p>
     </button>

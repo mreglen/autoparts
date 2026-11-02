@@ -463,6 +463,7 @@ def _to_staff_view(
         accepted_by_user_id=row.accepted_by_user_id,
         created_by_user_id=row.created_by_user_id,
         status=row.status,
+        status_completed_at=row.status_completed_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
         client=_client_brief(row.client),
@@ -1093,8 +1094,13 @@ def _replace_works(
 
 
 def _order_accrual_timestamp(db: Session, order: RepairOrder) -> datetime | None:
-    if order.status_completed_at:
-        return order.status_completed_at
+    # Отчёт о ЗП группировает начисления по месяцу: заказ с датой конца в октябре,
+    # закрытый в ноябре, должен остаться в октябрьской сводке. Дата конца берётся
+    # только если она не позже закрытия — иначе заказ, закрытый раньше плана,
+    # уводил бы начисления в будущий месяц.
+    moments = [moment for moment in (order.scheduled_end_at, order.status_completed_at) if moment]
+    if moments:
+        return min(moments)
     return (
         db.query(func.max(AutoservicePayrollAccrual.accrued_at))
         .filter(AutoservicePayrollAccrual.order_id == order.id)
@@ -2259,8 +2265,10 @@ def patch_repair_order_status(
         clear_order_contractor_payouts(db, row.id)
     if payload.status == "completed" and prev_status != "completed":
         db.flush()
-        accrue_order_payroll(db, row)
-        accrue_order_contractor_payouts(db, row)
+        accrue_order_payroll(db, row, accrued_at=_order_accrual_timestamp(db, row))
+        accrue_order_contractor_payouts(
+            db, row, accrued_at=_order_accrual_timestamp(db, row)
+        )
         fulfill_autoservice_stock_on_order_complete(
             db,
             order=row,

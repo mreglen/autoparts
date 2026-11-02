@@ -194,6 +194,12 @@ ACCRUAL_TYPE_LABELS = {
 }
 
 
+def _closed_at(order: RepairOrder | None) -> str | None:
+    """День начисления = день закрытия заказ-наряда (отчёт группирует по нему)."""
+    moment = order.status_completed_at if order else None
+    return moment.strftime("%Y-%m-%d") if moment else None
+
+
 def _executor_percent(work: RepairOrderWork | None, employee_id: int) -> Decimal | None:
     if work is None:
         return None
@@ -393,6 +399,7 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
                 {
                     "order_id": order_id,
                     "order_number": order.order_number if order else f"#{order_id}",
+                    "closed_at": _closed_at(order),
                     "vehicle": _vehicle_brief(vehicle),
                     "amount": order_amount,
                     "works": works,

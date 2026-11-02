@@ -26,6 +26,13 @@ def _month_label(year: int, month: int) -> str:
     return f"{month:02d}.{year}"
 
 
+def _day_label(value: str | None) -> str:
+    if not value:
+        return "—"
+    year, month, day = str(value).split("-")
+    return f"{day}.{month}.{year}"
+
+
 def _sheet_summary(wb: Workbook, report: dict) -> None:
     ws = wb.active
     ws.title = "Сводка"
@@ -61,15 +68,16 @@ def _sheet_employees(wb: Workbook, employees: list[dict]) -> None:
 
 def _sheet_details(wb: Workbook, employees: list[dict]) -> None:
     ws = wb.create_sheet("По заказ-нарядам")
-    headers = ["Сотрудник", "Заказ-наряд", "Автомобиль", "Сумма, ₽"]
+    headers = ["Сотрудник", "Заказ-наряд", "Дата закрытия", "Автомобиль", "Сумма, ₽"]
     _write_header(ws, headers)
     row_index = 2
     for employee in employees:
         for order in employee.get("orders") or []:
             ws.cell(row=row_index, column=1, value=employee["name"])
             ws.cell(row=row_index, column=2, value=order["order_number"])
-            ws.cell(row=row_index, column=3, value=_vehicle_label(order.get("vehicle")))
-            ws.cell(row=row_index, column=4, value=order["amount"])
+            ws.cell(row=row_index, column=3, value=_day_label(order.get("closed_at")))
+            ws.cell(row=row_index, column=4, value=_vehicle_label(order.get("vehicle")))
+            ws.cell(row=row_index, column=5, value=order["amount"])
             row_index += 1
     _autosize_columns(ws)
 

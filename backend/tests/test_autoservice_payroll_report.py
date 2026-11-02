@@ -27,11 +27,12 @@ def _vehicle(order_id: int):
     )
 
 
-def _order(order_id: int, order_number: str):
+def _order(order_id: int, order_number: str, closed_at: datetime | None = None):
     return SimpleNamespace(
         id=order_id,
         order_number=order_number,
         vehicle_id=100 + order_id,
+        status_completed_at=closed_at,
     )
 
 
@@ -135,7 +136,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
             ),
         ]
 
-        orders = [_order(10, "RO-010"), _order(11, "RO-011")]
+        orders = [_order(10, "RO-010", closed_at=datetime(2026, 11, 2, 13, 6)), _order(11, "RO-011")]
         db = self._mock_db([emp_a, emp_b, emp_idle], accruals, orders, works=works)
 
         result = compute_org_monthly_payroll(db, "ORG1", 2026, 8)
@@ -154,6 +155,8 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         self.assertEqual(ivanov_by_order[10]["amount"], Decimal("100.00"))
         self.assertEqual(ivanov_by_order[10]["order_number"], "RO-010")
         self.assertEqual(ivanov_by_order[10]["vehicle"]["make"], "Toyota")
+        self.assertEqual(ivanov_by_order[10]["closed_at"], "2026-11-02")
+        self.assertIsNone(ivanov_by_order[11]["closed_at"])
         self.assertEqual(len(ivanov_by_order[10]["works"]), 1)
         self.assertEqual(ivanov_by_order[10]["works"][0]["title"], "Замена масла")
         self.assertEqual(ivanov_by_order[10]["works"][0]["percent"], Decimal("10.00"))
@@ -305,3 +308,36 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         self.assertEqual(by_employee[2].accrued_at, ts)
         self.assertEqual(by_employee[1].work_id, 501)
         self.assertEqual(by_employee[1].work_title, "Ремонт")
+
+
+class OrderAccrualTimestampTests(unittest.TestCase):
+    def _ts(self, scheduled_end_at, status_completed_at):
+        from app.routers.autoservice_repair_orders import _order_accrual_timestamp
+
+        db = MagicMock()
+        order = SimpleNamespace(
+            id=10,
+            scheduled_end_at=scheduled_end_at,
+            status_completed_at=status_completed_at,
+        )
+        return _order_accrual_timestamp(db, order)
+
+    def test_late_closure_keeps_accrual_in_the_work_month(self):
+        self.assertEqual(
+            self._ts(datetime(2026, 10, 31, 18, 0), datetime(2026, 11, 2, 9, 8)),
+            datetime(2026, 10, 31, 18, 0),
+        )
+
+    def test_early_closure_does_not_move_accrual_into_the_future(self):
+        self.assertEqual(
+            self._ts(datetime(2026, 12, 15, 0, 0), datetime(2026, 11, 2, 9, 8)),
+            datetime(2026, 11, 2, 9, 8),
+        )
+
+    def test_without_dates_falls_back_to_existing_accruals(self):
+        from app.routers.autoservice_repair_orders import _order_accrual_timestamp
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.scalar.return_value = datetime(2026, 9, 1, 12, 0)
+        order = SimpleNamespace(id=10, scheduled_end_at=None, status_completed_at=None)
+        self.assertEqual(_order_accrual_timestamp(db, order), datetime(2026, 9, 1, 12, 0))
