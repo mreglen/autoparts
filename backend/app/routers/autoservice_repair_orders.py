@@ -1098,7 +1098,13 @@ def _order_accrual_timestamp(db: Session, order: RepairOrder) -> datetime | None
     # закрытый в ноябре, должен остаться в октябрьской сводке. Дата конца берётся
     # только если она не позже закрытия — иначе заказ, закрытый раньше плана,
     # уводил бы начисления в будущий месяц.
-    moments = [moment for moment in (order.scheduled_end_at, order.status_completed_at) if moment]
+    # Колонки дат — timestamptz, поэтому из БД значение приходит смещённым, а только
+    # что записанный datetime.now() — наивный: без _normalize_dt min() падает на смешанных.
+    moments = [
+        _normalize_dt(moment)
+        for moment in (order.scheduled_end_at, order.status_completed_at)
+        if moment
+    ]
     if moments:
         return min(moments)
     return (

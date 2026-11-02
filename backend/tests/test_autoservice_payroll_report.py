@@ -1,6 +1,6 @@
 import json
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -341,6 +341,17 @@ class OrderAccrualTimestampTests(unittest.TestCase):
         self.assertEqual(
             self._ts(datetime(2026, 12, 15, 0, 0), datetime(2026, 11, 2, 9, 8)),
             datetime(2026, 11, 2, 9, 8),
+        )
+
+    def test_mixed_awareness_dates_compare(self):
+        # Дата конца приходит из timestamptz-колонки смещённой, а закрытие только что
+        # записано наивным datetime.now() — на смешанных min() падал с TypeError.
+        self.assertEqual(
+            self._ts(
+                datetime(2026, 10, 31, 18, 55, tzinfo=timezone(timedelta(hours=3))),
+                datetime(2026, 11, 2, 9, 8),
+            ),
+            datetime(2026, 10, 31, 18, 55),
         )
 
     def test_without_dates_falls_back_to_existing_accruals(self):
