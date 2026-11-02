@@ -68,7 +68,7 @@ const PAYROLL_REPORT = {
         {
           order_id: 119,
           order_number: '119',
-          closed_at: '2026-11-02',
+          end_at: '2026-10-31',
           vehicle: { make: 'Hyundai', model: 'Creta', year: 2019, plate: 'A119BC' },
           amount: 3000,
           works: [
@@ -183,7 +183,7 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
     expect(screen.queryByText('доход организации за период')).not.toBeInTheDocument();
   });
 
-  it('shows the repair order closing date in the payroll report', async () => {
+  it('shows the repair order end date in the payroll report', async () => {
     mockSearchParams = new URLSearchParams('tab=payroll');
     renderReportsPage({ is_director: true });
 
@@ -191,10 +191,10 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
     fireEvent.click(toggles[0]);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Дата закрытия')).toHaveLength(2);
+      expect(screen.getAllByText('Дата конца')).toHaveLength(2);
     });
     await waitFor(() => {
-      expect(screen.getAllByText('02.11.2026')).toHaveLength(2);
+      expect(screen.getAllByText('31.10.2026')).toHaveLength(2);
     });
   });
 });

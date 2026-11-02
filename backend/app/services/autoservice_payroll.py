@@ -194,10 +194,10 @@ ACCRUAL_TYPE_LABELS = {
 }
 
 
-def _closed_at(order: RepairOrder | None) -> str | None:
-    """День начисления = день закрытия заказ-наряда (отчёт группирует по нему)."""
-    moment = order.status_completed_at if order else None
-    return moment.strftime("%Y-%m-%d") if moment else None
+def _end_at(accruals: list[AutoservicePayrollAccrual]) -> str | None:
+    """Дата конца работ: начисление привязано к ней, отчёт группирует по этому месяцу."""
+    moments = [accrual.accrued_at for accrual in accruals if accrual.accrued_at]
+    return max(moments).strftime("%Y-%m-%d") if moments else None
 
 
 def _executor_percent(work: RepairOrderWork | None, employee_id: int) -> Decimal | None:
@@ -399,7 +399,7 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
                 {
                     "order_id": order_id,
                     "order_number": order.order_number if order else f"#{order_id}",
-                    "closed_at": _closed_at(order),
+                    "end_at": _end_at(work_accruals),
                     "vehicle": _vehicle_brief(vehicle),
                     "amount": order_amount,
                     "works": works,

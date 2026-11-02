@@ -27,12 +27,11 @@ def _vehicle(order_id: int):
     )
 
 
-def _order(order_id: int, order_number: str, closed_at: datetime | None = None):
+def _order(order_id: int, order_number: str):
     return SimpleNamespace(
         id=order_id,
         order_number=order_number,
         vehicle_id=100 + order_id,
-        status_completed_at=closed_at,
     )
 
 
@@ -88,6 +87,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 work_id=501,
                 accrual_type="work_percent",
                 amount=Decimal("100.00"),
+                accrued_at=datetime(2026, 10, 31, 19, 55),
             ),
             SimpleNamespace(
                 employee_id=1,
@@ -95,6 +95,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 work_id=502,
                 accrual_type="work_percent",
                 amount=Decimal("50.00"),
+                accrued_at=datetime(2026, 8, 15, 12, 0),
             ),
             SimpleNamespace(
                 employee_id=2,
@@ -102,6 +103,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 work_id=501,
                 accrual_type="work_percent",
                 amount=Decimal("200.00"),
+                accrued_at=datetime(2026, 10, 31, 19, 55),
             ),
             SimpleNamespace(
                 employee_id=2,
@@ -109,6 +111,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 work_id=None,
                 accrual_type="daily_rate",
                 amount=Decimal("1500.00"),
+                accrued_at=datetime(2026, 10, 31, 19, 55),
             ),
         ]
 
@@ -136,7 +139,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
             ),
         ]
 
-        orders = [_order(10, "RO-010", closed_at=datetime(2026, 11, 2, 13, 6)), _order(11, "RO-011")]
+        orders = [_order(10, "RO-010"), _order(11, "RO-011")]
         db = self._mock_db([emp_a, emp_b, emp_idle], accruals, orders, works=works)
 
         result = compute_org_monthly_payroll(db, "ORG1", 2026, 8)
@@ -155,8 +158,8 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
         self.assertEqual(ivanov_by_order[10]["amount"], Decimal("100.00"))
         self.assertEqual(ivanov_by_order[10]["order_number"], "RO-010")
         self.assertEqual(ivanov_by_order[10]["vehicle"]["make"], "Toyota")
-        self.assertEqual(ivanov_by_order[10]["closed_at"], "2026-11-02")
-        self.assertIsNone(ivanov_by_order[11]["closed_at"])
+        self.assertEqual(ivanov_by_order[10]["end_at"], "2026-10-31")
+        self.assertEqual(ivanov_by_order[11]["end_at"], "2026-08-15")
         self.assertEqual(len(ivanov_by_order[10]["works"]), 1)
         self.assertEqual(ivanov_by_order[10]["works"][0]["title"], "Замена масла")
         self.assertEqual(ivanov_by_order[10]["works"][0]["percent"], Decimal("10.00"))
@@ -188,6 +191,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 work_id=501,
                 accrual_type="work_percent",
                 amount=Decimal("100.00"),
+                accrued_at=datetime(2026, 8, 15, 12, 0),
             ),
             SimpleNamespace(
                 employee_id=1,
@@ -195,6 +199,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 work_id=None,
                 accrual_type="daily_rate",
                 amount=Decimal("1500.00"),
+                accrued_at=datetime(2026, 8, 15, 12, 0),
             ),
             SimpleNamespace(
                 employee_id=1,
@@ -202,6 +207,7 @@ class AutoserviceMonthlyPayrollTests(unittest.TestCase):
                 work_id=501,
                 accrual_type="work_percent",
                 amount=Decimal("50.00"),
+                accrued_at=datetime(2026, 8, 15, 12, 0),
             ),
         ]
         works = [

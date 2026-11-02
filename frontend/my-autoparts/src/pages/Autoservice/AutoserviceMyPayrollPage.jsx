@@ -92,7 +92,7 @@ function PayrollOrderRow({ order, onOpen }) {
       </div>
       <p className="mt-0.5 truncate text-xs text-ink-muted">
         {vehicleLabel(order.vehicle) || 'Автомобиль не указан'}
-        {order.closed_at ? ` · закрыт ${formatServerDate(order.closed_at)}` : ''}
+        {order.end_at ? ` · дата конца ${formatServerDate(order.end_at)}` : ''}
         {works.length ? ` · ${works.length} работ${works.length === 1 ? 'а' : works.length >= 2 && works.length <= 4 ? 'ы' : ''}` : ''}
       </p>
     </button>

@@ -68,14 +68,14 @@ def _sheet_employees(wb: Workbook, employees: list[dict]) -> None:
 
 def _sheet_details(wb: Workbook, employees: list[dict]) -> None:
     ws = wb.create_sheet("По заказ-нарядам")
-    headers = ["Сотрудник", "Заказ-наряд", "Дата закрытия", "Автомобиль", "Сумма, ₽"]
+    headers = ["Сотрудник", "Заказ-наряд", "Дата конца", "Автомобиль", "Сумма, ₽"]
     _write_header(ws, headers)
     row_index = 2
     for employee in employees:
         for order in employee.get("orders") or []:
             ws.cell(row=row_index, column=1, value=employee["name"])
             ws.cell(row=row_index, column=2, value=order["order_number"])
-            ws.cell(row=row_index, column=3, value=_day_label(order.get("closed_at")))
+            ws.cell(row=row_index, column=3, value=_day_label(order.get("end_at")))
             ws.cell(row=row_index, column=4, value=_vehicle_label(order.get("vehicle")))
             ws.cell(row=row_index, column=5, value=order["amount"])
             row_index += 1
