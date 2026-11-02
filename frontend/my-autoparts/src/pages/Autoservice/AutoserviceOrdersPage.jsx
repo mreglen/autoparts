@@ -31,9 +31,11 @@ import {
   autoserviceListTableClass,
   autoserviceListTheadRowClass,
   autoserviceListThClass,
+  autoserviceListThRightClass,
   autoserviceListTbodyClass,
   autoserviceListTrClickableClass,
   autoserviceListTdClass,
+  autoserviceListTdRightClass,
 } from '../../utils/warehouseListUi';
 
 const PAGE_SIZE = 50;
@@ -527,7 +529,7 @@ export default function AutoserviceOrdersPage() {
         <table className={autoserviceListTableClass}>
           <thead>
             <tr className={autoserviceListTheadRowClass}>
-              <th className={`w-28 ${autoserviceListThClass}`}>Заказ</th>
+              <th className={`w-20 ${autoserviceListThClass}`}>Заказ</th>
               {!draftOnly ? (
                 <>
                   <SortableDateTh
@@ -535,36 +537,38 @@ export default function AutoserviceOrdersPage() {
                     column="scheduled_at"
                     sort={sort}
                     onSort={handleSort}
+                    className="w-28 whitespace-nowrap"
                   />
                   <SortableDateTh
                     label="Дата конца"
                     column="scheduled_end_at"
                     sort={sort}
                     onSort={handleSort}
+                    className="w-28 whitespace-nowrap"
                   />
                 </>
               ) : null}
               <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
-              <th className={`w-32 ${autoserviceListThClass}`}>Сумма</th>
-              <th className={`w-32 ${autoserviceListThClass}`}>Статус</th>
+              <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
+              <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Статус</th>
             </tr>
           </thead>
           <tbody className={autoserviceListTbodyClass}>
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <tr key={`sk-${i}`}>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-16" /></td>
+                  <td className={`w-20 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-16" /></td>
                   {!draftOnly ? (
                     <>
-                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
-                      <td className={autoserviceListTdClass}><Skeleton className="h-4 w-20" /></td>
+                      <td className={`w-28 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-20" /></td>
+                      <td className={`w-28 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-20" /></td>
                     </>
                   ) : null}
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-36" /></td>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-28" /></td>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-4 w-24" /></td>
-                  <td className={autoserviceListTdClass}><Skeleton className="h-6 w-20 rounded-full" /></td>
+                  <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
+                  <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-28" /></td>
+                  <td className={`w-28 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-24" /></td>
+                  <td className={`w-32 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-6 w-20 rounded-full" /></td>
                 </tr>
               ))
             ) : (
@@ -584,39 +588,35 @@ export default function AutoserviceOrdersPage() {
                       className={autoserviceListTrClickableClass}
                       onClick={() => openDraft(draft)}
                     >
-                      <td className={autoserviceListTdClass}>
+                      <td className={`w-20 ${autoserviceListTdClass}`}>
                         <span className="font-medium tabular-nums text-ink-muted">
                           {draft.mode === 'create' ? 'Новый' : `№ ${draft.orderId}`}
                         </span>
                       </td>
                       {!draftOnly ? (
                         <>
-                          <td className={autoserviceListTdClass}>
+                          <td className={`w-28 ${autoserviceListTdClass}`}>
                             <span className="tabular-nums text-ink-muted">
                               {form.scheduledAt ? formatServerDate(form.scheduledAt) : '—'}
                             </span>
                           </td>
-                          <td className={autoserviceListTdClass}>
+                          <td className={`w-28 ${autoserviceListTdClass}`}>
                             <span className="tabular-nums text-ink-muted">
                               {form.scheduledEndAt ? formatServerDate(form.scheduledEndAt) : '—'}
                             </span>
                           </td>
                         </>
                       ) : null}
-                      <td className={`${autoserviceListTdClass} font-semibold text-ink`}>
-                        {vehicleName}
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                        <div className="w-0 min-w-full truncate font-semibold text-ink">{vehicleName}</div>
                       </td>
-                      <td className={autoserviceListTdClass}>
-                        <div className="font-semibold text-ink">
-                          {clientName}
-                        </div>
+                      <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                        <div className="w-0 min-w-full truncate font-semibold text-ink">{clientName}</div>
                       </td>
-                      <td className={autoserviceListTdClass}>
-                        <span className="tabular-nums font-semibold text-ink">
-                          {draftTotal != null ? `${formatMoney(draftTotal)} ₽` : '—'}
-                        </span>
+                      <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold text-ink`}>
+                        {draftTotal != null ? `${formatMoney(draftTotal)} ₽` : '—'}
                       </td>
-                      <td className={autoserviceListTdClass}>
+                      <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass}`}>
                         <div className="flex items-center justify-between gap-2">
                           <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
                             Черновик
@@ -651,25 +651,27 @@ export default function AutoserviceOrdersPage() {
                       setViewOrder(row);
                     }}
                   >
-                    <td className={autoserviceListTdClass}>
+                    <td className={`w-20 ${autoserviceListTdClass}`}>
                       <span className="font-medium tabular-nums text-ink-muted">{repairOrderNumberLabel(row)}</span>
                     </td>
-                    <td className={autoserviceListTdClass}>
+                    <td className={`w-28 whitespace-nowrap ${autoserviceListTdClass}`}>
                       <span className="tabular-nums text-ink-muted">{formatServerDate(row.scheduled_at)}</span>
                     </td>
-                    <td className={autoserviceListTdClass}>
+                    <td className={`w-28 whitespace-nowrap ${autoserviceListTdClass}`}>
                       <span className="tabular-nums text-ink-muted">
                         {row.scheduled_end_at ? formatServerDate(row.scheduled_end_at) : '—'}
                       </span>
                     </td>
-                    <td className={`${autoserviceListTdClass} font-semibold text-ink`}>{vehicleMakeModelLabel(row.vehicle)}</td>
-                    <td className={autoserviceListTdClass}>
-                      <div className="font-semibold text-ink">{row.client?.name || '—'}</div>
+                    <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                      <div className="w-0 min-w-full truncate font-semibold text-ink">{vehicleMakeModelLabel(row.vehicle)}</div>
                     </td>
-                    <td className={autoserviceListTdClass}>
-                      <div className="tabular-nums font-semibold text-ink">{formatMoney(row.grand_total)} ₽</div>
+                    <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                      <div className="w-0 min-w-full truncate font-semibold text-ink">{row.client?.name || '—'}</div>
                     </td>
-                    <td className={`${autoserviceListTdClass} [&_span]:ring-0`}>
+                    <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold text-ink`}>
+                      {formatMoney(row.grand_total)} ₽
+                    </td>
+                    <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} [&_span]:ring-0`}>
                       <RepairOrderStatusPicker
                         status={row.status}
                         options={STATUS_ACTIONS}
