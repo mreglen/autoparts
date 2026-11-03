@@ -236,11 +236,21 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
       'Дата',
       'Сумма',
       'Запчасти',
-      'ЗП',
+      'Зарплата',
       'Прибыль',
       'Дебит',
       'Статус',
     ]);
+  });
+
+  it('leaves only the order status in the economics status column', async () => {
+    mockSearchParams = new URLSearchParams('tab=economics');
+    renderReportsPage({ is_director: true });
+
+    // Метка «Предварительный расчёт» остаётся только в мобильной карточке.
+    await waitFor(() => {
+      expect(screen.getAllByText('Предварительный расчёт')).toHaveLength(1);
+    });
   });
 
   it('keeps the order economics cards for mobile next to the table', async () => {

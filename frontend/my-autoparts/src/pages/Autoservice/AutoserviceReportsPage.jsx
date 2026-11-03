@@ -165,6 +165,15 @@ function ReportField({ label, children }) {
   );
 }
 
+function EconomicsDetail({ label, children }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-ink-faint">{label}</p>
+      <p className="truncate text-xs font-semibold tabular-nums text-ink">{children}</p>
+    </div>
+  );
+}
+
 function RepairOrderLink({ orderId, orderNumber, onOpen }) {
   if (!orderId) return orderNumber || '—';
   return (
@@ -1141,8 +1150,8 @@ export default function AutoserviceReportsPage() {
                       <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
                       <th className={`w-28 whitespace-nowrap ${autoserviceListThClass}`}>Дата</th>
                       <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
-                      <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Запчасти</th>
-                      <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>ЗП</th>
+                      <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Запчасти</th>
+                      <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>Зарплата</th>
                       <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Прибыль</th>
                       <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Дебит</th>
                       <th className={`w-32 ${autoserviceListThClass}`}>Статус</th>
@@ -1189,7 +1198,7 @@ export default function AutoserviceReportsPage() {
                             <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                               {formatFinanceCurrency(row.grand_total)}
                             </td>
-                            <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>
+                            <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>
                               {formatFinanceCurrency(row.parts_cost)}
                             </td>
                             <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>
@@ -1201,31 +1210,26 @@ export default function AutoserviceReportsPage() {
                             <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums ${Number(row.remaining_amount) > 0 ? 'text-danger-600' : 'text-ink-muted'}`}>
                               {formatFinanceCurrency(row.remaining_amount)}
                             </td>
-                            <td className={`w-32 ${autoserviceListTdClass}`}>
-                              <div className="flex flex-wrap items-center gap-1">
-                                <OrderStatusBadge status={row.status} />
-                                {row.is_preliminary ? (
-                                  <span className="rounded-full bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700 ring-1 ring-inset ring-warning-100">
-                                    Предварительный расчёт
-                                  </span>
-                                ) : null}
-                              </div>
+                            <td className={`w-32 !py-1 ${autoserviceListTdClass}`}>
+                              <OrderStatusBadge status={row.status} />
                             </td>
                           </tr>
                           {isExpanded ? (
                             <tr>
                               <td colSpan={11} className="bg-surface-muted/40 px-4 py-3">
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 md:grid-cols-4">
-                                  <ReportField label="Оплачено">{formatFinanceCurrency(row.paid_amount)}</ReportField>
-                                  <ReportField label="Оплата">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 xl:grid-cols-6">
+                                  <EconomicsDetail label="Телефон">{row.client_phone || '—'}</EconomicsDetail>
+                                  <EconomicsDetail label="Оплата">
                                     {PAYMENT_STATUS_LABELS[row.payment_status] || row.payment_status}
-                                  </ReportField>
-                                  <ReportField label="Статус">
-                                    {REPAIR_ORDER_STATUS_LABELS[row.status] || row.status}
-                                  </ReportField>
-                                  <ReportField label="Телефон">{row.client_phone || '—'}</ReportField>
-                                  <ReportField label="Работ">{row.works_count}</ReportField>
-                                  <ReportField label="Позиции запчастей">{row.shop_parts_count}</ReportField>
+                                  </EconomicsDetail>
+                                  <EconomicsDetail label="Оплачено">
+                                    {formatFinanceCurrency(row.paid_amount)}
+                                  </EconomicsDetail>
+                                  <EconomicsDetail label="Работ">{row.works_count}</EconomicsDetail>
+                                  <EconomicsDetail label="Позиции запчастей">{row.shop_parts_count}</EconomicsDetail>
+                                  <EconomicsDetail label="Расчёт">
+                                    {row.is_preliminary ? 'Предварительный' : 'Фактический'}
+                                  </EconomicsDetail>
                                 </div>
                               </td>
                             </tr>
