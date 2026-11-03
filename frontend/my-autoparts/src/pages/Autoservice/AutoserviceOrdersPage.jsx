@@ -73,6 +73,23 @@ function formatMoney(value) {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+const PAYMENT_LABELS = {
+  paid: 'Оплачено',
+  partial: 'Частично оплачено',
+  unpaid: 'Не оплачено',
+};
+
+const PAYMENT_TONES = {
+  paid: 'text-success-700',
+  partial: 'text-warning-700',
+  unpaid: 'text-danger-600',
+};
+
+function paymentStatusOf(row) {
+  if (row.is_paid) return 'paid';
+  return Number(row.paid_amount) > 0 ? 'partial' : 'unpaid';
+}
+
 export default function AutoserviceOrdersPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const navigate = useNavigate();
@@ -551,6 +568,7 @@ export default function AutoserviceOrdersPage() {
               <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
               <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
+              <th className={`w-40 whitespace-nowrap ${autoserviceListThRightClass}`}>Оплата</th>
               <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Статус</th>
             </tr>
           </thead>
@@ -568,6 +586,7 @@ export default function AutoserviceOrdersPage() {
                   <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-36" /></td>
                   <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-28" /></td>
                   <td className={`w-28 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-24" /></td>
+                  <td className={`w-40 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-4 w-24" /></td>
                   <td className={`w-32 ${autoserviceListTdRightClass}`}><Skeleton className="ml-auto h-6 w-20 rounded-full" /></td>
                 </tr>
               ))
@@ -616,6 +635,7 @@ export default function AutoserviceOrdersPage() {
                       <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold text-ink`}>
                         {draftTotal != null ? `${formatMoney(draftTotal)} ₽` : '—'}
                       </td>
+                      <td className={`w-40 whitespace-nowrap ${autoserviceListTdRightClass} text-ink-faint`}>—</td>
                       <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass}`}>
                         <div className="flex items-center justify-between gap-2">
                           <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
@@ -671,6 +691,11 @@ export default function AutoserviceOrdersPage() {
                     <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold text-ink`}>
                       {formatMoney(row.grand_total)} ₽
                     </td>
+                    <td className={`w-40 whitespace-nowrap ${autoserviceListTdRightClass}`}>
+                      <span className={`text-xs font-medium ${PAYMENT_TONES[paymentStatusOf(row)]}`}>
+                        {PAYMENT_LABELS[paymentStatusOf(row)]}
+                      </span>
+                    </td>
                     <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} [&_span]:ring-0`}>
                       <RepairOrderStatusPicker
                         status={row.status}
@@ -684,7 +709,7 @@ export default function AutoserviceOrdersPage() {
                 )) : null}
                 {(viewDrafts ? filteredDrafts.length === 0 : true) && (draftOnly || rows.length === 0) ? (
                   <tr>
-                    <td colSpan={draftOnly ? 5 : 7} className="py-12 text-center text-ink-muted">
+                    <td colSpan={draftOnly ? 6 : 8} className="py-12 text-center text-ink-muted">
                       {emptyMessage}
                     </td>
                   </tr>
