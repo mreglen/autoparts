@@ -23,6 +23,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { formatDromExportMessage } from '../../utils/dromExport';
 import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
+import { buildResponsibleFilterOptions } from '../../utils/myPartsResponsibleFilter';
 import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopButton';
 import PillDropdown from '../../components/PillDropdown/PillDropdown';
 import { UnderlineTabs } from '../../components/UI';
@@ -915,13 +916,6 @@ const buildMyProductsRequest = ({ page = 1, storage, cell, cellValue, responsibl
   append,
 });
 
-const formatResponsibleLabel = (person) => {
-  if (!person) return '';
-  const initials = person.first_name ? `${person.first_name[0]}.` : '';
-  const patronymic = person.patronymic ? `${person.patronymic[0]}.` : '';
-  return `${person.last_name || ''} ${initials}${patronymic}`.trim();
-};
-
 const getModerationPartKey = (part) => `${part.moderationKind || 'pending'}-${part.id}`;
 
 function MyParts() {
@@ -1141,10 +1135,13 @@ function MyParts() {
     [activeTab, activeFilters.storage, activeFilters.cell, activeFilters.cellValue, activeFilters.responsible, activeFilters.sort, debouncedSearch, isModerationTab, stockFilter, noPhotoFilter],
   );
 
-  const responsibleOptions = useMemo(() => {
-    return [...(employees || [])]
-      .sort((a, b) => formatResponsibleLabel(a).localeCompare(formatResponsibleLabel(b), 'ru'));
-  }, [employees]);
+  const responsibleFilterOptions = useMemo(
+    () => [
+      { value: '', label: 'Ответственный' },
+      ...buildResponsibleFilterOptions(employees),
+    ],
+    [employees],
+  );
 
   const availableStorageCells = useMemo(() => {
     const storageId = activeFilters.storage;
@@ -1209,17 +1206,6 @@ function MyParts() {
       ...activeCellValueOptions.map((value) => ({ value, label: value })),
     ],
     [activeCellValueOptions, cellValuePlaceholder],
-  );
-
-  const responsibleFilterOptions = useMemo(
-    () => [
-      { value: '', label: 'Ответственный' },
-      ...responsibleOptions.map((employee) => ({
-        value: String(employee.id),
-        label: formatResponsibleLabel(employee),
-      })),
-    ],
-    [responsibleOptions],
   );
 
   const setFilterDropdownOpen = (key) => (open) => {
@@ -1965,6 +1951,14 @@ function MyParts() {
       updateActiveFilters({ cellValue: '' });
     }
   }, [activeFilters.cellValue, activeCellValueOptions]);
+
+  useEffect(() => {
+    if (!activeFilters.responsible || responsibleFilterOptions.length <= 1) return;
+    const knownUserIds = new Set(responsibleFilterOptions.map((option) => option.value));
+    if (!knownUserIds.has(String(activeFilters.responsible))) {
+      updateActiveFilters({ responsible: '' });
+    }
+  }, [activeFilters.responsible, responsibleFilterOptions]);
 
   useEffect(() => {
     if (activeTab !== 'in-stock' || !isReady || !user?.organization_id) return;
