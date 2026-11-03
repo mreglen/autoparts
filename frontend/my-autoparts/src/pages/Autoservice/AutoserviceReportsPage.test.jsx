@@ -86,6 +86,41 @@ const PAYROLL_REPORT = {
   ],
 };
 
+const ECONOMICS_REPORT = {
+  summary: {
+    count: 1,
+    revenue: 13723,
+    parts_cost: 5000,
+    payroll_total: 3000,
+    net_profit: 5723,
+    paid_amount: 0,
+    debt_amount: 13723,
+    unpaid_count: 1,
+  },
+  items: [
+    {
+      order_id: 99,
+      order_number: '99',
+      status: 'pending',
+      client_name: 'Марат Тайота',
+      client_phone: '+7 900 000-00-00',
+      vehicle: { id: 5, make: 'Toyota', model: 'Land Cruiser', year: 2018, plate: 'A099BC' },
+      scheduled_at: '2026-10-28T12:35:00',
+      grand_total: 13723,
+      parts_cost: 5000,
+      payroll_total: 3000,
+      net_profit: 5723,
+      paid_amount: 0,
+      remaining_amount: 13723,
+      is_paid: false,
+      payment_status: 'unpaid',
+      is_preliminary: true,
+      works_count: 2,
+      shop_parts_count: 3,
+    },
+  ],
+};
+
 vi.mock('../../utils/apiClient', () => ({
   apiRequest: vi.fn(),
   apiAxios: {
@@ -146,16 +181,7 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
         return Promise.resolve(ROSSKO_REPORT);
       }
       if (String(url).includes('/autoservice/reports/order-economics')) {
-        return Promise.resolve({
-          summary: {
-            count: 0,
-            revenue: 0,
-            parts_cost: 0,
-            payroll_total: 0,
-            net_profit: 0,
-          },
-          items: [],
-        });
+        return Promise.resolve(ECONOMICS_REPORT);
       }
       if (String(url).includes('/autoservice/finance/receipts')) {
         return Promise.resolve({ total_amount: 0, count: 0, items: [] });
@@ -195,6 +221,46 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
     });
     await waitFor(() => {
       expect(screen.getAllByText('31.10.2026')).toHaveLength(2);
+    });
+  });
+
+  it('renders order economics as a warehouse-style table', async () => {
+    mockSearchParams = new URLSearchParams('tab=economics');
+    renderReportsPage({ is_director: true });
+
+    const columns = await screen.findAllByRole('columnheader');
+    expect(columns.map((th) => th.textContent)).toEqual([
+      'Заказ',
+      'Клиент',
+      'Автомобиль',
+      'Дата',
+      'Сумма',
+      'Запчасти',
+      'ЗП',
+      'Прибыль',
+      'Дебит',
+      'Статус',
+    ]);
+  });
+
+  it('keeps the order economics cards for mobile next to the table', async () => {
+    mockSearchParams = new URLSearchParams('tab=economics');
+    renderReportsPage({ is_director: true });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Марат Тайота')).toHaveLength(2);
+    });
+  });
+
+  it('expands an order economics row into payment details', async () => {
+    mockSearchParams = new URLSearchParams('tab=economics');
+    renderReportsPage({ is_director: true });
+
+    const rows = await screen.findAllByRole('button', { name: /№99/ });
+    fireEvent.click(rows[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Позиции запчастей')).toBeInTheDocument();
     });
   });
 });

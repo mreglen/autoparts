@@ -1097,77 +1097,185 @@ export default function AutoserviceReportsPage() {
               description="За выбранный период и фильтры заказ-нарядов не найдено."
             />
           ) : (
-            <div className="space-y-3">
-              {economicsItems.map((row) => {
-                const isExpanded = expandedOrderId === row.order_id;
-                return (
-                  <div
-                    key={row.order_id}
-                    className="cursor-pointer rounded-sg-lg bg-surface p-4 ring-1 ring-line/80 transition hover:bg-surface-muted/80"
-                    onClick={() => toggleOrderExpand(row.order_id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        toggleOrderExpand(row.order_id);
-                      }
-                    }}
-                    tabIndex={0}
-                    role="button"
-                    aria-expanded={isExpanded}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <ExpandChevron expanded={isExpanded} className="h-4 w-4" />
-                          <RepairOrderLink
-                            orderId={row.order_id}
-                            orderNumber={row.order_number}
-                            onOpen={openOrderView}
-                          />
-                          <OrderStatusBadge status={row.status} />
-                          {row.is_preliminary ? (
-                            <span className="rounded-full bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700 ring-1 ring-inset ring-warning-100">
-                              Предварительный расчёт
+            <>
+              <div className="space-y-3 md:hidden">
+                {economicsItems.map((row) => {
+                  const isExpanded = expandedOrderId === row.order_id;
+                  return (
+                    <div
+                      key={row.order_id}
+                      className="cursor-pointer rounded-sg-lg bg-surface p-4 ring-1 ring-line/80 transition hover:bg-surface-muted/80"
+                      onClick={() => toggleOrderExpand(row.order_id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleOrderExpand(row.order_id);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-expanded={isExpanded}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <ExpandChevron expanded={isExpanded} className="h-4 w-4" />
+                            <RepairOrderLink
+                              orderId={row.order_id}
+                              orderNumber={row.order_number}
+                              onOpen={openOrderView}
+                            />
+                            <OrderStatusBadge status={row.status} />
+                            {row.is_preliminary ? (
+                              <span className="rounded-full bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700 ring-1 ring-inset ring-warning-100">
+                                Предварительный расчёт
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="truncate text-sm">
+                            <span className="text-ink">{row.client_name || '—'}</span>
+                            <span className="mx-1 text-ink-muted">·</span>
+                            <span className="text-ink-muted">{vehicleLabel(row.vehicle)}</span>
+                            <span className="mx-1 text-ink-muted">·</span>
+                            <span className="text-ink-faint">
+                              {row.scheduled_at ? formatWallClockDateTime(row.scheduled_at) : '—'}
                             </span>
-                          ) : null}
+                          </p>
                         </div>
-                        <p className="truncate text-sm">
-                          <span className="text-ink">{row.client_name || '—'}</span>
-                          <span className="mx-1 text-ink-muted">·</span>
-                          <span className="text-ink-muted">{vehicleLabel(row.vehicle)}</span>
-                          <span className="mx-1 text-ink-muted">·</span>
-                          <span className="text-ink-faint">
-                            {row.scheduled_at ? formatWallClockDateTime(row.scheduled_at) : '—'}
-                          </span>
-                        </p>
+                        <div className="shrink-0 text-right">
+                          <p className="text-lg font-semibold tabular-nums text-ink">
+                            {formatFinanceCurrency(row.grand_total)}
+                          </p>
+                          <p className={`mt-1 text-xs font-medium ${row.payment_status === 'unpaid' ? 'text-danger-600' : 'text-ink-muted'}`}>
+                            {PAYMENT_STATUS_LABELS[row.payment_status] || row.payment_status}
+                            {Number(row.remaining_amount) > 0 ? ` · ${formatFinanceCurrency(row.remaining_amount)}` : ''}
+                          </p>
+                        </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-lg font-semibold tabular-nums text-ink">
-                          {formatFinanceCurrency(row.grand_total)}
-                        </p>
-                        <p className={`mt-1 text-xs font-medium ${row.payment_status === 'unpaid' ? 'text-danger-600' : 'text-ink-muted'}`}>
-                          {PAYMENT_STATUS_LABELS[row.payment_status] || row.payment_status}
-                          {Number(row.remaining_amount) > 0 ? ` · ${formatFinanceCurrency(row.remaining_amount)}` : ''}
-                        </p>
-                      </div>
+                      {isExpanded ? (
+                        <div className="mt-3 space-y-2 border-t border-line-soft pt-3">
+                          <ReportField label="Сумма заказа">{formatFinanceCurrency(row.grand_total)}</ReportField>
+                          <ReportField label="Себестоимость запчастей">{formatFinanceCurrency(row.parts_cost)}</ReportField>
+                          <ReportField label="Зарплата мастеру">{formatFinanceCurrency(row.payroll_total)}</ReportField>
+                          <ReportField label="Чистая прибыль">{formatFinanceCurrency(row.net_profit)}</ReportField>
+                          <ReportField label="Оплачено">{formatFinanceCurrency(row.paid_amount)}</ReportField>
+                          <ReportField label="Дебит">{formatFinanceCurrency(row.remaining_amount)}</ReportField>
+                          <ReportField label="Статус">
+                            {REPAIR_ORDER_STATUS_LABELS[row.status] || row.status}
+                          </ReportField>
+                        </div>
+                      ) : null}
                     </div>
-                    {isExpanded ? (
-                      <div className="mt-3 space-y-2 border-t border-line-soft pt-3">
-                        <ReportField label="Сумма заказа">{formatFinanceCurrency(row.grand_total)}</ReportField>
-                        <ReportField label="Себестоимость запчастей">{formatFinanceCurrency(row.parts_cost)}</ReportField>
-                        <ReportField label="Зарплата мастеру">{formatFinanceCurrency(row.payroll_total)}</ReportField>
-                        <ReportField label="Чистая прибыль">{formatFinanceCurrency(row.net_profit)}</ReportField>
-                        <ReportField label="Оплачено">{formatFinanceCurrency(row.paid_amount)}</ReportField>
-                        <ReportField label="Дебит">{formatFinanceCurrency(row.remaining_amount)}</ReportField>
-                        <ReportField label="Статус">
-                          {REPAIR_ORDER_STATUS_LABELS[row.status] || row.status}
-                        </ReportField>
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+
+              <div className={autoserviceListTableWrapClass}>
+                <table className={autoserviceListTableClass}>
+                  <thead>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className={`w-10 ${autoserviceListThClass}`} aria-hidden="true" />
+                      <th className={`w-20 ${autoserviceListThClass}`}>Заказ</th>
+                      <th className={`min-w-0 ${autoserviceListThClass}`}>Клиент</th>
+                      <th className={`min-w-0 ${autoserviceListThClass}`}>Автомобиль</th>
+                      <th className={`w-28 whitespace-nowrap ${autoserviceListThClass}`}>Дата</th>
+                      <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
+                      <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Запчасти</th>
+                      <th className={`w-24 whitespace-nowrap ${autoserviceListThRightClass}`}>ЗП</th>
+                      <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Прибыль</th>
+                      <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Дебит</th>
+                      <th className={`w-32 ${autoserviceListThClass}`}>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody className={autoserviceListTbodyClass}>
+                    {economicsItems.map((row) => {
+                      const isExpanded = expandedOrderId === row.order_id;
+                      return (
+                        <Fragment key={row.order_id}>
+                          <tr
+                            className={autoserviceListTrClickableClass}
+                            onClick={() => toggleOrderExpand(row.order_id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                toggleOrderExpand(row.order_id);
+                              }
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            aria-expanded={isExpanded}
+                            aria-label={`№${row.order_number}, ${formatFinanceCurrency(row.grand_total)}`}
+                          >
+                            <td className={autoserviceListTdClass}>
+                              <ExpandChevron expanded={isExpanded} />
+                            </td>
+                            <td className={autoserviceListTdClass}>
+                              <RepairOrderLink
+                                orderId={row.order_id}
+                                orderNumber={row.order_number}
+                                onOpen={openOrderView}
+                              />
+                            </td>
+                            <td className={autoserviceListTdClass}>
+                              <div className="w-0 min-w-full truncate text-ink">{row.client_name || '—'}</div>
+                            </td>
+                            <td className={autoserviceListTdClass}>
+                              <div className="w-0 min-w-full truncate text-ink-muted">{vehicleLabel(row.vehicle)}</div>
+                            </td>
+                            <td className={`w-28 whitespace-nowrap ${autoserviceListTdClass} tabular-nums text-ink-muted`}>
+                              {row.scheduled_at ? formatWallClockDateTime(row.scheduled_at) : '—'}
+                            </td>
+                            <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                              {formatFinanceCurrency(row.grand_total)}
+                            </td>
+                            <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>
+                              {formatFinanceCurrency(row.parts_cost)}
+                            </td>
+                            <td className={`w-24 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>
+                              {formatFinanceCurrency(row.payroll_total)}
+                            </td>
+                            <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                              {formatFinanceCurrency(row.net_profit)}
+                            </td>
+                            <td className={`w-28 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums ${Number(row.remaining_amount) > 0 ? 'text-danger-600' : 'text-ink-muted'}`}>
+                              {formatFinanceCurrency(row.remaining_amount)}
+                            </td>
+                            <td className={`w-32 ${autoserviceListTdClass}`}>
+                              <div className="flex flex-wrap items-center gap-1">
+                                <OrderStatusBadge status={row.status} />
+                                {row.is_preliminary ? (
+                                  <span className="rounded-full bg-warning-50 px-2 py-0.5 text-xs font-medium text-warning-700 ring-1 ring-inset ring-warning-100">
+                                    Предварительный расчёт
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                          {isExpanded ? (
+                            <tr>
+                              <td colSpan={11} className="bg-surface-muted/40 px-4 py-3">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 md:grid-cols-4">
+                                  <ReportField label="Оплачено">{formatFinanceCurrency(row.paid_amount)}</ReportField>
+                                  <ReportField label="Оплата">
+                                    {PAYMENT_STATUS_LABELS[row.payment_status] || row.payment_status}
+                                  </ReportField>
+                                  <ReportField label="Статус">
+                                    {REPAIR_ORDER_STATUS_LABELS[row.status] || row.status}
+                                  </ReportField>
+                                  <ReportField label="Телефон">{row.client_phone || '—'}</ReportField>
+                                  <ReportField label="Работ">{row.works_count}</ReportField>
+                                  <ReportField label="Позиции запчастей">{row.shop_parts_count}</ReportField>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </>
       ) : tab === 'warehouse-stock' ? (
