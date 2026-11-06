@@ -85,6 +85,11 @@ const PAYMENT_TONES = {
   unpaid: 'text-danger-600',
 };
 
+const PAYMENT_OPTIONS = ['unpaid', 'partial', 'paid'].map((value) => ({
+  value,
+  label: PAYMENT_LABELS[value],
+}));
+
 function paymentStatusOf(row) {
   if (row.is_paid) return 'paid';
   return Number(row.paid_amount) > 0 ? 'partial' : 'unpaid';
@@ -121,6 +126,9 @@ export default function AutoserviceOrdersPage() {
   const [zoneFilter, setZoneFilter] = useState(
     () => (Array.isArray(storedFilters.zoneFilter) ? storedFilters.zoneFilter : []),
   );
+  const [paymentFilter, setPaymentFilter] = useState(
+    () => (Array.isArray(storedFilters.paymentFilter) ? storedFilters.paymentFilter : []),
+  );
   const [sort, setSort] = useState(() => ({
     by: storedFilters.sort?.by === 'scheduled_end_at' ? 'scheduled_end_at' : 'scheduled_at',
     dir: storedFilters.sort?.dir === 'asc' ? 'asc' : 'desc',
@@ -137,10 +145,18 @@ export default function AutoserviceOrdersPage() {
   const loadSeqRef = useRef(0);
   const sentinelRef = useRef(null);
 
-  const viewDrafts = statusFilter.includes(DRAFT_STATUS);
+  // У черновика нет оплаты, поэтому с фильтром по оплате он не показывается.
+  const viewDrafts = statusFilter.includes(DRAFT_STATUS) && paymentFilter.length === 0;
   const draftOnly = viewDrafts && statusFilter.length === 1;
 
-  usePersistedPageFilters(ORDERS_FILTERS_KEY, { dateFrom, dateTo, statusFilter, zoneFilter, sort });
+  usePersistedPageFilters(ORDERS_FILTERS_KEY, {
+    dateFrom,
+    dateTo,
+    statusFilter,
+    zoneFilter,
+    paymentFilter,
+    sort,
+  });
 
   const handleSort = useCallback((column) => {
     setSort((prev) => (prev.by === column
@@ -166,9 +182,12 @@ export default function AutoserviceOrdersPage() {
       if (zoneFilter.length) {
         zoneFilter.forEach((zoneId) => params.append('work_zone_id', zoneId));
       }
+      if (paymentFilter.length) {
+        paymentFilter.forEach((value) => params.append('payment', value));
+      }
       return params;
     },
-    [qApplied, statusFilter, dateFrom, dateTo, zoneFilter, sort],
+    [qApplied, statusFilter, dateFrom, dateTo, zoneFilter, paymentFilter, sort],
   );
 
   const load = useCallback(async ({ silent = false } = {}) => {
@@ -399,12 +418,16 @@ export default function AutoserviceOrdersPage() {
       ? 'Ничего не найдено'
       : 'Заказ-нарядов нет';
   const filtersActive =
-    Boolean(dateFrom || dateTo) || zoneFilter.length > 0 || !isDefaultStatusFilter(statusFilter);
+    Boolean(dateFrom || dateTo)
+    || zoneFilter.length > 0
+    || paymentFilter.length > 0
+    || !isDefaultStatusFilter(statusFilter);
   const resetFilters = () => {
     setDateFrom('');
     setDateTo('');
     setStatusFilter(DEFAULT_STATUS_FILTER);
     setZoneFilter([]);
+    setPaymentFilter([]);
   };
 
   return (
@@ -439,6 +462,9 @@ export default function AutoserviceOrdersPage() {
           workZones={workZones}
           zoneFilter={zoneFilter}
           onZoneFilterChange={setZoneFilter}
+          paymentOptions={PAYMENT_OPTIONS}
+          paymentFilter={paymentFilter}
+          onPaymentFilterChange={setPaymentFilter}
           filtersActive={filtersActive}
           onResetFilters={resetFilters}
         />
@@ -527,6 +553,16 @@ export default function AutoserviceOrdersPage() {
                 options={buildOrderZoneFilterOptions(workZones)}
                 placeholder="Все зоны"
                 ariaLabel="Фильтр по рабочей зоне"
+              />
+            </div>
+            <div className="w-44 min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-ink-muted">Оплата</span>
+              <PillMultiSelect
+                values={paymentFilter}
+                onChange={setPaymentFilter}
+                options={PAYMENT_OPTIONS}
+                placeholder="Любая оплата"
+                ariaLabel="Фильтр по статусу оплаты"
               />
             </div>
             {filtersActive ? (

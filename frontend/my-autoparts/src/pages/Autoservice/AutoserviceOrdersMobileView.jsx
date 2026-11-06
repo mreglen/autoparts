@@ -133,6 +133,9 @@ export default function AutoserviceOrdersMobileView({
   workZones = [],
   zoneFilter = [],
   onZoneFilterChange,
+  paymentOptions = [],
+  paymentFilter = [],
+  onPaymentFilterChange,
   filtersActive = false,
   onResetFilters,
 }) {
@@ -217,6 +220,17 @@ export default function AutoserviceOrdersMobileView({
                 options={buildOrderZoneFilterOptions(workZones)}
                 placeholder="Все зоны"
                 ariaLabel="Фильтр по рабочей зоне"
+                triggerClassName="h-11 text-base"
+              />
+            </label>
+            <label className="block w-full min-w-0">
+              <span className="mb-1.5 block text-xs font-medium text-gray-500">Оплата</span>
+              <PillMultiSelect
+                values={paymentFilter}
+                onChange={onPaymentFilterChange}
+                options={paymentOptions}
+                placeholder="Любая оплата"
+                ariaLabel="Фильтр по статусу оплаты"
                 triggerClassName="h-11 text-base"
               />
             </label>

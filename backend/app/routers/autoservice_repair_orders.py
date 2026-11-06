@@ -97,6 +97,7 @@ from app.services.autoservice_contractor_payouts import (
     clear_order_contractor_payouts,
 )
 from app.services.autoservice_vat import DEFAULT_VAT_RATE, get_org_vat_rate
+from app.services.autoservice_order_economics import _payment_status
 from app.services.autoservice_payment_service import (
     batch_paid_amounts,
     create_repair_order_payment,
@@ -143,6 +144,7 @@ router = APIRouter(tags=["Autoservice repair orders"])
 
 _TWOPLACES = Decimal("0.01")
 _THREEPLACES = Decimal("0.001")
+PAYMENT_STATUSES = ("unpaid", "partial", "paid")
 
 
 def _money(value: Decimal | int | float | str) -> Decimal:
@@ -417,6 +419,11 @@ def _order_grand_total(row: RepairOrder) -> Decimal:
     shop_total = _money(sum((p.line_sum for p in shop), Decimal("0.00")))
     deliveries_total = _money(sum((d.price for d in deliveries), Decimal("0.00")))
     return _money((works_total + shop_total + deliveries_total) * _discount_factor(row))
+
+
+def _payment_status_of(row: RepairOrder, paid_amount: Decimal) -> str:
+    remaining = _money(max(Decimal("0.00"), _order_grand_total(row) - paid_amount))
+    return _payment_status(paid_amount, remaining)
 
 
 def _to_staff_view(
@@ -1613,6 +1620,7 @@ def list_repair_orders(
     status_filter: list[str] | None = Query(None, alias="status"),
     client_id: int | None = Query(None),
     work_zone_id: list[str] | None = Query(None),
+    payment_filter: list[str] | None = Query(None, alias="payment"),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
@@ -1702,20 +1710,36 @@ def list_repair_orders(
     if date_to:
         query = query.filter(func.date(RepairOrder.scheduled_at) <= date_to)
     query = _apply_search_filter(query, q)
-    total = query.order_by(None).count()
+    if payment_filter and any(value not in PAYMENT_STATUSES for value in payment_filter):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Недопустимый статус оплаты",
+        )
     sort_column = (
         RepairOrder.scheduled_end_at
         if sort_by == "scheduled_end_at"
         else RepairOrder.scheduled_at
     )
     direction = sort_column.desc() if sort_dir == "desc" else sort_column.asc()
-    rows = (
-        query.order_by(direction.nulls_last(), RepairOrder.id.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
-    paid_map = batch_paid_amounts(db, [row.id for row in rows])
+    ordered = query.order_by(direction.nulls_last(), RepairOrder.id.desc())
+    if payment_filter:
+        # grand_total считается только на Python, поэтому по оплате отбираем после расчёта,
+        # а страницу срезаем уже из подходящих заказов.
+        candidates = ordered.all()
+        candidate_paid = batch_paid_amounts(db, [row.id for row in candidates])
+        matched = [
+            row
+            for row in candidates
+            if _payment_status_of(row, candidate_paid.get(row.id, Decimal("0.00")))
+            in payment_filter
+        ]
+        total = len(matched)
+        rows = matched[offset: offset + limit]
+        paid_map = {row.id: candidate_paid.get(row.id, Decimal("0.00")) for row in rows}
+    else:
+        total = ordered.order_by(None).count()
+        rows = ordered.offset(offset).limit(limit).all()
+        paid_map = batch_paid_amounts(db, [row.id for row in rows])
     items = [
         _to_staff_view(
             db,
