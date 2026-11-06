@@ -273,4 +273,66 @@ describe('AutoserviceReportsPage Rossko sales tab', () => {
       expect(screen.getByText('Позиции запчастей')).toBeInTheDocument();
     });
   });
+
+  it('hides the economics period and status pills behind the filters button', async () => {
+    mockSearchParams = new URLSearchParams('tab=economics');
+    renderReportsPage({ is_director: true });
+
+    const filtersButton = await screen.findByRole('button', { name: 'Фильтры' });
+    expect(filtersButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByLabelText('Период с')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Отменён' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Дебит' })).not.toBeInTheDocument();
+
+    fireEvent.click(filtersButton);
+
+    expect(filtersButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Период с')).toBeInTheDocument();
+    expect(screen.getByLabelText('Период по')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Отменён' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Дебит' })).toBeInTheDocument();
+  });
+
+  it('keeps the Excel export in the toolbar row next to the filters button', async () => {
+    mockSearchParams = new URLSearchParams('tab=economics');
+    renderReportsPage({ is_director: true });
+
+    const exportButton = await screen.findByRole('button', { name: 'Экспорт в Excel' });
+
+    expect(screen.getAllByRole('button', { name: 'Экспорт в Excel' })).toHaveLength(1);
+    expect(exportButton.parentElement).toContainElement(screen.getByRole('button', { name: 'Фильтры' }));
+  });
+
+  it('hides the warehouse stock month and zero-quantity switch behind the filters button', async () => {
+    mockSearchParams = new URLSearchParams('tab=warehouse-stock');
+    renderReportsPage();
+
+    const filtersButton = await screen.findByRole('button', { name: 'Фильтры' });
+    expect(screen.queryByLabelText('Месяц')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Скрыть нулевые остатки')).not.toBeInTheDocument();
+
+    fireEvent.click(filtersButton);
+
+    expect(screen.getByLabelText('Месяц')).toBeInTheDocument();
+    expect(screen.getByLabelText('Скрыть нулевые остатки')).toBeInTheDocument();
+  });
+
+  it('puts the warehouse stock Excel export in the same toolbar row', async () => {
+    mockSearchParams = new URLSearchParams('tab=warehouse-stock');
+    renderReportsPage();
+
+    const exportButton = await screen.findByRole('button', { name: 'Экспорт в Excel' });
+
+    expect(exportButton.parentElement).toContainElement(screen.getByRole('button', { name: 'Фильтры' }));
+  });
+
+  it('keeps the payroll Excel export in the toolbar row', async () => {
+    mockSearchParams = new URLSearchParams('tab=payroll');
+    renderReportsPage({ is_director: true });
+
+    const exportButton = await screen.findByRole('button', { name: 'Экспорт в Excel' });
+
+    expect(screen.queryByRole('button', { name: 'Фильтры' })).not.toBeInTheDocument();
+    expect(exportButton.parentElement).toContainElement(screen.getByLabelText('Месяц'));
+  });
 });

@@ -10,7 +10,6 @@ import {
 } from '../Finance/financeDisplay';
 import { formatServerDate, formatServerDateTime, formatWallClockDateTime } from '../../utils/serverDate';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
-import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import {
   EmptyState,
   PageHeader,
@@ -19,6 +18,7 @@ import {
 } from '../../components/UI';
 import {
   warehouseEmptyShellClass,
+  warehousePillButtonClass,
   warehousePillControlClass,
   warehousePrimaryButtonClass,
   warehouseToolbarClass,
@@ -85,6 +85,57 @@ const tabFilterButtonClass = (active) =>
       ? 'bg-surface text-ink shadow-sm ring-1 ring-line'
       : 'text-ink-muted hover:bg-surface/60 hover:text-ink'
   }`;
+
+// Экспорт на всех вкладках стоит в одном месте — справа в строке тулбара.
+const reportsExportButtonClass = `${warehousePrimaryButtonClass} ml-auto shrink-0`;
+
+const reportsFiltersButtonClass = (open) =>
+  `${warehousePillButtonClass} shrink-0 ${
+    open ? 'bg-surface text-ink shadow-sm ring-2 ring-brand-400/60' : ''
+  }`;
+
+function ReportsToolbar({ children }) {
+  return <div className="flex flex-wrap items-center gap-2">{children}</div>;
+}
+
+function ReportsToolbarSlot({ children }) {
+  return <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">{children}</div>;
+}
+
+function ReportsFiltersButton({ open, onToggle }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className={reportsFiltersButtonClass(open)}
+    >
+      Фильтры
+      <svg
+        className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        aria-hidden="true"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  );
+}
+
+function ReportsExportButton({ onClick, busy, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={reportsExportButtonClass}
+    >
+      {busy ? 'Формируем файл…' : 'Экспорт в Excel'}
+    </button>
+  );
+}
 
 const EMPTY_WAREHOUSE_STOCK = {
   summary: {
@@ -269,6 +320,7 @@ export default function AutoserviceReportsPage() {
   const defaults = useMemo(() => getMonthRangeDefaults(), []);
   const todayDate = useMemo(() => getFinanceTodayDate(), []);
   const [storedFilters] = useState(() => readPageFilters(REPORTS_FILTERS_KEY));
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState(() => (
     clampFinanceDate(storedFilters.dateFrom || defaults.dateFrom, todayDate)
   ));
@@ -669,6 +721,8 @@ export default function AutoserviceReportsPage() {
     setExpandedRosskoOrderId((prev) => (prev === orderId ? null : orderId));
   };
 
+  const toggleFilters = () => setFiltersOpen((prev) => !prev);
+
   const payrollOrderCount = payrollRows.reduce((sum, row) => sum + Number(row.completed_orders || 0), 0);
 
   return (
@@ -737,21 +791,20 @@ export default function AutoserviceReportsPage() {
 
       {tab === 'payroll' ? (
         <>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <MonthPickerField
-              value={monthValue}
-              onChange={(e) => setMonthValue(e.target.value || currentMonthValue())}
-              className={warehousePillControlClass}
-            />
-            <button
-              type="button"
+          <ReportsToolbar>
+            <ReportsToolbarSlot>
+              <MonthPickerField
+                value={monthValue}
+                onChange={(e) => setMonthValue(e.target.value || currentMonthValue())}
+                className={warehousePillControlClass}
+              />
+            </ReportsToolbarSlot>
+            <ReportsExportButton
               onClick={exportPayroll}
+              busy={payrollExporting}
               disabled={payrollExporting || payrollLoading}
-              className={`${warehousePrimaryButtonClass} w-full shrink-0 sm:w-auto`}
-            >
-              {payrollExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
-            </button>
-          </div>
+            />
+          </ReportsToolbar>
 
           {payrollError ? (
             <div className="rounded-sg bg-danger-50 px-4 py-3 text-sm text-danger-700">{payrollError}</div>
@@ -940,90 +993,93 @@ export default function AutoserviceReportsPage() {
         </>
       ) : tab === 'economics' ? (
         <>
-          <MobileCollapsibleFilters title="Фильтры">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="block min-w-0">
-                  <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    max={dateTo < todayDate ? dateTo : todayDate}
-                    onChange={(e) => {
-                      const next = clampFinanceDate(e.target.value, todayDate);
-                      setDateFrom(next);
-                      if (next > dateTo) setDateTo(next);
-                    }}
-                    className={warehousePillControlClass}
-                  />
-                </label>
-                <label className="block min-w-0">
-                  <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    min={dateFrom}
-                    max={todayDate}
-                    onChange={(e) => {
-                      const next = clampFinanceDate(e.target.value, todayDate);
-                      setDateTo(next);
-                      if (next < dateFrom) setDateFrom(next);
-                    }}
-                    className={warehousePillControlClass}
-                  />
-                </label>
-              </div>
-              <AutoserviceLiveSearchField
-                value={economicsSearchInput}
-                onChange={setEconomicsSearchInput}
-                placeholder="Номер, клиент, авто, VIN, госномер"
-                ariaLabel="Поиск заказ-нарядов"
+          <div className="space-y-4">
+            <ReportsToolbar>
+              <ReportsToolbarSlot>
+                <AutoserviceLiveSearchField
+                  value={economicsSearchInput}
+                  onChange={setEconomicsSearchInput}
+                  placeholder="Номер, клиент, авто, VIN, госномер"
+                  ariaLabel="Поиск заказ-нарядов"
+                />
+              </ReportsToolbarSlot>
+              <ReportsFiltersButton open={filtersOpen} onToggle={toggleFilters} />
+              <ReportsExportButton
+                onClick={exportEconomics}
+                busy={economicsExporting}
+                disabled={economicsExporting || economicsLoading}
               />
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-ink-muted">Статус</p>
-                <div className={`${warehouseToolbarClass} flex-wrap`}>
-                  {ECONOMICS_STATUS_FILTERS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={tabFilterButtonClass(economicsStatus === item.id)}
-                      onClick={() => setEconomicsStatus(item.id)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-ink-muted">Оплата</p>
-                <div className={`${warehouseToolbarClass} flex-wrap`}>
-                  {ECONOMICS_PAYMENT_FILTERS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={tabFilterButtonClass(economicsPayment === item.id)}
-                      onClick={() => setEconomicsPayment(item.id)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </MobileCollapsibleFilters>
+            </ReportsToolbar>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {filtersOpen ? (
+              <>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="block min-w-0">
+                    <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      max={dateTo < todayDate ? dateTo : todayDate}
+                      onChange={(e) => {
+                        const next = clampFinanceDate(e.target.value, todayDate);
+                        setDateFrom(next);
+                        if (next > dateTo) setDateTo(next);
+                      }}
+                      className={warehousePillControlClass}
+                    />
+                  </label>
+                  <label className="block min-w-0">
+                    <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период по</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom}
+                      max={todayDate}
+                      onChange={(e) => {
+                        const next = clampFinanceDate(e.target.value, todayDate);
+                        setDateTo(next);
+                        if (next < dateFrom) setDateFrom(next);
+                      }}
+                      className={warehousePillControlClass}
+                    />
+                  </label>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-ink-muted">Статус</p>
+                  <div className={`${warehouseToolbarClass} flex-wrap`}>
+                    {ECONOMICS_STATUS_FILTERS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={tabFilterButtonClass(economicsStatus === item.id)}
+                        onClick={() => setEconomicsStatus(item.id)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-ink-muted">Оплата</p>
+                  <div className={`${warehouseToolbarClass} flex-wrap`}>
+                    {ECONOMICS_PAYMENT_FILTERS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={tabFilterButtonClass(economicsPayment === item.id)}
+                        onClick={() => setEconomicsPayment(item.id)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : null}
+
             <p className="text-sm text-ink-muted">
               {economicsSummary.count ?? 0} заказ-наряд{economicsSummary.count === 1 ? '' : economicsSummary.count >= 2 && economicsSummary.count <= 4 ? 'а' : 'ов'} за период
             </p>
-            <button
-              type="button"
-              onClick={exportEconomics}
-              disabled={economicsExporting || economicsLoading}
-              className={`${warehousePrimaryButtonClass} w-full shrink-0 sm:w-auto`}
-            >
-              {economicsExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
-            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -1245,44 +1301,47 @@ export default function AutoserviceReportsPage() {
         </>
       ) : tab === 'warehouse-stock' ? (
         <>
-          <MobileCollapsibleFilters title="Фильтры">
-            <div className="space-y-4">
-              <MonthPickerField
-                value={monthValue}
-                onChange={(e) => setMonthValue(e.target.value || currentMonthValue())}
-                className={warehousePillControlClass}
-              />
-              <AutoserviceLiveSearchField
-                value={warehouseStockSearchInput}
-                onChange={setWarehouseStockSearchInput}
-                placeholder="Бренд, артикул, наименование"
-                loading={warehouseStockLoading}
-              />
-              <label className="inline-flex items-center gap-2 text-sm text-ink-soft">
-                <input
-                  type="checkbox"
-                  checked={warehouseStockHideZero}
-                  onChange={(e) => setWarehouseStockHideZero(e.target.checked)}
-                  className="rounded border-line-strong text-brand-600 focus:ring-brand-500"
+          <div className="space-y-4">
+            <ReportsToolbar>
+              <ReportsToolbarSlot>
+                <AutoserviceLiveSearchField
+                  value={warehouseStockSearchInput}
+                  onChange={setWarehouseStockSearchInput}
+                  placeholder="Бренд, артикул, наименование"
+                  ariaLabel="Поиск складских остатков"
                 />
-                Скрыть нулевые остатки
-              </label>
-            </div>
-          </MobileCollapsibleFilters>
+              </ReportsToolbarSlot>
+              <ReportsFiltersButton open={filtersOpen} onToggle={toggleFilters} />
+              <ReportsExportButton
+                onClick={exportWarehouseStock}
+                busy={warehouseStockExporting}
+                disabled={warehouseStockExporting || warehouseStockLoading}
+              />
+            </ReportsToolbar>
 
-          <div className={`${warehouseToolbarClass} flex-wrap`}>
+            {filtersOpen ? (
+              <>
+                <MonthPickerField
+                  value={monthValue}
+                  onChange={(e) => setMonthValue(e.target.value || currentMonthValue())}
+                  className={warehousePillControlClass}
+                />
+                <label className="inline-flex items-center gap-2 text-sm text-ink-soft">
+                  <input
+                    type="checkbox"
+                    checked={warehouseStockHideZero}
+                    onChange={(e) => setWarehouseStockHideZero(e.target.checked)}
+                    className="rounded border-line-strong text-brand-600 focus:ring-brand-500"
+                  />
+                  Скрыть нулевые остатки
+                </label>
+              </>
+            ) : null}
+
             <p className="text-sm text-ink-muted">
               {warehouseStockItems.length} позиц{warehouseStockItems.length === 1 ? 'ия' : warehouseStockItems.length >= 2 && warehouseStockItems.length <= 4 ? 'ии' : 'ий'}
               {warehouseStock.as_of ? ` · на ${warehouseStock.as_of}` : ''}
             </p>
-            <button
-              type="button"
-              className={warehousePrimaryButtonClass}
-              disabled={warehouseStockExporting || warehouseStockLoading}
-              onClick={exportWarehouseStock}
-            >
-              {warehouseStockExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
-            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -1396,8 +1455,25 @@ export default function AutoserviceReportsPage() {
         </>
       ) : tab === 'rossko-sales' ? (
         <>
-          <MobileCollapsibleFilters title="Фильтры">
-            <div className="space-y-4">
+          <div className="space-y-4">
+            <ReportsToolbar>
+              <ReportsToolbarSlot>
+                <AutoserviceLiveSearchField
+                  value={rosskoSalesSearchInput}
+                  onChange={setRosskoSalesSearchInput}
+                  placeholder="Заказ, Росско №, покупатель, запчасть"
+                  ariaLabel="Поиск продаж Росско"
+                />
+              </ReportsToolbarSlot>
+              <ReportsFiltersButton open={filtersOpen} onToggle={toggleFilters} />
+              <ReportsExportButton
+                onClick={exportRosskoSales}
+                busy={rosskoSalesExporting}
+                disabled={rosskoSalesExporting || rosskoSalesLoading}
+              />
+            </ReportsToolbar>
+
+            {filtersOpen ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="block min-w-0">
                   <span className="mt-1.5 mb-1.5 block text-xs font-medium text-ink-muted">Период с</span>
@@ -1429,27 +1505,11 @@ export default function AutoserviceReportsPage() {
                   />
                 </label>
               </div>
-              <AutoserviceLiveSearchField
-                value={rosskoSalesSearchInput}
-                onChange={setRosskoSalesSearchInput}
-                placeholder="Заказ, Росско №, покупатель, запчасть"
-                ariaLabel="Поиск продаж Росско"
-              />
-            </div>
-          </MobileCollapsibleFilters>
+            ) : null}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-ink-muted">
               {rosskoSalesSummary.count ?? 0} операц{(rosskoSalesSummary.count ?? 0) === 1 ? 'ия' : (rosskoSalesSummary.count ?? 0) >= 2 && (rosskoSalesSummary.count ?? 0) <= 4 ? 'ии' : 'ий'} за период
             </p>
-            <button
-              type="button"
-              onClick={exportRosskoSales}
-              disabled={rosskoSalesExporting || rosskoSalesLoading}
-              className={`${warehousePrimaryButtonClass} w-full shrink-0 sm:w-auto`}
-            >
-              {rosskoSalesExporting ? 'Формируем файл…' : 'Экспорт в Excel'}
-            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
