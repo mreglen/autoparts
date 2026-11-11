@@ -1079,6 +1079,80 @@ def ensure_seo_new_part_url_exports_table() -> None:
     logger.info("Created seo_new_part_url_exports table")
 
 
+def ensure_autoservice_expenses_table() -> None:
+    """Create autoservice_expenses table for expense tracking."""
+    inspector = inspect(engine)
+    if "autoservice_expenses" in inspector.get_table_names():
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE autoservice_expenses (
+                        id SERIAL PRIMARY KEY,
+                        organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                        type VARCHAR(32) NOT NULL,
+                        amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                        expense_date DATE NOT NULL,
+                        description VARCHAR(255),
+                        employee_id INTEGER REFERENCES autoservice_service_employees(id) ON DELETE SET NULL,
+                        created_by_user_id INTEGER NOT NULL REFERENCES users(id),
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+                        deleted_at TIMESTAMPTZ,
+                        deleted_by_user_id INTEGER REFERENCES users(id)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text("CREATE INDEX ix_autoservice_expenses_organization_id ON autoservice_expenses (organization_id)")
+            )
+            conn.execute(
+                text("CREATE INDEX ix_autoservice_expenses_employee_id ON autoservice_expenses (employee_id)")
+            )
+            conn.execute(
+                text("CREATE INDEX ix_autoservice_expenses_expense_date ON autoservice_expenses (expense_date)")
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE autoservice_expenses (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                        type VARCHAR(32) NOT NULL,
+                        amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                        expense_date DATE NOT NULL,
+                        description VARCHAR(255),
+                        employee_id INTEGER REFERENCES autoservice_service_employees(id),
+                        created_by_user_id INTEGER NOT NULL REFERENCES users(id),
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        is_deleted BOOLEAN NOT NULL DEFAULT 0,
+                        deleted_at DATETIME,
+                        deleted_by_user_id INTEGER REFERENCES users(id)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text("CREATE INDEX ix_autoservice_expenses_organization_id ON autoservice_expenses (organization_id)")
+            )
+            conn.execute(
+                text("CREATE INDEX ix_autoservice_expenses_employee_id ON autoservice_expenses (employee_id)")
+            )
+            conn.execute(
+                text("CREATE INDEX ix_autoservice_expenses_expense_date ON autoservice_expenses (expense_date)")
+            )
+
+    logger.info("Created autoservice_expenses table")
+
+
 def ensure_seo_sitemap_cache_table() -> None:
     """Table storing cached product sitemap XML."""
     inspector = inspect(engine)

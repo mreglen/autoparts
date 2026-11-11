@@ -435,7 +435,9 @@ function WorkAssignPicker({
   onAddEmployee,
   onToggleContractor,
   onAmountChange,
+  onAddContractor,
 }) {
+  const [activeTab, setActiveTab] = useState('employees');
   const [employeeQuery, setEmployeeQuery] = useState('');
   const [contractorQuery, setContractorQuery] = useState('');
   const executors = work?.executors || [];
@@ -468,115 +470,146 @@ function WorkAssignPicker({
     0,
   );
 
+  const tabs = [
+    { id: 'employees', label: 'Сотрудники', count: executors.length },
+    { id: 'contractors', label: 'Подрядчики', count: assignedContractors.length },
+  ];
+
   return (
     <div className="space-y-4">
-      <AssignSection title="Сотрудники" selectedCount={executors.length}>
-        <input
-          type="text"
-          value={employeeQuery}
-          onChange={(e) => setEmployeeQuery(e.target.value)}
-          placeholder="Поиск сотрудника…"
-          className="sg-pill-input sg-pill-input-sm w-full"
-        />
-        {employeesFiltered.length === 0 ? (
-          <p className="text-sm text-ink-muted">{employeeQuery.trim() ? 'Не найдено' : 'Нет сотрудников'}</p>
-        ) : (
-          <div className="divide-y divide-line-soft">
-            {employeesFiltered.map((emp) => {
-              const ex = checkedById.get(String(emp.id));
-              const checked = Boolean(ex);
-              return (
-                <div key={emp.id} className="flex min-w-0 items-center gap-2 py-2">
-                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => onToggle(emp.id)}
-                      className="h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
-                    />
-                    <span className="min-w-0 truncate text-sm text-ink">{emp.name}</span>
-                  </label>
-                  {checked ? (
-                    <>
-                      <NumericInput
-                        mode="numeric"
-                        className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center ${overLimit ? 'border-danger-600 text-danger-600' : ''}`}
-                        value={ex.percent}
-                        aria-label="Процент оплаты"
-                        onChange={(e) => onPercentChange(emp.id, e.target.value)}
-                      />
-                      <span className="shrink-0 text-xs text-ink-muted">%</span>
-                      <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
-                        {formatMoney(workPayAmount(work?.qty, work?.unit_price, ex.percent))} ₽
-                      </span>
-                    </>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {executors.length > 0 ? (
-          <p className={`text-xs ${overLimit ? 'font-medium text-danger-600' : 'text-ink-muted'}`}>
-            Всего {formatMoney(totalPercent)}%
-            {overLimit ? ' — сумма процентов не может превышать 100%' : ` · доступно ещё ${formatMoney(Math.max(0, 100 - totalPercent))}%`}
-          </p>
-        ) : null}
-        <SectionAddLink onClick={onAddEmployee} label="+ Сотрудник" />
-      </AssignSection>
+      <div className="flex gap-2 border-b border-line-soft pb-2">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-3 py-1.5 text-sm font-medium transition ${
+              activeTab === tab.id
+                ? 'text-brand-600 border-b-2 border-brand-600'
+                : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            {tab.label}
+            {tab.count > 0 ? ` (${tab.count})` : ''}
+          </button>
+        ))}
+      </div>
 
-      <AssignSection title="Подрядчики" selectedCount={assignedContractors.length}>
-        <input
-          type="text"
-          value={contractorQuery}
-          onChange={(e) => setContractorQuery(e.target.value)}
-          placeholder="Поиск подрядчика…"
-          className="sg-pill-input sg-pill-input-sm w-full"
-        />
-        {contractorsFiltered.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            {contractorQuery.trim() ? 'Не найдено' : 'Подрядчики не добавлены'}
-          </p>
-        ) : (
-          <div className="divide-y divide-line-soft">
-            {contractorsFiltered.map((row) => {
-              const assigned = contractorById.get(String(row.id));
-              const checked = Boolean(assigned);
-              return (
-                <div key={row.id} className="flex min-w-0 items-center gap-2 py-2">
-                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => onToggleContractor(row.id)}
-                      className="h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
-                    />
-                    <span className="min-w-0 truncate text-sm text-ink">{row.name}</span>
-                  </label>
-                  {checked ? (
-                    <>
-                      <NumericInput
-                        mode="decimal"
-                        className={`w-24 shrink-0 ${compactControlInputClass} px-1.5 text-right`}
-                        value={assigned.amount}
-                        placeholder="0"
-                        aria-label="Сумма подрядчику"
-                        onChange={(e) => onAmountChange(row.id, e.target.value)}
+      {activeTab === 'employees' ? (
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={employeeQuery}
+            onChange={(e) => setEmployeeQuery(e.target.value)}
+            placeholder="Поиск сотрудника…"
+            className="sg-pill-input sg-pill-input-sm w-full"
+          />
+          {employeesFiltered.length === 0 ? (
+            <p className="text-sm text-ink-muted">{employeeQuery.trim() ? 'Не найдено' : 'Нет сотрудников'}</p>
+          ) : (
+            <div className="divide-y divide-line-soft">
+              {employeesFiltered.map((emp) => {
+                const ex = checkedById.get(String(emp.id));
+                const checked = Boolean(ex);
+                return (
+                  <div key={emp.id} className="flex min-w-0 items-center gap-2 py-2">
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggle(emp.id)}
+                        className="h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
                       />
-                      <span className="shrink-0 text-xs text-ink-muted">₽</span>
-                    </>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {assignedContractors.length > 0 ? (
-          <p className="text-xs text-ink-muted">
-            Всего подрядчикам {formatMoney(contractorTotal)} ₽ — фиксированные суммы, проценты сотрудников они не уменьшают
-          </p>
-        ) : null}
-      </AssignSection>
+                      <span className="min-w-0 truncate text-sm text-ink">{emp.name}</span>
+                    </label>
+                    {checked ? (
+                      <>
+                        <NumericInput
+                          mode="numeric"
+                          className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center ${overLimit ? 'border-danger-600 text-danger-600' : ''}`}
+                          value={ex.percent}
+                          aria-label="Процент оплаты"
+                          onChange={(e) => onPercentChange(emp.id, e.target.value)}
+                        />
+                        <span className="shrink-0 text-xs text-ink-muted">%</span>
+                        <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
+                          {formatMoney(workPayAmount(work?.qty, work?.unit_price, ex.percent))} ₽
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {executors.length > 0 ? (
+            <p className={`text-xs ${overLimit ? 'font-medium text-danger-600' : 'text-ink-muted'}`}>
+              Всего {formatMoney(totalPercent)}%
+              {overLimit ? ' — сумма процентов не может превышать 100%' : ` · доступно ещё ${formatMoney(Math.max(0, 100 - totalPercent))}%`}
+            </p>
+          ) : null}
+          <SectionAddLink onClick={onAddEmployee} label="+ Сотрудник" />
+        </div>
+      ) : null}
+
+      {activeTab === 'contractors' ? (
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={contractorQuery}
+            onChange={(e) => setContractorQuery(e.target.value)}
+            placeholder="Поиск подрядчика…"
+            className="sg-pill-input sg-pill-input-sm w-full"
+          />
+          {contractorsFiltered.length === 0 ? (
+            <p className="text-sm text-ink-muted">
+              {contractorQuery.trim() ? 'Не найдено' : 'Подрядчики не добавлены'}
+            </p>
+          ) : (
+            <div className="divide-y divide-line-soft">
+              {contractorsFiltered.map((row) => {
+                const assigned = contractorById.get(String(row.id));
+                const checked = Boolean(assigned);
+                return (
+                  <div key={row.id} className="flex min-w-0 items-center gap-2 py-2">
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggleContractor(row.id)}
+                        className="h-4 w-4 shrink-0 rounded border-line text-brand-600 focus:ring-brand-500"
+                      />
+                      <span className="min-w-0 truncate text-sm text-ink">{row.name}</span>
+                    </label>
+                    {checked ? (
+                      <>
+                        <NumericInput
+                          mode="numeric"
+                          className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center`}
+                          value={assigned.percent || 0}
+                          placeholder="0"
+                          aria-label="Процент подрядчику"
+                          onChange={(e) => onAmountChange(row.id, e.target.value)}
+                        />
+                        <span className="shrink-0 text-xs text-ink-muted">%</span>
+                        <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
+                          {formatMoney(workPayAmount(work?.qty, work?.unit_price, assigned.percent || 0))} ₽
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {assignedContractors.length > 0 ? (
+            <p className="text-xs text-ink-muted">
+              Всего подрядчикам {formatMoney(contractorTotal)}%
+            </p>
+          ) : null}
+          <SectionAddLink onClick={onAddContractor} label="+ Подрядчик" />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -8,8 +8,9 @@ import {
 } from '../Finance/financeDisplay';
 import { formatServerDateTime } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
-import { Button, ConfirmDialog, Modal, Skeleton } from '../../components/UI';
+import { Button, ConfirmDialog, Modal, Skeleton, UnderlineTabs } from '../../components/UI';
 import RepairOrderViewModal from '../../components/Autoservice/RepairOrderViewModal';
+import AutoserviceExpenseModal from '../../components/Autoservice/AutoserviceExpenseModal';
 import Toast from '../../components/UI/Toast';
 import { MOBILE_PULL_REFRESH_EVENT } from '../../utils/mobileRouteRefresh';
 import { readPageFilters, usePersistedPageFilters } from '../../utils/pageFilterStorage';
@@ -29,9 +30,15 @@ import {
   warehouseEmptyShellClass,
   warehousePillControlClass,
   warehouseToolbarClass,
+  autoserviceListPrimaryButtonClass,
 } from '../../utils/warehouseListUi';
 
 const FINANCE_FILTERS_KEY = 'autoservice-finance';
+
+const TABS = [
+  { id: 'receipts', label: 'Поступления' },
+  { id: 'expenses', label: 'Расходы' },
+];
 
 const ALL_METHODS = [
   { id: 'all', label: 'Все' },
@@ -168,6 +175,92 @@ function PaymentReceiptDateField({ row, todayDate, saving, onSave }) {
   );
 }
 
+function FinanceExpenseRows({ rows, onOpen, emptyText = 'Нет расходов за период' }) {
+  if (!rows.length) {
+    return (
+      <p className={`${warehouseEmptyShellClass} text-sm text-ink-muted`}>
+        {emptyText}
+      </p>
+    );
+  }
+
+  const formatExpenseDate = (dateStr) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  return (
+    <>
+      <div className="md:hidden divide-y divide-line-soft">
+        {rows.map((row) => (
+          <div
+            role="button"
+            tabIndex={0}
+            key={row.id}
+            onClick={() => onOpen(row)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpen(row); }}
+            className="block w-full cursor-pointer py-2.5 text-left transition hover:bg-surface-muted/50"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate text-sm font-semibold text-ink">
+                {row.type_label || row.type}
+              </span>
+              <span className="shrink-0 text-sm font-bold tabular-nums text-ink">
+                {formatFinanceCurrency(row.amount)}
+              </span>
+            </div>
+            <div className="mt-0.5 flex items-center justify-between gap-3">
+              <span className="min-w-0 truncate text-xs text-ink-muted">
+                {formatExpenseDate(row.expense_date)}
+                {row.employee_name ? ` · ${row.employee_name}` : ''}
+              </span>
+              <span className="min-w-0 truncate text-xs text-ink-muted">
+                {row.created_by_name}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className={autoserviceListTableWrapClass}>
+        <table className={autoserviceListTableClass}>
+          <thead>
+            <tr className={autoserviceListTheadRowClass}>
+              <th className={`w-32 ${autoserviceListThClass}`}>Дата</th>
+              <th className={`w-32 ${autoserviceListThClass}`}>Вид</th>
+              <th className={`min-w-0 pl-4 ${autoserviceListThClass}`}>Ответственный</th>
+              <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
+            </tr>
+          </thead>
+          <tbody className={autoserviceListTbodyClass}>
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                className={autoserviceListTrClickableClass}
+                onClick={() => onOpen(row)}
+              >
+                <td className={`${autoserviceListTdClass} whitespace-nowrap text-ink-muted`}>
+                  {formatExpenseDate(row.expense_date)}
+                </td>
+                <td className={`${autoserviceListTdClass} truncate`}>
+                  {row.type_label || row.type}
+                </td>
+                <td className={`${autoserviceListTdClass} truncate pl-4`}>
+                  {row.employee_name || row.created_by_name || '—'}
+                </td>
+                <td className={`${autoserviceListTdRightClass} font-semibold tabular-nums`}>
+                  {formatFinanceCurrency(row.amount)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
 function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет поступлений за период' }) {
   if (!rows.length) {
     return (
@@ -301,6 +394,18 @@ export default function AutoserviceFinancePage() {
   const [exporting, setExporting] = useState(false);
   const filterSwitchTimerRef = useRef(null);
 
+  const [activeTab, setActiveTab] = useState('receipts');
+  const [expensesData, setExpensesData] = useState({ total_amount: 0, count: 0, items: [] });
+  const [expensesLoading, setExpensesLoading] = useState(false);
+  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [editExpense, setEditExpense] = useState(null);
+  const [detailsExpense, setDetailsExpense] = useState(null);
+  const [deleteExpense, setDeleteExpense] = useState(null);
+  const [deletingExpenseId, setDeletingExpenseId] = useState(null);
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+
   usePersistedPageFilters(FINANCE_FILTERS_KEY, { dateFrom, dateTo, selectedMethod });
 
   const handleMethodChange = useCallback((methodId) => {
@@ -329,9 +434,43 @@ export default function AutoserviceFinancePage() {
     }
   }, [dateFrom, dateTo]);
 
+  const loadExpenses = useCallback(async () => {
+    setExpensesLoading(true);
+    setError('');
+    try {
+      const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+      const response = await apiRequest(`/autoservice/finance/expenses?${params.toString()}`);
+      setExpensesData(response || { total_amount: 0, count: 0, items: [] });
+    } catch (e) {
+      setError(e?.message || 'Не удалось загрузить расходы');
+      setExpensesData({ total_amount: 0, count: 0, items: [] });
+    } finally {
+      setExpensesLoading(false);
+    }
+  }, [dateFrom, dateTo]);
+
+  const loadEmployees = useCallback(async () => {
+    setEmployeesLoading(true);
+    try {
+      const response = await apiRequest('/autoservice/service-employees');
+      setEmployees(Array.isArray(response) ? response : []);
+    } catch (e) {
+      setEmployees([]);
+    } finally {
+      setEmployeesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (activeTab === 'expenses') {
+      loadExpenses();
+      loadEmployees();
+    }
+  }, [activeTab, loadExpenses, loadEmployees]);
 
   useEffect(() => {
     const onPullRefresh = (event) => {
@@ -416,6 +555,89 @@ export default function AutoserviceFinancePage() {
       setViewRepairOrderLoading(false);
     }
   }, []);
+
+  const handleCreateExpense = async (values) => {
+    setSavingExpense(true);
+    setError('');
+    try {
+      const payload = {
+        type: values.type,
+        amount: values.amount,
+        expense_date: values.expense_date,
+        description: values.description || null,
+        employee_id: values.type === 'salary' ? values.employee_id : null,
+      };
+      await apiRequest('/autoservice/finance/expenses', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setAddExpenseOpen(false);
+      await loadExpenses();
+    } catch (err) {
+      setError(err?.message || 'Не удалось создать расход');
+      throw err;
+    } finally {
+      setSavingExpense(false);
+    }
+  };
+
+  const handleUpdateExpense = async (values) => {
+    if (!editExpense?.id) return;
+    setSavingExpense(true);
+    setError('');
+    try {
+      const payload = {
+        type: values.type,
+        amount: values.amount,
+        expense_date: values.expense_date,
+        description: values.description || null,
+        employee_id: values.type === 'salary' ? values.employee_id : null,
+      };
+      await apiRequest(`/autoservice/finance/expenses/${editExpense.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      setEditExpense(null);
+      setDetailsExpense(null);
+      await loadExpenses();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить изменения');
+      throw err;
+    } finally {
+      setSavingExpense(false);
+    }
+  };
+
+  const handleDeleteExpenseConfirm = async () => {
+    if (!deleteExpense) return;
+    setDeletingExpenseId(deleteExpense.id);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/finance/expenses/${deleteExpense.id}`, {
+        method: 'DELETE',
+      });
+      setDeleteExpense(null);
+      setDetailsExpense(null);
+      await loadExpenses();
+    } catch (e) {
+      setError(e?.message || 'Не удалось удалить расход');
+    } finally {
+      setDeletingExpenseId(null);
+    }
+  };
+
+  const getEmployeePayrollInfo = async (employeeId) => {
+    const year = new Date(dateFrom).getFullYear();
+    const month = new Date(dateFrom).getMonth() + 1;
+    try {
+      const params = new URLSearchParams({ year, month });
+      const response = await apiRequest(`/autoservice/finance/expenses/employee-payroll/${employeeId}?${params.toString()}`);
+      return response;
+    } catch (e) {
+      setError(e?.message || 'Не удалось загрузить информацию о зарплате');
+      return null;
+    }
+  };
 
   const items = useMemo(() => data.items || [], [data.items]);
 
@@ -508,7 +730,18 @@ export default function AutoserviceFinancePage() {
 
       <Toast message={error} variant="error" onClose={() => setError('')} />
 
-      <MethodSegmentedFilter
+      <UnderlineTabs
+        className="mb-4"
+        ariaLabel="Разделы финансов"
+        gapClassName="gap-4"
+        tabs={TABS}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
+
+      {activeTab === 'receipts' ? (
+        <>
+          <MethodSegmentedFilter
         methods={ALL_METHODS}
         selected={selectedMethod}
         onChange={handleMethodChange}
@@ -546,6 +779,79 @@ export default function AutoserviceFinancePage() {
           emptyText="Нет поступлений за период"
         />
       )}
+        </>
+      ) : null}
+
+      {activeTab === 'expenses' ? (
+        <>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="grid grid-cols-2 gap-4 sm:flex sm:shrink-0 sm:gap-8">
+              <div className="text-center">
+                {expensesLoading ? (
+                  <Skeleton className="mx-auto h-8 w-24 sm:h-9" />
+                ) : (
+                  <div className="text-2xl font-bold tabular-nums leading-none text-ink sm:text-[1.75rem]">
+                    {formatFinanceCurrency(expensesData.total_amount)}
+                  </div>
+                )}
+                <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">Всего</div>
+              </div>
+              <div className="text-center">
+                {expensesLoading ? (
+                  <Skeleton className="mx-auto h-8 w-12 sm:h-9" />
+                ) : (
+                  <div className="text-2xl font-bold tabular-nums leading-none text-brand-600 sm:text-[1.75rem]">
+                    {expensesData.count}
+                  </div>
+                )}
+                <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">Записей</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setError('');
+                setAddExpenseOpen(true);
+              }}
+              className={autoserviceListPrimaryButtonClass}
+            >
+              Добавить документ
+            </button>
+          </div>
+
+          {expensesLoading ? (
+            <div className="space-y-3">
+              <div className="space-y-3 md:hidden">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="space-y-3 rounded-sg-lg bg-surface p-4 ring-1 ring-line/80">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-4/5" />
+                    <Skeleton className="h-4 w-3/5" />
+                  </div>
+                ))}
+              </div>
+              <div className="hidden overflow-hidden rounded-sg-lg bg-surface ring-1 ring-line/80 md:block">
+                <div className="space-y-0 divide-y divide-line-soft px-4 py-2">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="flex items-center gap-4 py-3">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 flex-1" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <FinanceExpenseRows
+              rows={expensesData.items}
+              onOpen={setDetailsExpense}
+              emptyText="Нет расходов за период"
+            />
+          )}
+        </>
+      ) : null}
 
       <Modal
         open={Boolean(detailsPayment)}
@@ -619,6 +925,96 @@ export default function AutoserviceFinancePage() {
         wrapperZIndex="var(--sg-z-modal-elevated-shell)"
         onClose={() => setViewRepairOrder(null)}
         onOrderChange={(updated) => setViewRepairOrder(updated)}
+      />
+
+      <AutoserviceExpenseModal
+        open={addExpenseOpen}
+        onClose={() => setAddExpenseOpen(false)}
+        onSubmit={handleCreateExpense}
+        employees={employees}
+        employeesLoading={employeesLoading}
+        dateFrom={dateFrom}
+        getEmployeePayrollInfo={getEmployeePayrollInfo}
+      />
+
+      <AutoserviceExpenseModal
+        open={Boolean(editExpense)}
+        onClose={() => setEditExpense(null)}
+        onSubmit={handleUpdateExpense}
+        employees={employees}
+        employeesLoading={employeesLoading}
+        initialData={editExpense}
+        dateFrom={dateFrom}
+        getEmployeePayrollInfo={getEmployeePayrollInfo}
+      />
+
+      <Modal
+        open={Boolean(detailsExpense)}
+        onClose={() => {
+          if (!deletingExpenseId) setDetailsExpense(null);
+        }}
+        title="Детали расхода"
+        size="sm"
+        footer={detailsExpense ? (
+          <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
+            <Button
+              variant="secondary"
+              onClick={() => setDetailsExpense(null)}
+              disabled={Boolean(deletingExpenseId)}
+              className="max-md:min-h-11"
+            >
+              Закрыть
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setEditExpense(detailsExpense);
+                setDetailsExpense(null);
+              }}
+              disabled={Boolean(deletingExpenseId)}
+              className="max-md:min-h-11"
+            >
+              Редактировать
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => setDeleteExpense(detailsExpense)}
+              disabled={Boolean(deletingExpenseId)}
+              className="max-md:min-h-11"
+            >
+              Удалить
+            </Button>
+          </div>
+        ) : null}
+      >
+        {detailsExpense ? (
+          <div className="space-y-1.5">
+            <FinanceField label="Вид">{detailsExpense.type_label || detailsExpense.type}</FinanceField>
+            <FinanceField label="Сумма">{formatFinanceCurrency(detailsExpense.amount)}</FinanceField>
+            <FinanceField label="Дата">{detailsExpense.expense_date}</FinanceField>
+            <FinanceField label="Ответственный">{detailsExpense.employee_name || detailsExpense.created_by_name || '—'}</FinanceField>
+            {detailsExpense.description ? (
+              <FinanceField label="Описание">{detailsExpense.description}</FinanceField>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteExpense)}
+        onClose={() => {
+          if (!deletingExpenseId) setDeleteExpense(null);
+        }}
+        onConfirm={handleDeleteExpenseConfirm}
+        title="Удалить расход?"
+        message={
+          deleteExpense
+            ? `Расход ${deleteExpense.type_label} на сумму ${formatFinanceCurrency(deleteExpense.amount)} будет удалён.`
+            : ''
+        }
+        confirmLabel="Удалить"
+        danger
+        loading={Boolean(deletingExpenseId)}
       />
     </div>
   );

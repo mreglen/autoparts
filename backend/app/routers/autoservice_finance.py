@@ -4,14 +4,23 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_payment import AutoservicePayment
+from app.models.autoservice_expense import AutoserviceExpense
+from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
+from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.repair_order import RepairOrder
 from app.models.user import User
 from app.schemas.autoservice_finance import (
+    AutoserviceEmployeePayrollInfo,
+    AutoserviceExpenseCreate,
+    AutoserviceExpenseRow,
+    AutoserviceExpenseUpdate,
+    AutoserviceExpensesResponse,
     AutoserviceFinanceReceiptRow,
     AutoserviceFinanceReceiptsResponse,
     AutoserviceOrderEconomicsResponse,
@@ -449,4 +458,400 @@ def export_autoservice_rossko_sales_xlsx(
         content=content,
         media_type=XLSX_MEDIA_TYPE,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/autoservice/finance/expenses",
+    response_model=AutoserviceExpensesResponse,
+)
+def get_autoservice_expenses(
+    date_from: date = Query(...),
+    date_to: date = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_FINANCE,
+        AUTOSERVICE_PERMISSION_REPORTS,
+    )
+    from datetime import datetime
+
+    start = datetime.combine(date_from, datetime.min.time())
+    end = datetime.combine(date_to, datetime.max.time())
+
+    expenses = (
+        db.query(AutoserviceExpense)
+        .options(
+            joinedload(AutoserviceExpense.employee),
+            joinedload(AutoserviceExpense.created_by),
+        )
+        .filter(
+            AutoserviceExpense.organization_id == org_id,
+            AutoserviceExpense.is_deleted == False,
+            AutoserviceExpense.expense_date >= start,
+            AutoserviceExpense.expense_date <= end,
+        )
+        .order_by(AutoserviceExpense.expense_date.desc(), AutoserviceExpense.created_at.desc())
+        .all()
+    )
+
+    TYPE_LABELS = {"salary": "Зарплата", "other": "Прочее"}
+
+    items = []
+    total_amount = Decimal("0.00")
+    for exp in expenses:
+        total_amount += exp.amount
+        items.append(
+            AutoserviceExpenseRow(
+                id=exp.id,
+                type=exp.type,
+                type_label=TYPE_LABELS.get(exp.type, exp.type),
+                amount=exp.amount,
+                expense_date=exp.expense_date.date(),
+                description=exp.description,
+                employee_id=exp.employee_id,
+                employee_name=exp.employee.name if exp.employee else None,
+                created_by_user_id=exp.created_by_user_id,
+                created_by_name=f"{exp.created_by.last_name} {exp.created_by.first_name[0]}."
+                if exp.created_by.first_name
+                else exp.created_by.last_name or "",
+                created_at=exp.created_at,
+            )
+        )
+
+    return AutoserviceExpensesResponse(
+        total_amount=total_amount,
+        count=len(items),
+        items=items,
+    )
+
+
+@router.post(
+    "/autoservice/finance/expenses",
+    response_model=AutoserviceExpenseRow,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_autoservice_expense(
+    payload: AutoserviceExpenseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_FINANCE,
+        AUTOSERVICE_PERMISSION_REPORTS,
+    )
+    from datetime import datetime
+
+    expense = AutoserviceExpense(
+        organization_id=org_id,
+        type=payload.type,
+        amount=payload.amount,
+        expense_date=datetime.combine(payload.expense_date, datetime.min.time()),
+        description=payload.description,
+        employee_id=payload.employee_id,
+        created_by_user_id=current_user.id,
+    )
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
+
+    TYPE_LABELS = {"salary": "Зарплата", "other": "Прочее"}
+
+    log_autoservice(
+        db,
+        event_type="expense_created",
+        summary=f"Создан расход: {TYPE_LABELS.get(expense.type, expense.type)} {expense.amount} ₽",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_expense",
+        entity_id=expense.id,
+        details={
+            "type": expense.type,
+            "amount": str(expense.amount),
+            "expense_date": str(expense.expense_date.date()),
+            "employee_id": expense.employee_id,
+        },
+    )
+
+    return AutoserviceExpenseRow(
+        id=expense.id,
+        type=expense.type,
+        type_label=TYPE_LABELS.get(expense.type, expense.type),
+        amount=expense.amount,
+        expense_date=expense.expense_date.date(),
+        description=expense.description,
+        employee_id=expense.employee_id,
+        employee_name=expense.employee.name if expense.employee else None,
+        created_by_user_id=expense.created_by_user_id,
+        created_by_name=f"{current_user.last_name} {current_user.first_name[0]}."
+        if current_user.first_name
+        else current_user.last_name or "",
+        created_at=expense.created_at,
+    )
+
+
+@router.get(
+    "/autoservice/finance/expenses/{expense_id}",
+    response_model=AutoserviceExpenseRow,
+)
+def get_autoservice_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_FINANCE,
+        AUTOSERVICE_PERMISSION_REPORTS,
+    )
+    expense = (
+        db.query(AutoserviceExpense)
+        .options(
+            joinedload(AutoserviceExpense.employee),
+            joinedload(AutoserviceExpense.created_by),
+        )
+        .filter(
+            AutoserviceExpense.id == expense_id,
+            AutoserviceExpense.organization_id == org_id,
+            AutoserviceExpense.is_deleted == False,
+        )
+        .first()
+    )
+    if not expense:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Расход не найден")
+
+    TYPE_LABELS = {"salary": "Зарплата", "other": "Прочее"}
+
+    return AutoserviceExpenseRow(
+        id=expense.id,
+        type=expense.type,
+        type_label=TYPE_LABELS.get(expense.type, expense.type),
+        amount=expense.amount,
+        expense_date=expense.expense_date.date(),
+        description=expense.description,
+        employee_id=expense.employee_id,
+        employee_name=expense.employee.name if expense.employee else None,
+        created_by_user_id=expense.created_by_user_id,
+        created_by_name=f"{expense.created_by.last_name} {expense.created_by.first_name[0]}."
+        if expense.created_by.first_name
+        else expense.created_by.last_name or "",
+        created_at=expense.created_at,
+    )
+
+
+@router.patch(
+    "/autoservice/finance/expenses/{expense_id}",
+    response_model=AutoserviceExpenseRow,
+)
+def update_autoservice_expense(
+    expense_id: int,
+    payload: AutoserviceExpenseUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_FINANCE,
+        AUTOSERVICE_PERMISSION_REPORTS,
+    )
+    from datetime import datetime
+
+    expense = (
+        db.query(AutoserviceExpense)
+        .options(joinedload(AutoserviceExpense.employee))
+        .filter(
+            AutoserviceExpense.id == expense_id,
+            AutoserviceExpense.organization_id == org_id,
+            AutoserviceExpense.is_deleted == False,
+        )
+        .first()
+    )
+    if not expense:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Расход не найден")
+
+    if payload.type is not None:
+        expense.type = payload.type
+    if payload.amount is not None:
+        expense.amount = payload.amount
+    if payload.expense_date is not None:
+        expense.expense_date = datetime.combine(payload.expense_date, datetime.min.time())
+    if payload.description is not None:
+        expense.description = payload.description
+    if payload.employee_id is not None:
+        expense.employee_id = payload.employee_id
+
+    db.commit()
+    db.refresh(expense)
+
+    TYPE_LABELS = {"salary": "Зарплата", "other": "Прочее"}
+
+    log_autoservice(
+        db,
+        event_type="expense_updated",
+        summary=f"Изменён расход: {TYPE_LABELS.get(expense.type, expense.type)} {expense.amount} ₽",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_expense",
+        entity_id=expense.id,
+        details={
+            "type": expense.type,
+            "amount": str(expense.amount),
+            "expense_date": str(expense.expense_date.date()),
+            "employee_id": expense.employee_id,
+        },
+    )
+
+    return AutoserviceExpenseRow(
+        id=expense.id,
+        type=expense.type,
+        type_label=TYPE_LABELS.get(expense.type, expense.type),
+        amount=expense.amount,
+        expense_date=expense.expense_date.date(),
+        description=expense.description,
+        employee_id=expense.employee_id,
+        employee_name=expense.employee.name if expense.employee else None,
+        created_by_user_id=expense.created_by_user_id,
+        created_by_name=f"{current_user.last_name} {current_user.first_name[0]}."
+        if current_user.first_name
+        else current_user.last_name or "",
+        created_at=expense.created_at,
+    )
+
+
+@router.delete(
+    "/autoservice/finance/expenses/{expense_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_autoservice_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_FINANCE,
+        AUTOSERVICE_PERMISSION_REPORTS,
+    )
+    from datetime import datetime
+
+    expense = (
+        db.query(AutoserviceExpense)
+        .options(joinedload(AutoserviceExpense.employee))
+        .filter(
+            AutoserviceExpense.id == expense_id,
+            AutoserviceExpense.organization_id == org_id,
+            AutoserviceExpense.is_deleted == False,
+        )
+        .first()
+    )
+    if not expense:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Расход не найден")
+
+    TYPE_LABELS = {"salary": "Зарплата", "other": "Прочее"}
+
+    expense.is_deleted = True
+    expense.deleted_at = datetime.utcnow()
+    expense.deleted_by_user_id = current_user.id
+    db.commit()
+
+    log_autoservice(
+        db,
+        event_type="expense_deleted",
+        summary=f"Удалён расход: {TYPE_LABELS.get(expense.type, expense.type)} {expense.amount} ₽",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="autoservice_expense",
+        entity_id=expense.id,
+        details={
+            "type": expense.type,
+            "amount": str(expense.amount),
+            "expense_date": str(expense.expense_date.date()),
+            "employee_id": expense.employee_id,
+        },
+    )
+
+
+@router.get(
+    "/autoservice/finance/expenses/employee-payroll/{employee_id}",
+    response_model=AutoserviceEmployeePayrollInfo,
+)
+def get_employee_payroll_info(
+    employee_id: int,
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_any_autoservice_permission(
+        db,
+        current_user,
+        AUTOSERVICE_PERMISSION_FINANCE,
+        AUTOSERVICE_PERMISSION_REPORTS,
+    )
+    from datetime import datetime
+    from calendar import monthrange
+
+    employee = (
+        db.query(AutoserviceServiceEmployee)
+        .filter(
+            AutoserviceServiceEmployee.id == employee_id,
+            AutoserviceServiceEmployee.organization_id == org_id,
+        )
+        .first()
+    )
+    if not employee:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+
+    start_of_month = datetime(year, month, 1)
+    last_day = monthrange(year, month)[1]
+    end_of_month = datetime(year, month, last_day, 23, 59, 59)
+
+    total_accrued = (
+        db.query(AutoservicePayrollAccrual)
+        .filter(
+            AutoservicePayrollAccrual.organization_id == org_id,
+            AutoservicePayrollAccrual.employee_id == employee_id,
+            AutoservicePayrollAccrual.accrued_at >= start_of_month,
+            AutoservicePayrollAccrual.accrued_at <= end_of_month,
+        )
+        .with_entities(func.sum(AutoservicePayrollAccrual.amount))
+        .scalar()
+        or Decimal("0.00")
+    )
+
+    total_paid = (
+        db.query(AutoserviceExpense)
+        .filter(
+            AutoserviceExpense.organization_id == org_id,
+            AutoserviceExpense.employee_id == employee_id,
+            AutoserviceExpense.type == "salary",
+            AutoserviceExpense.expense_date >= start_of_month,
+            AutoserviceExpense.expense_date <= end_of_month,
+            AutoserviceExpense.is_deleted == False,
+        )
+        .with_entities(func.sum(AutoserviceExpense.amount))
+        .scalar()
+        or Decimal("0.00")
+    )
+
+    remaining = total_accrued - total_paid
+
+    return AutoserviceEmployeePayrollInfo(
+        employee_id=employee.id,
+        employee_name=employee.name,
+        total_accrued=total_accrued,
+        total_paid=total_paid,
+        remaining=remaining,
     )

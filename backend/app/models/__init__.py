@@ -57,6 +57,8 @@ from app.models.autoservice_contractor_payout import AutoserviceContractorPayout
 from app.models.autoservice_payment import AutoservicePayment
 from app.models.autoservice_counter import AutoserviceCounter
 from app.models.autoservice_warehouse import AutoserviceWarehouseItem
+from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
+from app.models.autoservice_expense import AutoserviceExpense
 from app.models.organization_employee import OrganizationEmployee
 from app.models.employee_work_zone import EmployeeWorkZone
 from app.models.garage_vehicle import GarageVehicle

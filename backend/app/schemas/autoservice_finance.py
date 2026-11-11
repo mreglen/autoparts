@@ -243,3 +243,62 @@ class RosskoSalesReportResponse(BaseModel):
     date_to: date
     summary: RosskoSalesReportSummary
     items: list[RosskoSalesReportRow] = Field(default_factory=list)
+
+
+AutoserviceExpenseType = Literal["salary", "other"]
+
+
+class AutoserviceExpenseCreate(BaseModel):
+    type: AutoserviceExpenseType
+    amount: Decimal = Field(gt=0)
+    expense_date: date
+    description: Optional[str] = None
+    employee_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _validate_employee_for_salary(self):
+        if self.type == "salary" and not self.employee_id:
+            raise ValueError("Для выплаты зарплаты необходимо указать сотрудника")
+        return self
+
+
+class AutoserviceExpenseUpdate(BaseModel):
+    type: Optional[AutoserviceExpenseType] = None
+    amount: Optional[Decimal] = Field(default=None, gt=0)
+    expense_date: Optional[date] = None
+    description: Optional[str] = None
+    employee_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _validate_employee_for_salary(self):
+        if self.type == "salary" and not self.employee_id:
+            raise ValueError("Для выплаты зарплаты необходимо указать сотрудника")
+        return self
+
+
+class AutoserviceExpenseRow(BaseModel):
+    id: int
+    type: AutoserviceExpenseType
+    type_label: str
+    amount: Decimal
+    expense_date: date
+    description: Optional[str] = None
+    employee_id: Optional[int] = None
+    employee_name: Optional[str] = None
+    created_by_user_id: int
+    created_by_name: str
+    created_at: datetime
+
+
+class AutoserviceExpensesResponse(BaseModel):
+    total_amount: Decimal = Decimal("0.00")
+    count: int = 0
+    items: list[AutoserviceExpenseRow] = Field(default_factory=list)
+
+
+class AutoserviceEmployeePayrollInfo(BaseModel):
+    employee_id: int
+    employee_name: str
+    total_accrued: Decimal = Decimal("0.00")
+    total_paid: Decimal = Decimal("0.00")
+    remaining: Decimal = Decimal("0.00")

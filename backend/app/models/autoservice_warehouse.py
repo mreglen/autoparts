@@ -94,6 +94,12 @@ class AutoserviceWarehouseItem(Base):
     )
 
     @property
+    def return_reserved_qty(self) -> int:
+        if not self.receipts:
+            return 0
+        return sum(int(r.return_reserved_qty or 0) for r in self.receipts)
+
+    @property
     def available_qty(self) -> int:
         return max(
             0,
