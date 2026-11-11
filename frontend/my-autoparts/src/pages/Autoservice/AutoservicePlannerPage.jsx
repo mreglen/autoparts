@@ -37,9 +37,9 @@ function readPlannerViewMode() {
 
 const ORDER_STATUS_STYLES = {
   pending: 'bg-warning-100 text-warning-700 hover:bg-warning-50',
-  in_progress: 'bg-brand-400 text-white hover:bg-brand-500',
-  done: 'bg-brand-500 text-white hover:bg-brand-600',
-  completed: 'bg-brand-500 text-white hover:bg-brand-600',
+  in_progress: 'bg-brand-500 text-white hover:bg-brand-600',
+  done: 'bg-sky-500 text-white hover:bg-sky-600',
+  completed: 'bg-surface-subtle text-ink-soft hover:bg-line',
   cancelled: 'bg-line text-ink-soft line-through hover:bg-line-strong',
 };
 
@@ -60,9 +60,9 @@ function plannerItemStyle(item) {
 
 const ORDER_BAR_COLORS = {
   pending: 'bg-warning-600',
-  in_progress: 'bg-brand-400',
-  done: 'bg-brand-500',
-  completed: 'bg-brand-500',
+  in_progress: 'bg-brand-500',
+  done: 'bg-sky-500',
+  completed: 'bg-ink-faint',
   cancelled: 'bg-line-strong',
 };
 

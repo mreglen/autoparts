@@ -127,6 +127,8 @@ class AutoservicePayrollReportEmployeeRow(BaseModel):
     name: str
     completed_orders: int = 0
     total: Decimal = Decimal("0.00")
+    paid: Decimal = Decimal("0.00")
+    remaining: Decimal = Decimal("0.00")
     orders: list[AutoservicePayrollReportOrderRow] = Field(default_factory=list)
 
 
@@ -134,6 +136,8 @@ class AutoservicePayrollReportResponse(BaseModel):
     year: int
     month: int
     total: Decimal = Decimal("0.00")
+    total_paid: Decimal = Decimal("0.00")
+    total_remaining: Decimal = Decimal("0.00")
     employees: list[AutoservicePayrollReportEmployeeRow] = Field(default_factory=list)
 
 

@@ -2516,10 +2516,7 @@ export default function AutoserviceOrderFormPage() {
         <SectionCard
           title="Работы"
           action={(
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <p className="text-xs tabular-nums text-ink-muted">{formatMoney(worksTotal)} ₽</p>
-              <SectionAddLink onClick={() => setWorks((prev) => [...prev, emptyWork()])} />
-            </div>
+            <p className="text-xs tabular-nums text-ink-muted">{formatMoney(worksTotal)} ₽</p>
           )}
         >
           {works.length === 0 ? (
@@ -2633,13 +2630,13 @@ export default function AutoserviceOrderFormPage() {
               })}
             </div>
           )}
+          <div className="mt-2">
+            <SectionAddLink onClick={() => setWorks((prev) => [...prev, emptyWork()])} />
+          </div>
         </SectionCard>
 
         <SectionCard
           title="Запчасти клиента"
-          action={(
-            <SectionAddLink onClick={() => setClientParts((prev) => [...prev, emptyClientPart()])} />
-          )}
         >
           {clientParts.length === 0 ? (
             <p className="text-sm text-ink-muted">Пока нет запчастей клиента</p>
@@ -2694,6 +2691,9 @@ export default function AutoserviceOrderFormPage() {
               ))}
             </div>
           )}
+          <div className="mt-2">
+            <SectionAddLink onClick={() => setClientParts((prev) => [...prev, emptyClientPart()])} />
+          </div>
         </SectionCard>
 
         {!ownMode ? (
@@ -2712,13 +2712,6 @@ export default function AutoserviceOrderFormPage() {
                   />
                 </div>
               ) : null}
-              <SectionAddLink
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShopPartAddMenuOpen(true);
-                }}
-              />
             </div>
           )}
         >
@@ -2857,6 +2850,15 @@ export default function AutoserviceOrderFormPage() {
               })}
             </div>
           )}
+          <div className="mt-2">
+            <SectionAddLink
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShopPartAddMenuOpen(true);
+              }}
+            />
+          </div>
         </SectionCard>
         ) : null}
 

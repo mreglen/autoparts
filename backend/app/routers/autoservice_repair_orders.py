@@ -2120,15 +2120,22 @@ def update_manual_repair_order_shop_part(
         receipt_date=payload.receipt_date,
     )
     db.commit()
+    part_label = shop_part_display_name(
+        title=part.title,
+        brand=part.brand,
+        partnumber=part.partnumber,
+        rossko_brand=part.rossko_brand,
+        rossko_partnumber=part.rossko_partnumber,
+    )
     log_autoservice(
         db,
         event_type="repair_order_part_updated",
-        summary=f"Изменена запчасть заказ-наряда {repair_order_label(order_row)}: {part.name}",
+        summary=f"Изменена запчасть заказ-наряда {repair_order_label(order_row)}: {part_label}",
         user=current_user,
         organization_id=org_id,
         entity_type="repair_order_shop_part",
         entity_id=part.id,
-        details={"quantity": str(part.quantity), "unit_price": str(part.unit_price)},
+        details={"qty": str(part.qty), "unit_price": str(part.unit_price)},
     )
     return _shop_part_view(part, db=db, org_id=org_id)
 

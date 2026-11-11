@@ -7,6 +7,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy.orm import Session, selectinload
 
+from app.models.autoservice_expense import AutoserviceExpense
 from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.garage_vehicle import GarageVehicle
@@ -305,6 +306,24 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
         )
         .all()
     )
+    salary_expenses = (
+        db.query(AutoserviceExpense)
+        .filter(
+            AutoserviceExpense.organization_id == org_id,
+            AutoserviceExpense.type == "salary",
+            AutoserviceExpense.is_deleted == False,
+            AutoserviceExpense.expense_date >= start,
+            AutoserviceExpense.expense_date < end,
+        )
+        .all()
+    )
+    paid_by_emp: dict[int, Decimal] = {}
+    for expense in salary_expenses:
+        if not expense.employee_id:
+            continue
+        paid_by_emp[expense.employee_id] = paid_by_emp.get(
+            expense.employee_id, Decimal("0.00")
+        ) + _money(expense.amount)
 
     by_emp: dict[int, dict] = {}
     for emp in employees:
@@ -375,6 +394,7 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
 
     rows = []
     total = Decimal("0.00")
+    total_paid = Decimal("0.00")
     for bucket in sorted(by_emp.values(), key=lambda item: item["name"].lower()):
         order_rows = []
         row_total = Decimal("0.00")
@@ -407,12 +427,16 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
             )
         row_total = _money(row_total)
         total += row_total
+        paid = paid_by_emp.get(bucket["employee_id"], Decimal("0.00"))
+        total_paid += paid
         rows.append(
             {
                 "employee_id": bucket["employee_id"],
                 "name": bucket["name"],
                 "completed_orders": len(bucket["order_amounts"]),
                 "total": row_total,
+                "paid": paid,
+                "remaining": _money(row_total - paid),
                 "orders": order_rows,
             }
         )
@@ -420,6 +444,8 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
         "year": year,
         "month": month,
         "total": _money(total),
+        "total_paid": _money(total_paid),
+        "total_remaining": _money(total - total_paid),
         "employees": rows,
     }
 

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { apiAxios, apiRequest } from '../../utils/apiClient';
 import {
   clampFinanceDate,
@@ -380,6 +381,8 @@ function FinanceReceiptRows({ rows, onOpen, onOpenOrder, emptyText = 'Нет п�
 }
 
 export default function AutoserviceFinancePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const defaults = useMemo(() => getMonthRangeDefaults(), []);
   const todayDate = useMemo(() => getFinanceTodayDate(), []);
   const [storedFilters] = useState(() => readPageFilters(FINANCE_FILTERS_KEY));
@@ -408,7 +411,9 @@ export default function AutoserviceFinancePage() {
   const filterSwitchTimerRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState(() => (
-    storedFilters.activeTab === 'expenses' ? 'expenses' : 'receipts'
+    storedFilters.activeTab === 'expenses' || location.state?.tab === 'expenses'
+      ? 'expenses'
+      : 'receipts'
   ));
   const [expenseTypeFilter, setExpenseTypeFilter] = useState(() => (
     EXPENSE_TYPE_FILTERS.some((option) => option.id === storedFilters.expenseTypeFilter)
@@ -417,7 +422,7 @@ export default function AutoserviceFinancePage() {
   ));
   const [expensesData, setExpensesData] = useState({ total_amount: 0, count: 0, items: [] });
   const [expensesLoading, setExpensesLoading] = useState(false);
-  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [notice, setNotice] = useState('');
   const [editExpense, setEditExpense] = useState(null);
   const [detailsExpense, setDetailsExpense] = useState(null);
   const [deleteExpense, setDeleteExpense] = useState(null);
@@ -426,6 +431,12 @@ export default function AutoserviceFinancePage() {
   const [employeesLoading, setEmployeesLoading] = useState(false);
 
   usePersistedPageFilters(FINANCE_FILTERS_KEY, { dateFrom, dateTo, selectedMethod, activeTab, expenseTypeFilter });
+
+  useEffect(() => {
+    if (location.state?.expenseCreated) {
+      setNotice('Расход добавлен');
+    }
+  }, [location.state]);
 
   const handleMethodChange = useCallback((methodId) => {
     setSelectedMethod(methodId);
@@ -580,28 +591,6 @@ export default function AutoserviceFinancePage() {
       setViewRepairOrderLoading(false);
     }
   }, []);
-
-  const handleCreateExpense = async (values) => {
-    setError('');
-    try {
-      const payload = {
-        type: values.type,
-        amount: values.amount,
-        expense_date: values.expense_date,
-        description: values.description || null,
-        employee_id: values.type === 'salary' ? values.employee_id : null,
-      };
-      await apiRequest('/autoservice/finance/expenses', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      setAddExpenseOpen(false);
-      await loadExpenses();
-    } catch (err) {
-      setError(err?.message || 'Не удалось создать расход');
-      throw err;
-    }
-  };
 
   const handleUpdateExpense = async (values) => {
     if (!editExpense?.id) return;
@@ -782,6 +771,7 @@ export default function AutoserviceFinancePage() {
       </MobileCollapsibleFilters>
 
       <Toast message={error} variant="error" onClose={() => setError('')} />
+      <Toast message={notice} variant="success" onClose={() => setNotice('')} />
 
       <UnderlineTabs
         className="mb-4"
@@ -845,10 +835,7 @@ export default function AutoserviceFinancePage() {
             />
             <button
               type="button"
-              onClick={() => {
-                setError('');
-                setAddExpenseOpen(true);
-              }}
+              onClick={() => navigate('/autoservice/finance/expenses/new')}
               className={autoserviceListPrimaryButtonClass}
             >
               Добавить расход
@@ -961,16 +948,6 @@ export default function AutoserviceFinancePage() {
         wrapperZIndex="var(--sg-z-modal-elevated-shell)"
         onClose={() => setViewRepairOrder(null)}
         onOrderChange={(updated) => setViewRepairOrder(updated)}
-      />
-
-      <AutoserviceExpenseModal
-        open={addExpenseOpen}
-        onClose={() => setAddExpenseOpen(false)}
-        onSubmit={handleCreateExpense}
-        employees={employees}
-        employeesLoading={employeesLoading}
-        dateFrom={dateFrom}
-        getEmployeePayrollInfo={getEmployeePayrollInfo}
       />
 
       <AutoserviceExpenseModal

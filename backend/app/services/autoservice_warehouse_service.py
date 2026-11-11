@@ -1803,7 +1803,17 @@ def update_manual_shop_part(
     part.unit_price = price
     part.warehouse_receipt_id = receipt.id
 
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_warehouse_item_identity_conflict_message(
+                brand=brand_norm,
+                article=article_norm,
+            ),
+        ) from exc
     return part
 
 

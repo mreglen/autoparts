@@ -331,7 +331,7 @@ export default function AutoserviceReportsPage() {
 
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [payrollError, setPayrollError] = useState('');
-  const [payroll, setPayroll] = useState({ total: 0, employees: [] });
+  const [payroll, setPayroll] = useState({ total: 0, total_paid: 0, total_remaining: 0, employees: [] });
   const [payrollExporting, setPayrollExporting] = useState(false);
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null);
 
@@ -432,7 +432,7 @@ export default function AutoserviceReportsPage() {
       setPayroll(response || { total: 0, employees: [] });
     } catch (e) {
       setPayrollError(e?.message || 'Не удалось загрузить зарплаты');
-      setPayroll({ total: 0, employees: [] });
+      setPayroll({ total: 0, total_paid: 0, total_remaining: 0, employees: [] });
     } finally {
       setPayrollLoading(false);
     }
@@ -850,6 +850,9 @@ export default function AutoserviceReportsPage() {
                               <span className="mt-1 block text-xs text-ink-muted">
                                 {row.completed_orders} заказ-наряд{row.completed_orders === 1 ? '' : row.completed_orders >= 2 && row.completed_orders <= 4 ? 'а' : 'ов'}
                               </span>
+                              <span className="mt-0.5 block text-xs text-ink-muted">
+                                Выдано {formatFinanceCurrency(row.paid)} · Остаток {formatFinanceCurrency(row.remaining)}
+                              </span>
                             </span>
                           </button>
                           {isExpanded ? (
@@ -878,7 +881,9 @@ export default function AutoserviceReportsPage() {
                       );
                     })}
                     <div className="border-t border-line pt-3">
-                      <ReportField label="Итого">{formatFinanceCurrency(payroll.total)}</ReportField>
+                      <ReportField label="Сумма">{formatFinanceCurrency(payroll.total)}</ReportField>
+                      <ReportField label="Выдано">{formatFinanceCurrency(payroll.total_paid)}</ReportField>
+                      <ReportField label="Остаток">{formatFinanceCurrency(payroll.total_remaining)}</ReportField>
                     </div>
                   </>
                 )}
@@ -894,7 +899,9 @@ export default function AutoserviceReportsPage() {
                           <th className={`w-10 ${autoserviceListThClass}`} aria-hidden="true" />
                           <th className={`min-w-0 ${autoserviceListThClass}`}>Сотрудник</th>
                           <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Заказ-наряды</th>
-                          <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Итого</th>
+                          <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
+                          <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Выдано</th>
+                          <th className={`w-32 whitespace-nowrap ${autoserviceListThRightClass}`}>Остаток</th>
                         </tr>
                       </thead>
                       <tbody className={autoserviceListTbodyClass}>
@@ -925,10 +932,12 @@ export default function AutoserviceReportsPage() {
                                 </td>
                                 <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums text-ink-muted`}>{row.completed_orders}</td>
                                 <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatFinanceCurrency(row.total)}</td>
+                                <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums`}>{formatFinanceCurrency(row.paid)}</td>
+                                <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>{formatFinanceCurrency(row.remaining)}</td>
                               </tr>
                               {isExpanded ? (
                                 <tr>
-                                  <td colSpan={4} className="bg-surface-muted/40 px-4 py-3">
+                                  <td colSpan={6} className="bg-surface-muted/40 px-4 py-3">
                                     {!orders.length ? (
                                       <p className="text-sm text-ink-muted">Нет начислений по заказ-нарядам</p>
                                     ) : (
@@ -981,6 +990,12 @@ export default function AutoserviceReportsPage() {
                           <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>{payrollOrderCount}</td>
                           <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
                             {formatFinanceCurrency(payroll.total)}
+                          </td>
+                          <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                            {formatFinanceCurrency(payroll.total_paid)}
+                          </td>
+                          <td className={`w-32 whitespace-nowrap ${autoserviceListTdRightClass} tabular-nums font-semibold`}>
+                            {formatFinanceCurrency(payroll.total_remaining)}
                           </td>
                         </tr>
                       </tfoot>

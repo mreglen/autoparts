@@ -31,6 +31,7 @@ export const AUTOSERVICE_SECTION_PERMISSION = {
   clients: AUTOSERVICE_PERMISSION.clients,
   inspections: AUTOSERVICE_PERMISSION.inspections,
   finance: AUTOSERVICE_PERMISSION.finance,
+  'expense-form': AUTOSERVICE_PERMISSION.finance,
   reports: AUTOSERVICE_PERMISSION.reports,
   payroll: AUTOSERVICE_ORDERS_SECTION_CODES,
   warehouse: AUTOSERVICE_PERMISSION.warehouse,

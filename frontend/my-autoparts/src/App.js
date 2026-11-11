@@ -129,6 +129,7 @@ const AutoserviceWelcomePage = lazy(() => import('./pages/Autoservice/Autoservic
 const AutoserviceRepairBookingPage = lazy(() => import('./pages/Autoservice/AutoserviceRepairBookingPage'));
 const AutoservicePlannerPage = lazy(() => import('./pages/Autoservice/AutoservicePlannerPage'));
 const AutoserviceFinancePage = lazy(() => import('./pages/Autoservice/AutoserviceFinancePage'));
+const AutoserviceExpenseFormPage = lazy(() => import('./pages/Autoservice/AutoserviceExpenseFormPage'));
 const AutoserviceMyPayrollPage = lazy(() => import('./pages/Autoservice/AutoserviceMyPayrollPage'));
 const AutoserviceReportsPage = lazy(() => import('./pages/Autoservice/AutoserviceReportsPage'));
 const AutoserviceInspectionsPage = lazy(() => import('./pages/Autoservice/AutoserviceInspectionsPage'));
@@ -417,6 +418,13 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
     return (
       <LazyRoute>
         <AutoserviceFinancePage />
+      </LazyRoute>
+    );
+  }
+  if (section === 'expense-form') {
+    return (
+      <LazyRoute>
+        <AutoserviceExpenseFormPage />
       </LazyRoute>
     );
   }
@@ -1166,6 +1174,10 @@ function App() {
           <Route
             path="/autoservice/finance"
             element={<AutoserviceStaffRoute section="finance" />}
+          />
+          <Route
+            path="/autoservice/finance/expenses/new"
+            element={<AutoserviceStaffRoute section="expense-form" />}
           />
           <Route
             path="/autoservice/payroll"

@@ -276,6 +276,8 @@ def get_autoservice_payroll_report(
         year=data["year"],
         month=data["month"],
         total=data["total"],
+        total_paid=data["total_paid"],
+        total_remaining=data["total_remaining"],
         employees=[AutoservicePayrollReportEmployeeRow.model_validate(row) for row in data["employees"]],
     )
 
