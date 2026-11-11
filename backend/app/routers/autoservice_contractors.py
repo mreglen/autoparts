@@ -40,6 +40,9 @@ def _view(row: AutoserviceContractor) -> AutoserviceContractorView:
         phone=row.phone,
         note=row.note,
         is_active=row.is_active,
+        salary_type=row.salary_type,
+        salary_amount=row.salary_amount,
+        work_percent=row.work_percent,
         requisite_sets=RequisiteSetsView.model_validate(requisite_sets_from_obj(row)),
     )
 
@@ -164,6 +167,9 @@ def create_contractor(
         phone=payload.phone,
         note=payload.note,
         is_active=True,
+        salary_type=payload.salary_type,
+        salary_amount=payload.salary_amount,
+        work_percent=payload.work_percent,
     )
     apply_requisite_sets(row, payload.requisite_sets)
     db.add(row)
@@ -218,6 +224,12 @@ def update_contractor(
         apply_requisite_sets(row, payload.requisite_sets)
     if payload.is_active is not None:
         row.is_active = payload.is_active
+    if payload.salary_type is not None:
+        row.salary_type = payload.salary_type
+    if payload.salary_amount is not None:
+        row.salary_amount = payload.salary_amount
+    if payload.work_percent is not None:
+        row.work_percent = payload.work_percent
     db.commit()
     db.refresh(row)
     log_autoservice(

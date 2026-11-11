@@ -33,9 +33,11 @@ import {
 } from '../../utils/warehouseListUi';
 import {
   buildContractorPayload,
+  CONTRACTOR_SALARY_TYPES,
   contractorFormFromApi,
   emptyContractorForm,
   formatContractorDefaults,
+  formatContractorPayment,
   formatContractorTypeCoverage,
   parseContractorSaveError,
   validateContractorForm,
@@ -69,12 +71,13 @@ function ContractorMobileCard({ contractor, onOpen }) {
         <span className="truncate text-xs font-semibold text-ink">{contractor.name || '—'}</span>
         <StatusBadge isActive={contractor.is_active} />
       </div>
-      <p className="mt-1 truncate text-xs text-ink-muted">{formatContractorDefaults(contractor)}</p>
+      <p className="mt-1 truncate text-xs text-ink-muted">{formatContractorPayment(contractor)}</p>
     </button>
   );
 }
 
 function ContractorFormFields({ form, sets, errors, disabled, onField, onSets }) {
+  const isPercent = form.salary_type === 'percent_work';
   return (
     <div className="space-y-4">
       <div>
@@ -90,6 +93,54 @@ function ContractorFormFields({ form, sets, errors, disabled, onField, onSets })
         />
         {errors.name ? <FieldHint error>{errors.name}</FieldHint> : null}
       </div>
+      <div>
+        <FieldLabel htmlFor="contractor-salary-type">Тип оплаты</FieldLabel>
+        <select
+          id="contractor-salary-type"
+          value={form.salary_type}
+          onChange={(e) => onField('salary_type', e.target.value)}
+          disabled={disabled}
+          className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:cursor-wait disabled:opacity-60"
+        >
+          {CONTRACTOR_SALARY_TYPES.map((t) => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+      {isPercent ? (
+        <div>
+          <FieldLabel htmlFor="contractor-work-percent">Процент от работы</FieldLabel>
+          <Input
+            id="contractor-work-percent"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={form.work_percent}
+            onChange={(e) => onField('work_percent', e.target.value)}
+            placeholder="0"
+            disabled={disabled}
+            error={Boolean(errors.work_percent)}
+          />
+          {errors.work_percent ? <FieldHint error>{errors.work_percent}</FieldHint> : null}
+        </div>
+      ) : (
+        <div>
+          <FieldLabel htmlFor="contractor-salary-amount">Сумма, ₽</FieldLabel>
+          <Input
+            id="contractor-salary-amount"
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.salary_amount}
+            onChange={(e) => onField('salary_amount', e.target.value)}
+            placeholder="0.00"
+            disabled={disabled}
+            error={Boolean(errors.salary_amount)}
+          />
+          {errors.salary_amount ? <FieldHint error>{errors.salary_amount}</FieldHint> : null}
+        </div>
+      )}
       <div>
         <FieldLabel htmlFor="contractor-note">Комментарий</FieldLabel>
         <Textarea
@@ -289,6 +340,7 @@ export default function ContractorsPage() {
               <thead>
                 <tr className={autoserviceListTheadRowClass}>
                   <th className={autoserviceListThClass}>Подрядчик</th>
+                  <th className={`w-48 ${autoserviceListThClass}`}>Оплата</th>
                   <th className={`w-64 ${autoserviceListThClass}`}>Реквизиты по умолчанию</th>
                   <th className={`w-48 ${autoserviceListThClass}`}>Типы в документах</th>
                   <th className={`w-28 ${autoserviceListThClass}`}>Статус</th>
@@ -304,6 +356,9 @@ export default function ContractorsPage() {
                     <td className={`min-w-0 ${autoserviceListTdClass}`}>
                       <div className="w-0 min-w-full truncate font-semibold text-ink">{row.name || '—'}</div>
                       <div className="w-0 min-w-full truncate text-ink-muted">{row.phone || ''}</div>
+                    </td>
+                    <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                      <div className="w-0 min-w-full truncate text-ink-muted">{formatContractorPayment(row)}</div>
                     </td>
                     <td className={`min-w-0 ${autoserviceListTdClass}`}>
                       <div className="w-0 min-w-full truncate text-ink-muted">{formatContractorDefaults(row)}</div>
@@ -346,6 +401,10 @@ export default function ContractorsPage() {
                 <div>
                   <dt className="text-ink-muted">Телефон</dt>
                   <dd className="mt-0.5 font-medium text-ink">{detailsContractor.phone || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-ink-muted">Оплата</dt>
+                  <dd className="mt-0.5 font-medium text-ink">{formatContractorPayment(detailsContractor)}</dd>
                 </div>
                 <div>
                   <dt className="text-ink-muted">Email</dt>

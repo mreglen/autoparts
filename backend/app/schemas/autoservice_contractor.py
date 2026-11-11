@@ -66,6 +66,9 @@ class AutoserviceContractorCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     phone: Optional[str] = Field(default=None, max_length=32)
     note: Optional[str] = Field(default=None, max_length=2000)
+    salary_type: str = Field(default="fixed", max_length=32)
+    salary_amount: Decimal = Field(default=Decimal("0.00"), ge=0)
+    work_percent: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
     requisite_sets: RequisiteSetsIn = Field(default_factory=RequisiteSetsIn)
 
     @field_validator("name", mode="before")
@@ -79,6 +82,9 @@ class AutoserviceContractorUpdate(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=32)
     note: Optional[str] = Field(default=None, max_length=2000)
     is_active: Optional[bool] = None
+    salary_type: Optional[str] = Field(default=None, max_length=32)
+    salary_amount: Optional[Decimal] = Field(default=None, ge=0)
+    work_percent: Optional[Decimal] = Field(default=None, ge=0, le=100)
     requisite_sets: Optional[RequisiteSetsIn] = None
 
     @field_validator("name", "phone", "note", mode="before")
@@ -93,6 +99,9 @@ class AutoserviceContractorView(BaseModel):
     phone: Optional[str] = None
     note: Optional[str] = None
     is_active: bool
+    salary_type: str
+    salary_amount: Decimal
+    work_percent: Decimal
     requisite_sets: RequisiteSetsView
 
     model_config = {"from_attributes": True}

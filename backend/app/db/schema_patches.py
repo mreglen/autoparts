@@ -6071,6 +6071,32 @@ def ensure_autoservice_warehouse_return_tables() -> None:
                 )
             )
 
+    contractor_columns = {
+        col["name"] for col in inspector.get_columns("autoservice_contractors")
+    }
+    with engine.begin() as conn:
+        if "salary_type" not in contractor_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE autoservice_contractors "
+                    "ADD COLUMN salary_type VARCHAR(32) NOT NULL DEFAULT 'fixed'"
+                )
+            )
+        if "salary_amount" not in contractor_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE autoservice_contractors "
+                    "ADD COLUMN salary_amount NUMERIC(12, 2) NOT NULL DEFAULT 0"
+                )
+            )
+        if "work_percent" not in contractor_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE autoservice_contractors "
+                    "ADD COLUMN work_percent NUMERIC(5, 2) NOT NULL DEFAULT 0"
+                )
+            )
+
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
     if "autoservice_warehouse_return_requests" not in tables:

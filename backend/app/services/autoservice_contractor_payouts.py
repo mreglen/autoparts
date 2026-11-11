@@ -6,6 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy.orm import Session
 
+from app.models.autoservice_contractor import AutoserviceContractor
 from app.models.autoservice_contractor_payout import AutoserviceContractorPayout
 from app.models.repair_order import RepairOrder
 from app.services.autoservice_payroll import _period_bounds
@@ -32,9 +33,27 @@ def accrue_order_contractor_payouts(
     accrued_at: datetime | None = None,
 ) -> None:
     clear_order_contractor_payouts(db, order.id)
+    contractor_ids = {row.contractor_id for work in order.works or [] for row in work.contractors or []}
+    contractors_by_id = {}
+    if contractor_ids:
+        contractors_by_id = {
+            c.id: c
+            for c in db.query(AutoserviceContractor)
+            .filter(
+                AutoserviceContractor.id.in_(contractor_ids),
+                AutoserviceContractor.organization_id == order.organization_id,
+            )
+            .all()
+        }
     for work in sorted(order.works or [], key=lambda w: (w.position, w.id or 0)):
         for row in work.contractors or []:
-            amount = _money(row.amount)
+            contractor = contractors_by_id.get(row.contractor_id)
+            if not contractor:
+                continue
+            if contractor.salary_type == "percent_work":
+                amount = _money(work.price * contractor.work_percent / 100)
+            else:
+                amount = _money(row.amount)
             if amount <= 0:
                 continue
             db.add(
@@ -44,7 +63,7 @@ def accrue_order_contractor_payouts(
                     order_id=order.id,
                     work_id=work.id,
                     work_title=work.title,
-                    accrual_type=ACCRUAL_TYPE,
+                    accrual_type="percent_work" if contractor.salary_type == "percent_work" else "fixed",
                     amount=amount,
                     accrued_at=accrued_at,
                 )

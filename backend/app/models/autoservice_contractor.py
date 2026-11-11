@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from decimal import Decimal
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -21,6 +23,9 @@ class AutoserviceContractor(Base):
     phone = Column(String(32), nullable=True)
     note = Column(Text, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
+    salary_type = Column(String(32), nullable=False, default="fixed")
+    salary_amount = Column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    work_percent = Column(Numeric(5, 2), nullable=False, default=Decimal("0.00"))
 
     person_type_default = Column(String(16), nullable=False, default="individual")
     ind_name = Column(String(255), nullable=True)

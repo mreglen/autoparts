@@ -583,18 +583,37 @@ function WorkAssignPicker({
                     </label>
                     {checked ? (
                       <>
-                        <NumericInput
-                          mode="numeric"
-                          className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center`}
-                          value={assigned.percent || 0}
-                          placeholder="0"
-                          aria-label="Процент подрядчику"
-                          onChange={(e) => onAmountChange(row.id, e.target.value)}
-                        />
-                        <span className="shrink-0 text-xs text-ink-muted">%</span>
-                        <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
-                          {formatMoney(workPayAmount(work?.qty, work?.unit_price, assigned.percent || 0))} ₽
-                        </span>
+                        {row.salary_type === 'percent_work' ? (
+                          <>
+                            <NumericInput
+                              mode="numeric"
+                              className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center`}
+                              value={assigned.percent || 0}
+                              placeholder="0"
+                              aria-label="Процент подрядчику"
+                              onChange={(e) => onAmountChange(row.id, e.target.value)}
+                            />
+                            <span className="shrink-0 text-xs text-ink-muted">%</span>
+                            <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
+                              {formatMoney(workPayAmount(work?.qty, work?.unit_price, assigned.percent || 0))} ₽
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <NumericInput
+                              mode="numeric"
+                              className={`w-14 shrink-0 ${compactControlInputClass} px-1.5 text-center`}
+                              value={assigned.amount || 0}
+                              placeholder="0"
+                              aria-label="Сумма подрядчику"
+                              onChange={(e) => onAmountChange(row.id, e.target.value)}
+                            />
+                            <span className="shrink-0 text-xs text-ink-muted">₽</span>
+                            <span className="w-20 shrink-0 text-right text-xs font-medium tabular-nums text-ink">
+                              {formatMoney(assigned.amount || 0)} ₽
+                            </span>
+                          </>
+                        )}
                       </>
                     ) : null}
                   </div>

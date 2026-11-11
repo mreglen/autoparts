@@ -39,7 +39,7 @@ const ORDER_STATUS_STYLES = {
   pending: 'bg-warning-100 text-warning-700 hover:bg-warning-50',
   in_progress: 'bg-brand-400 text-white hover:bg-brand-500',
   done: 'bg-brand-500 text-white hover:bg-brand-600',
-  completed: 'bg-ink-muted text-white hover:bg-ink-faint',
+  completed: 'bg-brand-500 text-white hover:bg-brand-600',
   cancelled: 'bg-line text-ink-soft line-through hover:bg-line-strong',
 };
 
@@ -62,7 +62,7 @@ const ORDER_BAR_COLORS = {
   pending: 'bg-warning-600',
   in_progress: 'bg-brand-400',
   done: 'bg-brand-500',
-  completed: 'bg-ink-muted',
+  completed: 'bg-brand-500',
   cancelled: 'bg-line-strong',
 };
 
