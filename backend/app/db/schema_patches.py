@@ -224,6 +224,34 @@ def ensure_site_settings_markup_tiers_columns() -> None:
     logger.info("Applied site_settings markup tier column patches: %s", statements)
 
 
+def ensure_site_settings_mobile_app_columns() -> None:
+    """Add mobile app version/APK columns to site_settings."""
+    inspector = inspect(engine)
+    if "site_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_settings")}
+    statements = []
+
+    for name, ddl_type in (
+        ("mobile_min_app_version", "VARCHAR(32)"),
+        ("mobile_apk_version", "VARCHAR(32)"),
+        ("mobile_apk_url", "VARCHAR(500)"),
+        ("mobile_apk_notes", "TEXT"),
+    ):
+        if name not in columns:
+            statements.append(f"ALTER TABLE site_settings ADD COLUMN {name} {ddl_type}")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied site_settings mobile app column patches: %s", statements)
+
+
 def _index_exists(inspector, table_name: str, index_name: str) -> bool:
     return any(index.get("name") == index_name for index in inspector.get_indexes(table_name))
 
@@ -6495,6 +6523,22 @@ def ensure_user_session_refresh_columns() -> None:
         )
 
     logger.info("Applied user_sessions refresh token columns patch: %s", statements)
+
+
+def ensure_user_session_client_kind_column() -> None:
+    """Add mobile client platform column to user_sessions."""
+    inspector = inspect(engine)
+    if "user_sessions" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("user_sessions")}
+    if "client_kind" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE user_sessions ADD COLUMN client_kind VARCHAR(16)"))
+
+    logger.info("Applied user_sessions client_kind column patch")
 
 
 def ensure_garage_vehicle_mileage_history() -> None:

@@ -41,6 +41,19 @@ class AutoserviceTariffApplicationReject(BaseModel):
     reason: Optional[str] = Field(None, max_length=2000)
 
 
+class AutoserviceTariffInfoView(BaseModel):
+    price_rub_per_month: int
+    autoservice_markup_percent: float
+
+
+class AutoserviceApplicationMeView(BaseModel):
+    organization_is_autoservice: bool
+    organization_is_seller_business: bool
+    application: Optional[AutoserviceTariffApplicationOut] = None
+    price_rub_per_month: int
+    autoservice_markup_percent: float
+
+
 class AutoserviceConnectedOrganizationOut(BaseModel):
     organization_id: str
     organization_name: str

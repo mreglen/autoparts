@@ -69,6 +69,12 @@ class AutoserviceClientMeResponse(BaseModel):
     client: Optional[AutoserviceClientView] = None
 
 
+class AutoserviceClientOrgBrief(BaseModel):
+    organization_id: str
+    organization_name: str
+    client_id: int
+
+
 class AutoserviceClientCreateAccountResponse(BaseModel):
     client: AutoserviceClientView
     user_id: int

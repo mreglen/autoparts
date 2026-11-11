@@ -16,6 +16,7 @@ from app.schemas.autoservice_contractor import (
     AutoserviceContractorView,
     RequisiteSetsView,
 )
+from app.schemas.page import Page
 from app.services.autoservice_audit import log_autoservice
 from app.services.autoservice_contractor_payouts import compute_contractor_stats
 from app.utils.autoservice_access import (
@@ -26,6 +27,7 @@ from app.utils.autoservice_access import (
     require_autoservice_director,
     require_autoservice_settings,
 )
+from app.utils.pagination import PageParams, build_page
 from app.utils.requisite_sets import apply_requisite_sets, requisite_sets_from_obj
 
 router = APIRouter(tags=["Autoservice contractors"])
@@ -68,20 +70,25 @@ def _name_taken(db: Session, org_id: str, name: str, exclude_id: int | None = No
     return query.first() is not None
 
 
-@router.get("/autoservice/contractors", response_model=list[AutoserviceContractorView])
-def list_contractors(
-    include_inactive: bool = Query(False),
-    q: str = Query(""),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    org_id = require_any_autoservice_permission(
+def _list_org_id(db: Session, current_user: User) -> str:
+    return require_any_autoservice_permission(
         db,
         current_user,
         AUTOSERVICE_PERMISSION_ORDERS,
         AUTOSERVICE_PERMISSION_PLANNER,
         AUTOSERVICE_PERMISSION_SETTINGS,
     )
+
+
+def _query_contractors(
+    db: Session,
+    org_id: str,
+    include_inactive: bool,
+    q: str,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[AutoserviceContractor], int]:
     query = db.query(AutoserviceContractor).filter(
         AutoserviceContractor.organization_id == org_id,
     )
@@ -98,8 +105,38 @@ def list_contractors(
                 AutoserviceContractor.inn_individual.ilike(like),
             )
         )
-    rows = query.order_by(AutoserviceContractor.name.asc(), AutoserviceContractor.id.asc()).all()
+    total = query.count()
+    query = query.order_by(AutoserviceContractor.name.asc(), AutoserviceContractor.id.asc())
+    if limit is not None:
+        query = query.offset(offset).limit(limit)
+    return query.all(), total
+
+
+@router.get("/autoservice/contractors", response_model=list[AutoserviceContractorView])
+def list_contractors(
+    include_inactive: bool = Query(False),
+    q: str = Query(""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    rows, _total = _query_contractors(
+        db, _list_org_id(db, current_user), include_inactive, q
+    )
     return [_view(row) for row in rows]
+
+
+@router.get("/autoservice/contractors/page", response_model=Page[AutoserviceContractorView])
+def list_contractors_page(
+    include_inactive: bool = Query(False),
+    q: str = Query(""),
+    page: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    rows, total = _query_contractors(
+        db, _list_org_id(db, current_user), include_inactive, q, limit=page.limit, offset=page.offset
+    )
+    return build_page([_view(row) for row in rows], total, page)
 
 
 @router.post(

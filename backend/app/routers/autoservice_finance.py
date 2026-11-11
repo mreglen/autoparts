@@ -59,6 +59,10 @@ from app.utils.autoservice_access import (
 
 router = APIRouter(tags=["Autoservice finance"])
 
+XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+# Схема бинарного ответа нужна кодогену: без неё клиентский метод типизируется как unknown.
+XLSX_RESPONSES = {200: {"content": {XLSX_MEDIA_TYPE: {}}, "description": "Файл Excel"}}
+
 
 def _log_report_export(
     db: Session,
@@ -85,6 +89,8 @@ def _log_report_export(
 def get_autoservice_finance_receipts(
     date_from: date = Query(...),
     date_to: date = Query(...),
+    limit: int | None = Query(None, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -94,7 +100,14 @@ def get_autoservice_finance_receipts(
         AUTOSERVICE_PERMISSION_FINANCE,
         AUTOSERVICE_PERMISSION_REPORTS,
     )
-    return list_finance_receipts(db, org_id=org_id, date_from=date_from, date_to=date_to)
+    return list_finance_receipts(
+        db,
+        org_id=org_id,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.patch(
@@ -188,7 +201,11 @@ def delete_autoservice_finance_receipt(
     )
 
 
-@router.get("/autoservice/finance/receipts.xlsx")
+@router.get(
+    "/autoservice/finance/receipts.xlsx",
+    response_class=Response,
+    responses=XLSX_RESPONSES,
+)
 def export_autoservice_finance_receipts_xlsx(
     date_from: date = Query(...),
     date_to: date = Query(...),
@@ -208,7 +225,7 @@ def export_autoservice_finance_receipts_xlsx(
     filename = f"autoservice_payments_{date_from.isoformat()}_{date_to.isoformat()}.xlsx"
     return Response(
         content=content,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type=XLSX_MEDIA_TYPE,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -233,7 +250,11 @@ def get_autoservice_payroll_report(
     )
 
 
-@router.get("/autoservice/reports/payroll.xlsx")
+@router.get(
+    "/autoservice/reports/payroll.xlsx",
+    response_class=Response,
+    responses=XLSX_RESPONSES,
+)
 def export_autoservice_payroll_report_xlsx(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
@@ -246,7 +267,7 @@ def export_autoservice_payroll_report_xlsx(
     filename = f"payroll_{year}_{month:02d}.xlsx"
     return Response(
         content=content,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type=XLSX_MEDIA_TYPE,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -281,7 +302,11 @@ def get_autoservice_order_economics_report(
     )
 
 
-@router.get("/autoservice/reports/order-economics.xlsx")
+@router.get(
+    "/autoservice/reports/order-economics.xlsx",
+    response_class=Response,
+    responses=XLSX_RESPONSES,
+)
 def export_autoservice_order_economics_xlsx(
     date_from: date = Query(...),
     date_to: date = Query(...),
@@ -310,7 +335,7 @@ def export_autoservice_order_economics_xlsx(
     filename = f"order_economics_{date_from.isoformat()}_{date_to.isoformat()}.xlsx"
     return Response(
         content=content,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type=XLSX_MEDIA_TYPE,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -345,7 +370,11 @@ def get_autoservice_warehouse_stock_report(
     )
 
 
-@router.get("/autoservice/reports/warehouse-stock.xlsx")
+@router.get(
+    "/autoservice/reports/warehouse-stock.xlsx",
+    response_class=Response,
+    responses=XLSX_RESPONSES,
+)
 def export_autoservice_warehouse_stock_xlsx(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
@@ -366,7 +395,7 @@ def export_autoservice_warehouse_stock_xlsx(
     filename = f"warehouse_stock_{year}_{month:02d}.xlsx"
     return Response(
         content=content,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type=XLSX_MEDIA_TYPE,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -393,7 +422,11 @@ def get_autoservice_rossko_sales_report(
     )
 
 
-@router.get("/autoservice/reports/rossko-sales.xlsx")
+@router.get(
+    "/autoservice/reports/rossko-sales.xlsx",
+    response_class=Response,
+    responses=XLSX_RESPONSES,
+)
 def export_autoservice_rossko_sales_xlsx(
     date_from: date = Query(...),
     date_to: date = Query(...),
@@ -414,6 +447,6 @@ def export_autoservice_rossko_sales_xlsx(
     filename = f"rossko_sales_{date_from.isoformat()}_{date_to.isoformat()}.xlsx"
     return Response(
         content=content,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type=XLSX_MEDIA_TYPE,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

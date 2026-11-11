@@ -89,6 +89,8 @@ from app.routers.seo_landing_pages import router as seo_landing_pages_router
 from app.routers.user_engagement import router as user_engagement_router
 from app.routers.admin_sms import router as admin_sms_router
 from app.routers.autoservice_caldav import router as autoservice_caldav_router
+from app.routers.mobile import router as mobile_router
+from app.routers.tasks import router as tasks_router
 
 
 
@@ -186,3 +188,5 @@ api_router.include_router(dadata_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(user_engagement_router)
 api_router.include_router(admin_sms_router)
+api_router.include_router(mobile_router)
+api_router.include_router(tasks_router)

@@ -63,6 +63,13 @@ class AutoserviceFinanceReceiptsResponse(BaseModel):
     total_amount: Decimal = Decimal("0.00")
     count: int = 0
     items: list[AutoserviceFinanceReceiptRow] = Field(default_factory=list)
+    # Пагинация добавлена аддитивно: без limit ответ остаётся прежним, а total/has_more
+    # описывают уже существующий items (итоговые суммы всегда по всему периоду).
+    limit: Optional[int] = None
+    offset: int = 0
+    total: int = 0
+    has_more: bool = False
+    fetched_at: str = ""
 
 
 class AutoservicePayrollReportOrderVehicle(BaseModel):

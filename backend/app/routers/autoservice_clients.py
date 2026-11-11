@@ -25,10 +25,12 @@ from app.schemas.autoservice_client import (
     AutoserviceClientCreateAccountResponse,
     AutoserviceClientLinkAccountIn,
     AutoserviceClientMeResponse,
+    AutoserviceClientOrgBrief,
     AutoserviceClientStaffCreate,
     AutoserviceClientStaffUpdate,
     AutoserviceClientView,
 )
+from app.schemas.page import Page
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_CLIENTS,
     AUTOSERVICE_PERMISSION_INSPECTIONS,
@@ -49,6 +51,7 @@ from app.utils.autoservice_access import (
     user_display_name,
 )
 from app.services.autoservice_client_stats import client_stats_map
+from app.utils.pagination import PageParams, build_page
 from app.services.autoservice_audit import client_label, log_autoservice
 from app.utils.email import send_autoservice_guest_account_email
 from app.utils.user_avatar import resolve_user_by_contact
@@ -382,7 +385,10 @@ def _apply_client_search_filter(query, org_id: str, q: str | None):
     return query.filter(or_(*client_clauses))
 
 
-@router.get("/autoservice/clients/me/orgs")
+@router.get(
+    "/autoservice/clients/me/orgs",
+    response_model=list[AutoserviceClientOrgBrief],
+)
 def list_my_autoservice_orgs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -478,7 +484,29 @@ def list_autoservice_clients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    org_id = require_any_autoservice_permission(
+    org_id = _clients_org_id(db, current_user)
+    rows, _total = _query_autoservice_clients(db, org_id, q)
+    return _client_rows_to_views(db, org_id, rows, q)
+
+
+@router.get("/autoservice/clients/page", response_model=Page[AutoserviceClientView])
+def list_autoservice_clients_page(
+    q: str | None = Query(None, max_length=120),
+    sort_by: str = Query("consented_at", pattern="^(consented_at|created_at|name)$"),
+    sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
+    page: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = _clients_org_id(db, current_user)
+    rows, total = _query_autoservice_clients(
+        db, org_id, q, limit=page.limit, offset=page.offset, sort_by=sort_by, sort_dir=sort_dir
+    )
+    return build_page(_client_rows_to_views(db, org_id, rows, q), total, page)
+
+
+def _clients_org_id(db: Session, current_user: User) -> str:
+    return require_any_autoservice_permission(
         db,
         current_user,
         AUTOSERVICE_PERMISSION_CLIENTS,
@@ -486,12 +514,36 @@ def list_autoservice_clients(
         AUTOSERVICE_PERMISSION_ORDERS_OWN,
         AUTOSERVICE_PERMISSION_INSPECTIONS,
     )
+
+
+def _query_autoservice_clients(
+    db: Session,
+    org_id: str,
+    q: str | None,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    sort_by: str = "consented_at",
+    sort_dir: str = "desc",
+) -> tuple[list[AutoserviceClient], int]:
     query = db.query(AutoserviceClient).filter(AutoserviceClient.organization_id == org_id)
     query = _apply_client_search_filter(query, org_id, q)
-    rows = query.order_by(
-        AutoserviceClient.consented_at.desc(),
-        AutoserviceClient.id.desc(),
-    ).all()
+    total = query.count()
+    sort_column = {
+        "consented_at": AutoserviceClient.consented_at,
+        "created_at": AutoserviceClient.created_at,
+        "name": AutoserviceClient.name,
+    }[sort_by]
+    direction = sort_column.asc() if sort_dir == "asc" else sort_column.desc()
+    query = query.order_by(direction, AutoserviceClient.id.desc())
+    if limit is not None:
+        query = query.offset(offset).limit(limit)
+    return query.all(), total
+
+
+def _client_rows_to_views(
+    db: Session, org_id: str, rows: list[AutoserviceClient], q: str | None
+) -> list[AutoserviceClientView]:
     q_norm = (q or "").strip()
     stats_map = client_stats_map(db, org_id, [row.id for row in rows])
     if q_norm:

@@ -6,6 +6,7 @@ from app.db.schema_patches import (
     ensure_event_log_audit_columns,
     ensure_user_public_code,
     ensure_user_session_refresh_columns,
+    ensure_user_session_client_kind_column,
     ensure_garage_used_order_item_fulfillment_columns,
     ensure_garage_used_order_item_payment_columns,
     ensure_garage_order_delivery_columns,
@@ -18,6 +19,7 @@ from app.db.schema_patches import (
     ensure_organizations_allow_unpaid_checkout_column,
     ensure_organizations_legal_details_columns,
     ensure_site_settings_markup_tiers_columns,
+    ensure_site_settings_mobile_app_columns,
     ensure_organization_drom_api_columns,
     ensure_stock_out_source_columns,
     ensure_avito_pro_status_columns,
@@ -157,6 +159,7 @@ from app.db.schema_patches import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
+from app.middleware.app_version_middleware import AppVersionLoggingMiddleware
 from app.middleware.slow_request_middleware import SlowRequestLoggingMiddleware
 from app.routers import api_router
 from app.routers import chats as chats_router
@@ -270,6 +273,7 @@ try:
     ensure_organizations_allow_unpaid_checkout_column()
     ensure_organizations_legal_details_columns()
     ensure_site_settings_markup_tiers_columns()
+    ensure_site_settings_mobile_app_columns()
     ensure_organization_drom_api_columns()
     ensure_stock_out_source_columns()
     ensure_garage_used_order_item_fulfillment_columns()
@@ -373,6 +377,7 @@ try:
     ensure_event_log_audit_columns()
     ensure_user_public_code()
     ensure_user_session_refresh_columns()
+    ensure_user_session_client_kind_column()
     ensure_group_chat_columns()
     ensure_chat_created_by_column()
     ensure_seo_product_url_exports_table()
@@ -486,6 +491,7 @@ app.add_middleware(
 )
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SlowRequestLoggingMiddleware)
+app.add_middleware(AppVersionLoggingMiddleware)
 
 
 @app.middleware("http")

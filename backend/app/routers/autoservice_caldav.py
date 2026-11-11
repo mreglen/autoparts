@@ -6,7 +6,7 @@ from app.db.database import get_db
 from app.models.caldav_account import CaldavAccount
 from app.models.user import User
 from app.core.auth import get_current_user
-from app.schemas.caldav import CaldavCredentialsView, CaldavStatusView
+from app.schemas.caldav import CaldavCredentialsView, CaldavStatusView, CaldavSyncTaskView
 from app.services.autoservice_caldav import (
     disconnect_account,
     provision_account,
@@ -18,6 +18,7 @@ from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_INSPECTIONS_CALENDAR_CREATE,
     require_autoservice_permission,
 )
+from app.utils.task_ownership import remember_task_owner
 
 router = APIRouter(tags=["Autoservice CalDAV"])
 
@@ -105,12 +106,16 @@ def disconnect_calendar_sync(
     return CaldavStatusView(enabled=False, configured=settings.CALDAV_SYNC_ENABLED)
 
 
-@router.post("/autoservice/calendar-sync/sync-from-calendar")
+@router.post(
+    "/autoservice/calendar-sync/sync-from-calendar",
+    response_model=CaldavSyncTaskView,
+)
 def sync_from_calendar(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS_CALENDAR_CREATE)
     task = sync_calendar_to_bookings.delay(current_user.id, org_id)
+    remember_task_owner(task.id, current_user.id)
     return {"task_id": task.id, "message": "Синхронизация запущена"}
 

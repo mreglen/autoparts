@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass
 
@@ -8,6 +9,9 @@ from fastapi import Request
 from app.utils.redis_sync import get_redis_sync
 
 logger = logging.getLogger(__name__)
+
+# Публичные пути считают по IP: там защита от скрапперов нужнее, чем честный лимит на пользователя.
+IP_ONLY_PREFIXES: tuple[str, ...] = ("/api/public/",)
 
 
 @dataclass(frozen=True)
@@ -66,13 +70,23 @@ def resolve_rate_limit_rule(path: str, rules: tuple[RateLimitRule, ...]) -> Rate
 
 
 def enforce_rate_limit(request: Request, rule: RateLimitRule) -> RateLimitResult:
-    ip = client_ip(request)
-    bucket = f"{rule.prefix}:{ip}"
+    bucket = f"{rule.prefix}:{rate_limit_bucket(request)}"
     return check_rate_limit(
         key=bucket,
         max_requests=rule.max_requests,
         window_seconds=rule.window_seconds,
     )
+
+
+def rate_limit_bucket(request: Request) -> str:
+    """IP для анонимных запросов; для Bearer — хеш токена, чтобы NAT не делил лимит на всех."""
+    if not request.url.path.startswith(IP_ONLY_PREFIXES):
+        authorization = request.headers.get("authorization") or ""
+        if authorization[:7].lower() == "bearer ":
+            token = authorization[7:].strip()
+            if token:
+                return f"tok:{hashlib.sha1(token.encode('utf-8')).hexdigest()[:16]}"
+    return client_ip(request)
 
 
 def retry_after_header(result: RateLimitResult) -> str:

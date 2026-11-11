@@ -12,6 +12,11 @@ class CaldavStatusView(BaseModel):
     last_synced_at: Optional[datetime] = None
 
 
+class CaldavSyncTaskView(BaseModel):
+    task_id: str
+    message: str
+
+
 class CaldavCredentialsView(BaseModel):
     server_url: str
     username: str

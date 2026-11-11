@@ -12,8 +12,10 @@ from app.models.autoservice_tariff_application import AutoserviceTariffApplicati
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.autoservice_tariff_application import (
+    AutoserviceApplicationMeView,
     AutoserviceTariffApplicationCreate,
     AutoserviceTariffApplicationOut,
+    AutoserviceTariffInfoView,
 )
 from app.utils.org_markup import autoservice_markup_percent
 from app.utils.phone import normalize_to_storage_format
@@ -65,7 +67,7 @@ def _serialize_application(db: Session, row: AutoserviceTariffApplication) -> di
     ).model_dump()
 
 
-@router.get("/tariff-info")
+@router.get("/tariff-info", response_model=AutoserviceTariffInfoView)
 def get_autoservice_tariff_info(db: Session = Depends(get_db)):
     settings_row = get_or_create_site_settings(db)
     return {
@@ -74,7 +76,7 @@ def get_autoservice_tariff_info(db: Session = Depends(get_db)):
     }
 
 
-@router.get("/me")
+@router.get("/me", response_model=AutoserviceApplicationMeView)
 def get_my_autoservice_application(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -101,7 +103,11 @@ def get_my_autoservice_application(
     }
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=AutoserviceTariffApplicationOut,
+    status_code=status.HTTP_201_CREATED,
+)
 def submit_autoservice_application(
     payload: AutoserviceTariffApplicationCreate,
     current_user: User = Depends(get_current_user),

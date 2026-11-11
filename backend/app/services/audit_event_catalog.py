@@ -101,6 +101,7 @@ EVENT_TYPE_LABELS: dict[str, str] = {
     "finance_payment_date_changed": "Дата поступления изменена",
     "finance_payment_cancelled": "Поступление отменено",
     "autoservice_report_exported": "Экспорт отчёта автосервиса",
+    "autoservice_document_downloaded": "Скачивание печатной формы автосервиса",
     "autoservice_settings_updated": "Настройки автосервиса изменены",
     "autoservice_work_created": "Работа добавлена в каталог",
     "autoservice_work_updated": "Работа каталога изменена",

@@ -66,3 +66,7 @@ class OrganizationEmployeeCreateAccountResponse(BaseModel):
 
 class OrganizationEmployeeCardPermissionsRequest(BaseModel):
     permission_ids: list[int] = Field(default_factory=list)
+
+
+class OrganizationEmployeeCardPermissionsResponse(BaseModel):
+    message: str

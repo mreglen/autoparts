@@ -114,6 +114,12 @@ def _new_parts_markup_percent_value(row) -> float:
     return float(v) if v is not None else 15.0
 
 
+def _mobile_setting_value(row, name: str) -> Optional[str]:
+    v = getattr(row, name, None)
+    v = (str(v) if v is not None else "").strip()
+    return v or None
+
+
 class SiteSettingsResponse(BaseModel):
     show_new_autoparts: bool
     show_site_reviews: bool = True
@@ -123,6 +129,10 @@ class SiteSettingsResponse(BaseModel):
     new_parts_markup_percent: float
     used_parts_purchase_mode: str = "both"
     round_product_prices: bool = False
+    mobile_min_app_version: Optional[str] = None
+    mobile_apk_version: Optional[str] = None
+    mobile_apk_url: Optional[str] = None
+    mobile_apk_notes: Optional[str] = None
 
 
 class SiteSettingsPatch(BaseModel):
@@ -134,6 +144,10 @@ class SiteSettingsPatch(BaseModel):
     new_parts_markup_percent: Optional[float] = Field(None, ge=0, le=500)
     used_parts_purchase_mode: Optional[str] = None
     round_product_prices: Optional[bool] = None
+    mobile_min_app_version: Optional[str] = Field(None, max_length=32)
+    mobile_apk_version: Optional[str] = Field(None, max_length=32)
+    mobile_apk_url: Optional[str] = Field(None, max_length=500)
+    mobile_apk_notes: Optional[str] = None
     global_markup_apply_mode: Optional[str] = Field(
         None,
         description="all — применить глобальную наценку ко всем организациям; skip_manual — пропустить организации с ручной наценкой",
@@ -382,6 +396,10 @@ def get_site_settings_admin(
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
         used_parts_purchase_mode=mode,
         round_product_prices=getattr(row, "round_product_prices", False) is True,
+        mobile_min_app_version=_mobile_setting_value(row, "mobile_min_app_version"),
+        mobile_apk_version=_mobile_setting_value(row, "mobile_apk_version"),
+        mobile_apk_url=_mobile_setting_value(row, "mobile_apk_url"),
+        mobile_apk_notes=_mobile_setting_value(row, "mobile_apk_notes"),
     )
 
 
@@ -431,6 +449,15 @@ def patch_site_settings_admin(
         row.used_parts_purchase_mode = mode
     if "round_product_prices" in data:
         row.round_product_prices = bool(data["round_product_prices"])
+    for mobile_field in (
+        "mobile_min_app_version",
+        "mobile_apk_version",
+        "mobile_apk_url",
+        "mobile_apk_notes",
+    ):
+        if mobile_field in data:
+            value = (str(data[mobile_field]) if data[mobile_field] is not None else "").strip()
+            setattr(row, mobile_field, value or None)
     db.commit()
     db.refresh(row)
     log_audit(
@@ -451,6 +478,10 @@ def patch_site_settings_admin(
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
         used_parts_purchase_mode=mode,
         round_product_prices=getattr(row, "round_product_prices", False) is True,
+        mobile_min_app_version=_mobile_setting_value(row, "mobile_min_app_version"),
+        mobile_apk_version=_mobile_setting_value(row, "mobile_apk_version"),
+        mobile_apk_url=_mobile_setting_value(row, "mobile_apk_url"),
+        mobile_apk_notes=_mobile_setting_value(row, "mobile_apk_notes"),
     )
 
 

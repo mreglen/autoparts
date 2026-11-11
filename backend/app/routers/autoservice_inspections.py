@@ -13,6 +13,8 @@ from app.models.inspection_booking import InspectionBooking
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.sms import SmsSendResult
+from app.schemas.page import Page
+from app.utils.pagination import PageParams, build_page
 from app.services.sms_gateway import send_sms
 from app.services.autoservice_caldav import request_org_sync
 from app.services.autoservice_audit import (
@@ -295,6 +297,40 @@ def list_inspection_bookings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    rows, _total = _query_inspection_bookings(
+        db, current_user, status_filter, client_id, sort_by, sort_dir
+    )
+    return [_booking_to_view(row) for row in rows]
+
+
+@router.get(
+    "/autoservice/inspection-bookings/page",
+    response_model=Page[InspectionBookingView],
+)
+def list_inspection_bookings_page(
+    status_filter: str | None = Query(None, alias="status"),
+    client_id: int | None = Query(None),
+    sort_by: str = Query("created_at", pattern="^(created_at|preferred_date)$"),
+    sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
+    page: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    rows, total = _query_inspection_bookings(
+        db, current_user, status_filter, client_id, sort_by, sort_dir
+    )
+    window = rows[page.offset : page.offset + page.limit]
+    return build_page([_booking_to_view(row) for row in window], total, page)
+
+
+def _query_inspection_bookings(
+    db: Session,
+    current_user: User,
+    status_filter: str | None,
+    client_id: int | None,
+    sort_by: str,
+    sort_dir: str,
+) -> tuple[list[InspectionBooking], int]:
     from app.utils.autoservice_access import (
         AUTOSERVICE_PERMISSION_INSPECTIONS_OWN,
         get_employee_work_zone_ids,
@@ -350,8 +386,7 @@ def list_inspection_bookings(
                 detail="Недопустимый статус",
             )
         q = q.filter(InspectionBooking.status == status_filter)
-    rows = q.order_by(*_booking_order_by(sort_by, sort_dir)).all()
-    return [_booking_to_view(row) for row in rows]
+    return q.order_by(*_booking_order_by(sort_by, sort_dir)).all(), q.count()
 
 
 def _booking_order_by(sort_by: str, sort_dir: str):

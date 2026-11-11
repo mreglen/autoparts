@@ -10,6 +10,7 @@ from ..models.user import User
 from ..tasks.photo_tasks import process_and_upload_photo
 from ..tasks.video_tasks import process_and_upload_video
 from ..utils.photo_naming import generate_photo_filename
+from ..utils.task_ownership import remember_task_owner
 from ..core.config import settings
 from celery.result import AsyncResult
 
@@ -595,6 +596,7 @@ async def upload_media(
             predicted_path = f"/videos/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.mp4')}"
         
         print(f"Celery task queued: {task.id}")
+        remember_task_owner(task.id, current_user.id)
         
         # Return task info and relative path (frontend will construct full URL)
         result = {
@@ -745,6 +747,7 @@ async def upload_organization_logo(
         )
         
         print(f"Celery task queued: {task.id}")
+        remember_task_owner(task.id, current_user.id)
         
         # Return immediately with task ID - frontend will poll for status
         # This prevents timeout issues with long-running processing
@@ -1174,6 +1177,7 @@ async def start_video_processing(
         )
         
         print(f"✅ Celery task queued: {task.id}")
+        remember_task_owner(task.id, current_user.id)
         
         # Update processing status in database
         video_record.processing_status = 'processing'
@@ -1316,6 +1320,7 @@ async def start_photo_processing(
         )
 
         print(f"✅ Celery task queued: {task.id}")
+        remember_task_owner(task.id, current_user.id)
 
         # Update processing status in database
         photo_record.processing_status = 'processing'

@@ -12,6 +12,7 @@ class UserSession(Base):
     refresh_token_hash = Column(String(64), nullable=True, index=True)
     refresh_expires_at = Column(DateTime(timezone=True), nullable=True)
     device_info = Column(String(255))  # Информация об устройстве (опционально)
+    client_kind = Column(String(16))   # Платформа мобильного приложения (ios/android), NULL — веб
     ip_address = Column(String(45))    # IPv4 или IPv6 адрес
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

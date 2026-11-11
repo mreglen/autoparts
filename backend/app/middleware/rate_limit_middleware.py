@@ -19,7 +19,10 @@ logger = logging.getLogger(__name__)
 # Порядок важен: более специфичные префиксы первыми.
 # Регистрация — многошаговый флоу (send-code / verify / complete + повторы).
 DEFAULT_RATE_LIMIT_RULES: tuple[RateLimitRule, ...] = (
-    RateLimitRule(prefix="/api/auth/login", max_requests=10, window_seconds=900),
+    # Вход: общий IP-порог — только защита от флуда. Анти-брутфорс по аккаунту считается
+    # в самом роуте (40 попыток на логин+IP за 15 минут), иначе офис за операторским NAT
+    # блокирует себе вход всей командой.
+    RateLimitRule(prefix="/api/auth/login", max_requests=200, window_seconds=900),
     RateLimitRule(prefix="/api/auth/register/send-code", max_requests=10, window_seconds=3600),
     RateLimitRule(prefix="/api/auth/register/verify-code", max_requests=30, window_seconds=3600),
     RateLimitRule(prefix="/api/auth/register", max_requests=30, window_seconds=3600),

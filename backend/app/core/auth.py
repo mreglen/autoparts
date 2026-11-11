@@ -23,6 +23,17 @@ def hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+MOBILE_PLATFORMS = ("ios", "android")
+
+
+def resolve_client_kind(request: Optional[Request]) -> Optional[str]:
+    """Платформа мобильного приложения из заголовка X-App-Platform; для веба — None."""
+    if request is None:
+        return None
+    platform = (request.headers.get("x-app-platform") or "").strip().lower()
+    return platform if platform in MOBILE_PLATFORMS else None
+
+
 def issue_auth_token_pair(
     db: Session,
     user: User,
@@ -30,6 +41,7 @@ def issue_auth_token_pair(
     device_info: str = None,
     ip_address: str = None,
     expires_delta: Optional[timedelta] = None,
+    client_kind: Optional[str] = None,
 ) -> Tuple[str, str]:
     """Create UserSession and return (access_token, refresh_token)."""
     expires_delta = expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -42,6 +54,7 @@ def issue_auth_token_pair(
         refresh_token_hash=hash_refresh_token(refresh_token),
         refresh_expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
         device_info=device_info,
+        client_kind=client_kind,
         ip_address=ip_address,
         is_active=True,
     )
@@ -231,10 +244,13 @@ def get_current_admin_user(
     return current_user
 
 def cleanup_old_user_sessions(db: Session, user_id: int, ip_address: str, max_sessions_per_ip: int = 5):
-    from sqlalchemy import and_
+    from sqlalchemy import and_, case
+    # Мобильные сессии вытесняются последними: у приложения нет «новой вкладки», его сессия дорогая,
+    # а веб перелогинивается молча через /auth/refresh.
+    mobile_first = case((UserSession.client_kind.isnot(None), 1), else_=0)
     old_sessions = db.query(UserSession)\
         .filter(and_(UserSession.user_id == user_id, UserSession.ip_address == ip_address))\
-        .order_by(UserSession.created_at.desc())\
+        .order_by(mobile_first.desc(), UserSession.created_at.desc())\
         .offset(max_sessions_per_ip)\
         .all()
 

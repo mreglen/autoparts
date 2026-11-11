@@ -29,6 +29,7 @@ from app.core.auth import (
     issue_auth_token_pair,
     build_token_data_for_user,
     refresh_auth_tokens,
+    resolve_client_kind,
 )
 from app.models.user_session import UserSession
 from app.db.database import get_db
@@ -56,12 +57,35 @@ from app.utils.org_markup import (
 from app.utils.autoservice_access import can_see_rossko_sales_report
 from app.utils.user_public_code import assign_public_code
 from app.utils.user_avatar import avatar_public_url
+from app.utils.rate_limit import check_rate_limit, client_ip, retry_after_header
+import hashlib
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 settings = Settings()
+
+# Анти-брутфорс входа: считаем по аккаунту+IP, а не по IP — сотрудники автосервиса сидят за
+# одним операторским NAT, и IP-лимит на 10 попыток блокировал бы вход всей команде.
+LOGIN_MAX_ATTEMPTS = 40
+LOGIN_WINDOW_SECONDS = 900
+
+
+def enforce_login_rate_limit(request: Request | None, username: str) -> None:
+    ip = client_ip(request) if request is not None else "unknown"
+    login_hash = hashlib.sha1(username.strip().lower().encode("utf-8")).hexdigest()[:16]
+    result = check_rate_limit(
+        key=f"auth-login:{login_hash}:{ip}",
+        max_requests=LOGIN_MAX_ATTEMPTS,
+        window_seconds=LOGIN_WINDOW_SECONDS,
+    )
+    if not result.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Слишком много попыток входа. Подождите немного и попробуйте снова.",
+            headers={"Retry-After": retry_after_header(result)},
+        )
 
 
 def build_user_profile_response(user: User, db: Session | None = None) -> dict:
@@ -290,6 +314,7 @@ def login(
     request: Request = None,
     response: Response = None
 ):
+    enforce_login_rate_limit(request, username)
     user = authenticate_user(db, username, password)
     if not user:
         raise HTTPException(
@@ -312,6 +337,12 @@ def login(
     if not device_info and user_agent:
         device_info = user_agent[:255]  # Ограничиваем длину
 
+    client_kind = resolve_client_kind(request)
+    if client_kind:
+        app_version = (request.headers.get("x-app-version") or "").strip()
+        label = f"{client_kind} app" + (f" {app_version}" if app_version else "")
+        device_info = (f"{device_info} · {label}" if device_info else label)[:255]
+
     log_event(db, event_type="user_logged_in", user_id=user.id, email=user.email, details={
         "ip_address": ip_address,
         "device_info": device_info
@@ -328,6 +359,7 @@ def login(
         device_info=device_info,
         ip_address=ip_address,
         expires_delta=access_token_expires,
+        client_kind=client_kind,
     )
     
     # Clean up old sessions for this user from the same IP

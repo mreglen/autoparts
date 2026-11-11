@@ -20,10 +20,12 @@ from app.schemas.employee_work_zone import (
 from app.schemas.organization_employee import (
     OrganizationEmployeeCardCreate,
     OrganizationEmployeeCardPermissionsRequest,
+    OrganizationEmployeeCardPermissionsResponse,
     OrganizationEmployeeCardUpdate,
     OrganizationEmployeeCardView,
     OrganizationEmployeeCreateAccountResponse,
 )
+from app.schemas.page import Page
 from app.services.autoservice_caldav import (
     disconnect_account,
     provision_account,
@@ -41,6 +43,7 @@ from app.services.organization_employee_service import (
     update_employee_card,
 )
 from app.utils.org_access import org_has_admin_director, ADMIN_AUDIT_PERMISSION_CODE
+from app.utils.pagination import PageParams, build_page
 from app.services.autoservice_audit import (
     employee_label,
     log_autoservice,
@@ -108,6 +111,13 @@ def _card_caldav_status(account: CaldavAccount | None) -> CaldavStatusView:
     )
 
 
+def _require_cards_access(current_user: User, org_id: str) -> None:
+    if not current_user.is_admin and (
+        current_user.organization_id != org_id or not current_user.is_director
+    ):
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+
+
 @router.get("/{org_id}/employee-cards", response_model=list[OrganizationEmployeeCardView])
 def get_employee_cards(
     org_id: str,
@@ -115,11 +125,21 @@ def get_employee_cards(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not current_user.is_admin and (
-        current_user.organization_id != org_id or not current_user.is_director
-    ):
-        raise HTTPException(status_code=403, detail="Доступ запрещён")
+    _require_cards_access(current_user, org_id)
     return list_employee_cards(db, org_id, include_inactive=include_inactive)
+
+
+@router.get("/{org_id}/employee-cards/page", response_model=Page[OrganizationEmployeeCardView])
+def get_employee_cards_page(
+    org_id: str,
+    include_inactive: bool = Query(False),
+    page: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_cards_access(current_user, org_id)
+    rows = list_employee_cards(db, org_id, include_inactive=include_inactive)
+    return build_page(rows[page.offset : page.offset + page.limit], len(rows), page)
 
 
 @router.post("/{org_id}/employee-cards", response_model=OrganizationEmployeeCardView, status_code=201)
@@ -270,7 +290,10 @@ def get_employee_card_permissions(
     return get_card_permissions(db, org_id, card_id)
 
 
-@router.put("/{org_id}/employee-cards/{card_id}/permissions")
+@router.put(
+    "/{org_id}/employee-cards/{card_id}/permissions",
+    response_model=OrganizationEmployeeCardPermissionsResponse,
+)
 def put_employee_card_permissions(
     org_id: str,
     card_id: int,

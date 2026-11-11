@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.models.autoservice_work import AutoserviceWork
 from app.models.user import User
 from app.schemas.autoservice_work import AutoserviceWorkCreate, AutoserviceWorkUpdate, AutoserviceWorkView
+from app.schemas.page import Page
 from app.services.autoservice_audit import log_autoservice
 from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_ORDERS,
@@ -17,6 +18,7 @@ from app.utils.autoservice_access import (
     require_any_autoservice_permission,
     require_autoservice_settings,
 )
+from app.utils.pagination import CatalogPageParams, build_page
 
 router = APIRouter(tags=["Autoservice works"])
 
@@ -35,14 +37,8 @@ def _get_org_work_or_404(db: Session, org_id: str, work_id: int) -> AutoserviceW
     return row
 
 
-@router.get("/autoservice/works", response_model=list[AutoserviceWorkView])
-def list_autoservice_works(
-    q: str | None = Query(None),
-    include_inactive: bool = Query(False),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    org_id = require_any_autoservice_permission(
+def _list_org_id(db: Session, current_user: User) -> str:
+    return require_any_autoservice_permission(
         db,
         current_user,
         AUTOSERVICE_PERMISSION_ORDERS,
@@ -50,14 +46,62 @@ def list_autoservice_works(
         AUTOSERVICE_PERMISSION_PLANNER,
         AUTOSERVICE_PERMISSION_SETTINGS,
     )
+
+
+def _query_autoservice_works(
+    db: Session,
+    org_id: str,
+    q: str | None,
+    include_inactive: bool,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[AutoserviceWork], int]:
     query = db.query(AutoserviceWork).filter(AutoserviceWork.organization_id == org_id)
     if not include_inactive:
         query = query.filter(AutoserviceWork.is_active.is_(True))
     if q and q.strip():
         term = f"%{q.strip()}%"
         query = query.filter(AutoserviceWork.name.ilike(term))
-    rows = query.order_by(AutoserviceWork.sort_order.asc(), AutoserviceWork.name.asc()).all()
+    total = query.count()
+    query = query.order_by(AutoserviceWork.sort_order.asc(), AutoserviceWork.name.asc())
+    if limit is not None:
+        query = query.offset(offset).limit(limit)
+    return query.all(), total
+
+
+@router.get("/autoservice/works", response_model=list[AutoserviceWorkView])
+def list_autoservice_works(
+    q: str | None = Query(None),
+    include_inactive: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    rows, _total = _query_autoservice_works(
+        db, _list_org_id(db, current_user), q, include_inactive
+    )
     return [AutoserviceWorkView.model_validate(row) for row in rows]
+
+
+@router.get("/autoservice/works/page", response_model=Page[AutoserviceWorkView])
+def list_autoservice_works_page(
+    q: str | None = Query(None),
+    include_inactive: bool = Query(False),
+    page: CatalogPageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    rows, total = _query_autoservice_works(
+        db,
+        _list_org_id(db, current_user),
+        q,
+        include_inactive,
+        limit=page.limit,
+        offset=page.offset,
+    )
+    return build_page(
+        [AutoserviceWorkView.model_validate(row) for row in rows], total, page
+    )
 
 
 @router.post(

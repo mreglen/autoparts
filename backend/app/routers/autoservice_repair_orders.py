@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import exists, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -32,6 +33,12 @@ from app.models.product import Product
 from app.models.autoservice_warehouse import AutoserviceWarehouseItem
 from app.models.user import User
 from app.services.garage_vehicle_mileage import sync_repair_order_vehicle_mileage
+from app.services.repair_order_document import (
+    content_disposition,
+    render_document_pdf_bytes,
+    render_repair_order_html,
+    repair_order_pdf_filename,
+)
 from app.schemas.repair_order import (
     ACTIVE_STATUSES,
     ALL_STATUSES,
@@ -1617,10 +1624,10 @@ def get_my_repair_order(
 def list_repair_orders(
     scope: str = Query("active"),
     q: str | None = Query(None),
-    status_filter: list[str] | None = Query(None, alias="status"),
+    status_filter: list[str] | None = Query(None, alias="status", explode=True),
     client_id: int | None = Query(None),
-    work_zone_id: list[str] | None = Query(None),
-    payment_filter: list[str] | None = Query(None, alias="payment"),
+    work_zone_id: list[str] | None = Query(None, explode=True),
+    payment_filter: list[str] | None = Query(None, alias="payment", explode=True),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
@@ -1768,6 +1775,41 @@ def get_repair_order(
     org_id, level = require_orders_access(db, current_user)
     row = _get_visible_order_or_404(db, org_id, order_id, current_user, level)
     return _to_staff_view(db, row)
+
+
+@router.get(
+    "/autoservice/repair-orders/{order_id}/pdf",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}, "description": "PDF заказ-наряда"}},
+)
+async def get_repair_order_pdf(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id, level = require_orders_access(db, current_user)
+    row = _get_visible_order_or_404(db, org_id, order_id, current_user, level)
+    view = _to_staff_view(db, row)
+    html = render_repair_order_html(view, row.organization)
+    content = await render_document_pdf_bytes(html)
+    log_autoservice(
+        db,
+        event_type="autoservice_document_downloaded",
+        summary=f"Скачан PDF «Заказ-наряд»: {repair_order_label(row)}",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order",
+        entity_id=row.id,
+        details={"document": "order"},
+    )
+    filename = repair_order_pdf_filename(view.order_number or "")
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": content_disposition(filename, f"order-{order_id}.pdf"),
+        },
+    )
 
 
 @router.post(

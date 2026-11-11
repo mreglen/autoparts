@@ -213,6 +213,8 @@ def list_finance_receipts(
     org_id: str,
     date_from: date,
     date_to: date,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> AutoserviceFinanceReceiptsResponse:
     start, end = _period_bounds(date_from, date_to)
     effective_date = func.coalesce(
@@ -241,11 +243,17 @@ def list_finance_receipts(
         setattr(totals, method, _money(getattr(totals, method) + amount))
         items.append(_finance_receipt_row(row))
     total_amount = _money(totals.card + totals.cash + totals.bank)
+    window = items[offset : offset + limit] if limit is not None else items
     return AutoserviceFinanceReceiptsResponse(
         totals=totals,
         total_amount=total_amount,
         count=len(items),
-        items=items,
+        items=window,
+        limit=limit,
+        offset=offset,
+        total=len(items),
+        has_more=limit is not None and offset + len(window) < len(items),
+        fetched_at=datetime.now().isoformat(timespec="seconds"),
     )
 
 

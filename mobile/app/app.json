@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Свой Гараж — Автосервис",
+    "slug": "sg-autoservice",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "sgautoservice",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ru.svoygarage.autoservice"
+    },
+    "android": {
+      "package": "ru.svoygarage.autoservice",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": ["expo-secure-store"]
+  }
+}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 
@@ -44,6 +44,7 @@ from app.schemas.autoservice_warehouse import (
     AutoserviceWarehouseReturnView,
     PurchaseWarehouseImportIn,
 )
+from app.schemas.page import Page
 from app.services.autoservice_audit import (
     log_autoservice,
     receipt_doc_label,
@@ -66,6 +67,7 @@ from app.services.autoservice_warehouse_service import (
 )
 from app.utils.autoservice_access import AUTOSERVICE_PERMISSION_WAREHOUSE, require_autoservice_permission
 from app.utils.autoservice_warehouse_supplier import resolve_autoservice_supplier_display_name
+from app.utils.pagination import CatalogPageParams, PageParams, build_page
 from app.services.autoservice_warehouse_return_service import (
     create_warehouse_return,
     list_purchase_lots,
@@ -262,6 +264,20 @@ def list_autoservice_warehouse_purchase_lots(
     return list_purchase_lots(db, org_id=org_id)
 
 
+@router.get(
+    "/autoservice/warehouse/purchase-lots/page",
+    response_model=Page[AutoserviceWarehousePurchaseLotView],
+)
+def list_autoservice_warehouse_purchase_lots_page(
+    page: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows = list_purchase_lots(db, org_id=org_id)
+    return build_page(rows[page.offset : page.offset + page.limit], len(rows), page)
+
+
 @router.post(
     "/autoservice/warehouse/returns",
     response_model=AutoserviceWarehouseReturnView,
@@ -323,6 +339,23 @@ def list_autoservice_warehouse_returns(
     ]
 
 
+@router.get(
+    "/autoservice/warehouse/returns/page",
+    response_model=Page[AutoserviceWarehouseReturnView],
+)
+def list_autoservice_warehouse_returns_page(
+    page: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows = [
+        serialize_warehouse_return(row)
+        for row in list_warehouse_returns(db, org_id=org_id)
+    ]
+    return build_page(rows[page.offset : page.offset + page.limit], len(rows), page)
+
+
 @router.patch(
     "/autoservice/warehouse/returns/{return_id}/status",
     response_model=AutoserviceWarehouseReturnView,
@@ -359,19 +392,17 @@ def update_own_autoservice_warehouse_return(
     return serialize_warehouse_return(row)
 
 
-@router.get(
-    "/autoservice/warehouse/items",
-    response_model=list[AutoserviceWarehouseItemView],
-)
-def list_autoservice_warehouse_items(
-    q: str = Query("", max_length=120),
-    supplier: str = Query("", max_length=255),
-    available_only: bool = Query(False),
-    exclude_zero_qty: bool = Query(False),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+def _query_warehouse_items(
+    db: Session,
+    org_id: str,
+    q: str,
+    supplier: str,
+    available_only: bool,
+    exclude_zero_qty: bool,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[AutoserviceWarehouseItem], int]:
     query = db.query(AutoserviceWarehouseItem).filter(
         AutoserviceWarehouseItem.organization_id == org_id,
     )
@@ -410,11 +441,62 @@ def list_autoservice_warehouse_items(
             - AutoserviceWarehouseItem.return_reserved_qty
             > 0
         )
-    rows = query.order_by(
+    total = query.count()
+    query = query.order_by(
         AutoserviceWarehouseItem.name.asc(),
         AutoserviceWarehouseItem.id.asc(),
-    ).limit(500).all()
+    )
+    if limit is not None:
+        query = query.offset(offset).limit(limit)
+    else:
+        query = query.limit(500)
+    return query.all(), total
+
+
+@router.get(
+    "/autoservice/warehouse/items",
+    response_model=list[AutoserviceWarehouseItemView],
+)
+def list_autoservice_warehouse_items(
+    q: str = Query("", max_length=120),
+    supplier: str = Query("", max_length=255),
+    available_only: bool = Query(False),
+    exclude_zero_qty: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows, _total = _query_warehouse_items(
+        db, org_id, q, supplier, available_only, exclude_zero_qty
+    )
     return [_item_view(row) for row in rows]
+
+
+@router.get(
+    "/autoservice/warehouse/items/page",
+    response_model=Page[AutoserviceWarehouseItemView],
+)
+def list_autoservice_warehouse_items_page(
+    q: str = Query("", max_length=120),
+    supplier: str = Query("", max_length=255),
+    available_only: bool = Query(False),
+    exclude_zero_qty: bool = Query(False),
+    page: CatalogPageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows, total = _query_warehouse_items(
+        db,
+        org_id,
+        q,
+        supplier,
+        available_only,
+        exclude_zero_qty,
+        limit=page.limit,
+        offset=page.offset,
+    )
+    return build_page([_item_view(row) for row in rows], total, page)
 
 
 @router.get(
@@ -678,6 +760,38 @@ def patch_autoservice_warehouse_item(
     return _item_view(item)
 
 
+def _query_warehouse_receipt_docs(
+    db: Session,
+    org_id: str,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[AutoserviceWarehouseReceiptDoc], int]:
+    query = db.query(AutoserviceWarehouseReceiptDoc).filter(
+        AutoserviceWarehouseReceiptDoc.organization_id == org_id
+    )
+    if date_from:
+        query = query.filter(AutoserviceWarehouseReceiptDoc.doc_date >= date_from)
+    if date_to:
+        query = query.filter(AutoserviceWarehouseReceiptDoc.doc_date <= date_to)
+    total = query.count()
+    query = query.options(
+        joinedload(AutoserviceWarehouseReceiptDoc.lines),
+        joinedload(AutoserviceWarehouseReceiptDoc.repair_order),
+        joinedload(AutoserviceWarehouseReceiptDoc.creator),
+    ).order_by(
+        AutoserviceWarehouseReceiptDoc.doc_date.desc(),
+        AutoserviceWarehouseReceiptDoc.id.desc(),
+    )
+    if limit is not None:
+        query = query.offset(offset).limit(limit)
+    else:
+        query = query.limit(500)
+    return query.all(), total
+
+
 @router.get(
     "/autoservice/warehouse/receipts",
     response_model=list[AutoserviceWarehouseReceiptDocListView],
@@ -687,22 +801,58 @@ def list_autoservice_warehouse_receipts(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
-    rows = (
-        db.query(AutoserviceWarehouseReceiptDoc)
-        .options(
-            joinedload(AutoserviceWarehouseReceiptDoc.lines),
-            joinedload(AutoserviceWarehouseReceiptDoc.repair_order),
-            joinedload(AutoserviceWarehouseReceiptDoc.creator),
-        )
-        .filter(AutoserviceWarehouseReceiptDoc.organization_id == org_id)
-        .order_by(
-            AutoserviceWarehouseReceiptDoc.doc_date.desc(),
-            AutoserviceWarehouseReceiptDoc.id.desc(),
-        )
-        .limit(500)
-        .all()
-    )
+    rows, _total = _query_warehouse_receipt_docs(db, org_id)
     return [_doc_list_view(db, row) for row in rows]
+
+
+@router.get(
+    "/autoservice/warehouse/receipts/page",
+    response_model=Page[AutoserviceWarehouseReceiptDocListView],
+)
+def list_autoservice_warehouse_receipts_page(
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    page: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows, total = _query_warehouse_receipt_docs(
+        db, org_id, date_from=date_from, date_to=date_to,
+        limit=page.limit, offset=page.offset,
+    )
+    return build_page([_doc_list_view(db, row) for row in rows], total, page)
+
+
+def _query_warehouse_receipt_lines(
+    db: Session,
+    org_id: str,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[AutoserviceWarehouseReceipt], int]:
+    query = db.query(AutoserviceWarehouseReceipt).filter(
+        AutoserviceWarehouseReceipt.organization_id == org_id
+    )
+    total = query.count()
+    query = query.options(
+        joinedload(AutoserviceWarehouseReceipt.item),
+        joinedload(AutoserviceWarehouseReceipt.creator),
+        joinedload(AutoserviceWarehouseReceipt.repair_order),
+        joinedload(AutoserviceWarehouseReceipt.document).joinedload(
+            AutoserviceWarehouseReceiptDoc.repair_order
+        ),
+        joinedload(AutoserviceWarehouseReceipt.document).joinedload(
+            AutoserviceWarehouseReceiptDoc.creator
+        ),
+    ).order_by(
+        AutoserviceWarehouseReceipt.created_at.desc(), AutoserviceWarehouseReceipt.id.desc()
+    )
+    if limit is not None:
+        query = query.offset(offset).limit(limit)
+    else:
+        query = query.limit(500)
+    return query.all(), total
 
 
 @router.get(
@@ -714,25 +864,24 @@ def list_autoservice_warehouse_receipt_lines(
     current_user: User = Depends(get_current_user),
 ):
     org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
-    rows = (
-        db.query(AutoserviceWarehouseReceipt)
-        .options(
-            joinedload(AutoserviceWarehouseReceipt.item),
-            joinedload(AutoserviceWarehouseReceipt.creator),
-            joinedload(AutoserviceWarehouseReceipt.repair_order),
-            joinedload(AutoserviceWarehouseReceipt.document).joinedload(
-                AutoserviceWarehouseReceiptDoc.repair_order
-            ),
-            joinedload(AutoserviceWarehouseReceipt.document).joinedload(
-                AutoserviceWarehouseReceiptDoc.creator
-            ),
-        )
-        .filter(AutoserviceWarehouseReceipt.organization_id == org_id)
-        .order_by(AutoserviceWarehouseReceipt.created_at.desc(), AutoserviceWarehouseReceipt.id.desc())
-        .limit(500)
-        .all()
-    )
+    rows, _total = _query_warehouse_receipt_lines(db, org_id)
     return [_receipt_line_list_view(db, row) for row in rows]
+
+
+@router.get(
+    "/autoservice/warehouse/receipts/lines/page",
+    response_model=Page[AutoserviceWarehouseReceiptLineListView],
+)
+def list_autoservice_warehouse_receipt_lines_page(
+    page: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows, total = _query_warehouse_receipt_lines(
+        db, org_id, limit=page.limit, offset=page.offset
+    )
+    return build_page([_receipt_line_list_view(db, row) for row in rows], total, page)
 
 
 @router.get(
@@ -1042,16 +1191,16 @@ def update_autoservice_warehouse_receipt_line_price(
     return _doc_detail_view(db, doc)
 
 
-@router.get(
-    "/autoservice/warehouse/expenses",
-    response_model=list[AutoserviceWarehouseExpenseView],
-)
-def list_autoservice_warehouse_expenses(
-    supplier: str = Query("", max_length=255),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+def _query_warehouse_expenses(
+    db: Session,
+    org_id: str,
+    supplier: str,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[AutoserviceWarehouseExpense], int]:
     query = db.query(AutoserviceWarehouseExpense).filter(
         AutoserviceWarehouseExpense.organization_id == org_id,
     )
@@ -1073,21 +1222,66 @@ def list_autoservice_warehouse_expenses(
         query = query.filter(
             AutoserviceWarehouseExpense.item_id.in_(supplier_item_ids.scalar_subquery())
         )
-    rows = (
-        query
-        .options(
-            joinedload(AutoserviceWarehouseExpense.item),
-            joinedload(AutoserviceWarehouseExpense.creator),
-            joinedload(AutoserviceWarehouseExpense.repair_order),
+    if date_from:
+        query = query.filter(
+            AutoserviceWarehouseExpense.created_at >= datetime.combine(date_from, time.min)
         )
-        .order_by(
-            AutoserviceWarehouseExpense.created_at.desc(),
-            AutoserviceWarehouseExpense.id.desc(),
+    if date_to:
+        query = query.filter(
+            AutoserviceWarehouseExpense.created_at
+            < datetime.combine(date_to, time.min) + timedelta(days=1)
         )
-        .limit(500)
-        .all()
+    total = query.count()
+    query = query.options(
+        joinedload(AutoserviceWarehouseExpense.item),
+        joinedload(AutoserviceWarehouseExpense.creator),
+        joinedload(AutoserviceWarehouseExpense.repair_order),
+    ).order_by(
+        AutoserviceWarehouseExpense.created_at.desc(),
+        AutoserviceWarehouseExpense.id.desc(),
     )
+    if limit is not None:
+        query = query.offset(offset).limit(limit)
+    else:
+        query = query.limit(500)
+    return query.all(), total
 
+
+@router.get(
+    "/autoservice/warehouse/expenses",
+    response_model=list[AutoserviceWarehouseExpenseView],
+)
+def list_autoservice_warehouse_expenses(
+    supplier: str = Query("", max_length=255),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows, _total = _query_warehouse_expenses(db, org_id, supplier)
+    return _expense_rows_to_views(db, org_id, rows)
+
+
+@router.get(
+    "/autoservice/warehouse/expenses/page",
+    response_model=Page[AutoserviceWarehouseExpenseView],
+)
+def list_autoservice_warehouse_expenses_page(
+    supplier: str = Query("", max_length=255),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    page: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_WAREHOUSE)
+    rows, total = _query_warehouse_expenses(
+        db, org_id, supplier, date_from=date_from, date_to=date_to,
+        limit=page.limit, offset=page.offset,
+    )
+    return build_page(_expense_rows_to_views(db, org_id, rows), total, page)
+
+
+def _expense_rows_to_views(db: Session, org_id: str, rows) -> list[AutoserviceWarehouseExpenseView]:
     order_numbers = set()
     for row in rows:
         reason = (row.reason or "").strip()

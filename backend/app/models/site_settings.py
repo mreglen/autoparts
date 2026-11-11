@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Boolean, Float, String
+from sqlalchemy import Column, Integer, Boolean, Float, String, Text
 
 from ..db.database import Base
 
@@ -23,3 +23,7 @@ class SiteSettings(Base):
     smsgold_password = Column(String(200), nullable=True)
     smsgold_sender = Column(String(16), nullable=True)
     sms_provider = Column(String(16), nullable=False, default="smsgold")
+    mobile_min_app_version = Column(String(32), nullable=True)
+    mobile_apk_version = Column(String(32), nullable=True)
+    mobile_apk_url = Column(String(500), nullable=True)
+    mobile_apk_notes = Column(Text, nullable=True)
