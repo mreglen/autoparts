@@ -271,7 +271,11 @@ class AutoserviceExpenseUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _validate_employee_for_salary(self):
-        if self.type == "salary" and not self.employee_id:
+        if (
+            self.type == "salary"
+            and "employee_id" in self.model_fields_set
+            and not self.employee_id
+        ):
             raise ValueError("Для выплаты зарплаты необходимо указать сотрудника")
         return self
 

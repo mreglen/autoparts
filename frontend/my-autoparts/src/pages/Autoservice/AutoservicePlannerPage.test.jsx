@@ -265,6 +265,37 @@ describe('планировщик: день записи на осмотр вну
     expect(segment.className.split(' ')).toContain('bg-success-600');
   });
 
+  it('день осмотра вне полосы заказа показывается отдельным зелёным маркером', async () => {
+    apiRequest.mockImplementation(() => Promise.resolve({
+      ...weekResponse,
+      zones: [
+        {
+          ...weekResponse.zones[0],
+          days: [
+            {
+              date: '2026-10-28',
+              orders: [
+                {
+                  ...weekResponse.zones[0].days[0].orders[0],
+                  status: 'done',
+                  scheduled_at: '2026-10-28T09:00:00',
+                  scheduled_end_at: '2026-10-28T12:00:00',
+                  inspection_scheduled_at: '2026-10-30T14:00:00',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+
+    renderPage();
+    const bars = await screen.findAllByTitle(/Осмотр 30\.10 14:00/);
+    const marker = bars.find((el) => el.className.includes('bg-success-600'));
+    expect(marker).toBeTruthy();
+    expect(within(marker).getByText('14:00')).toBeTruthy();
+  });
+
   it('у закрытого заказа зелёная метка записи не показывается', async () => {
     apiRequest.mockImplementation(() => Promise.resolve({
       ...weekResponse,

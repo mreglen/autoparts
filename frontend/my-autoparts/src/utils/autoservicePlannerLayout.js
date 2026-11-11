@@ -95,9 +95,11 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
       }
     }
     let inspectionIdx = -1;
+    let inspectionDayIdx = -1;
     const inspection = parseWallClockDate(item.inspection_scheduled_at);
     if (inspection) {
       const idx = dayIsos.indexOf(toIsoDate(inspection));
+      inspectionDayIdx = idx;
       if (idx >= startIdx && idx <= endIdx) inspectionIdx = idx;
     }
     placed.push({
@@ -105,6 +107,7 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
       startIdx,
       endIdx,
       inspectionIdx,
+      inspectionDayIdx,
       continuesPastWeek,
       continuesFromPrevWeek,
     });
@@ -154,6 +157,20 @@ export function assignPlannerLanes(items, dayIsos, now = new Date()) {
       entry.lane = lanes.length;
       lanes.push(lane);
     }
+  }
+  // День осмотра вне полосы заказ-наряда: отдельный зелёный маркер на своей дате.
+  for (const entry of placed) {
+    const dayIdx = entry.inspectionDayIdx;
+    if (dayIdx < 0 || (dayIdx >= entry.startIdx && dayIdx <= entry.endIdx)) continue;
+    const subStart = dayIdx * 2;
+    const subEnd = subStart + 1;
+    let laneIdx = lanes.findIndex((lane) => isFree(lane, subStart, subEnd));
+    if (laneIdx < 0) {
+      laneIdx = lanes.length;
+      lanes.push(new Array(subCount).fill(false));
+    }
+    occupy(lanes[laneIdx], subStart, subEnd);
+    entry.inspectionMarker = { dayIdx, lane: laneIdx };
   }
   return placed;
 }

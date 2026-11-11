@@ -94,7 +94,7 @@ class AutoserviceWarehouseItem(Base):
     )
 
     @property
-    def return_reserved_qty(self) -> int:
+    def computed_return_reserved_qty(self) -> int:
         if not self.receipts:
             return 0
         return sum(int(r.return_reserved_qty or 0) for r in self.receipts)
@@ -105,7 +105,7 @@ class AutoserviceWarehouseItem(Base):
             0,
             int(self.quantity or 0)
             - int(self.reserved_qty or 0)
-            - int(self.return_reserved_qty or 0),
+            - int(self.computed_return_reserved_qty or 0),
         )
 
 

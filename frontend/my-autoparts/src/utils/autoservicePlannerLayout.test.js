@@ -199,6 +199,59 @@ describe('autoservicePlannerLayout', () => {
     expect(plannerInspectionSegment(entries[0])).toBeNull();
   });
 
+  it('marks an inspection day outside the order bar with a separate marker', () => {
+    const dayIsos = [
+      '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+    ];
+    const entries = assignPlannerLanes([
+      {
+        id: 1,
+        status: 'done',
+        scheduled_at: '2026-09-21T11:00:00',
+        scheduled_end_at: '2026-09-21T18:00:00',
+        inspection_scheduled_at: '2026-09-23T09:30:00',
+      },
+    ], dayIsos, new Date('2026-09-26T12:00:00'));
+    expect(entries[0].inspectionIdx).toBe(-1);
+    expect(plannerInspectionSegment(entries[0])).toBeNull();
+    expect(entries[0].inspectionMarker).toEqual({ dayIdx: 2, lane: 0 });
+  });
+
+  it('does not create a marker when the inspection day is inside the bar', () => {
+    const dayIsos = [
+      '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+    ];
+    const entries = assignPlannerLanes([
+      {
+        id: 1,
+        status: 'done',
+        scheduled_at: '2026-09-21T11:00:00',
+        scheduled_end_at: '2026-09-24T18:00:00',
+        inspection_scheduled_at: '2026-09-22T09:30:00',
+      },
+    ], dayIsos, new Date('2026-09-26T12:00:00'));
+    expect(entries[0].inspectionMarker).toBeUndefined();
+  });
+
+  it('ignores an inspection marker outside the visible week', () => {
+    const dayIsos = [
+      '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24',
+      '2026-09-25', '2026-09-26', '2026-09-27',
+    ];
+    const entries = assignPlannerLanes([
+      {
+        id: 1,
+        status: 'done',
+        scheduled_at: '2026-09-21T11:00:00',
+        scheduled_end_at: '2026-09-21T18:00:00',
+        inspection_scheduled_at: '2026-10-05T09:30:00',
+      },
+    ], dayIsos, new Date('2026-09-26T12:00:00'));
+    expect(entries[0].inspectionMarker).toBeUndefined();
+  });
+
   it('pins the week header under the app chrome without loosing it below the grid', () => {
     expect(plannerHeadShift({ chromeHeight: 120, gridTop: 200, gridHeight: 900, headHeight: 44 })).toBe(0);
     expect(plannerHeadShift({ chromeHeight: 120, gridTop: -60, gridHeight: 900, headHeight: 44 })).toBe(180);

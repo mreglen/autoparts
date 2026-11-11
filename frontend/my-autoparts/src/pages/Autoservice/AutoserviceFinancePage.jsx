@@ -6,6 +6,7 @@ import {
   getFinanceTodayDate,
   getMonthRangeDefaults,
 } from '../Finance/financeDisplay';
+
 import { formatServerDateTime } from '../../utils/serverDate';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 import { Button, ConfirmDialog, Modal, Skeleton, UnderlineTabs } from '../../components/UI';
@@ -45,6 +46,12 @@ const ALL_METHODS = [
   { id: 'card', label: 'Карта' },
   { id: 'cash', label: 'Наличные' },
   { id: 'bank', label: 'Расчётный счёт' },
+];
+
+const EXPENSE_TYPE_FILTERS = [
+  { id: 'all', label: 'Все' },
+  { id: 'salary', label: 'Зарплата' },
+  { id: 'other', label: 'Прочее' },
 ];
 
 const METHOD_COLORS = {
@@ -121,6 +128,18 @@ function receiptsWord(count) {
   return 'поступлений';
 }
 
+function expensesWord(count) {
+  if (count === 1) return 'расход';
+  if (count >= 2 && count <= 4) return 'расхода';
+  return 'расходов';
+}
+
+function formatExpenseDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function MethodBadge({ method }) {
   const label = FINANCE_METHOD_LABELS[method] || method || '—';
   const colorClass = METHOD_COLORS[method] || 'bg-surface-subtle text-ink-soft';
@@ -183,12 +202,6 @@ function FinanceExpenseRows({ rows, onOpen, emptyText = 'Нет расходов
       </p>
     );
   }
-
-  const formatExpenseDate = (dateStr) => {
-    if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
 
   return (
     <>
@@ -394,7 +407,14 @@ export default function AutoserviceFinancePage() {
   const [exporting, setExporting] = useState(false);
   const filterSwitchTimerRef = useRef(null);
 
-  const [activeTab, setActiveTab] = useState('receipts');
+  const [activeTab, setActiveTab] = useState(() => (
+    storedFilters.activeTab === 'expenses' ? 'expenses' : 'receipts'
+  ));
+  const [expenseTypeFilter, setExpenseTypeFilter] = useState(() => (
+    EXPENSE_TYPE_FILTERS.some((option) => option.id === storedFilters.expenseTypeFilter)
+      ? storedFilters.expenseTypeFilter
+      : 'all'
+  ));
   const [expensesData, setExpensesData] = useState({ total_amount: 0, count: 0, items: [] });
   const [expensesLoading, setExpensesLoading] = useState(false);
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
@@ -402,11 +422,10 @@ export default function AutoserviceFinancePage() {
   const [detailsExpense, setDetailsExpense] = useState(null);
   const [deleteExpense, setDeleteExpense] = useState(null);
   const [deletingExpenseId, setDeletingExpenseId] = useState(null);
-  const [savingExpense, setSavingExpense] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
 
-  usePersistedPageFilters(FINANCE_FILTERS_KEY, { dateFrom, dateTo, selectedMethod });
+  usePersistedPageFilters(FINANCE_FILTERS_KEY, { dateFrom, dateTo, selectedMethod, activeTab, expenseTypeFilter });
 
   const handleMethodChange = useCallback((methodId) => {
     setSelectedMethod(methodId);
@@ -475,12 +494,13 @@ export default function AutoserviceFinancePage() {
   useEffect(() => {
     const onPullRefresh = (event) => {
       if (event.detail?.pathname === '/autoservice/finance') {
-        load();
+        if (activeTab === 'expenses') loadExpenses();
+        else load();
       }
     };
     window.addEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
     return () => window.removeEventListener(MOBILE_PULL_REFRESH_EVENT, onPullRefresh);
-  }, [load]);
+  }, [load, loadExpenses, activeTab]);
 
   const handlePaymentDateSave = async (paymentId, paidAt) => {
     setSavingPaymentId(paymentId);
@@ -517,31 +537,36 @@ export default function AutoserviceFinancePage() {
     }
   };
 
-  const exportReceipts = useCallback(async () => {
+  const exportReport = useCallback(async () => {
     setExporting(true);
     setError('');
     try {
-      const response = await apiAxios.get('/autoservice/finance/receipts.xlsx', {
+      const isExpenses = activeTab === 'expenses';
+      const url = isExpenses
+        ? '/autoservice/finance/expenses.xlsx'
+        : '/autoservice/finance/receipts.xlsx';
+      const prefix = isExpenses ? 'autoservice_expenses' : 'autoservice_payments';
+      const response = await apiAxios.get(url, {
         params: { date_from: dateFrom, date_to: dateTo },
         responseType: 'blob',
       });
       const blob = new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
-      const url = window.URL.createObjectURL(blob);
+      const objectUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = `autoservice_payments_${dateFrom}_${dateTo}.xlsx`;
+      link.href = objectUrl;
+      link.download = `${prefix}_${dateFrom}_${dateTo}.xlsx`;
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(objectUrl);
     } catch (e) {
       setError(e?.message || 'Не удалось выгрузить Excel');
     } finally {
       setExporting(false);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, activeTab]);
 
   const openRepairOrder = useCallback(async (orderId) => {
     if (!orderId) return;
@@ -557,7 +582,6 @@ export default function AutoserviceFinancePage() {
   }, []);
 
   const handleCreateExpense = async (values) => {
-    setSavingExpense(true);
     setError('');
     try {
       const payload = {
@@ -576,14 +600,11 @@ export default function AutoserviceFinancePage() {
     } catch (err) {
       setError(err?.message || 'Не удалось создать расход');
       throw err;
-    } finally {
-      setSavingExpense(false);
     }
   };
 
   const handleUpdateExpense = async (values) => {
     if (!editExpense?.id) return;
-    setSavingExpense(true);
     setError('');
     try {
       const payload = {
@@ -603,8 +624,6 @@ export default function AutoserviceFinancePage() {
     } catch (err) {
       setError(err?.message || 'Не удалось сохранить изменения');
       throw err;
-    } finally {
-      setSavingExpense(false);
     }
   };
 
@@ -626,9 +645,10 @@ export default function AutoserviceFinancePage() {
     }
   };
 
-  const getEmployeePayrollInfo = async (employeeId) => {
-    const year = new Date(dateFrom).getFullYear();
-    const month = new Date(dateFrom).getMonth() + 1;
+  const getEmployeePayrollInfo = async (employeeId, expenseDate) => {
+    const base = expenseDate ? new Date(`${expenseDate}T00:00:00`) : new Date(dateFrom);
+    const year = base.getFullYear();
+    const month = base.getMonth() + 1;
     try {
       const params = new URLSearchParams({ year, month });
       const response = await apiRequest(`/autoservice/finance/expenses/employee-payroll/${employeeId}?${params.toString()}`);
@@ -656,6 +676,39 @@ export default function AutoserviceFinancePage() {
     return filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   }, [filteredRows, selectedMethod, data.total_amount]);
 
+  const expenseItems = useMemo(() => expensesData.items || [], [expensesData.items]);
+
+  const filteredExpenseRows = useMemo(() => {
+    if (expenseTypeFilter === 'all') return expenseItems;
+    return expenseItems.filter((row) => row.type === expenseTypeFilter);
+  }, [expenseItems, expenseTypeFilter]);
+
+  const expensesDisplayTotal = useMemo(() => {
+    if (expenseTypeFilter === 'all') return expensesData.total_amount || 0;
+    return filteredExpenseRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  }, [filteredExpenseRows, expenseTypeFilter, expensesData.total_amount]);
+
+  const expenseTypeLabel = useMemo(() => {
+    const found = EXPENSE_TYPE_FILTERS.find((option) => option.id === expenseTypeFilter);
+    return found?.label || 'Все';
+  }, [expenseTypeFilter]);
+
+  const headerStats = activeTab === 'expenses'
+    ? {
+        total: expensesDisplayTotal,
+        totalLabel: expenseTypeLabel,
+        count: filteredExpenseRows.length,
+        countLabel: expensesWord(filteredExpenseRows.length),
+        loading: expensesLoading,
+      }
+    : {
+        total: selectedTotal,
+        totalLabel: selectedLabel,
+        count: filteredRows.length,
+        countLabel: receiptsWord(filteredRows.length),
+        loading: loading || filterSwitching,
+      };
+
   return (
     <div className="min-w-0 space-y-4 lg:mt-5">
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
@@ -663,7 +716,7 @@ export default function AutoserviceFinancePage() {
           <h1 className="text-2xl font-bold text-ink max-lg:hidden sm:text-[1.75rem]">Финансы</h1>
           <button
             type="button"
-            onClick={exportReceipts}
+            onClick={exportReport}
             disabled={exporting}
             className="inline-flex h-9 items-center rounded-full bg-surface-subtle px-4 text-sm font-medium text-ink-soft transition hover:bg-surface-muted disabled:opacity-60"
           >
@@ -672,24 +725,24 @@ export default function AutoserviceFinancePage() {
         </div>
         <div className="grid grid-cols-2 gap-4 sm:flex sm:shrink-0 sm:gap-8">
           <div className="text-center">
-            {loading ? (
+            {headerStats.loading ? (
               <Skeleton className="mx-auto h-8 w-24 sm:h-9" />
             ) : (
               <div className="text-2xl font-bold tabular-nums leading-none text-ink sm:text-[1.75rem]">
-                {formatFinanceCurrency(selectedTotal)}
+                {formatFinanceCurrency(headerStats.total)}
               </div>
             )}
-            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">{selectedLabel}</div>
+            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">{headerStats.totalLabel}</div>
           </div>
           <div className="text-center">
-            {loading ? (
+            {headerStats.loading ? (
               <Skeleton className="mx-auto h-8 w-12 sm:h-9" />
             ) : (
               <div className="text-2xl font-bold tabular-nums leading-none text-brand-600 sm:text-[1.75rem]">
-                {filteredRows.length}
+                {headerStats.count}
               </div>
             )}
-            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">{receiptsWord(filteredRows.length)}</div>
+            <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">{headerStats.countLabel}</div>
           </div>
         </div>
       </div>
@@ -785,28 +838,11 @@ export default function AutoserviceFinancePage() {
       {activeTab === 'expenses' ? (
         <>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-            <div className="grid grid-cols-2 gap-4 sm:flex sm:shrink-0 sm:gap-8">
-              <div className="text-center">
-                {expensesLoading ? (
-                  <Skeleton className="mx-auto h-8 w-24 sm:h-9" />
-                ) : (
-                  <div className="text-2xl font-bold tabular-nums leading-none text-ink sm:text-[1.75rem]">
-                    {formatFinanceCurrency(expensesData.total_amount)}
-                  </div>
-                )}
-                <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">Всего</div>
-              </div>
-              <div className="text-center">
-                {expensesLoading ? (
-                  <Skeleton className="mx-auto h-8 w-12 sm:h-9" />
-                ) : (
-                  <div className="text-2xl font-bold tabular-nums leading-none text-brand-600 sm:text-[1.75rem]">
-                    {expensesData.count}
-                  </div>
-                )}
-                <div className="mt-1.5 text-xs text-ink-muted sm:text-sm">Записей</div>
-              </div>
-            </div>
+            <MethodSegmentedFilter
+              methods={EXPENSE_TYPE_FILTERS}
+              selected={expenseTypeFilter}
+              onChange={setExpenseTypeFilter}
+            />
             <button
               type="button"
               onClick={() => {
@@ -815,7 +851,7 @@ export default function AutoserviceFinancePage() {
               }}
               className={autoserviceListPrimaryButtonClass}
             >
-              Добавить документ
+              Добавить расход
             </button>
           </div>
 
@@ -845,9 +881,9 @@ export default function AutoserviceFinancePage() {
             </div>
           ) : (
             <FinanceExpenseRows
-              rows={expensesData.items}
+              rows={filteredExpenseRows}
               onOpen={setDetailsExpense}
-              emptyText="Нет расходов за период"
+              emptyText={expenseTypeFilter === 'all' ? 'Нет расходов за период' : 'Нет расходов этого вида'}
             />
           )}
         </>
@@ -991,7 +1027,7 @@ export default function AutoserviceFinancePage() {
           <div className="space-y-1.5">
             <FinanceField label="Вид">{detailsExpense.type_label || detailsExpense.type}</FinanceField>
             <FinanceField label="Сумма">{formatFinanceCurrency(detailsExpense.amount)}</FinanceField>
-            <FinanceField label="Дата">{detailsExpense.expense_date}</FinanceField>
+            <FinanceField label="Дата">{formatExpenseDate(detailsExpense.expense_date)}</FinanceField>
             <FinanceField label="Ответственный">{detailsExpense.employee_name || detailsExpense.created_by_name || '—'}</FinanceField>
             {detailsExpense.description ? (
               <FinanceField label="Описание">{detailsExpense.description}</FinanceField>

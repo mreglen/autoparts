@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Modal from '../UI/Modal';
 import Button from '../UI/Button';
-import { formatFinanceCurrency } from '../../pages/Finance/financeDisplay';
+import { formatFinanceCurrency, getFinanceTodayDate } from '../../pages/Finance/financeDisplay';
 
 const EXPENSE_TYPES = [
   { id: 'salary', label: 'Зарплата' },
@@ -21,7 +21,7 @@ function AutoserviceExpenseModal({
   const [type, setType] = useState(initialData?.type || 'other');
   const [amount, setAmount] = useState(initialData?.amount ? String(initialData.amount) : '');
   const [expenseDate, setExpenseDate] = useState(
-    initialData?.expense_date || dateFrom || new Date().toISOString().slice(0, 10)
+    initialData?.expense_date || dateFrom || getFinanceTodayDate()
   );
   const [description, setDescription] = useState(initialData?.description || '');
   const [employeeId, setEmployeeId] = useState(initialData?.employee_id || '');
@@ -33,7 +33,7 @@ function AutoserviceExpenseModal({
     if (open) {
       setType(initialData?.type || 'other');
       setAmount(initialData?.amount ? String(initialData.amount) : '');
-      setExpenseDate(initialData?.expense_date || dateFrom || new Date().toISOString().slice(0, 10));
+      setExpenseDate(initialData?.expense_date || dateFrom || getFinanceTodayDate());
       setDescription(initialData?.description || '');
       setEmployeeId(initialData?.employee_id || '');
       setPayrollInfo(null);
@@ -43,7 +43,7 @@ function AutoserviceExpenseModal({
   useEffect(() => {
     if (type === 'salary' && employeeId && open) {
       setPayrollLoading(true);
-      getEmployeePayrollInfo?.(employeeId).then((info) => {
+      getEmployeePayrollInfo?.(employeeId, expenseDate).then((info) => {
         setPayrollInfo(info);
         setPayrollLoading(false);
       }).catch(() => {
@@ -52,7 +52,7 @@ function AutoserviceExpenseModal({
     } else {
       setPayrollInfo(null);
     }
-  }, [type, employeeId, open, getEmployeePayrollInfo]);
+  }, [type, employeeId, expenseDate, open, getEmployeePayrollInfo]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -128,6 +128,7 @@ function AutoserviceExpenseModal({
           <label className="mb-1.5 block text-xs font-medium text-ink-muted">Сумма, ₽</label>
           <input
             type="number"
+            inputMode="decimal"
             step="0.01"
             min="0.01"
             value={amount}
@@ -169,6 +170,10 @@ function AutoserviceExpenseModal({
                 </select>
               )}
             </div>
+
+            {payrollLoading && (
+              <div className="rounded-lg bg-surface-subtle p-3 text-sm text-ink-muted">Загрузка зарплаты…</div>
+            )}
 
             {payrollInfo && (
               <div className="rounded-lg bg-surface-subtle p-3 text-sm">

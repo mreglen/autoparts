@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { usePlannerWorkZonePermissions } from '../../hooks/usePlannerWorkZonePermissions';
@@ -91,11 +91,25 @@ function plannerInspectionSegmentFor(entry) {
   return plannerInspectionSegment(entry);
 }
 
+function plannerOrderHasInspectionDay(item, dayIso) {
+  if (!item || item.kind === 'inspection') return false;
+  if (CLOSED_ORDER_STATUSES.has(normalizeRepairOrderStatus(item.status))) return false;
+  const date = parseWallClockDate(item.inspection_scheduled_at);
+  return Boolean(date) && toIsoDate(date) === dayIso;
+}
+
+function plannerInspectionClockLabel(item) {
+  const date = parseWallClockDate(item?.inspection_scheduled_at);
+  return date
+    ? date.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    : '—';
+}
+
 function plannerZoneDayItems(zone, dayIso) {
   return sortDayOrders(
     (zone?.days || [])
       .flatMap((day) => day.orders || [])
-      .filter((item) => plannerItemCoversDay(item, dayIso)),
+      .filter((item) => plannerItemCoversDay(item, dayIso) || plannerOrderHasInspectionDay(item, dayIso)),
   );
 }
 
@@ -269,26 +283,31 @@ function PlannerZoneWeekRow({
               const nameWithVehicle = [plannerClientFirstName(clientName), vehicleLabel].filter(Boolean).join(' ');
               const titleVehicle = [item.vehicle_make, item.vehicle_model].filter(Boolean).join(' ');
               const segment = plannerInspectionSegmentFor(entry);
+              const inspectionLabel = item.kind !== 'inspection'
+                && !CLOSED_ORDER_STATUSES.has(normalizeRepairOrderStatus(item.status))
+                ? plannerInspectionTitleLabel(item)
+                : '';
               const itemTitle = [
                 item.kind === 'inspection' ? 'Осмотр' : `№ ${item.order_number}`,
                 clientName,
                 titleVehicle,
-                segment ? plannerInspectionTitleLabel(item) : '',
+                inspectionLabel,
               ].filter(Boolean).join(' · ');
               const isHighlighted = dimmed && plannerItemKey(item) === highlightKey;
               const isFaded = dimmed && !isHighlighted;
+              const handleItemClick = () => {
+                if (isFaded) {
+                  onClearHighlight?.();
+                  return;
+                }
+                onItemClick(item);
+              };
               return (
+                <Fragment key={plannerItemKey(item)}>
                 <button
-                  key={plannerItemKey(item)}
                   data-planner-key={plannerItemKey(item)}
                   type="button"
-                  onClick={() => {
-                    if (isFaded) {
-                      onClearHighlight?.();
-                      return;
-                    }
-                    onItemClick(item);
-                  }}
+                  onClick={handleItemClick}
                   className={`pointer-events-auto relative mx-0.5 my-px min-w-0 overflow-hidden rounded-sg-sm px-2 py-1.5 text-left text-[11px] font-semibold leading-tight transition sm:mx-1 sm:my-0.5 sm:text-xs ${styleClass} ${
                     entry.continuesPastWeek ? 'rounded-r-none' : ''
                   } ${entry.continuesFromPrevWeek ? 'rounded-l-none' : ''} ${
@@ -310,6 +329,25 @@ function PlannerZoneWeekRow({
                   <span className="relative block truncate tabular-nums">{plannerBarTimeLabel(entry, dayIsos)}</span>
                   <span className="relative mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
                 </button>
+                {entry.inspectionMarker && inspectionLabel ? (
+                  <button
+                    data-planner-key={`${plannerItemKey(item)}-inspection`}
+                    type="button"
+                    onClick={handleItemClick}
+                    className={`pointer-events-auto relative mx-0.5 my-px min-w-0 overflow-hidden rounded-sg-sm bg-success-600 px-2 py-1.5 text-left text-[11px] font-semibold leading-tight text-white transition hover:bg-success-700 sm:mx-1 sm:my-0.5 sm:text-xs ${
+                      isFaded ? 'opacity-30' : ''
+                    } ${isHighlighted ? 'z-10 ring-2 ring-ink' : ''}`}
+                    style={{
+                      gridColumn: `${entry.inspectionMarker.dayIdx * 2 + 1} / ${entry.inspectionMarker.dayIdx * 2 + 3}`,
+                      gridRow: entry.inspectionMarker.lane + 1,
+                    }}
+                    title={itemTitle}
+                  >
+                    <span className="relative block truncate tabular-nums">{plannerInspectionClockLabel(item)}</span>
+                    <span className="relative mt-0.5 block truncate font-normal">{nameWithVehicle}</span>
+                  </button>
+                ) : null}
+                </Fragment>
               );
             })}
           </div>
@@ -991,7 +1029,10 @@ function MobileDayPlanner({
                 </div>
                 {orders.length > 0 ? (
                   <ul className="mt-2 space-y-1.5">
-                    {orders.map((order) => (
+                    {orders.map((order) => {
+                      const inspectionDay = plannerOrderHasInspectionDay(order, selectedDayIso);
+                      const inspectionOnlyDay = inspectionDay && !plannerItemCoversDay(order, selectedDayIso);
+                      return (
                       <li key={plannerItemKey(order)}>
                         <button
                           type="button"
@@ -1012,7 +1053,9 @@ function MobileDayPlanner({
                           }`}
                         >
                           <span className="w-14 shrink-0 pt-0.5 text-sm font-semibold tabular-nums">
-                            {plannerItemMobileTimeLabel(order, selectedDayIso)}
+                            {inspectionOnlyDay
+                              ? plannerInspectionClockLabel(order)
+                              : plannerItemMobileTimeLabel(order, selectedDayIso)}
                           </span>
                           {order.kind === 'inspection' ? (
                             <span className="min-w-0 flex-1">
@@ -1029,6 +1072,11 @@ function MobileDayPlanner({
                                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                                   {order.vehicle && order.vehicle !== '—' ? order.vehicle : 'Авто'}
                                 </span>
+                                {inspectionDay ? (
+                                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-success-700">
+                                    Осмотр
+                                  </span>
+                                ) : null}
                                 <OrderStatusBadge status={order.status} className="shrink-0" noRing />
                               </span>
                               <span className="mt-0.5 block truncate text-sm opacity-80">
@@ -1039,7 +1087,8 @@ function MobileDayPlanner({
                           )}
                         </button>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 ) : null}
               </section>
@@ -1273,7 +1322,7 @@ export default function AutoservicePlannerPage() {
   const monthItemsByDay = {};
   monthDayIsos.forEach((iso) => {
     monthItemsByDay[iso] = sortDayOrders(
-      monthItems.filter((item) => plannerItemCoversDay(item, iso)),
+      monthItems.filter((item) => plannerItemCoversDay(item, iso) || plannerOrderHasInspectionDay(item, iso)),
     );
   });
 
