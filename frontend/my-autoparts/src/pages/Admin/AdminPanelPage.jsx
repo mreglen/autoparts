@@ -33,6 +33,7 @@ const ADMIN_TOC = [
   { id: 'admin-deploy', label: 'Обновление' },
   { id: 'admin-backups', label: 'Копии' },
   { id: 'admin-features', label: 'Сайт' },
+  { id: 'admin-mobile-app', label: 'Приложение' },
   { id: 'admin-openrouter', label: 'OpenRouter' },
   { id: 'admin-vpn-bot', label: 'VPN-бот' },
   { id: 'admin-unpaid-checkout', label: 'Без оплаты' },
@@ -71,6 +72,10 @@ function AdminPanelPage() {
   const [priceRoundingMigrationBusy, setPriceRoundingMigrationBusy] = useState(false);
   const [priceRoundingMigrationResult, setPriceRoundingMigrationResult] = useState(null);
   const [priceRoundingMigrationOrgId, setPriceRoundingMigrationOrgId] = useState('');
+  const [mobileMinVersion, setMobileMinVersion] = useState('');
+  const [mobileApkVersion, setMobileApkVersion] = useState('');
+  const [mobileApkUrl, setMobileApkUrl] = useState('');
+  const [mobileApkNotes, setMobileApkNotes] = useState('');
 
   const [siteQuickLinks, setSiteQuickLinks] = useState([]);
   const [siteQuickLinksLoading, setSiteQuickLinksLoading] = useState(true);
@@ -103,6 +108,10 @@ function AdminPanelPage() {
           setUsedPartsPurchaseModeLocal(
             mode === 'cart_only' || mode === 'cta_only' || mode === 'both' ? mode : 'both',
           );
+          setMobileMinVersion(data.mobile_min_app_version || '');
+          setMobileApkVersion(data.mobile_apk_version || '');
+          setMobileApkUrl(data.mobile_apk_url || '');
+          setMobileApkNotes(data.mobile_apk_notes || '');
         }
       } catch (e) {
         if (!cancelled) {
@@ -275,6 +284,27 @@ function AdminPanelPage() {
       dispatch(setUsedPartsPurchaseMode(value));
       patchPublicSiteConfigCache({ used_parts_purchase_mode: value });
       dispatch(fetchPublicSiteConfig(true));
+    } catch (e) {
+      setError(e?.message || 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveMobileAppSettings = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          mobile_min_app_version: mobileMinVersion.trim() || null,
+          mobile_apk_version: mobileApkVersion.trim() || null,
+          mobile_apk_url: mobileApkUrl.trim() || null,
+          mobile_apk_notes: mobileApkNotes.trim() || null,
+        }),
+      });
+      setNotice('Настройки мобильного приложения сохранены');
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
     } finally {
@@ -550,6 +580,72 @@ function AdminPanelPage() {
           {(loadingSettings || saving) && (
             <p className="mt-3 text-sm text-gray-500">{saving ? 'Сохранение…' : 'Загрузка…'}</p>
           )}
+        </section>
+
+        <section
+          id="admin-mobile-app"
+          className="scroll-mt-24 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
+        >
+          <h2 className="mb-1 text-lg font-semibold text-gray-900">Мобильное приложение</h2>
+          <p className="mb-4 text-sm text-gray-500">
+            Версия и ссылка на APK отдаются приложению через /api/mobile/meta. Если заполнены
+            «Версия APK» и «Ссылка», у пользователей с более старой версией появится предложение
+            обновиться; «Минимальная версия» блокирует приложение до обновления.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Версия APK</span>
+              <input
+                type="text"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="1.0.1"
+                value={mobileApkVersion}
+                disabled={loadingSettings || saving}
+                onChange={(e) => setMobileApkVersion(e.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Минимальная версия приложения</span>
+              <input
+                type="text"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="1.0.0"
+                value={mobileMinVersion}
+                disabled={loadingSettings || saving}
+                onChange={(e) => setMobileMinVersion(e.target.value)}
+              />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Ссылка на APK</span>
+              <input
+                type="text"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="https://svoygarage.ru/downloads/sg-autoservice-1.0.1.apk"
+                value={mobileApkUrl}
+                disabled={loadingSettings || saving}
+                onChange={(e) => setMobileApkUrl(e.target.value)}
+              />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-sm font-medium text-gray-700">Примечание к обновлению</span>
+              <input
+                type="text"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="Что нового"
+                value={mobileApkNotes}
+                disabled={loadingSettings || saving}
+                onChange={(e) => setMobileApkNotes(e.target.value)}
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveMobileAppSettings}
+            disabled={loadingSettings || saving}
+            className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </button>
         </section>
 
         <section id="admin-openrouter" className="scroll-mt-24 space-y-6">

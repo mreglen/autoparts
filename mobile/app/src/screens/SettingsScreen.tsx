@@ -20,6 +20,8 @@ import {
   type CaldavStatus,
 } from "../api/directory";
 import { describeError } from "../api/errors";
+import { APP_VERSION } from "../app/appIdentity";
+import { requestUpdateCheck } from "../app/appUpdate";
 import { canAccessSection } from "../auth/access";
 import { useSession } from "../auth/session";
 import { currentPermissionCodes } from "../auth/permissions";
@@ -311,6 +313,40 @@ export function SettingsScreen() {
               </Text>
             </View>
           ) : null}
+
+          <View className="gap-3">
+            <Text className="text-lg font-bold" style={{ color: colors.ink }}>
+              О приложении
+            </Text>
+            <View
+              className="flex-row items-center justify-between rounded-2xl p-4"
+              style={{ backgroundColor: colors.surfaceSubtle }}
+            >
+              <View>
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: colors.ink }}
+                >
+                  Свой Гараж · Автосервис
+                </Text>
+                <Text className="text-xs" style={{ color: colors.inkMuted }}>
+                  Версия {APP_VERSION}
+                </Text>
+              </View>
+              <Pressable
+                onPress={requestUpdateCheck}
+                className="rounded-full px-4 py-2"
+                style={{ backgroundColor: colors.brand }}
+              >
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: "#fff" }}
+                >
+                  Проверить обновление
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       )}
 

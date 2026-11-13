@@ -341,7 +341,18 @@ systemctl restart kroan.service
 - `backend/app/utils/repair_order_number.py`
 - `backend/app/models/repair_order.py`
 - `backend/app/db/schema_patches.py`
+- `mobile/build-apk.ps1` — сборка release APK (см. ниже)
+- `mobile/app/src/app/appUpdate.ts` — self-update APK в приложении
+
+## 11. Мобильное приложение (`mobile/`)
+
+- **Сборка APK:** `powershell -File mobile\build-apk.ps1` (из корня репо). Скрипт синхронизирует `mobile/app` в `C:\s` (ASCII-путь — кириллица/пробелы в `OneDrive\Рабочий стол` ломают prebuild/Gradle), патчит `signingConfigs.release` в `android/app/build.gradle` и запускает `gradlew assembleRelease`. Результат — `mobile/releases/sg-autoservice-<version>.apk`.
+- **Подпись:** релизный keystore `mobile/keys/sg-release.jks` + `keystore.properties` (gitignored, не коммитить). Релиз подписан им, НЕ debug-ключом — не удалять `mobile/keys/`.
+- **Self-update:** `GET /api/mobile/meta` отдаёт `latest_apk {version,url,notes}` и `min_supported_app_version` из `site_settings` (`mobile_apk_*`). Заполняется в админке «Настройки → Приложение». Приложение при старте (после входа) и по кнопке «Проверить обновление» в «Настройки → О приложении» сравнивает версии, скачивает APK в кэш и открывает системный share/install. «Минимальная версия» — блокирующее обновление.
+- **Хостинг APK:** положить файл в `/var/www/my-autoparts/downloads/` на сервере — nginx отдаст его как `https://svoygarage.ru/downloads/<file>.apk`; этот URL прописать в админке.
+- **Хранилище токенов:** `src/auth/tokenStore.ts` — SecureStore с таймаутом 3с + зеркало в AsyncStorage (на части устройств SecureStore зависает — была причина «вечной загрузки»).
+- **Проверки mobile:** `cd mobile/app && npx tsc --noEmit && npx eslint src App.tsx && npx jest && npx prettier --check "src/**/*.{ts,tsx}" App.tsx`.
 
 ---
 
-Последнее обновление: 2026-10-28
+Последнее обновление: 2026-11-13

@@ -7,6 +7,7 @@ import { queryClient } from "./src/api/queryClient";
 import { bootstrapOfflineCache } from "./src/offline";
 import { initThemeMode, useTheme } from "./src/theme/useTheme";
 import { SessionProvider } from "./src/auth/session";
+import { AppUpdatePrompt } from "./src/components/AppUpdatePrompt";
 import { OfflineBanner } from "./src/components/OfflineBanner";
 import { ToastProvider } from "./src/components/ui";
 import { RootNavigator } from "./src/navigation/RootNavigator";
@@ -28,6 +29,7 @@ export default function App() {
         <SessionProvider>
           <ToastProvider>
             <RootNavigator />
+            <AppUpdatePrompt />
             <OfflineBanner />
             <ThemedStatusBar />
           </ToastProvider>
