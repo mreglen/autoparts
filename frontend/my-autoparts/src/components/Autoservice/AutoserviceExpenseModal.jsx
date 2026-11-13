@@ -3,22 +3,19 @@ import Modal from '../UI/Modal';
 import Button from '../UI/Button';
 import { formatFinanceCurrency, getFinanceTodayDate } from '../../pages/Finance/financeDisplay';
 
-const EXPENSE_TYPES = [
-  { id: 'salary', label: 'Зарплата' },
-  { id: 'other', label: 'Прочее' },
-];
-
 function AutoserviceExpenseModal({
   open,
   onClose,
   onSubmit,
   employees,
   employeesLoading,
+  articles = [],
   initialData = null,
   dateFrom,
   getEmployeePayrollInfo,
 }) {
-  const [type, setType] = useState(initialData?.type || 'other');
+  const [articleId, setArticleId] = useState(initialData?.article_id || '');
+  const [type] = useState(initialData?.type || 'other');
   const [amount, setAmount] = useState(initialData?.amount ? String(initialData.amount) : '');
   const [expenseDate, setExpenseDate] = useState(
     initialData?.expense_date || dateFrom || getFinanceTodayDate()
@@ -31,7 +28,7 @@ function AutoserviceExpenseModal({
 
   useEffect(() => {
     if (open) {
-      setType(initialData?.type || 'other');
+      setArticleId(initialData?.article_id || '');
       setAmount(initialData?.amount ? String(initialData.amount) : '');
       setExpenseDate(initialData?.expense_date || dateFrom || getFinanceTodayDate());
       setDescription(initialData?.description || '');
@@ -70,6 +67,7 @@ function AutoserviceExpenseModal({
     try {
       await onSubmit({
         type,
+        article_id: articleId ? Number(articleId) : null,
         amount: Number(amount),
         expense_date: expenseDate,
         description: description || null,
@@ -111,16 +109,20 @@ function AutoserviceExpenseModal({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-ink-muted">Вид</label>
+          <label className="mb-1.5 block text-xs font-medium text-ink-muted">Статья расхода</label>
           <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
+            value={articleId}
+            onChange={(e) => setArticleId(e.target.value)}
             className="w-full rounded-lg border border-line px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:cursor-wait disabled:opacity-60"
             disabled={submitting}
           >
-            {EXPENSE_TYPES.map((t) => (
-              <option key={t.id} value={t.id}>{t.label}</option>
+            <option value="">Не указана</option>
+            {articles.map((article) => (
+              <option key={article.id} value={article.id}>{article.name}</option>
             ))}
+            {initialData?.article_name && !articles.some((a) => a.id === initialData.article_id) ? (
+              <option value={initialData.article_id || ''}>{initialData.article_name}</option>
+            ) : null}
           </select>
         </div>
 

@@ -1153,6 +1153,28 @@ def ensure_autoservice_expenses_table() -> None:
     logger.info("Created autoservice_expenses table")
 
 
+def ensure_autoservice_expenses_article_column() -> None:
+    """Link autoservice expenses to expense articles."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "autoservice_expenses" not in tables or "autoservice_expense_articles" not in tables:
+        return
+    columns = {col["name"] for col in inspector.get_columns("autoservice_expenses")}
+    if "article_id" in columns:
+        return
+    article_ref = (
+        "INTEGER REFERENCES autoservice_expense_articles(id) ON DELETE SET NULL"
+        if engine.dialect.name == "postgresql"
+        else "INTEGER REFERENCES autoservice_expense_articles(id)"
+    )
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE autoservice_expenses ADD COLUMN article_id {article_ref}"))
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_autoservice_expenses_article_id ON autoservice_expenses (article_id)")
+        )
+    logger.info("Applied autoservice_expenses article_id column patch")
+
+
 def ensure_seo_sitemap_cache_table() -> None:
     """Table storing cached product sitemap XML."""
     inspector = inspect(engine)

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.autoservice_payment import AutoservicePayment
-from app.models.autoservice_expense import AutoserviceExpense
+from app.models.autoservice_expense import AutoserviceExpense, AutoserviceExpenseArticle
 from app.models.autoservice_payroll_accrual import AutoservicePayrollAccrual
 from app.models.autoservice_service_employee import AutoserviceServiceEmployee
 from app.models.repair_order import RepairOrder
@@ -45,6 +45,7 @@ from app.services.autoservice_expense_service import (
     list_autoservice_expenses,
 )
 from app.services.autoservice_finance_expenses_xlsx import build_finance_expenses_workbook_bytes
+from app.routers.autoservice_expense_articles import find_or_create_expense_article
 from app.services.autoservice_finance_receipts_xlsx import build_finance_receipts_workbook_bytes
 from app.services.autoservice_audit import log_autoservice, repair_order_label
 from app.services.autoservice_order_economics import (
@@ -92,6 +93,27 @@ def _require_expense_employee(db: Session, org_id: str, employee_id: int) -> Non
     )
     if not employee:
         raise HTTPException(status_code=400, detail="Сотрудник не найден")
+
+
+def _resolve_expense_article(
+    db: Session,
+    org_id: str,
+    article_id: int | None,
+    article_name: str | None,
+) -> AutoserviceExpenseArticle | None:
+    if article_id is not None:
+        row = (
+            db.query(AutoserviceExpenseArticle)
+            .filter(
+                AutoserviceExpenseArticle.id == article_id,
+                AutoserviceExpenseArticle.organization_id == org_id,
+            )
+            .first()
+        )
+        if not row:
+            raise HTTPException(status_code=400, detail="Статья расхода не найдена")
+        return row
+    return find_or_create_expense_article(db, org_id, article_name)
 
 
 def _log_report_export(
@@ -556,16 +578,20 @@ def create_autoservice_expense(
         AUTOSERVICE_PERMISSION_REPORTS,
     )
 
-    if payload.employee_id and payload.type == "salary":
+    article = _resolve_expense_article(db, org_id, payload.article_id, payload.article_name)
+    expense_type = payload.type or ("salary" if payload.employee_id else "other")
+
+    if payload.employee_id and expense_type == "salary":
         _require_expense_employee(db, org_id, payload.employee_id)
 
     expense = AutoserviceExpense(
         organization_id=org_id,
-        type=payload.type,
+        type=expense_type,
+        article_id=article.id if article else None,
         amount=payload.amount,
         expense_date=datetime.combine(payload.expense_date, datetime.min.time()),
         description=payload.description,
-        employee_id=payload.employee_id if payload.type == "salary" else None,
+        employee_id=payload.employee_id if expense_type == "salary" else None,
         created_by_user_id=current_user.id,
     )
     db.add(expense)
@@ -582,6 +608,7 @@ def create_autoservice_expense(
         entity_id=expense.id,
         details={
             "type": expense.type,
+            "article_id": expense.article_id,
             "amount": str(expense.amount),
             "expense_date": str(expense.expense_date.date()),
             "employee_id": expense.employee_id,
@@ -609,6 +636,7 @@ def get_autoservice_expense(
     expense = (
         db.query(AutoserviceExpense)
         .options(
+            joinedload(AutoserviceExpense.article),
             joinedload(AutoserviceExpense.employee),
             joinedload(AutoserviceExpense.created_by),
         )
@@ -645,6 +673,7 @@ def update_autoservice_expense(
     expense = (
         db.query(AutoserviceExpense)
         .options(
+            joinedload(AutoserviceExpense.article),
             joinedload(AutoserviceExpense.employee),
             joinedload(AutoserviceExpense.created_by),
         )
@@ -661,6 +690,15 @@ def update_autoservice_expense(
     fields = payload.model_fields_set
     if "type" in fields and payload.type is not None:
         expense.type = payload.type
+    if "article_id" in fields or "article_name" in fields:
+        if payload.article_id is not None:
+            article = _resolve_expense_article(db, org_id, payload.article_id, None)
+        elif payload.article_name is not None:
+            article = _resolve_expense_article(db, org_id, None, payload.article_name)
+        else:
+            article = None
+        expense.article_id = article.id if article else None
+        expense.article = article
     if "amount" in fields and payload.amount is not None:
         expense.amount = payload.amount
     if "expense_date" in fields and payload.expense_date is not None:
@@ -689,6 +727,7 @@ def update_autoservice_expense(
         entity_id=expense.id,
         details={
             "type": expense.type,
+            "article_id": expense.article_id,
             "amount": str(expense.amount),
             "expense_date": str(expense.expense_date.date()),
             "employee_id": expense.employee_id,

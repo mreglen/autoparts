@@ -28,6 +28,8 @@ def _expense(**overrides):
     base = dict(
         id=1,
         type="salary",
+        article_id=None,
+        article=None,
         amount=Decimal("15000.00"),
         expense_date=datetime(2026, 10, 5, 0, 0),
         description="Октябрь",

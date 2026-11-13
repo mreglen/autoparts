@@ -1,20 +1,38 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect } from "react";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { QueryClientProvider } from "@tanstack/react-query";
 
-export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
+import { queryClient } from "./src/api/queryClient";
+import { bootstrapOfflineCache } from "./src/offline";
+import { initThemeMode, useTheme } from "./src/theme/useTheme";
+import { SessionProvider } from "./src/auth/session";
+import { OfflineBanner } from "./src/components/OfflineBanner";
+import { ToastProvider } from "./src/components/ui";
+import { RootNavigator } from "./src/navigation/RootNavigator";
+
+function ThemedStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? "light" : "dark"} />;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  useEffect(() => {
+    void bootstrapOfflineCache();
+    void initThemeMode();
+  }, []);
+
+  return (
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider>
+          <ToastProvider>
+            <RootNavigator />
+            <OfflineBanner />
+            <ThemedStatusBar />
+          </ToastProvider>
+        </SessionProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
+  );
+}

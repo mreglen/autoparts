@@ -29,9 +29,10 @@ def _sheet_summary(wb: Workbook, expenses, total_amount, date_from: date, date_t
     ]
     by_type: dict[str, float] = {}
     for exp in expenses:
-        by_type[exp.type] = by_type.get(exp.type, 0) + float(exp.amount)
-    for expense_type in sorted(by_type, key=expense_type_label):
-        metrics.append((expense_type_label(expense_type), by_type[expense_type]))
+        label = exp.article.name if exp.article else expense_type_label(exp.type)
+        by_type[label] = by_type.get(label, 0) + float(exp.amount)
+    for expense_type in sorted(by_type):
+        metrics.append((expense_type, by_type[expense_type]))
 
     for label, value in metrics:
         ws.cell(row=row, column=1, value=label)
@@ -44,7 +45,7 @@ def _sheet_expenses(wb: Workbook, expenses) -> None:
     ws = wb.create_sheet("Расходы")
     headers = [
         "Дата",
-        "Вид",
+        "Статья расхода",
         "Сумма, ₽",
         "Сотрудник",
         "Ответственный",
@@ -54,7 +55,7 @@ def _sheet_expenses(wb: Workbook, expenses) -> None:
     _write_header(ws, headers)
     for index, exp in enumerate(expenses, start=2):
         ws.cell(row=index, column=1, value=exp.expense_date.date())
-        ws.cell(row=index, column=2, value=expense_type_label(exp.type))
+        ws.cell(row=index, column=2, value=exp.article.name if exp.article else expense_type_label(exp.type))
         ws.cell(row=index, column=3, value=exp.amount)
         ws.cell(row=index, column=4, value=exp.employee.name if exp.employee else "")
         ws.cell(row=index, column=5, value=user_short_name(exp.created_by))

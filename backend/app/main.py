@@ -157,6 +157,7 @@ from app.db.schema_patches import (
     ensure_user_rossko_favorites_table,
     ensure_storage_location_geocode_columns,
     ensure_autoservice_expenses_table,
+    ensure_autoservice_expenses_article_column,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
@@ -434,6 +435,7 @@ try:
     ensure_user_rossko_favorites_table()
     ensure_storage_location_geocode_columns()
     ensure_autoservice_expenses_table()
+    ensure_autoservice_expenses_article_column()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise

@@ -1,6 +1,6 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from "expo-secure-store";
 
-import { TOKEN_KEYS } from '../storage/keys';
+import { TOKEN_KEYS } from "../storage/keys";
 
 export interface StoredTokens {
   access: string | null;
@@ -16,14 +16,18 @@ export async function readTokens(): Promise<StoredTokens> {
 }
 
 export async function saveTokens(tokens: Partial<StoredTokens>): Promise<void> {
-  const jobs: Array<Promise<unknown>> = [];
-  if ('access' in tokens) jobs.push(setOrDelete(TOKEN_KEYS.access, tokens.access));
-  if ('refresh' in tokens) jobs.push(setOrDelete(TOKEN_KEYS.refresh, tokens.refresh));
+  const jobs: Promise<unknown>[] = [];
+  if ("access" in tokens && tokens.access !== undefined)
+    jobs.push(setOrDelete(TOKEN_KEYS.access, tokens.access));
+  if ("refresh" in tokens && tokens.refresh !== undefined)
+    jobs.push(setOrDelete(TOKEN_KEYS.refresh, tokens.refresh));
   await Promise.all(jobs);
 }
 
 async function setOrDelete(key: string, value: string | null): Promise<void> {
-  return value ? SecureStore.setItemAsync(key, value) : SecureStore.deleteItemAsync(key);
+  return value
+    ? SecureStore.setItemAsync(key, value)
+    : SecureStore.deleteItemAsync(key);
 }
 
 export async function clearTokens(): Promise<void> {

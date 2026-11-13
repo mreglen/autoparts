@@ -218,7 +218,7 @@ function FinanceExpenseRows({ rows, onOpen, emptyText = 'Нет расходов
           >
             <div className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 truncate text-sm font-semibold text-ink">
-                {row.type_label || row.type}
+                {row.article_name || row.type_label || row.type}
               </span>
               <span className="shrink-0 text-sm font-bold tabular-nums text-ink">
                 {formatFinanceCurrency(row.amount)}
@@ -233,6 +233,11 @@ function FinanceExpenseRows({ rows, onOpen, emptyText = 'Нет расходов
                 {row.created_by_name}
               </span>
             </div>
+            {row.description ? (
+              <div className="mt-0.5 truncate text-xs text-ink-muted">
+                {row.description}
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -242,8 +247,9 @@ function FinanceExpenseRows({ rows, onOpen, emptyText = 'Нет расходов
           <thead>
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-32 ${autoserviceListThClass}`}>Дата</th>
-              <th className={`w-32 ${autoserviceListThClass}`}>Вид</th>
+              <th className={`w-40 ${autoserviceListThClass}`}>Статьи расходов</th>
               <th className={`min-w-0 pl-4 ${autoserviceListThClass}`}>Ответственный</th>
+              <th className={`min-w-0 ${autoserviceListThClass}`}>Комментарий</th>
               <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
             </tr>
           </thead>
@@ -258,10 +264,13 @@ function FinanceExpenseRows({ rows, onOpen, emptyText = 'Нет расходов
                   {formatExpenseDate(row.expense_date)}
                 </td>
                 <td className={`${autoserviceListTdClass} truncate`}>
-                  {row.type_label || row.type}
+                  {row.article_name || row.type_label || row.type}
                 </td>
                 <td className={`${autoserviceListTdClass} truncate pl-4`}>
                   {row.employee_name || row.created_by_name || '—'}
+                </td>
+                <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>
+                  {row.description || '—'}
                 </td>
                 <td className={`${autoserviceListTdRightClass} font-semibold tabular-nums`}>
                   {formatFinanceCurrency(row.amount)}
@@ -429,14 +438,9 @@ export default function AutoserviceFinancePage() {
   const [deletingExpenseId, setDeletingExpenseId] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
+  const [expenseArticles, setExpenseArticles] = useState([]);
 
   usePersistedPageFilters(FINANCE_FILTERS_KEY, { dateFrom, dateTo, selectedMethod, activeTab, expenseTypeFilter });
-
-  useEffect(() => {
-    if (location.state?.expenseCreated) {
-      setNotice('Расход добавлен');
-    }
-  }, [location.state]);
 
   const handleMethodChange = useCallback((methodId) => {
     setSelectedMethod(methodId);
@@ -491,6 +495,25 @@ export default function AutoserviceFinancePage() {
     }
   }, []);
 
+  const loadExpenseArticles = useCallback(async () => {
+    try {
+      const response = await apiRequest('/autoservice/expense-articles');
+      setExpenseArticles(Array.isArray(response) ? response : []);
+    } catch (e) {
+      setExpenseArticles([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (location.state?.tab === 'expenses' || location.state?.expenseCreated) {
+      setActiveTab('expenses');
+    }
+    if (location.state?.expenseCreated) {
+      setNotice('Расход добавлен');
+      loadExpenses();
+    }
+  }, [location.state, loadExpenses]);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -499,8 +522,9 @@ export default function AutoserviceFinancePage() {
     if (activeTab === 'expenses') {
       loadExpenses();
       loadEmployees();
+      loadExpenseArticles();
     }
-  }, [activeTab, loadExpenses, loadEmployees]);
+  }, [activeTab, loadExpenses, loadEmployees, loadExpenseArticles]);
 
   useEffect(() => {
     const onPullRefresh = (event) => {
@@ -598,6 +622,7 @@ export default function AutoserviceFinancePage() {
     try {
       const payload = {
         type: values.type,
+        article_id: values.article_id ?? null,
         amount: values.amount,
         expense_date: values.expense_date,
         description: values.description || null,
@@ -956,6 +981,7 @@ export default function AutoserviceFinancePage() {
         onSubmit={handleUpdateExpense}
         employees={employees}
         employeesLoading={employeesLoading}
+        articles={expenseArticles}
         initialData={editExpense}
         dateFrom={dateFrom}
         getEmployeePayrollInfo={getEmployeePayrollInfo}
@@ -1002,7 +1028,7 @@ export default function AutoserviceFinancePage() {
       >
         {detailsExpense ? (
           <div className="space-y-1.5">
-            <FinanceField label="Вид">{detailsExpense.type_label || detailsExpense.type}</FinanceField>
+            <FinanceField label="Статья расхода">{detailsExpense.article_name || detailsExpense.type_label || detailsExpense.type}</FinanceField>
             <FinanceField label="Сумма">{formatFinanceCurrency(detailsExpense.amount)}</FinanceField>
             <FinanceField label="Дата">{formatExpenseDate(detailsExpense.expense_date)}</FinanceField>
             <FinanceField label="Ответственный">{detailsExpense.employee_name || detailsExpense.created_by_name || '—'}</FinanceField>
@@ -1022,7 +1048,7 @@ export default function AutoserviceFinancePage() {
         title="Удалить расход?"
         message={
           deleteExpense
-            ? `Расход ${deleteExpense.type_label} на сумму ${formatFinanceCurrency(deleteExpense.amount)} будет удалён.`
+            ? `Расход «${deleteExpense.article_name || deleteExpense.type_label}» на сумму ${formatFinanceCurrency(deleteExpense.amount)} будет удалён.`
             : ''
         }
         confirmLabel="Удалить"

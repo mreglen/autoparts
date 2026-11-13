@@ -252,8 +252,25 @@ class RosskoSalesReportResponse(BaseModel):
 AutoserviceExpenseType = Literal["salary", "other"]
 
 
+class AutoserviceExpenseArticleCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class AutoserviceExpenseArticleUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+class AutoserviceExpenseArticleView(BaseModel):
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 class AutoserviceExpenseCreate(BaseModel):
-    type: AutoserviceExpenseType
+    type: Optional[AutoserviceExpenseType] = None
+    article_id: Optional[int] = None
+    article_name: Optional[str] = Field(default=None, max_length=120)
     amount: Decimal = Field(gt=0)
     expense_date: date
     description: Optional[str] = None
@@ -268,6 +285,8 @@ class AutoserviceExpenseCreate(BaseModel):
 
 class AutoserviceExpenseUpdate(BaseModel):
     type: Optional[AutoserviceExpenseType] = None
+    article_id: Optional[int] = None
+    article_name: Optional[str] = Field(default=None, max_length=120)
     amount: Optional[Decimal] = Field(default=None, gt=0)
     expense_date: Optional[date] = None
     description: Optional[str] = None
@@ -288,6 +307,8 @@ class AutoserviceExpenseRow(BaseModel):
     id: int
     type: AutoserviceExpenseType
     type_label: str
+    article_id: Optional[int] = None
+    article_name: Optional[str] = None
     amount: Decimal
     expense_date: date
     description: Optional[str] = None

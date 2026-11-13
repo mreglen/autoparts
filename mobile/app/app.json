@@ -7,7 +7,9 @@
     "icon": "./assets/icon.png",
     "scheme": "sgautoservice",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ru.svoygarage.autoservice"
@@ -22,6 +24,10 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "plugins": ["expo-secure-store"]
+    "plugins": [
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-sharing"
+    ]
   }
 }

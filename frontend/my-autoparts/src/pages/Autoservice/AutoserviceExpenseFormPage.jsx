@@ -9,11 +9,6 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import useHistoryBack from '../../hooks/useHistoryBack';
 import { Z_MOBILE_STICKY_FOOTER } from '../../constants/mobileTokens';
 
-const EXPENSE_TYPES = [
-  { id: 'other', label: 'Прочее' },
-  { id: 'salary', label: 'Зарплата' },
-];
-
 const pillInputClass = 'sg-pill-input mt-1';
 const pillTextareaClass = 'sg-pill-textarea mt-1';
 const pillDateInputClass = 'sg-pill-input sg-native-date-input mt-1';
@@ -49,7 +44,10 @@ export default function AutoserviceExpenseFormPage() {
   const navigate = useNavigate();
   const goBack = useHistoryBack('/autoservice/finance');
 
-  const [type, setType] = useState('other');
+  const [articles, setArticles] = useState([]);
+  const [articleId, setArticleId] = useState(null);
+  const [articleQuery, setArticleQuery] = useState('');
+  const [articleOpen, setArticleOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [expenseDate, setExpenseDate] = useState(() => getFinanceTodayDate());
   const [description, setDescription] = useState('');
@@ -64,6 +62,13 @@ export default function AutoserviceExpenseFormPage() {
   useEffect(() => {
     if (!isReady || !isAuthenticated) return undefined;
     let cancelled = false;
+    apiRequest('/autoservice/expense-articles')
+      .then((rows) => {
+        if (!cancelled) setArticles(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setArticles([]);
+      });
     setEmployeesLoading(true);
     apiRequest('/autoservice/service-employees')
       .then((rows) => {
@@ -81,7 +86,7 @@ export default function AutoserviceExpenseFormPage() {
   }, [isReady, isAuthenticated]);
 
   useEffect(() => {
-    if (type !== 'salary' || !employeeId || !expenseDate) {
+    if (!employeeId || !expenseDate) {
       setPayrollInfo(null);
       return undefined;
     }
@@ -105,11 +110,22 @@ export default function AutoserviceExpenseFormPage() {
     return () => {
       cancelled = true;
     };
-  }, [type, employeeId, expenseDate]);
+  }, [employeeId, expenseDate]);
 
   const amountNumber = Number(String(amount || '').replace(',', '.'));
   const amountValid = Number.isFinite(amountNumber) && amountNumber > 0;
-  const canSubmit = amountValid && Boolean(expenseDate) && (type !== 'salary' || Boolean(employeeId));
+  const articleName = articleId
+    ? (articles.find((a) => a.id === articleId)?.name || articleQuery.trim())
+    : articleQuery.trim();
+  const canSubmit = amountValid && Boolean(expenseDate) && Boolean(articleName);
+
+  const normalizedArticleQuery = articleQuery.trim().toLowerCase();
+  const filteredArticles = articles.filter((a) =>
+    a.name.toLowerCase().includes(normalizedArticleQuery),
+  );
+  const exactArticleMatch = articles.some(
+    (a) => a.name.toLowerCase() === normalizedArticleQuery,
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -122,8 +138,8 @@ export default function AutoserviceExpenseFormPage() {
       setError('Укажите дату расхода');
       return;
     }
-    if (type === 'salary' && !employeeId) {
-      setError('Выберите сотрудника');
+    if (!articleName) {
+      setError('Укажите статью расхода');
       return;
     }
     setSaving(true);
@@ -131,11 +147,12 @@ export default function AutoserviceExpenseFormPage() {
       await apiRequest('/autoservice/finance/expenses', {
         method: 'POST',
         body: JSON.stringify({
-          type,
+          article_id: articleId || null,
+          article_name: articleId ? null : articleName,
           amount: amountNumber,
           expense_date: expenseDate,
           description: description.trim() || null,
-          employee_id: type === 'salary' ? Number(employeeId) : null,
+          employee_id: employeeId ? Number(employeeId) : null,
         }),
       });
       navigate('/autoservice/finance', { state: { tab: 'expenses', expenseCreated: true } });
@@ -166,18 +183,55 @@ export default function AutoserviceExpenseFormPage() {
       <form id="expense-form" onSubmit={handleSubmit} className="min-w-0">
         <section className="min-w-0 space-y-5">
           <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="min-w-0">
-              <FieldLabel>Вид</FieldLabel>
-              <select
+            <div className="relative min-w-0">
+              <FieldLabel>Статья расхода</FieldLabel>
+              <input
+                type="text"
                 className={pillInputClass}
-                value={type}
-                onChange={(e) => setType(e.target.value)}
+                value={articleQuery}
+                onChange={(e) => {
+                  setArticleQuery(e.target.value);
+                  setArticleId(null);
+                  setArticleOpen(true);
+                }}
+                onFocus={() => setArticleOpen(true)}
+                onBlur={() => setTimeout(() => setArticleOpen(false), 150)}
+                placeholder="Выберите или введите новую"
                 disabled={saving}
-              >
-                {EXPENSE_TYPES.map((t) => (
-                  <option key={t.id} value={t.id}>{t.label}</option>
-                ))}
-              </select>
+                autoComplete="off"
+              />
+              {articleOpen ? (
+                <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-sg-sm border border-line bg-surface py-1 shadow-sg-md">
+                  {filteredArticles.map((article) => (
+                    <button
+                      key={article.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setArticleId(article.id);
+                        setArticleQuery(article.name);
+                        setArticleOpen(false);
+                      }}
+                      className="block w-full truncate px-3 py-1.5 text-left text-sm text-ink hover:bg-surface-muted"
+                    >
+                      {article.name}
+                    </button>
+                  ))}
+                  {articleQuery.trim() && !exactArticleMatch ? (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setArticleOpen(false)}
+                      className="block w-full truncate px-3 py-1.5 text-left text-sm font-medium text-brand-700 hover:bg-brand-50"
+                    >
+                      Создать «{articleQuery.trim()}»
+                    </button>
+                  ) : null}
+                  {!filteredArticles.length && !articleQuery.trim() ? (
+                    <p className="px-3 py-1.5 text-sm text-ink-muted">Статей пока нет — введите название</p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div className="min-w-0">
               <FieldLabel>Сумма, ₽</FieldLabel>
@@ -201,24 +255,22 @@ export default function AutoserviceExpenseFormPage() {
                 disabled={saving}
               />
             </div>
-            {type === 'salary' ? (
-              <div className="min-w-0">
-                <FieldLabel>Сотрудник</FieldLabel>
-                <select
-                  className={pillInputClass}
-                  value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
-                  disabled={saving || employeesLoading}
-                >
-                  <option value="">
-                    {employeesLoading ? 'Загрузка сотрудников…' : 'Выберите сотрудника'}
-                  </option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>{emp.name}</option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
+            <div className="min-w-0">
+              <FieldLabel optional>Сотрудник</FieldLabel>
+              <select
+                className={pillInputClass}
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                disabled={saving || employeesLoading}
+              >
+                <option value="">
+                  {employeesLoading ? 'Загрузка сотрудников…' : 'Не указан'}
+                </option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
+            </div>
             <div className="min-w-0 lg:col-span-2">
               <FieldLabel optional>Описание</FieldLabel>
               <textarea
@@ -232,7 +284,7 @@ export default function AutoserviceExpenseFormPage() {
             </div>
           </div>
 
-          {type === 'salary' ? (
+          {employeeId ? (
             <div className="min-w-0 rounded-sg-sm border border-line-soft bg-surface-muted px-4 py-3">
               {payrollLoading ? (
                 <p className="text-sm text-ink-muted">Загрузка зарплаты…</p>

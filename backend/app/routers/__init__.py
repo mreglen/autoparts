@@ -71,6 +71,7 @@ from app.routers.autoservice_document_buyers import router as autoservice_docume
 from app.routers.autoservice_repair_orders import router as autoservice_repair_orders_router
 from app.routers.autoservice_warehouse import router as autoservice_warehouse_router
 from app.routers.autoservice_finance import router as autoservice_finance_router
+from app.routers.autoservice_expense_articles import router as autoservice_expense_articles_router
 from app.routers.autoservice_my_payroll import router as autoservice_my_payroll_router
 from app.routers.autoservice_repair_bookings import router as autoservice_repair_bookings_router
 from app.routers.autoservice_planner import router as autoservice_planner_router
@@ -172,6 +173,7 @@ api_router.include_router(autoservice_document_buyers_router)
 api_router.include_router(autoservice_repair_orders_router)
 api_router.include_router(autoservice_warehouse_router)
 api_router.include_router(autoservice_finance_router)
+api_router.include_router(autoservice_expense_articles_router)
 api_router.include_router(autoservice_my_payroll_router)
 api_router.include_router(autoservice_repair_bookings_router)
 api_router.include_router(autoservice_planner_router)

@@ -242,6 +242,109 @@ function WorkZoneModal({ open, mode, zone, onClose, onSaved }) {
 
 
 
+function ExpenseArticleModal({ open, article, onClose, onSaved, onDelete }) {
+  const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+  const isEdit = Boolean(article?.id);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(article?.name || '');
+    setSaving(false);
+    setDeleting(false);
+    setError('');
+  }, [open, article]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError('Укажите название');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      if (isEdit) {
+        await apiRequest(`/autoservice/expense-articles/${article.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: trimmed }),
+        });
+      } else {
+        await apiRequest('/autoservice/expense-articles', {
+          method: 'POST',
+          body: JSON.stringify({ name: trimmed }),
+        });
+      }
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось сохранить');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!isEdit || deleting) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await apiRequest(`/autoservice/expense-articles/${article.id}`, { method: 'DELETE' });
+      await onSaved();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось удалить');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? 'Редактировать статью' : 'Новая статья расхода'}
+      size="sm"
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          {isEdit ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={saving || deleting}
+              className={`${btnGhost} mr-auto text-danger-600`}
+            >
+              {deleting ? '…' : 'Удалить'}
+            </button>
+          ) : null}
+          <button type="button" onClick={onClose} className={btnGhost} disabled={saving || deleting}>
+            Отмена
+          </button>
+          <button type="submit" form="expense-article-form" disabled={saving || deleting} className={btnPrimary}>
+            {saving ? '…' : 'Сохранить'}
+          </button>
+        </div>
+      }
+    >
+      <form id="expense-article-form" onSubmit={handleSubmit}>
+        <label className="block text-sm font-medium text-ink-soft">Название</label>
+        <input
+          autoFocus
+          className={inputClass}
+          placeholder="Например, Запчасти, Аренда, Связь"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={120}
+        />
+        {error ? <p className="mt-2 text-sm text-danger-600">{error}</p> : null}
+      </form>
+    </Modal>
+  );
+}
+
 export default function AutoserviceSettingsPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const [tab, setTab] = useState('general');
@@ -262,6 +365,9 @@ export default function AutoserviceSettingsPage() {
   const [works, setWorks] = useState([]);
   const [worksLoading, setWorksLoading] = useState(false);
   const [zonesReordering, setZonesReordering] = useState(false);
+  const [expenseArticles, setExpenseArticles] = useState([]);
+  const [articlesLoading, setArticlesLoading] = useState(false);
+  const [articleModal, setArticleModal] = useState(null);
 
   const loadSettings = useCallback(async () => {
     const data = await apiRequest('/autoservice/settings');
@@ -294,17 +400,29 @@ export default function AutoserviceSettingsPage() {
     }
   }, []);
 
+  const loadExpenseArticles = useCallback(async () => {
+    setArticlesLoading(true);
+    try {
+      const data = await apiRequest('/autoservice/expense-articles');
+      setExpenseArticles(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(e?.message || 'Не удалось загрузить статьи расходов');
+    } finally {
+      setArticlesLoading(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      await Promise.all([loadSettings(), loadWorkZones(), loadWorks()]);
+      await Promise.all([loadSettings(), loadWorkZones(), loadWorks(), loadExpenseArticles()]);
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить настройки');
     } finally {
       setLoading(false);
     }
-  }, [loadSettings, loadWorkZones, loadWorks]);
+  }, [loadSettings, loadWorkZones, loadWorks, loadExpenseArticles]);
 
   useEffect(() => {
     if (isReady && isAuthenticated) load();
@@ -404,6 +522,7 @@ export default function AutoserviceSettingsPage() {
           { id: 'general', label: 'Общее' },
           { id: 'zones', label: 'Зоны' },
           { id: 'works', label: 'Работы' },
+          { id: 'articles', label: 'Статьи расходов' },
           { id: 'iphone', label: 'iPhone' },
         ]}
         value={tab}
@@ -597,6 +716,79 @@ export default function AutoserviceSettingsPage() {
             </section>
           ) : null}
 
+          {tab === 'articles' ? (
+            <section>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-ink-muted">
+                  {articlesLoading ? 'Загрузка…' : `${expenseArticles.length} статей`}
+                </p>
+                <button type="button" onClick={() => setArticleModal({ article: null })} className={btnPrimary}>
+                  Добавить
+                </button>
+              </div>
+              <div className={autoserviceListTableWrapClass}>
+                <table className={autoserviceListTableClass}>
+                  <thead>
+                    <tr className={autoserviceListTheadRowClass}>
+                      <th className={autoserviceListThClass}>Название</th>
+                    </tr>
+                  </thead>
+                  <tbody className={autoserviceListTbodyClass}>
+                    {articlesLoading ? (
+                      Array.from({ length: 4 }).map((_, index) => (
+                        <tr key={`article-sk-${index}`}>
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}><Skeleton className="h-4 w-48" /></td>
+                        </tr>
+                      ))
+                    ) : expenseArticles.length === 0 ? (
+                      <tr>
+                        <td className="py-12 text-center text-ink-muted">
+                          Статей расходов пока нет
+                        </td>
+                      </tr>
+                    ) : (
+                      expenseArticles.map((article) => (
+                        <tr
+                          key={article.id}
+                          className={autoserviceListTrClickableClass}
+                          onClick={() => setArticleModal({ article })}
+                        >
+                          <td className={`min-w-0 ${autoserviceListTdClass}`}>
+                            <div className="w-0 min-w-full truncate font-semibold text-ink">{article.name}</div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className={autoserviceListMobileWrapClass}>
+                {articlesLoading ? (
+                  <div className="divide-y divide-line-soft">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div key={`marticle-sk-${index}`} className="py-2">
+                        <Skeleton className="h-4 w-40" />
+                      </div>
+                    ))}
+                  </div>
+                ) : expenseArticles.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-ink-muted">Статей расходов пока нет</p>
+                ) : (
+                  expenseArticles.map((article) => (
+                    <button
+                      key={article.id}
+                      type="button"
+                      onClick={() => setArticleModal({ article })}
+                      className="flex w-full items-center border-b border-line-soft py-2.5 text-left last:border-b-0"
+                    >
+                      <p className="min-w-0 truncate text-sm font-semibold text-ink">{article.name}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </section>
+          ) : null}
+
           {tab === 'iphone' ? <CalendarSyncSection basePath="/autoservice/calendar-sync" /> : null}
         </>
       )}
@@ -626,6 +818,13 @@ export default function AutoserviceSettingsPage() {
         zone={zoneModal?.zone}
         onClose={() => setZoneModal(null)}
         onSaved={loadWorkZones}
+      />
+
+      <ExpenseArticleModal
+        open={Boolean(articleModal)}
+        article={articleModal?.article}
+        onClose={() => setArticleModal(null)}
+        onSaved={loadExpenseArticles}
       />
 
     </div>

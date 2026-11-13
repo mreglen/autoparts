@@ -426,6 +426,17 @@ def compute_org_monthly_payroll(db: Session, org_id: str, year: int, month: int)
                 }
             )
         row_total = _money(row_total)
+        emp = employees_by_id.get(bucket["employee_id"])
+        fixed_part = Decimal("0.00")
+        if (
+            emp is not None
+            and getattr(emp, "salary_type", None) == "fixed"
+            and emp.is_active
+        ):
+            fixed_amount = _money(getattr(emp, "salary_amount", 0) or 0)
+            if fixed_amount > 0:
+                fixed_part = fixed_amount
+        row_total = _money(row_total + fixed_part)
         total += row_total
         paid = paid_by_emp.get(bucket["employee_id"], Decimal("0.00"))
         total_paid += paid

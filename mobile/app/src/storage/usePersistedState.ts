@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 
-import { readJson, writeJson } from './kv';
+import { readJson, writeJson } from "./kv";
 
 export type Setter<T> = (next: T | ((previous: T) => T)) => void;
 
@@ -23,7 +23,8 @@ export function usePersistedState<T>(key: string, initial: T) {
   const update = useCallback<Setter<T>>(
     (next) => {
       setValue((previous) => {
-        const resolved = typeof next === 'function' ? (next as (p: T) => T)(previous) : next;
+        const resolved =
+          typeof next === "function" ? (next as (p: T) => T)(previous) : next;
         void writeJson(key, resolved);
         return resolved;
       });

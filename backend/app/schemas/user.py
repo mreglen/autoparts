@@ -60,6 +60,7 @@ class UserResponse(BaseModel):
     organization_has_admin_director: bool = False
     can_see_rossko_sales_report: bool = False
     is_service_executor: bool = False
+    must_change_password: bool = False
     notification_prefs: NotificationPrefs = NotificationPrefs()
 
     class Config:

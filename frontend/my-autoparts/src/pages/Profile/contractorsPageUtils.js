@@ -58,10 +58,12 @@ export function validateContractorForm(form) {
   if (!String(form?.name || '').trim()) {
     errors.name = 'Наименование обязательно';
   }
-  if (form?.salary_type === 'fixed' && (!form?.salary_amount || Number(form.salary_amount) < 0)) {
-    errors.salary_amount = 'Укажите сумму';
+  if (form?.salary_type === 'fixed' && form?.salary_amount !== '' && form?.salary_amount != null
+      && (Number.isNaN(Number(form.salary_amount)) || Number(form.salary_amount) < 0)) {
+    errors.salary_amount = 'Укажите сумму не меньше 0';
   }
-  if (form?.salary_type === 'percent_work' && (!form?.work_percent || Number(form.work_percent) < 0 || Number(form.work_percent) > 100)) {
+  if (form?.salary_type === 'percent_work' && form?.work_percent !== '' && form?.work_percent != null
+      && (Number.isNaN(Number(form.work_percent)) || Number(form.work_percent) < 0 || Number(form.work_percent) > 100)) {
     errors.work_percent = 'Процент от 0 до 100';
   }
   Object.assign(errors, validateRequisiteSets(form?.requisite_sets));
@@ -105,7 +107,9 @@ export function formatContractorAmount(value) {
 
 export function formatContractorPayment(row) {
   if (row?.salary_type === 'percent_work') {
-    return `${Number(row?.work_percent || 0)}%`;
+    const percent = Number(row?.work_percent || 0);
+    return percent > 0 ? `${percent}%` : '—';
   }
-  return formatContractorAmount(row?.salary_amount);
+  const amount = Number(row?.salary_amount || 0);
+  return amount > 0 ? formatContractorAmount(amount) : '—';
 }

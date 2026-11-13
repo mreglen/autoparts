@@ -29,6 +29,8 @@ def autoservice_expense_row(expense: AutoserviceExpense) -> AutoserviceExpenseRo
         id=expense.id,
         type=expense.type,
         type_label=expense_type_label(expense.type),
+        article_id=expense.article_id,
+        article_name=expense.article.name if expense.article else None,
         amount=expense.amount,
         expense_date=expense.expense_date.date(),
         description=expense.description,
@@ -51,6 +53,7 @@ def list_autoservice_expenses(
     expenses = (
         db.query(AutoserviceExpense)
         .options(
+            joinedload(AutoserviceExpense.article),
             joinedload(AutoserviceExpense.employee),
             joinedload(AutoserviceExpense.created_by),
         )

@@ -8,6 +8,7 @@ from app.models.pending_seller import PendingSeller
 from app.models.user import User
 from app.models.user_permission import UserPermission
 from app.schemas.auth import (
+    ChangePasswordRequest,
     EmailOnly,
     PasswordResetConfirm,
     PasswordResetRequest,
@@ -19,7 +20,7 @@ from app.schemas.auth import (
     RefreshTokenRequest,
 )
 from app.schemas.pending_seller import SellerRegisterRequest, SellerRegisterResponse
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 from app.core.auth import (
     authenticate_user,
     create_access_token,
@@ -125,6 +126,7 @@ def build_user_profile_response(user: User, db: Session | None = None) -> dict:
             if user.organization_id and user.organization else "buyer"
         ),
         "can_see_rossko_sales_report": can_see_rossko_sales_report(db, user) if db else False,
+        "must_change_password": bool(getattr(user, "must_change_password", False)),
         "notification_prefs": NotificationPrefs.model_validate(
             get_user_notification_prefs(user)
         ).model_dump(),
@@ -383,6 +385,23 @@ def refresh_tokens(data: RefreshTokenRequest, db: Session = Depends(get_db)):
         "refresh_token": refresh_token,
         "token_type": "bearer",
     }
+
+@router.post("/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not data.new_password or len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Новый пароль должен быть не короче 6 символов")
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Текущий пароль указан неверно")
+    current_user.hashed_password = get_password_hash(data.new_password)
+    current_user.must_change_password = False
+    db.commit()
+    log_event(db, event_type="user_password_changed", user_id=current_user.id, email=current_user.email)
+    return {"msg": "Пароль успешно изменён"}
+
 
 @router.get("/profile", response_model=UserResponse)
 def get_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

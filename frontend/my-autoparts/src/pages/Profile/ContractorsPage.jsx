@@ -122,7 +122,7 @@ function ContractorFormFields({ form, sets, errors, disabled, onField, onSets })
             disabled={disabled}
             error={Boolean(errors.work_percent)}
           />
-          {errors.work_percent ? <FieldHint error>{errors.work_percent}</FieldHint> : null}
+          {errors.work_percent ? <FieldHint error>{errors.work_percent}</FieldHint> : <FieldHint>Необязательно</FieldHint>}
         </div>
       ) : (
         <div>
@@ -138,7 +138,7 @@ function ContractorFormFields({ form, sets, errors, disabled, onField, onSets })
             disabled={disabled}
             error={Boolean(errors.salary_amount)}
           />
-          {errors.salary_amount ? <FieldHint error>{errors.salary_amount}</FieldHint> : null}
+          {errors.salary_amount ? <FieldHint error>{errors.salary_amount}</FieldHint> : <FieldHint>Необязательно</FieldHint>}
         </div>
       )}
       <div>
