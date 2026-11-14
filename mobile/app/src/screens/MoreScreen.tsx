@@ -7,6 +7,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { canAccessSection } from "../auth/access";
 import { currentPermissionCodes } from "../auth/permissions";
 import { describeError } from "../api/errors";
+import { useAppRole } from "../auth/roles";
 import { useSession } from "../auth/session";
 import { ConfirmDialog, ListRow, Screen, useToast } from "../components/ui";
 import type { RootStackParamList } from "../navigation/types";
@@ -67,6 +68,7 @@ const SECTIONS: SectionLink[] = [
 export function MoreScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
   const { user, signOut } = useSession();
+  const { canUseClient, setActiveRole } = useAppRole();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { show } = useToast();
@@ -140,6 +142,15 @@ export function MoreScreen() {
         Профиль
       </Text>
       <ListRow title={user?.email ?? "—"} subtitle="Аккаунт автосервиса" />
+      {canUseClient ? (
+        <View className="mt-2">
+          <ListRow
+            title="Режим клиента"
+            subtitle="Гараж, записи и история ремонтов"
+            onPress={() => setActiveRole("client")}
+          />
+        </View>
+      ) : null}
 
       <Text
         className="mb-3 mt-6 text-lg font-semibold"

@@ -7,10 +7,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Animated, Text, View } from "react-native";
+import { Animated, Easing, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../../theme/useTheme";
+import { DURATION, EASING } from "../../theme/motion";
+import { hapticError, hapticSuccess } from "../../utils/haptics";
 
 interface ToastState {
   message: string;
@@ -34,15 +36,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (message: string, variant: ToastState["variant"] = "info") => {
       if (timer.current) clearTimeout(timer.current);
       setToast({ message, variant });
+      if (variant === "success") hapticSuccess();
+      else if (variant === "error") hapticError();
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 180,
+        duration: DURATION.fast,
+        easing: Easing.bezier(...EASING.standard),
         useNativeDriver: true,
       }).start();
       timer.current = setTimeout(() => {
         Animated.timing(opacity, {
           toValue: 0,
-          duration: 180,
+          duration: DURATION.fast,
+          easing: Easing.bezier(...EASING.exit),
           useNativeDriver: true,
         }).start(() => setToast(null));
       }, 4000);

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Animated, View } from "react-native";
+import { Animated, Easing, View } from "react-native";
 
 import { useTheme } from "../../theme/useTheme";
+import { DURATION, EASING } from "../../theme/motion";
 
 export function Skeleton({
   className = "",
@@ -18,12 +19,14 @@ export function Skeleton({
       Animated.sequence([
         Animated.timing(opacity, {
           toValue: 1,
-          duration: 700,
+          duration: DURATION.slower,
+          easing: Easing.bezier(...EASING.standard),
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
           toValue: 0.55,
-          duration: 700,
+          duration: DURATION.slower,
+          easing: Easing.bezier(...EASING.standard),
           useNativeDriver: true,
         }),
       ]),

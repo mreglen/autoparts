@@ -31,7 +31,7 @@ class GarageDecodeVinTests(unittest.TestCase):
         db = MagicMock()
         user = MagicMock()
         with patch(
-            "app.routers.autoservice_garage.require_my_active_autoservice_client"
+            "app.routers.autoservice_garage._require_any_client_card"
         ), patch(
             "app.routers.autoservice_garage.lookup_by_vin",
             return_value=lookup,
@@ -58,7 +58,7 @@ class GarageDecodeVinTests(unittest.TestCase):
             candidates=[],
         )
         with patch(
-            "app.routers.autoservice_garage.require_my_active_autoservice_client"
+            "app.routers.autoservice_garage._require_any_client_card"
         ), patch(
             "app.routers.autoservice_garage.lookup_by_vin",
             return_value=lookup,
@@ -83,7 +83,7 @@ class GarageDecodeVinTests(unittest.TestCase):
             candidates=[],
         )
         with patch(
-            "app.routers.autoservice_garage.require_my_active_autoservice_client"
+            "app.routers.autoservice_garage._require_any_client_card"
         ), patch(
             "app.routers.autoservice_garage.lookup_by_vin",
             return_value=lookup,
@@ -105,7 +105,7 @@ class GarageDecodeVinTests(unittest.TestCase):
         from app.schemas.garage_vehicle import GarageVehicleDecodeVinRequest
 
         with patch(
-            "app.routers.autoservice_garage.require_my_active_autoservice_client"
+            "app.routers.autoservice_garage._require_any_client_card"
         ), patch(
             "app.routers.autoservice_garage.lookup_by_vin",
             side_effect=lambda db, vin: normalize_vin_or_raise(vin),
@@ -132,7 +132,7 @@ class GarageDecodeVinTests(unittest.TestCase):
         )
 
         with patch(
-            "app.routers.autoservice_garage.require_my_active_autoservice_client"
+            "app.routers.autoservice_garage._require_any_client_card"
         ), patch(
             "app.routers.autoservice_garage.lookup_by_frame",
             return_value=lookup,

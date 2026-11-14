@@ -6,4 +6,5 @@ export { ConfirmDialog } from "./ConfirmDialog";
 export { DateField } from "./DateField";
 export { MoneyField } from "./MoneyField";
 export { Skeleton, SkeletonRows } from "./Skeleton";
+export { FadeSlideIn, PressableScale } from "./motion";
 export { StaleDataBadge } from "./StaleDataBadge";

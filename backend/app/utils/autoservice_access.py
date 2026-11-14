@@ -445,6 +445,37 @@ def list_my_autoservice_client_orgs(db: Session, user: User) -> list[dict]:
     ]
 
 
+def my_active_autoservice_client_cards(db: Session, user: User) -> list[AutoserviceClient]:
+    """Все активные клиентские карточки пользователя по всем автосервис-организациям."""
+    require_autoservice_enabled(db)
+    return (
+        db.query(AutoserviceClient)
+        .join(Organization, Organization.id == AutoserviceClient.organization_id)
+        .filter(
+            AutoserviceClient.user_id == user.id,
+            AutoserviceClient.status == "active",
+            Organization.is_autoservice.is_(True),
+            Organization.autoservice_paused.is_(False),
+        )
+        .order_by(Organization.name.asc(), AutoserviceClient.id.asc())
+        .all()
+    )
+
+
+def my_related_autoservice_client_ids(db: Session, user: User) -> set[int]:
+    """Плоский набор client_id по всем карточкам пользователя.
+
+    Склейка только по user_id (include_phone_matches=False) — fuzzy-матчинг
+    по хвосту телефона для своих данных не применяем.
+    """
+    ids: set[int] = set()
+    for client in my_active_autoservice_client_cards(db, user):
+        ids.update(
+            related_autoservice_client_ids(db, client, include_phone_matches=False)
+        )
+    return ids
+
+
 def get_employee_work_zone_ids(db: Session, user: User, org_id: str) -> list[int]:
     """Получить список ID рабочих зон, назначенных сотруднику."""
     from app.models.organization_employee import OrganizationEmployee

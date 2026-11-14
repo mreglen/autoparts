@@ -1,3 +1,4 @@
+import type { GarageVehicle } from "../api/clientAccount";
 import type { SectionRouteParams } from "../screens/SectionScreen";
 
 export type RootStackParamList = {
@@ -16,6 +17,11 @@ export type RootStackParamList = {
   Finance: undefined;
   Reports: undefined;
   Clients: undefined;
+  ClientHistory: undefined;
+  ClientVehicle: { vehicle: GarageVehicle; orgName?: string | null };
+  ClientVehicleForm:
+    | { vehicle?: GarageVehicle; organizationId?: string }
+    | undefined;
   Employees: undefined;
   Contractors: undefined;
   Settings: undefined;

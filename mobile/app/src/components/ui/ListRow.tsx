@@ -1,7 +1,8 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useTheme } from "../../theme/useTheme";
+import { PressableScale } from "./motion";
 
 interface ListRowProps {
   title: string;
@@ -59,8 +60,8 @@ export function ListRow({
   );
   if (!onPress) return content;
   return (
-    <Pressable onPress={onPress} android_ripple={{ color: colors.line }}>
+    <PressableScale onPress={onPress} android_ripple={{ color: colors.line }}>
       {content}
-    </Pressable>
+    </PressableScale>
   );
 }

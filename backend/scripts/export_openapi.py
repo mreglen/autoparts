@@ -27,6 +27,7 @@ MOBILE_PATH_PREFIXES = (
     "/api/mobile/",
     "/api/tasks/",
     "/api/autoservice/",
+    "/api/public/autoservice/",
     "/api/organizations/",
 )
 

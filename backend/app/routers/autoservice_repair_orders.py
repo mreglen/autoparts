@@ -83,6 +83,8 @@ from app.schemas.autoservice_contractor import AutoserviceContractorOption
 from app.utils.autoservice_access import (
     display_client_phone,
     missing_phone_placeholder,
+    my_active_autoservice_client,
+    my_related_autoservice_client_ids,
     related_autoservice_client_ids,
     require_my_active_autoservice_client,
     require_orders_access,
@@ -512,6 +514,8 @@ def _to_client_view(row: RepairOrder) -> RepairOrderClientView:
     return RepairOrderClientView(
         id=row.id,
         order_number=row.order_number,
+        organization_id=row.organization_id,
+        organization_name=row.organization.name if row.organization else None,
         vehicle_id=row.vehicle_id,
         client_comment=row.client_comment,
         work_zone_id=row.work_zone_id,
@@ -536,6 +540,7 @@ def _to_client_view(row: RepairOrder) -> RepairOrderClientView:
 
 def _order_query(db: Session):
     return db.query(RepairOrder).options(
+        joinedload(RepairOrder.organization),
         joinedload(RepairOrder.client),
         joinedload(RepairOrder.vehicle),
         joinedload(RepairOrder.accepted_by),
@@ -1576,19 +1581,61 @@ def list_repair_order_contractor_options(
     ]
 
 
+def _my_repair_order_client(
+    db: Session,
+    current_user: User,
+    organization_id: str | None,
+) -> AutoserviceClient:
+    if organization_id:
+        client = my_active_autoservice_client(db, current_user, organization_id)
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Доступно только клиентам автосервиса",
+            )
+        return client
+    return require_my_active_autoservice_client(db, current_user)
+
+
+def _get_my_repair_order_or_404(
+    db: Session,
+    order_id: int,
+    current_user: User,
+) -> RepairOrder:
+    client_ids = my_related_autoservice_client_ids(db, current_user)
+    if not client_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступно только клиентам автосервиса",
+        )
+    row = (
+        _order_query(db)
+        .filter(RepairOrder.id == order_id, RepairOrder.client_id.in_(client_ids))
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ремонт не найден",
+        )
+    return row
+
+
 @router.get("/autoservice/repair-orders/me", response_model=list[RepairOrderClientView])
 def list_my_repair_orders(
     scope: str = Query("active"),
+    organization_id: str | None = Query(None, max_length=10),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    client = require_my_active_autoservice_client(db, current_user)
+    client = _my_repair_order_client(db, current_user, organization_id)
     if scope not in ("active", "history", "all"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="scope должен быть active, history или all",
         )
-    query = _order_query(db).filter(RepairOrder.client_id == client.id)
+    related_ids = related_autoservice_client_ids(db, client, include_phone_matches=False)
+    query = _order_query(db).filter(RepairOrder.client_id.in_(related_ids))
     if scope == "active":
         query = query.filter(RepairOrder.status.in_(ACTIVE_STATUSES))
     elif scope == "history":
@@ -1606,18 +1653,42 @@ def get_my_repair_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    client = require_my_active_autoservice_client(db, current_user)
-    row = (
-        _order_query(db)
-        .filter(RepairOrder.id == order_id, RepairOrder.client_id == client.id)
-        .first()
-    )
-    if not row:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Ремонт не найден",
-        )
+    row = _get_my_repair_order_or_404(db, order_id, current_user)
     return _to_client_view(row)
+
+
+@router.get(
+    "/autoservice/repair-orders/me/{order_id}/pdf",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}, "description": "PDF заказ-наряда"}},
+)
+async def get_my_repair_order_pdf(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    row = _get_my_repair_order_or_404(db, order_id, current_user)
+    view = _to_staff_view(db, row)
+    html = render_repair_order_html(view, row.organization)
+    content = await render_document_pdf_bytes(html)
+    log_autoservice(
+        db,
+        event_type="autoservice_document_downloaded",
+        summary=f"Скачан PDF «Заказ-наряд»: {repair_order_label(row)}",
+        user=current_user,
+        organization_id=row.organization_id,
+        entity_type="repair_order",
+        entity_id=row.id,
+        details={"document": "order", "channel": "client"},
+    )
+    filename = repair_order_pdf_filename(view.order_number or "")
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": content_disposition(filename, f"order-{order_id}.pdf"),
+        },
+    )
 
 
 @router.get("/autoservice/repair-orders", response_model=RepairOrderListPage)

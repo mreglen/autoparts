@@ -6,6 +6,7 @@ import { ActivityIndicator, View } from "react-native";
 
 import { canAccessSection } from "../auth/access";
 import { currentPermissionCodes } from "../auth/permissions";
+import { useAppRole } from "../auth/roles";
 import { useSession } from "../auth/session";
 import { OrderDetailScreen } from "../screens/OrderDetailScreen";
 import { OrderFormScreen } from "../screens/OrderFormScreen";
@@ -14,6 +15,9 @@ import { PlannerScreen } from "../screens/PlannerScreen";
 import { BookingsScreen } from "../screens/BookingsScreen";
 import { BookingDetailScreen } from "../screens/BookingDetailScreen";
 import { BookingFormScreen } from "../screens/BookingFormScreen";
+import { ClientHistoryScreen } from "../screens/ClientHistoryScreen";
+import { ClientVehicleScreen } from "../screens/ClientVehicleScreen";
+import { ClientVehicleFormScreen } from "../screens/ClientVehicleFormScreen";
 import { ChangePasswordScreen } from "../screens/ChangePasswordScreen";
 import { LoginScreen } from "../screens/LoginScreen";
 import { MoreScreen } from "../screens/MoreScreen";
@@ -28,6 +32,7 @@ import { EmployeesScreen } from "../screens/EmployeesScreen";
 import { ContractorsScreen } from "../screens/ContractorsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { useTheme } from "../theme/useTheme";
+import { ClientTabs } from "./ClientTabs";
 import type { RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -137,6 +142,22 @@ function Tabs() {
   );
 }
 
+function AppShell() {
+  const { activeRole, rolesReady, canUseStaff } = useAppRole();
+  const { colors } = useTheme();
+  if (!rolesReady && !canUseStaff) {
+    return (
+      <View
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: colors.surface }}
+      >
+        <ActivityIndicator color={colors.brand} />
+      </View>
+    );
+  }
+  return activeRole === "client" ? <ClientTabs /> : <Tabs />;
+}
+
 export function RootNavigator() {
   const { status, user } = useSession();
   const { colors } = useTheme();
@@ -174,7 +195,7 @@ export function RootNavigator() {
             <>
               <Stack.Screen
                 name="Main"
-                component={Tabs}
+                component={AppShell}
                 options={{ headerShown: false }}
               />
               <Stack.Screen
@@ -244,6 +265,25 @@ export function RootNavigator() {
                   title: route.params?.orderId
                     ? "Редактирование заказ-наряда"
                     : "Новый заказ-наряд",
+                })}
+              />
+              <Stack.Screen
+                name="ClientHistory"
+                component={ClientHistoryScreen}
+                options={{ title: "История ремонтов" }}
+              />
+              <Stack.Screen
+                name="ClientVehicle"
+                component={ClientVehicleScreen}
+                options={{ title: "Автомобиль" }}
+              />
+              <Stack.Screen
+                name="ClientVehicleForm"
+                component={ClientVehicleFormScreen}
+                options={({ route }) => ({
+                  title: route.params?.vehicle
+                    ? "Редактирование автомобиля"
+                    : "Новый автомобиль",
                 })}
               />
             </>

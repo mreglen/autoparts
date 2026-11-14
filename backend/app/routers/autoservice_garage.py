@@ -33,6 +33,7 @@ from app.utils.autoservice_access import (
     AUTOSERVICE_PERMISSION_ORDERS_OWN,
     get_or_create_autoservice_client_for_user,
     my_active_autoservice_client,
+    my_active_autoservice_client_cards,
     related_autoservice_client_ids,
     require_any_autoservice_permission,
     require_autoservice_permission,
@@ -133,6 +134,31 @@ def _create_vehicle_for_client(
     return row
 
 
+def _require_any_client_card(db: Session, user: User) -> None:
+    """Decode-эндпоинты не привязаны к организации — достаточно любой активной карточки."""
+    if not my_active_autoservice_client_cards(db, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступно только клиентам автосервиса",
+        )
+
+
+def _my_garage_client(
+    db: Session,
+    user: User,
+    organization_id: str | None,
+) -> AutoserviceClient:
+    if organization_id:
+        client = my_active_autoservice_client(db, user, organization_id)
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Доступно только клиентам автосервиса",
+            )
+        return client
+    return require_my_active_autoservice_client(db, user)
+
+
 @router.post(
     "/autoservice/garage/decode-vin",
     response_model=GarageVehicleDecodeVinResponse,
@@ -142,7 +168,7 @@ def decode_garage_vin(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_my_active_autoservice_client(db, current_user)
+    _require_any_client_card(db, current_user)
     result = lookup_by_vin(db, payload.vin)
     return GarageVehicleDecodeVinResponse(**result.to_response_dict())
 
@@ -156,7 +182,7 @@ def decode_garage_plate(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_my_active_autoservice_client(db, current_user)
+    _require_any_client_card(db, current_user)
     result = lookup_by_plate(
         db,
         payload.plate,
@@ -174,7 +200,7 @@ def decode_garage_frame(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_my_active_autoservice_client(db, current_user)
+    _require_any_client_card(db, current_user)
     result = lookup_by_frame(db, payload.frame)
     return GarageVehicleDecodeFrameResponse(**result.to_response_dict())
 
@@ -333,10 +359,11 @@ def _apply_vehicle_update(db: Session, row: GarageVehicle, payload: GarageVehicl
 def update_garage_vehicle(
     vehicle_id: int,
     payload: GarageVehicleUpdate,
+    organization_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    my_client = require_my_active_autoservice_client(db, current_user)
+    my_client = _my_garage_client(db, current_user, organization_id)
     row = _get_client_vehicle_or_404(db, vehicle_id, my_client.id)
     row = _apply_vehicle_update(db, row, payload)
     return _vehicle_to_view(row)
@@ -394,10 +421,11 @@ def update_garage_vehicle_staff(
 )
 def delete_garage_vehicle(
     vehicle_id: int,
+    organization_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    my_client = require_my_active_autoservice_client(db, current_user)
+    my_client = _my_garage_client(db, current_user, organization_id)
     row = _get_client_vehicle_or_404(db, vehicle_id, my_client.id)
     orders_count = (
         db.query(RepairOrder.id)

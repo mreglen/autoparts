@@ -27,3 +27,5 @@ export const META_CACHE_KEY = "sg:mobile-meta";
 export const LAST_LOGIN_KEY = "sg:last-login";
 
 export const THEME_MODE_KEY = "sg:theme-mode";
+
+export const ACTIVE_ROLE_KEY = "sg:active-role";

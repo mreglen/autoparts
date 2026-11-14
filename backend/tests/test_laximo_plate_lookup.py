@@ -293,7 +293,7 @@ class GarageDecodePlateTests(unittest.TestCase):
             candidates=[cand],
         )
         with patch(
-            "app.routers.autoservice_garage.require_my_active_autoservice_client"
+            "app.routers.autoservice_garage._require_any_client_card"
         ), patch(
             "app.routers.autoservice_garage.lookup_by_plate",
             return_value=lookup,
@@ -313,7 +313,7 @@ class GarageDecodePlateTests(unittest.TestCase):
         from app.schemas.garage_vehicle import GarageVehicleDecodePlateRequest
 
         with patch(
-            "app.routers.autoservice_garage.require_my_active_autoservice_client"
+            "app.routers.autoservice_garage._require_any_client_card"
         ):
             with self.assertRaises(HTTPException) as ctx:
                 decode_garage_plate(

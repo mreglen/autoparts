@@ -112,6 +112,18 @@ export const CACHE_POLICIES: CachePolicy[] = [
     offlineReadable: true,
   },
   {
+    entity: "garage-vehicles",
+    pathPrefix: "/autoservice/garage",
+    ttlMs: 30 * MIN,
+    offlineReadable: true,
+  },
+  {
+    entity: "public-autoservice-orgs",
+    pathPrefix: "/public/autoservice",
+    ttlMs: DAY,
+    offlineReadable: true,
+  },
+  {
     entity: "employees",
     pathPrefix: "/autoservice/service-employees",
     ttlMs: DAY,

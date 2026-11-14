@@ -338,6 +338,8 @@ class RepairOrderListPage(BaseModel):
 class RepairOrderClientView(BaseModel):
     id: int
     order_number: Optional[str] = None
+    organization_id: Optional[str] = None
+    organization_name: Optional[str] = None
     vehicle_id: Optional[int] = None
     client_comment: Optional[str] = None
     work_zone_id: Optional[int] = None
