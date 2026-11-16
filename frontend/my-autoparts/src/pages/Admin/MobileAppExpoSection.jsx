@@ -90,8 +90,10 @@ export default function MobileAppExpoSection() {
         Тестирование в Expo Go
       </h3>
       <p className="mb-4 text-sm text-gray-500">
-        Запускает <code>npx expo start --tunnel</code> на сервере. Откройте ссылку
-        или отсканируйте QR-код в Expo Go на iPhone/Android — работает из любой сети.
+        Запускает Metro на сервере в LAN-режиме — работает без аккаунта Expo.
+        Откройте ссылку или отсканируйте QR-код в Expo Go на iPhone/Android.
+        Нужен открытый порт 8081–8089 на сервере. Для туннеля через аккаунт
+        Expo задайте <code>EXPO_TUNNEL=1</code> в env backend.
       </p>
 
       {status && !status.mobile_dir_exists ? (

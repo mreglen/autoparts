@@ -23,6 +23,29 @@ PID_FILE = RUNTIME_DIR / "expo.pid"
 LOG_FILE = RUNTIME_DIR / "expo.log"
 
 _URL_RE = re.compile(r"(exp://[^\s]+|https?://[^\s]*on\.expo\.app[^\s]*)")
+_PUBLIC_IP_CACHE: Optional[str] = None
+
+
+def _public_ip() -> Optional[str]:
+    global _PUBLIC_IP_CACHE
+    if _PUBLIC_IP_CACHE:
+        return _PUBLIC_IP_CACHE
+    env_ip = os.environ.get("EXPO_PUBLIC_IP", "").strip()
+    if re.match(r"^\d+\.\d+\.\d+\.\d+$", env_ip):
+        _PUBLIC_IP_CACHE = env_ip
+        return env_ip
+    try:
+        out = subprocess.run(
+            ["curl", "-s", "--max-time", "5", "https://ifconfig.me"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+        ).stdout.strip()
+        if re.match(r"^\d+\.\d+\.\d+\.\d+$", out):
+            _PUBLIC_IP_CACHE = out
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return _PUBLIC_IP_CACHE
 
 
 def _find_expo_url() -> Optional[str]:
@@ -34,9 +57,17 @@ def _find_expo_url() -> Optional[str]:
     if not matches:
         return None
     url = matches[-1].rstrip(".,)")
-    if url.startswith("http"):
-        host = re.sub(r"^https?://", "", url).split(":")[0]
-        return f"exp://{host}"
+    if "on.expo.app" in url:
+        if url.startswith("http"):
+            host = re.sub(r"^https?://", "", url).split(":")[0]
+            return f"exp://{host}"
+        return url
+    # LAN-режим: exp://<локальный-ip>:<port> → подменяем хост на публичный IP сервера
+    m = re.match(r"exp://[^:/]+:(\d+)", url)
+    if m:
+        pub = _public_ip()
+        if pub:
+            return f"exp://{pub}:{m.group(1)}"
     return url
 
 
@@ -122,11 +153,14 @@ def expo_start(current_user: User = Depends(get_current_admin_user)):
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     env["EXPO_NO_TELEMETRY"] = "1"
+    use_tunnel = os.environ.get("EXPO_TUNNEL", "").lower() in ("1", "true", "yes")
+    cmd = [npx, "expo", "start"]
+    cmd += ["--tunnel"] if use_tunnel else ["--host", "lan"]
     with open(LOG_FILE, "ab") as log:
-        log.write(b"\n--- expo start --tunnel ---\n")
+        log.write(f"\n--- {' '.join(cmd)} ---\n".encode())
         log.flush()
         proc = subprocess.Popen(
-            [npx, "expo", "start", "--tunnel"],
+            cmd,
             cwd=str(MOBILE_DIR),
             stdout=log,
             stderr=subprocess.STDOUT,

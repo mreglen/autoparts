@@ -825,6 +825,10 @@ setup_mobile_app() {
   [[ -d "$MOBILE_APP" ]] || { log "mobile/app отсутствует — пропуск"; return 0; }
   mkdir -p "$MOBILE_APP/.expo-dev"
   chown -R fast:fast "$MOBILE_APP/.expo-dev"
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    ufw allow 8081:8089/tcp >/dev/null 2>&1 || true
+    log "ufw: открыт диапазон 8081-8089/tcp для expo dev"
+  fi
   local lock_hash marker="$MOBILE_APP/.expo-dev/deps.sha256"
   lock_hash=$(sha256sum "$MOBILE_APP/package-lock.json" 2>/dev/null | awk '{print $1}')
   [[ -n "$lock_hash" ]] || { log "mobile/app: нет package-lock.json — npm ci пропущен"; return 0; }
