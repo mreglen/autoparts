@@ -42,3 +42,21 @@ class NotificationPreferencesResponse(BaseModel):
 
 class NotificationPreferencesUpdate(BaseModel):
     notification_prefs: Optional[NotificationPrefs] = None
+
+
+class UserNotificationView(BaseModel):
+    id: int
+    event_type: str
+    title: str
+    body: Optional[str] = None
+    url: Optional[str] = None
+    data: Optional[dict] = None
+    is_read: bool = False
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserNotificationFeedResponse(BaseModel):
+    items: list[UserNotificationView]
+    unread_count: int

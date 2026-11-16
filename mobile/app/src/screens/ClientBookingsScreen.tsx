@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Ionicons } from "@expo/vector-icons";
 
-import { bookingStatusLabel } from "../api/bookings";
 import {
+  cancelClientInspectionBooking,
   fetchMyClientBookings,
   vehicleLabel,
   type ClientBooking,
 } from "../api/clientAccount";
 import { describeError } from "../api/errors";
 import {
+  ConfirmDialog,
   FadeSlideIn,
   ListRow,
   Screen,
@@ -16,8 +20,10 @@ import {
   StaleDataBadge,
   useToast,
 } from "../components/ui";
+import type { RootStackParamList } from "../navigation/types";
+import { invalidateEntities } from "../offline";
 import { useTheme } from "../theme/useTheme";
-import { formatDayMonth } from "../utils/format";
+import { clientBookingStatusLabel, formatDayMonth } from "../utils/format";
 
 function bookingTitle(b: ClientBooking): string {
   const label = vehicleLabel(b.vehicle) || b.vehicle_make || b.name || "Запись";
@@ -35,13 +41,21 @@ function bookingSubtitle(b: ClientBooking): string {
   return parts.join(" · ");
 }
 
+function isCancellable(b: ClientBooking): boolean {
+  return b.status === "new" || b.status === "confirmed";
+}
+
 export function ClientBookingsScreen() {
   const { colors } = useTheme();
   const { show } = useToast();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [rows, setRows] = useState<ClientBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState<number | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<ClientBooking | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -66,6 +80,23 @@ export function ClientBookingsScreen() {
     void load();
   }, [load]);
 
+  const doCancel = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await cancelClientInspectionBooking(cancelTarget.id);
+      await invalidateEntities(["bookings"]);
+      show("Запись отменена", "success");
+      setCancelTarget(null);
+      await load(true);
+    } catch (e) {
+      show(describeError(e), "error");
+      setCancelTarget(null);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (loading) {
     return (
       <Screen scroll={false}>
@@ -79,6 +110,12 @@ export function ClientBookingsScreen() {
       {stale != null ? <StaleDataBadge fetchedAt={stale} /> : null}
       {rows.length === 0 ? (
         <View className="items-center pt-16">
+          <Ionicons
+            name="calendar-outline"
+            size={40}
+            color={colors.inkFaint}
+            style={{ marginBottom: 8 }}
+          />
           <Text className="text-base font-medium" style={{ color: colors.ink }}>
             Записей пока нет
           </Text>
@@ -86,7 +123,7 @@ export function ClientBookingsScreen() {
             className="mt-1 text-center text-sm"
             style={{ color: colors.inkMuted }}
           >
-            Запись к автосервису появится на следующем этапе.
+            Запишитесь на осмотр — автосервис подтвердит дату и время.
           </Text>
         </View>
       ) : (
@@ -95,11 +132,37 @@ export function ClientBookingsScreen() {
             <ListRow
               title={bookingTitle(b)}
               subtitle={bookingSubtitle(b)}
-              right={bookingStatusLabel(b.status)}
+              right={clientBookingStatusLabel(b.status)}
+              onPress={isCancellable(b) ? () => setCancelTarget(b) : undefined}
             />
           </FadeSlideIn>
         ))
       )}
+
+      <Pressable
+        onPress={() => navigation.navigate("ClientBookingNew")}
+        className="mt-6 flex-row items-center justify-center gap-2 rounded-xl py-3.5"
+        style={{ backgroundColor: colors.brand }}
+      >
+        <Ionicons name="add" size={20} color="#fff" />
+        <Text className="text-base font-semibold text-white">
+          Записаться на осмотр
+        </Text>
+      </Pressable>
+
+      <ConfirmDialog
+        visible={cancelTarget != null}
+        title="Отменить запись?"
+        message={
+          cancelTarget
+            ? `${bookingTitle(cancelTarget)} · ${bookingSubtitle(cancelTarget)}`
+            : undefined
+        }
+        confirmLabel={cancelling ? "Отмена…" : "Отменить запись"}
+        destructive
+        onConfirm={() => void doCancel()}
+        onCancel={() => setCancelTarget(null)}
+      />
     </Screen>
   );
 }

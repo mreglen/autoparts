@@ -26,17 +26,31 @@
 | bookings             | `/autoservice/inspections`, `/autoservice/inspection-bookings`, `/autoservice/bookings` | 10 мин  | да, hot       | записи на осмотр                    |
 | repair-orders        | `/autoservice/repair-orders`                        | 10 мин  | да, hot       | списки и детали ЗН                  |
 | planner              | `/autoservice/planner`                              | 10 мин  | да, hot       | недельная сетка                     |
-| warehouse            | `/autoservice/warehouse*`                           | 15 мин  | да            | остатки/движения                    |
+| warehouse            | `/autoservice/warehouse`                            | 15 мин  | да            | остатки/движения                    |
+| warehouse-items      | `/autoservice/warehouse-items`                      | 15 мин  | да            | номенклатура                        |
 | finance-transactions | `/autoservice/finance/transactions`                 | 15 мин  | да            | поступления                         |
 | finance-expenses     | `/autoservice/finance/expenses`                     | 15 мин  | да            | расходы                             |
 | finance-payments     | `/autoservice/finance/payments`                     | 5 мин   | **нет**       | статусы/суммы оплат — только онлайн |
 | reports              | `/autoservice/reports`                              | 1 ч     | да            | просмотр (экспорт — онлайн)         |
-| clients              | `/autoservice/clients`                              | 1 ч     | да            | справочник                          |
-| employees            | `/autoservice/employees`                            | 1 сутки | да            | справочник                          |
+| clients              | `/autoservice/clients`                              | 1 ч     | да            | справочник + клиентские `/me`-карточки |
+| garage-vehicles      | `/autoservice/garage`                               | 30 мин  | да            | гараж клиента (decode — POST, не кэш) |
+| public-autoservice-orgs | `/public/autoservice`                            | 1 сутки | да            | публичный справочник СТО            |
+| employees            | `/autoservice/service-employees`                    | 1 сутки | да            | справочник                          |
 | contractors          | `/autoservice/contractors`                          | 1 сутки | да            | справочник                          |
 | expense-articles     | `/autoservice/expense-articles`                     | 1 сутки | да            | справочник                          |
+| notifications        | `/api/notifications`                                | 5 мин   | да, hot       | in-app лента                        |
 | settings             | `/autoservice/settings`                             | 1 сутки | да            | read-mostly                         |
 | meta                 | `/autoservice/meta`                                 | 1 сутки | да            | служебное                           |
+| calendar-sync        | `/autoservice/calendar-sync`                        | 1 ч     | **нет**       | креды CalDAV — только онлайн        |
+
+**Клиентский контур (этап 31):** гараж (`/autoservice/garage/vehicles`),
+история и деталка заказ-нарядов (`/autoservice/repair-orders/me*`), записи
+(`/autoservice/inspection-bookings/me`), карточки клиента
+(`/autoservice/clients/me*`), лента уведомлений и публичный справочник СТО
+читаются офлайн с `StaleDataBadge`. Мутации (запись/отмена, авто) инвалидируют
+сущности `bookings`/`garage-vehicles` из экранов. PDF заказ-наряда
+(`apiBlob`) и decode-подбор (POST) в кэш не попадают — только онлайн.
+Профиль (`/auth/profile`) и настройки уведомлений — онлайн-only.
 
 **Запрещено показывать без сети** (правило 1.8): суммы к оплате, статус оплаты, результат
 подтверждения записи. Эндпоинты без политики в таблице не кэшируются вовсе — добавить префикс

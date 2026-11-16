@@ -1,0 +1,55 @@
+appId: ru.svoygarage.autoservice
+name: Приёмка клиентского контура — запись (создаёт реальные данные!)
+#
+# ВНИМАНИЕ: создаёт автомобиль в гараже и запись на осмотр в реальном
+# автосервисе. Запускать только на тестовом контуре/тестовом клиенте.
+#
+#   maestro test mobile/e2e/client-journey-write.yaml \
+#     -e CLIENT_LOGIN=client@example.com \
+#     -e CLIENT_PASSWORD=secret \
+#     -e VEHICLE_MAKE=Lada \
+#     -e VEHICLE_MODEL=Vesta \
+#     -e BOOKING_DATE=2026-12-01
+---
+- launchApp
+- runFlow: subflows/login.yaml
+
+# --- Добавить авто ---
+- tapOn: "Гараж"
+- extendedWaitUntil:
+    visible: "Добавить автомобиль"
+    timeout: 15000
+- tapOn: "Добавить автомобиль"
+- extendedWaitUntil:
+    visible: "Марка *"
+    timeout: 10000
+- tapOn: "Марка *"
+- inputText: ${VEHICLE_MAKE}
+- hideKeyboard
+- tapOn: "Модель"
+- inputText: ${VEHICLE_MODEL}
+- hideKeyboard
+- tapOn: "Сохранить"
+- extendedWaitUntil:
+    notVisible: "Марка *"
+    timeout: 15000
+
+# --- Запись на осмотр ---
+- tapOn: "Записи"
+- extendedWaitUntil:
+    visible: "Записаться на осмотр"
+    timeout: 15000
+- tapOn: "Записаться на осмотр"
+- extendedWaitUntil:
+    visible: "ГГГГ-ММ-ДД"
+    timeout: 10000
+- tapOn: "ГГГГ-ММ-ДД"
+- inputText: ${BOOKING_DATE}
+- hideKeyboard
+- tapOn: "Записаться"
+- extendedWaitUntil:
+    notVisible: "ГГГГ-ММ-ДД"
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Записи"
+    timeout: 10000

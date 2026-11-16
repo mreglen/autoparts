@@ -1,0 +1,55 @@
+appId: ru.svoygarage.autoservice
+name: Приёмка клиентского контура — чтение и навигация
+#
+# Запуск (нужен Maestro CLI и запущенное приложение):
+#   maestro test mobile/e2e/client-journey.yaml \
+#     -e CLIENT_LOGIN=client@example.com \
+#     -e CLIENT_PASSWORD=secret
+#
+# Сценарий покрывает: вход → гараж → история → записи → профиль →
+# уведомления. Только чтение — безопасен для прогона на проде.
+---
+- launchApp
+- runFlow: subflows/login.yaml
+
+# --- Гараж ---
+- tapOn: "Гараж"
+- extendedWaitUntil:
+    visible: "Добавить автомобиль"
+    timeout: 15000
+
+# --- История ремонтов ---
+- tapOn: "Ещё"
+- extendedWaitUntil:
+    visible: "История ремонтов"
+    timeout: 10000
+- tapOn: "История ремонтов"
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 15000
+# Список или empty-state — оба валидны для приёмки чтения
+- pressKey: back
+
+# --- Записи ---
+- tapOn: "Записи"
+- extendedWaitUntil:
+    visible: "Записаться на осмотр"
+    timeout: 15000
+- pressKey: back
+
+# --- Профиль ---
+- tapOn: "Ещё"
+- tapOn: "Профиль"
+- extendedWaitUntil:
+    visible: "Данные аккаунта"
+    timeout: 10000
+- assertVisible: "Мои автосервисы"
+- pressKey: back
+
+# --- Уведомления ---
+- tapOn: "Ещё"
+- tapOn: "Уведомления"
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 15000
+- pressKey: back

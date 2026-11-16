@@ -1,7 +1,7 @@
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pywebpush import webpush, WebPushException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -9,13 +9,15 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.db.database import get_db
-from app.models.notification import PushSubscription
+from app.models.notification import PushSubscription, UserNotification
 from app.models.user import User
 from app.schemas.notification import (
     NotificationPreferencesResponse,
     NotificationPreferencesUpdate,
     NotificationPrefs,
     PushSubscriptionCreate,
+    UserNotificationFeedResponse,
+    UserNotificationView,
 )
 from app.services.notification_service import (
     get_user_notification_prefs,
@@ -179,3 +181,71 @@ def send_push_notification(user_id: int, message_data: dict, db: Session):
             logger.exception("Unexpected error sending push to user %s: %s", user_id, e)
     
     db.commit()
+
+
+@router.get("/feed", response_model=UserNotificationFeedResponse)
+def list_notification_feed(
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """In-app лента уведомлений текущего пользователя."""
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    items = (
+        db.query(UserNotification)
+        .filter(UserNotification.user_id == current_user.id)
+        .order_by(UserNotification.created_at.desc(), UserNotification.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    unread_count = (
+        db.query(func.count(UserNotification.id))
+        .filter(
+            UserNotification.user_id == current_user.id,
+            UserNotification.is_read.is_(False),
+        )
+        .scalar()
+        or 0
+    )
+    return UserNotificationFeedResponse(
+        items=[UserNotificationView.model_validate(row) for row in items],
+        unread_count=unread_count,
+    )
+
+
+@router.post("/feed/{notification_id}/read", response_model=UserNotificationView)
+def mark_notification_read(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    row = (
+        db.query(UserNotification)
+        .filter(
+            UserNotification.id == notification_id,
+            UserNotification.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Уведомление не найдено")
+    row.is_read = True
+    db.commit()
+    db.refresh(row)
+    return UserNotificationView.model_validate(row)
+
+
+@router.post("/feed/read-all")
+def mark_all_notifications_read(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db.query(UserNotification).filter(
+        UserNotification.user_id == current_user.id,
+        UserNotification.is_read.is_(False),
+    ).update({"is_read": True}, synchronize_session=False)
+    db.commit()
+    return {"ok": True}

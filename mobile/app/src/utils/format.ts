@@ -63,6 +63,43 @@ export function orderStatusLabel(status: string | null | undefined): string {
   return ORDER_STATUS_LABELS[normalized] ?? normalized ?? "—";
 }
 
+/** Клиентские формулировки статусов заказ-наряда (не staff-термины). */
+export const CLIENT_ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: "Запланирован",
+  in_progress: "Авто у мастера",
+  done: "Выполнен",
+  completed: "Завершён",
+  cancelled: "Отменён",
+  review: "На проверке",
+};
+
+export function clientOrderStatusLabel(
+  status: string | null | undefined,
+): string {
+  const normalized = normalizeOrderStatus(status);
+  return (
+    CLIENT_ORDER_STATUS_LABELS[normalized] ??
+    ORDER_STATUS_LABELS[normalized] ??
+    normalized ??
+    "—"
+  );
+}
+
+/** Клиентские формулировки статусов записи на осмотр. */
+export const CLIENT_BOOKING_STATUS_LABELS: Record<string, string> = {
+  new: "Отправлена",
+  confirmed: "Подтверждена",
+  processed: "Обработана",
+  cancelled: "Отменена",
+};
+
+export function clientBookingStatusLabel(
+  status: string | null | undefined,
+): string {
+  const normalized = (status ?? "").toLowerCase();
+  return CLIENT_BOOKING_STATUS_LABELS[normalized] ?? normalized ?? "—";
+}
+
 export function greetingByHour(hour: number): string {
   if (hour < 5) return "Доброй ночи";
   if (hour < 12) return "Доброе утро";

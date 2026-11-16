@@ -141,6 +141,14 @@ export const CACHE_POLICIES: CachePolicy[] = [
     ttlMs: DAY,
     offlineReadable: true,
   },
+  // --- Уведомления ---
+  {
+    entity: "notifications",
+    pathPrefix: "/api/notifications",
+    ttlMs: 5 * MIN,
+    offlineReadable: true,
+    hot: true,
+  },
   // --- Настройки/профиль ---
   {
     entity: "settings",

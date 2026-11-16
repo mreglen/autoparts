@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON
 from sqlalchemy.sql import func
 from app.db.database import Base
 from sqlalchemy.orm import relationship
@@ -18,4 +18,22 @@ class PushSubscription(Base):
     last_used = Column(DateTime(timezone=True))
     
     # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class UserNotification(Base):
+    """In-app лента уведомлений пользователя (push/email — отдельные каналы)."""
+
+    __tablename__ = "user_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    event_type = Column(String(80), nullable=False)
+    title = Column(String(200), nullable=False)
+    body = Column(Text, nullable=True)
+    url = Column(String(500), nullable=True)
+    data = Column(JSON, nullable=True)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
     user = relationship("User", foreign_keys=[user_id])

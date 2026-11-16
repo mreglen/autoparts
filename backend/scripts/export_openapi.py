@@ -24,11 +24,13 @@ PREFIX = "#/components/schemas/"
 # Путь должен начинаться с одного из префиксов. `{…}` в префиксе не допускается.
 MOBILE_PATH_PREFIXES = (
     "/api/auth/",
+    "/api/users/me",
     "/api/mobile/",
     "/api/tasks/",
     "/api/autoservice/",
     "/api/public/autoservice/",
     "/api/organizations/",
+    "/api/notifications/",
 )
 
 # Из /api/organizations/ мобильному клиенту нужны только карточки сотрудников.

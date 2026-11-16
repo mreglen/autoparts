@@ -18,6 +18,10 @@ export type RootStackParamList = {
   Reports: undefined;
   Clients: undefined;
   ClientHistory: undefined;
+  ClientOrder: { orderId: number };
+  ClientBookingNew: undefined;
+  ClientNotifications: undefined;
+  ClientProfile: undefined;
   ClientVehicle: { vehicle: GarageVehicle; orgName?: string | null };
   ClientVehicleForm:
     | { vehicle?: GarageVehicle; organizationId?: string }

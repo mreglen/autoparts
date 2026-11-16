@@ -5,7 +5,7 @@ from typing import Any
 
 from app.celery_app import celery_app
 from app.db.database import SessionLocal
-from app.models.notification import PushSubscription
+from app.models.notification import PushSubscription, UserNotification
 from app.models.user import User
 from app.services.notification_service import (
     should_send_email_for_event,
@@ -29,6 +29,26 @@ def deliver_user_notification(
         if not user:
             logger.warning("Notification skipped: user %s not found (%s)", user_id, event_type)
             return
+
+        # In-app лента — всегда, независимо от push/email предпочтений.
+        push = push_data or {}
+        title = str(push.get("title") or email_subject or event_type)[:200]
+        body = str(push.get("body") or email_body or "")[:2000]
+        try:
+            db.add(
+                UserNotification(
+                    user_id=user_id,
+                    event_type=event_type[:80],
+                    title=title,
+                    body=body or None,
+                    url=str(push.get("url"))[:500] if push.get("url") else None,
+                    data=push or None,
+                )
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("In-app notification feed write failed for user %s", user_id)
 
         notify_push = should_send_push_for_event(user, event_type)
         notify_email = should_send_email_for_event(user, event_type)

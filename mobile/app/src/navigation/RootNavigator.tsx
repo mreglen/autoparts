@@ -16,6 +16,10 @@ import { BookingsScreen } from "../screens/BookingsScreen";
 import { BookingDetailScreen } from "../screens/BookingDetailScreen";
 import { BookingFormScreen } from "../screens/BookingFormScreen";
 import { ClientHistoryScreen } from "../screens/ClientHistoryScreen";
+import { ClientBookingFormScreen } from "../screens/ClientBookingFormScreen";
+import { ClientNotificationsScreen } from "../screens/ClientNotificationsScreen";
+import { ClientProfileScreen } from "../screens/ClientProfileScreen";
+import { ClientOrderScreen } from "../screens/ClientOrderScreen";
 import { ClientVehicleScreen } from "../screens/ClientVehicleScreen";
 import { ClientVehicleFormScreen } from "../screens/ClientVehicleFormScreen";
 import { ChangePasswordScreen } from "../screens/ChangePasswordScreen";
@@ -271,6 +275,26 @@ export function RootNavigator() {
                 name="ClientHistory"
                 component={ClientHistoryScreen}
                 options={{ title: "История ремонтов" }}
+              />
+              <Stack.Screen
+                name="ClientOrder"
+                component={ClientOrderScreen}
+                options={{ title: "Заказ-наряд" }}
+              />
+              <Stack.Screen
+                name="ClientBookingNew"
+                component={ClientBookingFormScreen}
+                options={{ title: "Запись на осмотр" }}
+              />
+              <Stack.Screen
+                name="ClientNotifications"
+                component={ClientNotificationsScreen}
+                options={{ title: "Уведомления" }}
+              />
+              <Stack.Screen
+                name="ClientProfile"
+                component={ClientProfileScreen}
+                options={{ title: "Профиль" }}
               />
               <Stack.Screen
                 name="ClientVehicle"

@@ -1,0 +1,18 @@
+appId: ru.svoygarage.autoservice
+name: Вход клиента (подфлоу)
+---
+# Запускается, только если виден экран логина. Если сессия уже активна — пропускается.
+- runFlow:
+    when:
+      visible: "Email или телефон"
+    commands:
+      - tapOn: "Email или телефон"
+      - inputText: ${CLIENT_LOGIN}
+      - hideKeyboard
+      - tapOn: "Пароль"
+      - inputText: ${CLIENT_PASSWORD}
+      - hideKeyboard
+      - tapOn: "Войти"
+      - extendedWaitUntil:
+          visible: "Гараж"
+          timeout: 30000

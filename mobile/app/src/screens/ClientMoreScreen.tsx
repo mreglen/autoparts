@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { useAppRole } from "../auth/roles";
+import { fetchNotificationFeed } from "../api/notifications";
 import { describeError } from "../api/errors";
 import { useSession } from "../auth/session";
 import { ConfirmDialog, ListRow, Screen, useToast } from "../components/ui";
@@ -20,6 +21,19 @@ export function ClientMoreScreen() {
   const { show } = useToast();
   const [confirmOut, setConfirmOut] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchNotificationFeed(1)
+      .then((r) => {
+        if (!cancelled) setUnread(r.data?.unread_count ?? 0);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const doSignOut = async () => {
     setBusy(true);
@@ -61,6 +75,18 @@ export function ClientMoreScreen() {
           subtitle="Ваши заказ-наряды во всех автосервисах"
           onPress={() => navigation.navigate("ClientHistory")}
         />
+        <View className="mt-2">
+          <ListRow
+            title="Уведомления"
+            subtitle={
+              unread > 0
+                ? `Непрочитанных: ${unread}`
+                : "Статусы записей и заказов"
+            }
+            right={unread > 0 ? String(unread) : undefined}
+            onPress={() => navigation.navigate("ClientNotifications")}
+          />
+        </View>
       </View>
       {canUseStaff ? (
         <View className="mt-2">
@@ -78,7 +104,11 @@ export function ClientMoreScreen() {
       >
         Профиль
       </Text>
-      <ListRow title={user?.email ?? "—"} subtitle="Аккаунт клиента" />
+      <ListRow
+        title="Профиль"
+        subtitle={user?.email ?? "Данные аккаунта"}
+        onPress={() => navigation.navigate("ClientProfile")}
+      />
 
       <Text
         className="mb-3 mt-6 text-lg font-semibold"
