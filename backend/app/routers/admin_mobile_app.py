@@ -9,6 +9,10 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth import get_current_admin_user
