@@ -820,8 +820,22 @@ verify_frontend_chunks() {
   [[ -n "$used_ok" ]] || log "WARN: UsedPartsList lazy chunk missing from build source maps"
 }
 
+ensure_expo_env() {
+  # Гарантирует EXPO_TUNNEL/EXPO_TOKEN в backend/.env (файл сохраняется между деплоями).
+  # Токен в репозиторий не коммитится: можно передать при запуске `sudo EXPO_TOKEN=... update`,
+  # либо один раз дописать его в backend/.env на сервере вручную.
+  local envf="$BACKEND/.env"
+  [[ -f "$envf" ]] || return 0
+  grep -q '^EXPO_TUNNEL=' "$envf" || echo 'EXPO_TUNNEL=1' >> "$envf"
+  if [[ -n "${EXPO_TOKEN:-}" ]] && ! grep -q '^EXPO_TOKEN=.' "$envf"; then
+    echo "EXPO_TOKEN=${EXPO_TOKEN}" >> "$envf"
+    log "backend/.env: добавлен EXPO_TOKEN"
+  fi
+}
+
 setup_mobile_app() {
   # Зависимости и runtime-каталог для «npx expo start --tunnel» (админка → Приложение).
+  ensure_expo_env
   [[ -d "$MOBILE_APP" ]] || { log "mobile/app отсутствует — пропуск"; return 0; }
   mkdir -p "$MOBILE_APP/.expo-dev"
   chown -R fast:fast "$MOBILE_APP/.expo-dev"
