@@ -117,25 +117,20 @@ export function BookingsScreen() {
         {staleAt ? <StaleDataBadge fetchedAt={staleAt} /> : null}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        className="mb-2"
-        contentContainerStyle={{ gap: 6 }}
-      >
+      <View className="mb-2 flex-row flex-wrap gap-1">
         {FILTERS.map((f) => {
           const active = filter === f.key;
           return (
             <Pressable
               key={f.key}
               onPress={() => setFilter(f.key)}
-              className="rounded-full px-2 py-0"
+              className="rounded-full px-3 py-1"
               style={{
                 backgroundColor: active ? colors.brand : colors.surfaceSubtle,
               }}
             >
               <Text
-                className="text-[10px] font-medium"
+                className="text-[11px] font-medium"
                 style={{ color: active ? "#fff" : colors.inkSoft }}
               >
                 {f.label}
@@ -152,18 +147,18 @@ export function BookingsScreen() {
               setSortBy("created_at");
               setSortDir("desc");
             }}
-            className="rounded-full px-2 py-0"
+            className="rounded-full px-3 py-1"
             style={{ backgroundColor: colors.dangerSoft }}
           >
             <Text
-              className="text-[10px] font-medium"
+              className="text-[11px] font-medium"
               style={{ color: colors.danger }}
             >
               Сбросить
             </Text>
           </Pressable>
         ) : null}
-      </ScrollView>
+      </View>
 
       <View className="mb-3 flex-row items-center gap-2">
         {(["created_at", "preferred_date"] as const).map((key) => {

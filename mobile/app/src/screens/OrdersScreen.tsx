@@ -266,13 +266,13 @@ export function OrdersScreen() {
               onPress={() =>
                 patchFilters({ statuses: toggleIn(filters.statuses, s.value) })
               }
-              className="rounded-full px-2.5 py-0.5"
+              className="rounded-full px-3 py-1"
               style={{
                 backgroundColor: active ? colors.brand : colors.surfaceSubtle,
               }}
             >
               <Text
-                className="text-[10px] font-medium"
+                className="text-[11px] font-medium"
                 style={{ color: active ? "#fff" : colors.inkSoft }}
               >
                 {s.label}
@@ -283,11 +283,11 @@ export function OrdersScreen() {
         {filtersDirty ? (
           <Pressable
             onPress={() => setFilters(DEFAULT_FILTERS)}
-            className="rounded-full px-2.5 py-0.5"
+            className="rounded-full px-3 py-1"
             style={{ backgroundColor: colors.dangerSoft }}
           >
             <Text
-              className="text-[10px] font-medium"
+              className="text-[11px] font-medium"
               style={{ color: colors.danger }}
             >
               Сбросить
