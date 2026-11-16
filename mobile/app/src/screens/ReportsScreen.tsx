@@ -7,13 +7,11 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   fetchOrderEconomics,
   fetchPayrollReport,
-  fetchRosskoSales,
   fetchWarehouseStock,
   shareReportXlsx,
   type OrderEconomicsResponse,
   type PayrollEmployeeRow,
   type PayrollReportResponse,
-  type RosskoSalesResponse,
   type WarehouseStockResponse,
 } from "../api/reports";
 import { describeError } from "../api/errors";
@@ -30,7 +28,7 @@ import { useTheme } from "../theme/useTheme";
 import { formatDayMonth, formatMoney } from "../utils/format";
 import { UNIT_LABELS } from "../api/warehouse";
 
-type Tab = "economics" | "stock" | "payroll" | "rossko";
+type Tab = "economics" | "stock" | "payroll";
 
 const MONTH_NAMES = [
   "Январь",
@@ -124,12 +122,10 @@ export function ReportsScreen() {
   const [query, setQuery] = useState("");
 
   const canPayroll = Boolean(user?.isDirector);
-  const canRossko = Boolean(user?.canSeeRosskoSalesReport);
 
   const [econ, setEcon] = useState<OrderEconomicsResponse | null>(null);
   const [stock, setStock] = useState<WarehouseStockResponse | null>(null);
   const [payroll, setPayroll] = useState<PayrollReportResponse | null>(null);
-  const [rossko, setRossko] = useState<RosskoSalesResponse | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -141,7 +137,6 @@ export function ReportsScreen() {
     { id: "economics", label: "Экономика" },
     { id: "stock", label: "Остатки" },
     ...(canPayroll ? [{ id: "payroll" as Tab, label: "Зарплата" }] : []),
-    ...(canRossko ? [{ id: "rossko" as Tab, label: "Продажи Росско" }] : []),
   ];
 
   const load = useCallback(
@@ -160,10 +155,6 @@ export function ReportsScreen() {
         } else if (tab === "payroll") {
           const r = await fetchPayrollReport(year, month);
           setPayroll(r.data);
-          setStale(r.stale ? { fetchedAt: r.fetchedAt } : null);
-        } else {
-          const r = await fetchRosskoSales(year, month, query);
-          setRossko(r.data);
           setStale(r.stale ? { fetchedAt: r.fetchedAt } : null);
         }
       } catch (e) {
@@ -194,9 +185,7 @@ export function ReportsScreen() {
         ? ("order-economics" as const)
         : tab === "stock"
           ? ("warehouse-stock" as const)
-          : tab === "payroll"
-            ? ("payroll" as const)
-            : ("rossko-sales" as const);
+          : ("payroll" as const);
     setXlsxBusy(true);
     try {
       await shareReportXlsx(kind, year, month, query);
@@ -525,91 +514,6 @@ export function ReportsScreen() {
             )}
           </>
         ) : null
-      ) : rossko ? (
-        <>
-          <View className="flex-row flex-wrap gap-2">
-            <SummaryTile label="Продаж" value={String(rossko.summary.count)} />
-            <SummaryTile
-              label="Выручка"
-              value={formatMoney(rossko.summary.sale_total)}
-            />
-            <SummaryTile
-              label="Закупка"
-              value={formatMoney(rossko.summary.supplier_total)}
-            />
-            <SummaryTile
-              label="Маржа"
-              value={formatMoney(rossko.summary.margin)}
-              tone={Number(rossko.summary.margin) >= 0 ? "success" : "danger"}
-            />
-            <SummaryTile
-              label="Возвраты"
-              value={formatMoney(rossko.summary.refund_total)}
-              tone={
-                Number(rossko.summary.refund_total) > 0 ? "warning" : undefined
-              }
-            />
-            {rossko.summary.pending_count > 0 ? (
-              <SummaryTile
-                label="Ожидают эквайринга"
-                value={String(rossko.summary.pending_count)}
-                tone="warning"
-              />
-            ) : null}
-          </View>
-          {rossko.items.map((o) => (
-            <View
-              key={o.order_id}
-              className="mb-2 rounded-xl p-3"
-              style={{ backgroundColor: colors.surfaceSubtle }}
-            >
-              <View className="flex-row items-center justify-between gap-2">
-                <View className="min-w-0 flex-1">
-                  <Text
-                    className="text-sm font-medium"
-                    style={{ color: colors.ink }}
-                    numberOfLines={1}
-                  >
-                    {o.buyer_name || "Покупатель"}
-                    {o.rossko_order_id ? ` · ${o.rossko_order_id}` : ""}
-                  </Text>
-                  <Text
-                    className="mt-0.5 text-xs"
-                    style={{ color: colors.inkMuted }}
-                    numberOfLines={1}
-                  >
-                    {formatDayMonth(o.operation_at)}
-                    {o.payment_method_label
-                      ? ` · ${o.payment_method_label}`
-                      : ""}
-                    {o.is_paid ? "" : " · не оплачен"}
-                  </Text>
-                </View>
-                <View className="items-end">
-                  <Text
-                    className="text-sm font-semibold"
-                    style={{ color: colors.ink }}
-                  >
-                    {formatMoney(o.sale_total)}
-                  </Text>
-                  {o.margin != null ? (
-                    <Text
-                      className="text-[10px]"
-                      style={{
-                        color:
-                          Number(o.margin) >= 0
-                            ? colors.success
-                            : colors.danger,
-                      }}
-                    >
-                      маржа {formatMoney(o.margin)}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            </View>
-          ))}
-        </>
       ) : null}
 
       {/* Шторка: заказы сотрудника */}

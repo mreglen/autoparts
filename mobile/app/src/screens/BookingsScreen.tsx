@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -108,11 +108,6 @@ export function BookingsScreen() {
     await load();
   }, [load]);
 
-  const sortedHint = useMemo(
-    () => (sortBy === "preferred_date" ? "По дате записи" : "По дате создания"),
-    [sortBy],
-  );
-
   return (
     <Screen scroll={false}>
       <View className="mb-2 flex-row items-center justify-between">
@@ -134,13 +129,13 @@ export function BookingsScreen() {
             <Pressable
               key={f.key}
               onPress={() => setFilter(f.key)}
-              className="rounded-full px-3 py-1.5"
+              className="rounded-full px-2 py-0.5"
               style={{
                 backgroundColor: active ? colors.brand : colors.surfaceSubtle,
               }}
             >
               <Text
-                className="text-xs font-medium"
+                className="text-[10px] font-medium"
                 style={{ color: active ? "#fff" : colors.inkSoft }}
               >
                 {f.label}
@@ -150,27 +145,43 @@ export function BookingsScreen() {
         })}
       </ScrollView>
 
-      <Pressable
-        onPress={() => {
-          if (sortBy === "created_at" && sortDir === "desc") {
-            setSortBy("preferred_date");
-            setSortDir("asc");
-          } else if (sortBy === "preferred_date" && sortDir === "asc") {
-            setSortBy("preferred_date");
-            setSortDir("desc");
-          } else {
-            setSortBy("created_at");
-            setSortDir("desc");
-          }
-        }}
-        className="mb-3 flex-row items-center gap-1 self-start"
-      >
-        <Ionicons name="swap-vertical" size={14} color={colors.inkMuted} />
-        <Text className="text-xs" style={{ color: colors.inkMuted }}>
-          {sortedHint}
-          {sortDir === "asc" ? " ↑" : " ↓"}
-        </Text>
-      </Pressable>
+      <View className="mb-3 flex-row items-center gap-2">
+        {(["created_at", "preferred_date"] as const).map((key) => {
+          const label = key === "preferred_date" ? "Дата записи" : "Создана";
+          const active = sortBy === key;
+          return (
+            <Pressable
+              key={key}
+              onPress={() => {
+                if (active) {
+                  setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                } else {
+                  setSortBy(key);
+                  setSortDir(key === "preferred_date" ? "asc" : "desc");
+                }
+              }}
+              className="flex-row items-center gap-0.5 rounded-full px-2 py-0.5"
+              style={{
+                backgroundColor: active ? colors.brandSoft : "transparent",
+              }}
+            >
+              <Text
+                className="text-[10px] font-medium"
+                style={{ color: active ? colors.brand : colors.inkMuted }}
+              >
+                {label}
+              </Text>
+              {active ? (
+                <Ionicons
+                  name={sortDir === "asc" ? "arrow-up" : "arrow-down"}
+                  size={10}
+                  color={colors.brand}
+                />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
 
       <ScrollView
         className="flex-1"

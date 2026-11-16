@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 
 import { cachedGet, type CachedResult } from "../offline";
 import { ApiError, describeError } from "../api/errors";
-import { Screen, SkeletonRows, StaleDataBadge } from "../components/ui";
+import {
+  Screen,
+  SkeletonRows,
+  StaleDataBadge,
+  PressableScale,
+} from "../components/ui";
 import {
   formatMoney,
   formatTime,
@@ -54,6 +60,8 @@ interface Tile {
   hint?: string;
   icon: keyof typeof Ionicons.glyphMap;
   accent: "warning" | "brand" | "danger" | "success";
+  /** Метод навигации при клике на плитку */
+  action?: "bookings" | "clients" | "orders" | "orders-in-progress" | "reports";
 }
 
 function buildTiles(summary: DashboardSummary): Tile[] {
@@ -65,6 +73,7 @@ function buildTiles(summary: DashboardSummary): Tile[] {
       hint: plural(summary.review_orders ?? 0, "заказ", "заказа", "заказов"),
       icon: "alert-circle-outline",
       accent: "warning",
+      action: "orders",
     });
   }
   if ((summary.new_bookings ?? 0) > 0) {
@@ -74,6 +83,7 @@ function buildTiles(summary: DashboardSummary): Tile[] {
       hint: "Требуют подтверждения",
       icon: "calendar-outline",
       accent: "warning",
+      action: "bookings",
     });
   }
   if (Number(summary.debt_total) > 0) {
@@ -83,6 +93,7 @@ function buildTiles(summary: DashboardSummary): Tile[] {
       hint: `${summary.debtors_count ?? 0} ${plural(summary.debtors_count ?? 0, "клиент", "клиента", "клиентов")}`,
       icon: "card-outline",
       accent: "danger",
+      action: "clients",
     });
   }
   if (summary.in_progress_orders != null) {
@@ -95,6 +106,7 @@ function buildTiles(summary: DashboardSummary): Tile[] {
           : `${summary.active_orders ?? 0} активных`,
       icon: "construct-outline",
       accent: "brand",
+      action: "orders-in-progress",
     });
   }
   if (summary.revenue_30d != null) {
@@ -103,6 +115,7 @@ function buildTiles(summary: DashboardSummary): Tile[] {
       value: formatMoney(summary.revenue_30d),
       icon: "trending-up-outline",
       accent: "success",
+      action: "reports",
     });
   }
   return tiles;
@@ -110,6 +123,7 @@ function buildTiles(summary: DashboardSummary): Tile[] {
 
 export function TodayScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation<any>();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -152,6 +166,34 @@ export function TodayScreen() {
   const tiles = summary ? buildTiles(summary) : [];
   const todayItems = summary?.today ?? [];
   const payroll = summary?.payroll_month ?? null;
+
+  const handleTilePress = (tile: Tile) => {
+    switch (tile.action) {
+      case "bookings":
+        navigation.jumpTo("Bookings");
+        break;
+      case "clients":
+        navigation.navigate("Clients");
+        break;
+      case "orders":
+      case "orders-in-progress":
+        navigation.jumpTo("Orders");
+        break;
+      case "reports":
+        navigation.navigate("Reports");
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleItemPress = (item: TodayItem) => {
+    if (item.kind === "inspection") {
+      navigation.navigate("BookingDetail", { id: item.id });
+    } else {
+      navigation.navigate("OrderDetail", { id: item.id });
+    }
+  };
 
   return (
     <Screen onRefresh={onRefresh} refreshing={refreshing}>
@@ -207,32 +249,40 @@ export function TodayScreen() {
               </Text>
               <View className="flex-row flex-wrap gap-2">
                 {tiles.map((tile) => (
-                  <View
+                  <PressableScale
                     key={tile.label}
+                    onPress={() => handleTilePress(tile)}
                     className="min-w-[46%] flex-1 rounded-xl p-3"
                     style={{ backgroundColor: colors.surfaceSubtle }}
                   >
-                    <View className="flex-row items-center gap-1.5">
+                    <View className="flex-row items-center justify-between gap-1.5">
+                      <View className="flex-row items-center gap-1.5">
+                        <Ionicons
+                          name={tile.icon}
+                          size={14}
+                          color={
+                            tile.accent === "warning"
+                              ? colors.warning
+                              : tile.accent === "danger"
+                                ? colors.danger
+                                : tile.accent === "success"
+                                  ? colors.success
+                                  : colors.brand
+                          }
+                        />
+                        <Text
+                          className="text-xs"
+                          style={{ color: colors.inkMuted }}
+                          numberOfLines={1}
+                        >
+                          {tile.label}
+                        </Text>
+                      </View>
                       <Ionicons
-                        name={tile.icon}
+                        name="chevron-forward"
                         size={14}
-                        color={
-                          tile.accent === "warning"
-                            ? colors.warning
-                            : tile.accent === "danger"
-                              ? colors.danger
-                              : tile.accent === "success"
-                                ? colors.success
-                                : colors.brand
-                        }
+                        color={colors.inkFaint}
                       />
-                      <Text
-                        className="text-xs"
-                        style={{ color: colors.inkMuted }}
-                        numberOfLines={1}
-                      >
-                        {tile.label}
-                      </Text>
                     </View>
                     <Text
                       className="mt-1 text-xl font-bold"
@@ -249,14 +299,14 @@ export function TodayScreen() {
                         {tile.hint}
                       </Text>
                     ) : null}
-                  </View>
+                  </PressableScale>
                 ))}
               </View>
             </View>
           ) : null}
 
           {payroll ? (
-            <View>
+            <PressableScale onPress={() => navigation.navigate("Finance")}>
               <Text
                 className="mb-2 text-xs font-semibold uppercase"
                 style={{ color: colors.inkMuted }}
@@ -264,7 +314,7 @@ export function TodayScreen() {
                 Моя зарплата
               </Text>
               <View
-                className="rounded-xl p-3"
+                className="flex-row items-center justify-between rounded-xl p-3"
                 style={{ backgroundColor: colors.surfaceSubtle }}
               >
                 <Text
@@ -273,21 +323,21 @@ export function TodayScreen() {
                 >
                   {formatMoney(payroll.total)}
                 </Text>
-                <Text
-                  className="mt-0.5 text-xs"
-                  style={{ color: colors.inkMuted }}
-                >
-                  Начислено за {payroll.month}.{payroll.year} ·{" "}
-                  {payroll.completed_orders}{" "}
-                  {plural(
-                    payroll.completed_orders,
-                    "заказ",
-                    "заказа",
-                    "заказов",
-                  )}
-                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={colors.inkMuted}
+                />
               </View>
-            </View>
+              <Text
+                className="mt-0.5 text-xs"
+                style={{ color: colors.inkMuted }}
+              >
+                Начислено за {payroll.month}.{payroll.year} ·{" "}
+                {payroll.completed_orders}{" "}
+                {plural(payroll.completed_orders, "заказ", "заказа", "заказов")}
+              </Text>
+            </PressableScale>
           ) : null}
 
           <View>
@@ -317,8 +367,9 @@ export function TodayScreen() {
             ) : (
               <View className="gap-2">
                 {todayItems.map((item) => (
-                  <View
+                  <PressableScale
                     key={`${item.kind}-${item.id}`}
+                    onPress={() => handleItemPress(item)}
                     className="flex-row items-center gap-3 rounded-xl p-3"
                     style={{ backgroundColor: colors.surfaceSubtle }}
                   >
@@ -368,7 +419,12 @@ export function TodayScreen() {
                         {item.work_zone_name ? ` · ${item.work_zone_name}` : ""}
                       </Text>
                     </View>
-                  </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={18}
+                      color={colors.inkMuted}
+                    />
+                  </PressableScale>
                 ))}
               </View>
             )}

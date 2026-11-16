@@ -33,7 +33,6 @@ export interface SessionUser {
   isDirector: boolean;
   isSeller: boolean;
   isEmployee: boolean;
-  canSeeRosskoSalesReport: boolean;
 }
 
 interface SessionContextValue {
@@ -89,7 +88,6 @@ function toSessionUser(
     isDirector: Boolean(profile.is_director),
     isSeller: Boolean(profile.is_seller),
     isEmployee: Boolean(profile.is_employee),
-    canSeeRosskoSalesReport: Boolean(profile.can_see_rossko_sales_report),
   };
 }
 

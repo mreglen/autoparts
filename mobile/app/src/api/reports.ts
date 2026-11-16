@@ -110,35 +110,6 @@ export interface WarehouseStockResponse {
   items: WarehouseStockRow[];
 }
 
-export interface RosskoSalesRow {
-  order_id: number;
-  operation_at?: string | null;
-  rossko_order_id?: string | null;
-  buyer_name: string;
-  buyer_phone?: string;
-  payment_method_label?: string;
-  is_paid: boolean;
-  sale_total: number;
-  supplier_total: number;
-  margin?: number | null;
-  refund_amount?: number;
-  pending_acquiring?: boolean;
-}
-
-export interface RosskoSalesResponse {
-  date_from: string;
-  date_to: string;
-  summary: {
-    count: number;
-    sale_total: number;
-    supplier_total: number;
-    margin: number;
-    refund_total: number;
-    pending_count: number;
-  };
-  items: RosskoSalesRow[];
-}
-
 // --- Запросы ---
 
 function monthBounds(year: number, month: number) {
@@ -180,22 +151,9 @@ export function fetchWarehouseStock(year: number, month: number, q = "") {
   );
 }
 
-export function fetchRosskoSales(year: number, month: number, q = "") {
-  const { from, to } = monthBounds(year, month);
-  const qs = new URLSearchParams({ date_from: from, date_to: to });
-  if (q.trim()) qs.set("q", q.trim());
-  return cachedGet<RosskoSalesResponse>(
-    `/autoservice/reports/rossko-sales?${qs}`,
-  );
-}
-
 // --- XLSX-выгрузки ---
 
-export type ReportKind =
-  | "order-economics"
-  | "payroll"
-  | "warehouse-stock"
-  | "rossko-sales";
+export type ReportKind = "order-economics" | "payroll" | "warehouse-stock";
 
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -231,7 +189,7 @@ export async function shareReportXlsx(
     path = `/autoservice/reports/order-economics.xlsx?${qs}`;
   } else if (kind === "payroll") {
     path = `/autoservice/reports/payroll.xlsx?year=${year}&month=${month}`;
-  } else if (kind === "warehouse-stock") {
+  } else {
     const qs = new URLSearchParams({
       year: String(year),
       month: String(month),
@@ -239,10 +197,6 @@ export async function shareReportXlsx(
     });
     if (q.trim()) qs.set("q", q.trim());
     path = `/autoservice/reports/warehouse-stock.xlsx?${qs}`;
-  } else {
-    const qs = new URLSearchParams({ date_from: from, date_to: to });
-    if (q.trim()) qs.set("q", q.trim());
-    path = `/autoservice/reports/rossko-sales.xlsx?${qs}`;
   }
   const response = await apiBlob(path);
   const blob = await response.blob();

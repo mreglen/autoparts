@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -61,11 +61,6 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 const DEFAULT_STATUSES = ["pending", "in_progress", "done", "review"];
 
 const PAYMENT_OPTIONS: PaymentFilter[] = ["unpaid", "partial", "paid"];
-const SORT_OPTIONS: { value: OrderSortBy; label: string }[] = [
-  { value: "scheduled_at", label: "Дата начала" },
-  { value: "scheduled_end_at", label: "Дата конца" },
-];
-
 interface OrdersFilters {
   statuses: string[];
   zoneIds: (number | typeof NONE_ZONE)[];
@@ -134,6 +129,7 @@ export function OrdersScreen() {
   const [staleAt, setStaleAt] = useState<number | null>(null);
   const [zones, setZones] = useState<WorkZone[]>([]);
   const [drafts, setDrafts] = useState<OrderFormDraft[]>([]);
+  const [draftsOpen, setDraftsOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const load = useCallback(
@@ -213,12 +209,6 @@ export function OrdersScreen() {
     (filters.dateFrom || filters.dateTo ? 1 : 0) +
     (filters.sortBy !== "scheduled_at" || filters.sortDir !== "desc" ? 1 : 0);
 
-  const sortHint = useMemo(() => {
-    const by =
-      SORT_OPTIONS.find((o) => o.value === filters.sortBy)?.label ?? "Дата";
-    return `${by} ${filters.sortDir === "asc" ? "↑" : "↓"}`;
-  }, [filters.sortBy, filters.sortDir]);
-
   const openOrder = useCallback(
     (order: OrderListItem) =>
       navigation.navigate("OrderDetail", { id: order.id }),
@@ -271,13 +261,13 @@ export function OrdersScreen() {
               onPress={() =>
                 patchFilters({ statuses: toggleIn(filters.statuses, s.value) })
               }
-              className="rounded-full px-3 py-1.5"
+              className="rounded-full px-2 py-0.5"
               style={{
                 backgroundColor: active ? colors.brand : colors.surfaceSubtle,
               }}
             >
               <Text
-                className="text-xs font-medium"
+                className="text-[10px] font-medium"
                 style={{ color: active ? "#fff" : colors.inkSoft }}
               >
                 {s.label}
@@ -290,51 +280,58 @@ export function OrdersScreen() {
       <View className="mb-3 flex-row items-center gap-3">
         <Pressable
           onPress={() => setSheetOpen(true)}
-          className="flex-row items-center gap-1.5 rounded-full px-3 py-1.5"
+          className="flex-row items-center gap-1.5 rounded-full px-2 py-0.5"
           style={{ backgroundColor: colors.surfaceSubtle }}
         >
           <Ionicons
             name="options-outline"
-            size={14}
+            size={12}
             color={activeFilterCount ? colors.brand : colors.inkMuted}
           />
           <Text
-            className="text-xs font-medium"
+            className="text-[10px] font-medium"
             style={{ color: activeFilterCount ? colors.brand : colors.inkSoft }}
           >
             Фильтры{activeFilterCount ? ` · ${activeFilterCount}` : ""}
           </Text>
         </Pressable>
-        <Pressable
-          onPress={() =>
-            patchFilters({
-              sortBy:
-                filters.sortBy === "scheduled_at"
-                  ? "scheduled_end_at"
-                  : "scheduled_at",
-            })
-          }
-          className="flex-row items-center gap-1"
-        >
-          <Ionicons name="swap-vertical" size={14} color={colors.inkMuted} />
-          <Text className="text-xs" style={{ color: colors.inkMuted }}>
-            {sortHint}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() =>
-            patchFilters({
-              sortDir: filters.sortDir === "asc" ? "desc" : "asc",
-            })
-          }
-          className="flex-row items-center"
-        >
-          <Ionicons
-            name={filters.sortDir === "asc" ? "arrow-up" : "arrow-down"}
-            size={14}
-            color={colors.inkMuted}
-          />
-        </Pressable>
+        {(["scheduled_at", "scheduled_end_at"] as const).map((key) => {
+          const label = key === "scheduled_at" ? "Начало" : "Конец";
+          const active = filters.sortBy === key;
+          return (
+            <Pressable
+              key={key}
+              onPress={() =>
+                patchFilters({
+                  sortBy: key,
+                  sortDir: active
+                    ? filters.sortDir === "asc"
+                      ? "desc"
+                      : "asc"
+                    : "asc",
+                })
+              }
+              className="flex-row items-center gap-0.5 rounded-full px-2 py-0.5"
+              style={{
+                backgroundColor: active ? colors.brandSoft : "transparent",
+              }}
+            >
+              <Text
+                className="text-[10px] font-medium"
+                style={{ color: active ? colors.brand : colors.inkMuted }}
+              >
+                {label}
+              </Text>
+              {active ? (
+                <Ionicons
+                  name={filters.sortDir === "asc" ? "arrow-up" : "arrow-down"}
+                  size={10}
+                  color={colors.brand}
+                />
+              ) : null}
+            </Pressable>
+          );
+        })}
       </View>
 
       <ScrollView
@@ -350,13 +347,24 @@ export function OrdersScreen() {
       >
         {drafts.length > 0 ? (
           <View className="gap-2">
-            <Text
-              className="text-xs font-semibold uppercase"
-              style={{ color: colors.inkMuted }}
+            <Pressable
+              onPress={() => setDraftsOpen((v) => !v)}
+              className="flex-row items-center gap-1 self-start"
             >
-              Черновики
-            </Text>
-            {drafts.map((draft) => (
+              <Text
+                className="text-xs font-semibold uppercase"
+                style={{ color: colors.inkMuted }}
+              >
+                Черновики · {drafts.length}
+              </Text>
+              <Ionicons
+                name={draftsOpen ? "chevron-up" : "chevron-down"}
+                size={12}
+                color={colors.inkMuted}
+              />
+            </Pressable>
+            {draftsOpen
+              ? drafts.map((draft) => (
               <Pressable
                 key={draft.key}
                 onPress={() => openDraft(draft)}
@@ -390,7 +398,8 @@ export function OrdersScreen() {
                   color={colors.inkFaint}
                 />
               </Pressable>
-            ))}
+              ))
+            : null}
           </View>
         ) : null}
 
