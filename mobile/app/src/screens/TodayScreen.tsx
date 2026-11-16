@@ -60,8 +60,6 @@ interface Tile {
   hint?: string;
   icon: keyof typeof Ionicons.glyphMap;
   accent: "warning" | "brand" | "danger" | "success";
-  /** Метод навигации при клике на плитку */
-  action?: "bookings" | "clients" | "orders" | "orders-in-progress" | "reports";
 }
 
 function buildTiles(summary: DashboardSummary): Tile[] {
@@ -73,7 +71,6 @@ function buildTiles(summary: DashboardSummary): Tile[] {
       hint: plural(summary.review_orders ?? 0, "заказ", "заказа", "заказов"),
       icon: "alert-circle-outline",
       accent: "warning",
-      action: "orders",
     });
   }
   if ((summary.new_bookings ?? 0) > 0) {
@@ -83,7 +80,6 @@ function buildTiles(summary: DashboardSummary): Tile[] {
       hint: "Требуют подтверждения",
       icon: "calendar-outline",
       accent: "warning",
-      action: "bookings",
     });
   }
   if (Number(summary.debt_total) > 0) {
@@ -93,7 +89,6 @@ function buildTiles(summary: DashboardSummary): Tile[] {
       hint: `${summary.debtors_count ?? 0} ${plural(summary.debtors_count ?? 0, "клиент", "клиента", "клиентов")}`,
       icon: "card-outline",
       accent: "danger",
-      action: "clients",
     });
   }
   if (summary.in_progress_orders != null) {
@@ -106,7 +101,6 @@ function buildTiles(summary: DashboardSummary): Tile[] {
           : `${summary.active_orders ?? 0} активных`,
       icon: "construct-outline",
       accent: "brand",
-      action: "orders-in-progress",
     });
   }
   if (summary.revenue_30d != null) {
@@ -115,7 +109,6 @@ function buildTiles(summary: DashboardSummary): Tile[] {
       value: formatMoney(summary.revenue_30d),
       icon: "trending-up-outline",
       accent: "success",
-      action: "reports",
     });
   }
   return tiles;
@@ -128,6 +121,7 @@ export function TodayScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [pressedKey, setPressedKey] = useState<string | null>(null);
   const [stale, setStale] = useState<CachedResult<DashboardSummary> | null>(
     null,
   );
@@ -166,26 +160,6 @@ export function TodayScreen() {
   const tiles = summary ? buildTiles(summary) : [];
   const todayItems = summary?.today ?? [];
   const payroll = summary?.payroll_month ?? null;
-
-  const handleTilePress = (tile: Tile) => {
-    switch (tile.action) {
-      case "bookings":
-        navigation.jumpTo("Bookings");
-        break;
-      case "clients":
-        navigation.navigate("Clients");
-        break;
-      case "orders":
-      case "orders-in-progress":
-        navigation.jumpTo("Orders");
-        break;
-      case "reports":
-        navigation.navigate("Reports");
-        break;
-      default:
-        break;
-    }
-  };
 
   const handleItemPress = (item: TodayItem) => {
     if (item.kind === "inspection") {
@@ -249,40 +223,37 @@ export function TodayScreen() {
               </Text>
               <View className="flex-row flex-wrap gap-2">
                 {tiles.map((tile) => (
-                  <PressableScale
+                  <Pressable
                     key={tile.label}
-                    onPress={() => handleTilePress(tile)}
+                    onPressIn={() => setPressedKey(tile.label)}
+                    onPressOut={() => setPressedKey(null)}
                     className="min-w-[46%] flex-1 rounded-xl p-3"
-                    style={{ backgroundColor: colors.surfaceSubtle }}
+                    style={{
+                      backgroundColor: colors.surfaceSubtle,
+                      opacity: pressedKey === tile.label ? 0.7 : 1,
+                    }}
                   >
-                    <View className="flex-row items-center justify-between gap-1.5">
-                      <View className="flex-row items-center gap-1.5">
-                        <Ionicons
-                          name={tile.icon}
-                          size={14}
-                          color={
-                            tile.accent === "warning"
-                              ? colors.warning
-                              : tile.accent === "danger"
-                                ? colors.danger
-                                : tile.accent === "success"
-                                  ? colors.success
-                                  : colors.brand
-                          }
-                        />
-                        <Text
-                          className="text-xs"
-                          style={{ color: colors.inkMuted }}
-                          numberOfLines={1}
-                        >
-                          {tile.label}
-                        </Text>
-                      </View>
+                    <View className="flex-row items-center gap-1.5">
                       <Ionicons
-                        name="chevron-forward"
+                        name={tile.icon}
                         size={14}
-                        color={colors.inkFaint}
+                        color={
+                          tile.accent === "warning"
+                            ? colors.warning
+                            : tile.accent === "danger"
+                              ? colors.danger
+                              : tile.accent === "success"
+                                ? colors.success
+                                : colors.brand
+                        }
                       />
+                      <Text
+                        className="text-xs"
+                        style={{ color: colors.inkMuted }}
+                        numberOfLines={1}
+                      >
+                        {tile.label}
+                      </Text>
                     </View>
                     <Text
                       className="mt-1 text-xl font-bold"
@@ -299,23 +270,28 @@ export function TodayScreen() {
                         {tile.hint}
                       </Text>
                     ) : null}
-                  </PressableScale>
+                  </Pressable>
                 ))}
               </View>
             </View>
           ) : null}
 
           {payroll ? (
-            <PressableScale onPress={() => navigation.navigate("Finance")}>
+            <View>
               <Text
                 className="mb-2 text-xs font-semibold uppercase"
                 style={{ color: colors.inkMuted }}
               >
                 Моя зарплата
               </Text>
-              <View
-                className="flex-row items-center justify-between rounded-xl p-3"
-                style={{ backgroundColor: colors.surfaceSubtle }}
+              <Pressable
+                onPressIn={() => setPressedKey("payroll")}
+                onPressOut={() => setPressedKey(null)}
+                className="rounded-xl p-3"
+                style={{
+                  backgroundColor: colors.surfaceSubtle,
+                  opacity: pressedKey === "payroll" ? 0.7 : 1,
+                }}
               >
                 <Text
                   className="text-base font-semibold"
@@ -323,12 +299,7 @@ export function TodayScreen() {
                 >
                   {formatMoney(payroll.total)}
                 </Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={colors.inkMuted}
-                />
-              </View>
+              </Pressable>
               <Text
                 className="mt-0.5 text-xs"
                 style={{ color: colors.inkMuted }}
@@ -337,7 +308,7 @@ export function TodayScreen() {
                 {payroll.completed_orders}{" "}
                 {plural(payroll.completed_orders, "заказ", "заказа", "заказов")}
               </Text>
-            </PressableScale>
+            </View>
           ) : null}
 
           <View>
@@ -419,11 +390,6 @@ export function TodayScreen() {
                         {item.work_zone_name ? ` · ${item.work_zone_name}` : ""}
                       </Text>
                     </View>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={18}
-                      color={colors.inkMuted}
-                    />
                   </PressableScale>
                 ))}
               </View>

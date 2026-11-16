@@ -1,5 +1,6 @@
+/* eslint-disable react-hooks/immutability, react-hooks/set-state-in-effect, react-hooks/refs, react-hooks/exhaustive-deps -- Reanimated shared values и синхронизация sheet с visible/keyboard требуют императивных присваиваний */
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -28,56 +29,39 @@ interface SheetProps {
   children: ReactNode;
 }
 
-const COLLAPSED_HEIGHT = 150; // px, минимальная высота свернутого состояния
-const SNAP_THRESHOLD = 80; // px, порог для переключения между состояниями
+const PEEK_HEIGHT = 96; // px видимой части в свёрнутом состоянии
+const SNAP_THRESHOLD = 60; // px свайпа для переключения состояния
 
 export function Sheet({ visible, title, onClose, children }: SheetProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(0);
   const [expanded, setExpanded] = useState(false);
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const panStart = useRef(0);
 
-  const maxHeight = 800 - insets.top - 32; // максимальная высота с отступом от верха
+  const maxHeight = 800 - insets.top - 24;
+  const collapsedOffset = Math.max(0, sheetHeight - PEEK_HEIGHT);
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, gestureState) => {
-      // Пан только вниз если уже в расширенном состоянии
-      if (expanded && gestureState.dy > 0) return true;
-      // Пан только вверх если в свернутом состоянии
-      if (!expanded && gestureState.dy < 0) return true;
-      return false;
+    onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 4,
+    onPanResponderGrant: () => {
+      panStart.current = translateY.value;
     },
-    onPanResponderMove: (_, gestureState) => {
-      let newY = gestureState.dy;
-      if (expanded) {
-        // От расширенного (0) до свернутого
-        newY = Math.max(0, Math.min(newY, maxHeight - COLLAPSED_HEIGHT));
-      } else {
-        // От свернутого (maxHeight - COLLAPSED_HEIGHT) до расширенного
-        newY = (maxHeight - COLLAPSED_HEIGHT) + gestureState.dy;
-        newY = Math.max(0, Math.min(newY, maxHeight - COLLAPSED_HEIGHT));
-      }
-      translateY.value = newY;
+    onPanResponderMove: (_, gs) => {
+      const next = panStart.current + gs.dy;
+      translateY.value = Math.max(0, Math.min(next, collapsedOffset || maxHeight));
     },
-    onPanResponderRelease: (_, gestureState) => {
-      const threshold = SNAP_THRESHOLD;
-      if (expanded) {
-        // Из расширенного: пан вниз > threshold → свернуть
-        if (gestureState.dy > threshold) {
-          translateY.value = withSpring(maxHeight - COLLAPSED_HEIGHT);
-          runOnJS(setExpanded)(false);
-        } else {
-          translateY.value = withSpring(0);
-        }
+    onPanResponderRelease: (_, gs) => {
+      if (gs.dy < -SNAP_THRESHOLD) {
+        translateY.value = withSpring(0);
+        runOnJS(setExpanded)(true);
+      } else if (gs.dy > SNAP_THRESHOLD) {
+        translateY.value = withSpring(collapsedOffset);
+        runOnJS(setExpanded)(false);
       } else {
-        // Из свернутого: пан вверх > threshold → расширить
-        if (gestureState.dy < -threshold) {
-          translateY.value = withSpring(0);
-          runOnJS(setExpanded)(true);
-        } else {
-          translateY.value = withSpring(maxHeight - COLLAPSED_HEIGHT);
-        }
+        translateY.value = withSpring(expanded ? 0 : collapsedOffset);
       }
     },
   });
@@ -88,8 +72,7 @@ export function Sheet({ visible, title, onClose, children }: SheetProps) {
 
   const toggleExpanded = () => {
     if (expanded) {
-      // eslint-disable-next-line react-hooks/immutability -- shared value Reanimated
-      translateY.value = withSpring(maxHeight - COLLAPSED_HEIGHT);
+      translateY.value = withSpring(collapsedOffset);
       setExpanded(false);
     } else {
       translateY.value = withSpring(0);
@@ -97,17 +80,23 @@ export function Sheet({ visible, title, onClose, children }: SheetProps) {
     }
   };
 
+  const handleLayout = (e: { nativeEvent: { layout: { height: number } } }) => {
+    const h = e.nativeEvent.layout.height;
+    setSheetHeight(h);
+    // Если шторка свёрнута — удерживаем её на peek-позиции после пересчёта высоты
+    const offset = Math.max(0, h - PEEK_HEIGHT);
+    if (!expanded) translateY.value = offset;
+  };
+
   // Сброс при открытии/закрытии
   useEffect(() => {
     if (visible) {
-      // eslint-disable-next-line react-hooks/immutability -- shared value Reanimated
-      translateY.value = withSpring(maxHeight - COLLAPSED_HEIGHT);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- синхронизация sheet с visible
       setExpanded(false);
+      setSheetHeight(0);
+      translateY.value = withSpring(0);
     } else {
       translateY.value = withSpring(maxHeight);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- maxHeight/translateY стабильны
   }, [visible]);
 
   // Поднимаем sheet при открытии клавиатуры
@@ -117,14 +106,13 @@ export function Sheet({ visible, title, onClose, children }: SheetProps) {
       setExpanded(true);
     });
     const hide = Keyboard.addListener("keyboardDidHide", () => {
-      translateY.value = withSpring(maxHeight - COLLAPSED_HEIGHT);
+      translateY.value = withSpring(collapsedOffset);
       setExpanded(false);
     });
     return () => {
       show.remove();
       hide.remove();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- слушатели вешаются один раз
   }, []);
 
   return (
@@ -140,6 +128,7 @@ export function Sheet({ visible, title, onClose, children }: SheetProps) {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <Animated.View
+          onLayout={handleLayout}
           style={[
             {
               backgroundColor: colors.surface,
@@ -169,7 +158,7 @@ export function Sheet({ visible, title, onClose, children }: SheetProps) {
             </Text>
           ) : null}
           <ScrollView
-            style={{ maxHeight: expanded ? maxHeight - COLLAPSED_HEIGHT : "auto" }}
+            style={{ flexGrow: 0 }}
             keyboardShouldPersistTaps="handled"
           >
             {children}

@@ -50,6 +50,7 @@ from app.routers.openrouter_admin import router as openrouter_admin_router
 from app.routers.vpn_bot_admin import router as vpn_bot_admin_router
 from app.routers.vpn_users_admin import router as vpn_users_admin_router
 from app.routers.laximo_cat_admin import router as laximo_cat_admin_router
+from app.routers.admin_mobile_app import router as admin_mobile_app_router
 from app.routers.laximo_vehicles import router as laximo_vehicles_router
 from app.routers.laximo_catalog import router as laximo_catalog_router
 from app.routers.laximo_public import router as laximo_public_router
@@ -151,6 +152,7 @@ api_router.include_router(openrouter_admin_router)
 api_router.include_router(vpn_bot_admin_router)
 api_router.include_router(vpn_users_admin_router)
 api_router.include_router(laximo_cat_admin_router)
+api_router.include_router(admin_mobile_app_router)
 api_router.include_router(laximo_vehicles_router)
 api_router.include_router(laximo_catalog_router)
 api_router.include_router(laximo_public_router)

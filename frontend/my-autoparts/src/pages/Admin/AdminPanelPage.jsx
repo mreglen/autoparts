@@ -27,6 +27,7 @@ import BackupSection from './BackupSection';
 import AvitoPhotoLocalizationSection from './AvitoPhotoLocalizationSection';
 import ProductPhotoThumbsSection from './ProductPhotoThumbsSection';
 import ProductPhotoReprocessSection from './ProductPhotoReprocessSection';
+import MobileAppExpoSection from './MobileAppExpoSection';
 
 const ADMIN_TOC = [
   { id: 'admin-server', label: 'Сервер' },
@@ -646,6 +647,8 @@ function AdminPanelPage() {
           >
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
+
+          <MobileAppExpoSection />
         </section>
 
         <section id="admin-openrouter" className="scroll-mt-24 space-y-6">

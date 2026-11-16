@@ -7,6 +7,7 @@ set -euo pipefail
 ROOT="/home/fast/autoparts"
 BACKEND="$ROOT/backend"
 FRONTEND="$ROOT/frontend/my-autoparts"
+MOBILE_APP="$ROOT/mobile/app"
 WEB_ROOT="/var/www/my-autoparts"
 VENV="$BACKEND/venv"
 LOG="/var/log/autoparts-update.log"
@@ -819,6 +820,30 @@ verify_frontend_chunks() {
   [[ -n "$used_ok" ]] || log "WARN: UsedPartsList lazy chunk missing from build source maps"
 }
 
+setup_mobile_app() {
+  # Зависимости и runtime-каталог для «npx expo start --tunnel» (админка → Приложение).
+  [[ -d "$MOBILE_APP" ]] || { log "mobile/app отсутствует — пропуск"; return 0; }
+  mkdir -p "$MOBILE_APP/.expo-dev"
+  chown -R fast:fast "$MOBILE_APP/.expo-dev"
+  local lock_hash marker="$MOBILE_APP/.expo-dev/deps.sha256"
+  lock_hash=$(sha256sum "$MOBILE_APP/package-lock.json" 2>/dev/null | awk '{print $1}')
+  [[ -n "$lock_hash" ]] || { log "mobile/app: нет package-lock.json — npm ci пропущен"; return 0; }
+  if [[ ! -d "$MOBILE_APP/node_modules" || ! -f "$marker" || "$(cat "$marker")" != "$lock_hash" ]]; then
+    log "mobile/app: npm ci (зависимости изменились или отсутствуют)..."
+    chown -R fast:fast "$MOBILE_APP"
+    sudo -u fast env bash -lc "
+      set -e
+      cd '$MOBILE_APP'
+      npm ci --no-audit --no-fund
+    "
+    echo "$lock_hash" > "$marker"
+    chown fast:fast "$marker"
+    log "mobile/app: зависимости установлены"
+  else
+    log "mobile/app: зависимости актуальны"
+  fi
+}
+
 verify() {
   local cart_code public_code part_types_code catalog_code
   cart_code=$(curl -sf -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8080/api/cart/ || echo "000")
@@ -860,6 +885,7 @@ main() {
   ensure_postgresql_tuning
   ensure_monitoring
   ensure_alert_bot
+  setup_mobile_app
 
   if [[ $SKIP_FRONTEND -eq 0 ]]; then
     install_backend_deps
