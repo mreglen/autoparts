@@ -16,6 +16,7 @@ const easingBezier = (curve: readonly number[]) =>
 interface PressableScaleProps extends Omit<PressableProps, "style"> {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  className?: string;
 }
 
 /** Pressable с пружинящим масштабированием при нажатии (motion-токены). */
@@ -25,6 +26,7 @@ export function PressableScale({
   onPressOut,
   disabled,
   style,
+  className,
   ...rest
 }: PressableScaleProps) {
   const [scale] = useState(() => new Animated.Value(1));
@@ -39,9 +41,13 @@ export function PressableScale({
   };
 
   return (
-    <Animated.View style={[{ transform: [{ scale }] }, style]}>
+    <Animated.View
+      className={className}
+      style={[{ transform: [{ scale }] }, style]}
+    >
       <Pressable
         {...rest}
+        className="flex-1"
         disabled={disabled}
         onPressIn={(e) => {
           if (!disabled) animate(PRESS.scale);

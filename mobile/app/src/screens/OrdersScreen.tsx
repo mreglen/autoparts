@@ -209,6 +209,16 @@ export function OrdersScreen() {
     (filters.dateFrom || filters.dateTo ? 1 : 0) +
     (filters.sortBy !== "scheduled_at" || filters.sortDir !== "desc" ? 1 : 0);
 
+  const filtersDirty =
+    filters.statuses.length !== DEFAULT_FILTERS.statuses.length ||
+    filters.statuses.some((s) => !DEFAULT_FILTERS.statuses.includes(s)) ||
+    filters.zoneIds.length > 0 ||
+    filters.payments.length > 0 ||
+    filters.dateFrom !== "" ||
+    filters.dateTo !== "" ||
+    filters.sortBy !== DEFAULT_FILTERS.sortBy ||
+    filters.sortDir !== DEFAULT_FILTERS.sortDir;
+
   const openOrder = useCallback(
     (order: OrderListItem) =>
       navigation.navigate("OrderDetail", { id: order.id }),
@@ -261,7 +271,7 @@ export function OrdersScreen() {
               onPress={() =>
                 patchFilters({ statuses: toggleIn(filters.statuses, s.value) })
               }
-              className="rounded-full px-2 py-0.5"
+              className="rounded-full px-2 py-0"
               style={{
                 backgroundColor: active ? colors.brand : colors.surfaceSubtle,
               }}
@@ -275,6 +285,20 @@ export function OrdersScreen() {
             </Pressable>
           );
         })}
+        {filtersDirty ? (
+          <Pressable
+            onPress={() => setFilters(DEFAULT_FILTERS)}
+            className="rounded-full px-2 py-0"
+            style={{ backgroundColor: colors.dangerSoft }}
+          >
+            <Text
+              className="text-[10px] font-medium"
+              style={{ color: colors.danger }}
+            >
+              Сбросить
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       <View className="mb-3 flex-row items-center gap-3">

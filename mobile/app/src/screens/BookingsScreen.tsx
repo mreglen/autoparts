@@ -129,7 +129,7 @@ export function BookingsScreen() {
             <Pressable
               key={f.key}
               onPress={() => setFilter(f.key)}
-              className="rounded-full px-2 py-0.5"
+              className="rounded-full px-2 py-0"
               style={{
                 backgroundColor: active ? colors.brand : colors.surfaceSubtle,
               }}
@@ -143,6 +143,26 @@ export function BookingsScreen() {
             </Pressable>
           );
         })}
+        {filter !== "all" ||
+        sortBy !== "created_at" ||
+        sortDir !== "desc" ? (
+          <Pressable
+            onPress={() => {
+              setFilter("all");
+              setSortBy("created_at");
+              setSortDir("desc");
+            }}
+            className="rounded-full px-2 py-0"
+            style={{ backgroundColor: colors.dangerSoft }}
+          >
+            <Text
+              className="text-[10px] font-medium"
+              style={{ color: colors.danger }}
+            >
+              Сбросить
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       <View className="mb-3 flex-row items-center gap-2">
