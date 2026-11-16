@@ -124,13 +124,13 @@ export function BookingsScreen() {
             <Pressable
               key={f.key}
               onPress={() => setFilter(f.key)}
-              className="rounded-full px-3 py-1"
+              className="rounded-full px-4 py-1.5"
               style={{
                 backgroundColor: active ? colors.brand : colors.surfaceSubtle,
               }}
             >
               <Text
-                className="text-[11px] font-medium"
+                className="text-xs font-medium"
                 style={{ color: active ? "#fff" : colors.inkSoft }}
               >
                 {f.label}
@@ -147,11 +147,11 @@ export function BookingsScreen() {
               setSortBy("created_at");
               setSortDir("desc");
             }}
-            className="rounded-full px-3 py-1"
+            className="rounded-full px-4 py-1.5"
             style={{ backgroundColor: colors.dangerSoft }}
           >
             <Text
-              className="text-[11px] font-medium"
+              className="text-xs font-medium"
               style={{ color: colors.danger }}
             >
               Сбросить
