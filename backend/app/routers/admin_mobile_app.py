@@ -59,9 +59,33 @@ def _read_pid() -> Optional[int]:
         return None
 
 
+def _find_expo_pid() -> Optional[int]:
+    try:
+        out = subprocess.run(
+            ["pgrep", "-f", "expo start"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout.split()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for token in out:
+        try:
+            pid = int(token)
+        except ValueError:
+            continue
+        if pid != os.getpid():
+            return pid
+    return None
+
+
 def _status() -> dict:
     pid = _read_pid()
     running = pid is not None and _pid_alive(pid)
+    if not running:
+        alt = _find_expo_pid()
+        running = alt is not None
+        pid = alt if running else None
     return {
         "running": running,
         "pid": pid if running else None,
@@ -97,7 +121,6 @@ def expo_start(current_user: User = Depends(get_current_admin_user)):
     )
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
-    env["CI"] = "1"
     env["EXPO_NO_TELEMETRY"] = "1"
     with open(LOG_FILE, "ab") as log:
         log.write(b"\n--- expo start --tunnel ---\n")
@@ -117,7 +140,7 @@ def expo_start(current_user: User = Depends(get_current_admin_user)):
 
 @router.post("/expo/stop")
 def expo_stop(current_user: User = Depends(get_current_admin_user)):
-    pid = _read_pid()
+    pid = _read_pid() or _find_expo_pid()
     if pid is None:
         return {"stopped": True, "was_running": False}
     was_running = _pid_alive(pid)
