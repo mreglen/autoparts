@@ -2,7 +2,7 @@
   "expo": {
     "name": "Свой Гараж — Автосервис",
     "slug": "sg-autoservice",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "sgautoservice",
@@ -28,6 +28,11 @@
       "expo-secure-store",
       "expo-sqlite",
       "expo-sharing"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "28b0c566-2cf1-471a-9261-4fb55531ef9d"
+      }
+    }
   }
 }

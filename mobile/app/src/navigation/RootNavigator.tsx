@@ -22,6 +22,10 @@ import { ClientProfileScreen } from "../screens/ClientProfileScreen";
 import { ClientOrderScreen } from "../screens/ClientOrderScreen";
 import { ClientVehicleScreen } from "../screens/ClientVehicleScreen";
 import { ClientVehicleFormScreen } from "../screens/ClientVehicleFormScreen";
+import { ClientPartDetailScreen } from "../screens/ClientPartDetailScreen";
+import { ClientCheckoutScreen } from "../screens/ClientCheckoutScreen";
+import { ClientPaymentScreen } from "../screens/ClientPaymentScreen";
+import { ClientPurchasesScreen } from "../screens/ClientPurchasesScreen";
 import { ChangePasswordScreen } from "../screens/ChangePasswordScreen";
 import { LoginScreen } from "../screens/LoginScreen";
 import { MoreScreen } from "../screens/MoreScreen";
@@ -309,6 +313,26 @@ export function RootNavigator() {
                     ? "Редактирование автомобиля"
                     : "Новый автомобиль",
                 })}
+              />
+              <Stack.Screen
+                name="ClientPartDetail"
+                component={ClientPartDetailScreen}
+                options={{ title: "Запчасть" }}
+              />
+              <Stack.Screen
+                name="ClientCheckout"
+                component={ClientCheckoutScreen}
+                options={{ title: "Оформление заказа" }}
+              />
+              <Stack.Screen
+                name="ClientPayment"
+                component={ClientPaymentScreen}
+                options={{ title: "Оплата заказа" }}
+              />
+              <Stack.Screen
+                name="ClientPurchases"
+                component={ClientPurchasesScreen}
+                options={{ title: "Мои заказы" }}
               />
             </>
           )

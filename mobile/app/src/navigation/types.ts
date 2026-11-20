@@ -1,10 +1,11 @@
 import type { GarageVehicle } from "../api/clientAccount";
+import type { ShopPart } from "../api/partsShop";
 import type { SectionRouteParams } from "../screens/SectionScreen";
 
 export type RootStackParamList = {
   Login: undefined;
   ChangePassword: undefined;
-  Main: undefined;
+  Main: { screen?: string } | undefined;
   Section: SectionRouteParams;
   Search: undefined;
   BookingDetail: { id: number };
@@ -26,6 +27,10 @@ export type RootStackParamList = {
   ClientVehicleForm:
     | { vehicle?: GarageVehicle; organizationId?: string }
     | undefined;
+  ClientPartDetail: { part: ShopPart };
+  ClientCheckout: undefined;
+  ClientPayment: { sessionId: string };
+  ClientPurchases: undefined;
   Employees: undefined;
   Contractors: undefined;
   Settings: undefined;

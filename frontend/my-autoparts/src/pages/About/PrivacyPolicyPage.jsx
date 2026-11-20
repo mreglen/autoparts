@@ -7,7 +7,7 @@ export default function PrivacyPolicyPage() {
     <LegalDocumentPage
       title="Политика конфиденциальности"
       path="/privacy"
-      description="Политика конфиденциальности интернет-магазина «Свой Гараж»."
+      description="Политика конфиденциальности интернет-магазина «Свой Гараж» и мобильного приложения «Свой Гараж — Автосервис»."
       paragraphs={PRIVACY_POLICY_PARAGRAPHS}
       relatedLinks={[
         { to: '/personal-data-consent', label: 'Согласие на обработку персональных данных' },

@@ -77,6 +77,13 @@ export function ClientMoreScreen() {
         />
         <View className="mt-2">
           <ListRow
+            title="Мои заказы"
+            subtitle="Покупки новых и б/у запчастей"
+            onPress={() => navigation.navigate("ClientPurchases")}
+          />
+        </View>
+        <View className="mt-2">
+          <ListRow
             title="Уведомления"
             subtitle={
               unread > 0
