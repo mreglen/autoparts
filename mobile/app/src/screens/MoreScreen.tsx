@@ -110,7 +110,7 @@ export function MoreScreen() {
         onPress={() => navigation.navigate("Search")}
       />
       {visibleSections.map((s) => (
-        <View key={s.section} className="mt-2">
+        <View key={s.route} className="mt-2">
           <ListRow
             title={s.title}
             onPress={() => {
