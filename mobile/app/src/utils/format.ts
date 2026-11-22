@@ -100,6 +100,107 @@ export function clientBookingStatusLabel(
   return CLIENT_BOOKING_STATUS_LABELS[normalized] ?? normalized ?? "—";
 }
 
+export function parseServerDate(
+  value: string | Date | null | undefined,
+): Date | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) return value;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw)) {
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const d = new Date(`${normalized}Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function parseWallClockDate(
+  value: string | Date | null | undefined,
+): Date | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) return value;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const naive = raw.replace(" ", "T").replace(/([zZ]|[+-]\d{2}:?\d{2})$/, "");
+  const d = new Date(naive.length === 10 ? `${naive}T00:00:00` : naive);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function formatServerDate(
+  value: string | Date | null | undefined,
+): string {
+  if (!value) return "—";
+  const raw = String(value).trim();
+  const dateOnly = raw.slice(0, 10);
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(dateOnly) &&
+    (raw.length === 10 || raw[10] === "T" || raw[10] === " ")
+  ) {
+    const parts = dateOnly.split("-");
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  }
+
+  const d = parseServerDate(value);
+  if (!d) return raw || "—";
+  return d.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+export function formatServerDateTime(
+  value: string | Date | null | undefined,
+): string {
+  if (!value) return "—";
+  const fallback = String(value).trim();
+  const d = parseServerDate(value);
+  if (!d) return fallback || "—";
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Значение для поля даты: берём YYYY-MM-DD из строки как есть (как `toDateInputValue` на вебе). */
+export function toDateInputValue(
+  value: string | Date | null | undefined,
+): string {
+  if (value == null || value === "") return "";
+  const raw = String(value).trim();
+  const dateOnly = raw.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return dateOnly;
+  const d = parseServerDate(value);
+  if (!d) return "";
+  return toIsoDate(d);
+}
+
+export function formatWallClockDateTime(
+  value: string | Date | null | undefined,
+): string {
+  if (!value) return "—";
+  const fallback = String(value).trim();
+  const d = parseWallClockDate(value);
+  if (!d) return fallback || "—";
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function greetingByHour(hour: number): string {
   if (hour < 5) return "Доброй ночи";
   if (hour < 12) return "Доброе утро";

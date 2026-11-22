@@ -1,12 +1,13 @@
 import { apiGet, apiSend } from "./client";
+import { shareReportXlsx } from "./reports";
 import { cachedGet, invalidateEntities } from "../offline";
 
 export type PaymentMethod = "card" | "cash" | "bank";
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   card: "Карта",
-  cash: "Наличные",
-  bank: "Безнал",
+  cash: "Наличными",
+  bank: "Расчётный счёт",
 };
 
 export interface FinanceReceipt {
@@ -16,15 +17,19 @@ export interface FinanceReceipt {
   repair_order_number: string;
   client_name: string;
   client_phone?: string;
-  amount: number;
+  amount: number | string;
   method: PaymentMethod;
   created_at: string;
   paid_at?: string | null;
 }
 
 export interface FinanceReceiptsResponse {
-  totals: { card: number; cash: number; bank: number };
-  total_amount: number;
+  totals: {
+    card: number | string;
+    cash: number | string;
+    bank: number | string;
+  };
+  total_amount: number | string;
   count: number;
   items: FinanceReceipt[];
   limit?: number | null;
@@ -40,29 +45,55 @@ export interface FinanceExpense {
   type_label: string;
   article_id?: number | null;
   article_name?: string | null;
-  amount: number;
+  amount: number | string;
   expense_date: string;
   description?: string | null;
   employee_id?: number | null;
   employee_name?: string | null;
+  created_by_user_id?: number;
   created_by_name: string;
   created_at: string;
 }
 
 export interface FinanceExpensesResponse {
-  total_amount: number;
+  total_amount: number | string;
   count: number;
   items: FinanceExpense[];
+}
+
+export interface FinanceExpenseArticle {
+  id: number;
+  name: string;
+}
+
+export type FinanceExpenseType = "salary" | "other";
+
+export interface FinanceExpensePayload {
+  type?: FinanceExpenseType;
+  article_id?: number | null;
+  article_name?: string | null;
+  amount: number;
+  expense_date: string;
+  description?: string | null;
+  employee_id?: number | null;
+}
+
+export interface EmployeePayrollInfo {
+  employee_id: number;
+  employee_name: string;
+  total_accrued: number | string;
+  total_paid: number | string;
+  remaining: number | string;
 }
 
 export interface ClientDebtRow {
   id: number;
   name: string;
   phone?: string | null;
-  debt_amount: number;
+  debt_amount: number | string;
   orders_count: number;
-  orders_total: number;
-  paid_total: number;
+  orders_total: number | string;
+  paid_total: number | string;
   last_visit_at?: string | null;
 }
 
@@ -88,6 +119,72 @@ export function fetchFinanceReceipts(params: {
 export function fetchFinanceExpenses(dateFrom: string, dateTo: string) {
   return cachedGet<FinanceExpensesResponse>(
     `/autoservice/finance/expenses?${periodParams(dateFrom, dateTo)}`,
+  );
+}
+
+export function fetchExpenseArticles() {
+  return cachedGet<FinanceExpenseArticle[]>("/autoservice/expense-articles");
+}
+
+export function fetchEmployeePayrollInfo(
+  employeeId: number,
+  year: number,
+  month: number,
+) {
+  return cachedGet<EmployeePayrollInfo>(
+    `/autoservice/finance/expenses/employee-payroll/${employeeId}?year=${year}&month=${month}`,
+  );
+}
+
+export async function createFinanceExpense(
+  body: FinanceExpensePayload,
+): Promise<FinanceExpense> {
+  const row = await apiSend<FinanceExpense>(
+    "POST",
+    "/autoservice/finance/expenses",
+    { body },
+  );
+  await invalidateEntities(["finance-expenses", "reports"]);
+  return row;
+}
+
+export async function patchFinanceExpense(
+  id: number,
+  body: Partial<FinanceExpensePayload>,
+): Promise<FinanceExpense> {
+  const row = await apiSend<FinanceExpense>(
+    "PATCH",
+    `/autoservice/finance/expenses/${id}`,
+    { body },
+  );
+  await invalidateEntities(["finance-expenses", "reports"]);
+  return row;
+}
+
+export async function deleteFinanceExpense(id: number): Promise<void> {
+  await apiSend("DELETE", `/autoservice/finance/expenses/${id}`);
+  await invalidateEntities(["finance-expenses", "reports"]);
+}
+
+export function financeReceiptsXlsxPath(dateFrom: string, dateTo: string) {
+  return `/autoservice/finance/receipts.xlsx?${periodParams(dateFrom, dateTo)}`;
+}
+
+export function financeExpensesXlsxPath(dateFrom: string, dateTo: string) {
+  return `/autoservice/finance/expenses.xlsx?${periodParams(dateFrom, dateTo)}`;
+}
+
+export function shareFinanceReceiptsXlsx(dateFrom: string, dateTo: string) {
+  return shareReportXlsx(
+    financeReceiptsXlsxPath(dateFrom, dateTo),
+    `autoservice_payments_${dateFrom}_${dateTo}.xlsx`,
+  );
+}
+
+export function shareFinanceExpensesXlsx(dateFrom: string, dateTo: string) {
+  return shareReportXlsx(
+    financeExpensesXlsxPath(dateFrom, dateTo),
+    `autoservice_expenses_${dateFrom}_${dateTo}.xlsx`,
   );
 }
 
