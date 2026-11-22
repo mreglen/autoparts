@@ -6,6 +6,7 @@ import { fetchProfile, logout } from './redux/slices/AuthSlice';
 import { clearAuthTokens } from './utils/apiClient';
 import { subscribeToPushNotifications } from './redux/slices/ChatSlice';
 import { fetchPublicSiteConfig, fetchSiteQuickLinks } from './redux/slices/PublicInfoSlice';
+import { isAuthEngagementError } from './utils/authSessionUtils';
 
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
 import { captureBoundaryError } from './utils/sentry';
@@ -497,7 +498,7 @@ function App() {
           dispatch(subscribeToPushNotifications({ prompt: false }));
         }
       } catch (error) {
-        if (String(error || '').includes('401') || String(error || '').includes('Unauthorized')) {
+        if (isAuthEngagementError(error)) {
           clearAuthTokens();
           dispatch(logout());
         }

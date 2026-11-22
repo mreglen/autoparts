@@ -4,6 +4,7 @@ import { apiRequest, apiRequestFormData, setAuthToken, setRefreshToken, clearAut
 import { updateProfile } from './UserSlice';
 import { clearCart } from './CartSlice';
 import { disconnectWebSocket, unsubscribeFromPushNotifications } from './ChatSlice';
+import { isAuthEngagementError } from '../../utils/authSessionUtils';
 
 // Helper function to decode JWT token
 const decodeToken = (token) => {
@@ -396,12 +397,7 @@ const authSlice = createSlice({
                 
                 // Only clear token if it's definitely an authentication error
                 // Don't clear for network errors or other issues
-                const errorMessage = action.payload || '';
-                if (errorMessage.includes('401') || 
-                    errorMessage.includes('Unauthorized') || 
-                    errorMessage.includes('invalid') ||
-                    errorMessage.includes('expired') ||
-                    errorMessage.includes('signature')) {
+                if (isAuthEngagementError(action.payload)) {
                     state.user = null;
                     state.token = null;
                     state.userPermissions = null;
