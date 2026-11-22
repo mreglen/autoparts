@@ -11,6 +11,10 @@
     "preview": {
       "distribution": "internal"
     },
+    "apk": {
+      "distribution": "internal",
+      "autoIncrement": true
+    },
     "production": {
       "autoIncrement": true
     }

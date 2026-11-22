@@ -28,6 +28,7 @@ import AvitoPhotoLocalizationSection from './AvitoPhotoLocalizationSection';
 import ProductPhotoThumbsSection from './ProductPhotoThumbsSection';
 import ProductPhotoReprocessSection from './ProductPhotoReprocessSection';
 import MobileAppExpoSection from './MobileAppExpoSection';
+import MobileAppBuildSection from './MobileAppBuildSection';
 
 const ADMIN_TOC = [
   { id: 'admin-server', label: 'Сервер' },
@@ -649,6 +650,8 @@ function AdminPanelPage() {
           </button>
 
           <MobileAppExpoSection />
+
+          <MobileAppBuildSection />
         </section>
 
         <section id="admin-openrouter" className="scroll-mt-24 space-y-6">

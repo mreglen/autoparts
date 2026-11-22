@@ -34,3 +34,6 @@ test-results/
 mobile/keys/
 mobile/releases/*.apk
 
+
+# EAS-built APKs (big binaries, published at runtime)
+frontend/my-autoparts/public/downloads/*.apk

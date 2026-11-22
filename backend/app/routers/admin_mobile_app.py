@@ -14,9 +14,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 
 from app.core.auth import get_current_admin_user
 from app.models.user import User
+from app.services import mobile_app_build_service as build_service
 
 router = APIRouter(prefix="/admin/mobile-app", tags=["Admin"])
 
@@ -207,3 +209,24 @@ def expo_stop(current_user: User = Depends(get_current_admin_user)):
     except OSError:
         pass
     return {"stopped": True, "was_running": was_running}
+
+
+class MobileAppBuildStartRequest(BaseModel):
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+@router.get("/build/status")
+def build_status(current_user: User = Depends(get_current_admin_user)):
+    return build_service.get_build_status()
+
+
+@router.post("/build/start")
+def build_start(
+    payload: Optional[MobileAppBuildStartRequest] = None,
+    current_user: User = Depends(get_current_admin_user),
+):
+    notes = (payload.notes or "").strip() if payload else ""
+    try:
+        return build_service.start_build(user_id=current_user.id, notes=notes or None)
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

@@ -179,6 +179,14 @@ sudo update
 - `systemctl is-active celery.service`
 - `curl -s -o /dev/null -w '%{http_code}' https://svoygarage.ru/server/api/auth/public-site-config`
 
+### 5.5 Сборка мобильного APK
+
+- В админке `/admin-settings` → «Приложение» → «Сборка APK» запускается удалённая сборка через EAS Build (`POST /admin/mobile-app/build/start`, статус `GET /admin/mobile-app/build/status`).
+- Джоб: `backend/app/services/mobile_app_build_service.py` → `scripts/mobile/eas_build_apk.py` (EAS-профиль `apk` в `mobile/app/eas.json`, internal distribution + autoIncrement versionCode). State/лог: `backend/var/mobile-app-build-job.json`, `mobile-app-build.log`.
+- Готовый APK кладётся в `frontend/my-autoparts/public/downloads/` (переживает деплои — `*.apk` в `.gitignore`, `git clean -fd` его не трогает) и зеркалится в `/var/www/my-autoparts/downloads/` для мгновенной отдачи; `site_settings.mobile_apk_*` обновляются автоматически → `/api/mobile/meta` отдаёт новую версию.
+- Требуется `EXPO_TOKEN` в `backend/.env` (update.sh сам дописывает его при `sudo EXPO_TOKEN=... update`). EAS собирает код из репозитория — перед сборкой увеличить `version` в `mobile/app/app.json`, закоммитить и задеплоить.
+- Локальная Windows-сборка APK — `powershell -File mobile\build-apk.ps1 [-Bump]` (зеркалит исходники в `C:\s`, Gradle + keystore из `mobile/keys/`).
+
 ## 6. Соглашения по коду
 
 ### 6.1 Общие
