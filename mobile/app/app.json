@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "РЎРІРѕР№ Р“Р°СЂР°Р¶ вЂ” РђРІС‚РѕСЃРµСЂРІРёСЃ",
+    "name": "Р РЋР Р†Р С•Р в„– Р вЂњР В°РЎР‚Р В°Р В¶ РІР‚вЂќ Р С’Р Р†РЎвЂљР С•РЎРѓР ВµРЎР‚Р Р†Р С‘РЎРѓ",
     "slug": "sg-autoservice",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "sgautoservice",
