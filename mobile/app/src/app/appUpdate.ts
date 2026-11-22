@@ -1,5 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
+import * as IntentLauncher from "expo-intent-launcher";
 
 import { fetchMobileMeta, type MobileMeta } from "../api/mobile";
 import { APP_VERSION } from "./appIdentity";
@@ -119,13 +119,15 @@ export async function downloadApk(
   return result.uri;
 }
 
-export async function shareApk(uri: string): Promise<void> {
-  if (!(await Sharing.isAvailableAsync())) {
-    throw new Error("sharing unavailable");
-  }
-  await Sharing.shareAsync(uri, {
-    mimeType: "application/vnd.android.package-archive",
-    dialogTitle: "Установка обновления",
-    UTI: "com.android.package-archive",
+const INTENT_FLAG_GRANT_READ_URI_PERMISSION = 0x00000001;
+const INTENT_FLAG_ACTIVITY_NEW_TASK = 0x10000000;
+
+export async function installApk(uri: string): Promise<void> {
+  const contentUri = await FileSystem.getContentUriAsync(uri);
+  await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+    data: contentUri,
+    type: "application/vnd.android.package-archive",
+    flags:
+      INTENT_FLAG_GRANT_READ_URI_PERMISSION | INTENT_FLAG_ACTIVITY_NEW_TASK,
   });
 }

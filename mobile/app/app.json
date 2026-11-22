@@ -1,13 +1,15 @@
 {
   "expo": {
-    "name": "Р РЋР Р†Р С•Р в„– Р вЂњР В°РЎР‚Р В°Р В¶ РІР‚вЂќ Р С’Р Р†РЎвЂљР С•РЎРѓР ВµРЎР‚Р Р†Р С‘РЎРѓ",
+    "name": "Свой Гараж",
     "slug": "sg-autoservice",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "sgautoservice",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ru.svoygarage.autoservice"
@@ -20,7 +22,15 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.REQUEST_INSTALL_PACKAGES"
+      ]
     },
     "plugins": [
       "expo-secure-store",

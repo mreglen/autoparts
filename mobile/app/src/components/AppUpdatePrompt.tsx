@@ -9,7 +9,7 @@ import {
   dismissUpdate,
   downloadApk,
   onManualUpdateCheck,
-  shareApk,
+  installApk,
   type UpdateInfo,
 } from "../app/appUpdate";
 
@@ -59,7 +59,7 @@ export function AppUpdatePrompt() {
     try {
       const uri = await downloadApk(info.url, info.version, setProgress);
       setProgress(null);
-      await shareApk(uri);
+      await installApk(uri);
     } catch {
       setProgress(null);
       setError(
