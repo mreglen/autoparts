@@ -1,4 +1,4 @@
-import { decodeJwtPayload, getRenewDelayMs, isTokenNearExpiry, getTokenExpiryMs } from './authSessionUtils';
+import { decodeJwtPayload, getRenewDelayMs, isTokenNearExpiry, getTokenExpiryMs, isAuthEngagementError } from './authSessionUtils';
 
 function makeToken(payload) {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
@@ -26,5 +26,14 @@ describe('authSessionUtils', () => {
     const exp = Math.floor(Date.now() / 1000) + 30;
     const token = makeToken({ exp });
     expect(isTokenNearExpiry(token, 120)).toBe(true);
+  });
+
+  it('detects auth errors in russian and english', () => {
+    expect(isAuthEngagementError('Сессия истекла или недействительна')).toBe(true);
+    expect(isAuthEngagementError('Refresh-токен недействителен')).toBe(true);
+    expect(isAuthEngagementError('Не удалось проверить учетные данные')).toBe(true);
+    expect(isAuthEngagementError('HTTP 401: Unauthorized')).toBe(true);
+    expect(isAuthEngagementError('Сервер не отвечает. Попробуйте ещё раз.')).toBe(false);
+    expect(isAuthEngagementError('Не удалось загрузить расходы')).toBe(false);
   });
 });
