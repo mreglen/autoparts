@@ -48,6 +48,9 @@ function parseAmount(value: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const PINNED_ARTICLES = ["Зарплата", "Прочее"];
+const SALARY_ARTICLE_KEY = "зарплата";
+
 export function ExpenseFormSheet({
   initial,
   onClose,
@@ -60,7 +63,8 @@ export function ExpenseFormSheet({
   const [articleId, setArticleId] = useState<number | null>(
     initial?.article_id ?? null,
   );
-  const [articleQuery, setArticleQuery] = useState(initial?.article_name ?? "");
+  const [articleName, setArticleName] = useState(initial?.article_name ?? "");
+  const [articleSearch, setArticleSearch] = useState("");
   const [articleSheetOpen, setArticleSheetOpen] = useState(false);
   const [amount, setAmount] = useState(() =>
     initial?.amount != null ? String(initial.amount) : "",
@@ -88,8 +92,15 @@ export function ExpenseFormSheet({
   );
   const [saving, setSaving] = useState(false);
 
-  const expenseType = isEdit ? initial.type : employeeId ? "salary" : "other";
-  const showEmployee = !isEdit || expenseType === "salary";
+  const resolvedArticleName = (
+    articleId != null
+      ? (articles.find((a) => a.id === articleId)?.name ?? articleName)
+      : articleName
+  ).trim();
+  const isSalaryArticle =
+    resolvedArticleName.toLowerCase() === SALARY_ARTICLE_KEY;
+  const isSalary = isEdit ? initial.type === "salary" : isSalaryArticle;
+  const showEmployee = isSalary;
   const payrollLoading = payrollLoadingKey === payrollKey;
   const payrollInfo = payroll?.key === payrollKey ? payroll.data : null;
 
@@ -144,27 +155,36 @@ export function ExpenseFormSheet({
 
   const amountNumber = useMemo(() => parseAmount(amount), [amount]);
   const amountValid = amountNumber > 0;
-  const articleName = (
-    articleId != null
-      ? (articles.find((a) => a.id === articleId)?.name ?? articleQuery)
-      : articleQuery
-  ).trim();
-  const normalizedQuery = articleQuery.trim().toLowerCase();
+  const mergedArticles = useMemo<{ id: number | null; name: string }[]>(() => {
+    const byName = new Map(
+      articles.map((a) => [a.name.trim().toLowerCase(), a]),
+    );
+    const defaults = PINNED_ARTICLES.map(
+      (name) => byName.get(name.toLowerCase()) ?? { id: null, name },
+    );
+    const rest = articles.filter(
+      (a) => !PINNED_ARTICLES.includes(a.name.trim().toLowerCase()),
+    );
+    return [...defaults, ...rest];
+  }, [articles]);
+  const normalizedSearch = articleSearch.trim().toLowerCase();
   const filteredArticles = useMemo(
     () =>
-      articles.filter((a) => a.name.toLowerCase().includes(normalizedQuery)),
-    [articles, normalizedQuery],
+      mergedArticles.filter((a) =>
+        a.name.toLowerCase().includes(normalizedSearch),
+      ),
+    [mergedArticles, normalizedSearch],
   );
-  const exactArticleMatch = articles.some(
-    (a) => a.name.toLowerCase() === normalizedQuery,
+  const exactArticleMatch = mergedArticles.some(
+    (a) => a.name.toLowerCase() === normalizedSearch,
   );
   const selectedEmployee = employees.find((e) => e.id === employeeId) ?? null;
 
   const canSubmit =
     amountValid &&
     Boolean(expenseDate) &&
-    (!isEdit || expenseType !== "salary" || employeeId != null) &&
-    (isEdit || articleName.length > 0);
+    (isEdit || resolvedArticleName.length > 0) &&
+    (!isSalary || employeeId != null);
 
   const handleSubmit = async () => {
     if (!canSubmit || saving) return;
@@ -172,7 +192,7 @@ export function ExpenseFormSheet({
     try {
       const base = {
         article_id: articleId,
-        article_name: articleId ? null : articleName || null,
+        article_name: articleId ? null : resolvedArticleName || null,
         amount: amountNumber,
         expense_date: expenseDate,
         description: description.trim() || null,
@@ -181,12 +201,13 @@ export function ExpenseFormSheet({
         await patchFinanceExpense(initial.id, {
           ...base,
           type: initial.type,
-          employee_id: initial.type === "salary" ? employeeId : null,
+          employee_id: isSalary ? employeeId : null,
         });
       } else {
         await createFinanceExpense({
           ...base,
-          employee_id: employeeId,
+          type: isSalaryArticle ? "salary" : "other",
+          employee_id: isSalaryArticle ? employeeId : null,
         });
       }
       show(isEdit ? "Расход обновлён" : "Расход добавлен", "success");
@@ -210,33 +231,29 @@ export function ExpenseFormSheet({
       <View className="gap-3">
         <View>
           <FieldLabel>Статья расхода</FieldLabel>
-          <View className="flex-row items-center gap-2">
-            <TextInput
-              value={articleQuery}
-              onChangeText={(v) => {
-                setArticleQuery(v);
-                setArticleId(null);
-              }}
-              placeholder="Выберите или введите новую"
-              placeholderTextColor={colors.inkFaint}
-              editable={!saving}
-              className="flex-1 rounded-xl px-4 py-3 text-base"
-              style={{
-                backgroundColor: colors.surfaceSubtle,
-                color: colors.ink,
-                minHeight: 48,
-              }}
-            />
-            <Pressable
-              onPress={() => setArticleSheetOpen(true)}
-              disabled={saving}
-              className="h-12 w-12 items-center justify-center rounded-xl"
-              style={{ backgroundColor: colors.surfaceSubtle }}
-              accessibilityLabel="Выбрать статью из списка"
+          <Pressable
+            onPress={() => {
+              setArticleSearch("");
+              setArticleSheetOpen(true);
+            }}
+            disabled={saving}
+            className="flex-row items-center justify-between rounded-xl px-4"
+            style={{
+              backgroundColor: colors.surfaceSubtle,
+              minHeight: 48,
+              borderWidth: 1,
+              borderColor: colors.line,
+            }}
+          >
+            <Text
+              className="flex-1 text-base"
+              style={{ color: resolvedArticleName ? colors.ink : colors.inkFaint }}
+              numberOfLines={1}
             >
-              <Ionicons name="chevron-down" size={18} color={colors.inkMuted} />
-            </Pressable>
-          </View>
+              {resolvedArticleName || "Выберите статью"}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={colors.inkMuted} />
+          </Pressable>
         </View>
 
         <View className="flex-row gap-2">
@@ -260,9 +277,7 @@ export function ExpenseFormSheet({
 
         {showEmployee ? (
           <View>
-            <FieldLabel>
-              {isEdit ? "Сотрудник" : "Сотрудник (необязательно)"}
-            </FieldLabel>
+            <FieldLabel>Сотрудник</FieldLabel>
             <Pressable
               onPress={() => setEmployeeSheetOpen(true)}
               disabled={saving || employeesLoading}
@@ -282,8 +297,7 @@ export function ExpenseFormSheet({
               >
                 {employeesLoading
                   ? "Загрузка сотрудников…"
-                  : (selectedEmployee?.name ??
-                    (isEdit ? "Выберите сотрудника" : "Не указан"))}
+                  : (selectedEmployee?.name ?? "Выберите сотрудника")}
               </Text>
               <Ionicons name="chevron-down" size={18} color={colors.inkMuted} />
             </Pressable>
@@ -379,11 +393,22 @@ export function ExpenseFormSheet({
         title="Статья расхода"
         onClose={() => setArticleSheetOpen(false)}
       >
+        <TextInput
+          value={articleSearch}
+          onChangeText={setArticleSearch}
+          placeholder="Поиск или новая статья"
+          placeholderTextColor={colors.inkFaint}
+          className="mb-2 rounded-xl px-4 py-3 text-base"
+          style={{
+            backgroundColor: colors.surfaceSubtle,
+            color: colors.ink,
+          }}
+        />
         <ScrollView className="max-h-96" keyboardShouldPersistTaps="handled">
           <Pressable
             onPress={() => {
               setArticleId(null);
-              setArticleQuery("");
+              setArticleName("");
               setArticleSheetOpen(false);
             }}
             className="mb-2 rounded-xl p-3"
@@ -393,9 +418,13 @@ export function ExpenseFormSheet({
               Не указана
             </Text>
           </Pressable>
-          {articleQuery.trim() && !exactArticleMatch ? (
+          {articleSearch.trim() && !exactArticleMatch ? (
             <Pressable
-              onPress={() => setArticleSheetOpen(false)}
+              onPress={() => {
+                setArticleId(null);
+                setArticleName(articleSearch.trim());
+                setArticleSheetOpen(false);
+              }}
               className="mb-2 rounded-xl p-3"
               style={{ backgroundColor: colors.brandSoft }}
             >
@@ -403,16 +432,16 @@ export function ExpenseFormSheet({
                 className="text-sm font-medium"
                 style={{ color: colors.brand }}
               >
-                Использовать «{articleQuery.trim()}»
+                Использовать «{articleSearch.trim()}»
               </Text>
             </Pressable>
           ) : null}
           {filteredArticles.map((a) => (
             <Pressable
-              key={a.id}
+              key={a.id ?? a.name}
               onPress={() => {
                 setArticleId(a.id);
-                setArticleQuery(a.name);
+                setArticleName(a.name);
                 setArticleSheetOpen(false);
               }}
               className="mb-2 rounded-xl p-3"
@@ -423,7 +452,7 @@ export function ExpenseFormSheet({
               </Text>
             </Pressable>
           ))}
-          {filteredArticles.length === 0 && !articleQuery.trim() ? (
+          {filteredArticles.length === 0 && !articleSearch.trim() ? (
             <Text className="py-3 text-sm" style={{ color: colors.inkMuted }}>
               Статей пока нет — введите название
             </Text>
@@ -438,7 +467,7 @@ export function ExpenseFormSheet({
         onClose={() => setEmployeeSheetOpen(false)}
       >
         <ScrollView className="max-h-96">
-          {!isEdit || expenseType !== "salary" ? (
+          {!isSalary ? (
             <Pressable
               onPress={() => {
                 setEmployeeId(null);

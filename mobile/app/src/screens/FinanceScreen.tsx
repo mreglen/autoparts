@@ -17,6 +17,7 @@ import {
   deleteFinanceExpense,
   deleteFinanceReceipt,
   fetchClientsWithDebt,
+  fetchExpenseArticles,
   fetchFinanceExpenses,
   fetchFinanceReceipts,
   patchFinanceReceipt,
@@ -25,6 +26,7 @@ import {
   shareFinanceReceiptsXlsx,
   type ClientDebtRow,
   type FinanceExpense,
+  type FinanceExpenseArticle,
   type FinanceReceipt,
   type FinanceReceiptsResponse,
   type PaymentMethod,
@@ -58,7 +60,7 @@ import {
 
 type Tab = "receipts" | "expenses" | "debts";
 type ReceiptMethodFilter = "all" | PaymentMethod;
-type ExpenseTypeFilter = "all" | "salary" | "other";
+type ExpenseTypeFilter = string;
 
 const METHOD_OPTIONS: { id: ReceiptMethodFilter; label: string }[] = [
   { id: "all", label: "Все" },
@@ -67,11 +69,7 @@ const METHOD_OPTIONS: { id: ReceiptMethodFilter; label: string }[] = [
   { id: "bank", label: "Расчётный счёт" },
 ];
 
-const EXPENSE_TYPE_OPTIONS: { id: ExpenseTypeFilter; label: string }[] = [
-  { id: "all", label: "Все" },
-  { id: "salary", label: "Зарплата" },
-  { id: "other", label: "Прочее" },
-];
+const EXPENSE_PINNED_ARTICLES = ["Зарплата", "Прочее"];
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "receipts", label: "Поступления" },
@@ -121,11 +119,15 @@ function sanitizeFinanceFilters(
   const method = METHOD_OPTIONS.some((o) => o.id === value?.method)
     ? (value!.method as ReceiptMethodFilter)
     : "all";
-  const expenseType = EXPENSE_TYPE_OPTIONS.some(
-    (o) => o.id === value?.expenseType,
-  )
-    ? (value!.expenseType as ExpenseTypeFilter)
-    : "all";
+  const expenseTypeRaw = value?.expenseType;
+  const expenseType =
+    typeof expenseTypeRaw === "string" && expenseTypeRaw
+      ? expenseTypeRaw === "salary"
+        ? "Зарплата"
+        : expenseTypeRaw === "other"
+          ? "Прочее"
+          : expenseTypeRaw
+      : "all";
   const tab = TABS.some((o) => o.id === value?.tab)
     ? (value!.tab as Tab)
     : "receipts";
@@ -351,6 +353,9 @@ export function FinanceScreen() {
     count: number;
     items: FinanceExpense[];
   } | null>(null);
+  const [expenseArticles, setExpenseArticles] = useState<
+    FinanceExpenseArticle[]
+  >([]);
   const [debts, setDebts] = useState<ClientDebtRow[]>([]);
   const [debtQuery, setDebtQuery] = useState("");
   const [debtTotal, setDebtTotal] = useState(0);
@@ -390,12 +395,16 @@ export function FinanceScreen() {
           setReceipts(r);
           setStale(null);
         } else if (tab === "expenses") {
-          const r = await fetchFinanceExpenses(dateFrom, dateTo);
+          const [r, articlesRes] = await Promise.all([
+            fetchFinanceExpenses(dateFrom, dateTo),
+            fetchExpenseArticles().catch(() => null),
+          ]);
           setExpenses({
             total: Number(r.data.total_amount ?? 0),
             count: Number(r.data.count ?? 0),
             items: r.data.items ?? [],
           });
+          if (articlesRes) setExpenseArticles(articlesRes.data ?? []);
           setStale(r.stale ? { fetchedAt: r.fetchedAt } : null);
         } else {
           debtOffsetRef.current = 0;
@@ -524,15 +533,51 @@ export function FinanceScreen() {
       : filteredReceipts.reduce((s, r) => s + Number(r.amount || 0), 0);
 
   const expenseItems = useMemo(() => expenses?.items ?? [], [expenses]);
-  const filteredExpenses = useMemo(
-    () =>
-      expenseType === "all"
-        ? expenseItems
-        : expenseItems.filter((e) => e.type === expenseType),
-    [expenseItems, expenseType],
-  );
+
+  const expenseArticleOptions = useMemo(() => {
+    const labels = new Map<string, string>();
+    const add = (raw?: string | null) => {
+      const label = (raw ?? "").trim();
+      if (label) labels.set(label.toLowerCase(), label);
+    };
+    EXPENSE_PINNED_ARTICLES.forEach(add);
+    expenseArticles.forEach((a) => add(a.name));
+    expenseItems.forEach((row) => add(row.article_name || row.type_label));
+    const pinned = EXPENSE_PINNED_ARTICLES.map((name) => ({
+      id: name,
+      label: name,
+    }));
+    const rest = [...labels.entries()]
+      .filter(
+        ([key]) =>
+          !EXPENSE_PINNED_ARTICLES.some((p) => p.toLowerCase() === key),
+      )
+      .map(([, label]) => label)
+      .sort((a, b) => a.localeCompare(b, "ru"))
+      .map((label) => ({ id: label, label }));
+    return [{ id: "all", label: "Все" }, ...pinned, ...rest];
+  }, [expenseArticles, expenseItems]);
+
+  const expenseArticleFilter = expenseArticleOptions.some(
+    (o) => o.id === expenseType,
+  )
+    ? expenseType
+    : "all";
+  const expenseArticleLabel =
+    expenseArticleOptions.find((o) => o.id === expenseArticleFilter)?.label ??
+    "Все";
+
+  const filteredExpenses = useMemo(() => {
+    if (expenseArticleFilter === "all") return expenseItems;
+    const wanted = expenseArticleFilter.toLowerCase();
+    return expenseItems.filter((e) =>
+      (e.article_name || e.type_label || e.type || "")
+        .trim()
+        .toLowerCase() === wanted,
+    );
+  }, [expenseItems, expenseArticleFilter]);
   const expensesTotal =
-    expenseType === "all"
+    expenseArticleFilter === "all"
       ? (expenses?.total ?? 0)
       : filteredExpenses.reduce((s, e) => s + Number(e.amount || 0), 0);
 
@@ -618,8 +663,8 @@ export function FinanceScreen() {
         />
       ) : tab === "expenses" ? (
         <ChipRow
-          options={EXPENSE_TYPE_OPTIONS}
-          value={expenseType}
+          options={expenseArticleOptions}
+          value={expenseArticleFilter}
           onChange={(value) => updateFilters({ expenseType: value })}
         />
       ) : null}
@@ -778,9 +823,9 @@ export function FinanceScreen() {
             style={{ backgroundColor: colors.surfaceSubtle }}
           >
             <Text className="text-sm" style={{ color: colors.inkMuted }}>
-              {expenseType === "all"
+              {expenseArticleFilter === "all"
                 ? "Всего расходов"
-                : `Итого · ${EXPENSE_TYPE_OPTIONS.find((o) => o.id === expenseType)?.label ?? ""}`}
+                : `Итого · ${expenseArticleLabel}`}
             </Text>
             <Text
               className="text-base font-bold"
@@ -794,9 +839,9 @@ export function FinanceScreen() {
               className="py-8 text-center text-sm"
               style={{ color: colors.inkMuted }}
             >
-              {expenseType === "all"
+              {expenseArticleFilter === "all"
                 ? "Нет расходов за период"
-                : "Нет расходов этого вида"}
+                : "Нет расходов по этой статье"}
             </Text>
           ) : (
             filteredExpenses.map((e) => (
@@ -1053,10 +1098,11 @@ export function FinanceScreen() {
             <FinanceField label="Дата">
               {formatServerDate(expenseDetail.expense_date)}
             </FinanceField>
+            <FinanceField label="Сотрудник">
+              {expenseDetail.employee_name || "—"}
+            </FinanceField>
             <FinanceField label="Ответственный">
-              {expenseDetail.employee_name ||
-                expenseDetail.created_by_name ||
-                "—"}
+              {expenseDetail.created_by_name || "—"}
             </FinanceField>
             {expenseDetail.description ? (
               <FinanceField label="Описание">

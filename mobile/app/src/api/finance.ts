@@ -126,6 +126,36 @@ export function fetchExpenseArticles() {
   return cachedGet<FinanceExpenseArticle[]>("/autoservice/expense-articles");
 }
 
+export async function createExpenseArticle(
+  name: string,
+): Promise<FinanceExpenseArticle> {
+  const row = await apiSend<FinanceExpenseArticle>(
+    "POST",
+    "/autoservice/expense-articles",
+    { body: { name } },
+  );
+  await invalidateEntities(["expense-articles", "finance-expenses"]);
+  return row;
+}
+
+export async function patchExpenseArticle(
+  id: number,
+  name: string,
+): Promise<FinanceExpenseArticle> {
+  const row = await apiSend<FinanceExpenseArticle>(
+    "PATCH",
+    `/autoservice/expense-articles/${id}`,
+    { body: { name } },
+  );
+  await invalidateEntities(["expense-articles", "finance-expenses"]);
+  return row;
+}
+
+export async function deleteExpenseArticle(id: number): Promise<void> {
+  await apiSend("DELETE", `/autoservice/expense-articles/${id}`);
+  await invalidateEntities(["expense-articles", "finance-expenses"]);
+}
+
 export function fetchEmployeePayrollInfo(
   employeeId: number,
   year: number,

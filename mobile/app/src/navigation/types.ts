@@ -33,5 +33,6 @@ export type RootStackParamList = {
   ClientPurchases: undefined;
   Employees: undefined;
   Contractors: undefined;
+  ExpenseArticles: undefined;
   Settings: undefined;
 };

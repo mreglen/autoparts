@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../../utils/apiClient';
 import { formatFinanceCurrency, getFinanceTodayDate } from '../Finance/financeDisplay';
@@ -14,6 +14,9 @@ const pillTextareaClass = 'sg-pill-textarea mt-1';
 const pillDateInputClass = 'sg-pill-input sg-native-date-input mt-1';
 
 const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700';
+
+const DEFAULT_EXPENSE_ARTICLES = ['Зарплата', 'Прочее'];
+const SALARY_ARTICLE_NAME = 'зарплата';
 
 const btnPrimaryClass =
   'inline-flex min-h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:min-h-10';
@@ -85,8 +88,41 @@ export default function AutoserviceExpenseFormPage() {
     };
   }, [isReady, isAuthenticated]);
 
+  const amountNumber = Number(String(amount || '').replace(',', '.'));
+  const amountValid = Number.isFinite(amountNumber) && amountNumber > 0;
+  const articleName = articleId
+    ? (articles.find((a) => a.id === articleId)?.name || articleQuery.trim())
+    : articleQuery.trim();
+  const isSalaryArticle = articleName.trim().toLowerCase() === SALARY_ARTICLE_NAME;
+  const canSubmit =
+    amountValid &&
+    Boolean(expenseDate) &&
+    Boolean(articleName) &&
+    (!isSalaryArticle || Boolean(employeeId));
+
+  const mergedArticles = useMemo(() => {
+    const byName = new Map(
+      articles.map((a) => [a.name.trim().toLowerCase(), a]),
+    );
+    const defaults = DEFAULT_EXPENSE_ARTICLES.map(
+      (name) => byName.get(name.toLowerCase()) || { id: null, name },
+    );
+    const rest = articles.filter(
+      (a) => !DEFAULT_EXPENSE_ARTICLES.includes(a.name.trim().toLowerCase()),
+    );
+    return [...defaults, ...rest];
+  }, [articles]);
+
+  const normalizedArticleQuery = articleQuery.trim().toLowerCase();
+  const filteredArticles = mergedArticles.filter((a) =>
+    a.name.toLowerCase().includes(normalizedArticleQuery),
+  );
+  const exactArticleMatch = mergedArticles.some(
+    (a) => a.name.toLowerCase() === normalizedArticleQuery,
+  );
+
   useEffect(() => {
-    if (!employeeId || !expenseDate) {
+    if (!employeeId || !expenseDate || !isSalaryArticle) {
       setPayrollInfo(null);
       return undefined;
     }
@@ -110,22 +146,7 @@ export default function AutoserviceExpenseFormPage() {
     return () => {
       cancelled = true;
     };
-  }, [employeeId, expenseDate]);
-
-  const amountNumber = Number(String(amount || '').replace(',', '.'));
-  const amountValid = Number.isFinite(amountNumber) && amountNumber > 0;
-  const articleName = articleId
-    ? (articles.find((a) => a.id === articleId)?.name || articleQuery.trim())
-    : articleQuery.trim();
-  const canSubmit = amountValid && Boolean(expenseDate) && Boolean(articleName);
-
-  const normalizedArticleQuery = articleQuery.trim().toLowerCase();
-  const filteredArticles = articles.filter((a) =>
-    a.name.toLowerCase().includes(normalizedArticleQuery),
-  );
-  const exactArticleMatch = articles.some(
-    (a) => a.name.toLowerCase() === normalizedArticleQuery,
-  );
+  }, [employeeId, expenseDate, isSalaryArticle]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -152,7 +173,8 @@ export default function AutoserviceExpenseFormPage() {
           amount: amountNumber,
           expense_date: expenseDate,
           description: description.trim() || null,
-          employee_id: employeeId ? Number(employeeId) : null,
+          type: isSalaryArticle ? 'salary' : 'other',
+          employee_id: isSalaryArticle && employeeId ? Number(employeeId) : null,
         }),
       });
       navigate('/autoservice/finance', { state: { tab: 'expenses', expenseCreated: true } });
@@ -204,7 +226,7 @@ export default function AutoserviceExpenseFormPage() {
                 <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-sg-sm border border-line bg-surface py-1 shadow-sg-md">
                   {filteredArticles.map((article) => (
                     <button
-                      key={article.id}
+                      key={article.id ?? article.name}
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
@@ -255,8 +277,9 @@ export default function AutoserviceExpenseFormPage() {
                 disabled={saving}
               />
             </div>
+            {isSalaryArticle ? (
             <div className="min-w-0">
-              <FieldLabel optional>Сотрудник</FieldLabel>
+              <FieldLabel>Сотрудник</FieldLabel>
               <select
                 className={pillInputClass}
                 value={employeeId}
@@ -264,13 +287,14 @@ export default function AutoserviceExpenseFormPage() {
                 disabled={saving || employeesLoading}
               >
                 <option value="">
-                  {employeesLoading ? 'Загрузка сотрудников…' : 'Не указан'}
+                  {employeesLoading ? 'Загрузка сотрудников…' : 'Выберите сотрудника'}
                 </option>
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>{emp.name}</option>
                 ))}
               </select>
             </div>
+            ) : null}
             <div className="min-w-0 lg:col-span-2">
               <FieldLabel optional>Описание</FieldLabel>
               <textarea

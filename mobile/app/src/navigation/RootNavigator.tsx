@@ -38,6 +38,7 @@ import { ReportsScreen } from "../screens/ReportsScreen";
 import { ClientsScreen } from "../screens/ClientsScreen";
 import { EmployeesScreen } from "../screens/EmployeesScreen";
 import { ContractorsScreen } from "../screens/ContractorsScreen";
+import { ExpenseArticlesScreen } from "../screens/ExpenseArticlesScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { useTheme } from "../theme/useTheme";
 import { ClientTabs } from "./ClientTabs";
@@ -235,6 +236,11 @@ export function RootNavigator() {
                 name="Contractors"
                 component={ContractorsScreen}
                 options={{ title: "Подрядчики" }}
+              />
+              <Stack.Screen
+                name="ExpenseArticles"
+                component={ExpenseArticlesScreen}
+                options={{ title: "Статьи расходов" }}
               />
               <Stack.Screen
                 name="Settings"

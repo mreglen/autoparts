@@ -49,11 +49,7 @@ const ALL_METHODS = [
   { id: 'bank', label: 'Расчётный счёт' },
 ];
 
-const EXPENSE_TYPE_FILTERS = [
-  { id: 'all', label: 'Все' },
-  { id: 'salary', label: 'Зарплата' },
-  { id: 'other', label: 'Прочее' },
-];
+const EXPENSE_PINNED_ARTICLES = ['Зарплата', 'Прочее'];
 
 const METHOD_COLORS = {
   card: 'bg-blue-50 text-blue-700',
@@ -248,6 +244,7 @@ function FinanceExpenseRows({ rows, onOpen, emptyText = 'Нет расходов
             <tr className={autoserviceListTheadRowClass}>
               <th className={`w-32 ${autoserviceListThClass}`}>Дата</th>
               <th className={`w-40 ${autoserviceListThClass}`}>Статьи расходов</th>
+              <th className={`w-36 ${autoserviceListThClass}`}>Сотрудник</th>
               <th className={`min-w-0 pl-4 ${autoserviceListThClass}`}>Ответственный</th>
               <th className={`min-w-0 ${autoserviceListThClass}`}>Комментарий</th>
               <th className={`w-28 whitespace-nowrap ${autoserviceListThRightClass}`}>Сумма</th>
@@ -266,8 +263,11 @@ function FinanceExpenseRows({ rows, onOpen, emptyText = 'Нет расходов
                 <td className={`${autoserviceListTdClass} truncate`}>
                   {row.article_name || row.type_label || row.type}
                 </td>
+                <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>
+                  {row.employee_name || '—'}
+                </td>
                 <td className={`${autoserviceListTdClass} truncate pl-4`}>
-                  {row.employee_name || row.created_by_name || '—'}
+                  {row.created_by_name || '—'}
                 </td>
                 <td className={`${autoserviceListTdClass} truncate text-ink-muted`}>
                   {row.description || '—'}
@@ -424,11 +424,12 @@ export default function AutoserviceFinancePage() {
       ? 'expenses'
       : 'receipts'
   ));
-  const [expenseTypeFilter, setExpenseTypeFilter] = useState(() => (
-    EXPENSE_TYPE_FILTERS.some((option) => option.id === storedFilters.expenseTypeFilter)
-      ? storedFilters.expenseTypeFilter
-      : 'all'
-  ));
+  const [expenseArticleFilter, setExpenseArticleFilter] = useState(() => {
+    const stored = storedFilters.expenseArticleFilter ?? storedFilters.expenseTypeFilter;
+    if (stored === 'salary') return 'Зарплата';
+    if (stored === 'other') return 'Прочее';
+    return typeof stored === 'string' && stored ? stored : 'all';
+  });
   const [expensesData, setExpensesData] = useState({ total_amount: 0, count: 0, items: [] });
   const [expensesLoading, setExpensesLoading] = useState(false);
   const [notice, setNotice] = useState('');
@@ -440,7 +441,7 @@ export default function AutoserviceFinancePage() {
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const [expenseArticles, setExpenseArticles] = useState([]);
 
-  usePersistedPageFilters(FINANCE_FILTERS_KEY, { dateFrom, dateTo, selectedMethod, activeTab, expenseTypeFilter });
+  usePersistedPageFilters(FINANCE_FILTERS_KEY, { dateFrom, dateTo, selectedMethod, activeTab, expenseArticleFilter });
 
   const handleMethodChange = useCallback((methodId) => {
     setSelectedMethod(methodId);
@@ -692,25 +693,55 @@ export default function AutoserviceFinancePage() {
 
   const expenseItems = useMemo(() => expensesData.items || [], [expensesData.items]);
 
+  const expenseArticleOptions = useMemo(() => {
+    const labels = new Map();
+    const add = (raw) => {
+      const label = (raw || '').trim();
+      if (label) labels.set(label.toLowerCase(), label);
+    };
+    EXPENSE_PINNED_ARTICLES.forEach(add);
+    expenseArticles.forEach((a) => add(a.name));
+    expenseItems.forEach((row) => add(row.article_name || row.type_label));
+    const pinned = EXPENSE_PINNED_ARTICLES.map((name) => ({ id: name, label: name }));
+    const rest = [...labels.entries()]
+      .filter(([key]) => !EXPENSE_PINNED_ARTICLES.some((p) => p.toLowerCase() === key))
+      .map(([, label]) => label)
+      .sort((a, b) => a.localeCompare(b, 'ru'))
+      .map((label) => ({ id: label, label }));
+    return [{ id: 'all', label: 'Все' }, ...pinned, ...rest];
+  }, [expenseArticles, expenseItems]);
+
+  const expenseArticleFilterActive = expenseArticleOptions.some(
+    (option) => option.id === expenseArticleFilter,
+  )
+    ? expenseArticleFilter
+    : 'all';
+
   const filteredExpenseRows = useMemo(() => {
-    if (expenseTypeFilter === 'all') return expenseItems;
-    return expenseItems.filter((row) => row.type === expenseTypeFilter);
-  }, [expenseItems, expenseTypeFilter]);
+    if (expenseArticleFilterActive === 'all') return expenseItems;
+    const wanted = expenseArticleFilterActive.toLowerCase();
+    return expenseItems.filter(
+      (row) =>
+        (row.article_name || row.type_label || row.type || '')
+          .trim()
+          .toLowerCase() === wanted,
+    );
+  }, [expenseItems, expenseArticleFilterActive]);
 
   const expensesDisplayTotal = useMemo(() => {
-    if (expenseTypeFilter === 'all') return expensesData.total_amount || 0;
+    if (expenseArticleFilterActive === 'all') return expensesData.total_amount || 0;
     return filteredExpenseRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  }, [filteredExpenseRows, expenseTypeFilter, expensesData.total_amount]);
+  }, [filteredExpenseRows, expenseArticleFilterActive, expensesData.total_amount]);
 
-  const expenseTypeLabel = useMemo(() => {
-    const found = EXPENSE_TYPE_FILTERS.find((option) => option.id === expenseTypeFilter);
+  const expenseArticleLabelText = useMemo(() => {
+    const found = expenseArticleOptions.find((option) => option.id === expenseArticleFilterActive);
     return found?.label || 'Все';
-  }, [expenseTypeFilter]);
+  }, [expenseArticleOptions, expenseArticleFilterActive]);
 
   const headerStats = activeTab === 'expenses'
     ? {
         total: expensesDisplayTotal,
-        totalLabel: expenseTypeLabel,
+        totalLabel: expenseArticleLabelText,
         count: filteredExpenseRows.length,
         countLabel: expensesWord(filteredExpenseRows.length),
         loading: expensesLoading,
@@ -854,9 +885,9 @@ export default function AutoserviceFinancePage() {
         <>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
             <MethodSegmentedFilter
-              methods={EXPENSE_TYPE_FILTERS}
-              selected={expenseTypeFilter}
-              onChange={setExpenseTypeFilter}
+              methods={expenseArticleOptions}
+              selected={expenseArticleFilterActive}
+              onChange={setExpenseArticleFilter}
             />
             <button
               type="button"
@@ -895,7 +926,7 @@ export default function AutoserviceFinancePage() {
             <FinanceExpenseRows
               rows={filteredExpenseRows}
               onOpen={setDetailsExpense}
-              emptyText={expenseTypeFilter === 'all' ? 'Нет расходов за период' : 'Нет расходов этого вида'}
+              emptyText={expenseArticleFilterActive === 'all' ? 'Нет расходов за период' : 'Нет расходов по этой статье'}
             />
           )}
         </>
@@ -1031,7 +1062,8 @@ export default function AutoserviceFinancePage() {
             <FinanceField label="Статья расхода">{detailsExpense.article_name || detailsExpense.type_label || detailsExpense.type}</FinanceField>
             <FinanceField label="Сумма">{formatFinanceCurrency(detailsExpense.amount)}</FinanceField>
             <FinanceField label="Дата">{formatExpenseDate(detailsExpense.expense_date)}</FinanceField>
-            <FinanceField label="Ответственный">{detailsExpense.employee_name || detailsExpense.created_by_name || '—'}</FinanceField>
+            <FinanceField label="Сотрудник">{detailsExpense.employee_name || '—'}</FinanceField>
+            <FinanceField label="Ответственный">{detailsExpense.created_by_name || '—'}</FinanceField>
             {detailsExpense.description ? (
               <FinanceField label="Описание">{detailsExpense.description}</FinanceField>
             ) : null}

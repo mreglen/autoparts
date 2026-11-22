@@ -58,6 +58,12 @@ const SECTIONS: SectionLink[] = [
     route: "Contractors",
   },
   {
+    title: "Статьи расходов",
+    icon: "pricetag-outline",
+    section: "settings",
+    route: "ExpenseArticles",
+  },
+  {
     title: "Настройки",
     icon: "settings-outline",
     section: "settings",
@@ -126,6 +132,9 @@ export function MoreScreen() {
                   break;
                 case "Contractors":
                   navigation.navigate("Contractors");
+                  break;
+                case "ExpenseArticles":
+                  navigation.navigate("ExpenseArticles");
                   break;
                 default:
                   navigation.navigate("Settings");
