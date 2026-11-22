@@ -160,17 +160,15 @@ export function ExpenseFormSheet({
 
   const amountNumber = useMemo(() => parseAmount(amount), [amount]);
   const amountValid = amountNumber > 0;
-  const mergedArticles = useMemo<{ id: number | null; name: string }[]>(() => {
-    const byName = new Map(
-      articles.map((a) => [a.name.trim().toLowerCase(), a]),
-    );
-    const defaults = PINNED_ARTICLES.map(
-      (name) => byName.get(name.toLowerCase()) ?? { id: null, name },
-    );
+  const mergedArticles = useMemo<FinanceExpenseArticle[]>(() => {
+    const pinnedKeys = new Set(PINNED_ARTICLES.map((n) => n.toLowerCase()));
+    const pinned = PINNED_ARTICLES.map((name) =>
+      articles.find((a) => a.name.trim().toLowerCase() === name.toLowerCase()),
+    ).filter((a): a is FinanceExpenseArticle => Boolean(a));
     const rest = articles.filter(
-      (a) => !PINNED_ARTICLES.includes(a.name.trim().toLowerCase()),
+      (a) => !pinnedKeys.has(a.name.trim().toLowerCase()),
     );
-    return [...defaults, ...rest];
+    return [...pinned, ...rest];
   }, [articles]);
   const normalizedSearch = articleName.trim().toLowerCase();
   const filteredArticles = useMemo(

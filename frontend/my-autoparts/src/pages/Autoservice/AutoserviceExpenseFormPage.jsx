@@ -101,16 +101,14 @@ export default function AutoserviceExpenseFormPage() {
     (!isSalaryArticle || Boolean(employeeId));
 
   const mergedArticles = useMemo(() => {
-    const byName = new Map(
-      articles.map((a) => [a.name.trim().toLowerCase(), a]),
-    );
-    const defaults = DEFAULT_EXPENSE_ARTICLES.map(
-      (name) => byName.get(name.toLowerCase()) || { id: null, name },
-    );
+    const pinnedKeys = new Set(DEFAULT_EXPENSE_ARTICLES.map((n) => n.toLowerCase()));
+    const pinned = DEFAULT_EXPENSE_ARTICLES.map((name) =>
+      articles.find((a) => a.name.trim().toLowerCase() === name.toLowerCase()),
+    ).filter(Boolean);
     const rest = articles.filter(
-      (a) => !DEFAULT_EXPENSE_ARTICLES.includes(a.name.trim().toLowerCase()),
+      (a) => !pinnedKeys.has(a.name.trim().toLowerCase()),
     );
-    return [...defaults, ...rest];
+    return [...pinned, ...rest];
   }, [articles]);
 
   const normalizedArticleQuery = articleQuery.trim().toLowerCase();

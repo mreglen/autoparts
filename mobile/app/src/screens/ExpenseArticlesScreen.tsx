@@ -209,16 +209,6 @@ export function ExpenseArticlesScreen(_: Props) {
               className="flex-row items-center gap-3 rounded-2xl p-3"
               style={{ backgroundColor: colors.surfaceSubtle }}
             >
-              <View
-                className="h-10 w-10 items-center justify-center rounded-full"
-                style={{ backgroundColor: colors.brandSoft }}
-              >
-                <Ionicons
-                  name="pricetag-outline"
-                  size={18}
-                  color={colors.brand}
-                />
-              </View>
               <View className="min-w-0 flex-1">
                 <Text
                   className="text-sm font-semibold"
