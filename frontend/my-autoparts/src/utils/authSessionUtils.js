@@ -35,3 +35,31 @@ export function isTokenNearExpiry(token, leadSeconds = 120) {
   if (!expiryMs) return true;
   return expiryMs - Date.now() <= leadSeconds * 1000;
 }
+
+export function isAuthEngagementError(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('401')
+    || text.includes('unauthorized')
+    || text.includes('not authenticated')
+    || text.includes('invalid')
+    || text.includes('expired')
+    || text.includes('signature')
+    || text.includes('учетные данные')
+    || text.includes('учётные данные')
+    || text.includes('сессия')
+    || text.includes('refresh-токен')
+  );
+}
+
+export function isNetworkEngagementError(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('failed to fetch')
+    || text.includes('networkerror')
+    || text.includes('network')
+    || text.includes('не отвечает')
+    || text.includes('name_not_resolved')
+    || text.includes('load failed')
+  );
+}

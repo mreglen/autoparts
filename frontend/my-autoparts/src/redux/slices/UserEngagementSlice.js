@@ -1,30 +1,12 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { apiRequest, getAuthToken } from '../../utils/apiClient';
 import { favoriteKeyFromItem, productFavoriteKey, rosskoFavoriteKey } from '../../utils/favoriteKeys';
+import {
+  isAuthEngagementError,
+  isNetworkEngagementError,
+} from '../../utils/authSessionUtils';
 
-export function isAuthEngagementError(message) {
-  const text = String(message || '').toLowerCase();
-  return (
-    text.includes('401')
-    || text.includes('unauthorized')
-    || text.includes('not authenticated')
-    || text.includes('учетные данные')
-    || text.includes('учётные данные')
-    || text.includes('сессия')
-  );
-}
-
-export function isNetworkEngagementError(message) {
-  const text = String(message || '').toLowerCase();
-  return (
-    text.includes('failed to fetch')
-    || text.includes('networkerror')
-    || text.includes('network')
-    || text.includes('не отвечает')
-    || text.includes('name_not_resolved')
-    || text.includes('load failed')
-  );
-}
+export { isAuthEngagementError, isNetworkEngagementError };
 
 function hasAuthenticatedUser(getState) {
   const auth = getState().auth;
