@@ -351,6 +351,12 @@ def login(
         "device_info": device_info
     })
 
+    # Clean up old sessions for this user from the same IP.
+    # Важно: до выдачи нового токена — иначе свежая сессия может быть
+    # сразу вытеснена лимитом (мобильные сессии сортируются первыми).
+    if ip_address:
+        cleanup_old_user_sessions(db, user.id, ip_address)
+
     # Формируем данные для токена
     token_data = build_token_data_for_user(db, user)
 
@@ -364,10 +370,6 @@ def login(
         expires_delta=access_token_expires,
         client_kind=client_kind,
     )
-    
-    # Clean up old sessions for this user from the same IP
-    if ip_address:
-        cleanup_old_user_sessions(db, user.id, ip_address)
 
     if request is not None and response is not None:
         merge_guest_cart_from_request(db, request, response, user.id)
@@ -541,6 +543,10 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
             organization_name=organization_name
         )
 
+        ip_address = get_client_ip(request)
+        if ip_address:
+            cleanup_old_user_sessions(db, user.id, ip_address)
+
         # Создаем токен с сессией
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token, refresh_token = issue_auth_token_pair(
@@ -548,14 +554,9 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
             user=user,
             token_data={"sub": user.email},
             device_info="Registration Complete",
-            ip_address=get_client_ip(request),
+            ip_address=ip_address,
             expires_delta=access_token_expires,
         )
-        
-        # Clean up old sessions for this user from the same IP
-        ip_address = get_client_ip(request)
-        if ip_address:
-            cleanup_old_user_sessions(db, user.id, ip_address)
 
         if request is not None and response is not None:
             merge_guest_cart_from_request(db, request, response, user.id)
