@@ -59,6 +59,7 @@ from app.utils.autoservice_access import can_see_rossko_sales_report
 from app.utils.user_public_code import assign_public_code
 from app.utils.user_avatar import avatar_public_url
 from app.utils.rate_limit import check_rate_limit, client_ip, retry_after_header
+from app.core.request_context import get_client_ip
 import hashlib
 import logging
 
@@ -333,7 +334,7 @@ def login(
     )
 
     # Получаем IP адрес
-    ip_address = request.client.host if request else None
+    ip_address = get_client_ip(request)
 
     # Информация об устройстве
     if not device_info and user_agent:
@@ -547,12 +548,12 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
             user=user,
             token_data={"sub": user.email},
             device_info="Registration Complete",
-            ip_address=request.client.host if request else None,
+            ip_address=get_client_ip(request),
             expires_delta=access_token_expires,
         )
         
         # Clean up old sessions for this user from the same IP
-        ip_address = request.client.host if request else None
+        ip_address = get_client_ip(request)
         if ip_address:
             cleanup_old_user_sessions(db, user.id, ip_address)
 
