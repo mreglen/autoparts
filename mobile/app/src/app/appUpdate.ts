@@ -97,12 +97,35 @@ export interface DownloadProgress {
   (progress: number): void;
 }
 
+const APK_MAGIC_BASE64 = "UEsDBA=="; // "PK\x03\x04"
+const MIN_APK_BYTES = 1024 * 1024;
+
+async function validateApkFile(uri: string, httpStatus?: number): Promise<void> {
+  if (httpStatus !== undefined && httpStatus !== 200) {
+    throw new Error(`download failed: HTTP ${httpStatus}`);
+  }
+  const info = await FileSystem.getInfoAsync(uri);
+  const size = info.exists ? info.size : 0;
+  if (size < MIN_APK_BYTES) {
+    throw new Error("Сервер вернул не APK-файл (файл слишком маленький)");
+  }
+  const head = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+    position: 0,
+    length: 4,
+  });
+  if (head !== APK_MAGIC_BASE64) {
+    throw new Error("Скачанный файл не является APK");
+  }
+}
+
 export async function downloadApk(
   url: string,
   version: string,
   onProgress?: DownloadProgress,
 ): Promise<string> {
   const target = `${FileSystem.cacheDirectory ?? ""}sg-autoservice-${version}.apk`;
+  await FileSystem.deleteAsync(target, { idempotent: true }).catch(() => {});
   const download = FileSystem.createDownloadResumable(
     url,
     target,
@@ -114,9 +137,15 @@ export async function downloadApk(
       }
     },
   );
-  const result = await download.downloadAsync();
-  if (!result?.uri) throw new Error("download failed");
-  return result.uri;
+  try {
+    const result = await download.downloadAsync();
+    if (!result?.uri) throw new Error("download failed");
+    await validateApkFile(result.uri, result.status);
+    return result.uri;
+  } catch (e) {
+    await FileSystem.deleteAsync(target, { idempotent: true }).catch(() => {});
+    throw e;
+  }
 }
 
 const INTENT_FLAG_GRANT_READ_URI_PERMISSION = 0x00000001;
