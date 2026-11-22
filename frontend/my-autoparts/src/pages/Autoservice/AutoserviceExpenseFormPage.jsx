@@ -15,8 +15,8 @@ const pillDateInputClass = 'sg-pill-input sg-native-date-input mt-1';
 
 const linkActionClass = 'text-sm font-medium text-brand-600 hover:text-brand-700';
 
-const DEFAULT_EXPENSE_ARTICLES = ['Зарплата', 'Прочее'];
-const SALARY_ARTICLE_NAME = 'зарплата';
+const DEFAULT_EXPENSE_ARTICLES = ['Заработная плата', 'Прочее'];
+const SALARY_ARTICLE_NAMES = ['зарплата', 'заработная плата'];
 
 const btnPrimaryClass =
   'inline-flex min-h-11 items-center justify-center rounded-sg-sm bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:min-h-10';
@@ -93,7 +93,7 @@ export default function AutoserviceExpenseFormPage() {
   const articleName = articleId
     ? (articles.find((a) => a.id === articleId)?.name || articleQuery.trim())
     : articleQuery.trim();
-  const isSalaryArticle = articleName.trim().toLowerCase() === SALARY_ARTICLE_NAME;
+  const isSalaryArticle = SALARY_ARTICLE_NAMES.includes(articleName.trim().toLowerCase());
   const canSubmit =
     amountValid &&
     Boolean(expenseDate) &&

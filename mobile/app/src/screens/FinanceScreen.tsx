@@ -69,7 +69,8 @@ const METHOD_OPTIONS: { id: ReceiptMethodFilter; label: string }[] = [
   { id: "bank", label: "Расчётный счёт" },
 ];
 
-const EXPENSE_PINNED_ARTICLES = ["Зарплата", "Прочее"];
+const EXPENSE_PINNED_ARTICLES = ["Заработная плата", "Прочее"];
+const EXPENSE_SALARY_ARTICLE = "Заработная плата";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "receipts", label: "Поступления" },
@@ -122,9 +123,9 @@ function sanitizeFinanceFilters(
   const expenseTypeRaw = value?.expenseType;
   const expenseType =
     typeof expenseTypeRaw === "string" && expenseTypeRaw
-      ? expenseTypeRaw === "salary"
-        ? "Зарплата"
-        : expenseTypeRaw === "other"
+      ? expenseTypeRaw === "salary" || expenseTypeRaw === "Зарплата"
+        ? EXPENSE_SALARY_ARTICLE
+        : expenseTypeRaw === "other" || expenseTypeRaw === "Прочее"
           ? "Прочее"
           : expenseTypeRaw
       : "all";
@@ -542,7 +543,12 @@ export function FinanceScreen() {
     };
     EXPENSE_PINNED_ARTICLES.forEach(add);
     expenseArticles.forEach((a) => add(a.name));
-    expenseItems.forEach((row) => add(row.article_name || row.type_label));
+    expenseItems.forEach((row) =>
+      add(
+        row.article_name ||
+          (row.type === "salary" ? EXPENSE_SALARY_ARTICLE : row.type_label),
+      ),
+    );
     const pinned = EXPENSE_PINNED_ARTICLES.map((name) => ({
       id: name,
       label: name,
@@ -571,7 +577,12 @@ export function FinanceScreen() {
     if (expenseArticleFilter === "all") return expenseItems;
     const wanted = expenseArticleFilter.toLowerCase();
     return expenseItems.filter((e) =>
-      (e.article_name || e.type_label || e.type || "")
+      (
+        e.article_name ||
+        (e.type === "salary" ? EXPENSE_SALARY_ARTICLE : e.type_label) ||
+        e.type ||
+        ""
+      )
         .trim()
         .toLowerCase() === wanted,
     );

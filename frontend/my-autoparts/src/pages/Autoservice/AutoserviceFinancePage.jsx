@@ -49,7 +49,8 @@ const ALL_METHODS = [
   { id: 'bank', label: 'Расчётный счёт' },
 ];
 
-const EXPENSE_PINNED_ARTICLES = ['Зарплата', 'Прочее'];
+const EXPENSE_PINNED_ARTICLES = ['Заработная плата', 'Прочее'];
+const EXPENSE_SALARY_ARTICLE = 'Заработная плата';
 
 const METHOD_COLORS = {
   card: 'bg-blue-50 text-blue-700',
@@ -426,8 +427,8 @@ export default function AutoserviceFinancePage() {
   ));
   const [expenseArticleFilter, setExpenseArticleFilter] = useState(() => {
     const stored = storedFilters.expenseArticleFilter ?? storedFilters.expenseTypeFilter;
-    if (stored === 'salary') return 'Зарплата';
-    if (stored === 'other') return 'Прочее';
+    if (stored === 'salary' || stored === 'Зарплата') return EXPENSE_SALARY_ARTICLE;
+    if (stored === 'other' || stored === 'Прочее') return 'Прочее';
     return typeof stored === 'string' && stored ? stored : 'all';
   });
   const [expensesData, setExpensesData] = useState({ total_amount: 0, count: 0, items: [] });
@@ -701,7 +702,9 @@ export default function AutoserviceFinancePage() {
     };
     EXPENSE_PINNED_ARTICLES.forEach(add);
     expenseArticles.forEach((a) => add(a.name));
-    expenseItems.forEach((row) => add(row.article_name || row.type_label));
+    expenseItems.forEach((row) =>
+      add(row.article_name || (row.type === 'salary' ? EXPENSE_SALARY_ARTICLE : row.type_label)),
+    );
     const pinned = EXPENSE_PINNED_ARTICLES.map((name) => ({ id: name, label: name }));
     const rest = [...labels.entries()]
       .filter(([key]) => !EXPENSE_PINNED_ARTICLES.some((p) => p.toLowerCase() === key))
@@ -722,7 +725,12 @@ export default function AutoserviceFinancePage() {
     const wanted = expenseArticleFilterActive.toLowerCase();
     return expenseItems.filter(
       (row) =>
-        (row.article_name || row.type_label || row.type || '')
+        (
+          row.article_name ||
+          (row.type === 'salary' ? EXPENSE_SALARY_ARTICLE : row.type_label) ||
+          row.type ||
+          ''
+        )
           .trim()
           .toLowerCase() === wanted,
     );
@@ -884,11 +892,18 @@ export default function AutoserviceFinancePage() {
       {activeTab === 'expenses' ? (
         <>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-            <MethodSegmentedFilter
-              methods={expenseArticleOptions}
-              selected={expenseArticleFilterActive}
-              onChange={setExpenseArticleFilter}
-            />
+            <select
+              value={expenseArticleFilterActive}
+              onChange={(e) => setExpenseArticleFilter(e.target.value)}
+              className="sg-pill-input h-9 w-full sm:w-64"
+              aria-label="Фильтр по статье расхода"
+            >
+              {expenseArticleOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={() => navigate('/autoservice/finance/expenses/new')}
