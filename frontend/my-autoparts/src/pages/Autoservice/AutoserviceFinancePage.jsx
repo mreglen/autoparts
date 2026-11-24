@@ -513,8 +513,13 @@ export default function AutoserviceFinancePage() {
     if (location.state?.expenseCreated) {
       setNotice('Расход добавлен');
       loadExpenses();
+      const { expenseCreated: _expenseCreated, ...restState } = location.state || {};
+      navigate(`${location.pathname}${location.search}`, {
+        replace: true,
+        state: restState,
+      });
     }
-  }, [location.state, loadExpenses]);
+  }, [location.state, location.pathname, location.search, loadExpenses, navigate]);
 
   useEffect(() => {
     load();

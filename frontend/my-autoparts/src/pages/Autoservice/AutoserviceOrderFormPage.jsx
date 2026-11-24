@@ -23,6 +23,7 @@ import RepairOrderDeliveryModal from '../../components/Autoservice/RepairOrderDe
 import AutoserviceWarehouseAddModal from '../../components/Autoservice/AutoserviceWarehouseAddModal';
 import ClientMarkupPopover from '../../components/NewParts/ClientMarkupPopover';
 import Modal, { ConfirmDialog } from '../../components/UI/Modal';
+import Button from '../../components/UI/Button';
 import { Z_MOBILE_STICKY_FOOTER } from '../../constants/mobileTokens';
 import {
   clearRepairOrderFormDraft,
@@ -262,6 +263,7 @@ function mergeShopPartIdsFromServer(localParts, serverOrder) {
         is_imported: Boolean(serverPart.is_imported),
         is_in_cart: Boolean(serverPart.is_in_cart),
         is_manual_editable: Boolean(serverPart.is_manual_editable),
+        return_kind: serverPart.return_kind || null,
       };
     }
     if (local.pending_import || local.pending_cart_import) return local;
@@ -274,6 +276,7 @@ function mergeShopPartIdsFromServer(localParts, serverOrder) {
       is_imported: Boolean(serverPart.is_imported),
       is_in_cart: Boolean(serverPart.is_in_cart),
       is_manual_editable: Boolean(serverPart.is_manual_editable),
+      return_kind: serverPart.return_kind || null,
     };
   });
 }
@@ -756,6 +759,99 @@ function AddEmployeeModal({ onClose, onCreated }) {
   );
 }
 
+function AddContractorModal({ onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [salaryType, setSalaryType] = useState('percent_work');
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    const trimmedName = name.trim();
+    if (trimmedName.length < 2) {
+      setError('Укажите наименование');
+      return;
+    }
+    const num = value.trim() === '' ? 0 : Number(value);
+    if (Number.isNaN(num) || num < 0 || (salaryType === 'percent_work' && num > 100)) {
+      setError(salaryType === 'percent_work' ? 'Укажите процент от 0 до 100' : 'Укажите корректную сумму');
+      return;
+    }
+    setSaving(true);
+    try {
+      const row = await apiRequest('/autoservice/contractors', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: trimmedName,
+          salary_type: salaryType,
+          salary_amount: salaryType === 'fixed' ? num : 0,
+          work_percent: salaryType === 'percent_work' ? num : 0,
+        }),
+      });
+      onCreated(row);
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Не удалось добавить подрядчика');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open title="Добавить подрядчика" onClose={onClose} draggable>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sg-caption font-medium text-ink-muted">Наименование</label>
+          <input
+            className={pillInputClass}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={saving}
+            required
+            maxLength={120}
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-sg-caption font-medium text-ink-muted">Тип оплаты</label>
+          <select
+            className={pillInputClass}
+            value={salaryType}
+            onChange={(e) => setSalaryType(e.target.value)}
+            disabled={saving}
+          >
+            <option value="percent_work">Процент от работы (%)</option>
+            <option value="fixed">Фиксированная сумма (₽)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sg-caption font-medium text-ink-muted">
+            {salaryType === 'percent_work' ? '% от работы' : 'Сумма, ₽'}
+          </label>
+          <NumericInput
+            mode="numeric"
+            className={pillInputClass}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={saving}
+          />
+        </div>
+        {error ? <p className="text-sm text-danger-600">{error}</p> : null}
+        <div className="flex justify-end gap-2 pt-2 max-md:flex-col">
+          <button type="button" onClick={onClose} className={btnSecondaryClass} disabled={saving}>
+            Отмена
+          </button>
+          <button type="submit" disabled={saving} className={btnPrimaryClass}>
+            {saving ? 'Сохранение…' : 'Добавить'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function shopPartRowKey(part, index) {
   if (part?.id) return `shop-part-${part.id}`;
   if (part?.pending_import && part.purchase_item_id != null) {
@@ -848,6 +944,7 @@ function mapOrderToFormState(order) {
           is_imported: Boolean(p.is_imported),
           is_in_cart: Boolean(p.is_in_cart),
           is_manual_editable: Boolean(p.is_manual_editable),
+          return_kind: p.return_kind || null,
         }))
       : [],
   };
@@ -943,12 +1040,17 @@ export default function AutoserviceOrderFormPage() {
   const [clientChoiceOpen, setClientChoiceOpen] = useState(false);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
   const [addEmployeeTarget, setAddEmployeeTarget] = useState(null);
+  const [addContractorOpen, setAddContractorOpen] = useState(false);
+  const [addContractorTarget, setAddContractorTarget] = useState(null);
   const [workExecutorEditIndex, setWorkExecutorEditIndex] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState('idle');
   const [detachingShopPartId, setDetachingShopPartId] = useState(null);
   const [shopPartRemoveConfirm, setShopPartRemoveConfirm] = useState(null);
+  const [shopPartReturnForm, setShopPartReturnForm] = useState(null);
+  const [returningShopPartId, setReturningShopPartId] = useState(null);
+  const [successNotice, setSuccessNotice] = useState('');
   const [fieldDetailModal, setFieldDetailModal] = useState(null);
   const [lineDeleteConfirm, setLineDeleteConfirm] = useState(null);
   const plannerPrefillRef = useRef(location.state);
@@ -1113,6 +1215,11 @@ export default function AutoserviceOrderFormPage() {
   const loadServiceEmployees = useCallback(async () => {
     const data = await apiRequest('/autoservice/repair-orders/service-employees-options');
     setServiceEmployees(Array.isArray(data) ? data : []);
+  }, []);
+
+  const loadServiceContractors = useCallback(async () => {
+    const data = await apiRequest('/autoservice/repair-orders/contractors-options');
+    setServiceContractors(Array.isArray(data) ? data : []);
   }, []);
 
   const loadMeta = useCallback(async () => {
@@ -1555,6 +1662,24 @@ export default function AutoserviceOrderFormPage() {
     setAddEmployeeOpen(true);
   };
 
+  const handleContractorCreated = async (row) => {
+    await loadServiceContractors();
+    if (!row?.id || addContractorTarget == null) return;
+    const { workIndex } = addContractorTarget;
+    setWorks((prev) => prev.map((w, i) => {
+      if (i !== workIndex) return w;
+      const assigned = w.contractors || [];
+      if (assigned.some((c) => String(c.contractor_id) === String(row.id))) return w;
+      return { ...w, contractors: [...assigned, emptyContractorAssignment(String(row.id))] };
+    }));
+    setAddContractorTarget(null);
+  };
+
+  const openAddContractorModal = (workIndex) => {
+    setAddContractorTarget({ workIndex });
+    setAddContractorOpen(true);
+  };
+
   const updatePart = (index, patch) => {
     setClientParts((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
   };
@@ -1640,6 +1765,56 @@ export default function AutoserviceOrderFormPage() {
     removeShopPartLocally,
     applyFormState,
   ]);
+
+  const openShopPartReturnForm = useCallback(() => {
+    const pending = shopPartRemoveConfirm;
+    const part = pending?.part;
+    if (!pending || !part?.id || part.pending_import || part.pending_cart_import) return;
+    setShopPartReturnForm({
+      index: pending.index,
+      part,
+      qty: String(Math.max(1, Math.floor(Number(part.qty) || 1))),
+      reason: 'other',
+      comment: '',
+    });
+  }, [shopPartRemoveConfirm]);
+
+  const confirmReturnShopPart = useCallback(async () => {
+    const form = shopPartReturnForm;
+    if (!form?.part?.id || !orderId) return;
+    const partQty = Number(form.part.qty) || 0;
+    const qty = Math.max(
+      1,
+      Math.min(Math.round(Number(form.qty) || 1), Math.max(1, Math.ceil(partQty))),
+    );
+    setReturningShopPartId(form.part.id);
+    setError('');
+    try {
+      const order = await apiRequest(
+        `/autoservice/repair-orders/${orderId}/shop-parts/${form.part.id}/return`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            quantity: qty,
+            reason: form.reason || 'other',
+            comment: form.comment.trim() || null,
+          }),
+        },
+      );
+      applyFormState(mapOrderToFormState(order));
+      setShopPartReturnForm(null);
+      setShopPartRemoveConfirm(null);
+      setSuccessNotice(
+        form.part.return_kind === 'rossko'
+          ? 'Возврат поставщику оформлен'
+          : 'Возврат позиции оформлен',
+      );
+    } catch (err) {
+      setError(err?.message || 'Не удалось оформить возврат');
+    } finally {
+      setReturningShopPartId(null);
+    }
+  }, [shopPartReturnForm, orderId, applyFormState]);
 
   const handleManualShopPartAdd = (values) => {
     const isRossko = values.source === 'rossko';
@@ -2328,6 +2503,7 @@ export default function AutoserviceOrderFormPage() {
 
       <Toast message={error} variant="error" onClose={() => setError('')} />
       <Toast message={discountNotice} variant="success" onClose={() => setDiscountNotice('')} />
+      <Toast message={successNotice} variant="success" onClose={() => setSuccessNotice('')} />
 
       {isClosedOrder ? (
         <p
@@ -2982,6 +3158,16 @@ export default function AutoserviceOrderFormPage() {
         />
       ) : null}
 
+      {addContractorOpen ? (
+        <AddContractorModal
+          onClose={() => {
+            setAddContractorOpen(false);
+            setAddContractorTarget(null);
+          }}
+          onCreated={handleContractorCreated}
+        />
+      ) : null}
+
       <Modal
         open={shopPartAddMenuOpen}
         title="Добавить запчасть исполнителя"
@@ -3063,6 +3249,7 @@ export default function AutoserviceOrderFormPage() {
               workExecutorEditIndex,
               (works[workExecutorEditIndex].executors || []).length,
             )}
+            onAddContractor={() => openAddContractorModal(workExecutorEditIndex)}
           />
         ) : null}
       </Modal>
@@ -3146,7 +3333,14 @@ export default function AutoserviceOrderFormPage() {
       />
 
       <ConfirmDialog
-        open={Boolean(shopPartRemoveConfirm)}
+        open={Boolean(
+          shopPartRemoveConfirm
+          && !(shopPartRemoveConfirm.part?.id
+            && !shopPartRemoveConfirm.part?.pending_import
+            && !shopPartRemoveConfirm.part?.pending_cart_import
+            && isEdit
+            && orderId)
+        )}
         onClose={() => {
           if (!detachingShopPartId) setShopPartRemoveConfirm(null);
         }}
@@ -3162,6 +3356,155 @@ export default function AutoserviceOrderFormPage() {
         danger
         loading={Boolean(detachingShopPartId)}
       />
+
+      <Modal
+        open={Boolean(
+          shopPartRemoveConfirm?.part?.id
+          && !shopPartRemoveConfirm.part?.pending_import
+          && !shopPartRemoveConfirm.part?.pending_cart_import
+          && isEdit
+          && orderId
+        )}
+        onClose={() => {
+          if (!detachingShopPartId) setShopPartRemoveConfirm(null);
+        }}
+        title="Позиция заказ-наряда"
+        size="sm"
+        wrapperZIndex="var(--sg-z-modal-elevated-shell)"
+        footer={(
+          <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
+            <Button
+              variant="secondary"
+              onClick={() => setShopPartRemoveConfirm(null)}
+              disabled={Boolean(detachingShopPartId)}
+              className="max-md:min-h-11"
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="soft"
+              onClick={openShopPartReturnForm}
+              disabled={Boolean(detachingShopPartId)}
+              className="max-md:min-h-11"
+            >
+              Вернуть
+            </Button>
+            <Button
+              variant="danger"
+              loading={Boolean(detachingShopPartId)}
+              onClick={confirmRemoveShopPart}
+              className="max-md:min-h-11"
+            >
+              Удалить из заказ-наряда
+            </Button>
+          </div>
+        )}
+      >
+        {shopPartRemoveConfirm?.part ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-ink">
+              {shopPartDisplayName(shopPartRemoveConfirm.part) || shopPartRemoveConfirm.part.title || 'Запчасть'}
+            </p>
+            <p className="text-sm text-ink-soft">
+              Количество: {shopPartRemoveConfirm.part.qty} {formatShopPartUnit(shopPartRemoveConfirm.part.unit || 'pcs')}
+            </p>
+            <p className="text-sm text-ink-muted">
+              {shopPartRemoveConfirm.part.return_kind === 'rossko'
+                ? '«Вернуть» оформит заявку на возврат поставщику.'
+                : '«Вернуть» спишет позицию с пометкой «Возврат».'}
+            </p>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(shopPartReturnForm)}
+        onClose={() => {
+          if (!returningShopPartId) setShopPartReturnForm(null);
+        }}
+        title={shopPartReturnForm?.part?.return_kind === 'rossko'
+          ? 'Возврат поставщику'
+          : 'Возврат позиции'}
+        size="sm"
+        wrapperZIndex="var(--sg-z-modal-elevated-shell)"
+        footer={(
+          <div className="flex flex-wrap justify-end gap-2 max-md:flex-col">
+            <Button
+              variant="secondary"
+              onClick={() => setShopPartReturnForm(null)}
+              disabled={Boolean(returningShopPartId)}
+              className="max-md:min-h-11"
+            >
+              Отмена
+            </Button>
+            <Button
+              loading={Boolean(returningShopPartId)}
+              onClick={confirmReturnShopPart}
+              className="max-md:min-h-11"
+            >
+              Оформить возврат
+            </Button>
+          </div>
+        )}
+      >
+        {shopPartReturnForm?.part ? (
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              confirmReturnShopPart();
+            }}
+          >
+            <div className="rounded-sg bg-surface-muted px-4 py-3 text-sm text-ink-soft">
+              <p className="font-medium text-ink">
+                {shopPartDisplayName(shopPartReturnForm.part) || shopPartReturnForm.part.title || 'Запчасть'}
+              </p>
+              <p className="mt-1">
+                В наличии в заказ-наряде: {shopPartReturnForm.part.qty}{' '}
+                {formatShopPartUnit(shopPartReturnForm.part.unit || 'pcs')}
+              </p>
+            </div>
+            <label className="block text-sm font-medium text-ink-soft">
+              Количество
+              <NumericInput
+                mode="numeric"
+                maxLength={String(Math.ceil(Number(shopPartReturnForm.part.qty) || 1)).length}
+                value={shopPartReturnForm.qty}
+                onChange={(event) => setShopPartReturnForm((prev) => (prev ? { ...prev, qty: event.target.value } : prev))}
+                className="sg-pill-input mt-1 w-full"
+                required
+              />
+            </label>
+            {shopPartReturnForm.part.return_kind === 'rossko' ? (
+              <>
+                <label className="block text-sm font-medium text-ink-soft">
+                  Причина
+                  <select
+                    value={shopPartReturnForm.reason}
+                    onChange={(event) => setShopPartReturnForm((prev) => (prev ? { ...prev, reason: event.target.value } : prev))}
+                    className="sg-pill-select mt-1 w-full"
+                  >
+                    <option value="defect">Брак / неисправность</option>
+                    <option value="wrong_item">Не тот товар</option>
+                    <option value="not_as_described">Не соответствует описанию</option>
+                    <option value="changed_mind">Передумали</option>
+                    <option value="other">Другое</option>
+                  </select>
+                </label>
+                <label className="block text-sm font-medium text-ink-soft">
+                  Комментарий
+                  <textarea
+                    value={shopPartReturnForm.comment}
+                    onChange={(event) => setShopPartReturnForm((prev) => (prev ? { ...prev, comment: event.target.value } : prev))}
+                    rows={3}
+                    className="sg-pill-textarea mt-1 w-full"
+                  />
+                </label>
+              </>
+            ) : null}
+          </form>
+        ) : null}
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(lineDeleteConfirm)}
