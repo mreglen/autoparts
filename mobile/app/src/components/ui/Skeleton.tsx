@@ -39,7 +39,7 @@ export function Skeleton({
     <Animated.View
       className={className}
       style={[
-        { backgroundColor: colors.surfaceSubtle, borderRadius: 8 },
+        { backgroundColor: colors.line, borderRadius: 8 },
         style,
         { opacity },
       ]}
@@ -48,13 +48,18 @@ export function Skeleton({
 }
 
 export function SkeletonRows({ count = 5 }: { count?: number }) {
+  const { colors } = useTheme();
   return (
     <View className="gap-3">
       {Array.from({ length: count }).map((_, i) => (
         <View
           key={i}
-          className="gap-2 rounded-xl p-3"
-          style={{ backgroundColor: "transparent" }}
+          className="gap-2 rounded-xl p-3.5"
+          style={{
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.line,
+          }}
         >
           <Skeleton className="h-4 w-3/5" />
           <Skeleton className="h-3 w-2/5" />

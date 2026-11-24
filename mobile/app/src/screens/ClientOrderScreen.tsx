@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Ionicons } from "@expo/vector-icons";
 
 import {
   fetchMyRepairOrder,
@@ -10,6 +9,8 @@ import {
 } from "../api/clientAccount";
 import { describeError } from "../api/errors";
 import {
+  Button,
+  Card,
   Screen,
   SkeletonRows,
   StaleDataBadge,
@@ -24,6 +25,7 @@ import {
   formatTime,
   normalizeOrderStatus,
 } from "../utils/format";
+import { AppText as Text } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ClientOrder">;
 
@@ -180,10 +182,7 @@ export function ClientOrderScreen({ route }: Props) {
     <Screen>
       {stale != null ? <StaleDataBadge fetchedAt={stale} /> : null}
 
-      <View
-        className="rounded-xl px-4 py-3"
-        style={{ backgroundColor: colors.surfaceSubtle }}
-      >
+      <Card className="px-4 py-3">
         <View className="flex-row items-center justify-between">
           <Text className="text-lg font-semibold" style={{ color: colors.ink }}>
             {order.order_number
@@ -241,15 +240,12 @@ export function ClientOrderScreen({ route }: Props) {
             </Text>
           ) : null}
         </View>
-      </View>
+      </Card>
 
       {works.length > 0 ? (
         <>
           <SectionTitle>Работы</SectionTitle>
-          <View
-            className="rounded-xl px-4"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
+          <Card padded={false} className="px-4">
             {works.map((w) => (
               <ItemRow
                 key={w.id}
@@ -258,17 +254,14 @@ export function ClientOrderScreen({ route }: Props) {
                 right={formatMoney(w.line_sum)}
               />
             ))}
-          </View>
+          </Card>
         </>
       ) : null}
 
       {clientParts.length > 0 ? (
         <>
           <SectionTitle>Клиентские запчасти</SectionTitle>
-          <View
-            className="rounded-xl px-4"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
+          <Card padded={false} className="px-4">
             {clientParts.map((p) => (
               <ItemRow
                 key={p.id}
@@ -278,17 +271,14 @@ export function ClientOrderScreen({ route }: Props) {
                 }
               />
             ))}
-          </View>
+          </Card>
         </>
       ) : null}
 
       {shopParts.length > 0 ? (
         <>
           <SectionTitle>Запчасти магазина</SectionTitle>
-          <View
-            className="rounded-xl px-4"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
+          <Card padded={false} className="px-4">
             {shopParts.map((p) => (
               <ItemRow
                 key={p.id}
@@ -299,17 +289,14 @@ export function ClientOrderScreen({ route }: Props) {
                 right={formatMoney(p.line_sum)}
               />
             ))}
-          </View>
+          </Card>
         </>
       ) : null}
 
       {deliveries.length > 0 ? (
         <>
           <SectionTitle>Доставки</SectionTitle>
-          <View
-            className="rounded-xl px-4"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
+          <Card padded={false} className="px-4">
             {deliveries.map((d) => (
               <ItemRow
                 key={d.id}
@@ -317,15 +304,12 @@ export function ClientOrderScreen({ route }: Props) {
                 right={formatMoney(d.price)}
               />
             ))}
-          </View>
+          </Card>
         </>
       ) : null}
 
       <SectionTitle>Итого</SectionTitle>
-      <View
-        className="rounded-xl px-4 py-2"
-        style={{ backgroundColor: colors.surfaceSubtle }}
-      >
+      <Card className="px-4 py-2">
         {works.length > 0 ? (
           <MoneyLine label="Работы" value={order.works_total} />
         ) : null}
@@ -359,43 +343,27 @@ export function ClientOrderScreen({ route }: Props) {
             {formatMoney(order.grand_total)}
           </Text>
         </View>
-      </View>
+      </Card>
 
       {order.client_comment ? (
         <>
           <SectionTitle>Комментарий</SectionTitle>
-          <View
-            className="rounded-xl px-4 py-3"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
+          <Card>
             <Text className="text-sm" style={{ color: colors.inkSoft }}>
               {order.client_comment}
             </Text>
-          </View>
+          </Card>
         </>
       ) : null}
 
-      <Pressable
+      <Button
+        title={pdfBusy ? "Формирование PDF…" : "Счёт-заказ (PDF)"}
+        variant="secondary"
+        icon={pdfBusy ? "hourglass-outline" : "document-outline"}
+        loading={pdfBusy}
+        className="mt-6"
         onPress={() => void openPdf()}
-        disabled={pdfBusy}
-        className="mt-6 flex-row items-center justify-center gap-2 rounded-xl py-3.5"
-        style={{
-          backgroundColor: colors.surfaceSubtle,
-          opacity: pdfBusy ? 0.6 : 1,
-        }}
-      >
-        <Ionicons
-          name={pdfBusy ? "hourglass-outline" : "document-outline"}
-          size={18}
-          color={colors.brand}
-        />
-        <Text
-          className="text-base font-semibold"
-          style={{ color: colors.brand }}
-        >
-          {pdfBusy ? "Формирование PDF…" : "Счёт-заказ (PDF)"}
-        </Text>
-      </Pressable>
+      />
     </Screen>
   );
 }

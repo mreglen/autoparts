@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -23,7 +17,12 @@ import {
 } from "../api/orders";
 import { ApiError } from "../api/errors";
 import {
+  AppHeader,
+  Button,
+  Card,
+  Chip,
   DateField,
+  EmptyState,
   Screen,
   Sheet,
   SkeletonRows,
@@ -46,6 +45,7 @@ import {
   listOrderDrafts,
   type OrderFormDraft,
 } from "../utils/orderDrafts";
+import { AppText as Text } from "../components/ui/AppText";
 
 const PAGE_SIZE = 50;
 const NONE_ZONE = "none" as const;
@@ -243,83 +243,56 @@ export function OrdersScreen() {
 
   return (
     <Screen scroll={false}>
-      <View className="mb-2 flex-row items-center justify-between">
-        <Text className="text-lg font-semibold" style={{ color: colors.ink }}>
-          Заказ-наряды
-        </Text>
-        <View className="flex-row items-center gap-2">
-          {total > 0 ? (
-            <Text className="text-xs" style={{ color: colors.inkMuted }}>
-              {total}
-            </Text>
-          ) : null}
-          {staleAt ? <StaleDataBadge fetchedAt={staleAt} /> : null}
-        </View>
-      </View>
-
-      <View className="mb-2 flex-row flex-wrap gap-1">
-        {STATUS_OPTIONS.map((s) => {
-          const active = filters.statuses.includes(s.value);
-          return (
-            <Pressable
-              key={s.value}
-              onPress={() =>
-                patchFilters({ statuses: toggleIn(filters.statuses, s.value) })
-              }
-              className="rounded-full px-4 py-1.5"
-              style={{
-                backgroundColor: active ? colors.brand : colors.surfaceSubtle,
-              }}
-            >
-              <Text
-                className="text-xs font-medium"
-                style={{ color: active ? "#fff" : colors.inkSoft }}
-              >
-                {s.label}
+      <AppHeader
+        title="Заказ-наряды"
+        right={
+          <View className="flex-row items-center gap-2">
+            {total > 0 ? (
+              <Text className="text-xs" style={{ color: colors.inkMuted }}>
+                {total}
               </Text>
-            </Pressable>
-          );
-        })}
-        {filtersDirty ? (
-          <Pressable
-            onPress={() => setFilters(DEFAULT_FILTERS)}
-            className="rounded-full px-4 py-1.5"
-            style={{ backgroundColor: colors.dangerSoft }}
-          >
-            <Text
-              className="text-xs font-medium"
-              style={{ color: colors.danger }}
-            >
-              Сбросить
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+            ) : null}
+            {staleAt ? <StaleDataBadge fetchedAt={staleAt} /> : null}
+          </View>
+        }
+      />
 
-      <View className="mb-3 flex-row items-center gap-3">
-        <Pressable
-          onPress={() => setSheetOpen(true)}
-          className="flex-row items-center gap-1.5 rounded-full px-2 py-0.5"
-          style={{ backgroundColor: colors.surfaceSubtle }}
-        >
-          <Ionicons
-            name="options-outline"
-            size={12}
-            color={activeFilterCount ? colors.brand : colors.inkMuted}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mb-2 -mx-4 px-4"
+        contentContainerStyle={{ gap: 8 }}
+      >
+        {STATUS_OPTIONS.map((s) => (
+          <Chip
+            key={s.value}
+            label={s.label}
+            selected={filters.statuses.includes(s.value)}
+            onPress={() =>
+              patchFilters({ statuses: toggleIn(filters.statuses, s.value) })
+            }
           />
-          <Text
-            className="text-[10px] font-medium"
-            style={{ color: activeFilterCount ? colors.brand : colors.inkSoft }}
-          >
-            Фильтры{activeFilterCount ? ` · ${activeFilterCount}` : ""}
-          </Text>
-        </Pressable>
+        ))}
+        {filtersDirty ? (
+          <Chip label="Сбросить" onPress={() => setFilters(DEFAULT_FILTERS)} />
+        ) : null}
+      </ScrollView>
+
+      <View className="mb-3 flex-row items-center gap-2">
+        <Chip
+          label={`Фильтры${activeFilterCount ? ` · ${activeFilterCount}` : ""}`}
+          icon="options-outline"
+          selected={activeFilterCount > 0}
+          onPress={() => setSheetOpen(true)}
+        />
         {(["scheduled_at", "scheduled_end_at"] as const).map((key) => {
           const label = key === "scheduled_at" ? "Начало" : "Конец";
           const active = filters.sortBy === key;
           return (
-            <Pressable
+            <Chip
               key={key}
+              label={`${label}${active ? (filters.sortDir === "asc" ? " ↑" : " ↓") : ""}`}
+              selected={active}
               onPress={() =>
                 patchFilters({
                   sortBy: key,
@@ -330,25 +303,7 @@ export function OrdersScreen() {
                     : "asc",
                 })
               }
-              className="flex-row items-center gap-0.5 rounded-full px-2 py-0.5"
-              style={{
-                backgroundColor: active ? colors.brandSoft : "transparent",
-              }}
-            >
-              <Text
-                className="text-[10px] font-medium"
-                style={{ color: active ? colors.brand : colors.inkMuted }}
-              >
-                {label}
-              </Text>
-              {active ? (
-                <Ionicons
-                  name={filters.sortDir === "asc" ? "arrow-up" : "arrow-down"}
-                  size={10}
-                  color={colors.brand}
-                />
-              ) : null}
-            </Pressable>
+            />
           );
         })}
       </View>
@@ -384,76 +339,61 @@ export function OrdersScreen() {
             </Pressable>
             {draftsOpen
               ? drafts.map((draft) => (
-              <Pressable
-                key={draft.key}
-                onPress={() => openDraft(draft)}
-                className="flex-row items-center gap-3 rounded-xl p-3"
-                style={{ backgroundColor: colors.warningSoft }}
-              >
-                <Ionicons
-                  name="document-text-outline"
-                  size={18}
-                  color={colors.warning}
-                />
-                <View className="min-w-0 flex-1">
-                  <Text
-                    className="text-sm font-medium"
-                    style={{ color: colors.ink }}
-                    numberOfLines={1}
+                  <Pressable
+                    key={draft.key}
+                    onPress={() => openDraft(draft)}
                   >
-                    {draftTitle(draft)}
-                  </Text>
-                  <Text
-                    className="mt-0.5 text-xs"
-                    style={{ color: colors.inkMuted }}
-                  >
-                    Не отправлен ·{" "}
-                    {new Date(draft.savedAt).toLocaleDateString("ru-RU")}
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={colors.inkFaint}
-                />
-              </Pressable>
-              ))
-            : null}
+                    <Card padded={false}>
+                      <View
+                        className="flex-row items-center gap-3 p-3"
+                        style={{ borderLeftWidth: 3, borderLeftColor: colors.warning }}
+                      >
+                        <Ionicons
+                          name="document-text-outline"
+                          size={18}
+                          color={colors.warning}
+                        />
+                        <View className="min-w-0 flex-1">
+                          <Text
+                            className="text-sm font-medium"
+                            style={{ color: colors.ink }}
+                            numberOfLines={1}
+                          >
+                            {draftTitle(draft)}
+                          </Text>
+                          <Text
+                            className="mt-0.5 text-xs"
+                            style={{ color: colors.inkMuted }}
+                          >
+                            Не отправлен ·{" "}
+                            {new Date(draft.savedAt).toLocaleDateString("ru-RU")}
+                          </Text>
+                        </View>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={16}
+                          color={colors.inkFaint}
+                        />
+                      </View>
+                    </Card>
+                  </Pressable>
+                ))
+              : null}
           </View>
         ) : null}
 
         {loading ? (
           <SkeletonRows count={6} />
         ) : error && items.length === 0 ? (
-          <View className="items-center gap-3 pt-10">
-            <Ionicons
-              name="cloud-offline-outline"
-              size={40}
-              color={colors.inkFaint}
-            />
-            <Text className="text-sm" style={{ color: colors.inkMuted }}>
-              {error}
-            </Text>
-            <Pressable onPress={() => void load("initial")}>
-              <Text
-                className="text-sm font-medium"
-                style={{ color: colors.brand }}
-              >
-                Повторить
-              </Text>
-            </Pressable>
-          </View>
+          <EmptyState
+            icon="cloud-offline-outline"
+            title="Не удалось загрузить"
+            message={error}
+            actionLabel="Повторить"
+            onAction={() => void load("initial")}
+          />
         ) : items.length === 0 ? (
-          <View className="items-center gap-3 pt-10">
-            <Ionicons
-              name="construct-outline"
-              size={40}
-              color={colors.inkFaint}
-            />
-            <Text className="text-sm" style={{ color: colors.inkMuted }}>
-              Заказ-нарядов нет
-            </Text>
-          </View>
+          <EmptyState icon="construct-outline" title="Заказ-нарядов нет" />
         ) : (
           <View className="gap-2">
             {items.map((order) => {
@@ -467,108 +407,103 @@ export function OrdersScreen() {
                 <Pressable
                   key={order.id}
                   onPress={() => openOrder(order)}
-                  className="flex-row items-center gap-3 rounded-xl p-3"
-                  style={{ backgroundColor: colors.surfaceSubtle }}
                 >
-                  <View className="min-w-0 flex-1">
-                    <View className="flex-row items-center gap-2">
-                      <Text
-                        className="text-sm font-semibold"
-                        style={{ color: colors.ink }}
-                        numberOfLines={1}
-                      >
-                        {order.order_number
-                          ? `№${order.order_number}`
-                          : `#${order.id}`}
-                      </Text>
-                      <View
-                        className="rounded-full px-2 py-0.5"
-                        style={{
-                          backgroundColor: orderStatusSoft(
-                            colors,
-                            order.status,
-                          ),
-                        }}
-                      >
+                  <Card padded={false}>
+                    <View className="flex-row items-center gap-3 p-3">
+                      <View className="min-w-0 flex-1">
+                        <View className="flex-row items-center gap-2">
+                          <Text
+                            className="text-sm font-semibold"
+                            style={{ color: colors.ink }}
+                            numberOfLines={1}
+                          >
+                            {order.order_number
+                              ? `№${order.order_number}`
+                              : `#${order.id}`}
+                          </Text>
+                          <View
+                            className="rounded-full px-2 py-0.5"
+                            style={{
+                              backgroundColor: orderStatusSoft(
+                                colors,
+                                order.status,
+                              ),
+                            }}
+                          >
+                            <Text
+                              className="text-[10px] font-medium"
+                              style={{
+                                color: orderStatusColor(colors, order.status),
+                              }}
+                            >
+                              {ORDER_STATUS_LABELS[
+                                normalizeOrderStatus(order.status)
+                              ] ?? order.status}
+                            </Text>
+                          </View>
+                          <View
+                            className="rounded-full px-2 py-0.5"
+                            style={{
+                              backgroundColor: colors.surfaceSubtle,
+                              borderWidth: 1,
+                              borderColor: colors.line,
+                            }}
+                          >
+                            <Text
+                              className="text-[10px] font-medium"
+                              style={{ color: paymentColor(colors, payment) }}
+                            >
+                              {PAYMENT_LABELS[payment]}
+                            </Text>
+                          </View>
+                        </View>
                         <Text
-                          className="text-[10px] font-medium"
-                          style={{
-                            color: orderStatusColor(colors, order.status),
-                          }}
+                          className="mt-0.5 text-xs"
+                          style={{ color: colors.inkMuted }}
+                          numberOfLines={1}
                         >
-                          {ORDER_STATUS_LABELS[
-                            normalizeOrderStatus(order.status)
-                          ] ?? order.status}
+                          {order.client?.name ?? "—"}
+                          {vehicleLabel(order.vehicle)
+                            ? ` · ${vehicleLabel(order.vehicle)}`
+                            : ""}
+                        </Text>
+                        <Text
+                          className="mt-0.5 text-xs"
+                          style={{ color: colors.inkFaint }}
+                          numberOfLines={1}
+                        >
+                          {dates}
+                          {order.work_zone?.name
+                            ? ` · ${order.work_zone.name}`
+                            : ""}
                         </Text>
                       </View>
-                      <View
-                        className="rounded-full px-2 py-0.5"
-                        style={{
-                          backgroundColor: colors.surface,
-                          borderWidth: 1,
-                          borderColor: colors.line,
-                        }}
-                      >
+                      <View className="items-end">
                         <Text
-                          className="text-[10px] font-medium"
-                          style={{ color: paymentColor(colors, payment) }}
+                          className="text-sm font-semibold tabular-nums"
+                          style={{ color: colors.ink }}
                         >
-                          {PAYMENT_LABELS[payment]}
+                          {formatMoney(order.grand_total)}
                         </Text>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={16}
+                          color={colors.inkFaint}
+                          style={{ marginTop: 4 }}
+                        />
                       </View>
                     </View>
-                    <Text
-                      className="mt-0.5 text-xs"
-                      style={{ color: colors.inkMuted }}
-                      numberOfLines={1}
-                    >
-                      {order.client?.name ?? "—"}
-                      {vehicleLabel(order.vehicle)
-                        ? ` · ${vehicleLabel(order.vehicle)}`
-                        : ""}
-                    </Text>
-                    <Text
-                      className="mt-0.5 text-xs"
-                      style={{ color: colors.inkFaint }}
-                      numberOfLines={1}
-                    >
-                      {dates}
-                      {order.work_zone?.name
-                        ? ` · ${order.work_zone.name}`
-                        : ""}
-                    </Text>
-                  </View>
-                  <View className="items-end">
-                    <Text
-                      className="text-sm font-semibold tabular-nums"
-                      style={{ color: colors.ink }}
-                    >
-                      {formatMoney(order.grand_total)}
-                    </Text>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color={colors.inkFaint}
-                      style={{ marginTop: 4 }}
-                    />
-                  </View>
+                  </Card>
                 </Pressable>
               );
             })}
             {hasMore ? (
-              <Pressable
+              <Button
+                title={loadingMore ? "Загрузка…" : "Показать ещё"}
+                variant="secondary"
                 onPress={() => void load("more")}
                 disabled={loadingMore}
-                className="items-center rounded-xl py-3"
-                style={{ backgroundColor: colors.surfaceSubtle }}
-              >
-                <Text
-                  className="text-sm font-medium"
-                  style={{ color: colors.brand }}
-                >
-                  {loadingMore ? "Загрузка…" : "Показать ещё"}
-                </Text>
-              </Pressable>
+              />
             ) : null}
           </View>
         )}
@@ -587,54 +522,25 @@ export function OrdersScreen() {
             Рабочая зона
           </Text>
           <View className="mb-4 flex-row flex-wrap gap-2">
-            {zones.map((zone) => {
-              const active = filters.zoneIds.includes(zone.id);
-              return (
-                <Pressable
-                  key={zone.id}
-                  onPress={() =>
-                    patchFilters({
-                      zoneIds: toggleIn(filters.zoneIds, zone.id),
-                    })
-                  }
-                  className="rounded-full px-3 py-1.5"
-                  style={{
-                    backgroundColor: active
-                      ? colors.brand
-                      : colors.surfaceSubtle,
-                  }}
-                >
-                  <Text
-                    className="text-xs font-medium"
-                    style={{ color: active ? "#fff" : colors.inkSoft }}
-                  >
-                    {zone.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            <Pressable
+            {zones.map((zone) => (
+              <Chip
+                key={zone.id}
+                label={zone.name}
+                selected={filters.zoneIds.includes(zone.id)}
+                onPress={() =>
+                  patchFilters({
+                    zoneIds: toggleIn(filters.zoneIds, zone.id),
+                  })
+                }
+              />
+            ))}
+            <Chip
+              label="Не назначено"
+              selected={filters.zoneIds.includes(NONE_ZONE)}
               onPress={() =>
                 patchFilters({ zoneIds: toggleIn(filters.zoneIds, NONE_ZONE) })
               }
-              className="rounded-full px-3 py-1.5"
-              style={{
-                backgroundColor: filters.zoneIds.includes(NONE_ZONE)
-                  ? colors.brand
-                  : colors.surfaceSubtle,
-              }}
-            >
-              <Text
-                className="text-xs font-medium"
-                style={{
-                  color: filters.zoneIds.includes(NONE_ZONE)
-                    ? "#fff"
-                    : colors.inkSoft,
-                }}
-              >
-                Не назначено
-              </Text>
-            </Pressable>
+            />
           </View>
 
           <Text
@@ -644,30 +550,16 @@ export function OrdersScreen() {
             Оплата
           </Text>
           <View className="mb-4 flex-row flex-wrap gap-2">
-            {PAYMENT_OPTIONS.map((p) => {
-              const active = filters.payments.includes(p);
-              return (
-                <Pressable
-                  key={p}
-                  onPress={() =>
-                    patchFilters({ payments: toggleIn(filters.payments, p) })
-                  }
-                  className="rounded-full px-3 py-1.5"
-                  style={{
-                    backgroundColor: active
-                      ? colors.brand
-                      : colors.surfaceSubtle,
-                  }}
-                >
-                  <Text
-                    className="text-xs font-medium"
-                    style={{ color: active ? "#fff" : colors.inkSoft }}
-                  >
-                    {PAYMENT_LABELS[p]}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            {PAYMENT_OPTIONS.map((p) => (
+              <Chip
+                key={p}
+                label={PAYMENT_LABELS[p]}
+                selected={filters.payments.includes(p)}
+                onPress={() =>
+                  patchFilters({ payments: toggleIn(filters.payments, p) })
+                }
+              />
+            ))}
           </View>
 
           <Text
@@ -689,18 +581,11 @@ export function OrdersScreen() {
             />
           </View>
 
-          <Pressable
+          <Button
+            title="Сбросить фильтры"
+            variant="danger"
             onPress={() => setFilters(DEFAULT_FILTERS)}
-            className="items-center rounded-xl py-3"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
-            <Text
-              className="text-sm font-medium"
-              style={{ color: colors.danger }}
-            >
-              Сбросить фильтры
-            </Text>
-          </Pressable>
+          />
         </ScrollView>
       </Sheet>
 

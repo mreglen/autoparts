@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -13,12 +13,15 @@ import {
 } from "../api/planner";
 import { describeError } from "../api/errors";
 import {
+  Button,
+  Card,
   Screen,
   Sheet,
   SkeletonRows,
   StaleDataBadge,
   useToast,
 } from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import {
@@ -28,7 +31,8 @@ import {
   orderStatusLabel,
   toIsoDate,
 } from "../utils/format";
-import { orderStatusColor } from "../utils/orderStatusColors";
+import { orderStatusColor, orderStatusSoft } from "../utils/orderStatusColors";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 const DAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const CELL_W = 64;
@@ -166,7 +170,7 @@ export function PlannerScreen() {
       <View className="px-4 py-2">
         <View
           className="flex-row items-center gap-2 rounded-xl px-3"
-          style={{ backgroundColor: colors.surfaceSubtle, height: 40 }}
+          style={{ ...inputChrome(colors), height: 40, minHeight: 0 }}
         >
           <Ionicons name="search" size={16} color={colors.inkFaint} />
           <TextInput
@@ -191,14 +195,11 @@ export function PlannerScreen() {
           <Text className="text-sm" style={{ color: colors.inkMuted }}>
             Не удалось загрузить планировщик
           </Text>
-          <Pressable onPress={() => void load(weekStart)} className="mt-3">
-            <Text
-              className="text-sm font-medium"
-              style={{ color: colors.brand }}
-            >
-              Повторить
-            </Text>
-          </Pressable>
+          <Button
+            title="Повторить"
+            variant="secondary"
+            onPress={() => void load(weekStart)}
+          />
         </View>
       ) : (
         <View>
@@ -388,43 +389,50 @@ export function PlannerScreen() {
                 <Pressable
                   key={`${item.kind}-${item.id}`}
                   onPress={() => openItem(item)}
-                  className="mb-2 rounded-xl p-3"
-                  style={{ backgroundColor: colors.surfaceSubtle }}
+                  className="mb-2"
                 >
-                  <View className="flex-row items-center justify-between gap-2">
-                    <Text
-                      className="flex-1 text-sm font-medium"
-                      style={{ color: colors.ink }}
-                      numberOfLines={1}
-                    >
-                      {item.client_name}
-                      {item.order_number ? ` · №${item.order_number}` : ""}
-                    </Text>
-                    <View
-                      className="rounded-full px-2 py-0.5"
-                      style={{ backgroundColor: colors.surface }}
-                    >
+                  <Card padded={false}>
+                    <View className="p-3">
+                      <View className="flex-row items-center justify-between gap-2">
+                        <Text
+                          className="flex-1 text-sm font-medium"
+                          style={{ color: colors.ink }}
+                          numberOfLines={1}
+                        >
+                          {item.client_name}
+                          {item.order_number ? ` · №${item.order_number}` : ""}
+                        </Text>
+                        <View
+                          className="rounded-full px-2 py-0.5"
+                          style={{
+                            backgroundColor: isInspection
+                              ? colors.successSoft
+                              : orderStatusSoft(colors, status),
+                          }}
+                        >
+                          <Text
+                            className="text-[10px] font-medium"
+                            style={{
+                              color: isInspection
+                                ? colors.success
+                                : orderStatusColor(colors, status),
+                            }}
+                          >
+                            {isInspection
+                              ? "Осмотр"
+                              : orderStatusLabel(item.status)}
+                          </Text>
+                        </View>
+                      </View>
                       <Text
-                        className="text-[10px] font-medium"
-                        style={{
-                          color: isInspection
-                            ? colors.success
-                            : orderStatusColor(colors, status),
-                        }}
+                        className="mt-0.5 text-xs"
+                        style={{ color: colors.inkMuted }}
+                        numberOfLines={1}
                       >
-                        {isInspection
-                          ? "Осмотр"
-                          : orderStatusLabel(item.status)}
+                        {itemTime(item)} · {item.vehicle || "—"}
                       </Text>
                     </View>
-                  </View>
-                  <Text
-                    className="mt-0.5 text-xs"
-                    style={{ color: colors.inkMuted }}
-                    numberOfLines={1}
-                  >
-                    {itemTime(item)} · {item.vehicle || "—"}
-                  </Text>
+                  </Card>
                 </Pressable>
               );
             })

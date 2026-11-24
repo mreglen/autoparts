@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Linking, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
@@ -18,15 +11,21 @@ import {
 import { fetchClientVehicles, type FormVehicle } from "../api/orderForm";
 import { describeError } from "../api/errors";
 import {
+  AppHeader,
+  Button,
+  Card,
+  EmptyState,
   Screen,
   Sheet,
   SkeletonRows,
   StaleDataBadge,
   useToast,
 } from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { formatDayMonth, formatMoney } from "../utils/format";
 import { useTheme } from "../theme/useTheme";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Clients">;
 
@@ -109,10 +108,11 @@ export function ClientsScreen(_: Props) {
 
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
+      <AppHeader title="Клиенты" />
       <View className="mb-3 flex-row items-center gap-2">
         <View
           className="flex-1 flex-row items-center gap-2 rounded-xl px-3"
-          style={{ backgroundColor: colors.surfaceSubtle }}
+          style={inputChrome(colors)}
         >
           <Ionicons name="search" size={16} color={colors.inkMuted} />
           <TextInput
@@ -130,79 +130,62 @@ export function ClientsScreen(_: Props) {
       {loading ? (
         <SkeletonRows count={8} />
       ) : rows.length === 0 ? (
-        <Text
-          className="py-8 text-center text-sm"
-          style={{ color: colors.inkMuted }}
-        >
-          Клиенты не найдены
-        </Text>
+        <EmptyState icon="people-outline" title="Клиенты не найдены" />
       ) : (
         <View className="gap-2">
           {rows.map((c) => {
             const debt = num(c.debt_amount);
             return (
-              <Pressable
-                key={c.id}
-                onPress={() => void openClient(c)}
-                className="rounded-2xl p-3"
-                style={{ backgroundColor: colors.surfaceSubtle }}
-              >
-                <View className="flex-row items-center justify-between">
-                  <Text
-                    className="flex-1 text-sm font-semibold"
-                    style={{ color: colors.ink }}
-                    numberOfLines={1}
-                  >
-                    {c.name}
-                  </Text>
-                  {debt > 0 ? (
+              <Pressable key={c.id} onPress={() => void openClient(c)}>
+                <Card padded={false}>
+                  <View className="p-3.5">
+                    <View className="flex-row items-center justify-between">
+                      <Text
+                        className="flex-1 text-sm font-semibold"
+                        style={{ color: colors.ink }}
+                        numberOfLines={1}
+                      >
+                        {c.name}
+                      </Text>
+                      {debt > 0 ? (
+                        <Text
+                          className="ml-2 text-xs font-semibold"
+                          style={{ color: colors.danger }}
+                        >
+                          долг {formatMoney(debt)}
+                        </Text>
+                      ) : null}
+                    </View>
                     <Text
-                      className="ml-2 text-xs font-semibold"
-                      style={{ color: colors.danger }}
+                      className="mt-0.5 text-xs"
+                      style={{ color: colors.inkMuted }}
+                      numberOfLines={1}
                     >
-                      долг {formatMoney(debt)}
+                      {[c.phone, c.matched_vehicle_label]
+                        .filter(Boolean)
+                        .join(" · ") || "—"}
                     </Text>
-                  ) : null}
-                </View>
-                <Text
-                  className="mt-0.5 text-xs"
-                  style={{ color: colors.inkMuted }}
-                  numberOfLines={1}
-                >
-                  {[c.phone, c.matched_vehicle_label]
-                    .filter(Boolean)
-                    .join(" · ") || "—"}
-                </Text>
-                <Text
-                  className="mt-0.5 text-xs"
-                  style={{ color: colors.inkFaint }}
-                >
-                  Заказов: {c.orders_count ?? 0}
-                  {c.last_visit_at
-                    ? ` · последний визит ${formatDayMonth(c.last_visit_at)}`
-                    : ""}
-                </Text>
+                    <Text
+                      className="mt-0.5 text-xs"
+                      style={{ color: colors.inkFaint }}
+                    >
+                      Заказов: {c.orders_count ?? 0}
+                      {c.last_visit_at
+                        ? ` · последний визит ${formatDayMonth(c.last_visit_at)}`
+                        : ""}
+                    </Text>
+                  </View>
+                </Card>
               </Pressable>
             );
           })}
           {hasMore ? (
-            <Pressable
+            <Button
+              title={`Показать ещё${page ? ` (${rows.length}/${page.total})` : ""}`}
+              variant="secondary"
+              loading={loadingMore}
               onPress={() => void loadMore()}
-              disabled={loadingMore}
-              className="items-center rounded-2xl py-3"
-              style={{ backgroundColor: colors.surfaceSubtle }}
-            >
-              {loadingMore ? (
-                <ActivityIndicator color={colors.brand} />
-              ) : (
-                <Text
-                  className="text-sm font-medium"
-                  style={{ color: colors.brand }}
-                >
-                  Показать ещё{page ? ` (${rows.length}/${page.total})` : ""}
-                </Text>
-              )}
-            </Pressable>
+            />
           ) : null}
         </View>
       )}
@@ -215,19 +198,12 @@ export function ClientsScreen(_: Props) {
         {selected ? (
           <View className="gap-3">
             {selected.phone ? (
-              <Pressable
+              <Button
+                title={selected.phone}
+                variant="primary"
+                icon="call"
                 onPress={() => void Linking.openURL(`tel:${selected.phone}`)}
-                className="flex-row items-center gap-2 self-start rounded-full px-4 py-2"
-                style={{ backgroundColor: colors.brand }}
-              >
-                <Ionicons name="call" size={16} color="#fff" />
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: "#fff" }}
-                >
-                  {selected.phone}
-                </Text>
-              </Pressable>
+              />
             ) : null}
             <View className="flex-row flex-wrap gap-2">
               {[
@@ -237,21 +213,19 @@ export function ClientsScreen(_: Props) {
                 ["Долг", formatMoney(num(selected.debt_amount))],
                 ["Скидка", `${num(selected.discount_percent)}%`],
               ].map(([label, value]) => (
-                <View
-                  key={label}
-                  className="min-w-[45%] flex-1 rounded-xl p-3"
-                  style={{ backgroundColor: colors.surfaceSubtle }}
-                >
-                  <Text className="text-xs" style={{ color: colors.inkMuted }}>
-                    {label}
-                  </Text>
-                  <Text
-                    className="mt-1 text-sm font-semibold"
-                    style={{ color: colors.ink }}
-                  >
-                    {value}
-                  </Text>
-                </View>
+                <Card key={label} className="min-w-[45%] flex-1" padded={false}>
+                  <View className="p-3">
+                    <Text className="text-xs" style={{ color: colors.inkMuted }}>
+                      {label}
+                    </Text>
+                    <Text
+                      className="mt-1 text-sm font-semibold"
+                      style={{ color: colors.ink }}
+                    >
+                      {value}
+                    </Text>
+                  </View>
+                </Card>
               ))}
             </View>
             <Text

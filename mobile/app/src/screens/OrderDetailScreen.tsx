@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Linking, Pressable, Text, TextInput, View } from "react-native";
+import { Linking, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type {
@@ -25,6 +25,9 @@ import { currentPermissionCodes } from "../auth/permissions";
 import { useSession } from "../auth/session";
 import { describeError } from "../api/errors";
 import {
+  Button,
+  Card,
+  Chip,
   ConfirmDialog,
   DateField,
   Screen,
@@ -33,6 +36,7 @@ import {
   StaleDataBadge,
   useToast,
 } from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import {
@@ -44,6 +48,7 @@ import {
   toIsoDate,
 } from "../utils/format";
 import { orderStatusColor, orderStatusSoft } from "../utils/orderStatusColors";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "OrderDetail">;
 
@@ -92,18 +97,15 @@ function SectionCard({
 }) {
   const { colors } = useTheme();
   return (
-    <View
-      className="mb-3 rounded-xl p-3"
-      style={{ backgroundColor: colors.surfaceSubtle }}
-    >
+    <Card className="mb-3">
       <Text
         className="mb-2 text-xs font-semibold uppercase"
-        style={{ color: colors.inkMuted }}
+        style={{ color: colors.inkMuted, letterSpacing: 0.5 }}
       >
         {title}
       </Text>
       {children}
-    </View>
+    </Card>
   );
 }
 
@@ -325,11 +327,7 @@ export function OrderDetailScreen({ route }: Props) {
             </View>
             <View
               className="rounded-full px-2 py-0.5"
-              style={{
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.line,
-              }}
+              style={{ backgroundColor: colors.surfaceSubtle }}
             >
               <Text
                 className="text-[10px] font-medium"
@@ -348,66 +346,39 @@ export function OrderDetailScreen({ route }: Props) {
 
       <View className="mb-3 flex-row gap-2">
         {order.client?.phone ? (
-          <Pressable
+          <Button
+            title="Позвонить"
+            variant="secondary"
+            icon="call-outline"
+            className="flex-1"
             onPress={callClient}
-            className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
-            <Ionicons name="call-outline" size={16} color={colors.brand} />
-            <Text
-              className="text-sm font-medium"
-              style={{ color: colors.brand }}
-            >
-              Позвонить
-            </Text>
-          </Pressable>
+          />
         ) : null}
         {!closed ? (
-          <Pressable
+          <Button
+            title="Изменить"
+            variant="secondary"
+            icon="create-outline"
+            className="flex-1"
             onPress={() =>
               navigation.navigate("OrderForm", { orderId: order.id })
             }
-            className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
-            <Ionicons name="create-outline" size={16} color={colors.inkSoft} />
-            <Text
-              className="text-sm font-medium"
-              style={{ color: colors.inkSoft }}
-            >
-              Изменить
-            </Text>
-          </Pressable>
-        ) : null}
-        <Pressable
-          onPress={() => void openPdf()}
-          disabled={busy === "pdf"}
-          className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5"
-          style={{ backgroundColor: colors.surfaceSubtle }}
-        >
-          <Ionicons
-            name={busy === "pdf" ? "hourglass-outline" : "document-outline"}
-            size={16}
-            color={colors.inkSoft}
           />
-          <Text
-            className="text-sm font-medium"
-            style={{ color: colors.inkSoft }}
-          >
-            {busy === "pdf" ? "PDF…" : "PDF"}
-          </Text>
-        </Pressable>
+        ) : null}
+        <Button
+          title={busy === "pdf" ? "PDF…" : "PDF"}
+          variant="secondary"
+          icon={busy === "pdf" ? "hourglass-outline" : "document-outline"}
+          className="flex-1"
+          onPress={() => void openPdf()}
+        />
         {allowedActions.length > 0 ? (
-          <Pressable
+          <Button
+            title="Статус"
+            icon="swap-horizontal-outline"
+            className="flex-1"
             onPress={() => setActionSheet(true)}
-            className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5"
-            style={{ backgroundColor: colors.brand }}
-          >
-            <Ionicons name="swap-horizontal-outline" size={16} color="#fff" />
-            <Text className="text-sm font-medium" style={{ color: "#fff" }}>
-              Статус
-            </Text>
-          </Pressable>
+          />
         ) : null}
       </View>
 
@@ -456,7 +427,7 @@ export function OrderDetailScreen({ route }: Props) {
             <View
               key={work.id}
               className="mb-2 rounded-lg p-2.5"
-              style={{ backgroundColor: colors.surface }}
+              style={{ backgroundColor: colors.surfaceSubtle }}
             >
               <View className="flex-row items-start justify-between gap-2">
                 <Text
@@ -653,19 +624,13 @@ export function OrderDetailScreen({ route }: Props) {
             ))
           )}
           {!closed && Number(order.remaining_amount ?? 0) > 0 ? (
-            <Pressable
+            <Button
+              title={`Добавить оплату · остаток ${formatMoney(order.remaining_amount)}`}
+              variant="secondary"
+              icon="add"
+              className="mt-2"
               onPress={openPaySheet}
-              className="mt-2 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5"
-              style={{ backgroundColor: colors.brandSoft }}
-            >
-              <Ionicons name="add" size={16} color={colors.brand} />
-              <Text
-                className="text-sm font-medium"
-                style={{ color: colors.brand }}
-              >
-                Добавить оплату · остаток {formatMoney(order.remaining_amount)}
-              </Text>
-            </Pressable>
+            />
           ) : null}
         </SectionCard>
       ) : null}
@@ -682,23 +647,25 @@ export function OrderDetailScreen({ route }: Props) {
               onPress={() =>
                 setPendingAction({ status: a.value, label: a.label })
               }
-              className="flex-row items-center gap-3 rounded-xl px-3 py-3"
-              style={{ backgroundColor: colors.surfaceSubtle }}
             >
-              <Ionicons
-                name={
-                  a.value === "cancelled"
-                    ? "close-circle-outline"
-                    : a.value === "completed"
-                      ? "checkmark-done-outline"
-                      : "arrow-forward-circle-outline"
-                }
-                size={18}
-                color={colors.inkSoft}
-              />
-              <Text className="text-base" style={{ color: colors.ink }}>
-                {a.label}
-              </Text>
+              <Card padded={false}>
+                <View className="flex-row items-center gap-3 p-3">
+                  <Ionicons
+                    name={
+                      a.value === "cancelled"
+                        ? "close-circle-outline"
+                        : a.value === "completed"
+                          ? "checkmark-done-outline"
+                          : "arrow-forward-circle-outline"
+                    }
+                    size={18}
+                    color={colors.inkSoft}
+                  />
+                  <Text className="text-base" style={{ color: colors.ink }}>
+                    {a.label}
+                  </Text>
+                </View>
+              </Card>
             </Pressable>
           ))}
         </View>
@@ -738,22 +705,12 @@ export function OrderDetailScreen({ route }: Props) {
           </Text>
           <View className="flex-row gap-2">
             {(["cash", "card", "bank"] as const).map((m) => (
-              <Pressable
+              <Chip
                 key={m}
+                label={PAYMENT_METHOD_LABELS[m]}
+                selected={payMethod === m}
                 onPress={() => setPayMethod(m)}
-                className="flex-1 items-center rounded-xl py-2.5"
-                style={{
-                  backgroundColor:
-                    payMethod === m ? colors.brand : colors.surfaceSubtle,
-                }}
-              >
-                <Text
-                  className="text-xs font-medium"
-                  style={{ color: payMethod === m ? "#fff" : colors.inkSoft }}
-                >
-                  {PAYMENT_METHOD_LABELS[m]}
-                </Text>
-              </Pressable>
+              />
             ))}
           </View>
           <View>
@@ -770,10 +727,7 @@ export function OrderDetailScreen({ route }: Props) {
               placeholder="0"
               placeholderTextColor={colors.inkFaint}
               className="rounded-xl px-4 py-3 text-base"
-              style={{
-                backgroundColor: colors.surfaceSubtle,
-                color: colors.ink,
-              }}
+              style={inputChrome(colors)}
             />
           </View>
           <DateField
@@ -781,19 +735,11 @@ export function OrderDetailScreen({ route }: Props) {
             value={payDate}
             onChangeText={setPayDate}
           />
-          <Pressable
+          <Button
+            title={payBusy ? "Сохранение…" : "Добавить оплату"}
+            loading={payBusy}
             onPress={() => void submitPayment()}
-            disabled={payBusy}
-            className="items-center rounded-xl py-3.5"
-            style={{
-              backgroundColor: colors.brand,
-              opacity: payBusy ? 0.6 : 1,
-            }}
-          >
-            <Text className="text-sm font-semibold text-white">
-              {payBusy ? "Сохранение…" : "Добавить оплату"}
-            </Text>
-          </Pressable>
+          />
         </View>
       </Sheet>
     </Screen>

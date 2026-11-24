@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Linking, Pressable, Text, View } from "react-native";
+import { Linking, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
@@ -16,6 +16,9 @@ import { currentPermissionCodes } from "../auth/permissions";
 import { useSession } from "../auth/session";
 import { describeError } from "../api/errors";
 import {
+  AppHeader,
+  Button,
+  Card,
   ConfirmDialog,
   Screen,
   Sheet,
@@ -26,10 +29,15 @@ import {
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import { formatDayMonth } from "../utils/format";
+import { AppText as Text } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "BookingDetail">;
 
-const NEXT_ACTIONS: { status: string; label: string; icon: string }[] = [
+const NEXT_ACTIONS: {
+  status: string;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
   {
     status: "confirmed",
     label: "Подтвердить",
@@ -178,22 +186,13 @@ export function BookingDetailScreen({ route, navigation }: Props) {
 
   return (
     <Screen>
-      <View className="mb-4 flex-row items-start justify-between">
-        <View className="flex-1">
-          <Text className="text-xl font-bold" style={{ color: colors.ink }}>
-            {booking.name}
-          </Text>
-          <Text className="mt-0.5 text-sm" style={{ color: colors.inkMuted }}>
-            {bookingStatusLabel(booking.status)}
-          </Text>
-        </View>
-        {staleAt ? <StaleDataBadge fetchedAt={staleAt} /> : null}
-      </View>
+      <AppHeader
+        title={booking.name}
+        subtitle={bookingStatusLabel(booking.status)}
+        right={staleAt ? <StaleDataBadge fetchedAt={staleAt} /> : null}
+      />
 
-      <View
-        className="rounded-xl p-4"
-        style={{ backgroundColor: colors.surfaceSubtle }}
-      >
+      <Card>
         {rows.map((row, i) => (
           <View
             key={row.label}
@@ -211,69 +210,45 @@ export function BookingDetailScreen({ route, navigation }: Props) {
             </Text>
           </View>
         ))}
-      </View>
+      </Card>
 
       {booking.phone ? (
-        <Pressable
-          onPress={() => void Linking.openURL(`tel:${booking.phone}`)}
-          className="mt-3 flex-row items-center justify-center gap-2 rounded-xl py-3"
-          style={{ backgroundColor: colors.surfaceSubtle }}
-        >
-          <Ionicons name="call-outline" size={16} color={colors.brand} />
-          <Text className="text-sm font-medium" style={{ color: colors.brand }}>
-            Позвонить
-          </Text>
-        </Pressable>
+        <View className="mt-3">
+          <Button
+            title="Позвонить"
+            variant="secondary"
+            icon="call-outline"
+            onPress={() => void Linking.openURL(`tel:${booking.phone}`)}
+          />
+        </View>
       ) : null}
 
       {allowedActions.length > 0 || booking.phone ? (
         <View className="mt-4 gap-2">
           {booking.status === "new" && canConfirm ? (
-            <Pressable
+            <Button
+              title={busy === "confirm" ? "Подтверждение…" : "Подтвердить запись"}
+              variant="primary"
+              loading={busy === "confirm"}
+              disabled={busy !== null && busy !== "confirm"}
               onPress={() => void confirmBooking()}
-              disabled={busy !== null}
-              className="items-center rounded-xl py-3.5"
-              style={{
-                backgroundColor: colors.success,
-                opacity: busy ? 0.6 : 1,
-              }}
-            >
-              <Text className="text-base font-semibold text-white">
-                {busy === "confirm" ? "Подтверждение…" : "Подтвердить запись"}
-              </Text>
-            </Pressable>
+            />
           ) : null}
 
-          <Pressable
+          <Button
+            title="Другие действия"
+            variant="outline"
             onPress={() => setActionSheet(true)}
-            className="items-center rounded-xl py-3"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
-            <Text
-              className="text-sm font-medium"
-              style={{ color: colors.inkSoft }}
-            >
-              Другие действия
-            </Text>
-          </Pressable>
+          />
 
           {booking.phone ? (
-            <Pressable
+            <Button
+              title={busy === "sms" ? "Отправка SMS…" : "Отправить SMS"}
+              variant="outline"
+              loading={busy === "sms"}
+              disabled={busy !== null && busy !== "sms"}
               onPress={() => void sendSms()}
-              disabled={busy !== null}
-              className="items-center rounded-xl py-3"
-              style={{
-                backgroundColor: colors.surfaceSubtle,
-                opacity: busy ? 0.6 : 1,
-              }}
-            >
-              <Text
-                className="text-sm font-medium"
-                style={{ color: colors.inkSoft }}
-              >
-                {busy === "sms" ? "Отправка SMS…" : "Отправить SMS"}
-              </Text>
-            </Pressable>
+            />
           ) : null}
         </View>
       ) : null}
@@ -285,42 +260,26 @@ export function BookingDetailScreen({ route, navigation }: Props) {
       >
         <View className="gap-2">
           {canOrders ? (
-            <Pressable
+            <Button
+              title="Создать заказ-наряд"
+              variant="secondary"
+              icon="construct-outline"
               onPress={() => {
                 setActionSheet(false);
                 navigation.navigate("OrderForm", { bookingId: id });
               }}
-              className="flex-row items-center gap-3 rounded-xl px-3 py-3"
-              style={{ backgroundColor: colors.surfaceSubtle }}
-            >
-              <Ionicons
-                name="construct-outline"
-                size={18}
-                color={colors.inkSoft}
-              />
-              <Text className="text-base" style={{ color: colors.ink }}>
-                Создать заказ-наряд
-              </Text>
-            </Pressable>
+            />
           ) : null}
           {NEXT_ACTIONS.filter((a) => allowedActions.includes(a)).map((a) => (
-            <Pressable
+            <Button
               key={a.status}
+              title={a.label}
+              variant="outline"
+              icon={a.icon}
               onPress={() =>
                 setPendingAction({ status: a.status, label: a.label })
               }
-              className="flex-row items-center gap-3 rounded-xl px-3 py-3"
-              style={{ backgroundColor: colors.surfaceSubtle }}
-            >
-              <Ionicons
-                name={a.icon as never}
-                size={18}
-                color={colors.inkSoft}
-              />
-              <Text className="text-base" style={{ color: colors.ink }}>
-                {a.label}
-              </Text>
-            </Pressable>
+            />
           ))}
         </View>
       </Sheet>

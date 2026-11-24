@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -37,6 +29,9 @@ import { useSession } from "../auth/session";
 import { describeError } from "../api/errors";
 import { ExpenseFormSheet } from "../components/finance/ExpenseFormSheet";
 import {
+  AppHeader,
+  Button,
+  Card,
   ConfirmDialog,
   DatePickerField,
   Screen,
@@ -45,6 +40,7 @@ import {
   StaleDataBadge,
   useToast,
 } from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { pageFiltersKey } from "../storage/keys";
 import { usePersistedState } from "../storage/usePersistedState";
@@ -57,6 +53,7 @@ import {
   toDateInputValue,
   toIsoDate,
 } from "../utils/format";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Tab = "receipts" | "expenses" | "debts";
 type ReceiptMethodFilter = "all" | PaymentMethod;
@@ -154,8 +151,12 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-full px-3 py-1.5"
-      style={{ backgroundColor: active ? colors.brand : colors.surfaceSubtle }}
+      className="rounded-full px-3.5 py-1.5"
+      style={{
+        backgroundColor: active ? colors.brand : colors.surface,
+        borderWidth: 1,
+        borderColor: active ? colors.brand : colors.lineStrong,
+      }}
     >
       <Text
         className="text-xs font-medium"
@@ -208,9 +209,11 @@ function FilterButton({
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row items-center gap-1 rounded-full px-3 py-2"
+      className="flex-row items-center gap-1 rounded-full px-3.5 py-1.5"
       style={{
-        backgroundColor: open ? colors.brandSoft : colors.surfaceSubtle,
+        backgroundColor: open ? colors.brandSoft : colors.surface,
+        borderWidth: 1,
+        borderColor: open ? colors.brand : colors.lineStrong,
       }}
       accessibilityRole="button"
       accessibilityLabel="Период"
@@ -256,7 +259,11 @@ function ExportButton({
       onPress={onPress}
       disabled={disabled || busy}
       className="rounded-full p-2"
-      style={{ backgroundColor: colors.surfaceSubtle }}
+      style={{
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.lineStrong,
+      }}
       accessibilityRole="button"
       accessibilityLabel="Экспорт в Excel"
     >
@@ -606,6 +613,7 @@ export function FinanceScreen() {
 
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
+      <AppHeader title="Финансы" />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -652,7 +660,7 @@ export function FinanceScreen() {
       ) : (
         <View
           className="mb-3 flex-row items-center gap-2 rounded-xl px-3"
-          style={{ backgroundColor: colors.surfaceSubtle, height: 42 }}
+          style={{ ...inputChrome(colors), height: 42, minHeight: 0 }}
         >
           <Ionicons name="search" size={16} color={colors.inkFaint} />
           <TextInput
@@ -681,10 +689,7 @@ export function FinanceScreen() {
       ) : null}
 
       {filtersOpen && tab !== "debts" ? (
-        <View
-          className="mb-3 gap-3 rounded-xl p-3"
-          style={{ backgroundColor: colors.surfaceSubtle }}
-        >
+        <Card className="mb-3 gap-3">
           <Text
             className="text-xs font-semibold uppercase"
             style={{ color: colors.inkMuted }}
@@ -720,7 +725,7 @@ export function FinanceScreen() {
               />
             </View>
           </View>
-        </View>
+        </Card>
       ) : null}
 
       {stale ? <StaleDataBadge fetchedAt={stale.fetchedAt} /> : null}
@@ -729,10 +734,7 @@ export function FinanceScreen() {
         <SkeletonRows count={8} />
       ) : tab === "receipts" ? (
         <>
-          <View
-            className="mb-3 rounded-xl p-3"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
+          <Card className="mb-3">
             <View className="flex-row items-center justify-between">
               <Text className="text-sm" style={{ color: colors.inkMuted }}>
                 {method === "all"
@@ -762,7 +764,7 @@ export function FinanceScreen() {
                 )}
               </Text>
             </View>
-          </View>
+          </Card>
           {filteredReceipts.length === 0 ? (
             <Text
               className="py-8 text-center text-sm"
@@ -772,11 +774,7 @@ export function FinanceScreen() {
             </Text>
           ) : (
             filteredReceipts.map((r) => (
-              <View
-                key={r.id}
-                className="mb-2 rounded-xl p-3"
-                style={{ backgroundColor: colors.surfaceSubtle }}
-              >
+              <Card key={r.id} padded={false} className="mb-2 p-3">
                 <Pressable
                   onPress={() => setReceiptDetail(r)}
                   accessibilityRole="button"
@@ -823,16 +821,13 @@ export function FinanceScreen() {
                     Заказ-наряд № {r.repair_order_number}
                   </Text>
                 </Pressable>
-              </View>
+              </Card>
             ))
           )}
         </>
       ) : tab === "expenses" ? (
         <>
-          <View
-            className="mb-3 flex-row items-center justify-between rounded-xl p-3"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
+          <Card className="mb-3 flex-row items-center justify-between">
             <Text className="text-sm" style={{ color: colors.inkMuted }}>
               {expenseArticleFilter === "all"
                 ? "Всего расходов"
@@ -844,7 +839,7 @@ export function FinanceScreen() {
             >
               −{formatMoney(expensesTotal)}
             </Text>
-          </View>
+          </Card>
           {filteredExpenses.length === 0 ? (
             <Text
               className="py-8 text-center text-sm"
@@ -859,10 +854,10 @@ export function FinanceScreen() {
               <Pressable
                 key={e.id}
                 onPress={() => setExpenseDetail(e)}
-                className="mb-2 rounded-xl p-3"
-                style={{ backgroundColor: colors.surfaceSubtle }}
+                className="mb-2"
                 accessibilityRole="button"
               >
+                <Card padded={false} className="p-3">
                 <View className="flex-row items-start justify-between gap-2">
                   <View className="min-w-0 flex-1">
                     <Text
@@ -904,16 +899,14 @@ export function FinanceScreen() {
                     −{formatMoney(e.amount)}
                   </Text>
                 </View>
+                </Card>
               </Pressable>
             ))
           )}
         </>
       ) : (
         <>
-          <View
-            className="mb-3 flex-row items-center justify-between rounded-xl p-3"
-            style={{ backgroundColor: colors.surfaceSubtle }}
-          >
+          <Card className="mb-3 flex-row items-center justify-between">
             <Text className="text-sm" style={{ color: colors.inkMuted }}>
               Долг клиентов
             </Text>
@@ -923,7 +916,7 @@ export function FinanceScreen() {
             >
               {formatMoney(debtTotal)}
             </Text>
-          </View>
+          </Card>
           {debts.length === 0 ? (
             <Text
               className="py-8 text-center text-sm"
@@ -933,10 +926,10 @@ export function FinanceScreen() {
             </Text>
           ) : (
             debts.map((c) => (
-              <View
+              <Card
                 key={c.id}
-                className="mb-2 flex-row items-center rounded-xl p-3"
-                style={{ backgroundColor: colors.surfaceSubtle }}
+                padded={false}
+                className="mb-2 flex-row items-center p-3"
               >
                 <View className="min-w-0 flex-1">
                   <Text
@@ -974,7 +967,7 @@ export function FinanceScreen() {
                     />
                   </Pressable>
                 ) : null}
-              </View>
+              </Card>
             ))
           )}
         </>
@@ -1057,33 +1050,21 @@ export function FinanceScreen() {
               </View>
             ) : null}
             <View className="mt-2 gap-2">
-              <Pressable
+              <Button
+                title="Открыть заказ-наряд"
                 onPress={() => {
                   const id = receiptDetail.repair_order_id;
                   setReceiptDetail(null);
                   openOrder(id);
                 }}
-                className="items-center rounded-xl py-3"
-                style={{ backgroundColor: colors.brand }}
-              >
-                <Text className="text-sm font-semibold text-white">
-                  Открыть заказ-наряд
-                </Text>
-              </Pressable>
+              />
               {canCancelReceipt ? (
-                <Pressable
+                <Button
+                  title={cancelingReceipt ? "Отмена…" : "Отменить поступление"}
+                  variant="danger"
+                  loading={cancelingReceipt}
                   onPress={() => setConfirmCancelReceipt(true)}
-                  disabled={cancelingReceipt}
-                  className="items-center rounded-xl py-3"
-                  style={{ backgroundColor: colors.dangerSoft }}
-                >
-                  <Text
-                    className="text-sm font-medium"
-                    style={{ color: colors.danger }}
-                  >
-                    {cancelingReceipt ? "Отмена…" : "Отменить поступление"}
-                  </Text>
-                </Pressable>
+                />
               ) : null}
             </View>
           </View>
@@ -1122,31 +1103,19 @@ export function FinanceScreen() {
             ) : null}
             {canManageExpenses ? (
               <View className="mt-2 gap-2">
-                <Pressable
+                <Button
+                  title="Редактировать"
                   onPress={() => {
                     setExpenseForm({ open: true, initial: expenseDetail });
                     setExpenseDetail(null);
                   }}
-                  className="items-center rounded-xl py-3"
-                  style={{ backgroundColor: colors.brand }}
-                >
-                  <Text className="text-sm font-semibold text-white">
-                    Редактировать
-                  </Text>
-                </Pressable>
-                <Pressable
+                />
+                <Button
+                  title={deletingExpense ? "Удаление…" : "Удалить расход"}
+                  variant="danger"
+                  loading={deletingExpense}
                   onPress={() => setConfirmDeleteExpense(true)}
-                  disabled={deletingExpense}
-                  className="items-center rounded-xl py-3"
-                  style={{ backgroundColor: colors.dangerSoft }}
-                >
-                  <Text
-                    className="text-sm font-medium"
-                    style={{ color: colors.danger }}
-                  >
-                    {deletingExpense ? "Удаление…" : "Удалить расход"}
-                  </Text>
-                </Pressable>
+                />
               </View>
             ) : null}
           </View>

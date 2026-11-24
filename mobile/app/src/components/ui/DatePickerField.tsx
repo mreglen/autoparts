@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { toIsoDate } from "../../utils/format";
 import { useTheme } from "../../theme/useTheme";
 import { NativeDatePicker } from "./NativeDatePicker";
+import { AppText as Text } from "./AppText";
 
 interface DatePickerFieldProps {
   value: string;
@@ -57,10 +58,11 @@ export function DatePickerField({
         onPress={() => setOpen(true)}
         className="flex-row items-center justify-between rounded-xl px-4"
         style={{
-          backgroundColor: colors.surfaceSubtle,
+          backgroundColor: colors.surface,
           minHeight: 48,
           borderWidth: 1,
-          borderColor: colors.line,
+          borderColor: colors.lineStrong,
+          borderRadius: 12,
         }}
       >
         <Text

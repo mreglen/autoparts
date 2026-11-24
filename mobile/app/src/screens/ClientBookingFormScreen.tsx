@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -11,11 +11,20 @@ import {
   type MyClientOrg,
 } from "../api/clientAccount";
 import { describeError } from "../api/errors";
-import { DateField, ListRow, Screen, useToast } from "../components/ui";
+import {
+  Button,
+  Chip,
+  DateField,
+  ListRow,
+  Screen,
+  useToast,
+} from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { invalidateEntities } from "../offline";
 import { toIsoDate } from "../utils/format";
 import { useTheme } from "../theme/useTheme";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ClientBookingNew">;
 
@@ -95,10 +104,7 @@ export function ClientBookingFormScreen({ navigation }: Props) {
     };
   }, [orgId]);
 
-  const inputStyle = {
-    backgroundColor: colors.surfaceSubtle,
-    color: colors.ink,
-  } as const;
+  const inputStyle = inputChrome(colors);
 
   const submit = async () => {
     setError("");
@@ -152,32 +158,18 @@ export function ClientBookingFormScreen({ navigation }: Props) {
               Автосервис
             </Text>
             <View className="flex-row flex-wrap gap-2">
-              {orgs.map((o) => {
-                const active = o.organization_id === orgId;
-                return (
-                  <Pressable
-                    key={o.organization_id}
-                    onPress={() => {
-                      setOrgId(o.organization_id);
-                      setManualVehicle(false);
-                      setVehicleId(null);
-                    }}
-                    className="rounded-full px-3.5 py-2"
-                    style={{
-                      backgroundColor: active
-                        ? colors.brand
-                        : colors.surfaceSubtle,
-                    }}
-                  >
-                    <Text
-                      className="text-sm font-medium"
-                      style={{ color: active ? "#fff" : colors.inkSoft }}
-                    >
-                      {o.organization_name ?? o.organization_id}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {orgs.map((o) => (
+                <Chip
+                  key={o.organization_id}
+                  label={o.organization_name ?? o.organization_id}
+                  selected={o.organization_id === orgId}
+                  onPress={() => {
+                    setOrgId(o.organization_id);
+                    setManualVehicle(false);
+                    setVehicleId(null);
+                  }}
+                />
+              ))}
             </View>
           </View>
         ) : null}
@@ -214,20 +206,20 @@ export function ClientBookingFormScreen({ navigation }: Props) {
                 }}
                 className="flex-row items-center rounded-xl px-4 py-3"
                 style={{
-                  backgroundColor: manualVehicle
-                    ? colors.brand
-                    : colors.surfaceSubtle,
+                  backgroundColor: colors.surface,
+                  borderWidth: 1,
+                  borderColor: manualVehicle ? colors.brand : colors.lineStrong,
                 }}
               >
                 <Ionicons
                   name="create-outline"
                   size={16}
-                  color={manualVehicle ? "#fff" : colors.inkMuted}
+                  color={manualVehicle ? colors.brand : colors.inkMuted}
                   style={{ marginRight: 8 }}
                 />
                 <Text
                   className="text-sm font-medium"
-                  style={{ color: manualVehicle ? "#fff" : colors.inkSoft }}
+                  style={{ color: manualVehicle ? colors.brand : colors.inkSoft }}
                 >
                   Указать вручную
                 </Text>
@@ -308,16 +300,11 @@ export function ClientBookingFormScreen({ navigation }: Props) {
           </Text>
         ) : null}
 
-        <Pressable
+        <Button
+          title={busy ? "Отправка…" : "Записаться"}
+          loading={busy}
           onPress={() => void submit()}
-          disabled={busy}
-          className="items-center rounded-xl py-3.5"
-          style={{ backgroundColor: colors.brand, opacity: busy ? 0.6 : 1 }}
-        >
-          <Text className="text-base font-semibold text-white">
-            {busy ? "Отправка…" : "Записаться"}
-          </Text>
-        </Pressable>
+        />
       </View>
     </Screen>
   );

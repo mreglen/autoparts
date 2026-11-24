@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import { readJson, writeJson } from "../storage/kv";
 import { THEME_MODE_KEY } from "../storage/keys";
 import { palette } from "./tokens";
+import { mobileBrand } from "./mobile";
 
 export type ThemeMode = "system" | "light" | "dark";
 
@@ -49,8 +50,8 @@ export interface ThemeColors {
 }
 
 const light: ThemeColors = {
-  brand: palette.brand[600],
-  brandSoft: palette.brand[50],
+  brand: mobileBrand[700],
+  brandSoft: mobileBrand[50],
   accent: palette.accent[600],
   surface: palette.surface.DEFAULT,
   surfaceMuted: palette.surface.muted,
@@ -70,8 +71,8 @@ const light: ThemeColors = {
 };
 
 const dark: ThemeColors = {
-  brand: palette.brand[400],
-  brandSoft: "#1e1b4b",
+  brand: mobileBrand[400],
+  brandSoft: "#172554",
   accent: palette.accent[400],
   surface: palette.surface.inverse,
   surfaceMuted: "#1e293b",

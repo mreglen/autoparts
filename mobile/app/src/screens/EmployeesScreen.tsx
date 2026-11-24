@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, Switch, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
@@ -21,6 +14,11 @@ import {
 } from "../api/directory";
 import { describeError } from "../api/errors";
 import {
+  AppHeader,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
   MoneyField,
   Screen,
   Sheet,
@@ -28,8 +26,10 @@ import {
   StaleDataBadge,
   useToast,
 } from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Employees">;
 
@@ -62,10 +62,7 @@ function EmployeeForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const inputStyle = {
-    backgroundColor: colors.surfaceSubtle,
-    color: colors.ink,
-  } as const;
+  const inputStyle = inputChrome(colors);
 
   const num = (s: string) => Number(String(s).replace(",", ".")) || 0;
 
@@ -139,26 +136,14 @@ function EmployeeForm({
         Тип оплаты
       </Text>
       <View className="flex-row flex-wrap gap-2">
-        {SALARY_TYPES.map((t) => {
-          const active = salaryType === t;
-          return (
-            <Pressable
-              key={t}
-              onPress={() => setSalaryType(t)}
-              className="rounded-full px-4 py-2"
-              style={{
-                backgroundColor: active ? colors.brand : colors.surfaceSubtle,
-              }}
-            >
-              <Text
-                className="text-sm font-medium"
-                style={{ color: active ? "#fff" : colors.inkSoft }}
-              >
-                {SALARY_TYPE_LABELS[t]}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {SALARY_TYPES.map((t) => (
+          <Chip
+            key={t}
+            label={SALARY_TYPE_LABELS[t]}
+            selected={salaryType === t}
+            onPress={() => setSalaryType(t)}
+          />
+        ))}
       </View>
       <View className="flex-row gap-2">
         <MoneyField
@@ -194,20 +179,11 @@ function EmployeeForm({
           trackColor={{ false: colors.surfaceSubtle, true: colors.brand }}
         />
       </View>
-      <Pressable
+      <Button
+        title={initial ? "Сохранить" : "Добавить"}
         onPress={() => void save()}
-        disabled={busy}
-        className="items-center rounded-xl py-3.5"
-        style={{ backgroundColor: colors.brand, opacity: busy ? 0.6 : 1 }}
-      >
-        {busy ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text className="text-base font-semibold" style={{ color: "#fff" }}>
-            {initial ? "Сохранить" : "Добавить"}
-          </Text>
-        )}
-      </Pressable>
+        loading={busy}
+      />
     </View>
   );
 }
@@ -246,78 +222,70 @@ export function EmployeesScreen(_: Props) {
 
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
-      <View className="mb-3 flex-row items-center justify-between">
-        <Text className="text-lg font-bold" style={{ color: colors.ink }}>
-          Сотрудники
-        </Text>
-        <View className="flex-row items-center gap-2">
-          <StaleDataBadge fetchedAt={stale} />
-          <Pressable
-            onPress={() => setEditing("new")}
-            className="flex-row items-center gap-1 rounded-full px-3 py-1.5"
-            style={{ backgroundColor: colors.brand }}
-          >
-            <Ionicons name="add" size={16} color="#fff" />
-            <Text className="text-sm font-semibold" style={{ color: "#fff" }}>
-              Добавить
-            </Text>
-          </Pressable>
-        </View>
-      </View>
+      <AppHeader
+        title="Сотрудники"
+        right={
+          <View className="flex-row items-center gap-2">
+            <StaleDataBadge fetchedAt={stale} />
+            <Pressable
+              onPress={() => setEditing("new")}
+              className="flex-row items-center gap-1 rounded-full px-3 py-1.5"
+              style={{ backgroundColor: colors.brand }}
+            >
+              <Ionicons name="add" size={16} color="#fff" />
+              <Text className="text-sm font-semibold" style={{ color: "#fff" }}>
+                Добавить
+              </Text>
+            </Pressable>
+          </View>
+        }
+      />
 
       {loading ? (
         <SkeletonRows count={6} />
       ) : rows.length === 0 ? (
-        <Text
-          className="py-8 text-center text-sm"
-          style={{ color: colors.inkMuted }}
-        >
-          Сотрудники не добавлены
-        </Text>
+        <EmptyState icon="people-outline" title="Сотрудники не добавлены" />
       ) : (
         <View className="gap-2">
           {rows.map((e) => (
-            <Pressable
-              key={e.id}
-              onPress={() => setEditing(e)}
-              className="flex-row items-center gap-3 rounded-2xl p-3"
-              style={{
-                backgroundColor: colors.surfaceSubtle,
-                opacity: e.is_active ? 1 : 0.55,
-              }}
-            >
-              <View
-                className="h-10 w-10 items-center justify-center rounded-full"
-                style={{
-                  backgroundColor: colors.brandSoft ?? colors.surfaceSubtle,
-                }}
+            <Pressable key={e.id} onPress={() => setEditing(e)}>
+              <Card
+                padded={false}
+                style={{ opacity: e.is_active ? 1 : 0.55 }}
               >
-                <Ionicons name="person" size={18} color={colors.brand} />
-              </View>
-              <View className="flex-1">
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: colors.ink }}
-                >
-                  {e.name}
-                  {!e.is_active ? " · неактивен" : ""}
-                </Text>
-                <Text className="text-xs" style={{ color: colors.inkMuted }}>
-                  {[e.position, e.phone].filter(Boolean).join(" · ") || "—"}
-                </Text>
-                <Text className="text-xs" style={{ color: colors.inkFaint }}>
-                  {SALARY_TYPE_LABELS[e.salary_type] ?? e.salary_type}
-                  {" · "}
-                  {e.salary_type === "percent_work"
-                    ? `${e.work_percent}% от работ`
-                    : `ставка ${e.salary_amount}`}
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color={colors.inkFaint}
-              />
+                <View className="flex-row items-center gap-3 p-3.5">
+                  <View
+                    className="h-10 w-10 items-center justify-center rounded-full"
+                    style={{ backgroundColor: colors.brandSoft }}
+                  >
+                    <Ionicons name="person" size={18} color={colors.brand} />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: colors.ink }}
+                    >
+                      {e.name}
+                      {!e.is_active ? " · неактивен" : ""}
+                    </Text>
+                    <Text className="text-xs" style={{ color: colors.inkMuted }}>
+                      {[e.position, e.phone].filter(Boolean).join(" · ") || "—"}
+                    </Text>
+                    <Text className="text-xs" style={{ color: colors.inkFaint }}>
+                      {SALARY_TYPE_LABELS[e.salary_type] ?? e.salary_type}
+                      {" · "}
+                      {e.salary_type === "percent_work"
+                        ? `${e.work_percent}% от работ`
+                        : `ставка ${e.salary_amount}`}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={colors.inkFaint}
+                  />
+                </View>
+              </Card>
             </Pressable>
           ))}
         </View>

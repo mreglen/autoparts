@@ -1,12 +1,20 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { createBooking } from "../api/bookings";
 import { describeError } from "../api/errors";
-import { DateField, Screen, useToast } from "../components/ui";
+import {
+  AppHeader,
+  Button,
+  DateField,
+  Screen,
+  useToast,
+} from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "BookingNew">;
 
@@ -25,10 +33,7 @@ export function BookingFormScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const inputStyle = {
-    backgroundColor: colors.surfaceSubtle,
-    color: colors.ink,
-  } as const;
+  const inputStyle = inputChrome(colors);
 
   const submit = async () => {
     setError("");
@@ -66,6 +71,7 @@ export function BookingFormScreen({ navigation }: Props) {
 
   return (
     <Screen>
+      <AppHeader title="Новая запись" />
       <View className="gap-4">
         <TextInput
           value={name}
@@ -149,16 +155,11 @@ export function BookingFormScreen({ navigation }: Props) {
           </Text>
         ) : null}
 
-        <Pressable
+        <Button
+          title={busy ? "Сохранение…" : "Создать запись"}
           onPress={() => void submit()}
-          disabled={busy}
-          className="items-center rounded-xl py-3.5"
-          style={{ backgroundColor: colors.brand, opacity: busy ? 0.6 : 1 }}
-        >
-          <Text className="text-base font-semibold text-white">
-            {busy ? "Сохранение…" : "Создать запись"}
-          </Text>
-        </Pressable>
+          loading={busy}
+        />
       </View>
     </Screen>
   );

@@ -1,6 +1,7 @@
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, View } from "react-native";
 
 import { useTheme } from "../../theme/useTheme";
+import { AppText as Text } from "./AppText";
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -34,7 +35,11 @@ export function ConfirmDialog({
       <View className="flex-1 items-center justify-center bg-black/40 px-6">
         <View
           className="w-full max-w-sm rounded-2xl p-5"
-          style={{ backgroundColor: colors.surface }}
+          style={{
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.line,
+          }}
         >
           <Text className="text-lg font-semibold" style={{ color: colors.ink }}>
             {title}

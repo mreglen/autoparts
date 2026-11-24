@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Modal, Platform, Pressable, Text, View } from "react-native";
+import { Modal, Platform, Pressable, View } from "react-native";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 
 import { useTheme } from "../../theme/useTheme";
+import { AppText as Text } from "./AppText";
 
 interface NativeDatePickerProps {
   visible: boolean;

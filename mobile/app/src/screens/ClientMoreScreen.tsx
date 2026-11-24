@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -8,12 +7,19 @@ import { useAppRole } from "../auth/roles";
 import { fetchNotificationFeed } from "../api/notifications";
 import { describeError } from "../api/errors";
 import { useSession } from "../auth/session";
-import { ConfirmDialog, ListRow, Screen, useToast } from "../components/ui";
+import {
+  Button,
+  ConfirmDialog,
+  ListRow,
+  Screen,
+  SectionHeader,
+  useToast,
+} from "../components/ui";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 
 export function ClientMoreScreen() {
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const { user, signOut } = useSession();
   const { canUseStaff, clientOrgs, setActiveRole } = useAppRole();
   const navigation =
@@ -47,12 +53,7 @@ export function ClientMoreScreen() {
 
   return (
     <Screen>
-      <Text
-        className="mb-3 text-lg font-semibold"
-        style={{ color: colors.ink }}
-      >
-        Автосервисы
-      </Text>
+      <SectionHeader title="Автосервисы" />
       {clientOrgs.length === 0 ? (
         <ListRow title="Нет привязанных автосервисов" />
       ) : (
@@ -63,12 +64,7 @@ export function ClientMoreScreen() {
         ))
       )}
 
-      <Text
-        className="mb-3 mt-6 text-lg font-semibold"
-        style={{ color: colors.ink }}
-      >
-        Сервис
-      </Text>
+      <SectionHeader title="Сервис" className="mt-6" />
       <View className="mt-2">
         <ListRow
           title="История ремонтов"
@@ -105,24 +101,14 @@ export function ClientMoreScreen() {
         </View>
       ) : null}
 
-      <Text
-        className="mb-3 mt-6 text-lg font-semibold"
-        style={{ color: colors.ink }}
-      >
-        Профиль
-      </Text>
+      <SectionHeader title="Профиль" className="mt-6" />
       <ListRow
         title="Профиль"
         subtitle={user?.email ?? "Данные аккаунта"}
         onPress={() => navigation.navigate("ClientProfile")}
       />
 
-      <Text
-        className="mb-3 mt-6 text-lg font-semibold"
-        style={{ color: colors.ink }}
-      >
-        Приложение
-      </Text>
+      <SectionHeader title="Приложение" className="mt-6" />
       <ListRow
         title={isDark ? "Тёмная тема" : "Светлая тема"}
         subtitle="Переключить оформление"
@@ -130,23 +116,13 @@ export function ClientMoreScreen() {
       />
 
       <View className="mt-6">
-        <Pressable
+        <Button
+          title="Выйти"
+          variant="danger"
+          icon="log-out-outline"
+          loading={busy}
           onPress={() => setConfirmOut(true)}
-          disabled={busy}
-          className="flex-row items-center justify-center gap-2 rounded-xl py-3.5"
-          style={{
-            backgroundColor: colors.dangerSoft,
-            opacity: busy ? 0.6 : 1,
-          }}
-        >
-          <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-          <Text
-            className="text-base font-semibold"
-            style={{ color: colors.danger }}
-          >
-            Выйти
-          </Text>
-        </Pressable>
+        />
       </View>
 
       <ConfirmDialog

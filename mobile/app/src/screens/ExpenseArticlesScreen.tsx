@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
@@ -18,6 +12,9 @@ import {
 } from "../api/finance";
 import { describeError } from "../api/errors";
 import {
+  AppHeader,
+  Button,
+  Card,
   ConfirmDialog,
   Screen,
   Sheet,
@@ -25,8 +22,10 @@ import {
   StaleDataBadge,
   useToast,
 } from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ExpenseArticles">;
 
@@ -47,10 +46,7 @@ function ArticleForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const inputStyle = {
-    backgroundColor: colors.surfaceSubtle,
-    color: colors.ink,
-  } as const;
+  const inputStyle = inputChrome(colors);
 
   const save = async () => {
     setError("");
@@ -90,34 +86,18 @@ function ArticleForm({
         autoFocus={!initial}
         maxLength={120}
       />
-      <Pressable
+      <Button
+        title={initial ? "Сохранить" : "Добавить"}
         onPress={() => void save()}
-        disabled={busy}
-        className="items-center rounded-xl py-3.5"
-        style={{ backgroundColor: colors.brand, opacity: busy ? 0.6 : 1 }}
-      >
-        {busy ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text className="text-base font-semibold" style={{ color: "#fff" }}>
-            {initial ? "Сохранить" : "Добавить"}
-          </Text>
-        )}
-      </Pressable>
+        loading={busy}
+      />
       {initial ? (
-        <Pressable
-          onPress={onDelete}
+        <Button
+          title="Удалить статью"
+          variant="danger"
           disabled={busy}
-          className="items-center rounded-xl py-3"
-          style={{ backgroundColor: colors.dangerSoft }}
-        >
-          <Text
-            className="text-base font-semibold"
-            style={{ color: colors.danger }}
-          >
-            Удалить статью
-          </Text>
-        </Pressable>
+          onPress={onDelete}
+        />
       ) : null}
     </View>
   );
@@ -170,6 +150,7 @@ export function ExpenseArticlesScreen(_: Props) {
 
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
+      <AppHeader title="Статьи расходов" />
       <View className="mb-3 flex-row items-center justify-between gap-2">
         <Text
           className="flex-1 text-sm"
@@ -203,26 +184,25 @@ export function ExpenseArticlesScreen(_: Props) {
       ) : (
         <View className="gap-2">
           {rows.map((a) => (
-            <Pressable
-              key={a.id}
-              onPress={() => setEditing(a)}
-              className="flex-row items-center gap-3 rounded-2xl p-3"
-              style={{ backgroundColor: colors.surfaceSubtle }}
-            >
-              <View className="min-w-0 flex-1">
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: colors.ink }}
-                  numberOfLines={1}
-                >
-                  {a.name}
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color={colors.inkFaint}
-              />
+            <Pressable key={a.id} onPress={() => setEditing(a)}>
+              <Card padded={false}>
+                <View className="flex-row items-center gap-3 p-3.5">
+                  <View className="min-w-0 flex-1">
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: colors.ink }}
+                      numberOfLines={1}
+                    >
+                      {a.name}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={colors.inkFaint}
+                  />
+                </View>
+              </Card>
             </Pressable>
           ))}
         </View>

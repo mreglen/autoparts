@@ -1,6 +1,8 @@
-import { Text, TextInput, View } from "react-native";
+import { View } from "react-native";
 
 import { useTheme } from "../../theme/useTheme";
+import { AppText as Text, AppTextInput as TextInput } from "./AppText";
+import { inputChrome } from "./chrome";
 
 interface DateFieldProps {
   value: string;
@@ -38,13 +40,7 @@ export function DateField({
         autoCapitalize="none"
         keyboardType="numbers-and-punctuation"
         className="rounded-xl px-4 py-3 text-base"
-        style={{
-          backgroundColor: colors.surfaceSubtle,
-          color: colors.ink,
-          minHeight: 48,
-          borderWidth: invalid || error ? 1 : 0,
-          borderColor: colors.danger,
-        }}
+        style={inputChrome(colors, invalid || Boolean(error))}
       />
       {invalid ? (
         <Text className="mt-1 text-xs" style={{ color: colors.danger }}>

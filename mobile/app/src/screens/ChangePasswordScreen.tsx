@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { View } from "react-native";
 
 import { describeError } from "../api/errors";
 import { useSession } from "../auth/session";
-import { Screen, useToast } from "../components/ui";
+import {
+  Button,
+  Screen,
+  useToast,
+} from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import { useTheme } from "../theme/useTheme";
+import {
+  AppText as Text,
+  AppTextInput as TextInput,
+} from "../components/ui/AppText";
 
 export function ChangePasswordScreen() {
   const { colors } = useTheme();
@@ -15,11 +24,6 @@ export function ChangePasswordScreen() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-
-  const inputStyle = {
-    backgroundColor: colors.surfaceSubtle,
-    color: colors.ink,
-  } as const;
 
   const submit = async () => {
     setError("");
@@ -69,7 +73,7 @@ export function ChangePasswordScreen() {
           secureTextEntry
           editable={!busy}
           className="rounded-xl px-4 py-3 text-base"
-          style={inputStyle}
+          style={inputChrome(colors)}
         />
         <TextInput
           value={next}
@@ -79,7 +83,7 @@ export function ChangePasswordScreen() {
           secureTextEntry
           editable={!busy}
           className="rounded-xl px-4 py-3 text-base"
-          style={inputStyle}
+          style={inputChrome(colors)}
         />
         <TextInput
           value={confirm}
@@ -90,7 +94,7 @@ export function ChangePasswordScreen() {
           editable={!busy}
           onSubmitEditing={submit}
           className="rounded-xl px-4 py-3 text-base"
-          style={inputStyle}
+          style={inputChrome(colors)}
         />
 
         {error ? (
@@ -99,16 +103,11 @@ export function ChangePasswordScreen() {
           </Text>
         ) : null}
 
-        <Pressable
+        <Button
+          title={busy ? "Сохранение…" : "Сохранить и продолжить"}
           onPress={submit}
-          disabled={busy}
-          className="items-center rounded-xl py-3.5"
-          style={{ backgroundColor: colors.brand, opacity: busy ? 0.6 : 1 }}
-        >
-          <Text className="text-base font-semibold text-white">
-            {busy ? "Сохранение…" : "Сохранить и продолжить"}
-          </Text>
-        </Pressable>
+          loading={busy}
+        />
       </View>
     </Screen>
   );

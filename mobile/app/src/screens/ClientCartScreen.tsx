@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import {
   useNavigation,
   type NavigationProp,
@@ -14,9 +14,10 @@ import {
   type ShopCartItem,
 } from "../api/partsShop";
 import { describeError } from "../api/errors";
-import { Screen, SkeletonRows, useToast } from "../components/ui";
+import { Button, Card, EmptyState, Screen, SkeletonRows, useToast } from "../components/ui";
 import { useTheme } from "../theme/useTheme";
 import { cartTotal, formatDeliveryText, formatMoney, truncateRubles } from "../utils/partsShop";
+import { AppText as Text } from "../components/ui/AppText";
 
 function CartRow({
   item,
@@ -35,10 +36,7 @@ function CartRow({
   const unavailable = item.available === false;
 
   return (
-    <View
-      className="mb-2 rounded-xl px-4 py-3"
-      style={{ backgroundColor: colors.surfaceSubtle }}
-    >
+    <Card padded={false} className="mb-2 px-4 py-3">
       <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
           <Text className="text-base font-medium" style={{ color: colors.ink }} numberOfLines={2}>
@@ -98,7 +96,7 @@ function CartRow({
           </Pressable>
         </View>
       </View>
-    </View>
+    </Card>
   );
 }
 
@@ -154,22 +152,13 @@ export function ClientCartScreen() {
   if (items.length === 0) {
     return (
       <Screen onRefresh={() => void refetch()} refreshing={isRefetching}>
-        <View className="items-center pt-16">
-          <Ionicons name="cart-outline" size={44} color={colors.inkFaint} />
-          <Text className="mt-3 text-base font-medium" style={{ color: colors.ink }}>
-            Корзина пуста
-          </Text>
-          <Text className="mt-1 text-center text-sm" style={{ color: colors.inkMuted }}>
-            Найдите запчасть по артикулу — привезём под заказ.
-          </Text>
-          <Pressable
-            onPress={() => navigation.navigate("ClientSearch")}
-            className="mt-6 rounded-xl px-6 py-3"
-            style={{ backgroundColor: colors.brand }}
-          >
-            <Text className="font-semibold text-white">Перейти к поиску</Text>
-          </Pressable>
-        </View>
+        <EmptyState
+          icon="cart-outline"
+          title="Корзина пуста"
+          message="Найдите запчасть по артикулу — привезём под заказ."
+          actionLabel="Перейти к поиску"
+          onAction={() => navigation.navigate("ClientSearch")}
+        />
       </Screen>
     );
   }
@@ -186,10 +175,7 @@ export function ClientCartScreen() {
         />
       ))}
 
-      <View
-        className="mt-4 rounded-xl px-4 py-4"
-        style={{ backgroundColor: colors.surfaceSubtle }}
-      >
+      <Card className="mt-4">
         <View className="flex-row items-center justify-between">
           <Text className="text-base" style={{ color: colors.inkMuted }}>
             Итого
@@ -201,14 +187,12 @@ export function ClientCartScreen() {
         <Text className="mt-2 text-xs" style={{ color: colors.inkFaint }}>
           Самовывоз · оплата после подтверждения наличия
         </Text>
-        <Pressable
+        <Button
+          title="Оформить заказ"
+          className="mt-4"
           onPress={() => navigation.navigate("ClientCheckout")}
-          className="mt-4 items-center rounded-xl py-3.5"
-          style={{ backgroundColor: colors.brand }}
-        >
-          <Text className="text-base font-semibold text-white">Оформить заказ</Text>
-        </Pressable>
-      </View>
+        />
+      </Card>
     </Screen>
   );
 }

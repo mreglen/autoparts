@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import {
@@ -23,6 +16,7 @@ import { describeError } from "../../api/errors";
 import { useTheme } from "../../theme/useTheme";
 import { formatMoney, toIsoDate } from "../../utils/format";
 import { DatePickerField, MoneyField, Sheet, useToast } from "../ui";
+import { AppText as Text, AppTextInput as TextInput } from "../ui/AppText";
 
 interface ExpenseFormSheetProps {
   /** null — создание, иначе редактирование существующего расхода. Компонент монтируется при открытии. */

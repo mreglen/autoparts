@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
 import { cachedGet, type CachedResult } from "../offline";
 import { ApiError, describeError } from "../api/errors";
 import {
+  AppHeader,
+  Button,
+  Card,
+  EmptyState,
   Screen,
+  SectionHeader,
   SkeletonRows,
   StaleDataBadge,
   PressableScale,
@@ -20,6 +25,7 @@ import {
 } from "../utils/format";
 import { orderStatusColor, orderStatusSoft } from "../utils/orderStatusColors";
 import { useTheme } from "../theme/useTheme";
+import { AppText as Text } from "../components/ui/AppText";
 
 interface PayrollBlock {
   year: number;
@@ -121,7 +127,6 @@ export function TodayScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [pressedKey, setPressedKey] = useState<string | null>(null);
   const [stale, setStale] = useState<CachedResult<DashboardSummary> | null>(
     null,
   );
@@ -171,17 +176,11 @@ export function TodayScreen() {
 
   return (
     <Screen onRefresh={onRefresh} refreshing={refreshing}>
-      <View className="mb-4 flex-row items-start justify-between">
-        <View>
-          <Text className="text-2xl font-bold" style={{ color: colors.ink }}>
-            {greeting}
-          </Text>
-          <Text className="mt-0.5 text-sm" style={{ color: colors.inkMuted }}>
-            Рабочий стол автосервиса
-          </Text>
-        </View>
-        {stale ? <StaleDataBadge fetchedAt={stale.fetchedAt} /> : null}
-      </View>
+      <AppHeader
+        title={greeting}
+        subtitle="Рабочий стол автосервиса"
+        right={stale ? <StaleDataBadge fetchedAt={stale.fetchedAt} /> : null}
+      />
 
       {loading ? (
         <SkeletonRows count={4} />
@@ -195,82 +194,67 @@ export function TodayScreen() {
           <Text className="text-sm" style={{ color: colors.inkMuted }}>
             {error}
           </Text>
-          <Pressable
+          <Button
+            title="Повторить"
+            variant="secondary"
             onPress={() => {
               setLoading(true);
               void load();
             }}
-            className="rounded-xl px-4 py-2.5"
-            style={{ backgroundColor: colors.brandSoft }}
-          >
-            <Text
-              className="text-sm font-medium"
-              style={{ color: colors.brand }}
-            >
-              Повторить
-            </Text>
-          </Pressable>
+          />
         </View>
       ) : summary ? (
         <View className="gap-5">
           {tiles.length > 0 ? (
             <View>
-              <Text
-                className="mb-2 text-xs font-semibold uppercase"
-                style={{ color: colors.inkMuted }}
-              >
-                Требует внимания
-              </Text>
+              <SectionHeader title="Требует внимания" />
               <View className="flex-row flex-wrap gap-2">
                 {tiles.map((tile) => (
-                  <Pressable
+                  <Card
                     key={tile.label}
-                    onPressIn={() => setPressedKey(tile.label)}
-                    onPressOut={() => setPressedKey(null)}
-                    className="min-w-[46%] flex-1 rounded-xl p-3"
-                    style={{
-                      backgroundColor: colors.surfaceSubtle,
-                      opacity: pressedKey === tile.label ? 0.7 : 1,
-                    }}
+                    padded={false}
+                    className="min-w-[46%] flex-1"
                   >
-                    <View className="flex-row items-center gap-1.5">
-                      <Ionicons
-                        name={tile.icon}
-                        size={14}
-                        color={
-                          tile.accent === "warning"
-                            ? colors.warning
-                            : tile.accent === "danger"
-                              ? colors.danger
-                              : tile.accent === "success"
-                                ? colors.success
-                                : colors.brand
-                        }
-                      />
+                    <View className="p-3">
+                      <View className="flex-row items-center gap-1.5">
+                        <Ionicons
+                          name={tile.icon}
+                          size={14}
+                          color={
+                            tile.accent === "warning"
+                              ? colors.warning
+                              : tile.accent === "danger"
+                                ? colors.danger
+                                : tile.accent === "success"
+                                  ? colors.success
+                                  : colors.brand
+                          }
+                        />
+                        <Text
+                          className="text-xs"
+                          style={{ color: colors.inkMuted }}
+                          numberOfLines={1}
+                        >
+                          {tile.label}
+                        </Text>
+                      </View>
                       <Text
-                        className="text-xs"
-                        style={{ color: colors.inkMuted }}
-                        numberOfLines={1}
+                        className="mt-1 text-xl font-bold"
+                        style={{ color: colors.ink }}
                       >
-                        {tile.label}
+                        {tile.value}
                       </Text>
+                      {tile.hint ? (
+                        <Text
+                          className="text-xs"
+                          style={{ color: colors.inkFaint }}
+                          numberOfLines={1}
+                        >
+                          {tile.hint}
+                        </Text>
+                      ) : null}
                     </View>
-                    <Text
-                      className="mt-1 text-xl font-bold"
-                      style={{ color: colors.ink }}
-                    >
-                      {tile.value}
-                    </Text>
-                    {tile.hint ? (
-                      <Text
-                        className="text-xs"
-                        style={{ color: colors.inkFaint }}
-                        numberOfLines={1}
-                      >
-                        {tile.hint}
-                      </Text>
-                    ) : null}
-                  </Pressable>
+                  </Card>
                 ))}
               </View>
             </View>
@@ -278,30 +262,17 @@ export function TodayScreen() {
 
           {payroll ? (
             <View>
-              <Text
-                className="mb-2 text-xs font-semibold uppercase"
-                style={{ color: colors.inkMuted }}
-              >
-                Моя зарплата
-              </Text>
-              <Pressable
-                onPressIn={() => setPressedKey("payroll")}
-                onPressOut={() => setPressedKey(null)}
-                className="rounded-xl p-3"
-                style={{
-                  backgroundColor: colors.surfaceSubtle,
-                  opacity: pressedKey === "payroll" ? 0.7 : 1,
-                }}
-              >
+              <SectionHeader title="Моя зарплата" />
+              <Card>
                 <Text
                   className="text-base font-semibold"
                   style={{ color: colors.ink }}
                 >
                   {formatMoney(payroll.total)}
                 </Text>
-              </Pressable>
+              </Card>
               <Text
-                className="mt-0.5 text-xs"
+                className="mt-1.5 text-xs"
                 style={{ color: colors.inkMuted }}
               >
                 Начислено за {payroll.month}.{payroll.year} ·{" "}
@@ -312,84 +283,82 @@ export function TodayScreen() {
           ) : null}
 
           <View>
-            <Text
-              className="mb-2 text-xs font-semibold uppercase"
-              style={{ color: colors.inkMuted }}
-            >
-              {summary.level === "own" ? "Мои заказы сегодня" : "Сегодня"}
-            </Text>
+            <SectionHeader
+              title={
+                summary.level === "own" ? "Мои заказы сегодня" : "Сегодня"
+              }
+            />
             {todayItems.length === 0 ? (
-              <View
-                className="items-center rounded-xl p-6"
-                style={{ backgroundColor: colors.surfaceSubtle }}
-              >
-                <Ionicons
-                  name="calendar-clear-outline"
-                  size={32}
-                  color={colors.inkFaint}
-                />
-                <Text
-                  className="mt-2 text-sm"
-                  style={{ color: colors.inkMuted }}
-                >
-                  Записей нет
-                </Text>
-              </View>
+              <EmptyState
+                icon="calendar-clear-outline"
+                title="Записей нет"
+              />
             ) : (
               <View className="gap-2">
                 {todayItems.map((item) => (
                   <PressableScale
                     key={`${item.kind}-${item.id}`}
                     onPress={() => handleItemPress(item)}
-                    className="flex-row items-center gap-3 rounded-xl p-3"
-                    style={{ backgroundColor: colors.surfaceSubtle }}
                   >
-                    <Text
-                      className="w-12 text-sm font-semibold"
-                      style={{ color: colors.ink }}
-                    >
-                      {formatTime(item.scheduled_at) || "—"}
-                    </Text>
-                    <View className="min-w-0 flex-1">
-                      <View className="flex-row items-center gap-2">
-                        <Text
-                          className="text-sm font-medium"
-                          style={{ color: colors.ink }}
-                          numberOfLines={1}
-                        >
-                          {item.client_name || "—"}
-                        </Text>
-                        <View
-                          className="rounded-full px-2 py-0.5"
-                          style={{
-                            backgroundColor: orderStatusSoft(
-                              colors,
-                              item.status,
-                            ),
-                          }}
-                        >
+                    <Card padded={false}>
+                      <View className="flex-row items-center gap-3 p-3.5">
+                        <View className="w-12">
                           <Text
-                            className="text-[10px] font-medium"
-                            style={{
-                              color: orderStatusColor(colors, item.status),
-                            }}
+                            className="text-sm font-semibold"
+                            style={{ color: colors.ink }}
                           >
-                            {orderStatusLabel(item.status)}
+                            {formatTime(item.scheduled_at) || "—"}
                           </Text>
                         </View>
+                        <View className="min-w-0 flex-1">
+                          <View className="flex-row items-center gap-2">
+                            <Text
+                              className="text-sm font-medium"
+                              style={{ color: colors.ink }}
+                              numberOfLines={1}
+                            >
+                              {item.client_name || "—"}
+                            </Text>
+                            <View
+                              className="rounded-full px-2 py-0.5"
+                              style={{
+                                backgroundColor: orderStatusSoft(
+                                  colors,
+                                  item.status,
+                                ),
+                              }}
+                            >
+                              <Text
+                                className="text-[10px] font-medium"
+                                style={{
+                                  color: orderStatusColor(colors, item.status),
+                                }}
+                              >
+                                {orderStatusLabel(item.status)}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text
+                            className="mt-0.5 text-xs"
+                            style={{ color: colors.inkMuted }}
+                            numberOfLines={1}
+                          >
+                            {item.kind === "inspection"
+                              ? "Осмотр"
+                              : `Заказ-наряд №${item.order_number ?? "—"}`}
+                            {item.vehicle ? ` · ${item.vehicle}` : ""}
+                            {item.work_zone_name
+                              ? ` · ${item.work_zone_name}`
+                              : ""}
+                          </Text>
+                        </View>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={16}
+                          color={colors.inkFaint}
+                        />
                       </View>
-                      <Text
-                        className="mt-0.5 text-xs"
-                        style={{ color: colors.inkMuted }}
-                        numberOfLines={1}
-                      >
-                        {item.kind === "inspection"
-                          ? "Осмотр"
-                          : `Заказ-наряд №${item.order_number ?? "—"}`}
-                        {item.vehicle ? ` · ${item.vehicle}` : ""}
-                        {item.work_zone_name ? ` · ${item.work_zone_name}` : ""}
-                      </Text>
-                    </View>
+                    </Card>
                   </PressableScale>
                 ))}
               </View>

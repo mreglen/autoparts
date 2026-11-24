@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -17,10 +11,21 @@ import {
   type InspectionBooking,
 } from "../api/bookings";
 import { ApiError } from "../api/errors";
-import { Screen, SkeletonRows, StaleDataBadge } from "../components/ui";
+import {
+  AppHeader,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  Screen,
+  SkeletonRows,
+  StaleDataBadge,
+  PressableScale,
+} from "../components/ui";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import { formatDayMonth } from "../utils/format";
+import { AppText as Text } from "../components/ui/AppText";
 
 const FILTERS: { key: BookingStatus | "all"; label: string }[] = [
   { key: "all", label: "Все" },
@@ -31,6 +36,11 @@ const FILTERS: { key: BookingStatus | "all"; label: string }[] = [
 ];
 
 type SortKey = "created_at" | "preferred_date";
+
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: "created_at", label: "Создана" },
+  { key: "preferred_date", label: "Дата записи" },
+];
 
 function statusColor(
   colors: ReturnType<typeof useTheme>["colors"],
@@ -108,65 +118,50 @@ export function BookingsScreen() {
     await load();
   }, [load]);
 
+  const filtersActive =
+    filter !== "all" || sortBy !== "created_at" || sortDir !== "desc";
+
   return (
     <Screen scroll={false}>
-      <View className="mb-2 flex-row items-center justify-between">
-        <Text className="text-lg font-semibold" style={{ color: colors.ink }}>
-          Записи на осмотр
-        </Text>
-        {staleAt ? <StaleDataBadge fetchedAt={staleAt} /> : null}
-      </View>
+      <AppHeader
+        title="Записи на осмотр"
+        right={staleAt ? <StaleDataBadge fetchedAt={staleAt} /> : null}
+      />
 
-      <View className="mb-2 flex-row flex-wrap gap-1">
-        {FILTERS.map((f) => {
-          const active = filter === f.key;
-          return (
-            <Pressable
-              key={f.key}
-              onPress={() => setFilter(f.key)}
-              className="rounded-full px-4 py-1.5"
-              style={{
-                backgroundColor: active ? colors.brand : colors.surfaceSubtle,
-              }}
-            >
-              <Text
-                className="text-xs font-medium"
-                style={{ color: active ? "#fff" : colors.inkSoft }}
-              >
-                {f.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-        {filter !== "all" ||
-        sortBy !== "created_at" ||
-        sortDir !== "desc" ? (
-          <Pressable
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mb-2 -mx-4 px-4"
+        contentContainerStyle={{ gap: 8 }}
+      >
+        {FILTERS.map((f) => (
+          <Chip
+            key={f.key}
+            label={f.label}
+            selected={filter === f.key}
+            onPress={() => setFilter(f.key)}
+          />
+        ))}
+        {filtersActive ? (
+          <Chip
+            label="Сбросить"
             onPress={() => {
               setFilter("all");
               setSortBy("created_at");
               setSortDir("desc");
             }}
-            className="rounded-full px-4 py-1.5"
-            style={{ backgroundColor: colors.dangerSoft }}
-          >
-            <Text
-              className="text-xs font-medium"
-              style={{ color: colors.danger }}
-            >
-              Сбросить
-            </Text>
-          </Pressable>
+          />
         ) : null}
-      </View>
+      </ScrollView>
 
       <View className="mb-3 flex-row items-center gap-2">
-        {(["created_at", "preferred_date"] as const).map((key) => {
-          const label = key === "preferred_date" ? "Дата записи" : "Создана";
+        {SORTS.map(({ key, label }) => {
           const active = sortBy === key;
           return (
-            <Pressable
+            <Chip
               key={key}
+              label={`${label}${active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}`}
+              selected={active}
               onPress={() => {
                 if (active) {
                   setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -175,25 +170,7 @@ export function BookingsScreen() {
                   setSortDir(key === "preferred_date" ? "asc" : "desc");
                 }
               }}
-              className="flex-row items-center gap-0.5 rounded-full px-2 py-0.5"
-              style={{
-                backgroundColor: active ? colors.brandSoft : "transparent",
-              }}
-            >
-              <Text
-                className="text-[10px] font-medium"
-                style={{ color: active ? colors.brand : colors.inkMuted }}
-              >
-                {label}
-              </Text>
-              {active ? (
-                <Ionicons
-                  name={sortDir === "asc" ? "arrow-up" : "arrow-down"}
-                  size={10}
-                  color={colors.brand}
-                />
-              ) : null}
-            </Pressable>
+            />
           );
         })}
       </View>
@@ -221,74 +198,71 @@ export function BookingsScreen() {
             <Text className="text-sm" style={{ color: colors.inkMuted }}>
               {error}
             </Text>
+            <Button title="Повторить" variant="secondary" onPress={() => void load()} />
           </View>
         ) : !items || items.length === 0 ? (
-          <View className="items-center gap-3 pt-10">
-            <Ionicons
-              name="calendar-clear-outline"
-              size={40}
-              color={colors.inkFaint}
-            />
-            <Text className="text-sm" style={{ color: colors.inkMuted }}>
-              Записей нет
-            </Text>
-          </View>
+          <EmptyState
+            icon="calendar-clear-outline"
+            title="Записей нет"
+          />
         ) : (
           <View className="gap-2">
             {items.map((item) => (
-              <Pressable
+              <PressableScale
                 key={item.id}
                 onPress={() =>
                   navigation.navigate("BookingDetail", { id: item.id })
                 }
-                className="flex-row items-center gap-3 rounded-xl p-3"
-                style={{ backgroundColor: colors.surfaceSubtle }}
               >
-                <View className="min-w-0 flex-1">
-                  <View className="flex-row items-center gap-2">
-                    <Text
-                      className="text-sm font-medium"
-                      style={{ color: colors.ink }}
-                      numberOfLines={1}
-                    >
-                      {item.name}
-                    </Text>
-                    <View
-                      className="rounded-full px-2 py-0.5"
-                      style={{
-                        backgroundColor: statusSoft(colors, item.status),
-                      }}
-                    >
+                <Card padded={false}>
+                  <View className="flex-row items-center gap-3 p-3.5">
+                    <View className="min-w-0 flex-1">
+                      <View className="flex-row items-center gap-2">
+                        <Text
+                          className="text-sm font-medium"
+                          style={{ color: colors.ink }}
+                          numberOfLines={1}
+                        >
+                          {item.name}
+                        </Text>
+                        <View
+                          className="rounded-full px-2 py-0.5"
+                          style={{
+                            backgroundColor: statusSoft(colors, item.status),
+                          }}
+                        >
+                          <Text
+                            className="text-[10px] font-medium"
+                            style={{ color: statusColor(colors, item.status) }}
+                          >
+                            {BOOKING_STATUS_LABELS[item.status] ?? item.status}
+                          </Text>
+                        </View>
+                      </View>
                       <Text
-                        className="text-[10px] font-medium"
-                        style={{ color: statusColor(colors, item.status) }}
+                        className="mt-0.5 text-xs"
+                        style={{ color: colors.inkMuted }}
+                        numberOfLines={1}
                       >
-                        {BOOKING_STATUS_LABELS[item.status] ?? item.status}
+                        {formatDayMonth(item.preferred_date)}
+                        {item.preferred_time
+                          ? ` ${String(item.preferred_time).slice(0, 5)}`
+                          : ""}
+                        {item.vehicle_make || item.vehicle_model
+                          ? ` · ${[item.vehicle_make, item.vehicle_model].filter(Boolean).join(" ")}`
+                          : item.vehicle
+                            ? ` · ${item.vehicle.make ?? ""} ${item.vehicle.model ?? ""}`.trim()
+                            : ""}
                       </Text>
                     </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={colors.inkFaint}
+                    />
                   </View>
-                  <Text
-                    className="mt-0.5 text-xs"
-                    style={{ color: colors.inkMuted }}
-                    numberOfLines={1}
-                  >
-                    {formatDayMonth(item.preferred_date)}
-                    {item.preferred_time
-                      ? ` ${String(item.preferred_time).slice(0, 5)}`
-                      : ""}
-                    {item.vehicle_make || item.vehicle_model
-                      ? ` · ${[item.vehicle_make, item.vehicle_model].filter(Boolean).join(" ")}`
-                      : item.vehicle
-                        ? ` · ${item.vehicle.make ?? ""} ${item.vehicle.model ?? ""}`.trim()
-                        : ""}
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={colors.inkFaint}
-                />
-              </Pressable>
+                </Card>
+              </PressableScale>
             ))}
           </View>
         )}

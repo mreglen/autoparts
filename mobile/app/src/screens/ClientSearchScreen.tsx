@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,7 +12,8 @@ import {
   type ShopPart,
 } from "../api/partsShop";
 import { describeError } from "../api/errors";
-import { Screen } from "../components/ui";
+import { Button, Card, EmptyState, Screen } from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import {
@@ -30,6 +31,7 @@ import {
   partTitle,
   splitOriginalAndAnalogs,
 } from "../utils/partsShop";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 const QUICK_CHIPS = [
   "тормозные колодки",
@@ -93,11 +95,8 @@ function PartCard({
   const count = getStockCount(part);
 
   return (
-    <Pressable
-      onPress={onPress}
-      className="mb-2 rounded-xl px-4 py-3"
-      style={{ backgroundColor: colors.surfaceSubtle }}
-    >
+    <Pressable onPress={onPress} className="mb-2">
+      <Card padded={false} className="px-4 py-3">
       <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
           <Text className="text-sm" style={{ color: colors.inkMuted }} numberOfLines={1}>
@@ -122,6 +121,7 @@ function PartCard({
           <Ionicons name="chevron-forward" size={16} color={colors.inkFaint} />
         </View>
       </View>
+      </Card>
     </Pressable>
   );
 }
@@ -137,10 +137,7 @@ export function ClientSearchScreen() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const inputStyle = {
-    backgroundColor: colors.surfaceSubtle,
-    color: colors.ink,
-  } as const;
+  const inputStyle = inputChrome(colors);
 
   const { originals, analogs } = useMemo(() => {
     const deduped = dedupeParts(results);
@@ -215,8 +212,12 @@ export function ClientSearchScreen() {
                     setQuery(chip);
                     void doSearch(chip);
                   }}
-                  className="rounded-full px-3 py-1.5"
-                  style={{ backgroundColor: colors.surfaceSubtle }}
+                  className="rounded-full px-3.5 py-1.5"
+                  style={{
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.lineStrong,
+                  }}
                 >
                   <Text className="text-sm" style={{ color: colors.ink }}>
                     {chip}
@@ -238,30 +239,24 @@ export function ClientSearchScreen() {
 
         {error ? (
           <View className="flex-1 items-center justify-center px-6">
-            <Ionicons name="cloud-offline-outline" size={36} color={colors.inkFaint} />
-            <Text className="mt-3 text-center text-sm" style={{ color: colors.inkMuted }}>
-              {error}
-            </Text>
-            <Pressable
-              onPress={() => void doSearch()}
-              className="mt-4 rounded-xl px-5 py-2.5"
-              style={{ backgroundColor: colors.brand }}
-            >
-              <Text className="font-semibold text-white">Повторить</Text>
-            </Pressable>
+            <EmptyState
+              icon="cloud-offline-outline"
+              title="Нет соединения"
+              message={error}
+              actionLabel="Повторить"
+              onAction={() => void doSearch()}
+            />
           </View>
         ) : null}
 
         {searched && !loading && !error ? (
           originals.length + analogs.length === 0 && allAnalogs.length === 0 ? (
             <View className="flex-1 items-center justify-center px-6">
-              <Ionicons name="search-outline" size={40} color={colors.inkFaint} />
-              <Text className="mt-3 text-center text-base font-medium" style={{ color: colors.ink }}>
-                Ничего не найдено
-              </Text>
-              <Text className="mt-1 text-center text-sm" style={{ color: colors.inkMuted }}>
-                Попробуйте другой артикул или название детали.
-              </Text>
+              <EmptyState
+                icon="search-outline"
+                title="Ничего не найдено"
+                message="Попробуйте другой артикул или название детали."
+              />
             </View>
           ) : (
             <View className="flex-1">
@@ -308,14 +303,12 @@ export function ClientSearchScreen() {
         ) : null}
 
         {searched && !loading && !error && (originals.length + analogs.length > 0 || allAnalogs.length > 0) ? (
-          <Pressable
+          <Button
+            title="Найти"
+            icon="search"
+            className="mt-2"
             onPress={() => void doSearch()}
-            className="mt-2 flex-row items-center justify-center gap-2 rounded-xl py-3"
-            style={{ backgroundColor: colors.brand }}
-          >
-            <Ionicons name="search" size={18} color="#fff" />
-            <Text className="font-semibold text-white">Найти</Text>
-          </Pressable>
+          />
         ) : null}
       </View>
     </Screen>

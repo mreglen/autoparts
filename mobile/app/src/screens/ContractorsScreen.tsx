@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, Switch, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
@@ -20,6 +13,11 @@ import {
 } from "../api/directory";
 import { describeError } from "../api/errors";
 import {
+  AppHeader,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
   MoneyField,
   Screen,
   Sheet,
@@ -27,8 +25,10 @@ import {
   StaleDataBadge,
   useToast,
 } from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Contractors">;
 
@@ -66,10 +66,7 @@ function ContractorForm({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const inputStyle = {
-    backgroundColor: colors.surfaceSubtle,
-    color: colors.ink,
-  } as const;
+  const inputStyle = inputChrome(colors);
 
   const num = (s: string) => {
     const n = Number(String(s).replace(",", "."));
@@ -145,26 +142,14 @@ function ContractorForm({
         Оплата
       </Text>
       <View className="flex-row flex-wrap gap-2">
-        {SALARY_TYPES.map((t) => {
-          const active = salaryType === t.id;
-          return (
-            <Pressable
-              key={t.id}
-              onPress={() => setSalaryType(t.id)}
-              className="rounded-full px-4 py-2"
-              style={{
-                backgroundColor: active ? colors.brand : colors.surfaceSubtle,
-              }}
-            >
-              <Text
-                className="text-sm font-medium"
-                style={{ color: active ? "#fff" : colors.inkSoft }}
-              >
-                {t.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {SALARY_TYPES.map((t) => (
+          <Chip
+            key={t.id}
+            label={t.label}
+            selected={salaryType === t.id}
+            onPress={() => setSalaryType(t.id)}
+          />
+        ))}
       </View>
       {salaryType === "fixed" ? (
         <MoneyField
@@ -193,20 +178,11 @@ function ContractorForm({
           trackColor={{ false: colors.surfaceSubtle, true: colors.brand }}
         />
       </View>
-      <Pressable
+      <Button
+        title={initial ? "Сохранить" : "Добавить"}
         onPress={() => void save()}
-        disabled={busy}
-        className="items-center rounded-xl py-3.5"
-        style={{ backgroundColor: colors.brand, opacity: busy ? 0.6 : 1 }}
-      >
-        {busy ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text className="text-base font-semibold" style={{ color: "#fff" }}>
-            {initial ? "Сохранить" : "Добавить"}
-          </Text>
-        )}
-      </Pressable>
+        loading={busy}
+      />
     </View>
   );
 }
@@ -276,10 +252,11 @@ export function ContractorsScreen(_: Props) {
 
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
+      <AppHeader title="Подрядчики" />
       <View className="mb-3 flex-row items-center justify-between gap-2">
         <View
           className="flex-1 flex-row items-center gap-2 rounded-xl px-3"
-          style={{ backgroundColor: colors.surfaceSubtle }}
+          style={inputChrome(colors)}
         >
           <Ionicons name="search" size={16} color={colors.inkMuted} />
           <TextInput
@@ -307,76 +284,56 @@ export function ContractorsScreen(_: Props) {
       {loading ? (
         <SkeletonRows count={6} />
       ) : rows.length === 0 ? (
-        <Text
-          className="py-8 text-center text-sm"
-          style={{ color: colors.inkMuted }}
-        >
-          Подрядчики не добавлены
-        </Text>
+        <EmptyState icon="construct-outline" title="Подрядчики не добавлены" />
       ) : (
         <View className="gap-2">
           {rows.map((c) => (
-            <Pressable
-              key={c.id}
-              onPress={() => setEditing(c)}
-              className="flex-row items-center gap-3 rounded-2xl p-3"
-              style={{
-                backgroundColor: colors.surfaceSubtle,
-                opacity: c.is_active ? 1 : 0.55,
-              }}
-            >
-              <View
-                className="h-10 w-10 items-center justify-center rounded-full"
-                style={{ backgroundColor: colors.brandSoft }}
-              >
-                <Ionicons name="construct" size={18} color={colors.brand} />
-              </View>
-              <View className="flex-1">
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: colors.ink }}
-                >
-                  {c.name}
-                  {!c.is_active ? " · неактивен" : ""}
-                </Text>
-                <Text
-                  className="text-xs"
-                  style={{ color: colors.inkMuted }}
-                  numberOfLines={1}
-                >
-                  {[c.phone, c.note].filter(Boolean).join(" · ") || "—"}
-                </Text>
-                <Text className="text-xs" style={{ color: colors.inkFaint }}>
-                  {c.salary_type === "percent_work"
-                    ? `${c.work_percent}% от работ`
-                    : `фикс. ${c.salary_amount ?? 0}`}
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color={colors.inkFaint}
-              />
+            <Pressable key={c.id} onPress={() => setEditing(c)}>
+              <Card padded={false} style={{ opacity: c.is_active ? 1 : 0.55 }}>
+                <View className="flex-row items-center gap-3 p-3.5">
+                  <View
+                    className="h-10 w-10 items-center justify-center rounded-full"
+                    style={{ backgroundColor: colors.brandSoft }}
+                  >
+                    <Ionicons name="construct" size={18} color={colors.brand} />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: colors.ink }}
+                    >
+                      {c.name}
+                      {!c.is_active ? " · неактивен" : ""}
+                    </Text>
+                    <Text
+                      className="text-xs"
+                      style={{ color: colors.inkMuted }}
+                      numberOfLines={1}
+                    >
+                      {[c.phone, c.note].filter(Boolean).join(" · ") || "—"}
+                    </Text>
+                    <Text className="text-xs" style={{ color: colors.inkFaint }}>
+                      {c.salary_type === "percent_work"
+                        ? `${c.work_percent}% от работ`
+                        : `фикс. ${c.salary_amount ?? 0}`}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={colors.inkFaint}
+                  />
+                </View>
+              </Card>
             </Pressable>
           ))}
           {hasMore ? (
-            <Pressable
+            <Button
+              title={`Показать ещё${page ? ` (${rows.length}/${page.total})` : ""}`}
+              variant="secondary"
+              loading={loadingMore}
               onPress={() => void loadMore()}
-              disabled={loadingMore}
-              className="items-center rounded-2xl py-3"
-              style={{ backgroundColor: colors.surfaceSubtle }}
-            >
-              {loadingMore ? (
-                <ActivityIndicator color={colors.brand} />
-              ) : (
-                <Text
-                  className="text-sm font-medium"
-                  style={{ color: colors.brand }}
-                >
-                  Показать ещё{page ? ` (${rows.length}/${page.total})` : ""}
-                </Text>
-              )}
-            </Pressable>
+            />
           ) : null}
         </View>
       )}

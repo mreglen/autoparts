@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, View } from "react-native";
 
 import { useSession } from "../auth/session";
 import { useTheme } from "../theme/useTheme";
@@ -12,6 +12,7 @@ import {
   installApk,
   type UpdateInfo,
 } from "../app/appUpdate";
+import { AppText as Text } from "./ui/AppText";
 
 export function AppUpdatePrompt() {
   const { status } = useSession();
@@ -82,7 +83,11 @@ export function AppUpdatePrompt() {
       <View className="flex-1 items-center justify-center bg-black/40 px-6">
         <View
           className="w-full max-w-sm rounded-2xl p-5"
-          style={{ backgroundColor: colors.surface }}
+          style={{
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.line,
+          }}
         >
           <Text className="text-lg font-semibold" style={{ color: colors.ink }}>
             {force ? "Требуется обновление" : "Доступно обновление"}

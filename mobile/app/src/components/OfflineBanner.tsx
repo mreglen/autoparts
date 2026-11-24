@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../theme/useTheme";
+import { AppText as Text } from "./ui/AppText";
 
 /** Глобальный баннер «нет сети» — поверх всего приложения. */
 export function OfflineBanner() {

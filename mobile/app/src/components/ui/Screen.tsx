@@ -54,7 +54,7 @@ export function Screen({
   return (
     <SafeAreaView
       className="flex-1"
-      style={{ backgroundColor: colors.surface }}
+      style={{ backgroundColor: colors.surfaceMuted }}
       edges={["top", "left", "right"]}
     >
       {body}

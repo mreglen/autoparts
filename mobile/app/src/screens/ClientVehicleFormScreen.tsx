@@ -1,11 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import {
@@ -19,7 +13,14 @@ import {
   type VehicleDecodeResult,
 } from "../api/clientAccount";
 import { describeError } from "../api/errors";
-import { ListRow, Screen, useToast } from "../components/ui";
+import {
+  Button,
+  Chip,
+  ListRow,
+  Screen,
+  useToast,
+} from "../components/ui";
+import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { invalidateEntities } from "../offline";
 import {
@@ -36,6 +37,7 @@ import {
   type VehicleLookupKind,
 } from "../utils/vehicleLookup";
 import { useTheme } from "../theme/useTheme";
+import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ClientVehicleForm">;
 
@@ -253,10 +255,7 @@ export function ClientVehicleFormScreen({ route, navigation }: Props) {
     }
   };
 
-  const inputStyle = {
-    backgroundColor: colors.surfaceSubtle,
-    color: colors.ink,
-  } as const;
+  const inputStyle = inputChrome(colors);
 
   const field = (
     key: keyof GarageVehicleFormFields,
@@ -315,23 +314,13 @@ export function ClientVehicleFormScreen({ route, navigation }: Props) {
                   className="flex-1 rounded-xl px-4 py-3 text-base"
                   style={inputStyle}
                 />
-                <Pressable
+                <Button
+                  title="Найти"
+                  compact
+                  loading={lookupBusy}
+                  className="justify-center px-4"
                   onPress={() => void runLookup()}
-                  disabled={lookupBusy}
-                  className="items-center justify-center rounded-xl px-4"
-                  style={{
-                    backgroundColor: colors.brand,
-                    opacity: lookupBusy ? 0.6 : 1,
-                  }}
-                >
-                  {lookupBusy ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text className="text-sm font-semibold text-white">
-                      Найти
-                    </Text>
-                  )}
-                </Pressable>
+                />
               </View>
             </View>
 
@@ -377,30 +366,14 @@ export function ClientVehicleFormScreen({ route, navigation }: Props) {
                   Автосервис
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
-                  {orgs.map((o) => {
-                    const active = o.organization_id === orgId;
-                    return (
-                      <Pressable
-                        key={o.organization_id}
-                        onPress={() => setOrgId(o.organization_id)}
-                        className="rounded-full px-3.5 py-2"
-                        style={{
-                          backgroundColor: active
-                            ? colors.brand
-                            : colors.surfaceSubtle,
-                        }}
-                      >
-                        <Text
-                          className="text-sm font-medium"
-                          style={{
-                            color: active ? "#fff" : colors.inkSoft,
-                          }}
-                        >
-                          {o.organization_name ?? o.organization_id}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                  {orgs.map((o) => (
+                    <Chip
+                      key={o.organization_id}
+                      label={o.organization_name ?? o.organization_id}
+                      selected={o.organization_id === orgId}
+                      onPress={() => setOrgId(o.organization_id)}
+                    />
+                  ))}
                 </View>
               </View>
             ) : null}
@@ -442,20 +415,17 @@ export function ClientVehicleFormScreen({ route, navigation }: Props) {
           </Text>
         ) : null}
 
-        <Pressable
-          onPress={() => void submit()}
-          disabled={busy}
-          className="items-center rounded-xl py-3.5"
-          style={{ backgroundColor: colors.brand, opacity: busy ? 0.6 : 1 }}
-        >
-          <Text className="text-base font-semibold text-white">
-            {busy
+        <Button
+          title={
+            busy
               ? "Сохранение…"
               : editing
                 ? "Сохранить изменения"
-                : "Добавить автомобиль"}
-          </Text>
-        </Pressable>
+                : "Добавить автомобиль"
+          }
+          loading={busy}
+          onPress={() => void submit()}
+        />
       </View>
     </Screen>
   );
