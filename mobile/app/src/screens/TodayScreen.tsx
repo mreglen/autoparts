@@ -11,6 +11,7 @@ import {
   StaleDataBadge,
   PressableScale,
 } from "../components/ui";
+import { NotificationsBell } from "../components/NotificationsBell";
 import {
   formatMoney,
   formatTime,
@@ -180,7 +181,10 @@ export function TodayScreen() {
             Рабочий стол автосервиса
           </Text>
         </View>
-        {stale ? <StaleDataBadge fetchedAt={stale.fetchedAt} /> : null}
+        <View className="flex-row items-center gap-2">
+          {stale ? <StaleDataBadge fetchedAt={stale.fetchedAt} /> : null}
+          <NotificationsBell />
+        </View>
       </View>
 
       {loading ? (

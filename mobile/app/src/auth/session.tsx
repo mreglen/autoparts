@@ -27,6 +27,7 @@ export type SessionStatus = "loading" | "signedOut" | "signedIn";
 export type SessionNotice = "rights" | "expired" | null;
 
 export interface SessionUser {
+  id: number;
   email: string;
   mustChangePassword: boolean;
   isAdmin: boolean;
@@ -68,6 +69,7 @@ interface LoginResponse {
 }
 
 interface ProfileResponse {
+  id?: number;
   email?: string;
   must_change_password?: boolean;
   is_admin?: boolean;
@@ -82,6 +84,7 @@ function toSessionUser(
 ): SessionUser | null {
   if (!profile?.email) return null;
   return {
+    id: profile.id ?? 0,
     email: profile.email,
     mustChangePassword: Boolean(profile.must_change_password),
     isAdmin: Boolean(profile.is_admin),

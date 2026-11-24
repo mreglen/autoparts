@@ -19,16 +19,17 @@ export interface NotificationFeed {
   unread_count: number;
 }
 
-export function fetchNotificationFeed(limit = 50) {
-  return cachedGet<NotificationFeed>(`/api/notifications/feed?limit=${limit}`);
+export function fetchNotificationFeed(limit = 50, categories?: string | null) {
+  const suffix = categories ? `&categories=${encodeURIComponent(categories)}` : "";
+  return cachedGet<NotificationFeed>(`/notifications/feed?limit=${limit}${suffix}`);
 }
 
 export async function markNotificationRead(id: number): Promise<void> {
-  await apiSend("POST", `/api/notifications/feed/${id}/read`);
+  await apiSend("POST", `/notifications/feed/${id}/read`);
   await invalidateEntities(["notifications"]);
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
-  await apiSend("POST", "/api/notifications/feed/read-all");
+  await apiSend("POST", "/notifications/feed/read-all");
   await invalidateEntities(["notifications"]);
 }

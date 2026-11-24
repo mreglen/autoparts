@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 
 import { fetchShopCart } from "../api/partsShop";
+import { ChatsScreen } from "../screens/ChatsScreen";
 import { ClientBookingsScreen } from "../screens/ClientBookingsScreen";
 import { ClientCartScreen } from "../screens/ClientCartScreen";
 import { ClientGarageScreen } from "../screens/ClientGarageScreen";
@@ -54,6 +55,16 @@ export function ClientTabs() {
           title: "Записи",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Chats"
+        component={ChatsScreen}
+        options={{
+          title: "Чаты",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubbles-outline" color={color} size={size} />
           ),
         }}
       />

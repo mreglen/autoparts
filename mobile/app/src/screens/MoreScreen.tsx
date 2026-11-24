@@ -4,12 +4,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { canAccessSection } from "../auth/access";
+import { canAccessSection, hasPermission, PERM } from "../auth/access";
 import { currentPermissionCodes } from "../auth/permissions";
 import { describeError } from "../api/errors";
 import { useAppRole } from "../auth/roles";
 import { useSession } from "../auth/session";
 import { ConfirmDialog, ListRow, Screen, useToast } from "../components/ui";
+import { NotificationsBell } from "../components/NotificationsBell";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 
@@ -98,17 +99,26 @@ export function MoreScreen() {
 
   return (
     <Screen>
-      <Text
-        className="mb-3 text-lg font-semibold"
-        style={{ color: colors.ink }}
-      >
-        Разделы
-      </Text>
+      <View className="mb-3 flex-row items-center justify-between">
+        <Text className="text-lg font-semibold" style={{ color: colors.ink }}>
+          Разделы
+        </Text>
+        <NotificationsBell />
+      </View>
       <ListRow
         title="Поиск"
         subtitle="Клиенты, авто, заказы, детали"
         onPress={() => navigation.navigate("Search")}
       />
+      {hasPermission(user, codes, PERM.chat) ? (
+        <View className="mt-2">
+          <ListRow
+            title="Сообщения"
+            subtitle="Чаты с клиентами автосервиса"
+            onPress={() => navigation.navigate("Chats")}
+          />
+        </View>
+      ) : null}
       {visibleSections.map((s) => (
         <View key={s.section} className="mt-2">
           <ListRow

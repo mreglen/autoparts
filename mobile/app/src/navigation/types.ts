@@ -21,7 +21,10 @@ export type RootStackParamList = {
   ClientHistory: undefined;
   ClientOrder: { orderId: number };
   ClientBookingNew: undefined;
-  ClientNotifications: undefined;
+  Notifications: undefined;
+  Chats: undefined;
+  ChatThread: { chatId: number; title?: string };
+  NewClientChat: undefined;
   ClientProfile: undefined;
   ClientVehicle: { vehicle: GarageVehicle; orgName?: string | null };
   ClientVehicleForm:

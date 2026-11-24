@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -17,7 +18,10 @@ import { BookingDetailScreen } from "../screens/BookingDetailScreen";
 import { BookingFormScreen } from "../screens/BookingFormScreen";
 import { ClientHistoryScreen } from "../screens/ClientHistoryScreen";
 import { ClientBookingFormScreen } from "../screens/ClientBookingFormScreen";
-import { ClientNotificationsScreen } from "../screens/ClientNotificationsScreen";
+import { NotificationsScreen } from "../screens/NotificationsScreen";
+import { ChatsScreen } from "../screens/ChatsScreen";
+import { ChatThreadScreen } from "../screens/ChatThreadScreen";
+import { NewClientChatScreen } from "../screens/NewClientChatScreen";
 import { ClientProfileScreen } from "../screens/ClientProfileScreen";
 import { ClientOrderScreen } from "../screens/ClientOrderScreen";
 import { ClientVehicleScreen } from "../screens/ClientVehicleScreen";
@@ -41,6 +45,7 @@ import { ContractorsScreen } from "../screens/ContractorsScreen";
 import { ExpenseArticlesScreen } from "../screens/ExpenseArticlesScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { useTheme } from "../theme/useTheme";
+import { connect as connectChatSocket, disconnect as disconnectChatSocket } from "../realtime/chatSocket";
 import { ClientTabs } from "./ClientTabs";
 import type { RootStackParamList } from "./types";
 
@@ -153,7 +158,15 @@ function Tabs() {
 
 function AppShell() {
   const { activeRole, rolesReady, canUseStaff } = useAppRole();
+  const { user: sessionUser } = useSession();
   const { colors } = useTheme();
+
+  useEffect(() => {
+    if (!sessionUser?.id) return undefined;
+    void connectChatSocket(sessionUser.id);
+    return () => disconnectChatSocket();
+  }, [sessionUser?.id]);
+
   if (!rolesReady && !canUseStaff) {
     return (
       <View
@@ -297,9 +310,24 @@ export function RootNavigator() {
                 options={{ title: "Запись на осмотр" }}
               />
               <Stack.Screen
-                name="ClientNotifications"
-                component={ClientNotificationsScreen}
+                name="Notifications"
+                component={NotificationsScreen}
                 options={{ title: "Уведомления" }}
+              />
+              <Stack.Screen
+                name="Chats"
+                component={ChatsScreen}
+                options={{ title: "Сообщения" }}
+              />
+              <Stack.Screen
+                name="ChatThread"
+                component={ChatThreadScreen}
+                options={({ route }) => ({ title: route.params.title || "Чат" })}
+              />
+              <Stack.Screen
+                name="NewClientChat"
+                component={NewClientChatScreen}
+                options={{ title: "Написать клиенту" }}
               />
               <Stack.Screen
                 name="ClientProfile"

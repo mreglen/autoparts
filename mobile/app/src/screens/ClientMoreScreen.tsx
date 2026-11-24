@@ -84,6 +84,13 @@ export function ClientMoreScreen() {
         </View>
         <View className="mt-2">
           <ListRow
+            title="Сообщения"
+            subtitle="Чаты с автосервисами"
+            onPress={() => navigation.navigate("Chats")}
+          />
+        </View>
+        <View className="mt-2">
+          <ListRow
             title="Уведомления"
             subtitle={
               unread > 0
@@ -91,7 +98,7 @@ export function ClientMoreScreen() {
                 : "Статусы записей и заказов"
             }
             right={unread > 0 ? String(unread) : undefined}
-            onPress={() => navigation.navigate("ClientNotifications")}
+            onPress={() => navigation.navigate("Notifications")}
           />
         </View>
       </View>

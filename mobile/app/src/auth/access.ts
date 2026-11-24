@@ -13,6 +13,7 @@ export const PERM = {
   clients: "autoservice.clients",
   inspections: "autoservice.inspections",
   inspectionsConfirm: "autoservice.inspections.confirm",
+  chat: "autoservice.chat",
   settings: "autoservice.settings",
   markup: "autoservice.markup",
 } as const;
@@ -31,6 +32,7 @@ export const SECTION_CODES: Record<string, readonly string[]> = {
   payroll: ORDERS_CODES,
   warehouse: [PERM.warehouse],
   settings: [PERM.settings],
+  chat: [PERM.chat],
   dashboard: [
     PERM.planner,
     PERM.orders,
