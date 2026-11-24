@@ -3,9 +3,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { openNotificationCenter } from '../../redux/slices/NotificationSlice';
 import { HeaderIconButton } from '../Header/headerPrimitives';
 
-export function BellIcon() {
+export function BellIcon({ className = 'h-5 w-5' }) {
   return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
       <path
         strokeLinecap="round"
         strokeLinejoin="round"

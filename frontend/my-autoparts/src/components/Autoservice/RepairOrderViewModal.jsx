@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import Modal from '../UI/Modal';
@@ -21,6 +22,8 @@ import { formatVatRate, orderVatRate, splitVatInclusive } from '../../utils/updD
 import { repairOrderNumberLabel } from '../../utils/autoserviceOrderDisplay';
 import { AUTOSERVICE_PAYMENT_METHOD_LABELS } from '../../utils/autoservicePaymentReceipt';
 import { normalizeVinForLookupOrNull } from '../../utils/laximoVin';
+import { openAutoserviceClientChat } from '../../redux/slices/ChatSlice';
+import { AUTOSERVICE_PERMISSION, hasAutoservicePermission } from '../../utils/autoservicePermissions';
 
 const LazyClientProfileModal = lazy(() =>
   import('./ClientProfileModals').then((m) => ({ default: m.ClientProfileModal })),
@@ -693,6 +696,12 @@ export default function RepairOrderViewModal({
   wrapperZIndex = null,
 }) {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const [chatConfirmOpen, setChatConfirmOpen] = useState(false);
+  const [chatOpening, setChatOpening] = useState(false);
+  const [chatError, setChatError] = useState('');
   const [payOpen, setPayOpen] = useState(false);
   const [payMethod, setPayMethod] = useState(null);
   const [payAmount, setPayAmount] = useState('');
@@ -1056,6 +1065,26 @@ export default function RepairOrderViewModal({
   };
 
   const clientLine = [order?.client?.name, order?.client?.phone].filter(Boolean).join(' · ') || '—';
+  const canWriteClient = hasAutoservicePermission(user, permissionCodes, AUTOSERVICE_PERMISSION.chat)
+    && Boolean(order?.client?.id && order?.client?.user_id);
+
+  const handleWriteToClient = async () => {
+    if (!order?.client?.id) return;
+    setChatOpening(true);
+    setChatError('');
+    try {
+      const chat = await dispatch(
+        openAutoserviceClientChat({ clientId: order.client.id, repairOrderId: order.id }),
+      ).unwrap();
+      setChatConfirmOpen(false);
+      onClose?.();
+      if (chat?.id) navigate(`/chats?source=autoservice&chatId=${chat.id}`);
+    } catch (e) {
+      setChatError(typeof e === 'string' ? e : 'Не удалось открыть чат');
+    } finally {
+      setChatOpening(false);
+    }
+  };
   const hasClientComment = Boolean(order?.client_comment?.trim());
   const hasStaffComment = Boolean(order?.staff_comment?.trim());
   const secondaryBtnClass =
@@ -1250,18 +1279,33 @@ export default function RepairOrderViewModal({
         <div className="space-y-5">
           <dl className="grid gap-4 sm:grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)]">
             <MetaItem label="Клиент">
-              {order?.client?.id ? (
-                <button
-                  type="button"
-                  onClick={openClientCard}
-                  className="inline-block whitespace-nowrap font-medium text-brand-700 underline decoration-brand-300 underline-offset-2 transition hover:text-brand-800 hover:decoration-brand-600"
-                  title="Открыть карточку клиента"
-                >
-                  {clientLine}
-                </button>
-              ) : (
-                <span className="inline-block whitespace-nowrap">{clientLine}</span>
-              )}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {order?.client?.id ? (
+                  <button
+                    type="button"
+                    onClick={openClientCard}
+                    className="inline-block whitespace-nowrap font-medium text-brand-700 underline decoration-brand-300 underline-offset-2 transition hover:text-brand-800 hover:decoration-brand-600"
+                    title="Открыть карточку клиента"
+                  >
+                    {clientLine}
+                  </button>
+                ) : (
+                  <span className="inline-block whitespace-nowrap">{clientLine}</span>
+                )}
+                {canWriteClient ? (
+                  <button
+                    type="button"
+                    onClick={() => { setChatError(''); setChatConfirmOpen(true); }}
+                    className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-sky-700 underline decoration-sky-300 underline-offset-2 transition hover:text-sky-800 hover:decoration-sky-500"
+                    title="Написать клиенту по этому заказ-наряду"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Написать
+                  </button>
+                ) : null}
+              </div>
             </MetaItem>
             <MetaItem label="Авто">
               {order?.vehicle?.id ? (
@@ -1351,6 +1395,38 @@ export default function RepairOrderViewModal({
             className={primaryBtnClass}
           >
             {completeSaving ? 'Закрытие…' : 'Да, закрыть'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+    <Modal
+      open={chatConfirmOpen && Boolean(order?.id)}
+      onClose={() => {
+        if (!chatOpening) setChatConfirmOpen(false);
+      }}
+      title="Написать клиенту?"
+    >
+      <div className="space-y-5">
+        <p className="text-sm text-ink-soft">
+          Открыть чат с {order?.client?.name || 'клиентом'} по {repairOrderNumberLabel(order)}?
+        </p>
+        {chatError ? <p className="text-sm text-red-600">{chatError}</p> : null}
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setChatConfirmOpen(false)}
+            disabled={chatOpening}
+            className={secondaryBtnClass}
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={handleWriteToClient}
+            disabled={chatOpening}
+            className={primaryBtnClass}
+          >
+            {chatOpening ? 'Открытие…' : 'Открыть чат'}
           </button>
         </div>
       </div>

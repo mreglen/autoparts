@@ -993,6 +993,31 @@ def ensure_chat_autoservice_client_column() -> None:
     logger.info("Applied chats.autoservice_client_id column patch")
 
 
+def ensure_chat_autoservice_context_columns() -> None:
+    """Контекст autoservice-чата: привязка к записи на осмотр или заказ-наряду."""
+    inspector = inspect(engine)
+    if "chats" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("chats")}
+    statements = []
+    if "autoservice_booking_id" not in columns:
+        statements.append(
+            "ALTER TABLE chats ADD COLUMN autoservice_booking_id INTEGER "
+            "REFERENCES inspection_bookings(id)"
+        )
+    if "autoservice_repair_order_id" not in columns:
+        statements.append(
+            "ALTER TABLE chats ADD COLUMN autoservice_repair_order_id INTEGER "
+            "REFERENCES repair_orders(id)"
+        )
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for statement in statements:
+            conn.execute(text(statement))
+    logger.info("Applied chats autoservice context column patches: %s", statements)
+
+
 def ensure_seo_product_url_exports_table() -> None:
     """Table tracking product URLs already included in daily SEO export batches."""
     inspector = inspect(engine)

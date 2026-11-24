@@ -14,6 +14,8 @@ class Chat(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
     organization_id = Column(String(10), ForeignKey("organizations.id"), nullable=True)
     autoservice_client_id = Column(Integer, ForeignKey("autoservice_clients.id"), nullable=True)
+    autoservice_booking_id = Column(Integer, ForeignKey("inspection_bookings.id"), nullable=True)
+    autoservice_repair_order_id = Column(Integer, ForeignKey("repair_orders.id"), nullable=True)
     title = Column(String(255), nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

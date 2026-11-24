@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import Modal, { ConfirmDialog } from '../UI/Modal';
 import Toast from '../UI/Toast';
 import PhoneInput from '../UI/PhoneInput';
@@ -15,6 +16,7 @@ import {
   canConfirmInspectionBookings,
   hasAutoservicePermission,
 } from '../../utils/autoservicePermissions';
+import { openAutoserviceClientChat } from '../../redux/slices/ChatSlice';
 
 const inputClass = 'sg-pill-input mt-1';
 const textareaClass = 'sg-pill-textarea mt-1';
@@ -48,6 +50,8 @@ export default function InspectionBookingAddModal({
 }) {
   const user = useSelector((state) => state.auth.user);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const canConfirm = canConfirmInspectionBookings(user, permissionCodes);
   const canSendSms = hasAutoservicePermission(user, permissionCodes, AUTOSERVICE_PERMISSION.planner);
   const [name, setName] = useState('');
@@ -77,6 +81,8 @@ export default function InspectionBookingAddModal({
   const [smsSending, setSmsSending] = useState(false);
   const [smsToast, setSmsToast] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [chatConfirmOpen, setChatConfirmOpen] = useState(false);
+  const [chatOpening, setChatOpening] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [zoneConflict, setZoneConflict] = useState(null);
   const editStartedAtRef = useRef(0);
@@ -412,6 +418,31 @@ export default function InspectionBookingAddModal({
     return timeValue ? `${date}, ${timeValue.slice(0, 5)}` : date;
   }
 
+  const canWriteClient = isEdit
+    && hasAutoservicePermission(user, permissionCodes, AUTOSERVICE_PERMISSION.chat)
+    && Boolean(initialBooking?.id && (initialBooking?.client_id || initialBooking?.created_by_user_id));
+
+  const handleWriteToClient = async () => {
+    if (!initialBooking?.id) return;
+    setChatOpening(true);
+    try {
+      const chat = await dispatch(
+        openAutoserviceClientChat({
+          clientId: selectedClientId ?? initialBooking.client_id ?? null,
+          bookingId: initialBooking.id,
+        }),
+      ).unwrap();
+      setChatConfirmOpen(false);
+      onClose?.();
+      if (chat?.id) navigate(`/chats?source=autoservice&chatId=${chat.id}`);
+    } catch (err) {
+      setSmsToast({ variant: 'error', message: typeof err === 'string' ? err : 'Не удалось открыть чат' });
+      setChatConfirmOpen(false);
+    } finally {
+      setChatOpening(false);
+    }
+  };
+
   const modalTitle = isEdit
     ? (isEditing ? 'Редактировать запись' : 'Запись на осмотр')
     : title;
@@ -468,6 +499,18 @@ export default function InspectionBookingAddModal({
           className="min-h-11 rounded-sg-sm bg-success-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-success-700 disabled:opacity-60"
         >
           {confirming ? 'Подтверждение…' : 'Подтвердить'}
+        </button>
+      ) : null}
+      {canWriteClient ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setChatConfirmOpen(true);
+          }}
+          className="min-h-11 rounded-sg-sm border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"
+        >
+          Написать клиенту
         </button>
       ) : null}
       {isEdit && canEdit && onCreateOrder ? (
@@ -800,6 +843,18 @@ export default function InspectionBookingAddModal({
         cancelLabel="Отмена"
         danger
         loading={deleting}
+      />
+      <ConfirmDialog
+        open={chatConfirmOpen}
+        onClose={() => {
+          if (!chatOpening) setChatConfirmOpen(false);
+        }}
+        onConfirm={handleWriteToClient}
+        title="Написать клиенту?"
+        message={`Открыть чат с клиентом по записи на ${formatDateTimeView(initialBooking?.preferred_date, initialBooking?.preferred_time)}?`}
+        confirmLabel="Открыть чат"
+        cancelLabel="Отмена"
+        loading={chatOpening}
       />
       <ConfirmDialog
         open={Boolean(zoneConflict)}

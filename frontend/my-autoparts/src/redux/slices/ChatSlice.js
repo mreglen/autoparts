@@ -74,6 +74,25 @@ export const openAutoserviceChat = createAsyncThunk(
     }
 );
 
+// Сотрудник автосервиса: открыть (или создать) чат с клиентом в контексте
+export const openAutoserviceClientChat = createAsyncThunk(
+    'chats/openAutoserviceClientChat',
+    async ({ clientId, bookingId, repairOrderId } = {}, { rejectWithValue }) => {
+        try {
+            return await apiRequest('/autoservice/chats/open-for-client', {
+                method: 'POST',
+                body: JSON.stringify({
+                    client_id: clientId ?? null,
+                    booking_id: bookingId ?? null,
+                    repair_order_id: repairOrderId ?? null,
+                }),
+            });
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Не удалось открыть чат');
+        }
+    }
+);
+
 export const createOrGetChatWithUser = createAsyncThunk(
     'chats/createOrGetChatWithUser',
     async (targetUserId, { rejectWithValue }) => {

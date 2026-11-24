@@ -39,7 +39,9 @@ import UserAvatar from '../../components/UserAvatar/UserAvatar';
 import ChatParticipantsPanel from './ChatParticipantsPanel';
 import CreateGroupChatModal from './CreateGroupChatModal';
 import AutoserviceChatClientModal from './AutoserviceChatClientModal';
+import AutoserviceNewClientChatModal from './AutoserviceNewClientChatModal';
 import { AUTOSERVICE_PERMISSION, hasAutoservicePermission } from '../../utils/autoservicePermissions';
+import { CABINET_MODE_AUTOSERVICE, getCabinetMode } from '../../utils/cabinetMode';
 import { getGarageCounterpartyProfilePath } from '../../utils/publicProfile';
 
 const formatTime = (dateString) => {
@@ -306,6 +308,7 @@ const ChatsHubPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useSelector((state) => state.auth);
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const autoserviceOrganizationId = useSelector((state) => state.publicInfo?.autoserviceOrganizationId || null);
   const { chats: garageChats, currentChat, loading: garageLoading, error: garageError, incomingChatAlert } = useSelector((state) => state.chats);
   const { 
     chats: avitoChats, 
@@ -332,6 +335,7 @@ const ChatsHubPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [createChatOpen, setCreateChatOpen] = useState(false);
+  const [newClientChatOpen, setNewClientChatOpen] = useState(false);
 
   const canCreateGroupChat = Boolean(user?.is_director || user?.is_admin);
 
@@ -349,6 +353,8 @@ const ChatsHubPage = () => {
     hasAutoserviceChatPermission
       || (garageChats || []).some((c) => getGarageChatListSource(c) === 'autoservice'),
   );
+  const isAutoserviceCabinet = getCabinetMode(user, { autoserviceOrganizationId }) === CABINET_MODE_AUTOSERVICE;
+  const showAutoserviceNewChat = isAutoserviceCabinet && hasAutoserviceChatPermission;
 
   // Подключаем WebSocket и push-уведомления при загрузке
   useEffect(() => {
@@ -639,6 +645,19 @@ const ChatsHubPage = () => {
     [dispatch, searchParams, setSearchParams]
   );
 
+  const handleAutoserviceClientChatCreated = useCallback(
+    (chat) => {
+      dispatch(fetchUserChats({}));
+      if (chat?.id) {
+        const next = new URLSearchParams(searchParams);
+        next.set('source', 'autoservice');
+        next.set('chatId', String(chat.id));
+        setSearchParams(next);
+      }
+    },
+    [dispatch, searchParams, setSearchParams]
+  );
+
   return (
     <div className="mx-auto flex h-full w-full max-w-7xl min-h-0 flex-col md:h-full md:overflow-hidden">
       <CreateGroupChatModal
@@ -646,6 +665,11 @@ const ChatsHubPage = () => {
         onClose={() => setCreateChatOpen(false)}
         onCreated={handleChatCreated}
         user={user}
+      />
+      <AutoserviceNewClientChatModal
+        isOpen={newClientChatOpen}
+        onClose={() => setNewClientChatOpen(false)}
+        onCreated={handleAutoserviceClientChatCreated}
       />
 
       {incomingChatAlert ? (
@@ -679,6 +703,16 @@ const ChatsHubPage = () => {
             } min-h-0 w-full min-w-0 flex-col overflow-hidden border-gray-200/80 bg-white md:h-full md:max-h-full md:w-[22rem] lg:w-96 md:border-r`}
           >
             <div className="flex-shrink-0 border-b border-gray-100 bg-white px-3 pb-3 pt-3 sm:px-4">
+              {showAutoserviceNewChat ? (
+                <button
+                  type="button"
+                  onClick={() => setNewClientChatOpen(true)}
+                  className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-sky-200 bg-sky-50/50 py-2.5 text-sm font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-50"
+                >
+                  <span className="text-lg leading-none">+</span>
+                  Написать клиенту
+                </button>
+              ) : null}
               {canCreateGroupChat ? (
                 <button
                   type="button"
@@ -1032,6 +1066,9 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
               ) : null}
               {isAvito && chat.context_title && (
                 <p className="truncate text-xs text-gray-500">{chat.context_title}</p>
+              )}
+              {isAutoservice && chat.autoservice_context_label && (
+                <p className="truncate text-xs text-gray-500">{chat.autoservice_context_label}</p>
               )}
             </div>
             {lastMessageTime && (
@@ -1411,7 +1448,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
           )
         }
         title={title}
-        subtitle={typingLabel}
+        subtitle={typingLabel || (isAutoserviceChat ? chat?.autoservice_context_label : null)}
         trailing={<ChatPanelMenu items={headerMenuItems} />}
       />
 

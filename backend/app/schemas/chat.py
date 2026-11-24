@@ -126,6 +126,9 @@ class ChatResponse(BaseModel):
     current_user_id: Optional[int] = None
     created_by_id: Optional[int] = None
     autoservice_client_id: Optional[int] = None
+    autoservice_booking_id: Optional[int] = None
+    autoservice_repair_order_id: Optional[int] = None
+    autoservice_context_label: Optional[str] = None
     can_manage: bool = False
     can_delete: bool = False
 

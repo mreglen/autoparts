@@ -56,6 +56,25 @@ class AutoserviceChatParticipantAdd(BaseModel):
     user_id: int
 
 
+class AutoserviceChatClientBrief(BaseModel):
+    id: int
+    name: str
+    phone: str
+    user_id: Optional[int] = None
+
+
+class AutoserviceChatTopics(BaseModel):
+    client: AutoserviceChatClientBrief
+    bookings: list[AutoserviceChatBookingBrief] = []
+    orders: list[AutoserviceChatOrderBrief] = []
+
+
+class AutoserviceChatOpenForClientIn(BaseModel):
+    client_id: Optional[int] = None
+    booking_id: Optional[int] = None
+    repair_order_id: Optional[int] = None
+
+
 __all__ = [
     "AutoserviceChatOpenResponse",
     "AutoserviceChatVehicleBrief",
@@ -63,5 +82,8 @@ __all__ = [
     "AutoserviceChatOrderBrief",
     "AutoserviceChatClientProfile",
     "AutoserviceChatParticipantAdd",
+    "AutoserviceChatClientBrief",
+    "AutoserviceChatTopics",
+    "AutoserviceChatOpenForClientIn",
     "ManageableUserItem",
 ]

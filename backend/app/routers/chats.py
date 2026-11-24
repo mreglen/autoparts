@@ -1239,6 +1239,17 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         can_manage = can_manage_autoservice_chat(db, chat, current_user)
     can_delete = bool(current_user and can_delete_chat(chat, current_user))
 
+    autoservice_context_label = None
+    booking_id = getattr(chat, "autoservice_booking_id", None)
+    repair_order_id = getattr(chat, "autoservice_repair_order_id", None)
+    if booking_id:
+        autoservice_context_label = f"Запись на осмотр №{booking_id}"
+    elif repair_order_id:
+        from app.models.repair_order import RepairOrder
+        order = db.query(RepairOrder).filter(RepairOrder.id == repair_order_id).first()
+        number = (order.order_number if order else None) or repair_order_id
+        autoservice_context_label = f"Заказ-наряд №{number}"
+
     return ChatResponse(
         id=chat.id,
         chat_type=chat_type,
@@ -1256,6 +1267,9 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         unread_count=unread_count,
         created_by_id=getattr(chat, "created_by_id", None),
         autoservice_client_id=getattr(chat, "autoservice_client_id", None),
+        autoservice_booking_id=booking_id,
+        autoservice_repair_order_id=repair_order_id,
+        autoservice_context_label=autoservice_context_label,
         can_manage=can_manage,
         can_delete=can_delete,
         seller_name=seller_name,

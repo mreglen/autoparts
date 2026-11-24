@@ -17,9 +17,12 @@ from app.routers.autoservice_clients import _client_view_with_account_email
 from app.routers.chats import _build_chat_response
 from app.schemas.autoservice_chat import (
     AutoserviceChatBookingBrief,
+    AutoserviceChatClientBrief,
     AutoserviceChatClientProfile,
+    AutoserviceChatOpenForClientIn,
     AutoserviceChatOrderBrief,
     AutoserviceChatParticipantAdd,
+    AutoserviceChatTopics,
     AutoserviceChatVehicleBrief,
 )
 from app.schemas.chat import ChatResponse, ManageableUserItem
@@ -123,6 +126,8 @@ def open_my_autoservice_chat(
             Chat.chat_type == CHAT_TYPE_AUTOSERVICE,
             Chat.organization_id == client.organization_id,
             Chat.autoservice_client_id == client.id,
+            Chat.autoservice_booking_id.is_(None),
+            Chat.autoservice_repair_order_id.is_(None),
             Chat.is_active == True,
         )
         .first()
@@ -166,6 +171,298 @@ def list_autoservice_chats(
     return [_build_chat_response(chat, db, current_user) for chat in chats]
 
 
+def _client_topics_rows(db: Session, organization_id: str, client: AutoserviceClient | None, client_user_id: int | None, limit: int = 200):
+    """Авто, записи и заказ-наряды клиента (общая выборка для профиля и пикера контекста)."""
+    related_ids: list[int] = []
+    if client:
+        related_ids = related_autoservice_client_ids(db, client, include_phone_matches=False)
+
+    vehicles = []
+    booking_rows = []
+    order_rows = []
+    if related_ids:
+        vehicles = (
+            db.query(GarageVehicle)
+            .filter(
+                GarageVehicle.organization_id == organization_id,
+                GarageVehicle.client_id.in_(related_ids),
+            )
+            .order_by(GarageVehicle.id.desc())
+            .all()
+        )
+        booking_rows = (
+            db.query(InspectionBooking)
+            .filter(
+                InspectionBooking.organization_id == organization_id,
+                or_(
+                    InspectionBooking.client_id.in_(related_ids),
+                    InspectionBooking.created_by_user_id == client_user_id,
+                ),
+            )
+            .order_by(InspectionBooking.preferred_date.desc(), InspectionBooking.id.desc())
+            .limit(limit)
+            .all()
+        )
+        order_rows = (
+            db.query(RepairOrder)
+            .filter(
+                RepairOrder.organization_id == organization_id,
+                RepairOrder.client_id.in_(related_ids),
+            )
+            .order_by(RepairOrder.created_at.desc(), RepairOrder.id.desc())
+            .limit(limit)
+            .all()
+        )
+    return vehicles, booking_rows, order_rows
+
+
+def _booking_brief(b, vehicle_labels: dict) -> AutoserviceChatBookingBrief:
+    return AutoserviceChatBookingBrief(
+        id=b.id,
+        preferred_date=b.preferred_date,
+        preferred_time=b.preferred_time,
+        status=b.status,
+        name=b.name,
+        vehicle_label=vehicle_labels.get(b.garage_vehicle_id)
+        or " ".join(p for p in (b.vehicle_make, b.vehicle_model) if p).strip()
+        or None,
+        source=b.source,
+        created_at=b.created_at,
+    )
+
+
+def _order_brief(o, vehicle_labels: dict) -> AutoserviceChatOrderBrief:
+    return AutoserviceChatOrderBrief(
+        id=o.id,
+        order_number=o.order_number,
+        status=o.status,
+        scheduled_at=o.scheduled_at,
+        scheduled_end_at=o.scheduled_end_at,
+        vehicle_label=vehicle_labels.get(o.vehicle_id),
+        created_at=o.created_at,
+    )
+
+
+def _client_brief(client: AutoserviceClient) -> AutoserviceChatClientBrief:
+    return AutoserviceChatClientBrief(
+        id=client.id,
+        name=client.name,
+        phone=client.phone,
+        user_id=client.user_id,
+    )
+
+
+@router.get("/autoservice/chats/clients", response_model=list[AutoserviceChatClientBrief])
+def list_autoservice_chat_clients(
+    q: str = Query("", max_length=120),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Сотрудник: клиенты организации для выбора при создании чата."""
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_CHAT)
+    query = db.query(AutoserviceClient).filter(AutoserviceClient.organization_id == org_id)
+    term = (q or "").strip()
+    if term:
+        like = f"%{term}%"
+        query = query.filter(
+            or_(
+                AutoserviceClient.name.ilike(like),
+                AutoserviceClient.phone.ilike(like),
+            )
+        )
+    rows = query.order_by(AutoserviceClient.name.asc()).limit(limit).all()
+    return [_client_brief(c) for c in rows]
+
+
+@router.get("/autoservice/chats/clients/{client_id}/topics", response_model=AutoserviceChatTopics)
+def get_autoservice_chat_client_topics(
+    client_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Сотрудник: записи на осмотр и заказ-наряды клиента для выбора контекста чата."""
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_CHAT)
+    client = (
+        db.query(AutoserviceClient)
+        .filter(
+            AutoserviceClient.id == client_id,
+            AutoserviceClient.organization_id == org_id,
+        )
+        .first()
+    )
+    if not client:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Клиент не найден")
+
+    vehicles, booking_rows, order_rows = _client_topics_rows(db, org_id, client, client.user_id, limit=30)
+    vehicle_labels = {v.id: _vehicle_label(v) for v in vehicles}
+    return AutoserviceChatTopics(
+        client=_client_brief(client),
+        bookings=[_booking_brief(b, vehicle_labels) for b in booking_rows],
+        orders=[_order_brief(o, vehicle_labels) for o in order_rows],
+    )
+
+
+def _resolve_chat_client(
+    db: Session,
+    org_id: str,
+    client_id: int | None,
+    booking_id: int | None,
+    repair_order_id: int | None,
+) -> tuple[AutoserviceClient | None, InspectionBooking | None, RepairOrder | None]:
+    """Определяет клиента и контекстный объект чата."""
+    booking = None
+    order = None
+    if booking_id:
+        booking = (
+            db.query(InspectionBooking)
+            .filter(
+                InspectionBooking.id == booking_id,
+                InspectionBooking.organization_id == org_id,
+            )
+            .first()
+        )
+        if not booking:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
+    if repair_order_id:
+        order = (
+            db.query(RepairOrder)
+            .filter(
+                RepairOrder.id == repair_order_id,
+                RepairOrder.organization_id == org_id,
+            )
+            .first()
+        )
+        if not order:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказ-наряд не найден")
+    if booking_id and repair_order_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите только один контекст чата",
+        )
+
+    client = None
+    if client_id:
+        client = (
+            db.query(AutoserviceClient)
+            .filter(
+                AutoserviceClient.id == client_id,
+                AutoserviceClient.organization_id == org_id,
+            )
+            .first()
+        )
+        if not client:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Клиент не найден")
+    elif booking_id:
+        booking_client_id = booking.client_id
+        if not booking_client_id and booking.created_by_user_id:
+            client = (
+                db.query(AutoserviceClient)
+                .filter(
+                    AutoserviceClient.organization_id == org_id,
+                    AutoserviceClient.user_id == booking.created_by_user_id,
+                )
+                .first()
+            )
+            booking_client_id = client.id if client else None
+        if booking_client_id:
+            client = (
+                db.query(AutoserviceClient)
+                .filter(
+                    AutoserviceClient.id == booking_client_id,
+                    AutoserviceClient.organization_id == org_id,
+                )
+                .first()
+            )
+    elif repair_order_id and order and order.client_id:
+        client = (
+            db.query(AutoserviceClient)
+            .filter(
+                AutoserviceClient.id == order.client_id,
+                AutoserviceClient.organization_id == org_id,
+            )
+            .first()
+        )
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Не удалось определить клиента",
+        )
+
+    related_ids = related_autoservice_client_ids(db, client, include_phone_matches=False)
+    if booking_id and booking.client_id not in related_ids and booking.created_by_user_id != client.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Запись не принадлежит клиенту",
+        )
+    if repair_order_id and order and order.client_id not in related_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Заказ-наряд не принадлежит клиенту",
+        )
+    return client, booking, order
+
+
+@router.post("/autoservice/chats/open-for-client", response_model=ChatResponse)
+def open_autoservice_chat_for_client(
+    body: AutoserviceChatOpenForClientIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Сотрудник: открыть/создать чат с клиентом в контексте (общий / заказ-наряд / запись)."""
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_CHAT)
+    client, booking, order = _resolve_chat_client(
+        db, org_id, body.client_id, body.booking_id, body.repair_order_id
+    )
+    if not client.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="У клиента нет аккаунта — чат недоступен",
+        )
+
+    query = db.query(Chat).filter(
+        Chat.chat_type == CHAT_TYPE_AUTOSERVICE,
+        Chat.organization_id == org_id,
+        Chat.autoservice_client_id == client.id,
+        Chat.is_active == True,
+    )
+    if booking:
+        query = query.filter(
+            Chat.autoservice_booking_id == booking.id,
+            Chat.autoservice_repair_order_id.is_(None),
+        )
+    elif order:
+        query = query.filter(
+            Chat.autoservice_repair_order_id == order.id,
+            Chat.autoservice_booking_id.is_(None),
+        )
+    else:
+        query = query.filter(
+            Chat.autoservice_booking_id.is_(None),
+            Chat.autoservice_repair_order_id.is_(None),
+        )
+    chat = query.first()
+
+    if not chat:
+        chat = Chat(
+            chat_type=CHAT_TYPE_AUTOSERVICE,
+            organization_id=org_id,
+            autoservice_client_id=client.id,
+            autoservice_booking_id=booking.id if booking else None,
+            autoservice_repair_order_id=order.id if order else None,
+            buyer_id=client.user_id,
+            title=client.name,
+            is_active=True,
+        )
+        db.add(chat)
+        db.flush()
+        _add_participant(db, chat.id, client.user_id)
+        _add_participant(db, chat.id, current_user.id)
+        db.commit()
+        db.refresh(chat)
+    return _build_chat_response(chat, db, current_user)
+
+
 @router.get("/autoservice/chats/{chat_id}/client-profile", response_model=AutoserviceChatClientProfile)
 def get_chat_client_profile(
     chat_id: int,
@@ -177,78 +474,12 @@ def get_chat_client_profile(
     client = _resolve_client_card(db, chat)
     client_user_id = client.user_id if client else chat.buyer_id
 
-    related_ids: list[int] = []
-    if client:
-        related_ids = related_autoservice_client_ids(db, client, include_phone_matches=False)
-
-    vehicles = []
-    bookings = []
-    orders = []
-    if related_ids:
-        vehicles = (
-            db.query(GarageVehicle)
-            .filter(
-                GarageVehicle.organization_id == chat.organization_id,
-                GarageVehicle.client_id.in_(related_ids),
-            )
-            .order_by(GarageVehicle.id.desc())
-            .all()
-        )
-        booking_rows = (
-            db.query(InspectionBooking)
-            .filter(
-                InspectionBooking.organization_id == chat.organization_id,
-                or_(
-                    InspectionBooking.client_id.in_(related_ids),
-                    InspectionBooking.created_by_user_id == client_user_id,
-                ),
-            )
-            .order_by(InspectionBooking.preferred_date.desc(), InspectionBooking.id.desc())
-            .limit(200)
-            .all()
-        )
-        order_rows = (
-            db.query(RepairOrder)
-            .filter(
-                RepairOrder.organization_id == chat.organization_id,
-                RepairOrder.client_id.in_(related_ids),
-            )
-            .order_by(RepairOrder.created_at.desc(), RepairOrder.id.desc())
-            .limit(200)
-            .all()
-        )
-    else:
-        booking_rows = []
-        order_rows = []
-
+    vehicles, booking_rows, order_rows = _client_topics_rows(
+        db, chat.organization_id, client, client_user_id
+    )
     vehicle_labels = {v.id: _vehicle_label(v) for v in vehicles}
-    for b in booking_rows:
-        bookings.append(
-            AutoserviceChatBookingBrief(
-                id=b.id,
-                preferred_date=b.preferred_date,
-                preferred_time=b.preferred_time,
-                status=b.status,
-                name=b.name,
-                vehicle_label=vehicle_labels.get(b.garage_vehicle_id)
-                or " ".join(p for p in (b.vehicle_make, b.vehicle_model) if p).strip()
-                or None,
-                source=b.source,
-                created_at=b.created_at,
-            )
-        )
-    for o in order_rows:
-        orders.append(
-            AutoserviceChatOrderBrief(
-                id=o.id,
-                order_number=o.order_number,
-                status=o.status,
-                scheduled_at=o.scheduled_at,
-                scheduled_end_at=o.scheduled_end_at,
-                vehicle_label=vehicle_labels.get(o.vehicle_id),
-                created_at=o.created_at,
-            )
-        )
+    bookings = [_booking_brief(b, vehicle_labels) for b in booking_rows]
+    orders = [_order_brief(o, vehicle_labels) for o in order_rows]
 
     return AutoserviceChatClientProfile(
         chat_id=chat.id,
