@@ -20,7 +20,6 @@ SERVER_TIMEZONE = "Europe/Moscow"
 
 @router.get("/meta", response_model=MobileMetaResponse)
 def get_mobile_meta(
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     now = datetime.now()
