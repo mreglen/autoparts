@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -9,15 +9,7 @@ import { currentPermissionCodes } from "../auth/permissions";
 import { describeError } from "../api/errors";
 import { useAppRole } from "../auth/roles";
 import { useSession } from "../auth/session";
-import {
-  AppHeader,
-  Button,
-  ConfirmDialog,
-  ListRow,
-  Screen,
-  SectionHeader,
-  useToast,
-} from "../components/ui";
+import { ConfirmDialog, ListRow, Screen, useToast } from "../components/ui";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 
@@ -80,7 +72,7 @@ const SECTIONS: SectionLink[] = [
 ];
 
 export function MoreScreen() {
-  const { isDark, toggleTheme } = useTheme();
+  const { colors, isDark, toggleTheme } = useTheme();
   const { user, signOut } = useSession();
   const { canUseClient, setActiveRole } = useAppRole();
   const navigation =
@@ -106,21 +98,21 @@ export function MoreScreen() {
 
   return (
     <Screen>
-      <AppHeader title="Ещё" subtitle="Разделы и настройки" />
-
-      <SectionHeader title="Разделы" />
-      <View className="gap-2">
-        <ListRow
-          title="Поиск"
-          subtitle="Клиенты, авто, заказы, детали"
-          icon="search-outline"
-          onPress={() => navigation.navigate("Search")}
-        />
-        {visibleSections.map((s) => (
+      <Text
+        className="mb-3 text-lg font-semibold"
+        style={{ color: colors.ink }}
+      >
+        Разделы
+      </Text>
+      <ListRow
+        title="Поиск"
+        subtitle="Клиенты, авто, заказы, детали"
+        onPress={() => navigation.navigate("Search")}
+      />
+      {visibleSections.map((s) => (
+        <View key={s.section} className="mt-2">
           <ListRow
-            key={s.route}
             title={s.title}
-            icon={s.icon}
             onPress={() => {
               switch (s.route) {
                 case "Warehouse":
@@ -149,40 +141,56 @@ export function MoreScreen() {
               }
             }}
           />
-        ))}
-      </View>
+        </View>
+      ))}
 
-      <SectionHeader title="Профиль" />
-      <View className="gap-2">
-        <ListRow title={user?.email ?? "—"} subtitle="Аккаунт автосервиса" />
-        {canUseClient ? (
+      <Text
+        className="mb-3 mt-6 text-lg font-semibold"
+        style={{ color: colors.ink }}
+      >
+        Профиль
+      </Text>
+      <ListRow title={user?.email ?? "—"} subtitle="Аккаунт автосервиса" />
+      {canUseClient ? (
+        <View className="mt-2">
           <ListRow
             title="Режим клиента"
             subtitle="Гараж, записи и история ремонтов"
-            icon="person-outline"
             onPress={() => setActiveRole("client")}
           />
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
-      <SectionHeader title="Приложение" />
-      <View className="gap-2">
-        <ListRow
-          title={isDark ? "Тёмная тема" : "Светлая тема"}
-          subtitle="Переключить оформление"
-          icon={isDark ? "moon-outline" : "sunny-outline"}
-          onPress={toggleTheme}
-        />
-      </View>
+      <Text
+        className="mb-3 mt-6 text-lg font-semibold"
+        style={{ color: colors.ink }}
+      >
+        Приложение
+      </Text>
+      <ListRow
+        title={isDark ? "Тёмная тема" : "Светлая тема"}
+        subtitle="Переключить оформление"
+        onPress={toggleTheme}
+      />
 
-      <View className="mt-8">
-        <Button
-          title="Выйти"
-          variant="danger"
-          icon="log-out-outline"
-          loading={busy}
+      <View className="mt-6">
+        <Pressable
           onPress={() => setConfirmOut(true)}
-        />
+          disabled={busy}
+          className="flex-row items-center justify-center gap-2 rounded-xl py-3.5"
+          style={{
+            backgroundColor: colors.dangerSoft,
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+          <Text
+            className="text-base font-semibold"
+            style={{ color: colors.danger }}
+          >
+            Выйти
+          </Text>
+        </Pressable>
       </View>
 
       <ConfirmDialog

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useRoute, type RouteProp } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,7 +15,7 @@ import {
   type ShopCartItem,
 } from "../api/partsShop";
 import { describeError } from "../api/errors";
-import { Button, Card, Screen, useToast } from "../components/ui";
+import { Screen, useToast } from "../components/ui";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import {
@@ -29,7 +29,6 @@ import {
   partTitle,
   type ShopStockData,
 } from "../utils/partsShop";
-import { AppText as Text } from "../components/ui/AppText";
 
 type DetailRoute = RouteProp<RootStackParamList, "ClientPartDetail">;
 
@@ -131,7 +130,10 @@ export function ClientPartDetailScreen() {
 
   return (
     <Screen>
-      <Card className="mb-4">
+      <View
+        className="mb-4 rounded-xl px-4 py-4"
+        style={{ backgroundColor: colors.surfaceSubtle }}
+      >
         <Text className="text-sm" style={{ color: colors.inkMuted }}>
           {[partBrand(part), partArticle(part)].filter(Boolean).join(" · ")}
         </Text>
@@ -147,7 +149,7 @@ export function ClientPartDetailScreen() {
             </Text>
           </Text>
         ) : null}
-      </Card>
+      </View>
 
       {stocks.length === 0 ? (
         <Text className="py-8 text-center text-sm" style={{ color: colors.inkMuted }}>
@@ -159,7 +161,11 @@ export function ClientPartDetailScreen() {
           const qty = existing?.quantity ?? 0;
           const isBusy = busy === stock.stock_id;
           return (
-            <Card key={stock.stock_id} padded={false} className="mb-2 px-4 py-3">
+            <View
+              key={stock.stock_id}
+              className="mb-2 rounded-xl px-4 py-3"
+              style={{ backgroundColor: colors.surfaceSubtle }}
+            >
               <View className="flex-row items-center justify-between">
                 <View className="min-w-0 flex-1">
                   <Text className="text-base font-semibold" style={{ color: colors.ink }}>
@@ -202,15 +208,21 @@ export function ClientPartDetailScreen() {
                     </Pressable>
                   </View>
                 ) : (
-                  <Button
-                    title="В корзину"
-                    compact
-                    loading={isBusy}
+                  <Pressable
                     onPress={() => void changeQty(stock, 1)}
-                  />
+                    disabled={isBusy}
+                    className="rounded-lg px-4 py-2"
+                    style={{ backgroundColor: colors.brand }}
+                  >
+                    {isBusy ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text className="font-semibold text-white">В корзину</Text>
+                    )}
+                  </Pressable>
                 )}
               </View>
-            </Card>
+            </View>
           );
         })
       )}
@@ -223,10 +235,10 @@ export function ClientPartDetailScreen() {
           {analogs.slice(0, 8).map((a) => {
             const aMin = inStockStocks(a)[0];
             return (
-              <Card
+              <View
                 key={String(a.guid || `${a.brand}|${a.partnumber}`)}
-                padded={false}
-                className="mb-1 flex-row items-center px-4 py-3"
+                className="mb-1 flex-row items-center justify-between rounded-xl px-4 py-3"
+                style={{ backgroundColor: colors.surfaceSubtle }}
               >
                 <View className="min-w-0 flex-1">
                   <Text className="text-sm" style={{ color: colors.inkMuted }} numberOfLines={1}>
@@ -241,7 +253,7 @@ export function ClientPartDetailScreen() {
                     {formatMoney(applyMarkup(aMin.price, markup))}
                   </Text>
                 ) : null}
-              </Card>
+              </View>
             );
           })}
         </>

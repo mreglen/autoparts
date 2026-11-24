@@ -1,7 +1,17 @@
 /* eslint-disable react-hooks/immutability, react-hooks/set-state-in-effect, react-hooks/refs, react-hooks/exhaustive-deps -- Reanimated shared values и синхронизация sheet с visible/keyboard требуют императивных присваиваний */
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
-import { Keyboard, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, View } from "react-native";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -11,7 +21,6 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useTheme } from "../../theme/useTheme";
-import { AppText as Text } from "./AppText";
 
 interface SheetProps {
   visible: boolean;

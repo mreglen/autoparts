@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import {
   fetchNotificationFeed,
@@ -9,18 +10,14 @@ import {
 } from "../api/notifications";
 import { describeError } from "../api/errors";
 import {
-  Button,
-  EmptyState,
   FadeSlideIn,
   Screen,
   SkeletonRows,
   StaleDataBadge,
   useToast,
 } from "../components/ui";
-import { cardChrome } from "../components/ui/chrome";
 import { useTheme } from "../theme/useTheme";
 import { formatDayMonth } from "../utils/format";
-import { AppText as Text } from "../components/ui/AppText";
 
 function timeLabel(value: string): string {
   const d = new Date(value);
@@ -109,35 +106,46 @@ export function ClientNotificationsScreen() {
           <Text className="text-sm" style={{ color: colors.inkMuted }}>
             Непрочитанных: {unread}
           </Text>
-          <Button
-            title="Прочитать все"
-            variant="ghost"
-            compact
-            loading={busy}
-            onPress={() => void readAll()}
-          />
+          <Pressable onPress={() => void readAll()} disabled={busy}>
+            <Text
+              className="text-sm font-medium"
+              style={{ color: colors.brand, opacity: busy ? 0.5 : 1 }}
+            >
+              Прочитать все
+            </Text>
+          </Pressable>
         </View>
       ) : null}
 
       {items.length === 0 ? (
-        <EmptyState
-          icon="notifications-outline"
-          title="Уведомлений нет"
-          message="Статусы записей и заказ-нарядов будут появляться здесь."
-        />
+        <View className="items-center pt-16">
+          <Ionicons
+            name="notifications-outline"
+            size={40}
+            color={colors.inkFaint}
+            style={{ marginBottom: 8 }}
+          />
+          <Text className="text-base font-medium" style={{ color: colors.ink }}>
+            Уведомлений нет
+          </Text>
+          <Text
+            className="mt-1 text-center text-sm"
+            style={{ color: colors.inkMuted }}
+          >
+            Статусы записей и заказ-нарядов будут появляться здесь.
+          </Text>
+        </View>
       ) : (
         items.map((n, i) => (
           <FadeSlideIn key={n.id} index={i} style={{ marginTop: 8 }}>
             <Pressable
               onPress={() => void openItem(n)}
               className="flex-row rounded-xl px-4 py-3"
-              style={[
-                cardChrome(colors),
-                {
-                  borderLeftWidth: n.is_read ? 0 : 3,
-                  borderLeftColor: colors.brand,
-                },
-              ]}
+              style={{
+                backgroundColor: colors.surfaceSubtle,
+                borderLeftWidth: n.is_read ? 0 : 3,
+                borderLeftColor: colors.brand,
+              }}
             >
               <View className="min-w-0 flex-1">
                 <Text

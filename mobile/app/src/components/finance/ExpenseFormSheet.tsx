@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import {
@@ -16,7 +23,6 @@ import { describeError } from "../../api/errors";
 import { useTheme } from "../../theme/useTheme";
 import { formatMoney, toIsoDate } from "../../utils/format";
 import { DatePickerField, MoneyField, Sheet, useToast } from "../ui";
-import { AppText as Text, AppTextInput as TextInput } from "../ui/AppText";
 
 interface ExpenseFormSheetProps {
   /** null — создание, иначе редактирование существующего расхода. Компонент монтируется при открытии. */
@@ -42,8 +48,8 @@ function parseAmount(value: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-const PINNED_ARTICLES = ["Заработная плата", "Прочее"];
-const SALARY_ARTICLE_NAMES = ["зарплата", "заработная плата"];
+const PINNED_ARTICLES = ["Зарплата", "Прочее"];
+const SALARY_ARTICLE_KEY = "зарплата";
 
 export function ExpenseFormSheet({
   initial,
@@ -58,7 +64,8 @@ export function ExpenseFormSheet({
     initial?.article_id ?? null,
   );
   const [articleName, setArticleName] = useState(initial?.article_name ?? "");
-  const [articleOpen, setArticleOpen] = useState(false);
+  const [articleSearch, setArticleSearch] = useState("");
+  const [articleSheetOpen, setArticleSheetOpen] = useState(false);
   const [amount, setAmount] = useState(() =>
     initial?.amount != null ? String(initial.amount) : "",
   );
@@ -90,9 +97,8 @@ export function ExpenseFormSheet({
       ? (articles.find((a) => a.id === articleId)?.name ?? articleName)
       : articleName
   ).trim();
-  const isSalaryArticle = SALARY_ARTICLE_NAMES.includes(
-    resolvedArticleName.toLowerCase(),
-  );
+  const isSalaryArticle =
+    resolvedArticleName.toLowerCase() === SALARY_ARTICLE_KEY;
   const isSalary = isEdit ? initial.type === "salary" : isSalaryArticle;
   const showEmployee = isSalary;
   const payrollLoading = payrollLoadingKey === payrollKey;
@@ -112,12 +118,7 @@ export function ExpenseFormSheet({
       });
     fetchExpenseArticles()
       .then((r) => {
-        if (!alive) return;
-        setArticles(r.data);
-        if (initial?.article_id != null && !initial.article_name) {
-          const found = r.data.find((a) => a.id === initial.article_id);
-          if (found) setArticleName(found.name);
-        }
+        if (alive) setArticles(r.data);
       })
       .catch(() => {
         if (alive) setArticles([]);
@@ -125,7 +126,7 @@ export function ExpenseFormSheet({
     return () => {
       alive = false;
     };
-  }, [initial]);
+  }, []);
 
   useEffect(() => {
     if (!showEmployee || employeeId == null || !expenseDate) return;
@@ -154,17 +155,19 @@ export function ExpenseFormSheet({
 
   const amountNumber = useMemo(() => parseAmount(amount), [amount]);
   const amountValid = amountNumber > 0;
-  const mergedArticles = useMemo<FinanceExpenseArticle[]>(() => {
-    const pinnedKeys = new Set(PINNED_ARTICLES.map((n) => n.toLowerCase()));
-    const pinned = PINNED_ARTICLES.map((name) =>
-      articles.find((a) => a.name.trim().toLowerCase() === name.toLowerCase()),
-    ).filter((a): a is FinanceExpenseArticle => Boolean(a));
-    const rest = articles.filter(
-      (a) => !pinnedKeys.has(a.name.trim().toLowerCase()),
+  const mergedArticles = useMemo<{ id: number | null; name: string }[]>(() => {
+    const byName = new Map(
+      articles.map((a) => [a.name.trim().toLowerCase(), a]),
     );
-    return [...pinned, ...rest];
+    const defaults = PINNED_ARTICLES.map(
+      (name) => byName.get(name.toLowerCase()) ?? { id: null, name },
+    );
+    const rest = articles.filter(
+      (a) => !PINNED_ARTICLES.includes(a.name.trim().toLowerCase()),
+    );
+    return [...defaults, ...rest];
   }, [articles]);
-  const normalizedSearch = articleName.trim().toLowerCase();
+  const normalizedSearch = articleSearch.trim().toLowerCase();
   const filteredArticles = useMemo(
     () =>
       mergedArticles.filter((a) =>
@@ -228,103 +231,29 @@ export function ExpenseFormSheet({
       <View className="gap-3">
         <View>
           <FieldLabel>Статья расхода</FieldLabel>
-          <View className="relative">
-            <TextInput
-              value={articleName}
-              onChangeText={(v) => {
-                setArticleName(v);
-                setArticleId(null);
-                setArticleOpen(true);
-              }}
-              onFocus={() => setArticleOpen(true)}
-              onBlur={() => setTimeout(() => setArticleOpen(false), 150)}
-              placeholder="Выберите или введите новую"
-              placeholderTextColor={colors.inkFaint}
-              editable={!saving}
-              autoComplete="off"
-              className="rounded-xl px-4 py-3 text-base"
-              style={{
-                backgroundColor: colors.surfaceSubtle,
-                color: colors.ink,
-                minHeight: 48,
-              }}
-            />
-            {articleOpen ? (
-              <View
-                className="absolute inset-x-0 top-full mt-1 max-h-56 overflow-hidden rounded-xl"
-                style={{
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.line,
-                  zIndex: 20,
-                  elevation: 8,
-                }}
-              >
-                <ScrollView keyboardShouldPersistTaps="handled">
-                  {isEdit ? (
-                    <Pressable
-                      onPress={() => {
-                        setArticleId(null);
-                        setArticleName("");
-                        setArticleOpen(false);
-                      }}
-                      className="px-3 py-2.5"
-                      style={{ backgroundColor: colors.surfaceSubtle }}
-                    >
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.inkMuted }}
-                      >
-                        Не указана
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  {articleName.trim() && !exactArticleMatch ? (
-                    <Pressable
-                      onPress={() => setArticleOpen(false)}
-                      className="px-3 py-2.5"
-                      style={{ backgroundColor: colors.brandSoft }}
-                    >
-                      <Text
-                        className="text-sm font-medium"
-                        style={{ color: colors.brand }}
-                      >
-                        Использовать «{articleName.trim()}»
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  {filteredArticles.map((a) => (
-                    <Pressable
-                      key={a.id ?? a.name}
-                      onPress={() => {
-                        setArticleId(a.id);
-                        setArticleName(a.name);
-                        setArticleOpen(false);
-                      }}
-                      className="px-3 py-2.5"
-                      style={{ backgroundColor: colors.surfaceSubtle }}
-                    >
-                      <Text
-                        className="text-sm"
-                        style={{ color: colors.ink }}
-                        numberOfLines={1}
-                      >
-                        {a.name}
-                      </Text>
-                    </Pressable>
-                  ))}
-                  {filteredArticles.length === 0 && !articleName.trim() ? (
-                    <Text
-                      className="px-3 py-2.5 text-sm"
-                      style={{ color: colors.inkMuted }}
-                    >
-                      Статей пока нет — введите название
-                    </Text>
-                  ) : null}
-                </ScrollView>
-              </View>
-            ) : null}
-          </View>
+          <Pressable
+            onPress={() => {
+              setArticleSearch("");
+              setArticleSheetOpen(true);
+            }}
+            disabled={saving}
+            className="flex-row items-center justify-between rounded-xl px-4"
+            style={{
+              backgroundColor: colors.surfaceSubtle,
+              minHeight: 48,
+              borderWidth: 1,
+              borderColor: colors.line,
+            }}
+          >
+            <Text
+              className="flex-1 text-base"
+              style={{ color: resolvedArticleName ? colors.ink : colors.inkFaint }}
+              numberOfLines={1}
+            >
+              {resolvedArticleName || "Выберите статью"}
+            </Text>
+            <Ionicons name="chevron-down" size={18} color={colors.inkMuted} />
+          </Pressable>
         </View>
 
         <View className="flex-row gap-2">
@@ -457,6 +386,79 @@ export function ExpenseFormSheet({
           </Pressable>
         </View>
       </View>
+
+      {/* Шторка выбора статьи */}
+      <Sheet
+        visible={articleSheetOpen}
+        title="Статья расхода"
+        onClose={() => setArticleSheetOpen(false)}
+      >
+        <TextInput
+          value={articleSearch}
+          onChangeText={setArticleSearch}
+          placeholder="Поиск или новая статья"
+          placeholderTextColor={colors.inkFaint}
+          className="mb-2 rounded-xl px-4 py-3 text-base"
+          style={{
+            backgroundColor: colors.surfaceSubtle,
+            color: colors.ink,
+          }}
+        />
+        <ScrollView className="max-h-96" keyboardShouldPersistTaps="handled">
+          <Pressable
+            onPress={() => {
+              setArticleId(null);
+              setArticleName("");
+              setArticleSheetOpen(false);
+            }}
+            className="mb-2 rounded-xl p-3"
+            style={{ backgroundColor: colors.surfaceSubtle }}
+          >
+            <Text className="text-sm" style={{ color: colors.inkMuted }}>
+              Не указана
+            </Text>
+          </Pressable>
+          {articleSearch.trim() && !exactArticleMatch ? (
+            <Pressable
+              onPress={() => {
+                setArticleId(null);
+                setArticleName(articleSearch.trim());
+                setArticleSheetOpen(false);
+              }}
+              className="mb-2 rounded-xl p-3"
+              style={{ backgroundColor: colors.brandSoft }}
+            >
+              <Text
+                className="text-sm font-medium"
+                style={{ color: colors.brand }}
+              >
+                Использовать «{articleSearch.trim()}»
+              </Text>
+            </Pressable>
+          ) : null}
+          {filteredArticles.map((a) => (
+            <Pressable
+              key={a.id ?? a.name}
+              onPress={() => {
+                setArticleId(a.id);
+                setArticleName(a.name);
+                setArticleSheetOpen(false);
+              }}
+              className="mb-2 rounded-xl p-3"
+              style={{ backgroundColor: colors.surfaceSubtle }}
+            >
+              <Text className="text-sm" style={{ color: colors.ink }}>
+                {a.name}
+              </Text>
+            </Pressable>
+          ))}
+          {filteredArticles.length === 0 && !articleSearch.trim() ? (
+            <Text className="py-3 text-sm" style={{ color: colors.inkMuted }}>
+              Статей пока нет — введите название
+            </Text>
+          ) : null}
+        </ScrollView>
+      </Sheet>
 
       {/* Шторка выбора сотрудника */}
       <Sheet

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Linking, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, Text, View } from "react-native";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,11 +11,10 @@ import {
   fetchShopPaymentSession,
 } from "../api/partsShop";
 import { describeError } from "../api/errors";
-import { Button, Card, Screen, useToast } from "../components/ui";
+import { Screen, useToast } from "../components/ui";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import { formatMoney } from "../utils/format";
-import { AppText as Text } from "../components/ui/AppText";
 
 type PaymentRoute = RouteProp<RootStackParamList, "ClientPayment">;
 
@@ -34,7 +33,10 @@ function ResultCard({
 }) {
   const { colors } = useTheme();
   return (
-    <Card className="items-center px-6 py-10">
+    <View
+      className="items-center rounded-2xl px-6 py-10"
+      style={{ backgroundColor: colors.surfaceSubtle }}
+    >
       <Ionicons name={icon} size={48} color={colors.brand} />
       <Text className="mt-4 text-xl font-bold" style={{ color: colors.ink }}>
         {title}
@@ -43,7 +45,7 @@ function ResultCard({
         {text}
       </Text>
       {actions ? <View className="mt-6 flex-row gap-3">{actions}</View> : null}
-    </Card>
+    </View>
   );
 }
 
@@ -120,8 +122,12 @@ export function ClientPaymentScreen() {
           text={`Заказ №${session?.garage_order_id ?? ""} оформлен. Мы отправим его поставщику.`}
           actions={
             <>
-              <Button title="Мои заказы" className="flex-1" onPress={goPurchases} />
-              <Button title="В поиск" variant="outline" className="flex-1" onPress={() => navigation.popToTop()} />
+              <Pressable onPress={goPurchases} className="rounded-xl px-5 py-3" style={{ backgroundColor: colors.brand }}>
+                <Text className="font-semibold text-white">Мои заказы</Text>
+              </Pressable>
+              <Pressable onPress={() => navigation.popToTop()} className="rounded-xl px-5 py-3" style={{ borderWidth: 1, borderColor: colors.line }}>
+                <Text className="font-semibold" style={{ color: colors.ink }}>В поиск</Text>
+              </Pressable>
             </>
           }
         />
@@ -138,8 +144,12 @@ export function ClientPaymentScreen() {
           text="Оплата прошла, но создать заказ не удалось. Средства возвращены на тот же способ оплаты."
           actions={
             <>
-              <Button title="Оформить снова" className="flex-1" onPress={goCheckout} />
-              <Button title="В корзину" variant="outline" className="flex-1" onPress={goCart} />
+              <Pressable onPress={goCheckout} className="rounded-xl px-5 py-3" style={{ backgroundColor: colors.brand }}>
+                <Text className="font-semibold text-white">Оформить снова</Text>
+              </Pressable>
+              <Pressable onPress={goCart} className="rounded-xl px-5 py-3" style={{ borderWidth: 1, borderColor: colors.line }}>
+                <Text className="font-semibold" style={{ color: colors.ink }}>В корзину</Text>
+              </Pressable>
             </>
           }
         />
@@ -155,7 +165,9 @@ export function ClientPaymentScreen() {
           title="Возврат средств"
           text="Заказ не был создан. Возврат оплаты обрабатывается — обновите статус через минуту."
           actions={
-            <Button title="Обновить статус" onPress={() => void refetch()} />
+            <Pressable onPress={() => void refetch()} className="rounded-xl px-5 py-3" style={{ backgroundColor: colors.brand }}>
+              <Text className="font-semibold text-white">Обновить статус</Text>
+            </Pressable>
           }
         />
       </Screen>
@@ -170,7 +182,9 @@ export function ClientPaymentScreen() {
           title="Заказ не оформлен"
           text="Оплата прошла, но заказ создать не удалось. Автоматический возврат не выполнен — свяжитесь с поддержкой."
           actions={
-            <Button title="Мои заказы" onPress={goPurchases} />
+            <Pressable onPress={goPurchases} className="rounded-xl px-5 py-3" style={{ backgroundColor: colors.brand }}>
+              <Text className="font-semibold text-white">Мои заказы</Text>
+            </Pressable>
           }
         />
       </Screen>
@@ -185,7 +199,9 @@ export function ClientPaymentScreen() {
           title="Время оплаты истекло"
           text="Вернитесь в корзину и начните оформление заново."
           actions={
-            <Button title="К оформлению" onPress={goCheckout} />
+            <Pressable onPress={goCheckout} className="rounded-xl px-5 py-3" style={{ backgroundColor: colors.brand }}>
+              <Text className="font-semibold text-white">К оформлению</Text>
+            </Pressable>
           }
         />
       </Screen>
@@ -217,7 +233,7 @@ export function ClientPaymentScreen() {
         </Text>
       ) : null}
 
-      <Card className="mt-6 px-5 py-6">
+      <View className="mt-6 rounded-2xl px-5 py-6" style={{ backgroundColor: colors.surfaceSubtle }}>
         <Text className="text-base font-semibold" style={{ color: colors.ink }}>
           СБП — QR-код
         </Text>
@@ -238,28 +254,36 @@ export function ClientPaymentScreen() {
             {statusLabel}
           </Text>
         </View>
-      </Card>
+      </View>
 
-      <Card className="mt-4 px-5 py-6">
+      <View className="mt-4 rounded-2xl px-5 py-6" style={{ backgroundColor: colors.surfaceSubtle }}>
         <Text className="text-base font-semibold" style={{ color: colors.ink }}>
           Банковская карта
         </Text>
         <Text className="mt-1 text-sm" style={{ color: colors.inkMuted }}>
           Visa, Mastercard, Мир — оплата на защищённой странице
         </Text>
-        <Button
-          title="Оплатить картой"
-          loading={cardLoading}
-          disabled={status !== "awaiting_payment"}
-          className="mt-5"
+        <Pressable
           onPress={() => void handleCard()}
-        />
+          disabled={cardLoading || status !== "awaiting_payment"}
+          className="mt-5 items-center rounded-xl py-3.5"
+          style={{
+            backgroundColor: colors.brand,
+            opacity: cardLoading || status !== "awaiting_payment" ? 0.5 : 1,
+          }}
+        >
+          {cardLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text className="font-semibold text-white">Оплатить картой</Text>
+          )}
+        </Pressable>
         {session?.card_payment_status ? (
           <Text className="mt-2 text-center text-xs" style={{ color: colors.inkFaint }}>
             Статус: {session.card_payment_status}
           </Text>
         ) : null}
-      </Card>
+      </View>
 
       <Text className="mt-4 text-center text-xs" style={{ color: colors.inkFaint }}>
         После успешной оплаты заказ будет автоматически отправлен поставщику

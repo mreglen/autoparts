@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Ionicons } from "@expo/vector-icons";
 
 import {
   cancelClientInspectionBooking,
@@ -10,9 +12,7 @@ import {
 } from "../api/clientAccount";
 import { describeError } from "../api/errors";
 import {
-  Button,
   ConfirmDialog,
-  EmptyState,
   FadeSlideIn,
   ListRow,
   Screen,
@@ -22,6 +22,7 @@ import {
 } from "../components/ui";
 import type { RootStackParamList } from "../navigation/types";
 import { invalidateEntities } from "../offline";
+import { useTheme } from "../theme/useTheme";
 import { clientBookingStatusLabel, formatDayMonth } from "../utils/format";
 
 function bookingTitle(b: ClientBooking): string {
@@ -45,6 +46,7 @@ function isCancellable(b: ClientBooking): boolean {
 }
 
 export function ClientBookingsScreen() {
+  const { colors } = useTheme();
   const { show } = useToast();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -107,11 +109,23 @@ export function ClientBookingsScreen() {
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
       {stale != null ? <StaleDataBadge fetchedAt={stale} /> : null}
       {rows.length === 0 ? (
-        <EmptyState
-          icon="calendar-outline"
-          title="Записей пока нет"
-          message="Запишитесь на осмотр — автосервис подтвердит дату и время."
-        />
+        <View className="items-center pt-16">
+          <Ionicons
+            name="calendar-outline"
+            size={40}
+            color={colors.inkFaint}
+            style={{ marginBottom: 8 }}
+          />
+          <Text className="text-base font-medium" style={{ color: colors.ink }}>
+            Записей пока нет
+          </Text>
+          <Text
+            className="mt-1 text-center text-sm"
+            style={{ color: colors.inkMuted }}
+          >
+            Запишитесь на осмотр — автосервис подтвердит дату и время.
+          </Text>
+        </View>
       ) : (
         rows.map((b, i) => (
           <FadeSlideIn key={b.id} index={i} style={{ marginTop: 8 }}>
@@ -125,12 +139,16 @@ export function ClientBookingsScreen() {
         ))
       )}
 
-      <Button
-        title="Записаться на осмотр"
-        icon="add"
-        className="mt-6"
+      <Pressable
         onPress={() => navigation.navigate("ClientBookingNew")}
-      />
+        className="mt-6 flex-row items-center justify-center gap-2 rounded-xl py-3.5"
+        style={{ backgroundColor: colors.brand }}
+      >
+        <Ionicons name="add" size={20} color="#fff" />
+        <Text className="text-base font-semibold text-white">
+          Записаться на осмотр
+        </Text>
+      </Pressable>
 
       <ConfirmDialog
         visible={cancelTarget != null}

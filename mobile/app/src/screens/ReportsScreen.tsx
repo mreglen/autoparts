@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Pressable, ScrollView, Switch, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -27,7 +34,6 @@ import { UNIT_LABELS } from "../api/warehouse";
 import { describeError } from "../api/errors";
 import { useSession } from "../auth/session";
 import {
-  AppHeader,
   DatePickerField,
   NativeDatePicker,
   Screen,
@@ -35,7 +41,6 @@ import {
   StaleDataBadge,
   useToast,
 } from "../components/ui";
-import { cardChrome, inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { pageFiltersKey } from "../storage/keys";
 import { usePersistedState } from "../storage/usePersistedState";
@@ -51,7 +56,6 @@ import {
   toIsoDate,
 } from "../utils/format";
 import { orderStatusColor, orderStatusSoft } from "../utils/orderStatusColors";
-import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Tab = "economics" | "stock" | "payroll";
 
@@ -245,12 +249,8 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-full px-3.5 py-1.5"
-      style={{
-        backgroundColor: active ? colors.brand : colors.surface,
-        borderWidth: 1,
-        borderColor: active ? colors.brand : colors.lineStrong,
-      }}
+      className="rounded-full px-3 py-1.5"
+      style={{ backgroundColor: active ? colors.brand : colors.surfaceSubtle }}
     >
       <Text
         className="text-xs font-medium"
@@ -273,7 +273,10 @@ function SummaryTile({
 }) {
   const { colors } = useTheme();
   return (
-    <View className="mb-2 min-w-[48%] flex-1 p-3" style={cardChrome(colors)}>
+    <View
+      className="mb-2 min-w-[48%] flex-1 rounded-xl p-3"
+      style={{ backgroundColor: colors.surfaceSubtle }}
+    >
       <Text className="text-[10px]" style={{ color: colors.inkMuted }}>
         {label}
       </Text>
@@ -368,7 +371,7 @@ function SearchField({
   return (
     <View
       className="min-w-[140px] flex-1 flex-row items-center gap-2 rounded-xl px-3"
-      style={{ ...inputChrome(colors), height: 40, minHeight: 0 }}
+      style={{ backgroundColor: colors.surfaceSubtle, height: 40 }}
     >
       <Ionicons name="search" size={16} color={colors.inkFaint} />
       <TextInput
@@ -403,12 +406,8 @@ function MonthPickerButton({
     <>
       <Pressable
         onPress={() => setOpen(true)}
-        className="flex-row items-center gap-1.5 rounded-full px-3.5 py-1.5"
-        style={{
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.lineStrong,
-        }}
+        className="flex-row items-center gap-1.5 rounded-full px-3 py-2"
+        style={{ backgroundColor: colors.surfaceSubtle }}
         accessibilityRole="button"
         accessibilityLabel={`Месяц: ${monthLabel(value)}`}
       >
@@ -443,11 +442,9 @@ function FilterButton({
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row items-center gap-1 rounded-full px-3.5 py-1.5"
+      className="flex-row items-center gap-1 rounded-full px-3 py-2"
       style={{
-        backgroundColor: open ? colors.brandSoft : colors.surface,
-        borderWidth: 1,
-        borderColor: open ? colors.brand : colors.lineStrong,
+        backgroundColor: open ? colors.brandSoft : colors.surfaceSubtle,
       }}
       accessibilityRole="button"
       accessibilityLabel="Фильтры"
@@ -493,11 +490,7 @@ function ExportButton({
       onPress={onPress}
       disabled={disabled || busy}
       className="rounded-full p-2"
-      style={{
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.lineStrong,
-      }}
+      style={{ backgroundColor: colors.surfaceSubtle }}
       accessibilityRole="button"
       accessibilityLabel="Экспорт в Excel"
     >
@@ -513,7 +506,10 @@ function ExportButton({
 function EmptyReport({ text }: { text: string }) {
   const { colors } = useTheme();
   return (
-    <View className="items-center px-4 py-8" style={cardChrome(colors)}>
+    <View
+      className="items-center rounded-xl px-4 py-8"
+      style={{ backgroundColor: colors.surfaceSubtle }}
+    >
       <Ionicons
         name="document-text-outline"
         size={28}
@@ -543,7 +539,7 @@ function EconomicsOrderCard({
     <Pressable
       onPress={onToggle}
       className="mb-2 rounded-xl p-3"
-      style={cardChrome(colors)}
+      style={{ backgroundColor: colors.surfaceSubtle }}
       accessibilityRole="button"
       accessibilityState={{ expanded }}
     >
@@ -695,7 +691,7 @@ function StockItemCard({
     <Pressable
       onPress={onToggle}
       className="mb-2 rounded-xl p-3"
-      style={cardChrome(colors)}
+      style={{ backgroundColor: colors.surfaceSubtle }}
       accessibilityRole="button"
       accessibilityState={{ expanded }}
     >
@@ -779,7 +775,7 @@ function PayrollEmployeeCard({
   return (
     <View
       className="mb-2 rounded-xl p-3"
-      style={cardChrome(colors)}
+      style={{ backgroundColor: colors.surfaceSubtle }}
     >
       <Pressable onPress={onToggle} accessibilityRole="button">
         <View className="flex-row items-start gap-2">
@@ -1151,7 +1147,6 @@ export function ReportsScreen() {
 
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
-      <AppHeader title="Отчёты" />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -1209,7 +1204,7 @@ export function ReportsScreen() {
       {filtersOpen && tab === "economics" ? (
         <View
           className="mb-3 gap-3 rounded-xl p-3"
-          style={cardChrome(colors)}
+          style={{ backgroundColor: colors.surfaceSubtle }}
         >
           <Text
             className="text-xs font-semibold uppercase"
@@ -1300,7 +1295,7 @@ export function ReportsScreen() {
       {filtersOpen && tab === "stock" ? (
         <View
           className="mb-3 flex-row items-center justify-between rounded-xl p-3"
-          style={cardChrome(colors)}
+          style={{ backgroundColor: colors.surfaceSubtle }}
         >
           <Text className="text-sm" style={{ color: colors.inkSoft }}>
             Скрыть нулевые остатки
@@ -1484,7 +1479,7 @@ export function ReportsScreen() {
               ))}
               <View
                 className="mt-1 rounded-xl p-3"
-                style={cardChrome(colors)}
+                style={{ backgroundColor: colors.surfaceSubtle }}
               >
                 <ReportField label="Сумма">
                   {formatMoney(payroll.total)}

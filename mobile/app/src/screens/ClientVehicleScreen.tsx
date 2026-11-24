@@ -1,15 +1,14 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 
 import { deleteGarageVehicle } from "../api/clientAccount";
 import { describeError } from "../api/errors";
-import { Button, Card, ConfirmDialog, Screen, useToast } from "../components/ui";
+import { ConfirmDialog, Screen, useToast } from "../components/ui";
 import { invalidateEntities } from "../offline";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
-import { AppText as Text } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ClientVehicle">;
 
@@ -59,7 +58,10 @@ export function ClientVehicleScreen({ route, navigation }: Props) {
 
   return (
     <Screen>
-      <Card className="mb-4 flex-row items-center">
+      <View
+        className="mb-4 flex-row items-center rounded-xl px-4 py-3"
+        style={{ backgroundColor: colors.surfaceSubtle }}
+      >
         <Ionicons
           name="car-sport-outline"
           size={22}
@@ -79,9 +81,12 @@ export function ClientVehicleScreen({ route, navigation }: Props) {
             </Text>
           ) : null}
         </View>
-      </Card>
+      </View>
 
-      <Card>
+      <View
+        className="rounded-xl px-4"
+        style={{ backgroundColor: colors.surfaceSubtle }}
+      >
         <Field label="VIN" value={vehicle.vin} />
         <Field label="Госномер" value={vehicle.plate} />
         <Field label="Год" value={vehicle.year ? String(vehicle.year) : null} />
@@ -91,24 +96,39 @@ export function ClientVehicleScreen({ route, navigation }: Props) {
           value={vehicle.mileage_km != null ? `${vehicle.mileage_km} км` : null}
         />
         <Field label="Заметки" value={vehicle.notes} />
-      </Card>
+      </View>
 
       <View className="mt-6 gap-2">
-        <Button
-          title="Редактировать"
+        <Pressable
           onPress={() =>
             navigation.navigate("ClientVehicleForm", {
               vehicle,
               organizationId: vehicle.organization_id,
             })
           }
-        />
-        <Button
-          title={deleting ? "Удаление…" : "Удалить автомобиль"}
-          variant="danger"
-          loading={deleting}
+          className="items-center rounded-xl py-3.5"
+          style={{ backgroundColor: colors.brand }}
+        >
+          <Text className="text-base font-semibold text-white">
+            Редактировать
+          </Text>
+        </Pressable>
+        <Pressable
           onPress={() => setConfirmDelete(true)}
-        />
+          disabled={deleting}
+          className="items-center rounded-xl py-3"
+          style={{
+            backgroundColor: colors.surfaceSubtle,
+            opacity: deleting ? 0.6 : 1,
+          }}
+        >
+          <Text
+            className="text-base font-medium"
+            style={{ color: colors.danger }}
+          >
+            {deleting ? "Удаление…" : "Удалить автомобиль"}
+          </Text>
+        </Pressable>
       </View>
 
       <ConfirmDialog

@@ -1,8 +1,7 @@
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useTheme } from "../../theme/useTheme";
-import { AppText as Text } from "./AppText";
 
 interface StaleDataBadgeProps {
   fetchedAt: Date | string | number | null | undefined;

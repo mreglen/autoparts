@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -25,15 +25,12 @@ import {
 } from "../api/orderForm";
 import { describeError } from "../api/errors";
 import {
-  AppHeader,
-  Button,
   ConfirmDialog,
   DateField,
   Screen,
   Sheet,
   useToast,
 } from "../components/ui";
-import { cardChrome, inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { repairOrderDraftKey } from "../storage/keys";
 import { useTheme } from "../theme/useTheme";
@@ -43,7 +40,6 @@ import {
   readOrderDraft,
   writeOrderDraft,
 } from "../utils/orderDrafts";
-import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 // ---------- Локальная модель формы ----------
 
@@ -206,7 +202,8 @@ function TextField({
         multiline={multiline}
         className="rounded-xl px-4 py-3 text-base"
         style={{
-          ...inputChrome(colors),
+          backgroundColor: colors.surfaceSubtle,
+          color: colors.ink,
           minHeight: multiline ? 80 : 48,
           textAlignVertical: multiline ? "top" : "center",
         }}
@@ -228,11 +225,9 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-full px-3.5 py-1.5"
+      className="rounded-full px-3 py-1.5"
       style={{
-        backgroundColor: active ? colors.brand : colors.surface,
-        borderWidth: 1,
-        borderColor: active ? colors.brand : colors.lineStrong,
+        backgroundColor: active ? colors.brand : colors.surfaceSubtle,
       }}
     >
       <Text
@@ -276,7 +271,7 @@ function LineRow({
     <Pressable
       onPress={onPress}
       className="mb-2 flex-row items-center gap-2 rounded-lg p-2.5"
-      style={cardChrome(colors)}
+      style={{ backgroundColor: colors.surface }}
     >
       <View className="min-w-0 flex-1">
         <Text
@@ -311,7 +306,19 @@ function LineRow({
 }
 
 function AddButton({ label, onPress }: { label: string; onPress: () => void }) {
-  return <Button title={label} variant="secondary" icon="add" className="mb-3" onPress={onPress} />;
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      className="mb-3 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5"
+      style={{ backgroundColor: colors.surfaceSubtle }}
+    >
+      <Ionicons name="add" size={16} color={colors.brand} />
+      <Text className="text-sm font-medium" style={{ color: colors.brand }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
 }
 
 // ---------- Шторки-выборы ----------
@@ -834,13 +841,12 @@ export function OrderFormScreen() {
 
   return (
     <Screen>
-      <AppHeader title={isEdit ? "Редактирование заказа" : "Новый заказ-наряд"} />
       {/* Клиент */}
       <SectionTitle>Клиент</SectionTitle>
       <Pressable
         onPress={() => setClientSheet(true)}
         className="mb-3 flex-row items-center justify-between rounded-xl p-3"
-        style={cardChrome(colors)}
+        style={{ backgroundColor: colors.surfaceSubtle }}
       >
         <View className="min-w-0 flex-1">
           <Text
@@ -882,7 +888,7 @@ export function OrderFormScreen() {
         <Pressable
           onPress={() => setVehicleSheet(true)}
           className="mb-3 flex-row items-center justify-between rounded-xl p-3"
-          style={cardChrome(colors)}
+          style={{ backgroundColor: colors.surfaceSubtle }}
         >
           <Text
             className="flex-1 text-sm font-medium"
@@ -930,7 +936,10 @@ export function OrderFormScreen() {
               placeholderTextColor={colors.inkFaint}
               keyboardType="numbers-and-punctuation"
               className="rounded-xl px-3 py-3 text-base"
-              style={inputChrome(colors)}
+              style={{
+                backgroundColor: colors.surfaceSubtle,
+                color: colors.ink,
+              }}
             />
           </View>
         </View>
@@ -951,7 +960,10 @@ export function OrderFormScreen() {
               placeholderTextColor={colors.inkFaint}
               keyboardType="numbers-and-punctuation"
               className="rounded-xl px-3 py-3 text-base"
-              style={inputChrome(colors)}
+              style={{
+                backgroundColor: colors.surfaceSubtle,
+                color: colors.ink,
+              }}
             />
           </View>
         </View>
@@ -972,7 +984,10 @@ export function OrderFormScreen() {
               placeholderTextColor={colors.inkFaint}
               keyboardType="numbers-and-punctuation"
               className="rounded-xl px-3 py-3 text-base"
-              style={inputChrome(colors)}
+              style={{
+                backgroundColor: colors.surfaceSubtle,
+                color: colors.ink,
+              }}
             />
           </View>
         </View>
@@ -1125,7 +1140,7 @@ export function OrderFormScreen() {
       {/* Итог и кнопка */}
       <View
         className="mt-2 flex-row items-center justify-between rounded-xl p-4"
-        style={cardChrome(colors)}
+        style={{ backgroundColor: colors.surfaceSubtle }}
       >
         <Text className="text-sm" style={{ color: colors.inkMuted }}>
           Примерная сумма
@@ -1134,18 +1149,20 @@ export function OrderFormScreen() {
           {formatMoney(totals.sum)}
         </Text>
       </View>
-      <Button
-        title={
-          saving
+      <Pressable
+        onPress={() => void submit()}
+        disabled={saving}
+        className="mt-3 items-center rounded-xl py-4"
+        style={{ backgroundColor: colors.brand, opacity: saving ? 0.6 : 1 }}
+      >
+        <Text className="text-base font-semibold text-white">
+          {saving
             ? "Сохранение…"
             : isEdit
               ? "Сохранить изменения"
-              : "Создать заказ-наряд"
-        }
-        loading={saving}
-        className="mt-3"
-        onPress={() => void submit()}
-      />
+              : "Создать заказ-наряд"}
+        </Text>
+      </Pressable>
       <View className="h-8" />
 
       {/* Шторка: клиент */}
@@ -1160,14 +1177,14 @@ export function OrderFormScreen() {
           placeholder="Поиск по имени или телефону"
           placeholderTextColor={colors.inkFaint}
           className="mb-3 rounded-xl px-4 py-3 text-base"
-          style={inputChrome(colors)}
+          style={{ backgroundColor: colors.surfaceSubtle, color: colors.ink }}
         />
         {clients.map((c) => (
           <Pressable
             key={c.id}
             onPress={() => selectClient(c)}
             className="mb-2 rounded-xl p-3"
-            style={cardChrome(colors)}
+            style={{ backgroundColor: colors.surfaceSubtle }}
           >
             <Text className="text-sm font-medium" style={{ color: colors.ink }}>
               {c.name}
@@ -1190,10 +1207,8 @@ export function OrderFormScreen() {
             placeholder="Телефон"
             keyboardType="phone-pad"
           />
-          <Button
-            title={creatingClient ? "Создание…" : "Создать клиента"}
-            loading={creatingClient}
-            disabled={newClientName.trim().length < 2}
+          <Pressable
+            disabled={creatingClient || newClientName.trim().length < 2}
             onPress={() => {
               setCreatingClient(true);
               void createClient({
@@ -1208,7 +1223,16 @@ export function OrderFormScreen() {
                 .catch((e) => show(describeError(e), "error"))
                 .finally(() => setCreatingClient(false));
             }}
-          />
+            className="items-center rounded-xl py-3"
+            style={{
+              backgroundColor:
+                newClientName.trim().length >= 2 ? colors.brand : colors.line,
+            }}
+          >
+            <Text className="text-sm font-semibold text-white">
+              {creatingClient ? "Создание…" : "Создать клиента"}
+            </Text>
+          </Pressable>
         </View>
       </PickerSheet>
 
@@ -1223,7 +1247,7 @@ export function OrderFormScreen() {
             key={v.id}
             onPress={() => selectVehicle(v)}
             className="mb-2 rounded-xl p-3"
-            style={cardChrome(colors)}
+            style={{ backgroundColor: colors.surfaceSubtle }}
           >
             <Text className="text-sm font-medium" style={{ color: colors.ink }}>
               {[v.make, v.model].filter(Boolean).join(" ")}
@@ -1274,10 +1298,10 @@ export function OrderFormScreen() {
               />
             </View>
           </View>
-          <Button
-            title={creatingVehicle ? "Создание…" : "Добавить автомобиль"}
-            loading={creatingVehicle}
-            disabled={!newVehicle.make.trim() || !form.clientId}
+          <Pressable
+            disabled={
+              creatingVehicle || !newVehicle.make.trim() || !form.clientId
+            }
             onPress={() => {
               if (!form.clientId) return;
               setCreatingVehicle(true);
@@ -1295,7 +1319,17 @@ export function OrderFormScreen() {
                 .catch((e) => show(describeError(e), "error"))
                 .finally(() => setCreatingVehicle(false));
             }}
-          />
+            className="items-center rounded-xl py-3"
+            style={{
+              backgroundColor: newVehicle.make.trim()
+                ? colors.brand
+                : colors.line,
+            }}
+          >
+            <Text className="text-sm font-semibold text-white">
+              {creatingVehicle ? "Создание…" : "Добавить автомобиль"}
+            </Text>
+          </Pressable>
         </View>
       </PickerSheet>
 
@@ -1311,14 +1345,14 @@ export function OrderFormScreen() {
           placeholder="Поиск по каталогу работ"
           placeholderTextColor={colors.inkFaint}
           className="mb-3 rounded-xl px-4 py-3 text-base"
-          style={inputChrome(colors)}
+          style={{ backgroundColor: colors.surfaceSubtle, color: colors.ink }}
         />
         {catalogWorks.map((w) => (
           <Pressable
             key={w.id}
             onPress={() => addCatalogWork(w)}
             className="mb-2 flex-row items-center justify-between rounded-xl p-3"
-            style={cardChrome(colors)}
+            style={{ backgroundColor: colors.surfaceSubtle }}
           >
             <Text
               className="flex-1 text-sm"
@@ -1351,11 +1385,18 @@ export function OrderFormScreen() {
             onChangeText={(v) => setManualWork((p) => ({ ...p, price: v }))}
             keyboardType="numeric"
           />
-          <Button
-            title="Добавить"
+          <Pressable
             disabled={!manualWork.title.trim()}
             onPress={addManualWork}
-          />
+            className="items-center rounded-xl py-3"
+            style={{
+              backgroundColor: manualWork.title.trim()
+                ? colors.brand
+                : colors.line,
+            }}
+          >
+            <Text className="text-sm font-semibold text-white">Добавить</Text>
+          </Pressable>
         </View>
       </PickerSheet>
 
@@ -1602,8 +1643,7 @@ export function OrderFormScreen() {
             ) : null}
           </>
         ) : null}
-        <Button
-          title="Добавить"
+        <Pressable
           disabled={!partForm.title.trim()}
           onPress={() =>
             addNamedLine(
@@ -1614,7 +1654,13 @@ export function OrderFormScreen() {
                   : "deliveries",
             )
           }
-        />
+          className="items-center rounded-xl py-3"
+          style={{
+            backgroundColor: partForm.title.trim() ? colors.brand : colors.line,
+          }}
+        >
+          <Text className="text-sm font-semibold text-white">Добавить</Text>
+        </Pressable>
       </PickerSheet>
 
       <ConfirmDialog

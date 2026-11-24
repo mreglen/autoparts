@@ -1,8 +1,6 @@
-import { type TextInputProps } from "react-native";
+import { TextInput, type TextInputProps } from "react-native";
 
 import { useTheme } from "../../theme/useTheme";
-import { AppTextInput as TextInput } from "./AppText";
-import { inputChrome } from "./chrome";
 
 interface MoneyFieldProps
   extends Omit<TextInputProps, "keyboardType" | "value" | "onChangeText"> {
@@ -26,7 +24,11 @@ export function MoneyField({
       placeholder={placeholder}
       placeholderTextColor={colors.inkFaint}
       className="rounded-xl px-4 py-3 text-base"
-      style={inputChrome(colors)}
+      style={{
+        backgroundColor: colors.surfaceSubtle,
+        color: colors.ink,
+        minHeight: 48,
+      }}
       {...rest}
     />
   );

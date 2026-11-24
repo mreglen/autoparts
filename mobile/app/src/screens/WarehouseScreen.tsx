@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -24,20 +24,15 @@ import {
 } from "../api/warehouse";
 import { describeError } from "../api/errors";
 import {
-  AppHeader,
-  Button,
-  Card,
   Screen,
   Sheet,
   SkeletonRows,
   StaleDataBadge,
   useToast,
 } from "../components/ui";
-import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import { formatDayMonth, formatMoney } from "../utils/format";
-import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 const PAGE = 50;
 
@@ -78,7 +73,7 @@ function Field({
         placeholderTextColor={colors.inkFaint}
         keyboardType={keyboardType}
         className="rounded-xl px-4 py-3 text-base"
-        style={inputChrome(colors)}
+        style={{ backgroundColor: colors.surfaceSubtle, color: colors.ink }}
       />
     </View>
   );
@@ -97,12 +92,8 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-full px-3.5 py-1.5"
-      style={{
-        backgroundColor: active ? colors.brand : colors.surface,
-        borderWidth: 1,
-        borderColor: active ? colors.brand : colors.lineStrong,
-      }}
+      className="rounded-full px-3 py-1.5"
+      style={{ backgroundColor: active ? colors.brand : colors.surfaceSubtle }}
     >
       <Text
         className="text-xs font-medium"
@@ -331,7 +322,6 @@ export function WarehouseScreen() {
       }}
       refreshing={refreshing}
     >
-      <AppHeader title="Склад" />
       {/* Переключатель вкладок */}
       <View className="mb-3 flex-row gap-2">
         <Chip
@@ -350,7 +340,7 @@ export function WarehouseScreen() {
         <>
           <View
             className="mb-3 flex-row items-center gap-2 rounded-xl px-3"
-            style={{ ...inputChrome(colors), height: 42, minHeight: 0 }}
+            style={{ backgroundColor: colors.surfaceSubtle, height: 42 }}
           >
             <Ionicons name="search" size={16} color={colors.inkFaint} />
             <TextInput
@@ -384,8 +374,12 @@ export function WarehouseScreen() {
           ) : (
             <>
               {items.map((item) => (
-                <Pressable key={item.id} onPress={() => void openItem(item)} className="mb-2">
-                  <Card padded={false} className="p-3">
+                <Pressable
+                  key={item.id}
+                  onPress={() => void openItem(item)}
+                  className="mb-2 rounded-xl p-3"
+                  style={{ backgroundColor: colors.surfaceSubtle }}
+                >
                   <View className="flex-row items-start justify-between gap-2">
                     <View className="min-w-0 flex-1">
                       <Text
@@ -426,27 +420,36 @@ export function WarehouseScreen() {
                       </Text>
                     </View>
                   </View>
-                  </Card>
                 </Pressable>
               ))}
               {hasMore ? (
-                <Button
-                  title={loadingMore ? "Загрузка…" : "Показать ещё"}
-                  variant="secondary"
-                  loading={loadingMore}
-                  className="mt-1"
+                <Pressable
                   onPress={() => void loadItems(false)}
-                />
+                  disabled={loadingMore}
+                  className="mt-1 items-center rounded-xl py-3"
+                  style={{ backgroundColor: colors.surfaceSubtle }}
+                >
+                  <Text
+                    className="text-sm font-medium"
+                    style={{ color: colors.brand }}
+                  >
+                    {loadingMore ? "Загрузка…" : "Показать ещё"}
+                  </Text>
+                </Pressable>
               ) : null}
             </>
           )}
 
-          <Button
-            title="Приход на склад"
-            icon="add"
-            className="mt-4"
+          <Pressable
             onPress={() => setReceiptSheet(true)}
-          />
+            className="mt-4 flex-row items-center justify-center gap-1.5 rounded-xl py-3.5"
+            style={{ backgroundColor: colors.brand }}
+          >
+            <Ionicons name="add" size={18} color="#fff" />
+            <Text className="text-sm font-semibold text-white">
+              Приход на склад
+            </Text>
+          </Pressable>
         </>
       ) : (
         <>
@@ -462,7 +465,11 @@ export function WarehouseScreen() {
             </Text>
           ) : (
             returns.slice(0, 50).map((r) => (
-              <Card key={r.id} padded={false} className="mb-2 p-3">
+              <View
+                key={r.id}
+                className="mb-2 rounded-xl p-3"
+                style={{ backgroundColor: colors.surfaceSubtle }}
+              >
                 <View className="flex-row items-center justify-between gap-2">
                   <Text
                     className="flex-1 text-sm font-medium"
@@ -483,7 +490,7 @@ export function WarehouseScreen() {
                   {formatDayMonth(r.created_at)} ·{" "}
                   {RETURN_REASON_LABELS[r.reason] ?? r.reason}
                 </Text>
-              </Card>
+              </View>
             ))
           )}
 
@@ -509,9 +516,9 @@ export function WarehouseScreen() {
                     comment: "",
                   });
                 }}
-                className="mb-2"
+                className="mb-2 rounded-xl p-3"
+                style={{ backgroundColor: colors.surfaceSubtle }}
               >
-                <Card padded={false} className="p-3">
                 <View className="flex-row items-center justify-between gap-2">
                   <Text
                     className="flex-1 text-sm font-medium"
@@ -535,7 +542,6 @@ export function WarehouseScreen() {
                   · {lot.supplier_name || "Поставщик"} ·{" "}
                   {formatDayMonth(lot.created_at)}
                 </Text>
-                </Card>
               </Pressable>
             ))
           )}
@@ -768,11 +774,16 @@ export function WarehouseScreen() {
             onChangeText={(v) => setReceiptForm((p) => ({ ...p, price: v }))}
             keyboardType="numeric"
           />
-          <Button
-            title={saving ? "Сохранение…" : "Оприходовать"}
-            loading={saving}
+          <Pressable
             onPress={() => void submitReceipt()}
-          />
+            disabled={saving}
+            className="items-center rounded-xl py-3.5"
+            style={{ backgroundColor: colors.brand, opacity: saving ? 0.6 : 1 }}
+          >
+            <Text className="text-sm font-semibold text-white">
+              {saving ? "Сохранение…" : "Оприходовать"}
+            </Text>
+          </Pressable>
         </ScrollView>
       </Sheet>
 
@@ -794,12 +805,16 @@ export function WarehouseScreen() {
           onChangeText={(v) => setExpenseForm((p) => ({ ...p, reason: v }))}
           placeholder="Списание, брак, использование…"
         />
-        <Button
-          title={saving ? "Списание…" : "Списать со склада"}
-          variant="danger"
-          loading={saving}
+        <Pressable
           onPress={() => void submitExpense()}
-        />
+          disabled={saving}
+          className="items-center rounded-xl py-3.5"
+          style={{ backgroundColor: colors.danger, opacity: saving ? 0.6 : 1 }}
+        >
+          <Text className="text-sm font-semibold text-white">
+            {saving ? "Списание…" : "Списать со склада"}
+          </Text>
+        </Pressable>
       </Sheet>
 
       {/* Шторка: возврат */}
@@ -841,11 +856,19 @@ export function WarehouseScreen() {
               value={returnForm.comment}
               onChangeText={(v) => setReturnForm((p) => ({ ...p, comment: v }))}
             />
-            <Button
-              title={saving ? "Оформление…" : "Оформить возврат"}
-              loading={saving}
+            <Pressable
               onPress={() => void submitReturn()}
-            />
+              disabled={saving}
+              className="items-center rounded-xl py-3.5"
+              style={{
+                backgroundColor: colors.brand,
+                opacity: saving ? 0.6 : 1,
+              }}
+            >
+              <Text className="text-sm font-semibold text-white">
+                {saving ? "Оформление…" : "Оформить возврат"}
+              </Text>
+            </Pressable>
           </ScrollView>
         ) : null}
       </Sheet>

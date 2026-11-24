@@ -2,7 +2,7 @@
   "expo": {
     "name": "Свой Гараж - автосервис",
     "slug": "sg-autoservice",
-    "version": "1.0.6",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "sgautoservice",
@@ -12,15 +12,12 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "ru.svoygarage.autoservice",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "bundleIdentifier": "ru.svoygarage.autoservice"
     },
     "android": {
       "package": "ru.svoygarage.autoservice",
       "adaptiveIcon": {
-        "backgroundColor": "#EFF6FF",
+        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -39,9 +36,7 @@
       "expo-secure-store",
       "expo-sqlite",
       "expo-sharing",
-      "@react-native-community/datetimepicker",
-      "expo-font",
-      "expo-status-bar"
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

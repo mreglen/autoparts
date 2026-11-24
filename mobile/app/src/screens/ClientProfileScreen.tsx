@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Image, Pressable, Switch, View } from "react-native";
+import { Image, Pressable, Switch, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import {
@@ -17,15 +17,8 @@ import {
 } from "../api/profile";
 import { useAppRole } from "../auth/roles";
 import { useSession } from "../auth/session";
-import {
-  Button,
-  Card,
-  Screen,
-  useToast,
-} from "../components/ui";
-import { inputChrome } from "../components/ui/chrome";
+import { Screen, useToast } from "../components/ui";
 import { useTheme } from "../theme/useTheme";
-import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 const PREF_LABELS: Record<keyof NotificationPrefs, string> = {
   orders: "Заказы и записи",
@@ -71,7 +64,10 @@ export function ClientProfileScreen() {
   const [confirmPwd, setConfirmPwd] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
 
-  const inputStyle = inputChrome(colors);
+  const inputStyle = {
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.ink,
+  } as const;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -252,11 +248,19 @@ export function ClientProfileScreen() {
         {field(patronymic, setPatronymic, "Отчество")}
         {field(phone, setPhone, "Телефон", { keyboardType: "phone-pad" })}
         {field(email, setEmail, "Email", { keyboardType: "email-address" })}
-        <Button
-          title={savingProfile ? "Сохранение…" : "Сохранить"}
-          loading={savingProfile}
+        <Pressable
           onPress={() => void saveProfile()}
-        />
+          disabled={savingProfile}
+          className="items-center rounded-xl py-3.5"
+          style={{
+            backgroundColor: colors.brand,
+            opacity: savingProfile ? 0.6 : 1,
+          }}
+        >
+          <Text className="text-base font-semibold" style={{ color: "#fff" }}>
+            {savingProfile ? "Сохранение…" : "Сохранить"}
+          </Text>
+        </Pressable>
       </View>
 
       <SectionTitle>Смена пароля</SectionTitle>
@@ -266,29 +270,33 @@ export function ClientProfileScreen() {
           {field(newPwd, setNewPwd, "Новый пароль")}
           {field(confirmPwd, setConfirmPwd, "Повторите новый пароль")}
           <View className="flex-row gap-3">
-            <Button
-              title="Отмена"
-              variant="outline"
-              className="flex-1"
+            <Pressable
               onPress={() => setShowPassword(false)}
-            />
-            <Button
-              title={savingPwd ? "…" : "Сменить"}
-              loading={savingPwd}
-              className="flex-1"
+              className="flex-1 items-center rounded-xl py-3"
+              style={{ backgroundColor: colors.surfaceSubtle }}
+            >
+              <Text style={{ color: colors.ink }}>Отмена</Text>
+            </Pressable>
+            <Pressable
               onPress={() => void savePassword()}
-            />
+              disabled={savingPwd}
+              className="flex-1 items-center rounded-xl py-3"
+              style={{
+                backgroundColor: colors.brand,
+                opacity: savingPwd ? 0.6 : 1,
+              }}
+            >
+              <Text className="font-semibold" style={{ color: "#fff" }}>
+                {savingPwd ? "…" : "Сменить"}
+              </Text>
+            </Pressable>
           </View>
         </View>
       ) : (
         <Pressable
           onPress={() => setShowPassword(true)}
           className="flex-row items-center justify-between rounded-xl px-4 py-3.5"
-          style={{
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.lineStrong,
-          }}
+          style={{ backgroundColor: colors.surfaceSubtle }}
         >
           <Text style={{ color: colors.ink }}>Изменить пароль</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.inkMuted} />
@@ -298,7 +306,10 @@ export function ClientProfileScreen() {
       {prefs ? (
         <>
           <SectionTitle>Уведомления</SectionTitle>
-          <Card padded={false} className="px-4 py-2">
+          <View
+            className="rounded-xl px-4 py-2"
+            style={{ backgroundColor: colors.surfaceSubtle }}
+          >
             {(Object.keys(PREF_LABELS) as (keyof NotificationPrefs)[]).map(
               (key) => (
                 <View
@@ -348,7 +359,7 @@ export function ClientProfileScreen() {
                 </View>
               ),
             )}
-          </Card>
+          </View>
         </>
       ) : null}
 
@@ -364,7 +375,11 @@ export function ClientProfileScreen() {
             .filter(Boolean)
             .join(" · ");
           return (
-            <Card key={org.organization_id} className="mb-2 px-4 py-3">
+            <View
+              key={org.organization_id}
+              className="mb-2 rounded-xl px-4 py-3"
+              style={{ backgroundColor: colors.surfaceSubtle }}
+            >
               <Text className="font-medium" style={{ color: colors.ink }}>
                 {org.organization_name ?? info?.name ?? org.organization_id}
               </Text>
@@ -376,7 +391,7 @@ export function ClientProfileScreen() {
                   {subtitle}
                 </Text>
               ) : null}
-            </Card>
+            </View>
           );
         })
       )}

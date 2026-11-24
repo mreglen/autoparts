@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type {
   NativeStackNavigationProp,
@@ -15,7 +15,6 @@ import {
 } from "../api/clientAccount";
 import { describeError } from "../api/errors";
 import {
-  EmptyState,
   FadeSlideIn,
   ListRow,
   Screen,
@@ -30,7 +29,6 @@ import {
   formatDayMonth,
   formatMoney,
 } from "../utils/format";
-import { AppText as Text } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ClientHistory">;
 
@@ -73,11 +71,9 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-full px-3.5 py-1.5"
+      className="rounded-full px-3.5 py-2"
       style={{
-        backgroundColor: active ? colors.brand : colors.surface,
-        borderWidth: 1,
-        borderColor: active ? colors.brand : colors.lineStrong,
+        backgroundColor: active ? colors.brand : colors.surfaceSubtle,
       }}
     >
       <Text
@@ -92,6 +88,7 @@ function Chip({
 }
 
 export function ClientHistoryScreen(_: Props) {
+  const { colors } = useTheme();
   const { show } = useToast();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -206,19 +203,21 @@ export function ClientHistoryScreen(_: Props) {
       ) : null}
 
       {visible.length === 0 ? (
-        <EmptyState
-          icon="time-outline"
-          title={
-            rows.length === 0
+        <View className="items-center pt-16">
+          <Text className="text-base font-medium" style={{ color: colors.ink }}>
+            {rows.length === 0
               ? "История ремонтов пуста"
-              : "Нет заказ-нарядов по выбранным фильтрам"
-          }
-          message={
-            rows.length === 0
+              : "Нет заказ-нарядов по выбранным фильтрам"}
+          </Text>
+          <Text
+            className="mt-1 text-center text-sm"
+            style={{ color: colors.inkMuted }}
+          >
+            {rows.length === 0
               ? "Заказ-наряды автосервиса появятся здесь."
-              : "Попробуйте другой фильтр."
-          }
-        />
+              : "Попробуйте другой фильтр."}
+          </Text>
+        </View>
       ) : (
         visible.map((o, i) => (
           <FadeSlideIn key={o.id} index={i} style={{ marginTop: 8 }}>

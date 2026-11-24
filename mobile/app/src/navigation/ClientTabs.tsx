@@ -9,7 +9,6 @@ import { ClientGarageScreen } from "../screens/ClientGarageScreen";
 import { ClientMoreScreen } from "../screens/ClientMoreScreen";
 import { ClientSearchScreen } from "../screens/ClientSearchScreen";
 import { useTheme } from "../theme/useTheme";
-import { fontFamily } from "../theme/fonts";
 
 const Tab = createBottomTabNavigator();
 
@@ -32,10 +31,6 @@ export function ClientTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.inkMuted,
-        tabBarLabelStyle: {
-          fontFamily: fontFamily.medium,
-          fontSize: 11,
-        },
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.line,
@@ -47,12 +42,8 @@ export function ClientTabs() {
         component={ClientGarageScreen}
         options={{
           title: "Гараж",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "car-sport" : "car-sport-outline"}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="car-sport-outline" color={color} size={size} />
           ),
         }}
       />
@@ -61,12 +52,8 @@ export function ClientTabs() {
         component={ClientBookingsScreen}
         options={{
           title: "Записи",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "calendar" : "calendar-outline"}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar-outline" color={color} size={size} />
           ),
         }}
       />
@@ -75,12 +62,8 @@ export function ClientTabs() {
         component={ClientSearchScreen}
         options={{
           title: "Поиск",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "search" : "search-outline"}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="search-outline" color={color} size={size} />
           ),
         }}
       />
@@ -90,12 +73,8 @@ export function ClientTabs() {
         options={{
           title: "Корзина",
           tabBarBadge: cartCount > 0 ? cartCount : undefined,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "cart" : "cart-outline"}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cart-outline" color={color} size={size} />
           ),
         }}
       />
@@ -104,13 +83,9 @@ export function ClientTabs() {
         component={ClientMoreScreen}
         options={{
           title: "Ещё",
-          tabBarIcon: ({ color, size, focused }) => (
+          tabBarIcon: ({ color, size }) => (
             <Ionicons
-              name={
-                focused
-                  ? "ellipsis-horizontal"
-                  : "ellipsis-horizontal-outline"
-              }
+              name="ellipsis-horizontal-outline"
               color={color}
               size={size}
             />

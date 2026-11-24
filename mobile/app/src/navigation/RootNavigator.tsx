@@ -41,7 +41,6 @@ import { ContractorsScreen } from "../screens/ContractorsScreen";
 import { ExpenseArticlesScreen } from "../screens/ExpenseArticlesScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { useTheme } from "../theme/useTheme";
-import { fontFamily } from "../theme/fonts";
 import { ClientTabs } from "./ClientTabs";
 import type { RootStackParamList } from "./types";
 
@@ -84,10 +83,6 @@ function Tabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.inkMuted,
-        tabBarLabelStyle: {
-          fontFamily: fontFamily.medium,
-          fontSize: 11,
-        },
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.line,
@@ -100,12 +95,8 @@ function Tabs() {
         options={{
           title: "Сегодня",
           tabBarButton: allowed("Today") ? undefined : () => null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "today" : "today-outline"}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="today-outline" color={color} size={size} />
           ),
         }}
       />
@@ -115,12 +106,8 @@ function Tabs() {
         options={{
           title: "Записи",
           tabBarButton: allowed("Bookings") ? undefined : () => null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "calendar" : "calendar-outline"}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar-outline" color={color} size={size} />
           ),
         }}
       />
@@ -130,12 +117,8 @@ function Tabs() {
         options={{
           title: "Заказ-наряды",
           tabBarButton: allowed("Orders") ? undefined : () => null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "construct" : "construct-outline"}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="construct-outline" color={color} size={size} />
           ),
         }}
       />
@@ -145,12 +128,8 @@ function Tabs() {
         options={{
           title: "Планировщик",
           tabBarButton: allowed("Planner") ? undefined : () => null,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "grid" : "grid-outline"}
-              color={color}
-              size={size}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="grid-outline" color={color} size={size} />
           ),
         }}
       />
@@ -159,13 +138,9 @@ function Tabs() {
         component={MoreTabScreen}
         options={{
           title: "Ещё",
-          tabBarIcon: ({ color, size, focused }) => (
+          tabBarIcon: ({ color, size }) => (
             <Ionicons
-              name={
-                focused
-                  ? "ellipsis-horizontal"
-                  : "ellipsis-horizontal-outline"
-              }
+              name="ellipsis-horizontal-outline"
               color={color}
               size={size}
             />
@@ -213,15 +188,9 @@ export function RootNavigator() {
         screenOptions={{
           headerShown: true,
           headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.brand,
+          headerTintColor: colors.ink,
           headerShadowVisible: false,
           headerBackTitle: "Назад",
-          headerTitleStyle: {
-            color: colors.ink,
-            fontFamily: fontFamily.semibold,
-            fontSize: 17,
-          },
-          headerBackButtonDisplayMode: "minimal",
         }}
       >
         {status === "signedIn" ? (

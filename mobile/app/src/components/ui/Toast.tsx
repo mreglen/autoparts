@@ -7,14 +7,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Animated, Easing, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Animated, Easing, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../../theme/useTheme";
 import { DURATION, EASING } from "../../theme/motion";
 import { hapticError, hapticSuccess } from "../../utils/haptics";
-import { AppText as Text } from "./AppText";
 
 interface ToastState {
   message: string;
@@ -88,24 +86,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           }}
         >
           <View
-            className="flex-row items-center gap-2.5 rounded-2xl px-4 py-3"
+            className="rounded-xl px-4 py-3"
             style={{ backgroundColor: tone }}
           >
-            <Ionicons
-              name={
-                toast.variant === "success"
-                  ? "checkmark-circle"
-                  : toast.variant === "error"
-                    ? "alert-circle"
-                    : "information-circle"
-              }
-              size={18}
-              color={textTone}
-            />
-            <Text
-              className="flex-1 text-sm font-medium"
-              style={{ color: textTone }}
-            >
+            <Text className="text-sm font-medium" style={{ color: textTone }}>
               {toast.message}
             </Text>
           </View>

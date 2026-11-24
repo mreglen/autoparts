@@ -1,6 +1,8 @@
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { EmptyState, Screen } from "../components/ui";
+import { Screen } from "../components/ui";
+import { useTheme } from "../theme/useTheme";
 
 interface PlaceholderScreenProps {
   title: string;
@@ -13,13 +15,21 @@ export function PlaceholderScreen({
   icon,
   description,
 }: PlaceholderScreenProps) {
+  const { colors } = useTheme();
   return (
     <Screen className="items-center justify-center">
-      <EmptyState
-        icon={icon}
-        title={title}
-        message={description ?? "Раздел появится на следующих этапах каркаса."}
-      />
+      <View className="items-center gap-3">
+        <Ionicons name={icon} size={48} color={colors.brand} />
+        <Text className="text-xl font-semibold" style={{ color: colors.ink }}>
+          {title}
+        </Text>
+        <Text
+          className="max-w-xs text-center text-sm"
+          style={{ color: colors.inkMuted }}
+        >
+          {description ?? "Раздел появится на следующих этапах каркаса."}
+        </Text>
+      </View>
     </Screen>
   );
 }

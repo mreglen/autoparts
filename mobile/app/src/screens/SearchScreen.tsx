@@ -1,11 +1,9 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { EmptyState, Screen } from "../components/ui";
-import { inputChrome } from "../components/ui/chrome";
+import { Screen } from "../components/ui";
 import { useTheme } from "../theme/useTheme";
-import { AppTextInput as TextInput } from "../components/ui/AppText";
 
 /** Глобальный поиск — отдельный экран. Источники данных подключатся с разделами этапов 6+. */
 export function SearchScreen() {
@@ -16,7 +14,7 @@ export function SearchScreen() {
     <Screen scroll={false}>
       <View
         className="mb-4 flex-row items-center gap-2 rounded-xl px-4"
-        style={inputChrome(colors)}
+        style={{ backgroundColor: colors.surfaceSubtle, minHeight: 48 }}
       >
         <Ionicons name="search" size={18} color={colors.inkFaint} />
         <TextInput
@@ -27,7 +25,7 @@ export function SearchScreen() {
           autoFocus
           autoCapitalize="none"
           autoCorrect={false}
-          className="flex-1 py-3 text-base"
+          className="flex-1 text-base"
           style={{ color: colors.ink }}
         />
         {query ? (
@@ -39,11 +37,12 @@ export function SearchScreen() {
           />
         ) : null}
       </View>
-      <EmptyState
-        icon="search-outline"
-        title="Найдите клиента, деталь или заказ"
-        message="Поиск заработает вместе с разделами."
-      />
+      <View className="items-center gap-3 pt-10">
+        <Ionicons name="search-outline" size={40} color={colors.inkFaint} />
+        <Text className="text-sm" style={{ color: colors.inkMuted }}>
+          Поиск по разделам появится вместе с ними.
+        </Text>
+      </View>
     </Screen>
   );
 }

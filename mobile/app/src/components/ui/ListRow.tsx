@@ -1,9 +1,7 @@
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useTheme } from "../../theme/useTheme";
-import { cardChrome } from "./chrome";
-import { AppText as Text } from "./AppText";
 import { PressableScale } from "./motion";
 
 interface ListRowProps {
@@ -12,7 +10,6 @@ interface ListRowProps {
   right?: string;
   onPress?: () => void;
   destructive?: boolean;
-  icon?: keyof typeof Ionicons.glyphMap;
 }
 
 export function ListRow({
@@ -21,28 +18,13 @@ export function ListRow({
   right,
   onPress,
   destructive,
-  icon,
 }: ListRowProps) {
   const { colors } = useTheme();
   const content = (
     <View
-      className="flex-row items-center rounded-xl px-3.5 py-3"
-      style={cardChrome(colors)}
+      className="flex-row items-center justify-between rounded-xl px-4 py-3"
+      style={{ backgroundColor: colors.surfaceSubtle }}
     >
-      {icon ? (
-        <View
-          className="mr-3 h-9 w-9 items-center justify-center rounded-lg"
-          style={{
-            backgroundColor: destructive ? colors.dangerSoft : colors.brandSoft,
-          }}
-        >
-          <Ionicons
-            name={icon}
-            size={18}
-            color={destructive ? colors.danger : colors.brand}
-          />
-        </View>
-      ) : null}
       <View className="min-w-0 flex-1">
         <Text
           className="text-base"

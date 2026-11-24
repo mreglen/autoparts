@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { Linking, Pressable, Switch, View } from "react-native";
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,14 +26,11 @@ import {
 } from "../api/partsShop";
 import { describeError } from "../api/errors";
 import {
-  Button,
-  Card,
   ConfirmDialog,
   Screen,
   SkeletonRows,
   useToast,
 } from "../components/ui";
-import { inputChrome } from "../components/ui/chrome";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import {
@@ -40,7 +45,6 @@ import {
   validateFullName,
   validatePhone,
 } from "../utils/partsShop";
-import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 const OFFER_URL = "https://svoygarage.ru/offer";
 
@@ -61,7 +65,10 @@ export function ClientCheckoutScreen() {
   const [unpaidConfirm, setUnpaidConfirm] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<number | null>(null);
 
-  const inputStyle = inputChrome(colors);
+  const inputStyle = {
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.ink,
+  } as const;
 
   const { data: cart, isLoading: cartLoading } = useQuery({
     queryKey: ["shop-cart"],
@@ -183,7 +190,10 @@ export function ClientCheckoutScreen() {
   if (placedOrder != null) {
     return (
       <Screen>
-        <Card className="items-center px-6 py-10">
+        <View
+          className="items-center rounded-2xl px-6 py-10"
+          style={{ backgroundColor: colors.surfaceSubtle }}
+        >
           <Ionicons name="checkmark-circle" size={48} color={colors.success ?? colors.brand} />
           <Text className="mt-4 text-xl font-bold" style={{ color: colors.ink }}>
             Заказ оформлен
@@ -192,10 +202,24 @@ export function ClientCheckoutScreen() {
             Заказ №{placedOrder} появится в разделе «Мои заказы».
           </Text>
           <View className="mt-6 flex-row gap-3">
-            <Button title="Мои заказы" className="flex-1" onPress={() => navigation.replace("ClientPurchases")} />
-            <Button title="В поиск" variant="outline" className="flex-1" onPress={() => navigation.popToTop()} />
+            <Pressable
+              onPress={() => navigation.replace("ClientPurchases")}
+              className="rounded-xl px-5 py-3"
+              style={{ backgroundColor: colors.brand }}
+            >
+              <Text className="font-semibold text-white">Мои заказы</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.popToTop()}
+              className="rounded-xl px-5 py-3"
+              style={{ borderWidth: 1, borderColor: colors.line }}
+            >
+              <Text className="font-semibold" style={{ color: colors.ink }}>
+                В поиск
+              </Text>
+            </Pressable>
           </View>
-        </Card>
+        </View>
       </Screen>
     );
   }
@@ -230,7 +254,7 @@ export function ClientCheckoutScreen() {
       <Text className="mb-2 text-xs font-semibold uppercase" style={{ color: colors.inkFaint }}>
         Состав заказа · {items.length} поз.
       </Text>
-      <Card className="mb-4">
+      <View className="mb-4 rounded-xl px-4 py-3" style={{ backgroundColor: colors.surfaceSubtle }}>
         {items.map((item) => (
           <View key={item.id} className="flex-row items-center justify-between py-1">
             <Text className="min-w-0 flex-1 text-sm" style={{ color: colors.ink }} numberOfLines={1}>
@@ -249,7 +273,7 @@ export function ClientCheckoutScreen() {
             {formatMoney(total)}
           </Text>
         </View>
-      </Card>
+      </View>
 
       <Text className="mb-2 text-xs font-semibold uppercase" style={{ color: colors.inkFaint }}>
         Получатель
@@ -289,7 +313,7 @@ export function ClientCheckoutScreen() {
       <Text className="mb-2 mt-5 text-xs font-semibold uppercase" style={{ color: colors.inkFaint }}>
         Получение
       </Text>
-      <Card className="mt-5">
+      <View className="rounded-xl px-4 py-3" style={{ backgroundColor: colors.surfaceSubtle }}>
         <View className="flex-row items-center gap-2">
           <Ionicons name="storefront-outline" size={18} color={colors.brand} />
           <Text className="flex-1 text-sm" style={{ color: colors.ink }}>
@@ -306,9 +330,9 @@ export function ClientCheckoutScreen() {
             Минимальная сумма для самовывоза — {formatMoney(minOrderAmount)}
           </Text>
         ) : null}
-      </Card>
+      </View>
 
-      <Card className="mt-4 flex-row items-center justify-between">
+      <View className="mt-4 flex-row items-center justify-between rounded-xl px-4 py-3" style={{ backgroundColor: colors.surfaceSubtle }}>
         <View className="min-w-0 flex-1">
           <Text className="text-sm" style={{ color: colors.ink }}>
             Отправлять частями по мере поступления
@@ -322,16 +346,12 @@ export function ClientCheckoutScreen() {
           onValueChange={setDeliverInParts}
           trackColor={{ true: colors.brand }}
         />
-      </Card>
+      </View>
 
       <Pressable
         onPress={() => setAcceptedOffer((v) => !v)}
         className="mt-4 flex-row items-start gap-3 rounded-xl px-4 py-3"
-        style={{
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: acceptedOffer ? colors.brand : colors.lineStrong,
-        }}
+        style={{ backgroundColor: colors.surfaceSubtle }}
       >
         <Ionicons
           name={acceptedOffer ? "checkbox" : "square-outline"}
@@ -352,27 +372,38 @@ export function ClientCheckoutScreen() {
         </Text>
       </Pressable>
 
-      <Button
-        title={submitting === "pay" ? "Переход к оплате…" : `Оплатить ${formatMoney(total)}`}
-        loading={submitting === "pay"}
-        className="mt-4"
+      <Pressable
         onPress={() => void handlePay()}
-      />
+        disabled={submitting != null}
+        className="mt-4 items-center rounded-xl py-4"
+        style={{ backgroundColor: colors.brand, opacity: submitting ? 0.7 : 1 }}
+      >
+        {submitting === "pay" ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text className="text-base font-semibold text-white">
+            Оплатить {formatMoney(total)}
+          </Text>
+        )}
+      </Pressable>
       <Text className="mt-2 text-center text-xs" style={{ color: colors.inkFaint }}>
         СБП или банковская карта · заказ создаётся после оплаты
       </Text>
 
       {config?.allow_unpaid_checkout ? (
-        <Button
-          title="Оформить без оплаты"
-          variant="outline"
-          className="mt-3"
-          disabled={submitting != null}
+        <Pressable
           onPress={() => {
             if (!validate()) return;
             setUnpaidConfirm(true);
           }}
-        />
+          disabled={submitting != null}
+          className="mt-3 items-center rounded-xl py-3"
+          style={{ borderWidth: 1, borderColor: colors.line }}
+        >
+          <Text className="font-medium" style={{ color: colors.ink }}>
+            Оформить без оплаты
+          </Text>
+        </Pressable>
       ) : null}
 
       <ConfirmDialog

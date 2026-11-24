@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import QRCode from "react-native-qrcode-svg";
@@ -11,7 +11,7 @@ import {
   type PurchaseUsedOrder,
 } from "../api/partsShop";
 import { describeError } from "../api/errors";
-import { Button, Card, EmptyState, Screen, SkeletonRows } from "../components/ui";
+import { Screen, SkeletonRows } from "../components/ui";
 import { useTheme } from "../theme/useTheme";
 import {
   formatGarageOrderDate,
@@ -23,7 +23,6 @@ import {
   type PurchaseOrderLike,
 } from "../utils/partsShop";
 import { formatMoney } from "../utils/format";
-import { AppText as Text } from "../components/ui/AppText";
 
 type Kind = "new" | "used";
 
@@ -48,7 +47,10 @@ function OrderCard({ order }: { order: UnifiedOrder }) {
   const ready = isReadyForPickup(order);
 
   return (
-    <Card padded={false} className="mb-3 px-4 py-3">
+    <View
+      className="mb-3 rounded-xl px-4 py-3"
+      style={{ backgroundColor: colors.surfaceSubtle }}
+    >
       <Pressable onPress={() => setExpanded((v) => !v)}>
         <View className="flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
@@ -126,7 +128,7 @@ function OrderCard({ order }: { order: UnifiedOrder }) {
           </Text>
         </View>
       ) : null}
-    </Card>
+    </View>
   );
 }
 
@@ -190,14 +192,12 @@ export function ClientPurchasesScreen() {
             onPress={() => setKind(k)}
             className="flex-1 items-center rounded-xl py-2.5"
             style={{
-              backgroundColor: kind === k ? colors.brand : colors.surface,
-              borderWidth: 1,
-              borderColor: kind === k ? colors.brand : colors.lineStrong,
+              backgroundColor: kind === k ? colors.brand : colors.surfaceSubtle,
             }}
           >
             <Text
               className="text-sm font-medium"
-              style={{ color: kind === k ? "#fff" : colors.inkSoft }}
+              style={{ color: kind === k ? "#fff" : colors.ink }}
             >
               {label}
             </Text>
@@ -210,23 +210,22 @@ export function ClientPurchasesScreen() {
           <Text className="text-sm" style={{ color: colors.danger }}>
             {error}
           </Text>
-          <Button
-            title="Повторить"
-            variant="secondary"
-            className="mt-3"
-            onPress={() => void active.refetch()}
-          />
+          <Pressable onPress={() => void active.refetch()} className="mt-3 rounded-xl px-4 py-2" style={{ backgroundColor: colors.brand }}>
+            <Text className="text-sm font-semibold text-white">Повторить</Text>
+          </Pressable>
         </View>
       ) : orders.length === 0 ? (
-        <EmptyState
-          icon="receipt-outline"
-          title="Заказов пока нет"
-          message={
-            kind === "new"
+        <View className="items-center pt-16">
+          <Ionicons name="receipt-outline" size={44} color={colors.inkFaint} />
+          <Text className="mt-3 text-base font-medium" style={{ color: colors.ink }}>
+            Заказов пока нет
+          </Text>
+          <Text className="mt-1 text-center text-sm" style={{ color: colors.inkMuted }}>
+            {kind === "new"
               ? "Найдите запчасть в поиске и оформите заказ."
-              : "Заказы б/у запчастей появятся здесь после покупки."
-          }
-        />
+              : "Заказы б/у запчастей появятся здесь после покупки."}
+          </Text>
+        </View>
       ) : (
         orders.map((order) => <OrderCard key={`${order.kind}-${order.id}`} order={order} />)
       )}

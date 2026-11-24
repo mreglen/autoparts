@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { Image, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 
 import { describeError } from "../api/errors";
 import { useSession } from "../auth/session";
-import { Button, Screen } from "../components/ui";
-import { inputChrome } from "../components/ui/chrome";
+import { Screen } from "../components/ui";
 import { useTheme } from "../theme/useTheme";
-import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 const NOTICE_TEXT = {
   rights: "Права сотрудника изменились — войдите заново",
@@ -41,25 +39,20 @@ export function LoginScreen() {
     }
   };
 
+  const inputStyle = {
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.ink,
+  } as const;
+
   return (
     <Screen scroll={false} className="justify-center">
       <View className="w-full max-w-sm self-center gap-4">
-        <View className="mb-6 items-center">
-          <View
-            className="h-16 w-16 items-center justify-center overflow-hidden rounded-2xl"
-            style={{ backgroundColor: colors.brandSoft }}
-          >
-            <Image
-              source={require("../../assets/icon.png")}
-              style={{ width: 40, height: 40 }}
-              resizeMode="contain"
-            />
-          </View>
-          <Text className="mt-4 text-2xl font-bold" style={{ color: colors.ink }}>
+        <View className="mb-4 items-center">
+          <Text className="text-2xl font-bold" style={{ color: colors.ink }}>
             Свой Гараж
           </Text>
           <Text className="mt-1 text-sm" style={{ color: colors.inkMuted }}>
-            Кабинет автосервиса
+            Автосервис
           </Text>
         </View>
 
@@ -88,7 +81,7 @@ export function LoginScreen() {
           keyboardType="email-address"
           editable={!busy}
           className="rounded-xl px-4 py-3 text-base"
-          style={inputChrome(colors)}
+          style={inputStyle}
         />
         <TextInput
           value={password}
@@ -99,7 +92,7 @@ export function LoginScreen() {
           editable={!busy}
           onSubmitEditing={submit}
           className="rounded-xl px-4 py-3 text-base"
-          style={inputChrome(colors)}
+          style={inputStyle}
         />
 
         {error ? (
@@ -108,12 +101,16 @@ export function LoginScreen() {
           </Text>
         ) : null}
 
-        <Button
-          title={busy ? "Вход…" : "Войти"}
-          loading={busy}
-          className="mt-2"
+        <Pressable
           onPress={submit}
-        />
+          disabled={busy}
+          className="items-center rounded-xl py-3.5"
+          style={{ backgroundColor: colors.brand, opacity: busy ? 0.6 : 1 }}
+        >
+          <Text className="text-base font-semibold text-white">
+            {busy ? "Вход…" : "Войти"}
+          </Text>
+        </Pressable>
       </View>
     </Screen>
   );

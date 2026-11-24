@@ -1,20 +1,12 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 import { createBooking } from "../api/bookings";
 import { describeError } from "../api/errors";
-import {
-  AppHeader,
-  Button,
-  DateField,
-  Screen,
-  useToast,
-} from "../components/ui";
-import { inputChrome } from "../components/ui/chrome";
+import { DateField, Screen, useToast } from "../components/ui";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
-import { AppText as Text, AppTextInput as TextInput } from "../components/ui/AppText";
 
 type Props = NativeStackScreenProps<RootStackParamList, "BookingNew">;
 
@@ -33,7 +25,10 @@ export function BookingFormScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const inputStyle = inputChrome(colors);
+  const inputStyle = {
+    backgroundColor: colors.surfaceSubtle,
+    color: colors.ink,
+  } as const;
 
   const submit = async () => {
     setError("");
@@ -71,7 +66,6 @@ export function BookingFormScreen({ navigation }: Props) {
 
   return (
     <Screen>
-      <AppHeader title="Новая запись" />
       <View className="gap-4">
         <TextInput
           value={name}
@@ -155,11 +149,16 @@ export function BookingFormScreen({ navigation }: Props) {
           </Text>
         ) : null}
 
-        <Button
-          title={busy ? "Сохранение…" : "Создать запись"}
+        <Pressable
           onPress={() => void submit()}
-          loading={busy}
-        />
+          disabled={busy}
+          className="items-center rounded-xl py-3.5"
+          style={{ backgroundColor: colors.brand, opacity: busy ? 0.6 : 1 }}
+        >
+          <Text className="text-base font-semibold text-white">
+            {busy ? "Сохранение…" : "Создать запись"}
+          </Text>
+        </Pressable>
       </View>
     </Screen>
   );
