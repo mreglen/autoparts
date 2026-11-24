@@ -125,6 +125,7 @@ class ChatResponse(BaseModel):
     # ID текущего пользователя (для определения роли)
     current_user_id: Optional[int] = None
     created_by_id: Optional[int] = None
+    autoservice_client_id: Optional[int] = None
     can_manage: bool = False
     can_delete: bool = False
 
@@ -155,3 +156,4 @@ class ManageableUserItem(BaseModel):
     organization_id: Optional[str] = None
     is_seller: bool = False
     is_buyer: bool = False
+    already_participant: bool = False

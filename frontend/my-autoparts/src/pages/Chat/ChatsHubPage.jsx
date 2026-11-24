@@ -38,6 +38,8 @@ import ReplyArrow from './ReplyArrow';
 import UserAvatar from '../../components/UserAvatar/UserAvatar';
 import ChatParticipantsPanel from './ChatParticipantsPanel';
 import CreateGroupChatModal from './CreateGroupChatModal';
+import AutoserviceChatClientModal from './AutoserviceChatClientModal';
+import { AUTOSERVICE_PERMISSION, hasAutoservicePermission } from '../../utils/autoservicePermissions';
 import { getGarageCounterpartyProfilePath } from '../../utils/publicProfile';
 
 const formatTime = (dateString) => {
@@ -72,7 +74,8 @@ function getChatSearchHaystack(chat, source, avitoUserId, currentUserId) {
   const isAvito = source === 'avito';
   const isOrganization = source === 'organization';
   const isSellers = source === 'sellers';
-  const isGroupSource = isOrganization || isSellers;
+  const isAutoservice = source === 'autoservice';
+  const isGroupSource = isOrganization || isSellers || isAutoservice;
 
   const title = isAvito
     ? (() => {
@@ -107,12 +110,13 @@ function getGarageChatListSource(chat) {
   const type = chat?.chat_type || (chat?.is_group ? 'organization' : 'direct');
   if (type === 'direct') return 'garage';
   if (type === 'sellers') return 'sellers';
+  if (type === 'autoservice') return 'autoservice';
   if (type === 'organization' || type === 'custom') return 'organization';
   return 'organization';
 }
 
 function isGarageGroupSource(source) {
-  return source === 'organization' || source === 'sellers';
+  return source === 'organization' || source === 'sellers' || source === 'autoservice';
 }
 
 function ChatPanelMenu({ items }) {
@@ -301,6 +305,7 @@ const ChatsHubPage = () => {
   const routeParams = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useSelector((state) => state.auth);
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const { chats: garageChats, currentChat, loading: garageLoading, error: garageError, incomingChatAlert } = useSelector((state) => state.chats);
   const { 
     chats: avitoChats, 
@@ -335,6 +340,15 @@ const ChatsHubPage = () => {
     user?.organization_id || (garageChats || []).some((c) => getGarageChatListSource(c) === 'organization'),
   );
   const showSellersFilter = Boolean(user?.is_seller || hasSellersChat);
+  const hasAutoserviceChatPermission = hasAutoservicePermission(
+    user,
+    permissionCodes,
+    AUTOSERVICE_PERMISSION.chat,
+  );
+  const showAutoserviceFilter = Boolean(
+    hasAutoserviceChatPermission
+      || (garageChats || []).some((c) => getGarageChatListSource(c) === 'autoservice'),
+  );
 
   // Подключаем WebSocket и push-уведомления при загрузке
   useEffect(() => {
@@ -424,7 +438,15 @@ const ChatsHubPage = () => {
         _source: 'sellers',
         _lastMessageAt: chat.last_message?.created_at || chat.created_at || '',
       }));
-    
+
+    const autoservice = (garageChats || [])
+      .filter((chat) => getGarageChatListSource(chat) === 'autoservice')
+      .map(chat => ({
+        ...chat,
+        _source: 'autoservice',
+        _lastMessageAt: chat.last_message?.created_at || chat.created_at || '',
+      }));
+
     const avito = avitoEnabled
       ? (avitoChats || []).map(chat => ({
         ...chat,
@@ -433,7 +455,7 @@ const ChatsHubPage = () => {
       }))
       : [];
     
-    return [...garage, ...organization, ...sellers, ...avito].sort((a, b) => {
+    return [...garage, ...organization, ...sellers, ...autoservice, ...avito].sort((a, b) => {
       const dateA = new Date(a._lastMessageAt);
       const dateB = new Date(b._lastMessageAt);
       return dateB - dateA;
@@ -445,6 +467,7 @@ const ChatsHubPage = () => {
     garage: unifiedChats.filter((c) => c._source === 'garage').length,
     organization: unifiedChats.filter((c) => c._source === 'organization').length,
     sellers: unifiedChats.filter((c) => c._source === 'sellers').length,
+    autoservice: unifiedChats.filter((c) => c._source === 'autoservice').length,
     avito: unifiedChats.filter((c) => c._source === 'avito').length,
   }), [unifiedChats]);
 
@@ -456,6 +479,8 @@ const ChatsHubPage = () => {
       list = list.filter((c) => c._source === 'organization');
     } else if (sourceFilter === 'sellers') {
       list = list.filter((c) => c._source === 'sellers');
+    } else if (sourceFilter === 'autoservice') {
+      list = list.filter((c) => c._source === 'autoservice');
     } else if (sourceFilter === 'avito') {
       list = list.filter((c) => c._source === 'avito');
     }
@@ -480,11 +505,14 @@ const ChatsHubPage = () => {
     if (showSellersFilter) {
       items.push({ id: 'sellers', label: 'Продавцы', count: chatCounts.sellers });
     }
+    if (showAutoserviceFilter) {
+      items.push({ id: 'autoservice', label: 'Автосервис', count: chatCounts.autoservice });
+    }
     if (avitoEnabled) {
       items.push({ id: 'avito', label: 'Авито', count: chatCounts.avito });
     }
     return items;
-  }, [chatCounts, avitoEnabled, showOrganizationFilter, showSellersFilter]);
+  }, [chatCounts, avitoEnabled, showOrganizationFilter, showSellersFilter, showAutoserviceFilter]);
 
   useEffect(() => {
     if (sourceFilter === 'avito' && !avitoEnabled) {
@@ -496,7 +524,10 @@ const ChatsHubPage = () => {
     if (sourceFilter === 'sellers' && !showSellersFilter) {
       setSourceFilter('all');
     }
-  }, [sourceFilter, avitoEnabled, showOrganizationFilter, showSellersFilter]);
+    if (sourceFilter === 'autoservice' && !showAutoserviceFilter) {
+      setSourceFilter('all');
+    }
+  }, [sourceFilter, avitoEnabled, showOrganizationFilter, showSellersFilter, showAutoserviceFilter]);
 
   useEffect(() => {
     if (activeChatSource === 'avito' && !avitoEnabled) {
@@ -515,7 +546,12 @@ const ChatsHubPage = () => {
       next.set('source', 'garage');
       setSearchParams(next, { replace: true });
     }
-  }, [activeChatSource, avitoEnabled, showOrganizationFilter, showSellersFilter, searchParams, setSearchParams]);
+    if (activeChatSource === 'autoservice' && !showAutoserviceFilter) {
+      const next = new URLSearchParams(searchParams);
+      next.set('source', 'garage');
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeChatSource, avitoEnabled, showOrganizationFilter, showSellersFilter, showAutoserviceFilter, searchParams, setSearchParams]);
 
   const handleSelectChat = useCallback((chat) => {
     const source = chat._source;
@@ -537,9 +573,17 @@ const ChatsHubPage = () => {
     setSearchParams(next);
   }, [dispatch, searchParams, setSearchParams, activeChatId, activeChatSource]);
 
-  const handleOpenIncomingChat = useCallback(() => {
+  const handleOpenIncomingChat = useCallback(async () => {
     if (!incomingChatAlert?.chatId) return;
-    const chat = garageChats.find((c) => c.id === incomingChatAlert.chatId);
+    let chat = garageChats.find((c) => String(c.id) === String(incomingChatAlert.chatId));
+    if (!chat) {
+      try {
+        const fresh = await dispatch(fetchUserChats({ skip: 0, limit: 100 })).unwrap();
+        chat = (fresh?.chats || []).find((c) => String(c.id) === String(incomingChatAlert.chatId));
+      } catch {
+        chat = null;
+      }
+    }
     if (chat) {
       handleSelectChat({ ...chat, _source: getGarageChatListSource(chat) });
     } else {
@@ -823,18 +867,21 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
   const isAvito = source === 'avito';
   const isOrganization = source === 'organization';
   const isSellers = source === 'sellers';
-  const isGroupRow = isOrganization || isSellers;
+  const isAutoservice = source === 'autoservice';
+  const isGroupRow = isOrganization || isSellers || isAutoservice;
 
-  const counterpartyAvatar = !isAvito && !isGroupRow
-    ? (currentUserId === chat.seller_id ? chat.buyer_avatar_url : chat.seller_avatar_url)
-    : null;
+  const counterpartyAvatar = isAutoservice
+    ? (currentUserId === chat.buyer_id ? chat.organization_logo : chat.buyer_avatar_url)
+    : !isAvito && !isGroupRow
+      ? (currentUserId === chat.seller_id ? chat.buyer_avatar_url : chat.seller_avatar_url)
+      : null;
 
   const img = isAvito
     ? (chat.context_image_url || chat.avatar_url)
     : isGroupRow
-      ? chat.product_photo_url
+      ? (isAutoservice ? counterpartyAvatar : chat.product_photo_url)
       : (counterpartyAvatar || chat.product_photo_url);
-  
+
   const title = isAvito
     ? (() => {
         const mine = avitoUserId != null ? String(avitoUserId) : '';
@@ -842,11 +889,15 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
         const joined = others.map((p) => p.name).filter(Boolean).join(', ');
         return joined || chat.title || 'Чат';
       })()
-    : isGroupRow
-      ? (chat.title || chat.organization_name || (isSellers ? 'Чат продавцов' : 'Чат организации'))
-      : (currentUserId === chat.seller_id 
-          ? (chat.buyer_name || 'Покупатель')
-          : (chat.seller_name || chat.seller_organization || 'Продавец'));
+    : isAutoservice
+      ? (currentUserId === chat.buyer_id
+          ? (chat.organization_name || 'Автосервис')
+          : (chat.title || chat.buyer_name || 'Клиент автосервиса'))
+      : isGroupRow
+        ? (chat.title || chat.organization_name || (isSellers ? 'Чат продавцов' : 'Чат организации'))
+        : (currentUserId === chat.seller_id
+            ? (chat.buyer_name || 'Покупатель')
+            : (chat.seller_name || chat.seller_organization || 'Продавец'));
 
   const lastMessageText = isAvito
     ? (chat.last_message_text || 'Нет сообщений')
@@ -947,10 +998,12 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
           <span
             className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow ring-1 ring-gray-200"
             onClick={isGroupRow ? undefined : handleSourceIconClick}
-            title={isAvito ? 'Открыть на Авито' : isSellers ? 'Продавцы' : isOrganization ? 'Организация' : 'Перейти к товару'}
+            title={isAvito ? 'Открыть на Авито' : isAutoservice ? 'Автосервис' : isSellers ? 'Продавцы' : isOrganization ? 'Организация' : 'Перейти к товару'}
           >
             {isSellers ? (
               <span className="text-[9px] font-bold text-amber-700">П</span>
+            ) : isAutoservice ? (
+              <span className="text-[9px] font-bold text-sky-700">А</span>
             ) : isOrganization ? (
               <span className="text-[9px] font-bold text-emerald-700">О</span>
             ) : (
@@ -972,9 +1025,11 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
               {!isAvito && !isGroupRow && chat.product_name && (
                 <p className="truncate text-xs text-gray-500">{chat.product_name}</p>
               )}
-              {isGroupRow && chat.participants_count > 0 && (
+              {isAutoservice && currentUserId === chat.buyer_id && chat.organization_name ? (
+                <p className="truncate text-xs text-gray-500">{chat.organization_name}</p>
+              ) : (isGroupRow || isAutoservice) && chat.participants_count > 0 ? (
                 <p className="truncate text-xs text-gray-500">{chat.participants_count} участников</p>
-              )}
+              ) : null}
               {isAvito && chat.context_title && (
                 <p className="truncate text-xs text-gray-500">{chat.context_title}</p>
               )}
@@ -1022,6 +1077,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showClientProfile, setShowClientProfile] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesScrollRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -1047,6 +1103,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
 
   useEffect(() => {
     setShowParticipants(false);
+    setShowClientProfile(false);
   }, [chatId]);
 
   // Автоскролл к последнему сообщению
@@ -1196,7 +1253,10 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
       return chat.seller_name || chat.seller_organization || 'Продавец';
     }
     if (sid === chat.buyer_id) {
-      return chat.buyer_name || 'Покупатель';
+      return chat.buyer_name || (isAutoserviceChat ? 'Клиент' : 'Покупатель');
+    }
+    if (isAutoserviceChat) {
+      return 'Автосервис';
     }
     return 'Собеседник';
   };
@@ -1224,11 +1284,18 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
     }, dimAfterMs + dimHoldMs + transitionMs);
   }, []);
 
-  const title = isGroupChat
-    ? (chat?.title || chat?.organization_name || 'Чат организации')
-    : (user?.id === chat?.seller_id 
-        ? (chat?.buyer_name || 'Покупатель')
-        : (chat?.seller_name || chat?.seller_organization || 'Продавец'));
+  const isAutoserviceChat = chat?.chat_type === 'autoservice';
+  const isAutoserviceClientSide = isAutoserviceChat && user?.id === chat?.buyer_id;
+
+  const title = isAutoserviceChat
+    ? (isAutoserviceClientSide
+        ? (chat?.organization_name || 'Автосервис')
+        : (chat?.title || chat?.buyer_name || 'Клиент автосервиса'))
+    : isGroupChat
+      ? (chat?.title || chat?.organization_name || 'Чат организации')
+      : (user?.id === chat?.seller_id
+          ? (chat?.buyer_name || 'Покупатель')
+          : (chat?.seller_name || chat?.seller_organization || 'Продавец'));
 
   const typingUserId = chatId ? typingByChatId[parseInt(chatId, 10)] : null;
   const typingLabel = typingUserId && typingUserId !== user?.id ? 'печатает…' : null;
@@ -1263,6 +1330,9 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
     isGroupChat
       ? { label: 'Участники', onClick: () => setShowParticipants(true) }
       : null,
+    isAutoserviceChat && !isAutoserviceClientSide
+      ? { label: 'Профиль клиента', onClick: () => setShowClientProfile(true) }
+      : null,
     !isGroupChat && counterpartyProfilePath
       ? { label: 'Профиль', to: counterpartyProfilePath }
       : null,
@@ -1280,7 +1350,29 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
         pinned
         onBack={onBack}
         avatar={
-          isGroupChat ? (
+          isAutoserviceChat ? (
+            isAutoserviceClientSide ? (
+              chat?.organization_logo ? (
+                <img
+                  src={chat.organization_logo}
+                  alt=""
+                  className="h-11 w-11 rounded-2xl object-cover ring-2 ring-white shadow-sm flex-shrink-0"
+                />
+              ) : (
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
+                  А
+                </div>
+              )
+            ) : (
+              <UserAvatar
+                avatarUrl={chat?.buyer_avatar_url}
+                firstName={chat?.buyer_name}
+                lastName=""
+                size="md"
+                className="ring-2 ring-white shadow-sm"
+              />
+            )
+          ) : isGroupChat ? (
             chat?.product_photo_url ? (
               <img
                 src={chat.product_photo_url}
@@ -1331,6 +1423,12 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
         onChanged={() => dispatch(fetchUserChats({}))}
       />
 
+      <AutoserviceChatClientModal
+        chatId={chatId ? parseInt(chatId, 10) : null}
+        isOpen={isAutoserviceChat && showClientProfile}
+        onClose={() => setShowClientProfile(false)}
+      />
+
       {/* Сообщения */}
       <div
         ref={messagesScrollRef}
@@ -1345,7 +1443,9 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
                 </svg>
               )}
               title="Начните беседу"
-              subtitle={isGroupChat ? 'Напишите первое сообщение в групповой чат' : 'Напишите первое сообщение покупателю или продавцу'}
+              subtitle={isAutoserviceChat
+                ? (isAutoserviceClientSide ? 'Напишите сообщение автосервису' : 'Напишите сообщение клиенту')
+                : isGroupChat ? 'Напишите первое сообщение в групповой чат' : 'Напишите первое сообщение покупателю или продавцу'}
             />
           </div>
         ) : (

@@ -975,6 +975,24 @@ def ensure_chat_created_by_column() -> None:
     logger.info("Applied chats.created_by_id column patch")
 
 
+def ensure_chat_autoservice_client_column() -> None:
+    """Привязка чата клиент↔автосервис к карточке AutoserviceClient."""
+    inspector = inspect(engine)
+    if "chats" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("chats")}
+    if "autoservice_client_id" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE chats ADD COLUMN autoservice_client_id INTEGER "
+                "REFERENCES autoservice_clients(id)"
+            )
+        )
+    logger.info("Applied chats.autoservice_client_id column patch")
+
+
 def ensure_seo_product_url_exports_table() -> None:
     """Table tracking product URLs already included in daily SEO export batches."""
     inspector = inspect(engine)

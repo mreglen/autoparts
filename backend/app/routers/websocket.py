@@ -10,7 +10,13 @@ from app.models.user import User
 from datetime import datetime
 from jose import jwt
 from app.core.config import Settings
-from app.utils.chat_access import get_accessible_chat, is_group_chat, get_chat_participant_ids
+from app.utils.chat_access import (
+    get_accessible_chat,
+    get_autoservice_chat_recipient_ids,
+    is_autoservice_chat,
+    is_group_chat,
+    get_chat_participant_ids,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -226,13 +232,21 @@ class ConnectionManager:
             or sender.email
         ) if sender else "Неизвестный"
 
-        if is_group_chat(chat):
+        if is_autoservice_chat(chat):
+            recipient_ids = get_autoservice_chat_recipient_ids(db, chat)
+        elif is_group_chat(chat):
             recipient_ids = get_chat_participant_ids(db, chat_id)
         else:
             recipient_ids = [uid for uid in (chat.buyer_id, chat.seller_id) if uid]
 
+        if is_autoservice_chat(chat):
+            chat_source = "autoservice"
+        elif is_group_chat(chat):
+            chat_source = "organization"
+        else:
+            chat_source = "garage"
         chat_title = chat.title or "Чат"
-        push_url = f"/chats?source={'organization' if is_group_chat(chat) else 'garage'}&chatId={chat_id}"
+        push_url = f"/chats?source={chat_source}&chatId={chat_id}"
 
         for recipient_id in recipient_ids:
             if recipient_id == exclude_user_id:
@@ -388,6 +402,11 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                     # Отправляем всем участникам чата, включая отправителя.
                     # Это нужно, чтобы на клиенте временное сообщение (temp_*) заменялось
                     # на реальное сообщение с id из БД без ожидания ручного refresh.
+                    if is_group_chat(chat) and sender:
+                        sender_full = " ".join(
+                            p for p in (sender.last_name, sender.first_name) if p
+                        ).strip() or sender_name
+                        message_response["sender_name"] = sender_full
                     await manager.broadcast_to_chat(message_response, chat_id, db, exclude_user_id=None)
                     
                 except Exception as e:
@@ -410,7 +429,11 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                                 "user_id": user_id,
                                 "chat_id": chat_id
                             }
-                            if is_group_chat(chat):
+                            if is_autoservice_chat(chat):
+                                for recipient_id in get_autoservice_chat_recipient_ids(db, chat):
+                                    if recipient_id != user_id:
+                                        await manager.send_personal_message(typing_message, recipient_id)
+                            elif is_group_chat(chat):
                                 for recipient_id in get_chat_participant_ids(db, chat_id):
                                     if recipient_id != user_id:
                                         await manager.send_personal_message(typing_message, recipient_id)

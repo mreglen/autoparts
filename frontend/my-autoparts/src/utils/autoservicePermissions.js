@@ -11,6 +11,7 @@ export const AUTOSERVICE_PERMISSION = {
   inspectionsConfirm: 'autoservice.inspections.confirm',
   settings: 'autoservice.settings',
   markup: 'autoservice.markup',
+  chat: 'autoservice.chat',
 };
 
 export const AUTOSERVICE_PERMISSION_CODES = Object.values(AUTOSERVICE_PERMISSION);

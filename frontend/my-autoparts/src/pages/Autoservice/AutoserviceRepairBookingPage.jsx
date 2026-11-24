@@ -14,6 +14,7 @@ import {
   fetchAutoserviceClientMe,
   selectIsAutoserviceClient,
 } from '../../redux/slices/AutoserviceClientSlice';
+import { fetchUserChats, openAutoserviceChat } from '../../redux/slices/ChatSlice';
 import { formatGarageVehicleLabel, garageVehicleSearchText } from '../../utils/garageVehicleUi';
 
 const pillControlClass = 'sg-pill-input w-full';
@@ -165,6 +166,7 @@ export default function AutoserviceRepairBookingPage() {
   const [rowsError, setRowsError] = useState('');
   const [viewBooking, setViewBooking] = useState(null);
   const [cancelSaving, setCancelSaving] = useState(false);
+  const [chatOpening, setChatOpening] = useState(false);
 
   useEffect(() => {
     if (isReady && isAuthenticated) {
@@ -317,6 +319,25 @@ export default function AutoserviceRepairBookingPage() {
       setError(err?.message || 'Не удалось отправить запись');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleOpenChat = async () => {
+    if (chatOpening) return;
+    setChatOpening(true);
+    setError('');
+    try {
+      const chat = await dispatch(
+        openAutoserviceChat({ organizationId: selectedOrgId || null }),
+      ).unwrap();
+      dispatch(fetchUserChats({}));
+      if (chat?.id) {
+        navigate(`/chats?source=autoservice&chatId=${chat.id}`);
+      }
+    } catch (err) {
+      setError(typeof err === 'string' ? err : err?.message || 'Не удалось открыть чат');
+    } finally {
+      setChatOpening(false);
     }
   };
 
@@ -479,6 +500,16 @@ export default function AutoserviceRepairBookingPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isClient ? (
+            <button
+              type="button"
+              onClick={handleOpenChat}
+              disabled={chatOpening || !selectedOrgId}
+              className={btnPrimary}
+            >
+              {chatOpening ? 'Открытие…' : 'Написать автосервису'}
+            </button>
+          ) : null}
           <Link to="/garage" className={btnGhost}>
             Мои авто
           </Link>

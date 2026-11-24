@@ -29,6 +29,7 @@ from app.routers.websocket import manager as websocket_manager
 from app.utils.chat_access import (
     get_accessible_chat,
     get_user_chats_query,
+    is_autoservice_chat,
     is_group_chat,
     get_chat_type,
 )
@@ -299,11 +300,19 @@ def list_manageable_users(
         chat = get_accessible_chat(db, chat_id, current_user.id)
         if not chat:
             raise HTTPException(status_code=404, detail="Чат не найден")
-    if not can_create_custom_chat(current_user) and not (
+    if chat and is_autoservice_chat(chat):
+        from app.services.autoservice_chat_service import can_manage_autoservice_chat
+        if not can_manage_autoservice_chat(db, chat, current_user):
+            raise HTTPException(status_code=403, detail="Недостаточно прав")
+    elif not can_create_custom_chat(current_user) and not (
         chat and can_manage_custom_chat(chat, current_user)
     ):
         raise HTTPException(status_code=403, detail="Недостаточно прав")
-    rows = search_manageable_users(db, current_user, query=q, chat=chat, limit=limit)
+    if chat and is_autoservice_chat(chat):
+        from app.services.autoservice_chat_service import search_autoservice_chat_staff
+        rows = search_autoservice_chat_staff(db, chat, query=q, limit=limit)
+    else:
+        rows = search_manageable_users(db, current_user, query=q, chat=chat, limit=limit)
     return [ManageableUserItem(**row) for row in rows]
 
 
@@ -1004,7 +1013,11 @@ def add_chat_participant(
     chat = get_accessible_chat(db, chat_id, current_user.id)
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
-    add_participant_to_custom_chat(db, chat, current_user, body.user_id)
+    if is_autoservice_chat(chat):
+        from app.services.autoservice_chat_service import add_autoservice_chat_participant
+        add_autoservice_chat_participant(db, chat, current_user, body.user_id)
+    else:
+        add_participant_to_custom_chat(db, chat, current_user, body.user_id)
     return None
 
 
@@ -1018,7 +1031,11 @@ def remove_chat_participant(
     chat = get_accessible_chat(db, chat_id, current_user.id)
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
-    remove_participant_from_custom_chat(db, chat, current_user, user_id)
+    if is_autoservice_chat(chat):
+        from app.services.autoservice_chat_service import remove_autoservice_chat_participant
+        remove_autoservice_chat_participant(db, chat, current_user, user_id)
+    else:
+        remove_participant_from_custom_chat(db, chat, current_user, user_id)
     return None
 
 
@@ -1217,6 +1234,9 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         last_message_response.message = _last_message_list_preview(last_message)
     
     can_manage = bool(current_user and can_manage_custom_chat(chat, current_user))
+    if not can_manage and current_user and is_autoservice_chat(chat):
+        from app.services.autoservice_chat_service import can_manage_autoservice_chat
+        can_manage = can_manage_autoservice_chat(db, chat, current_user)
     can_delete = bool(current_user and can_delete_chat(chat, current_user))
 
     return ChatResponse(
@@ -1235,6 +1255,7 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         last_message=last_message_response,
         unread_count=unread_count,
         created_by_id=getattr(chat, "created_by_id", None),
+        autoservice_client_id=getattr(chat, "autoservice_client_id", None),
         can_manage=can_manage,
         can_delete=can_delete,
         seller_name=seller_name,

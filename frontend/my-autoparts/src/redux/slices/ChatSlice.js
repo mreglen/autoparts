@@ -59,6 +59,21 @@ export const createOrGetChat = createAsyncThunk(
     }
 );
 
+// Клиент автосервиса: открыть (или создать) чат с автосервисом
+export const openAutoserviceChat = createAsyncThunk(
+    'chats/openAutoserviceChat',
+    async ({ organizationId } = {}, { rejectWithValue }) => {
+        try {
+            const qs = organizationId
+                ? `?organization_id=${encodeURIComponent(organizationId)}`
+                : '';
+            return await apiRequest(`/autoservice/chats/open${qs}`, { method: 'POST' });
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Не удалось открыть чат');
+        }
+    }
+);
+
 export const createOrGetChatWithUser = createAsyncThunk(
     'chats/createOrGetChatWithUser',
     async (targetUserId, { rejectWithValue }) => {
@@ -789,6 +804,12 @@ export const connectWebSocket = (userId) => (dispatch, getState) => {
                 message: data,
                 currentUserId: getState().auth?.user?.id,
             }));
+            const knownChat = (getState().chats?.chats || []).some(
+                (c) => String(c.id) === String(data.chat_id),
+            );
+            if (!knownChat) {
+                dispatch(fetchUserChats({ skip: 0, limit: 100 }));
+            }
             notifyIncomingMessage(dispatch, getState, data);
             dispatch(fetchUnreadCount());
         } else if (data.type === 'messages_read') {

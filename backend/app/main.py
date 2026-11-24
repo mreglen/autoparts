@@ -104,6 +104,7 @@ from app.db.schema_patches import (
     ensure_autoservice_warehouse_items_unit,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
+    ensure_chat_autoservice_client_column,
     ensure_seo_product_url_exports_table,
     ensure_seo_new_part_url_exports_table,
     ensure_seo_sitemap_cache_table,
@@ -382,6 +383,7 @@ try:
     ensure_user_session_client_kind_column()
     ensure_group_chat_columns()
     ensure_chat_created_by_column()
+    ensure_chat_autoservice_client_column()
     ensure_seo_product_url_exports_table()
     ensure_seo_new_part_url_exports_table()
     ensure_seo_sitemap_cache_table()

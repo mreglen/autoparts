@@ -79,6 +79,7 @@ def _ensure_default_permissions(db: Session) -> None:
         {"code": "autoservice.inspections.confirm", "name": "Записи: подтверждение заявок"},
         {"code": "autoservice.settings", "name": "Настройки автосервиса"},
         {"code": "autoservice.markup", "name": "Настройки наценки"},
+        {"code": "autoservice.chat", "name": "Сообщения клиентов"},
         {"code": QR_PART_CARD_PERMISSION, "name": "QR-карточка запчасти"},
     ]
     for perm in defaults:

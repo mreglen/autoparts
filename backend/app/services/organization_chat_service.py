@@ -14,6 +14,7 @@ CHAT_TYPE_DIRECT = "direct"
 CHAT_TYPE_ORGANIZATION = "organization"
 CHAT_TYPE_CUSTOM = "custom"
 CHAT_TYPE_SELLERS = "sellers"
+CHAT_TYPE_AUTOSERVICE = "autoservice"
 
 _LEGACY_DIRECTORS_CHAT_TYPE = "directors"
 

@@ -13,6 +13,7 @@ class Chat(Base):
     seller_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
     organization_id = Column(String(10), ForeignKey("organizations.id"), nullable=True)
+    autoservice_client_id = Column(Integer, ForeignKey("autoservice_clients.id"), nullable=True)
     title = Column(String(255), nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
