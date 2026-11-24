@@ -27,6 +27,7 @@ import autoserviceClientReducer from './slices/AutoserviceClientSlice';
 import autoserviceAdminReducer from './slices/AutoserviceAdminSlice';
 import clientMarkupReducer from './slices/ClientMarkupSlice';
 import contractorsReducer from './slices/ContractorsSlice';
+import notificationsReducer from './slices/NotificationSlice';
 
 export const store = configureStore({
   reducer: {
@@ -58,6 +59,7 @@ export const store = configureStore({
     autoserviceAdmin: autoserviceAdminReducer,
     clientMarkup: clientMarkupReducer,
     contractors: contractorsReducer,
+    notifications: notificationsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

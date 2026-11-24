@@ -20,6 +20,8 @@ from app.schemas.notification import (
     UserNotificationView,
 )
 from app.services.notification_service import (
+    DEFAULT_NOTIFICATION_PREFS,
+    event_category,
     get_user_notification_prefs,
     merge_notification_prefs_patch,
 )
@@ -183,33 +185,60 @@ def send_push_notification(user_id: int, message_data: dict, db: Session):
     db.commit()
 
 
+def _allowed_event_types_for_categories(
+    db: Session, user_id: int, categories: set[str]
+) -> list[str] | None:
+    """Event types пользователя, попадающие в выбранные категории. None — без фильтра."""
+    if not categories or categories >= set(DEFAULT_NOTIFICATION_PREFS):
+        return None
+    rows = (
+        db.query(UserNotification.event_type)
+        .filter(UserNotification.user_id == user_id)
+        .distinct()
+        .all()
+    )
+    return [
+        event_type
+        for (event_type,) in rows
+        if event_category(event_type) in categories
+    ]
+
+
 @router.get("/feed", response_model=UserNotificationFeedResponse)
 def list_notification_feed(
     limit: int = 50,
     offset: int = 0,
+    categories: str | None = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """In-app лента уведомлений текущего пользователя."""
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
+    category_filter = (
+        {part.strip() for part in categories.split(",") if part.strip()} & set(DEFAULT_NOTIFICATION_PREFS)
+        if categories
+        else set()
+    )
+    allowed_types = _allowed_event_types_for_categories(
+        db, current_user.id, category_filter
+    )
+    base = db.query(UserNotification).filter(UserNotification.user_id == current_user.id)
+    if allowed_types is not None:
+        base = base.filter(UserNotification.event_type.in_(allowed_types))
     items = (
-        db.query(UserNotification)
-        .filter(UserNotification.user_id == current_user.id)
-        .order_by(UserNotification.created_at.desc(), UserNotification.id.desc())
+        base.order_by(UserNotification.created_at.desc(), UserNotification.id.desc())
         .offset(offset)
         .limit(limit)
         .all()
     )
-    unread_count = (
-        db.query(func.count(UserNotification.id))
-        .filter(
-            UserNotification.user_id == current_user.id,
-            UserNotification.is_read.is_(False),
-        )
-        .scalar()
-        or 0
+    unread_query = db.query(func.count(UserNotification.id)).filter(
+        UserNotification.user_id == current_user.id,
+        UserNotification.is_read.is_(False),
     )
+    if allowed_types is not None:
+        unread_query = unread_query.filter(UserNotification.event_type.in_(allowed_types))
+    unread_count = unread_query.scalar() or 0
     return UserNotificationFeedResponse(
         items=[UserNotificationView.model_validate(row) for row in items],
         unread_count=unread_count,

@@ -90,7 +90,7 @@ def notify_sellers_new_order(
         "orderKind": order_kind,
         "title": title,
         "body": body,
-        "url": "/sales/orders",
+        "url": f"/sales/orders?order={order_kind}-{order_id}",
     }
     email_body = (
         f"Поступил новый заказ {kind_label} №{order_id}.\n"

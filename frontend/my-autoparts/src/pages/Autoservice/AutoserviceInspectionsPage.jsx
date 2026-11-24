@@ -132,6 +132,20 @@ export default function AutoserviceInspectionsPage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  useEffect(() => {
+    const bookingParam = searchParams.get('booking');
+    if (!bookingParam || !isReady || !isAuthenticated) return;
+    let cancelled = false;
+    apiRequest(`/autoservice/inspection-bookings/${bookingParam}`)
+      .then((data) => {
+        if (!cancelled) setViewBooking(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, isReady, isAuthenticated]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);

@@ -14,6 +14,7 @@ import {
   HeaderIconButton,
   HeaderLogo,
 } from '../Header/headerPrimitives';
+import NotificationBellButton from '../Notifications/NotificationBellButton';
 
 function MenuDotsIcon() {
   return (
@@ -106,6 +107,8 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
             <HeaderIconButton onClick={() => navigate('/autoparts/new')} label="Поиск в каталоге">
               <SearchIcon />
             </HeaderIconButton>
+
+            {token && user ? <NotificationBellButton /> : null}
 
             {token && user ? (
               <Link to={profilePath} aria-label="Профиль" className="shrink-0 active:scale-[0.97]">

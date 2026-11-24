@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import { apiAxios } from '../../utils/apiClient';
 import { subscribeToPushNotifications } from '../../redux/slices/ChatSlice';
 import { fetchSalesMenuCounts } from '../../redux/slices/SalesMenuCountsSlice';
@@ -124,6 +125,8 @@ export default function SalesOrdersPage() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
+  const [searchParams] = useSearchParams();
+  const deepLinkOrderKeyRef = useRef(null);
 
   const [usedOrders, setUsedOrders] = useState([]);
   const [newOrders, setNewOrders] = useState([]);
@@ -1274,6 +1277,24 @@ export default function SalesOrdersPage() {
     [allOrdersPool, filterUnifiedEntry]
   );
 
+  useEffect(() => {
+    const orderKey = searchParams.get('order');
+    if (!orderKey) return;
+    deepLinkOrderKeyRef.current = orderKey;
+    setStatusFilter('all');
+    setExpandedOrderKey(orderKey);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const key = deepLinkOrderKeyRef.current;
+    if (!key || loading) return;
+    const el = document.getElementById(`sales-order-card-${key}`);
+    if (el) {
+      el.scrollIntoView({ block: 'start' });
+      deepLinkOrderKeyRef.current = null;
+    }
+  }, [loading, filteredUnifiedOrders]);
+
   const stats = useMemo(() => {
     let activeCount = 0;
     let totalSum = 0;
@@ -1456,8 +1477,8 @@ export default function SalesOrdersPage() {
               if (entry.source === 'avito') {
                 const o = entry.order;
                 return (
+                  <div key={key} id={`sales-order-card-${key}`} className="scroll-mt-24">
                   <AvitoOrderCard
-                    key={key}
                     order={o}
                     isExpanded={isExpanded}
                     onToggle={() => toggleOrderExpand(key)}
@@ -1477,14 +1498,15 @@ export default function SalesOrdersPage() {
                     getAvitoWarehouseCanRetry={getAvitoWarehouseCanRetry}
                     getAvitoSkipReasonsForDisplay={getAvitoSkipReasonsForDisplay}
                   />
+                  </div>
                 );
               }
 
               const o = entry.order;
               const isUsed = entry.source === 'used';
               return (
+                <div key={key} id={`sales-order-card-${key}`} className="scroll-mt-24">
                 <SalesGarageOrderCard
-                  key={key}
                   order={o}
                   orderType={entry.source}
                   isExpanded={isExpanded}
@@ -1508,6 +1530,7 @@ export default function SalesOrdersPage() {
                   formatDate={formatDate}
                   formatPrice={formatPrice}
                 />
+                </div>
               );
             })}
           </div>

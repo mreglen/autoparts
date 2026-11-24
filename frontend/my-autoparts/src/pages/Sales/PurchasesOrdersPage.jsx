@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { apiAxios, apiRequest } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
@@ -115,6 +115,8 @@ export default function PurchasesOrdersPage() {
   const [expandedOrderKey, setExpandedOrderKey] = useState(null);
   const [newOrdersLoadFailed, setNewOrdersLoadFailed] = useState(false);
   const [statusFilter, setStatusFilter] = useState('active');
+  const [searchParams] = useSearchParams();
+  const deepLinkOrderKeyRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeReturnOrderIds, setActiveReturnOrderIds] = useState(new Set());
   const [selectedItemKeys, setSelectedItemKeys] = useState(new Set());
@@ -262,6 +264,24 @@ export default function PurchasesOrdersPage() {
     () => allOrdersPool.filter(filterUnifiedEntry),
     [allOrdersPool, filterUnifiedEntry],
   );
+
+  useEffect(() => {
+    const orderKey = searchParams.get('order');
+    if (!orderKey) return;
+    deepLinkOrderKeyRef.current = orderKey;
+    setStatusFilter('all');
+    setExpandedOrderKey(orderKey);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const key = deepLinkOrderKeyRef.current;
+    if (!key || loading) return;
+    const el = document.getElementById(`purchase-order-card-${key}`);
+    if (el) {
+      el.scrollIntoView({ block: 'start' });
+      deepLinkOrderKeyRef.current = null;
+    }
+  }, [loading, filteredUnifiedOrders]);
 
   const stats = useMemo(() => {
     let activeCount = 0;
@@ -502,8 +522,8 @@ export default function PurchasesOrdersPage() {
                 : 'Добавить к заказ-наряду';
 
               return (
+                <div key={key} id={`purchase-order-card-${key}`} className="scroll-mt-24">
                 <PurchaseOrderCard
-                  key={key}
                   order={{
                     ...order,
                     ...(entry.source === 'new'
@@ -535,6 +555,7 @@ export default function PurchasesOrdersPage() {
                   onAddToAutoserviceWarehouse={canLinkRepairOrder ? handleAddToAutoserviceWarehouse : undefined}
                   warehouseActionLoading={warehouseImportLoading}
                 />
+                </div>
               );
             })}
           </div>

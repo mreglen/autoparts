@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -254,6 +254,21 @@ export default function AutoserviceRepairBookingPage() {
       loadBookings();
     }
   }, [isReady, isAuthenticated, clientStatus, isClient, loadBookings]);
+
+  const [searchParams] = useSearchParams();
+  const bookingParamHandledRef = useRef(null);
+
+  useEffect(() => {
+    const bookingParam = searchParams.get('booking');
+    if (!bookingParam || bookingParamHandledRef.current === bookingParam) return;
+    if (rowsLoading || !rows.length) return;
+    const found = rows.find((row) => String(row.id) === String(bookingParam));
+    if (found) {
+      bookingParamHandledRef.current = bookingParam;
+      setTab('list');
+      setViewBooking(found);
+    }
+  }, [searchParams, rows, rowsLoading]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated || !selectedOrgId) return;

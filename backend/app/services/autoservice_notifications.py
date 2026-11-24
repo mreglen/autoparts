@@ -293,7 +293,7 @@ def notify_new_inspection_booking(db: Session, booking: InspectionBooking) -> No
         event_type=EVENT_AUTOSERVICE_NEW_INSPECTION,
         push_data={
             "type": "autoservice_inspection",
-            "url": "/autoservice/inspections",
+            "url": f"/autoservice/inspections?booking={booking.id}",
             "inspectionId": booking.id,
             "title": title,
             "body": push_body,
@@ -357,14 +357,14 @@ def notify_inspection_booking_client(
         body = f"{org_name}: {body}"
     push_data = {
         "type": "autoservice_inspection_client",
-        "url": "/autoservice/my-bookings",
+        "url": f"/autoservice/repair-booking?booking={booking.id}",
         "inspectionId": booking.id,
         "title": title,
         "body": body,
     }
     email_body = (
         f"{body}\n\n"
-        f"Открыть: {SITE_ORIGIN}/autoservice/my-bookings\n\n"
+        f"Открыть: {SITE_ORIGIN}/autoservice/repair-booking?booking={booking.id}\n\n"
         "С уважением,\nСвой Гараж"
     )
     for user_id in user_ids:
@@ -386,13 +386,13 @@ def notify_booking_cancelled_by_client(db: Session, booking: InspectionBooking) 
         event_type=EVENT_AUTOSERVICE_BOOKING_CANCELLED_STAFF,
         push_data={
             "type": "autoservice_inspection",
-            "url": "/autoservice/inspections",
+            "url": f"/autoservice/inspections?booking={booking.id}",
             "inspectionId": booking.id,
             "title": title,
             "body": body,
         },
         email_subject=title,
-        email_body=f"{body}\n\nОткрыть: {SITE_ORIGIN}/autoservice/inspections\n\nС уважением,\nСвой Гараж",
+        email_body=f"{body}\n\nОткрыть: {SITE_ORIGIN}/autoservice/inspections?booking={booking.id}\n\nС уважением,\nСвой Гараж",
         permission=AUTOSERVICE_PERMISSION_INSPECTIONS,
     )
 
@@ -443,13 +443,13 @@ def send_booking_reminder(db: Session, booking: InspectionBooking) -> bool:
             event_type=EVENT_AUTOSERVICE_BOOKING_REMINDER,
             push_data={
                 "type": "autoservice_inspection_client",
-                "url": "/autoservice/my-bookings",
+                "url": f"/autoservice/repair-booking?booking={booking.id}",
                 "inspectionId": booking.id,
                 "title": title,
                 "body": body,
             },
             email_subject=title,
-            email_body=f"{body}\n\nОткрыть: {SITE_ORIGIN}/autoservice/my-bookings\n\nС уважением,\nСвой Гараж",
+            email_body=f"{body}\n\nОткрыть: {SITE_ORIGIN}/autoservice/repair-booking?booking={booking.id}\n\nС уважением,\nСвой Гараж",
         )
     _mark_booking_reminder_sent(db, booking)
     return True

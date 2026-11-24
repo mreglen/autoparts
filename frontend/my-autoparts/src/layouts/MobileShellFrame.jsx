@@ -5,6 +5,7 @@ import MobileSideMenu from '../components/MobileSideMenu/MobileSideMenu';
 import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
 import OfflineBanner from '../components/OfflineBanner/OfflineBanner';
 import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
+import NotificationCenterModal from '../components/Notifications/NotificationCenterModal';
 
 /**
  * Shared mobile/desktop shell chrome for public and cabinet layouts.
@@ -42,6 +43,8 @@ export default function MobileShellFrame({
       {beforeMain}
 
       <OfflineBanner />
+
+      <NotificationCenterModal />
 
       {sideMenuProps ? <MobileSideMenu {...sideMenuProps} /> : null}
 

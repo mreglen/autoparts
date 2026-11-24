@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -93,6 +93,27 @@ export default function GarageRepairHistoryPage() {
   useEffect(() => {
     if (isReady && isAuthenticated && isClient) loadOrders();
   }, [isReady, isAuthenticated, isClient, loadOrders]);
+
+  const [searchParams] = useSearchParams();
+  const deepLinkOrderRef = useRef(null);
+
+  useEffect(() => {
+    const orderParam = searchParams.get('order');
+    if (!orderParam || deepLinkOrderRef.current === orderParam) return;
+    if (!isReady || !isAuthenticated || clientStatus !== 'succeeded' || !isClient) return;
+    let cancelled = false;
+    apiRequest(`/autoservice/repair-orders/me/${orderParam}`)
+      .then((data) => {
+        if (cancelled) return;
+        deepLinkOrderRef.current = orderParam;
+        setDetailsCache((prev) => ({ ...prev, [data.id]: data }));
+        setViewOrder(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, isReady, isAuthenticated, clientStatus, isClient]);
 
   const filteredRows = useMemo(() => {
     const query = qApplied.trim().toLowerCase();

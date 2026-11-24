@@ -323,6 +323,33 @@ def list_inspection_bookings_page(
     return build_page([_booking_to_view(row) for row in window], total, page)
 
 
+@router.get(
+    "/autoservice/inspection-bookings/{booking_id}",
+    response_model=InspectionBookingView,
+)
+def get_inspection_booking(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_permission(db, current_user, AUTOSERVICE_PERMISSION_INSPECTIONS)
+    row = (
+        db.query(InspectionBooking)
+        .options(
+            joinedload(InspectionBooking.vehicle),
+            joinedload(InspectionBooking.organization),
+        )
+        .filter(
+            InspectionBooking.id == booking_id,
+            InspectionBooking.organization_id == org_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
+    return _booking_to_view(row)
+
+
 def _query_inspection_bookings(
     db: Session,
     current_user: User,

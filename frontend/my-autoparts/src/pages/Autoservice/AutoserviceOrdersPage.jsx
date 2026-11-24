@@ -158,6 +158,20 @@ export default function AutoserviceOrdersPage() {
     sort,
   });
 
+  useEffect(() => {
+    const orderParam = searchParams.get('order');
+    if (!orderParam) return;
+    let cancelled = false;
+    apiRequest(`/autoservice/repair-orders/${orderParam}`)
+      .then((data) => {
+        if (!cancelled) setViewOrder(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
   const handleSort = useCallback((column) => {
     setSort((prev) => (prev.by === column
       ? { by: column, dir: prev.dir === 'desc' ? 'asc' : 'desc' }

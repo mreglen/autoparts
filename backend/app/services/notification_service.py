@@ -32,6 +32,7 @@ EVENT_AUTOSERVICE_BOOKING_CANCELLED = "autoservice_booking_cancelled"
 EVENT_AUTOSERVICE_BOOKING_REMINDER = "autoservice_booking_reminder"
 EVENT_AUTOSERVICE_BOOKING_CANCELLED_STAFF = "autoservice_booking_cancelled_staff"
 EVENT_AUTOSERVICE_APPLICATION_REVIEWED = "autoservice_application_reviewed"
+EVENT_REPAIR_ORDER_STATUS = "repair_order_status_changed"
 
 CATEGORY_ORDERS = "orders"
 CATEGORY_MESSAGES = "messages"
@@ -66,6 +67,7 @@ EVENT_TO_CATEGORY: dict[str, str] = {
     EVENT_AUTOSERVICE_BOOKING_REMINDER: CATEGORY_AUTOSERVICE,
     EVENT_AUTOSERVICE_BOOKING_CANCELLED_STAFF: CATEGORY_AUTOSERVICE,
     EVENT_AUTOSERVICE_APPLICATION_REVIEWED: CATEGORY_AUTOSERVICE,
+    EVENT_REPAIR_ORDER_STATUS: CATEGORY_AUTOSERVICE,
 }
 
 ORDER_STATUS_LABELS: dict[str, str] = {
@@ -328,7 +330,7 @@ def notify_order_status_buyer(
         "statusCode": status_code,
         "title": title,
         "body": body,
-        "url": "/purchases/orders",
+        "url": f"/purchases/orders?order={order_kind}-{order_id}",
     }
     email_body = (
         f"{body}\n\n"

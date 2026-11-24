@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 
@@ -19,6 +20,7 @@ from app.models.organization_employee import OrganizationEmployee, repair_order_
 from app.models.autoservice_work import AutoserviceWork
 from app.models.garage_vehicle import GarageVehicle
 from app.models.inspection_booking import InspectionBooking
+from app.models.notification import UserNotification
 from app.models.repair_order import (
     RepairOrder,
     RepairOrderClientPart,
@@ -82,6 +84,7 @@ from app.schemas.repair_order import (
 from app.schemas.autoservice_finance import AutoservicePaymentIn, RepairOrderPaymentsListResponse
 from app.schemas.autoservice_contractor import AutoserviceContractorOption
 from app.utils.autoservice_access import (
+    AUTOSERVICE_PERMISSION_ORDERS,
     display_client_phone,
     missing_phone_placeholder,
     my_active_autoservice_client,
@@ -101,6 +104,8 @@ from app.services.autoservice_audit import (
     status_label,
 )
 from app.services.autoservice_caldav import request_org_sync
+from app.services.autoservice_notifications import get_autoservice_staff_recipient_user_ids
+from app.services.notification_service import EVENT_REPAIR_ORDER_STATUS
 from app.services.autoservice_payroll import accrue_order_payroll, clear_order_accruals
 from app.services.autoservice_contractor_payouts import (
     accrue_order_contractor_payouts,
@@ -155,6 +160,8 @@ from app.services.autoservice_work_zone_helpers import (
 )
 
 router = APIRouter(tags=["Autoservice repair orders"])
+
+logger = logging.getLogger(__name__)
 
 _TWOPLACES = Decimal("0.01")
 _THREEPLACES = Decimal("0.001")
@@ -2434,6 +2441,49 @@ def remove_repair_order(
     )
 
 
+def _notify_repair_order_status_feed(
+    db: Session,
+    row: RepairOrder,
+    prev_status: str,
+    new_status: str,
+    actor: User,
+) -> None:
+    """In-app лента: статус заказ-наряда (без push/email)."""
+    label = repair_order_label(row)
+    title = f"Заказ-наряд {label}: {status_label(new_status)}"
+    body = f"Статус изменён: {status_label(prev_status)} → {status_label(new_status)}"
+    data = {"orderId": row.id, "from": prev_status, "to": new_status}
+    notified: set[int] = set()
+
+    def _add(user_id: int | None, url: str) -> None:
+        if not user_id or user_id == actor.id or user_id in notified:
+            return
+        notified.add(user_id)
+        db.add(
+            UserNotification(
+                user_id=user_id,
+                event_type=EVENT_REPAIR_ORDER_STATUS,
+                title=title[:200],
+                body=body,
+                url=url,
+                data=data,
+            )
+        )
+
+    for user_id in get_autoservice_staff_recipient_user_ids(
+        db, row.organization_id, AUTOSERVICE_PERMISSION_ORDERS
+    ):
+        _add(user_id, f"/autoservice/orders?order={row.id}")
+
+    client_user_id = None
+    if row.client_id:
+        client = db.query(AutoserviceClient).filter(AutoserviceClient.id == row.client_id).first()
+        client_user_id = client.user_id if client else None
+    _add(client_user_id, f"/garage/repairs?order={row.id}")
+
+    db.commit()
+
+
 @router.patch(
     "/autoservice/repair-orders/{order_id}/status",
     response_model=RepairOrderStaffView,
@@ -2494,6 +2544,11 @@ def patch_repair_order_status(
             entity_id=order_id,
             details={"from": prev_status, "to": payload.status},
         )
+        try:
+            _notify_repair_order_status_feed(db, row, prev_status, payload.status, current_user)
+        except Exception:
+            db.rollback()
+            logger.exception("Repair order status feed notification failed for order %s", order_id)
     return _to_staff_view(db, row)
 
 
