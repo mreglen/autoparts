@@ -229,6 +229,7 @@ def create_warehouse_return(
     reason: str,
     comment: str | None,
     photo_urls: list[str],
+    skip_reserved_check: bool = False,
 ) -> AutoserviceWarehouseReturnRequest:
     receipt = (
         db.query(AutoserviceWarehouseReceipt)
@@ -252,7 +253,7 @@ def create_warehouse_return(
     )
     if not item:
         raise HTTPException(status_code=404, detail="Товар склада не найден")
-    if int(item.reserved_qty or 0) > 0:
+    if not skip_reserved_check and int(item.reserved_qty or 0) > 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(

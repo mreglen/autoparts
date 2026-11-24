@@ -1526,7 +1526,12 @@ def create_autoservice_warehouse_expense(
         quantity=int(expense.quantity or 0),
         unit=(item.unit if item else None) or "pcs",
         unit_price=expense.unit_price,
+        client_unit_price=expense.client_unit_price,
         reason=expense.reason,
+        repair_order_id=expense.repair_order_id,
+        repair_order_number=(
+            expense.repair_order.order_number if expense.repair_order else None
+        ),
         created_at=expense.created_at,
         creator_name=_creator_name(current_user),
     )

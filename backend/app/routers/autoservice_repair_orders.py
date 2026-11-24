@@ -60,6 +60,7 @@ from app.schemas.repair_order import (
     RepairOrderWorkZoneBrief,
     RepairOrderWorkZonesMeta,
     RepairOrderShopPartIn,
+    RepairOrderShopPartReturnIn,
     RepairOrderShopPartView,
     RepairOrderEmployeeBrief,
     RepairOrderListPage,
@@ -123,6 +124,10 @@ from app.services.repair_order_purchase_import import (
     append_purchase_items_to_repair_order,
     detach_imported_shop_part_from_repair_order,
     shop_part_is_imported,
+)
+from app.services.repair_order_shop_part_return import (
+    return_repair_order_shop_part,
+    shop_part_return_kind,
 )
 from app.services.repair_order_status_timestamps import record_repair_order_status_timestamp
 from app.services.organization_employee_sync import service_employee_is_executor, user_is_service_executor
@@ -375,6 +380,11 @@ def _shop_part_view(
         ),
         receipt_date=(
             _receipt_doc_date(manual_receipt_for_shop_part(db, org_id=org_id, part=part))
+            if db is not None and org_id
+            else None
+        ),
+        return_kind=(
+            shop_part_return_kind(db, org_id, part)
             if db is not None and org_id
             else None
         ),
@@ -1576,7 +1586,13 @@ def list_repair_order_contractor_options(
         .all()
     )
     return [
-        AutoserviceContractorOption(id=row.id, name=row.name, phone=row.phone)
+        AutoserviceContractorOption(
+            id=row.id,
+            name=row.name,
+            phone=row.phone,
+            salary_type=row.salary_type,
+            work_percent=row.work_percent,
+        )
         for row in rows
     ]
 
@@ -2234,6 +2250,43 @@ def detach_imported_repair_order_shop_part(
         db,
         event_type="repair_order_part_updated",
         summary=f"Изменена запчасть заказ-наряда {repair_order_label(row)}: убрана импортная позиция",
+        user=current_user,
+        organization_id=org_id,
+        entity_type="repair_order_shop_part",
+        entity_id=part_id,
+    )
+    return _to_staff_view(db, row)
+
+
+@router.post(
+    "/autoservice/repair-orders/{order_id}/shop-parts/{part_id}/return",
+    response_model=RepairOrderStaffView,
+)
+def return_repair_order_shop_part_endpoint(
+    order_id: int,
+    part_id: int,
+    payload: RepairOrderShopPartReturnIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = _require_full_orders(db, current_user)
+    return_repair_order_shop_part(
+        db,
+        org_id=org_id,
+        order_id=order_id,
+        part_id=part_id,
+        quantity=payload.quantity,
+        user=current_user,
+        reason=payload.reason,
+        comment=payload.comment,
+        photo_urls=payload.photo_urls,
+    )
+    db.commit()
+    row = _get_org_order_or_404(db, org_id, order_id)
+    log_autoservice(
+        db,
+        event_type="repair_order_part_updated",
+        summary=f"Изменена запчасть заказ-наряда {repair_order_label(row)}: возврат позиции",
         user=current_user,
         organization_id=org_id,
         entity_type="repair_order_shop_part",

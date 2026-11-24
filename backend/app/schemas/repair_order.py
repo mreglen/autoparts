@@ -138,6 +138,13 @@ class ManualShopPartUpdate(BaseModel):
     receipt_date: Optional[date] = None
 
 
+class RepairOrderShopPartReturnIn(BaseModel):
+    quantity: int = Field(ge=1)
+    reason: Optional[str] = Field(default=None, max_length=32)
+    comment: Optional[str] = Field(default=None, max_length=4000)
+    photo_urls: list[str] = Field(default_factory=list, max_length=5)
+
+
 class RepairOrderPurchaseImportIn(BaseModel):
     order_type: Literal["new", "used"]
     item_ids: list[int] = Field(min_length=1)
@@ -219,6 +226,7 @@ class RepairOrderShopPartView(BaseModel):
     is_manual_editable: bool = False
     stock_max_qty: Optional[int] = None
     receipt_date: Optional[date] = None
+    return_kind: Optional[str] = None
 
 
 class RepairOrderClientShopPartView(BaseModel):

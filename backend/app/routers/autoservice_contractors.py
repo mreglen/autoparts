@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -168,8 +170,16 @@ def create_contractor(
         note=payload.note,
         is_active=True,
         salary_type=payload.salary_type,
-        salary_amount=payload.salary_amount,
-        work_percent=payload.work_percent,
+        salary_amount=(
+            payload.salary_amount
+            if payload.salary_amount is not None
+            else Decimal("0.00")
+        ),
+        work_percent=(
+            payload.work_percent
+            if payload.work_percent is not None
+            else Decimal("0.00")
+        ),
     )
     apply_requisite_sets(row, payload.requisite_sets)
     db.add(row)

@@ -67,8 +67,8 @@ class AutoserviceContractorCreate(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=32)
     note: Optional[str] = Field(default=None, max_length=2000)
     salary_type: str = Field(default="fixed", max_length=32)
-    salary_amount: Decimal = Field(default=Decimal("0.00"), ge=0)
-    work_percent: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
+    salary_amount: Optional[Decimal] = Field(default=None, ge=0)
+    work_percent: Optional[Decimal] = Field(default=None, ge=0, le=100)
     requisite_sets: RequisiteSetsIn = Field(default_factory=RequisiteSetsIn)
 
     @field_validator("name", mode="before")
@@ -111,6 +111,8 @@ class AutoserviceContractorOption(BaseModel):
     id: int
     name: str
     phone: Optional[str] = None
+    salary_type: str = "fixed"
+    work_percent: Decimal = Decimal("0.00")
 
     model_config = {"from_attributes": True}
 
