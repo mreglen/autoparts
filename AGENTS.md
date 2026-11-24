@@ -187,6 +187,13 @@ sudo update
 - Требуется `EXPO_TOKEN` в `backend/.env` (update.sh сам дописывает его при `sudo EXPO_TOKEN=... update`). EAS собирает код из репозитория — перед сборкой увеличить `version` в `mobile/app/app.json`, закоммитить и задеплоить.
 - Локальная Windows-сборка APK — `powershell -File mobile\build-apk.ps1 [-Bump]` (зеркалит исходники в `C:\s`, Gradle + keystore из `mobile/keys/`).
 
+### 5.6 App Store Connect (iOS)
+
+- **Bundle ID:** `ru.svoygarage.autoservice` (уже создан в Apple Developer → Identifiers)
+- **SKU:** `svoygarage-autoservice-001` (записан для учёта)
+- **Сборка:** EAS Build для iOS → `eas build --platform ios` → загрузи `.ipa` в App Store Connect
+- **Настройки автообновления:** таблица `site_settings` (`mobile_min_app_version`, `mobile_apk_version`, `mobile_apk_url`, `mobile_apk_notes`) → `/api/mobile/meta` (публичный)
+
 ## 6. Соглашения по коду
 
 ### 6.1 Общие
