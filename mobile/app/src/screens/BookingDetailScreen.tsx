@@ -11,6 +11,7 @@ import {
   sendBookingSms,
   type InspectionBooking,
 } from "../api/bookings";
+import { openAutoserviceClientChat } from "../api/chats";
 import { canAccessSection, PERM, hasPermission } from "../auth/access";
 import { currentPermissionCodes } from "../auth/permissions";
 import { useSession } from "../auth/session";
@@ -55,6 +56,7 @@ export function BookingDetailScreen({ route, navigation }: Props) {
   const codes = currentPermissionCodes();
   const canConfirm = hasPermission(user, codes, PERM.inspectionsConfirm);
   const canOrders = canAccessSection(user, codes, "orders");
+  const canChat = hasPermission(user, codes, PERM.chat);
 
   const [booking, setBooking] = useState<InspectionBooking | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,6 +68,8 @@ export function BookingDetailScreen({ route, navigation }: Props) {
     status: string;
     label: string;
   } | null>(null);
+  const [chatConfirm, setChatConfirm] = useState(false);
+  const [chatBusy, setChatBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -111,6 +115,21 @@ export function BookingDetailScreen({ route, navigation }: Props) {
       await patchBooking(id, { status });
       show(`Статус: ${label.toLowerCase()}`, "success");
     });
+
+  const openClientChat = async () => {
+    setChatBusy(true);
+    try {
+      const chat = await openAutoserviceClientChat({ bookingId: id });
+      navigation.navigate("ChatThread", {
+        chatId: chat.id,
+        title: booking?.name || chat.autoservice_context_label || "Клиент",
+      });
+    } catch (e) {
+      show(describeError(e), "error");
+    } finally {
+      setChatBusy(false);
+    }
+  };
 
   const sendSms = () =>
     runAction("sms", async () => {
@@ -226,6 +245,24 @@ export function BookingDetailScreen({ route, navigation }: Props) {
         </Pressable>
       ) : null}
 
+      {canChat ? (
+        <Pressable
+          onPress={() => setChatConfirm(true)}
+          disabled={chatBusy}
+          className="mt-3 flex-row items-center justify-center gap-2 rounded-xl py-3"
+          style={{ backgroundColor: colors.surfaceSubtle }}
+        >
+          <Ionicons
+            name={chatBusy ? "hourglass-outline" : "chatbubble-ellipses-outline"}
+            size={16}
+            color={colors.brand}
+          />
+          <Text className="text-sm font-medium" style={{ color: colors.brand }}>
+            {chatBusy ? "Открытие чата…" : "Написать клиенту"}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {allowedActions.length > 0 || booking.phone ? (
         <View className="mt-4 gap-2">
           {booking.status === "new" && canConfirm ? (
@@ -324,6 +361,18 @@ export function BookingDetailScreen({ route, navigation }: Props) {
           ))}
         </View>
       </Sheet>
+
+      <ConfirmDialog
+        visible={chatConfirm}
+        title="Написать клиенту"
+        message="Открыть чат по этой записи на осмотр?"
+        confirmLabel="Открыть чат"
+        onConfirm={() => {
+          setChatConfirm(false);
+          void openClientChat();
+        }}
+        onCancel={() => setChatConfirm(false)}
+      />
 
       <ConfirmDialog
         visible={pendingAction !== null}

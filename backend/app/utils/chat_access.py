@@ -2,7 +2,7 @@
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Query, Session
 
-from app.models.chat import Chat, ChatParticipant
+from app.models.chat import Chat, ChatMessageRead, ChatParticipant, Message
 from app.models.user import User
 from app.services.organization_chat_service import (
     CHAT_TYPE_AUTOSERVICE,
@@ -156,3 +156,86 @@ def get_autoservice_chat_recipient_ids(db: Session, chat: Chat) -> list[int]:
     if chat.buyer_id:
         ids.add(int(chat.buyer_id))
     return sorted(ids)
+
+
+def chat_member_ids(db: Session, chat: Chat) -> list[int]:
+    """Явные участники чата для read-усечений: ChatParticipant, для direct — buyer/seller."""
+    ids = get_chat_participant_ids(db, chat.id)
+    if ids:
+        return ids
+    if is_autoservice_chat(chat):
+        return [int(chat.buyer_id)] if chat.buyer_id else []
+    return [int(uid) for uid in (chat.buyer_id, chat.seller_id) if uid]
+
+
+def chat_unread_messages_filter(db: Session, chat_id: int, user_id: int):
+    """Чужие сообщения чата, которые user_id ещё не прочитал (персональные receipts)."""
+    read_ids = (
+        db.query(ChatMessageRead.message_id)
+        .filter(ChatMessageRead.user_id == user_id)
+        .scalar_subquery()
+    )
+    return and_(
+        Message.chat_id == chat_id,
+        Message.sender_id != user_id,
+        ~Message.id.in_(read_ids),
+    )
+
+
+def mark_chat_messages_read(db: Session, chat_id: int, user_id: int) -> list[int]:
+    """Помечает все чужие сообщения чата прочитанными для user_id.
+    Возвращает id сообщений, у которых появилось новое прочтение."""
+    candidates = [
+        row[0]
+        for row in db.query(Message.id)
+        .filter(Message.chat_id == chat_id, Message.sender_id != user_id)
+        .all()
+    ]
+    if not candidates:
+        return []
+    already = {
+        row[0]
+        for row in db.query(ChatMessageRead.message_id)
+        .filter(
+            ChatMessageRead.user_id == user_id,
+            ChatMessageRead.message_id.in_(candidates),
+        )
+        .all()
+    }
+    new_ids = [mid for mid in candidates if mid not in already]
+    for mid in new_ids:
+        db.add(ChatMessageRead(message_id=mid, user_id=user_id))
+    if new_ids:
+        # Legacy-флаг: сообщение «прочитано», если его открыл хоть один участник.
+        db.query(Message).filter(
+            Message.id.in_(new_ids), Message.is_read == False  # noqa: E712
+        ).update({"is_read": True}, synchronize_session=False)
+    return new_ids
+
+
+def fully_read_message_ids(db: Session, chat: Chat, messages: list[Message]) -> set[int]:
+    """id сообщений, прочитанных всеми остальными явными участниками чата.
+    Для отправителя это «галочка прочитано»; для чужих сообщений флаг не используется."""
+    members = chat_member_ids(db, chat)
+    if not members:
+        return set()
+    ids = [m.id for m in messages if m.id and m.id > 0]
+    if not ids:
+        return set()
+    rows = (
+        db.query(ChatMessageRead.message_id, ChatMessageRead.user_id)
+        .filter(
+            ChatMessageRead.message_id.in_(ids),
+            ChatMessageRead.user_id.in_(members),
+        )
+        .all()
+    )
+    read_map: dict[int, set[int]] = {}
+    for mid, uid in rows:
+        read_map.setdefault(mid, set()).add(uid)
+    result: set[int] = set()
+    for m in messages:
+        others = [u for u in members if u != m.sender_id]
+        if others and all(u in read_map.get(m.id, set()) for u in others):
+            result.add(m.id)
+    return result

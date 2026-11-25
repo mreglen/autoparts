@@ -10,3 +10,4 @@ export { MoneyField } from "./MoneyField";
 export { Skeleton, SkeletonRows } from "./Skeleton";
 export { FadeSlideIn, PressableScale } from "./motion";
 export { StaleDataBadge } from "./StaleDataBadge";
+export { SearchField } from "./SearchField";

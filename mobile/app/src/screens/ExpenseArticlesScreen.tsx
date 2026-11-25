@@ -20,6 +20,7 @@ import { describeError } from "../api/errors";
 import {
   ConfirmDialog,
   Screen,
+  SearchField,
   Sheet,
   SkeletonRows,
   StaleDataBadge,
@@ -134,6 +135,7 @@ export function ExpenseArticlesScreen(_: Props) {
     null,
   );
   const [deleting, setDeleting] = useState<FinanceExpenseArticle | null>(null);
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -168,6 +170,11 @@ export function ExpenseArticlesScreen(_: Props) {
     }
   };
 
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? rows.filter((a) => a.name.toLowerCase().includes(q))
+    : rows;
+
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
       <View className="mb-3 flex-row items-center justify-between gap-2">
@@ -191,6 +198,13 @@ export function ExpenseArticlesScreen(_: Props) {
         </Pressable>
       </View>
 
+      <SearchField
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Название статьи"
+        className="mb-3"
+      />
+
       {loading ? (
         <SkeletonRows count={6} />
       ) : rows.length === 0 ? (
@@ -200,9 +214,13 @@ export function ExpenseArticlesScreen(_: Props) {
         >
           Статьи расходов не добавлены
         </Text>
+      ) : visible.length === 0 ? (
+        <Text className="py-8 text-center text-sm" style={{ color: colors.inkMuted }}>
+          Ничего не найдено
+        </Text>
       ) : (
         <View className="gap-2">
-          {rows.map((a) => (
+          {visible.map((a) => (
             <Pressable
               key={a.id}
               onPress={() => setEditing(a)}

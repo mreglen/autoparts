@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, AppState, View } from "react-native";
 
 import { canAccessSection } from "../auth/access";
 import { currentPermissionCodes } from "../auth/permissions";
@@ -45,7 +45,11 @@ import { ContractorsScreen } from "../screens/ContractorsScreen";
 import { ExpenseArticlesScreen } from "../screens/ExpenseArticlesScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { useTheme } from "../theme/useTheme";
-import { connect as connectChatSocket, disconnect as disconnectChatSocket } from "../realtime/chatSocket";
+import {
+  connect as connectChatSocket,
+  disconnect as disconnectChatSocket,
+  reconnectIfNeeded as reconnectChatSocket,
+} from "../realtime/chatSocket";
 import { ClientTabs } from "./ClientTabs";
 import type { RootStackParamList } from "./types";
 
@@ -69,6 +73,7 @@ const TAB_SECTIONS: Record<string, string> = {
   Bookings: "inspections",
   Orders: "orders",
   Planner: "planner",
+  Chats: "chat",
 };
 
 function Tabs() {
@@ -78,7 +83,7 @@ function Tabs() {
   const allowed = (name: string) =>
     canAccessSection(user, codes, TAB_SECTIONS[name] ?? "dashboard");
   const initial = (
-    ["Today", "Bookings", "Orders", "Planner", "More"] as const
+    ["Today", "Bookings", "Orders", "Planner", "Chats", "More"] as const
   ).find((name) => name === "More" || allowed(name));
 
   return (
@@ -139,6 +144,17 @@ function Tabs() {
         }}
       />
       <Tab.Screen
+        name="Chats"
+        component={ChatsScreen}
+        options={{
+          title: "Сообщения",
+          tabBarButton: allowed("Chats") ? undefined : () => null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubbles-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="More"
         component={MoreTabScreen}
         options={{
@@ -164,7 +180,13 @@ function AppShell() {
   useEffect(() => {
     if (!sessionUser?.id) return undefined;
     void connectChatSocket(sessionUser.id);
-    return () => disconnectChatSocket();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") reconnectChatSocket();
+    });
+    return () => {
+      sub.remove();
+      disconnectChatSocket();
+    };
   }, [sessionUser?.id]);
 
   if (!rolesReady && !canUseStaff) {

@@ -1018,6 +1018,70 @@ def ensure_chat_autoservice_context_columns() -> None:
     logger.info("Applied chats autoservice context column patches: %s", statements)
 
 
+def ensure_chat_message_reads_table() -> None:
+    """Таблица персональных прочтений сообщений (unread/read receipts per user)."""
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    if "chat_message_reads" in tables or "messages" not in tables:
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE chat_message_reads (
+            message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            read_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (message_id, user_id)
+        )
+        """
+        backfill = """
+        INSERT INTO chat_message_reads (message_id, user_id, read_at)
+        SELECT m.id, v.uid, m.created_at
+        FROM messages m
+        JOIN chats c ON c.id = m.chat_id
+        JOIN (
+            SELECT chat_id, user_id FROM chat_participants
+            UNION ALL
+            SELECT c2.id, c2.buyer_id FROM chats c2 WHERE c2.buyer_id IS NOT NULL
+            UNION ALL
+            SELECT c3.id, c3.seller_id FROM chats c3 WHERE c3.seller_id IS NOT NULL
+        ) v ON v.chat_id = c.id
+        WHERE m.is_read = TRUE AND v.user_id <> m.sender_id
+        ON CONFLICT DO NOTHING
+        """
+    else:
+        ddl = """
+        CREATE TABLE chat_message_reads (
+            message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (message_id, user_id)
+        )
+        """
+        backfill = """
+        INSERT OR IGNORE INTO chat_message_reads (message_id, user_id, read_at)
+        SELECT m.id, v.uid, m.created_at
+        FROM messages m
+        JOIN chats c ON c.id = m.chat_id
+        JOIN (
+            SELECT chat_id, user_id FROM chat_participants
+            UNION ALL
+            SELECT c2.id, c2.buyer_id AS user_id FROM chats c2 WHERE c2.buyer_id IS NOT NULL
+            UNION ALL
+            SELECT c3.id, c3.seller_id AS user_id FROM chats c3 WHERE c3.seller_id IS NOT NULL
+        ) v ON v.chat_id = c.id
+        WHERE m.is_read = 1 AND v.user_id <> m.sender_id
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        try:
+            conn.execute(text(backfill))
+        except Exception:
+            logger.exception("chat_message_reads backfill failed")
+    logger.info("Applied chat_message_reads table patch")
+
+
 def ensure_seo_product_url_exports_table() -> None:
     """Table tracking product URLs already included in daily SEO export batches."""
     inspector = inspect(engine)

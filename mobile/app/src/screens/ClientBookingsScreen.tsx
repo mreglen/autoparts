@@ -16,6 +16,7 @@ import {
   FadeSlideIn,
   ListRow,
   Screen,
+  SearchField,
   SkeletonRows,
   StaleDataBadge,
   useToast,
@@ -56,6 +57,7 @@ export function ClientBookingsScreen() {
   const [stale, setStale] = useState<number | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ClientBooking | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [query, setQuery] = useState("");
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -97,6 +99,15 @@ export function ClientBookingsScreen() {
     }
   };
 
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? rows.filter((b) =>
+        `${bookingTitle(b)} ${bookingSubtitle(b)}`
+          .toLowerCase()
+          .includes(q),
+      )
+    : rows;
+
   if (loading) {
     return (
       <Screen scroll={false}>
@@ -108,7 +119,15 @@ export function ClientBookingsScreen() {
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
       {stale != null ? <StaleDataBadge fetchedAt={stale} /> : null}
-      {rows.length === 0 ? (
+      {rows.length > 0 ? (
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Автосервис, авто, дата"
+          className="mb-2"
+        />
+      ) : null}
+      {visible.length === 0 ? (
         <View className="items-center pt-16">
           <Ionicons
             name="calendar-outline"
@@ -117,17 +136,19 @@ export function ClientBookingsScreen() {
             style={{ marginBottom: 8 }}
           />
           <Text className="text-base font-medium" style={{ color: colors.ink }}>
-            Записей пока нет
+            {rows.length === 0 ? "Записей пока нет" : "Ничего не найдено"}
           </Text>
           <Text
             className="mt-1 text-center text-sm"
             style={{ color: colors.inkMuted }}
           >
-            Запишитесь на осмотр — автосервис подтвердит дату и время.
+            {q
+              ? "Ничего не найдено."
+              : "Запишитесь на осмотр — автосервис подтвердит дату и время."}
           </Text>
         </View>
       ) : (
-        rows.map((b, i) => (
+        visible.map((b, i) => (
           <FadeSlideIn key={b.id} index={i} style={{ marginTop: 8 }}>
             <ListRow
               title={bookingTitle(b)}

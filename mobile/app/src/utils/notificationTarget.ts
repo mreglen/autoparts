@@ -1,8 +1,19 @@
 import type { UserNotification } from "../api/notifications";
 
 export interface NotificationTarget {
-  screen: "ChatThread" | "BookingDetail" | "OrderDetail" | "ClientOrder";
-  params: { chatId?: number; id?: number; orderId?: number; title?: string };
+  screen:
+    | "ChatThread"
+    | "BookingDetail"
+    | "OrderDetail"
+    | "ClientOrder"
+    | "Tab";
+  params: {
+    chatId?: number;
+    id?: number;
+    orderId?: number;
+    title?: string;
+    tab?: string;
+  };
 }
 
 const CLIENT_BOOKING_EVENTS = new Set([
@@ -25,6 +36,7 @@ function toInt(value: unknown): number | null {
 /** Маппинг web-url/data уведомления в экран мобильного приложения. null — просто пометить прочитанным. */
 export function resolveMobileNotificationTarget(
   notification: UserNotification,
+  isClient: boolean,
 ): NotificationTarget | null {
   const data = (notification.data ?? {}) as Record<string, unknown>;
   const eventType = notification.event_type;
@@ -41,7 +53,10 @@ export function resolveMobileNotificationTarget(
     return { screen: "BookingDetail", params: { id: inspectionId } };
   }
   if (inspectionId && CLIENT_BOOKING_EVENTS.has(eventType)) {
-    return null; // у клиента нет экрана детали записи — только пометить прочитанным
+    // Клиенту — вкладка «Записи» (детали записи в приложении нет); staff — карточка записи.
+    return isClient
+      ? { screen: "Tab", params: { tab: "ClientBookings" } }
+      : { screen: "BookingDetail", params: { id: inspectionId } };
   }
 
   if (eventType === "repair_order_status_changed") {
@@ -52,11 +67,24 @@ export function resolveMobileNotificationTarget(
       : { screen: "OrderDetail", params: { id: orderId } };
   }
 
+  if (url.includes("/autoservice/planner")) {
+    return isClient ? null : { screen: "Tab", params: { tab: "Planner" } };
+  }
+
+  if (url.includes("/purchases/orders") && isClient) {
+    return { screen: "Tab", params: { tab: "ClientPurchases" } };
+  }
+
   const bookingParam = url.match(/booking=(\d+)/)?.[1];
   if (bookingParam) {
     const id = Number(bookingParam);
     if (url.includes("/autoservice/inspections")) {
       return { screen: "BookingDetail", params: { id } };
+    }
+    if (url.includes("/autoservice/repair-booking")) {
+      return isClient
+        ? { screen: "Tab", params: { tab: "ClientBookings" } }
+        : { screen: "BookingDetail", params: { id } };
     }
     return null;
   }

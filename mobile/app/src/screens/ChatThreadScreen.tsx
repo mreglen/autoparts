@@ -51,6 +51,7 @@ export function ChatThreadScreen() {
   const chatId = route.params.chatId;
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const [optimistic, setOptimistic] = useState<ChatMessage[]>([]);
   const nextTempId = useRef(-1);
 
@@ -68,7 +69,7 @@ export function ChatThreadScreen() {
   const messages = useMemo(() => {
     const serverIds = new Set(serverMessages.map((m) => m.id));
     const pending = optimistic
-      .filter((m) => !serverIds.has(m.id) && m.id < 0)
+      .filter((m) => !serverIds.has(m.id))
       .sort((a, b) => a.id - b.id);
     return [...serverMessages, ...pending];
   }, [serverMessages, optimistic]);
@@ -104,7 +105,11 @@ export function ChatThreadScreen() {
     setDraft("");
     setSending(true);
     try {
-      await sendChatMessage(chatId, user.id, text);
+      const created = await sendChatMessage(chatId, user.id, text);
+      // Подменяем временное сообщение реальным из ответа — без дублей до refetch.
+      setOptimistic((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...created, id: created.id } : m)),
+      );
       void queryClient.invalidateQueries({ queryKey: ["chat-messages", chatId] });
       void queryClient.invalidateQueries({ queryKey: ["chats"] });
       void queryClient.invalidateQueries({ queryKey: ["autoservice-chats"] });
@@ -156,7 +161,7 @@ export function ChatThreadScreen() {
             style={{ color: mine ? "rgba(255,255,255,0.7)" : colors.inkFaint }}
           >
             {formatTime(message.created_at)}
-            {mine && message.is_read ? " · прочитано" : ""}
+            {mine ? (message.is_read ? " · прочитано" : " · отправлено") : ""}
           </Text>
         </View>
       </View>
@@ -175,8 +180,13 @@ export function ChatThreadScreen() {
           keyExtractor={(item) => item.key}
           renderItem={renderRow}
           contentContainerStyle={{ paddingHorizontal: 14, paddingVertical: 10 }}
-          onRefresh={() => void messagesQuery.refetch()}
-          refreshing={messagesQuery.isRefetching}
+          onRefresh={() => {
+            setManualRefreshing(true);
+            void messagesQuery
+              .refetch()
+              .finally(() => setManualRefreshing(false));
+          }}
+          refreshing={manualRefreshing}
           inverted
         />
       )}

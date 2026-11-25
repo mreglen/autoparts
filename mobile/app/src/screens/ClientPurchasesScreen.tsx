@@ -11,7 +11,7 @@ import {
   type PurchaseUsedOrder,
 } from "../api/partsShop";
 import { describeError } from "../api/errors";
-import { Screen, SkeletonRows } from "../components/ui";
+import { Screen, SearchField, SkeletonRows } from "../components/ui";
 import { useTheme } from "../theme/useTheme";
 import {
   formatGarageOrderDate,
@@ -135,6 +135,7 @@ function OrderCard({ order }: { order: UnifiedOrder }) {
 export function ClientPurchasesScreen() {
   const { colors } = useTheme();
   const [kind, setKind] = useState<Kind>("new");
+  const [query, setQuery] = useState("");
 
   const newQuery = useQuery({
     queryKey: ["shop-purchases-new"],
@@ -162,6 +163,17 @@ export function ClientPurchasesScreen() {
       kind: "used" as const,
     }));
   }, [kind, newQuery.data, usedQuery.data]);
+
+  const q = query.trim().toLowerCase();
+  const visibleOrders = q
+    ? orders.filter((o) =>
+        (o.items ?? [])
+          .map((i) => i.name)
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      )
+    : orders;
 
   const refresh = useCallback(() => {
     void newQuery.refetch();
@@ -205,6 +217,15 @@ export function ClientPurchasesScreen() {
         ))}
       </View>
 
+      {orders.length > 0 ? (
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Название запчасти"
+          className="mb-3"
+        />
+      ) : null}
+
       {error ? (
         <View className="items-center py-8">
           <Text className="text-sm" style={{ color: colors.danger }}>
@@ -214,20 +235,22 @@ export function ClientPurchasesScreen() {
             <Text className="text-sm font-semibold text-white">Повторить</Text>
           </Pressable>
         </View>
-      ) : orders.length === 0 ? (
+      ) : visibleOrders.length === 0 ? (
         <View className="items-center pt-16">
           <Ionicons name="receipt-outline" size={44} color={colors.inkFaint} />
           <Text className="mt-3 text-base font-medium" style={{ color: colors.ink }}>
-            Заказов пока нет
+            {q ? "Ничего не найдено" : "Заказов пока нет"}
           </Text>
-          <Text className="mt-1 text-center text-sm" style={{ color: colors.inkMuted }}>
-            {kind === "new"
-              ? "Найдите запчасть в поиске и оформите заказ."
-              : "Заказы б/у запчастей появятся здесь после покупки."}
-          </Text>
+          {!q ? (
+            <Text className="mt-1 text-center text-sm" style={{ color: colors.inkMuted }}>
+              {kind === "new"
+                ? "Найдите запчасть в поиске и оформите заказ."
+                : "Заказы б/у запчастей появятся здесь после покупки."}
+            </Text>
+          ) : null}
         </View>
       ) : (
-        orders.map((order) => <OrderCard key={`${order.kind}-${order.id}`} order={order} />)
+        visibleOrders.map((order) => <OrderCard key={`${order.kind}-${order.id}`} order={order} />)
       )}
     </Screen>
   );

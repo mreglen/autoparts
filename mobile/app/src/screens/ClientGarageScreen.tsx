@@ -15,6 +15,7 @@ import {
   FadeSlideIn,
   ListRow,
   Screen,
+  SearchField,
   SkeletonRows,
   StaleDataBadge,
   useToast,
@@ -70,6 +71,7 @@ export function ClientGarageScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -124,11 +126,29 @@ export function ClientGarageScreen() {
   }
 
   const multiOrg = orgs.length > 1;
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? rows.filter((v) =>
+        [v.make, v.model, v.plate, v.vin]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      )
+    : rows;
 
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
       {stale != null ? <StaleDataBadge fetchedAt={stale} /> : null}
-      {rows.length === 0 ? (
+      {rows.length > 0 ? (
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Марка, модель, госномер, VIN"
+          className="mb-2"
+        />
+      ) : null}
+      {visible.length === 0 ? (
         <View className="items-center pt-16">
           <Ionicons
             name="car-outline"
@@ -137,17 +157,19 @@ export function ClientGarageScreen() {
             style={{ marginBottom: 8 }}
           />
           <Text className="text-base font-medium" style={{ color: colors.ink }}>
-            Автомобили не добавлены
+            {rows.length === 0 ? "Автомобили не добавлены" : "Ничего не найдено"}
           </Text>
-          <Text
-            className="mt-1 text-center text-sm"
-            style={{ color: colors.inkMuted }}
-          >
-            Добавьте авто — подберём марку и модель по VIN или госномеру.
-          </Text>
+          {rows.length === 0 ? (
+            <Text
+              className="mt-1 text-center text-sm"
+              style={{ color: colors.inkMuted }}
+            >
+              Добавьте авто — подберём марку и модель по VIN или госномеру.
+            </Text>
+          ) : null}
         </View>
       ) : (
-        rows.map((v, i) => (
+        visible.map((v, i) => (
           <FadeSlideIn
             key={`${v.organization_id}-${v.id}`}
             index={i}

@@ -144,7 +144,7 @@ export const CACHE_POLICIES: CachePolicy[] = [
   // --- Уведомления ---
   {
     entity: "notifications",
-    pathPrefix: "/api/notifications",
+    pathPrefix: "/notifications",
     ttlMs: 5 * MIN,
     offlineReadable: true,
     hot: true,

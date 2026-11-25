@@ -7,7 +7,7 @@ import os
 import uuid
 from pathlib import Path
 from app.db.database import get_db
-from app.models.chat import Chat, Message, ChatMedia, ChatBlockedUser, ChatParticipant
+from app.models.chat import Chat, Message, ChatMedia, ChatBlockedUser, ChatParticipant, ChatMessageRead
 from app.models.user import User
 from app.models.product import Product
 from app.schemas.chat import (
@@ -27,11 +27,16 @@ from app.services.public_user_profile_service import participant_from_user
 from app.core.auth import get_current_user
 from app.routers.websocket import manager as websocket_manager
 from app.utils.chat_access import (
+    chat_unread_messages_filter,
+    fully_read_message_ids,
     get_accessible_chat,
+    get_autoservice_chat_recipient_ids,
+    get_chat_participant_ids,
     get_user_chats_query,
     is_autoservice_chat,
     is_group_chat,
     get_chat_type,
+    mark_chat_messages_read,
 )
 from app.services.organization_chat_service import CHAT_TYPE_DIRECT
 from app.services.custom_chat_service import (
@@ -64,6 +69,7 @@ def _build_message_response(
     include_sender_name: bool = False,
     reply_to: Optional[MessageResponse] = None,
     media_list: Optional[List[ChatMedia]] = None,
+    is_read: Optional[bool] = None,
 ) -> MessageResponse:
     sender_name = None
     if include_sender_name:
@@ -78,7 +84,7 @@ def _build_message_response(
         chat_id=db_msg.chat_id,
         sender_id=db_msg.sender_id,
         message=db_msg.message,
-        is_read=db_msg.is_read,
+        is_read=db_msg.is_read if is_read is None else is_read,
         reply_to_id=db_msg.reply_to_id,
         reply_to=reply_to,
         created_at=db_msg.created_at,
@@ -352,23 +358,11 @@ def get_chat_messages(
         Message.chat_id == chat_id
     ).order_by(desc(Message.created_at)).offset(skip).limit(limit).all()
     
-    # Отмечаем сообщения как прочитанные (если пользователь не отправитель)
-    unread_messages = db.query(Message).filter(
-        Message.chat_id == chat_id,
-        Message.sender_id != current_user.id,
-        Message.is_read == False
-    ).all()
-
-    read_message_ids = []
-    sender_ids_to_notify = set()
-    for msg in unread_messages:
-        msg.is_read = True
-        read_message_ids.append(msg.id)
-        sender_ids_to_notify.add(msg.sender_id)
-
+    # Помечаем сообщения прочитанными для текущего пользователя (персональные receipts)
+    read_message_ids = mark_chat_messages_read(db, chat_id, current_user.id)
     db.commit()
 
-    # Уведомляем отправителей о прочтении сообщений через WebSocket (если они online)
+    # Уведомляем остальных участников чата через WebSocket (обновление бейджей/галочек)
     if read_message_ids:
         read_event = {
             "type": "messages_read",
@@ -376,9 +370,17 @@ def get_chat_messages(
             "message_ids": read_message_ids,
             "read_by_user_id": current_user.id
         }
-        for sender_id in sender_ids_to_notify:
+        if is_autoservice_chat(chat):
+            recipient_ids = get_autoservice_chat_recipient_ids(db, chat)
+        elif is_group_chat(chat):
+            recipient_ids = get_chat_participant_ids(db, chat_id)
+        else:
+            recipient_ids = [uid for uid in (chat.buyer_id, chat.seller_id) if uid]
+        for recipient_id in recipient_ids:
+            if recipient_id == current_user.id:
+                continue
             try:
-                anyio.from_thread.run(websocket_manager.send_personal_message, read_event, sender_id)
+                anyio.from_thread.run(websocket_manager.send_personal_message, read_event, recipient_id)
             except Exception:
                 # Не ломаем API-ответ, если realtime-уведомление не доставилось
                 pass
@@ -391,6 +393,9 @@ def get_chat_messages(
     if reply_parent_ids:
         for parent in db.query(Message).filter(Message.id.in_(reply_parent_ids)).all():
             reply_parents[parent.id] = parent
+
+    # is_read в ответе — «прочитано всеми остальными участниками» (галочка у отправителя)
+    fully_read_ids = fully_read_message_ids(db, chat, messages_reversed)
 
     # Добавляем медиа к каждому сообщению
     # Фильтруем сообщения с is_processing медиа для пользователей, которые не являются отправителем
@@ -417,6 +422,7 @@ def get_chat_messages(
             include_sender_name=is_group_chat(chat),
             reply_to=reply_to,
             media_list=media_list,
+            is_read=msg.id in fully_read_ids,
         ))
     
     return result
@@ -545,12 +551,17 @@ def get_unread_count(
     if not accessible_chat_ids:
         return {"unread_count": 0}
 
+    read_ids = (
+        db.query(ChatMessageRead.message_id)
+        .filter(ChatMessageRead.user_id == current_user.id)
+        .scalar_subquery()
+    )
     count = db.query(Message).filter(
         Message.chat_id.in_(accessible_chat_ids),
         Message.sender_id != current_user.id,
-        Message.is_read == False,
+        ~Message.id.in_(read_ids),
     ).count()
-    
+
     return {"unread_count": count}
 
 
@@ -1142,9 +1153,7 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
     unread_count = 0
     if current_user:
         unread_count = db.query(Message).filter(
-            Message.chat_id == chat.id,
-            Message.sender_id != current_user.id,
-            Message.is_read == False
+            chat_unread_messages_filter(db, chat.id, current_user.id)
         ).count()
 
     participants_count = 0

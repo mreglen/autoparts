@@ -40,6 +40,7 @@ import {
   ConfirmDialog,
   DatePickerField,
   Screen,
+  SearchField,
   Sheet,
   SkeletonRows,
   StaleDataBadge,
@@ -359,6 +360,7 @@ export function FinanceScreen() {
   const [debts, setDebts] = useState<ClientDebtRow[]>([]);
   const [debtQuery, setDebtQuery] = useState("");
   const [debtTotal, setDebtTotal] = useState(0);
+  const [listQuery, setListQuery] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -519,14 +521,22 @@ export function FinanceScreen() {
     }
   };
 
+  const listQ = listQuery.trim().toLowerCase();
   const receiptItems = useMemo(() => receipts?.items ?? [], [receipts]);
-  const filteredReceipts = useMemo(
-    () =>
+  const filteredReceipts = useMemo(() => {
+    const byMethod =
       method === "all"
         ? receiptItems
-        : receiptItems.filter((r) => r.method === method),
-    [receiptItems, method],
-  );
+        : receiptItems.filter((r) => r.method === method);
+    if (!listQ) return byMethod;
+    return byMethod.filter((r) =>
+      [r.client_name, r.client_phone, r.repair_order_number]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(listQ),
+    );
+  }, [receiptItems, method, listQ]);
   const receiptsTotal =
     method === "all"
       ? Number(receipts?.total_amount ?? 0)
@@ -568,14 +578,29 @@ export function FinanceScreen() {
     "Все";
 
   const filteredExpenses = useMemo(() => {
-    if (expenseArticleFilter === "all") return expenseItems;
-    const wanted = expenseArticleFilter.toLowerCase();
-    return expenseItems.filter((e) =>
-      (e.article_name || e.type_label || e.type || "")
-        .trim()
-        .toLowerCase() === wanted,
+    const byArticle =
+      expenseArticleFilter === "all"
+        ? expenseItems
+        : expenseItems.filter((e) =>
+            (e.article_name || e.type_label || e.type || "")
+              .trim()
+              .toLowerCase() === expenseArticleFilter.toLowerCase(),
+          );
+    if (!listQ) return byArticle;
+    return byArticle.filter((e) =>
+      [
+        e.article_name,
+        e.type_label,
+        e.description,
+        e.employee_name,
+        e.created_by_name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(listQ),
     );
-  }, [expenseItems, expenseArticleFilter]);
+  }, [expenseItems, expenseArticleFilter, listQ]);
   const expensesTotal =
     expenseArticleFilter === "all"
       ? (expenses?.total ?? 0)
@@ -609,6 +634,19 @@ export function FinanceScreen() {
           />
         ))}
       </ScrollView>
+
+      {tab !== "debts" ? (
+        <SearchField
+          value={listQuery}
+          onChangeText={setListQuery}
+          placeholder={
+            tab === "receipts"
+              ? "Клиент, телефон, № заказа"
+              : "Статья, описание, сотрудник"
+          }
+          className="mb-2"
+        />
+      ) : null}
 
       {tab !== "debts" ? (
         <View className="mb-2 flex-row flex-wrap items-center gap-2">
@@ -757,7 +795,9 @@ export function FinanceScreen() {
               className="py-8 text-center text-sm"
               style={{ color: colors.inkMuted }}
             >
-              Нет поступлений за период
+              {listQ
+                ? "Ничего не найдено"
+                : "Нет поступлений за период"}
             </Text>
           ) : (
             filteredReceipts.map((r) => (
@@ -839,9 +879,11 @@ export function FinanceScreen() {
               className="py-8 text-center text-sm"
               style={{ color: colors.inkMuted }}
             >
-              {expenseArticleFilter === "all"
-                ? "Нет расходов за период"
-                : "Нет расходов по этой статье"}
+              {listQ
+                ? "Ничего не найдено"
+                : expenseArticleFilter === "all"
+                  ? "Нет расходов за период"
+                  : "Нет расходов по этой статье"}
             </Text>
           ) : (
             filteredExpenses.map((e) => (

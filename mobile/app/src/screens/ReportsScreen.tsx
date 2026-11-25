@@ -362,15 +362,17 @@ function SearchField({
   value,
   onChangeText,
   placeholder,
+  className = "",
 }: {
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
+  className?: string;
 }) {
   const { colors } = useTheme();
   return (
     <View
-      className="min-w-[140px] flex-1 flex-row items-center gap-2 rounded-xl px-3"
+      className={`min-w-[140px] flex-1 flex-row items-center gap-2 rounded-xl px-3 ${className}`}
       style={{ backgroundColor: colors.surfaceSubtle, height: 40 }}
     >
       <Ionicons name="search" size={16} color={colors.inkFaint} />
@@ -949,6 +951,7 @@ export function ReportsScreen() {
   const [econSearch, setEconSearch] = useState("");
   const [stockSearchInput, setStockSearchInput] = useState("");
   const [stockSearch, setStockSearch] = useState("");
+  const [payrollQuery, setPayrollQuery] = useState("");
 
   const [econ, setEcon] = useState<OrderEconomicsResponse | null>(null);
   const [stock, setStock] = useState<WarehouseStockResponse | null>(null);
@@ -1135,6 +1138,12 @@ export function ReportsScreen() {
   const stockSummary = stock?.summary ?? EMPTY_STOCK_SUMMARY;
   const stockItems = stock?.items ?? [];
   const payrollEmployees = payroll?.employees ?? [];
+  const payrollQ = payrollQuery.trim().toLowerCase();
+  const visiblePayrollEmployees = payrollQ
+    ? payrollEmployees.filter((e) =>
+        (e.name ?? "").toLowerCase().includes(payrollQ),
+      )
+    : payrollEmployees;
 
   const resetEconomicsFilters = useCallback(() => {
     updateEconFilters({
@@ -1164,6 +1173,12 @@ export function ReportsScreen() {
 
       {tab === "payroll" ? (
         <View className="mb-2 flex-row flex-wrap items-center gap-2">
+          <SearchField
+            value={payrollQuery}
+            onChangeText={setPayrollQuery}
+            placeholder="Сотрудник"
+            className="mb-0 min-w-[120px] flex-1"
+          />
           <MonthPickerButton value={monthValue} onChange={setMonthValue} />
           <View className="flex-1" />
           <ExportButton
@@ -1458,11 +1473,17 @@ export function ReportsScreen() {
               tone={Number(payroll.total_remaining) > 0 ? "warning" : undefined}
             />
           </View>
-          {payrollEmployees.length === 0 ? (
-            <EmptyReport text="За этот месяц начислений по заказ-нарядам нет." />
+          {visiblePayrollEmployees.length === 0 ? (
+            <EmptyReport
+              text={
+                payrollQ
+                  ? "По запросу никого не найдено."
+                  : "За этот месяц начислений по заказ-нарядам нет."
+              }
+            />
           ) : (
             <>
-              {payrollEmployees.map((employee) => (
+              {visiblePayrollEmployees.map((employee) => (
                 <PayrollEmployeeCard
                   key={employee.employee_id}
                   employee={employee}

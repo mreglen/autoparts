@@ -106,6 +106,7 @@ from app.db.schema_patches import (
     ensure_chat_created_by_column,
     ensure_chat_autoservice_client_column,
     ensure_chat_autoservice_context_columns,
+    ensure_chat_message_reads_table,
     ensure_seo_product_url_exports_table,
     ensure_seo_new_part_url_exports_table,
     ensure_seo_sitemap_cache_table,
@@ -386,6 +387,7 @@ try:
     ensure_chat_created_by_column()
     ensure_chat_autoservice_client_column()
     ensure_chat_autoservice_context_columns()
+    ensure_chat_message_reads_table()
     ensure_seo_product_url_exports_table()
     ensure_seo_new_part_url_exports_table()
     ensure_seo_sitemap_cache_table()

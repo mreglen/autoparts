@@ -6,7 +6,7 @@ import json
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models.chat import Chat, Message
+from app.models.chat import Chat, ChatMessageRead, Message
 from app.models.garage_new_orders import GarageNewOrder
 from app.models.garage_used_orders import GarageUsedOrder
 from app.models.organization_avito_autoload_cache import OrganizationAvitoAutoloadCache
@@ -86,12 +86,17 @@ def _count_unread_messages(db: Session, user_id: int) -> int:
     ]
     if not accessible_chat_ids:
         return 0
+    read_ids = (
+        db.query(ChatMessageRead.message_id)
+        .filter(ChatMessageRead.user_id == user_id)
+        .scalar_subquery()
+    )
     return (
         db.query(func.count(Message.id))
         .filter(
             Message.chat_id.in_(accessible_chat_ids),
             Message.sender_id != user_id,
-            Message.is_read.is_(False),
+            ~Message.id.in_(read_ids),
         )
         .scalar()
         or 0

@@ -18,6 +18,7 @@ import {
   FadeSlideIn,
   ListRow,
   Screen,
+  SearchField,
   SkeletonRows,
   StaleDataBadge,
   useToast,
@@ -95,6 +96,7 @@ export function ClientHistoryScreen(_: Props) {
   const [rows, setRows] = useState<ClientRepairOrder[]>([]);
   const [scope, setScope] = useState<Scope>("all");
   const [vehicleFilter, setVehicleFilter] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState<number | null>(null);
@@ -151,13 +153,18 @@ export function ClientHistoryScreen(_: Props) {
     return [...map.values()];
   }, [rows]);
 
-  const visible = useMemo(
-    () =>
-      vehicleFilter
-        ? rows.filter((o) => String(o.vehicle_id) === vehicleFilter)
-        : rows,
-    [rows, vehicleFilter],
-  );
+  const visible = useMemo(() => {
+    const byVehicle = vehicleFilter
+      ? rows.filter((o) => String(o.vehicle_id) === vehicleFilter)
+      : rows;
+    const q = query.trim().toLowerCase();
+    if (!q) return byVehicle;
+    return byVehicle.filter((o) =>
+      `${orderTitle(o)} ${orderSubtitle(o)} ${o.order_number ?? ""}`
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [rows, vehicleFilter, query]);
 
   if (loading) {
     return (
@@ -170,6 +177,15 @@ export function ClientHistoryScreen(_: Props) {
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
       {stale != null ? <StaleDataBadge fetchedAt={stale} /> : null}
+
+      {rows.length > 0 ? (
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Номер наряда, авто, автосервис"
+          className="mb-3"
+        />
+      ) : null}
 
       <View className="mb-3 flex-row gap-2">
         {SCOPES.map((s) => (

@@ -64,6 +64,20 @@ class Message(Base):
     sender = relationship("User", foreign_keys=[sender_id])
     reply_to = relationship("Message", remote_side=[id], backref="replies", foreign_keys=[reply_to_id])
     media = relationship("ChatMedia", back_populates="message", cascade="all, delete-orphan")
+    reads = relationship("ChatMessageRead", back_populates="message", cascade="all, delete-orphan")
+
+
+class ChatMessageRead(Base):
+    """Персональное прочтение сообщения: у каждого участника свой статус."""
+
+    __tablename__ = "chat_message_reads"
+
+    message_id = Column(Integer, ForeignKey("messages.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    read_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    message = relationship("Message", back_populates="reads")
+    user = relationship("User")
 
 
 class ChatMedia(Base):

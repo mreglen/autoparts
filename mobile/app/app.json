@@ -2,7 +2,7 @@
   "expo": {
     "name": "Свой Гараж - автосервис",
     "slug": "sg-autoservice",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "sgautoservice",
@@ -17,7 +17,7 @@
     "android": {
       "package": "ru.svoygarage.autoservice",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FEFDFB",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

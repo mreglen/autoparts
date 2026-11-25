@@ -20,6 +20,7 @@ import {
   type OrderPayment,
 } from "../api/orders";
 import { createOrderPayment } from "../api/finance";
+import { openAutoserviceClientChat } from "../api/chats";
 import { PERM, hasPermission } from "../auth/access";
 import { currentPermissionCodes } from "../auth/permissions";
 import { useSession } from "../auth/session";
@@ -154,6 +155,7 @@ export function OrderDetailScreen({ route }: Props) {
   const { id } = route.params;
   const codes = currentPermissionCodes();
   const canFullOrders = hasPermission(user, codes, PERM.orders);
+  const canChat = hasPermission(user, codes, PERM.chat);
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [payments, setPayments] = useState<OrderPayment[]>([]);
@@ -171,6 +173,8 @@ export function OrderDetailScreen({ route }: Props) {
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(() => toIsoDate(new Date()));
   const [payBusy, setPayBusy] = useState(false);
+  const [chatConfirm, setChatConfirm] = useState(false);
+  const [chatBusy, setChatBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -225,6 +229,27 @@ export function OrderDetailScreen({ route }: Props) {
   const callClient = () => {
     const phone = order?.client?.phone?.replace(/[^\d+]/g, "");
     if (phone) void Linking.openURL(`tel:${phone}`);
+  };
+
+  const openClientChat = async () => {
+    if (!order) return;
+    setChatBusy(true);
+    try {
+      const chat = await openAutoserviceClientChat({
+        repairOrderId: order.id,
+      });
+      navigation.navigate("ChatThread", {
+        chatId: chat.id,
+        title:
+          order.client?.name ||
+          chat.autoservice_context_label ||
+          "Клиент автосервиса",
+      });
+    } catch (e) {
+      show(describeError(e), "error");
+    } finally {
+      setChatBusy(false);
+    }
   };
 
   const openPaySheet = () => {
@@ -410,6 +435,27 @@ export function OrderDetailScreen({ route }: Props) {
           </Pressable>
         ) : null}
       </View>
+
+      {canChat ? (
+        <Pressable
+          onPress={() => setChatConfirm(true)}
+          disabled={chatBusy}
+          className="mb-3 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5"
+          style={{ backgroundColor: colors.surfaceSubtle }}
+        >
+          <Ionicons
+            name={chatBusy ? "hourglass-outline" : "chatbubble-ellipses-outline"}
+            size={16}
+            color={colors.brand}
+          />
+          <Text
+            className="text-sm font-medium"
+            style={{ color: colors.brand }}
+          >
+            {chatBusy ? "Открытие чата…" : "Написать клиенту"}
+          </Text>
+        </Pressable>
+      ) : null}
 
       <SectionCard title="Детали">
         <InfoRow label="Клиент" value={order.client?.name} />
@@ -722,6 +768,18 @@ export function OrderDetailScreen({ route }: Props) {
           }
         }}
         onCancel={() => setPendingAction(null)}
+      />
+
+      <ConfirmDialog
+        visible={chatConfirm}
+        title="Написать клиенту"
+        message={`Открыть чат по заказ-наряду №${order.order_number ?? order.id}?`}
+        confirmLabel="Открыть чат"
+        onConfirm={() => {
+          setChatConfirm(false);
+          void openClientChat();
+        }}
+        onCancel={() => setChatConfirm(false)}
       />
 
       <Sheet

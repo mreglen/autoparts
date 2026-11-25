@@ -22,6 +22,8 @@ let stopped = false;
 
 function invalidateChatQueries(chatId?: number) {
   void queryClient.invalidateQueries({ queryKey: ["chats"] });
+  void queryClient.invalidateQueries({ queryKey: ["user-chats"] });
+  void queryClient.invalidateQueries({ queryKey: ["autoservice-chats"] });
   void queryClient.invalidateQueries({ queryKey: ["chat-unread-count"] });
   if (chatId != null) {
     void queryClient.invalidateQueries({ queryKey: ["chat-messages", chatId] });
@@ -31,6 +33,8 @@ function invalidateChatQueries(chatId?: number) {
 function handleEvent(data: WsEvent) {
   if (data.type === "message" || data.type === "messages_read") {
     invalidateChatQueries(data.chat_id);
+    // Новое сообщение могло создать уведомление в ленте — обновляем бейдж колокольчика.
+    void queryClient.invalidateQueries({ queryKey: ["notifications-feed-badge"] });
   } else if (data.type === "pong") {
     lastPongAt = Date.now();
   }
@@ -49,7 +53,8 @@ function startPing() {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     if (lastPongAt && Date.now() - lastPongAt > PONG_TIMEOUT_MS) {
       try {
-        socket.close();
+        // Код 4000 — не 1000, иначе onclose посчитает закрытие штатным и не переподключится.
+        socket.close(4000, "ping timeout");
       } catch {
         /* ignore */
       }
@@ -159,9 +164,11 @@ export function disconnect(): void {
   }
 }
 
-/** Переподключение после возврата приложения из фона / смены сети. */
+/** Переподключение после возврата приложения из фона / смены сети.
+ *  Принудительное: после фона сокет может числиться OPEN, но быть мёртвым. */
 export function reconnectIfNeeded(): void {
-  if (activeUserId && !stopped) {
-    void connect(activeUserId);
-  }
+  const userId = activeUserId;
+  if (!userId || stopped) return;
+  disconnect();
+  void connect(userId);
 }

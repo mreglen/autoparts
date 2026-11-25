@@ -488,7 +488,6 @@ const chatSlice = createSlice({
                 if (state.chats[chatIndex].last_message && message_ids.includes(state.chats[chatIndex].last_message.id)) {
                     state.chats[chatIndex].last_message.is_read = true;
                 }
-                state.chats[chatIndex].unread_count = 0;
             }
         }
     },
@@ -834,6 +833,11 @@ export const connectWebSocket = (userId) => (dispatch, getState) => {
         } else if (data.type === 'messages_read') {
             dispatch(markMessagesAsRead(data));
             dispatch(fetchUserChats({ skip: 0, limit: 50 }));
+            // Перечитываем открытый чат — is_read теперь «прочитано всеми участниками».
+            const openChatId = getState().chats?.currentChat?.id;
+            if (openChatId != null && Number(openChatId) === Number(data.chat_id)) {
+                dispatch(fetchChatMessages({ chatId: openChatId, skip: 0, limit: 100 }));
+            }
         } else if (data.type === 'typing') {
             if (data.chat_id && data.user_id) {
                 dispatch(setTypingUser({ chat_id: data.chat_id, user_id: data.user_id }));

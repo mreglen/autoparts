@@ -17,7 +17,7 @@ import {
   type InspectionBooking,
 } from "../api/bookings";
 import { ApiError } from "../api/errors";
-import { Screen, SkeletonRows, StaleDataBadge } from "../components/ui";
+import { Screen, SearchField, SkeletonRows, StaleDataBadge } from "../components/ui";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import { formatDayMonth } from "../utils/format";
@@ -76,6 +76,7 @@ export function BookingsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [staleAt, setStaleAt] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -108,6 +109,26 @@ export function BookingsScreen() {
     await load();
   }, [load]);
 
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? (items ?? []).filter((b) =>
+        [
+          b.name,
+          b.phone,
+          b.vehicle_make,
+          b.vehicle_model,
+          b.vehicle?.make,
+          b.vehicle?.model,
+          b.vehicle?.plate,
+          b.notes,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      )
+    : (items ?? []);
+
   return (
     <Screen scroll={false}>
       <View className="mb-2 flex-row items-center justify-between">
@@ -116,6 +137,13 @@ export function BookingsScreen() {
         </Text>
         {staleAt ? <StaleDataBadge fetchedAt={staleAt} /> : null}
       </View>
+
+      <SearchField
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Клиент, телефон, авто"
+        className="mb-2"
+      />
 
       <View className="mb-2 flex-row flex-wrap gap-1">
         {FILTERS.map((f) => {
@@ -233,9 +261,13 @@ export function BookingsScreen() {
               Записей нет
             </Text>
           </View>
+        ) : visible.length === 0 ? (
+          <Text className="py-10 text-center text-sm" style={{ color: colors.inkMuted }}>
+            Ничего не найдено
+          </Text>
         ) : (
           <View className="gap-2">
-            {items.map((item) => (
+            {visible.map((item) => (
               <Pressable
                 key={item.id}
                 onPress={() =>

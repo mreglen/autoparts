@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -15,6 +14,7 @@ import { useAppRole } from "../auth/roles";
 import {
   FadeSlideIn,
   Screen,
+  SearchField,
   SkeletonRows,
   StaleDataBadge,
   useToast,
@@ -53,15 +53,16 @@ export function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
   const seenIdsRef = useRef<Set<number> | null>(null);
 
   // Сотрудник автосервиса видит только категорию autoservice; клиент — все.
   const categories = activeRole === "staff" ? "autoservice" : null;
 
   const load = useCallback(
-    async (isRefresh = false) => {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+    async (isRefresh = false, silent = false) => {
+      if (isRefresh && !silent) setRefreshing(true);
+      else if (!isRefresh) setLoading(true);
       try {
         const r = await fetchNotificationFeed(100, categories);
         const next = r.data?.items ?? [];
@@ -79,7 +80,7 @@ export function NotificationsScreen() {
         show(describeError(e), "error");
       } finally {
         setLoading(false);
-        setRefreshing(false);
+        if (!silent) setRefreshing(false);
       }
     },
     [categories, show],
@@ -88,7 +89,7 @@ export function NotificationsScreen() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- первичная загрузка
     void load();
-    const timer = setInterval(() => void load(true), 20_000);
+    const timer = setInterval(() => void load(true, true), 20_000);
     return () => clearInterval(timer);
   }, [load]);
 
@@ -104,10 +105,12 @@ export function NotificationsScreen() {
         // read-флаг уже обновлён оптимистично
       }
     }
-    const target = resolveMobileNotificationTarget(item);
+    const target = resolveMobileNotificationTarget(item, activeRole === "client");
     if (target) {
       const { screen, params } = target;
-      if (screen === "ChatThread") {
+      if (screen === "Tab") {
+        navigation.navigate("Main", { screen: params.tab! });
+      } else if (screen === "ChatThread") {
         navigation.navigate("ChatThread", { chatId: params.chatId!, title: params.title });
       } else if (screen === "BookingDetail") {
         navigation.navigate("BookingDetail", { id: params.id! });
@@ -132,6 +135,13 @@ export function NotificationsScreen() {
     }
   };
 
+  const q = query.trim().toLowerCase();
+  const visibleItems = q
+    ? items.filter((n) =>
+        `${n.title} ${n.body ?? ""}`.toLowerCase().includes(q),
+      )
+    : items;
+
   if (loading) {
     return (
       <Screen scroll={false}>
@@ -143,6 +153,15 @@ export function NotificationsScreen() {
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
       {stale != null ? <StaleDataBadge fetchedAt={stale} /> : null}
+      {items.length > 0 ? (
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Поиск по уведомлениям"
+          className="mb-2"
+        />
+      ) : null}
+
       {unread > 0 ? (
         <View className="mb-3 flex-row items-center justify-between">
           <Text className="text-sm" style={{ color: colors.inkMuted }}>
@@ -159,20 +178,12 @@ export function NotificationsScreen() {
         </View>
       ) : null}
 
-      {items.length === 0 ? (
-        <View className="items-center pt-16">
-          <Ionicons
-            name="notifications-outline"
-            size={40}
-            color={colors.inkFaint}
-            style={{ marginBottom: 8 }}
-          />
-          <Text className="text-base font-medium" style={{ color: colors.ink }}>
-            Уведомлений нет
-          </Text>
-        </View>
+      {visibleItems.length === 0 ? (
+        <Text className="py-10 text-center text-sm" style={{ color: colors.inkMuted }}>
+          {q ? "Ничего не найдено" : "Уведомлений нет"}
+        </Text>
       ) : (
-        items.map((n, i) => (
+        visibleItems.map((n, i) => (
           <FadeSlideIn key={n.id} index={i} style={{ marginTop: 8 }}>
             <Pressable
               onPress={() => void openItem(n)}

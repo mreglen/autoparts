@@ -23,7 +23,7 @@ describe("offline cache — клиентский контур", () => {
       ["/autoservice/repair-orders/me/42", "repair-orders"],
       ["/autoservice/garage/vehicles?organization_id=org1", "garage-vehicles"],
       ["/public/autoservice/organizations", "public-autoservice-orgs"],
-      ["/api/notifications/feed?limit=50", "notifications"],
+      ["/notifications/feed?limit=50", "notifications"],
     ];
     for (const [path, entity] of cases) {
       expect(policyForPath(path)?.entity).toBe(entity);
@@ -56,7 +56,7 @@ describe("offline cache — клиентский контур", () => {
   });
 
   it("уведомления и публичный справочник СТО тоже офлайн-доступны", async () => {
-    const feed = "/api/notifications/feed?limit=50";
+    const feed = "/notifications/feed?limit=50";
     const orgs = "/public/autoservice/organizations";
     await cachedGet(feed, async () => ({ items: [], unread_count: 0 }));
     await cachedGet(orgs, async () => [{ organization_id: "o1" }]);

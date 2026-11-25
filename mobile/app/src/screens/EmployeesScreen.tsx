@@ -23,6 +23,7 @@ import { describeError } from "../api/errors";
 import {
   MoneyField,
   Screen,
+  SearchField,
   Sheet,
   SkeletonRows,
   StaleDataBadge,
@@ -220,6 +221,7 @@ export function EmployeesScreen(_: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState<number | null>(null);
   const [editing, setEditing] = useState<ServiceEmployee | "new" | null>(null);
+  const [query, setQuery] = useState("");
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -244,6 +246,17 @@ export function EmployeesScreen(_: Props) {
     return () => clearTimeout(t);
   }, [load]);
 
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? rows.filter((e) =>
+        [e.name, e.position, e.phone]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      )
+    : rows;
+
   return (
     <Screen onRefresh={() => void load(true)} refreshing={refreshing}>
       <View className="mb-3 flex-row items-center justify-between">
@@ -265,6 +278,13 @@ export function EmployeesScreen(_: Props) {
         </View>
       </View>
 
+      <SearchField
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Имя, должность, телефон"
+        className="mb-3"
+      />
+
       {loading ? (
         <SkeletonRows count={6} />
       ) : rows.length === 0 ? (
@@ -274,9 +294,13 @@ export function EmployeesScreen(_: Props) {
         >
           Сотрудники не добавлены
         </Text>
+      ) : visible.length === 0 ? (
+        <Text className="py-8 text-center text-sm" style={{ color: colors.inkMuted }}>
+          Ничего не найдено
+        </Text>
       ) : (
         <View className="gap-2">
-          {rows.map((e) => (
+          {visible.map((e) => (
             <Pressable
               key={e.id}
               onPress={() => setEditing(e)}

@@ -25,6 +25,7 @@ import { ApiError } from "../api/errors";
 import {
   DateField,
   Screen,
+  SearchField,
   Sheet,
   SkeletonRows,
   StaleDataBadge,
@@ -131,6 +132,8 @@ export function OrdersScreen() {
   const [drafts, setDrafts] = useState<OrderFormDraft[]>([]);
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
 
   const load = useCallback(
     async (mode: "initial" | "refresh" | "more" = "initial") => {
@@ -150,6 +153,7 @@ export function OrdersScreen() {
           sortDir: filters.sortDir,
           dateFrom: filters.dateFrom || undefined,
           dateTo: filters.dateTo || undefined,
+          q: debouncedQ || undefined,
           limit: PAGE_SIZE,
           offset: mode === "more" ? offsetRef.current : 0,
         });
@@ -176,8 +180,13 @@ export function OrdersScreen() {
         setRefreshing(false);
       }
     },
-    [filters],
+    [filters, debouncedQ],
   );
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(query.trim()), 350);
+    return () => clearTimeout(t);
+  }, [query]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- первичная загрузка и смена фильтров
@@ -256,6 +265,13 @@ export function OrdersScreen() {
           {staleAt ? <StaleDataBadge fetchedAt={staleAt} /> : null}
         </View>
       </View>
+
+      <SearchField
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Номер, клиент, авто, VIN, госномер"
+        className="mb-2"
+      />
 
       <View className="mb-2 flex-row flex-wrap gap-1">
         {STATUS_OPTIONS.map((s) => {

@@ -18,6 +18,7 @@ import {
 } from "../api/client";
 import { queryClient } from "../api/queryClient";
 import { describeError } from "../api/errors";
+import { disconnect as disconnectChatSocket } from "../realtime/chatSocket";
 import { deviceInfo } from "../app/appIdentity";
 import { readJson, writeJson } from "../storage/kv";
 import { LAST_LOGIN_KEY } from "../storage/keys";
@@ -175,6 +176,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
     await clearTokens();
     setAccessToken(null);
+    disconnectChatSocket();
     queryClient.clear();
     setUser(null);
     setNotice(null);
