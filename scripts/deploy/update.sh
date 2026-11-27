@@ -352,6 +352,17 @@ reconcile_drom_price_lists() {
   fi
 }
 
+seed_test_autoservice() {
+  local script="$BACKEND/scripts/seed_test_autoservice.py"
+  [[ -f "$script" ]] || return 0
+  log "Seed: тестовая организация автосервиса..."
+  if ( cd "$BACKEND" && sudo -u fast "$VENV/bin/python" scripts/seed_test_autoservice.py ) >>"$LOG" 2>&1; then
+    log "Seed: тестовые данные автосервиса проверены"
+  else
+    log "WARN: seed тестового автосервиса не удался — подробности в $LOG"
+  fi
+}
+
 install_kroan_unit() {
   local src="$ROOT/docs/ops/kroan.service"
   local dst="/etc/systemd/system/kroan.service"
@@ -918,6 +929,7 @@ main() {
   fi
 
   reconcile_drom_price_lists
+  seed_test_autoservice
 
   if [[ $RELOAD_NGINX -eq 1 ]]; then
     apply_nginx_configs
