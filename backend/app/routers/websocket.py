@@ -227,7 +227,7 @@ class ConnectionManager:
 
         sender = db.query(User).filter(User.id == message.get("sender_id")).first()
         sender_name = (
-            sender.first_name
+            " ".join(p for p in (sender.first_name, sender.last_name) if p).strip()
             or sender.phone
             or sender.email
         ) if sender else "Неизвестный"
@@ -248,17 +248,49 @@ class ConnectionManager:
         chat_title = chat.title or "Чат"
         push_url = f"/chats?source={chat_source}&chatId={chat_id}"
 
+        # Контекст и название организации для осмысленного заголовка уведомления
+        autoservice_context_label = None
+        autoservice_org_name = None
+        if is_autoservice_chat(chat):
+            booking_id = getattr(chat, "autoservice_booking_id", None)
+            repair_order_id = getattr(chat, "autoservice_repair_order_id", None)
+            if booking_id:
+                autoservice_context_label = f"Запись на осмотр №{booking_id}"
+            elif repair_order_id:
+                from app.models.repair_order import RepairOrder
+
+                order = db.query(RepairOrder).filter(RepairOrder.id == repair_order_id).first()
+                number = (order.order_number if order else None) or repair_order_id
+                autoservice_context_label = f"Заказ-наряд №{number}"
+            if chat.organization_id:
+                from app.models.organization import Organization
+
+                org = db.query(Organization).filter(Organization.id == chat.organization_id).first()
+                autoservice_org_name = org.name if org else None
+
         for recipient_id in recipient_ids:
             if recipient_id == exclude_user_id:
                 continue
             if await self.is_user_online_globally(recipient_id):
                 await self.send_personal_message(message, recipient_id)
             else:
-                push_title = (
-                    f"{sender_name} — {chat_title}"
-                    if is_group_chat(chat)
-                    else f"Новое сообщение от {sender_name}"
+                is_autoservice_client_recipient = (
+                    is_autoservice_chat(chat)
+                    and chat.buyer_id is not None
+                    and int(recipient_id) == int(chat.buyer_id)
                 )
+                if is_autoservice_chat(chat):
+                    if is_autoservice_client_recipient:
+                        # Клиенту: кто пишет + автосервис/контекст
+                        chat_part = autoservice_context_label or autoservice_org_name or "Автосервис"
+                    else:
+                        # Сотруднику: клиент + контекст
+                        chat_part = autoservice_context_label or chat.title or "Клиент"
+                    push_title = f"{sender_name} — {chat_part}"
+                elif is_group_chat(chat):
+                    push_title = f"{sender_name} — {chat_title}"
+                else:
+                    push_title = f"Новое сообщение от {sender_name}"
                 message_preview = (message.get("message") or "")[:100]
                 push_data = {
                     "type": "message",

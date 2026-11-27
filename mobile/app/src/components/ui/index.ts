@@ -6,6 +6,7 @@ export { ConfirmDialog } from "./ConfirmDialog";
 export { DateField } from "./DateField";
 export { DatePickerField } from "./DatePickerField";
 export { NativeDatePicker } from "./NativeDatePicker";
+export { DatePickerButton } from "./DatePickerButton";
 export { MoneyField } from "./MoneyField";
 export { Skeleton, SkeletonRows } from "./Skeleton";
 export { FadeSlideIn, PressableScale } from "./motion";

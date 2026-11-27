@@ -71,6 +71,7 @@ const notificationsSlice = createSlice({
     error: null,
     modalOpen: false,
     lastFetchedAt: 0,
+    highlightId: null,
   },
   reducers: {
     openNotificationCenter(state) {
@@ -78,6 +79,7 @@ const notificationsSlice = createSlice({
     },
     closeNotificationCenter(state) {
       state.modalOpen = false;
+      state.highlightId = null;
     },
     clearNotifications(state) {
       state.items = [];
@@ -86,6 +88,10 @@ const notificationsSlice = createSlice({
       state.error = null;
       state.modalOpen = false;
       state.lastFetchedAt = 0;
+      state.highlightId = null;
+    },
+    setHighlightId(state, action) {
+      state.highlightId = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -124,5 +130,6 @@ export const {
   openNotificationCenter,
   closeNotificationCenter,
   clearNotifications,
+  setHighlightId,
 } = notificationsSlice.actions;
 export default notificationsSlice.reducer;

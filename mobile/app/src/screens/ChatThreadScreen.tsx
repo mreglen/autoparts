@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   FlatList,
@@ -10,10 +10,11 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRoute, type RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  fetchChatDetail,
   fetchChatMessages,
   sendChatMessage,
   type ChatMessage,
@@ -21,6 +22,7 @@ import {
 import { describeError } from "../api/errors";
 import { useSession } from "../auth/session";
 import { SkeletonRows, useToast } from "../components/ui";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/types";
 import { useTheme } from "../theme/useTheme";
 import { formatTime, parseServerDate } from "../utils/format";
@@ -45,6 +47,7 @@ export function ChatThreadScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useSession();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, "ChatThread">>();
   const queryClient = useQueryClient();
   const { show } = useToast();
@@ -53,7 +56,27 @@ export function ChatThreadScreen() {
   const [sending, setSending] = useState(false);
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [optimistic, setOptimistic] = useState<ChatMessage[]>([]);
+  const [atBottom, setAtBottom] = useState(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
   const nextTempId = useRef(-1);
+  const flatListRef = useRef<FlatList<Row>>(null);
+  const prevMessagesLengthRef = useRef(0);
+
+  const chatDetailQuery = useQuery({
+    queryKey: ["chat-detail", chatId],
+    queryFn: () => fetchChatDetail(chatId),
+  });
+
+  const chat = chatDetailQuery.data;
+
+  const openContext = () => {
+    if (!chat) return;
+    if (chat.autoservice_booking_id) {
+      navigation.navigate("BookingDetail", { id: chat.autoservice_booking_id });
+    } else if (chat.autoservice_repair_order_id) {
+      navigation.navigate("OrderDetail", { id: chat.autoservice_repair_order_id });
+    }
+  };
 
   const messagesQuery = useQuery({
     queryKey: ["chat-messages", chatId],
@@ -87,6 +110,37 @@ export function ChatThreadScreen() {
     });
     return out.reverse();
   }, [messages]);
+
+  // Автоскролл при новых сообщениях если пользователь внизу
+  useEffect(() => {
+    const currentLength = messages.length;
+    if (currentLength > prevMessagesLengthRef.current) {
+      if (atBottom) {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      } else {
+        // Пользователь не внизу — показываем индикатор новых сообщений
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- индикатор новых сообщений при получении
+        setHasNewMessages(true);
+      }
+    }
+    prevMessagesLengthRef.current = currentLength;
+  }, [messages.length, atBottom]);
+
+  // Отслеживаем позицию скролла
+  const onScroll = useCallback((event: any) => {
+    const { contentOffset } = event.nativeEvent;
+    const isAtBottom = contentOffset.y < 10; // inverted список, offset 0 = низ
+    setAtBottom(isAtBottom);
+    if (isAtBottom) {
+      setHasNewMessages(false);
+    }
+  }, []);
+
+  const scrollToBottom = () => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    setAtBottom(true);
+    setHasNewMessages(false);
+  };
 
   const handleSend = useCallback(async () => {
     const text = draft.trim();
@@ -170,25 +224,62 @@ export function ChatThreadScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.surfaceMuted }}>
+      {/* Плашка контекста */}
+      {chat?.autoservice_context_label ? (
+        <Pressable
+          onPress={openContext}
+          className="flex-row items-center gap-2 border-b px-4 py-2"
+          style={{ backgroundColor: colors.surface, borderColor: colors.line }}
+        >
+          <Ionicons name="ribbon" size={16} color={colors.brand} />
+          <Text className="flex-1 text-sm" style={{ color: colors.ink }}>
+            {chat.autoservice_context_label}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.inkSoft} />
+        </Pressable>
+      ) : null}
+
       {messagesQuery.isLoading ? (
         <View className="flex-1 px-4 pt-4">
           <SkeletonRows count={8} />
         </View>
       ) : (
-        <FlatList
-          data={rows}
-          keyExtractor={(item) => item.key}
-          renderItem={renderRow}
-          contentContainerStyle={{ paddingHorizontal: 14, paddingVertical: 10 }}
-          onRefresh={() => {
-            setManualRefreshing(true);
-            void messagesQuery
-              .refetch()
-              .finally(() => setManualRefreshing(false));
-          }}
-          refreshing={manualRefreshing}
-          inverted
-        />
+        <>
+          <FlatList
+            ref={flatListRef}
+            data={rows}
+            keyExtractor={(item) => item.key}
+            renderItem={renderRow}
+            contentContainerStyle={{ paddingHorizontal: 14, paddingVertical: 10 }}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            onRefresh={() => {
+              setManualRefreshing(true);
+              void messagesQuery
+                .refetch()
+                .finally(() => setManualRefreshing(false));
+            }}
+            refreshing={manualRefreshing}
+            inverted
+          />
+
+          {/* Кнопка «вниз» при скролле вверх */}
+          {!atBottom && (
+            <Pressable
+              onPress={scrollToBottom}
+              className="absolute bottom-4 right-4 h-12 w-12 items-center justify-center rounded-full"
+              style={{ backgroundColor: colors.brand, elevation: 4 }}
+            >
+              <Ionicons name="chevron-down" size={24} color="#fff" />
+              {hasNewMessages && (
+                <View
+                  className="absolute -right-1 -top-1 h-4 w-4 rounded-full"
+                  style={{ backgroundColor: colors.danger }}
+                />
+              )}
+            </Pressable>
+          )}
+        </>
       )}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}

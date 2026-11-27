@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequest, apiRequestFormData, setAuthToken, setRefreshToken, clearAuthTokens, refreshAccessToken } from '../../utils/apiClient';
 import { updateProfile } from './UserSlice';
 import { clearCart } from './CartSlice';
-import { disconnectWebSocket, unsubscribeFromPushNotifications } from './ChatSlice';
+import { connectWebSocket, disconnectWebSocket, unsubscribeFromPushNotifications } from './ChatSlice';
 import { isAuthEngagementError } from '../../utils/authSessionUtils';
 
 // Helper function to decode JWT token
@@ -377,6 +377,11 @@ const authSlice = createSlice({
                 if (decodedToken && decodedToken.permission_codes) {
                     state.permissionCodes = decodedToken.permission_codes;
                 }
+
+                // Подключаем WebSocket если есть user_id
+                if (action.payload.user?.id) {
+                    action.meta.dispatch(connectWebSocket(action.payload.user.id));
+                }
             })
             .addCase(login.rejected, (state, action) => {
                 state.loading = false;
@@ -390,6 +395,11 @@ const authSlice = createSlice({
             .addCase(fetchProfile.fulfilled, (state, action) => {
                 state.profileLoading = false;
                 state.user = action.payload;
+
+                // Подключаем WebSocket если есть user_id
+                if (action.payload?.id) {
+                    action.meta.dispatch(connectWebSocket(action.payload.id));
+                }
             })
             .addCase(fetchProfile.rejected, (state, action) => {
                 state.profileLoading = false;
@@ -423,6 +433,7 @@ const authSlice = createSlice({
                 state.user = null;
                 state.userPermissions = null;
                 state.permissionCodes = null;
+                state.profileLoading = false;
             })
             // requestPasswordReset
             .addCase(requestPasswordReset.pending, (state) => {

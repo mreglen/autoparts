@@ -1,12 +1,17 @@
 {
   "expo": {
-    "name": "Свой Гараж - автосервис",
+    "name": "РЎРІРѕР№ Р“Р°СЂР°Р¶ - Р°РІС‚РѕСЃРµСЂРІРёСЃ",
     "slug": "sg-autoservice",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "sgautoservice",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FEFDFB"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],

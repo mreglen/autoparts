@@ -29,6 +29,11 @@ export function formatDayMonth(value: string | null | undefined): string {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
 }
 
+export function formatDayMonthYear(d: Date): string {
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function toIsoDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");

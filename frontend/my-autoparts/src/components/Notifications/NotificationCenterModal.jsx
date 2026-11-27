@@ -11,6 +11,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   openNotificationCenter,
+  setHighlightId,
 } from '../../redux/slices/NotificationSlice';
 import { BellIcon } from './NotificationBellButton';
 
@@ -98,10 +99,11 @@ export default function NotificationCenterModal() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { token, user } = useSelector((state) => state.auth);
-  const { modalOpen, items, unreadCount, status } = useSelector((state) => state.notifications);
+  const { modalOpen, items, unreadCount, status, highlightId } = useSelector((state) => state.notifications);
   const [toast, setToast] = useState(null);
   const seenIdsRef = useRef(null);
   const toastTimerRef = useRef(null);
+  const highlightTimerRef = useRef(null);
 
   useEffect(() => {
     if (!token || !user) return undefined;
@@ -119,6 +121,15 @@ export default function NotificationCenterModal() {
       dispatch(closeNotificationCenter());
     }
   }, [dispatch, token, user]);
+
+  // Автоочистка подсветки через 2 секунды
+  useEffect(() => {
+    if (highlightId !== null) {
+      window.clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = window.setTimeout(() => dispatch(setHighlightId(null)), 2000);
+      return () => window.clearTimeout(highlightTimerRef.current);
+    }
+  }, [highlightId, dispatch]);
 
   useEffect(() => {
     if (seenIdsRef.current === null) {
@@ -139,6 +150,7 @@ export default function NotificationCenterModal() {
   if (!token || !user) return null;
 
   const handleItemClick = (notification) => {
+    dispatch(setHighlightId(notification.id));
     if (!notification.is_read) {
       dispatch(markNotificationRead(notification.id));
     }
@@ -200,7 +212,11 @@ export default function NotificationCenterModal() {
                   type="button"
                   onClick={() => handleItemClick(notification)}
                   className={`flex w-full items-start gap-3 rounded-lg px-2 py-3 text-left transition ${
-                    notification.is_read ? 'hover:bg-surface-subtle' : 'bg-brand-50/40 hover:bg-brand-50/70'
+                    highlightId === notification.id
+                      ? 'bg-brand-200'
+                      : notification.is_read
+                      ? 'hover:bg-surface-subtle'
+                      : 'bg-brand-50/40 hover:bg-brand-50/70'
                   }`}
                 >
                   <span

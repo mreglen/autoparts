@@ -107,6 +107,10 @@ export function sendChatMessage(chatId: number, senderId: number, message: strin
   });
 }
 
+export function fetchChatDetail(chatId: number) {
+  return apiGet<ChatListItem>(`/chats/${chatId}`);
+}
+
 export function openClientAutoserviceChat(organizationId?: string | null) {
   const qs = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
   return apiSend<ChatListItem>("POST", `/autoservice/chats/open${qs}`);

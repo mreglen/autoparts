@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import {
@@ -54,6 +54,7 @@ export function NotificationsScreen() {
   const [stale, setStale] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
+  const [highlightId, setHighlightId] = useState<number | null>(null);
   const seenIdsRef = useRef<Set<number> | null>(null);
 
   // Сотрудник автосервиса видит только категорию autoservice; клиент — все.
@@ -93,7 +94,25 @@ export function NotificationsScreen() {
     return () => clearInterval(timer);
   }, [load]);
 
+  // Автоочистка подсветки через 2 секунды
+  useEffect(() => {
+    if (highlightId !== null) {
+      const t = setTimeout(() => setHighlightId(null), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [highlightId]);
+
+  // Сброс подсветки при уходе с экрана
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setHighlightId(null);
+      };
+    }, []),
+  );
+
   const openItem = async (item: UserNotification) => {
+    setHighlightId(item.id);
     if (!item.is_read) {
       setItems((prev) =>
         prev.map((n) => (n.id === item.id ? { ...n, is_read: true } : n)),
@@ -189,7 +208,10 @@ export function NotificationsScreen() {
               onPress={() => void openItem(n)}
               className="flex-row rounded-xl px-4 py-3"
               style={{
-                backgroundColor: colors.surfaceSubtle,
+                backgroundColor:
+                  highlightId === n.id
+                    ? `${colors.brand}20`
+                    : colors.surfaceSubtle,
                 borderLeftWidth: n.is_read ? 0 : 3,
                 borderLeftColor: colors.brand,
               }}
